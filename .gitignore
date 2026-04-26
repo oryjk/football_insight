@@ -66,3 +66,6 @@ sina_csl_scraper/.auto_sync_state.json
 .tmp-*
 output/
 design-prototype/
+membership_badges/
+generated_membership_badges/
+chengdu_rongcheng_rank_badges.png
