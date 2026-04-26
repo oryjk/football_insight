@@ -234,17 +234,16 @@ fn map_match_summary(item: ExternalMatchDto) -> anyhow::Result<TicketWatchMatchS
 
     let home_team_name = item.home_name.unwrap_or_else(|| "未知主队".to_string());
     let away_team_name = item.away_name.unwrap_or_else(|| "未知客队".to_string());
-    let sale_start_at = item
-        .begin_date
-        .as_deref()
-        .map(normalize_datetime)
-        .transpose()?;
+    let sale_start_source = item.begin_date.as_deref().or(item.begin_time.as_deref());
+    let sale_start_at = sale_start_source.map(normalize_datetime).transpose()?;
     let kickoff_source = item
         .match_time
-        .or(item.begin_date)
+        .as_deref()
+        .or(item.begin_date.as_deref())
+        .or(item.begin_time.as_deref())
         .ok_or_else(|| anyhow!("kickoff time is missing"))?;
-    let kickoff_at = normalize_datetime(&kickoff_source)?;
-    let (match_date, match_time) = split_kickoff_label(&kickoff_source)?;
+    let kickoff_at = normalize_datetime(kickoff_source)?;
+    let (match_date, match_time) = split_kickoff_label(kickoff_source)?;
 
     Ok(TicketWatchMatchSummary {
         match_id: schedule_id,
@@ -392,6 +391,8 @@ struct ExternalMatchDto {
     match_time: Option<String>,
     #[serde(default)]
     begin_date: Option<String>,
+    #[serde(default)]
+    begin_time: Option<String>,
     is_current: bool,
     #[serde(default)]
     match_id: Option<String>,
@@ -542,6 +543,7 @@ mod tests {
             home_name: Some("成都蓉城".to_string()),
             match_time: Some("2026-04-03 19:35:00".to_string()),
             begin_date: Some("2026-04-03 14:00:00".to_string()),
+            begin_time: None,
             is_current: true,
             match_id: Some("74".to_string()),
             round: 4,
@@ -553,5 +555,27 @@ mod tests {
             Some("2026-04-03T14:00:00+08:00")
         );
         assert_eq!(summary.kickoff_at, "2026-04-03T19:35:00+08:00");
+    }
+
+    #[test]
+    fn match_summary_should_use_begin_time_as_sale_start_at() {
+        let summary = map_match_summary(ExternalMatchDto {
+            id: 574,
+            away_name: Some("浙江俱乐部绿城".to_string()),
+            home_name: Some("成都蓉城".to_string()),
+            match_time: Some("2026-04-25T19:00:00".to_string()),
+            begin_date: None,
+            begin_time: Some("2026-04-23T14:00:00".to_string()),
+            is_current: false,
+            match_id: Some("78".to_string()),
+            round: 8,
+        })
+        .expect("summary");
+
+        assert_eq!(
+            summary.sale_start_at.as_deref(),
+            Some("2026-04-23T14:00:00+08:00")
+        );
+        assert_eq!(summary.kickoff_at, "2026-04-25T19:00:00+08:00");
     }
 }
