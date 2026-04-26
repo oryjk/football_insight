@@ -4,3 +4,7 @@
 target
 tests
 README.md
+logs/
+service.log*
+.DS_Store
+.tmp/
