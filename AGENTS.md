@@ -44,6 +44,8 @@
 - 生产 monorepo 目录：`/root/projects/football_insight`
 - 后端项目目录：`/root/projects/football_insight/football_insight_service_backend_rs`
 - 前端静态目录：`/root/docker_data/nginx/html/football/`
+- 后端生产优先使用 Docker 容器部署：`football-insight-service-backend-rs`
+- systemd unit `football-insight.service` 保留为备用部署方式，不是当前首选
 - Nginx 在 Docker 中运行
 
 修改 `jd` 上 Nginx 时必须注意：

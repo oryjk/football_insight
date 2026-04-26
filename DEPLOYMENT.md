@@ -18,7 +18,8 @@
 - scraper 项目目录：`/home/betalpha/projects/football_insight/sina_csl_scraper`
 - 后端应用日志：`/root/projects/football_insight/football_insight_service_backend_rs/logs/app.log`
 - 后端滚动日志：`/root/projects/football_insight/football_insight_service_backend_rs/logs/app.<timestamp>.log`
-- systemd stderr 兜底日志：`journalctl -u football-insight.service`
+- 后端生产容器：`football-insight-service-backend-rs`
+- systemd 备用服务：`football-insight.service`
 - 前端静态目录：`/root/docker_data/nginx/html/football/`
 
 ## Nginx 约定
@@ -64,60 +65,77 @@ curl -I https://match.oryjk.cn/football/
 
 ## 后端部署
 
+当前后端同时保留两种部署方式：
+
+- 首选：Docker 镜像部署，运行容器 `football-insight-service-backend-rs`
+- 备用：systemd 直接运行 release binary，服务名 `football-insight.service`
+
+常规发布优先使用 Docker。systemd unit 模板保留在 `football_insight_service_backend_rs/deploy/football-insight.service`，仅在明确需要备用部署时使用。
+
 ### 1. 推送代码
 
 先保证本地代码已经提交并 push。
 
-### 2. 服务器拉代码
+### 2. Docker 发布
+
+```bash
+cd football_insight_service_backend_rs
+./deploy_jd_docker.sh
+```
+
+Docker 发布脚本会完成：
+
+- 检查本地提交已经 push 到 `origin/main`
+- 在 `out109` 拉取最新 monorepo
+- 在 `out109` 构建 Docker 镜像并推送到 Harbor
+- 在 `jd` 拉取镜像
+- 停用旧 `football-insight.service`
+- 重建并启动 `football-insight-service-backend-rs` 容器
+- 挂载 `/root/projects/football_insight/football_insight_service_backend_rs/logs` 到容器 `/app/logs`
+- 验证 `http://127.0.0.1:8092/api/health`
+
+发布前需要在本地 `football_insight_service_backend_rs/.env` 或环境变量中提供 Harbor 凭据，例如 `HARBOR_PASSWORD`。不要提交真实 `.env`。
+
+### 3. 数据库迁移
+
+如果这次改动包含 migration，优先在生产目录执行仓库内置迁移入口：
 
 ```bash
 ssh jd
-cd /root/projects/football_insight
-git pull --ff-only
-```
-
-### 3. 执行数据库迁移
-
-如果这次改动包含 migration：
-
-```bash
 cd /root/projects/football_insight/football_insight_service_backend_rs
-cargo run --bin run_migrations
+cargo run --release --bin run_migrations
 ```
 
 如果需要临时执行某一条单独的 SQL 文件，也可以直接走项目内置入口：
 
 ```bash
 cd /root/projects/football_insight/football_insight_service_backend_rs
-cargo run --bin run_migrations -- migrations/<your_migration>.sql
+cargo run --release --bin run_migrations -- migrations/<your_migration>.sql
 ```
 
 当前不再把“服务器全局安装 `sqlx`”作为默认前提，优先使用仓库内的 `run_migrations`。
 
-### 4. 编译
+### 4. systemd 备用发布
+
+只有明确不用 Docker 时，才走 systemd 备用流程：
 
 ```bash
+ssh jd
+cd /root/projects/football_insight
+git pull --ff-only
 cd /root/projects/football_insight/football_insight_service_backend_rs
 cargo build --release
-```
-
-如果机器资源紧张，编译会比较慢，这是当前 `jd` 的正常情况。
-
-### 5. 重启后端
-
-当前生产环境后端由 systemd 管理，服务名是 `football-insight.service`：
-
-```bash
-cd /root/projects/football_insight/football_insight_service_backend_rs
 systemctl restart football-insight.service
 systemctl status football-insight.service --no-pager
 ```
 
 不要用 `nohup`、`service.pid`、裸 `cargo run` 或依赖 SSH 会话的后台进程托管生产后端。只有修改 systemd unit 文件后才需要执行 `systemctl daemon-reload`。
 
-### 6. 后端上线后验证
+### 5. 后端上线后验证
 
 ```bash
+ssh jd 'docker ps --filter name=football-insight-service-backend-rs'
+ssh jd 'curl http://127.0.0.1:8092/api/health'
 curl https://match.oryjk.cn/api/v1/live/overview
 curl https://match.oryjk.cn/api/v1/system/public-config
 ```
@@ -141,11 +159,16 @@ curl https://match.oryjk.cn/api/v1/system/public-config
 ssh jd 'tail -n 100 -f /root/projects/football_insight/football_insight_service_backend_rs/logs/app.log'
 ```
 
-systemd unit 会丢弃 stdout，并把 stderr 写入 journal；用于排查进程启动失败、panic 或早期 stderr 输出：
+Docker 容器 stdout/stderr 作为进程级兜底日志；应用业务日志仍优先看 `logs/app.log`：
 
 ```bash
-journalctl -u football-insight.service -n 100 --no-pager
-journalctl -u football-insight.service -f
+ssh jd 'docker logs --tail 100 football-insight-service-backend-rs'
+```
+
+如果切换到 systemd 备用部署，再用 journal 排查进程启动失败、panic 或早期 stderr 输出：
+
+```bash
+ssh jd 'journalctl -u football-insight.service -n 100 --no-pager'
 ```
 
 说明：
@@ -153,7 +176,8 @@ journalctl -u football-insight.service -f
 - `logs/app.log` 由后端代码直接写入，不保留 ANSI 颜色
 - `logs/app.log` 达到 10MB 后会滚动为 `logs/app.<timestamp>.log`
 - 当前代码最多保留 100 个滚动文件
-- systemd unit 使用 `StandardOutput=null` 和 `StandardError=journal`
+- Docker 部署下，容器挂载 `logs/`，业务日志仍写入 `logs/app.log`
+- systemd 备用部署下，unit 使用 `StandardOutput=null` 和 `StandardError=journal`
 - 历史遗留的 `service.log` 不再继续增长，不再作为当前日志入口
 
 ## 当前发布顺序建议
@@ -167,12 +191,10 @@ journalctl -u football-insight.service -f
 ### 纯后端改动
 
 1. push 代码
-2. `jd` 上 `git pull --ff-only`
-3. 如有 migration 先执行
-4. `cargo build --release`
-5. `systemctl restart football-insight.service`
-6. `curl` 验证接口
-7. 优先看 `logs/app.log`，必要时再看 `journalctl`
+2. 优先执行 `football_insight_service_backend_rs/deploy_jd_docker.sh`
+3. 如有 migration，再在 `jd` 执行 `cargo run --release --bin run_migrations`
+4. `curl` 验证接口
+5. 优先看 `logs/app.log`，必要时再看 `docker logs`
 
 ### 同时改前后端
 
