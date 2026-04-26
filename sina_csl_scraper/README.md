@@ -39,7 +39,7 @@
 ## 安装
 
 ```bash
-cd /Users/carlwang/football_insight/sina_csl_scraper
+cd sina_csl_scraper
 uv sync
 uv run playwright install chromium
 ```
@@ -124,7 +124,7 @@ uv run sina-csl-scraper scrape --season 2026 --upload-avatars --write-db
 为了避免每次手动敲一长串环境变量，项目根目录提供了一个可执行脚本：
 
 ```bash
-cd /Users/carlwang/football_insight/sina_csl_scraper
+cd sina_csl_scraper
 cp .env.sync.example .env.sync
 # 按需修改 .env.sync 中的 MinIO 配置
 ./sync_latest.sh 2026
@@ -147,7 +147,7 @@ cp .env.sync.example .env.sync
 如果需要“每场比赛按开球时间推导结束时间，再延后 10 分钟自动同步一次”，项目根目录还提供了：
 
 ```bash
-cd /Users/carlwang/football_insight/sina_csl_scraper
+cd sina_csl_scraper
 ./auto_sync_latest.sh
 ```
 
@@ -172,7 +172,7 @@ cd /Users/carlwang/football_insight/sina_csl_scraper
 1. 先准备环境变量：
 
 ```bash
-cd /Users/carlwang/football_insight/sina_csl_scraper
+cd sina_csl_scraper
 cp .env.sync.example .env.sync
 ```
 
@@ -242,11 +242,11 @@ uv run playwright install chromium
 
 实现入口在：
 
-- [team_insights.py](/Users/carlwang/football_insight/sina_csl_scraper/src/sina_csl_scraper/team_insights.py)
+- [team_insights.py](src/sina_csl_scraper/team_insights.py)
 
 写库入口在：
 
-- [postgres_repository.py](/Users/carlwang/football_insight/sina_csl_scraper/src/sina_csl_scraper/postgres_repository.py)
+- [postgres_repository.py](src/sina_csl_scraper/postgres_repository.py)
 
 当前规则：
 

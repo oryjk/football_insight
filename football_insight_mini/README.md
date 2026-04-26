@@ -84,14 +84,14 @@ Football Insight 的微信小程序前端，采用 `uni-app + Vue 3 + TypeScript
 ## 本地开发
 
 ```bash
-cd /Users/carlwang/football_insight/football_insight_mini
+cd football_insight_mini
 bun install
 bun run dev:mp-weixin
 ```
 
 然后用微信开发者工具打开：
 
-- `/Users/carlwang/football_insight/football_insight_mini/dist/dev/mp-weixin`
+- `football_insight_mini/dist/dev/mp-weixin`
 
 如果微信开发者工具是 Windows 侧打开，推荐直接同步产物到 Windows 目录再导入：
 
@@ -117,7 +117,7 @@ bun run build:mp-weixin
 
 ## 问题排查
 
-- [小程序排查记录](/Users/carlwang/football_insight/football_insight_mini/docs/mini-troubleshooting.md)
+- [小程序排查记录](docs/mini-troubleshooting.md)
 
 ## 接口说明
 
@@ -136,8 +136,8 @@ bun run build:mp-weixin
 
 当前项目已经内置：
 
-- [`.env.development`](/Users/carlwang/football_insight/football_insight_mini/.env.development)
-- [`.env.production`](/Users/carlwang/football_insight/football_insight_mini/.env.production)
+- `.env.development`
+- `.env.production`
 
 也就是说：
 
@@ -155,6 +155,6 @@ bun run build:mp-weixin
 
 ## 相关项目
 
-- 工作区总说明: [football_insight](/Users/carlwang/football_insight/README.md)
-- 后端: [football_insight_service_backend_rs](/Users/carlwang/football_insight/football_insight_service_backend_rs/README.md)
-- 抓取器: [sina_csl_scraper](/Users/carlwang/football_insight/sina_csl_scraper/README.md)
+- 工作区总说明: [football_insight](../README.md)
+- 后端: [football_insight_service_backend_rs](../football_insight_service_backend_rs/README.md)
+- 抓取器: [sina_csl_scraper](../sina_csl_scraper/README.md)

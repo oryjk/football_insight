@@ -20,7 +20,7 @@ Playwright 的优势不在“截图”，而在：
 下面所有例子都默认在前端项目目录执行：
 
 ```bash
-cd /Users/carlwang/football_insight/football_insight_mini
+cd football_insight_mini
 ```
 
 当前示例直接复用项目里的 Playwright 依赖：
@@ -44,7 +44,7 @@ node -e "console.log(require('./node_modules/playwright').chromium !== undefined
 - 想把页面分析从“看 HTML”升级到“抓真实数据源”
 
 ```bash
-cd /Users/carlwang/football_insight/football_insight_mini
+cd football_insight_mini
 
 node <<'EOF'
 const { chromium } = require('./node_modules/playwright');
@@ -124,7 +124,7 @@ EOF
 下面示例读取首页三张摘要卡：
 
 ```bash
-cd /Users/carlwang/football_insight/football_insight_mini
+cd football_insight_mini
 
 node <<'EOF'
 const { chromium } = require('./node_modules/playwright');
@@ -178,7 +178,7 @@ EOF
 下面示例先打开首页，再切到赛程页读取比赛卡：
 
 ```bash
-cd /Users/carlwang/football_insight/football_insight_mini
+cd football_insight_mini
 
 node <<'EOF'
 const { chromium } = require('./node_modules/playwright');

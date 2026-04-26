@@ -13,12 +13,12 @@
 ### Task 1: Define backend support domain and migration
 
 **Files:**
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/migrations/20260410110000_add_pre_match_support_tables.sql`
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/domain/mod.rs`
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/domain/support.rs`
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/ports/mod.rs`
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/ports/support_repository.rs`
-- Modify: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/lib.rs`
+- Create: `football_insight_service_backend_rs/migrations/20260410110000_add_pre_match_support_tables.sql`
+- Create: `football_insight_service_backend_rs/src/support/domain/mod.rs`
+- Create: `football_insight_service_backend_rs/src/support/domain/support.rs`
+- Create: `football_insight_service_backend_rs/src/support/ports/mod.rs`
+- Create: `football_insight_service_backend_rs/src/support/ports/support_repository.rs`
+- Modify: `football_insight_service_backend_rs/src/lib.rs`
 
 **Step 1: Write the failing tests**
 
@@ -31,7 +31,7 @@ Add unit tests for domain/window rules:
 
 Run:
 ```bash
-cd /Users/carlwang/football_insight/football_insight_service_backend_rs
+cd football_insight_service_backend_rs
 cargo test support::domain -- --nocapture
 ```
 
@@ -52,20 +52,20 @@ Run the same `cargo test` command until domain tests pass.
 ### Task 2: Add backend use cases, repository and HTTP routes
 
 **Files:**
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/application/mod.rs`
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/application/get_support_profile.rs`
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/application/list_support_teams.rs`
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/application/set_favorite_team.rs`
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/application/get_match_support_detail.rs`
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/application/cast_match_support_vote.rs`
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/adapters/mod.rs`
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/adapters/persistence/mod.rs`
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/adapters/persistence/postgres_support_repository.rs`
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/adapters/web/mod.rs`
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/adapters/web/dto.rs`
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/adapters/web/handlers.rs`
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/support/adapters/web/routes.rs`
-- Modify: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/app.rs`
+- Create: `football_insight_service_backend_rs/src/support/application/mod.rs`
+- Create: `football_insight_service_backend_rs/src/support/application/get_support_profile.rs`
+- Create: `football_insight_service_backend_rs/src/support/application/list_support_teams.rs`
+- Create: `football_insight_service_backend_rs/src/support/application/set_favorite_team.rs`
+- Create: `football_insight_service_backend_rs/src/support/application/get_match_support_detail.rs`
+- Create: `football_insight_service_backend_rs/src/support/application/cast_match_support_vote.rs`
+- Create: `football_insight_service_backend_rs/src/support/adapters/mod.rs`
+- Create: `football_insight_service_backend_rs/src/support/adapters/persistence/mod.rs`
+- Create: `football_insight_service_backend_rs/src/support/adapters/persistence/postgres_support_repository.rs`
+- Create: `football_insight_service_backend_rs/src/support/adapters/web/mod.rs`
+- Create: `football_insight_service_backend_rs/src/support/adapters/web/dto.rs`
+- Create: `football_insight_service_backend_rs/src/support/adapters/web/handlers.rs`
+- Create: `football_insight_service_backend_rs/src/support/adapters/web/routes.rs`
+- Modify: `football_insight_service_backend_rs/src/app.rs`
 
 **Step 1: Write the failing tests**
 
@@ -79,7 +79,7 @@ Add application tests for:
 
 Run:
 ```bash
-cd /Users/carlwang/football_insight/football_insight_service_backend_rs
+cd football_insight_service_backend_rs
 cargo test support::application -- --nocapture
 ```
 
@@ -115,11 +115,11 @@ cargo test
 ### Task 3: Add mini-app API/types and support page
 
 **Files:**
-- Create: `/Users/carlwang/football_insight/football_insight_mini/src/api/support.ts`
-- Create: `/Users/carlwang/football_insight/football_insight_mini/src/types/support.ts`
-- Create: `/Users/carlwang/football_insight/football_insight_mini/src/pages/support/index.vue`
-- Modify: `/Users/carlwang/football_insight/football_insight_mini/src/pages.json`
-- Optional create: `/Users/carlwang/football_insight/football_insight_mini/src/utils/supportSharePoster.ts`
+- Create: `football_insight_mini/src/api/support.ts`
+- Create: `football_insight_mini/src/types/support.ts`
+- Create: `football_insight_mini/src/pages/support/index.vue`
+- Modify: `football_insight_mini/src/pages.json`
+- Optional create: `football_insight_mini/src/utils/supportSharePoster.ts`
 
 **Step 1: Write the failing test / type-check target**
 
@@ -129,7 +129,7 @@ Add the new page, types and imports first, then run type-check/build so it fails
 
 Run:
 ```bash
-cd /Users/carlwang/football_insight/football_insight_mini
+cd football_insight_mini
 bun run type-check
 ```
 
@@ -153,10 +153,10 @@ bun run type-check
 ### Task 4: Wire home-page favorite team and entry flow
 
 **Files:**
-- Modify: `/Users/carlwang/football_insight/football_insight_mini/src/pages/home/index.vue`
-- Modify: `/Users/carlwang/football_insight/football_insight_mini/src/pages/user/index.vue`
-- Modify: `/Users/carlwang/football_insight/football_insight_mini/src/utils/postLoginRedirect.ts` only if needed
-- Modify: `/Users/carlwang/football_insight/football_insight_mini/src/utils/authStorage.ts` only if needed
+- Modify: `football_insight_mini/src/pages/home/index.vue`
+- Modify: `football_insight_mini/src/pages/user/index.vue`
+- Modify: `football_insight_mini/src/utils/postLoginRedirect.ts` only if needed
+- Modify: `football_insight_mini/src/utils/authStorage.ts` only if needed
 
 **Step 1: Write the failing test / type-check target**
 
@@ -166,7 +166,7 @@ Update the home page to reference support profile state before implementation, t
 
 Run:
 ```bash
-cd /Users/carlwang/football_insight/football_insight_mini
+cd football_insight_mini
 bun run type-check
 ```
 
@@ -194,20 +194,20 @@ bun run build:mp-weixin
 ### Task 5: Verify end-to-end behavior and deployment impact
 
 **Files:**
-- Optional docs note: `/Users/carlwang/football_insight/README.md`
-- Optional docs note: `/Users/carlwang/football_insight/DEPLOYMENT.md`
+- Optional docs note: `README.md`
+- Optional docs note: `DEPLOYMENT.md`
 
 **Step 1: Run backend verification**
 
 ```bash
-cd /Users/carlwang/football_insight/football_insight_service_backend_rs
+cd football_insight_service_backend_rs
 cargo test
 ```
 
 **Step 2: Run mini-app verification**
 
 ```bash
-cd /Users/carlwang/football_insight/football_insight_mini
+cd football_insight_mini
 bun run type-check
 bun run build:mp-weixin
 ```

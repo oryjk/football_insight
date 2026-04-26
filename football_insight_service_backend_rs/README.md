@@ -11,7 +11,7 @@ Football Insight 的后端服务，采用 Rust + Axum + SQLx + PostgreSQL。
 ## 本地开发
 
 ```bash
-cd /Users/carlwang/football_insight/football_insight_service_backend_rs
+cd football_insight_service_backend_rs
 
 cargo check
 DATABASE_URL='postgresql://football_app:***@117.72.164.211:5432/football_data?sslmode=disable' cargo run --bin football_insight_service_backend_rs
@@ -600,8 +600,8 @@ curl 'http://127.0.0.1:8092/api/v1/ai/chat' \
 ## 相关项目
 
 - 总说明：
-  [football_insight/README.md](/Users/carlwang/football_insight/README.md)
+  [football_insight/README.md](../README.md)
 - 前端：
-  [football_insight_mini/README.md](/Users/carlwang/football_insight/football_insight_mini/README.md)
+  [football_insight_mini/README.md](../football_insight_mini/README.md)
 - Python 抓取器：
-  [sina_csl_scraper/README.md](/Users/carlwang/football_insight/sina_csl_scraper/README.md)
+  [sina_csl_scraper/README.md](../sina_csl_scraper/README.md)

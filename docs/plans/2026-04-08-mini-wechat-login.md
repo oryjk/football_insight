@@ -13,9 +13,9 @@
 ### Task 1: Define mini-program auth contract
 
 **Files:**
-- Modify: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/domain/wechat.rs`
-- Modify: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/ports/wechat_oauth_port.rs`
-- Modify: `/Users/carlwang/football_insight/football_insight_mini/src/types/auth.ts`
+- Modify: `football_insight_service_backend_rs/src/auth/domain/wechat.rs`
+- Modify: `football_insight_service_backend_rs/src/auth/ports/wechat_oauth_port.rs`
+- Modify: `football_insight_mini/src/types/auth.ts`
 
 **Step 1: Write the failing test**
 
@@ -27,7 +27,7 @@ Add a backend test that expects a mini-program login result to carry either:
 
 Run:
 ```bash
-cd /Users/carlwang/football_insight/football_insight_service_backend_rs
+cd football_insight_service_backend_rs
 cargo test wechat_oauth_flow -- --nocapture
 ```
 
@@ -47,16 +47,16 @@ Run the same test command and confirm the new types compile and the test moves g
 **Step 5: Commit**
 
 ```bash
-git add /Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/domain/wechat.rs /Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/ports/wechat_oauth_port.rs /Users/carlwang/football_insight/football_insight_mini/src/types/auth.ts
+git add football_insight_service_backend_rs/src/auth/domain/wechat.rs football_insight_service_backend_rs/src/auth/ports/wechat_oauth_port.rs football_insight_mini/src/types/auth.ts
 git commit -m "feat: define mini wechat auth contract"
 ```
 
 ### Task 2: Add backend mini-program login use case
 
 **Files:**
-- Create: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/application/login_with_mini_wechat.rs`
-- Modify: `/Users/carlwang/football_insight/football_insight_service_backend_rs/tests/wechat_oauth_flow.rs`
-- Modify: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/application/mod.rs` if present
+- Create: `football_insight_service_backend_rs/src/auth/application/login_with_mini_wechat.rs`
+- Modify: `football_insight_service_backend_rs/tests/wechat_oauth_flow.rs`
+- Modify: `football_insight_service_backend_rs/src/auth/application/mod.rs` if present
 
 **Step 1: Write the failing tests**
 
@@ -70,7 +70,7 @@ Use the existing fake repository pattern from `tests/wechat_oauth_flow.rs`.
 
 Run:
 ```bash
-cd /Users/carlwang/football_insight/football_insight_service_backend_rs
+cd football_insight_service_backend_rs
 cargo test wechat_oauth_flow -- --nocapture
 ```
 
@@ -91,17 +91,17 @@ Run the same test target until both tests are green.
 **Step 5: Commit**
 
 ```bash
-git add /Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/application/login_with_mini_wechat.rs /Users/carlwang/football_insight/football_insight_service_backend_rs/tests/wechat_oauth_flow.rs
+git add football_insight_service_backend_rs/src/auth/application/login_with_mini_wechat.rs football_insight_service_backend_rs/tests/wechat_oauth_flow.rs
 git commit -m "feat: add mini program wechat login use case"
 ```
 
 ### Task 3: Replace bind flow with invite-only mini registration
 
 **Files:**
-- Modify: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/application/bind_wechat_account.rs`
-- Modify: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/ports/auth_repository.rs`
-- Modify: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/adapters/persistence/postgres_auth_repository.rs`
-- Modify: `/Users/carlwang/football_insight/football_insight_service_backend_rs/tests/wechat_oauth_flow.rs`
+- Modify: `football_insight_service_backend_rs/src/auth/application/bind_wechat_account.rs`
+- Modify: `football_insight_service_backend_rs/src/auth/ports/auth_repository.rs`
+- Modify: `football_insight_service_backend_rs/src/auth/adapters/persistence/postgres_auth_repository.rs`
+- Modify: `football_insight_service_backend_rs/tests/wechat_oauth_flow.rs`
 
 **Step 1: Write the failing tests**
 
@@ -113,7 +113,7 @@ Cover:
 
 Run:
 ```bash
-cd /Users/carlwang/football_insight/football_insight_service_backend_rs
+cd football_insight_service_backend_rs
 cargo test wechat_oauth_flow -- --nocapture
 ```
 
@@ -137,17 +137,17 @@ Run backend tests until both old and new WeChat auth scenarios are green.
 **Step 5: Commit**
 
 ```bash
-git add /Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/application/bind_wechat_account.rs /Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/ports/auth_repository.rs /Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/adapters/persistence/postgres_auth_repository.rs /Users/carlwang/football_insight/football_insight_service_backend_rs/tests/wechat_oauth_flow.rs
+git add football_insight_service_backend_rs/src/auth/application/bind_wechat_account.rs football_insight_service_backend_rs/src/auth/ports/auth_repository.rs football_insight_service_backend_rs/src/auth/adapters/persistence/postgres_auth_repository.rs football_insight_service_backend_rs/tests/wechat_oauth_flow.rs
 git commit -m "feat: bind mini wechat accounts with invite only"
 ```
 
 ### Task 4: Add Axum handlers and routes for mini-program login
 
 **Files:**
-- Modify: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/adapters/web/handlers.rs`
-- Modify: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/adapters/web/routes.rs`
-- Modify: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/app.rs`
-- Test: `/Users/carlwang/football_insight/football_insight_service_backend_rs/tests/wechat_webhook.rs` only if route wiring tests are needed
+- Modify: `football_insight_service_backend_rs/src/auth/adapters/web/handlers.rs`
+- Modify: `football_insight_service_backend_rs/src/auth/adapters/web/routes.rs`
+- Modify: `football_insight_service_backend_rs/src/app.rs`
+- Test: `football_insight_service_backend_rs/tests/wechat_webhook.rs` only if route wiring tests are needed
 
 **Step 1: Write the failing test**
 
@@ -159,7 +159,7 @@ Add handler-level or app integration tests for:
 
 Run:
 ```bash
-cd /Users/carlwang/football_insight/football_insight_service_backend_rs
+cd football_insight_service_backend_rs
 cargo test mini_wechat -- --nocapture
 ```
 
@@ -185,16 +185,16 @@ Expected: full backend green.
 **Step 5: Commit**
 
 ```bash
-git add /Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/adapters/web/handlers.rs /Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/adapters/web/routes.rs /Users/carlwang/football_insight/football_insight_service_backend_rs/src/app.rs
+git add football_insight_service_backend_rs/src/auth/adapters/web/handlers.rs football_insight_service_backend_rs/src/auth/adapters/web/routes.rs football_insight_service_backend_rs/src/app.rs
 git commit -m "feat: expose mini wechat auth endpoints"
 ```
 
 ### Task 5: Implement WeChat mini-program adapter
 
 **Files:**
-- Modify: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/adapters/integration/wechat_oauth_port.rs`
-- Modify: `/Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/ports/wechat_oauth_port.rs`
-- Optional docs: `/Users/carlwang/football_insight/football_insight_service_backend_rs/README.md`
+- Modify: `football_insight_service_backend_rs/src/auth/adapters/integration/wechat_oauth_port.rs`
+- Modify: `football_insight_service_backend_rs/src/auth/ports/wechat_oauth_port.rs`
+- Optional docs: `football_insight_service_backend_rs/README.md`
 
 **Step 1: Write the failing test**
 
@@ -204,7 +204,7 @@ Add a focused unit test for parsing mini-program login responses and propagating
 
 Run:
 ```bash
-cd /Users/carlwang/football_insight/football_insight_service_backend_rs
+cd football_insight_service_backend_rs
 cargo test wechat_oauth_port -- --nocapture
 ```
 
@@ -222,17 +222,17 @@ Run the focused test plus full `cargo test`.
 **Step 5: Commit**
 
 ```bash
-git add /Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/adapters/integration/wechat_oauth_port.rs /Users/carlwang/football_insight/football_insight_service_backend_rs/src/auth/ports/wechat_oauth_port.rs
+git add football_insight_service_backend_rs/src/auth/adapters/integration/wechat_oauth_port.rs football_insight_service_backend_rs/src/auth/ports/wechat_oauth_port.rs
 git commit -m "feat: support mini program wechat code exchange"
 ```
 
 ### Task 6: Implement mini-program frontend login flow
 
 **Files:**
-- Modify: `/Users/carlwang/football_insight/football_insight_mini/src/types/auth.ts`
-- Modify: `/Users/carlwang/football_insight/football_insight_mini/src/api/auth.ts`
-- Modify: `/Users/carlwang/football_insight/football_insight_mini/src/pages/user/index.vue`
-- Modify: `/Users/carlwang/football_insight/football_insight_mini/src/utils/authStorage.ts` if extra temporary storage is needed
+- Modify: `football_insight_mini/src/types/auth.ts`
+- Modify: `football_insight_mini/src/api/auth.ts`
+- Modify: `football_insight_mini/src/pages/user/index.vue`
+- Modify: `football_insight_mini/src/utils/authStorage.ts` if extra temporary storage is needed
 
 **Step 1: Write the failing test**
 
@@ -242,7 +242,7 @@ If there are no component tests, add focused utility tests around response norma
 
 Run:
 ```bash
-cd /Users/carlwang/football_insight/football_insight_mini
+cd football_insight_mini
 bun run type-check
 ```
 
@@ -272,16 +272,16 @@ bun run build:mp-weixin
 **Step 5: Commit**
 
 ```bash
-git add /Users/carlwang/football_insight/football_insight_mini/src/types/auth.ts /Users/carlwang/football_insight/football_insight_mini/src/api/auth.ts /Users/carlwang/football_insight/football_insight_mini/src/pages/user/index.vue
+git add football_insight_mini/src/types/auth.ts football_insight_mini/src/api/auth.ts football_insight_mini/src/pages/user/index.vue
 git commit -m "feat: add mini program wechat login flow"
 ```
 
 ### Task 7: Document secrets and rollout constraints
 
 **Files:**
-- Modify: `/Users/carlwang/football_insight/football_insight_mini/README.md`
-- Modify: `/Users/carlwang/football_insight/football_insight_service_backend_rs/README.md`
-- Modify: `/Users/carlwang/football_insight/README.md`
+- Modify: `football_insight_mini/README.md`
+- Modify: `football_insight_service_backend_rs/README.md`
+- Modify: `README.md`
 
 **Step 1: Write the failing doc checklist**
 
@@ -311,6 +311,6 @@ No build step required; read docs for completeness.
 **Step 5: Commit**
 
 ```bash
-git add /Users/carlwang/football_insight/football_insight_mini/README.md /Users/carlwang/football_insight/football_insight_service_backend_rs/README.md /Users/carlwang/football_insight/README.md
+git add football_insight_mini/README.md football_insight_service_backend_rs/README.md README.md
 git commit -m "docs: add mini wechat login setup notes"
 ```

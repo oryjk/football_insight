@@ -32,7 +32,7 @@
 ### 本地构建
 
 ```bash
-cd /Users/carlwang/football_insight/football_insight_mini
+cd football_insight_mini
 bun install
 bun run build:h5
 ```
@@ -41,7 +41,7 @@ bun run build:h5
 
 ```bash
 rsync -av --delete \
-  /Users/carlwang/football_insight/football_insight_mini/dist/build/h5/ \
+  football_insight_mini/dist/build/h5/ \
   jd:/root/docker_data/nginx/html/football/
 ```
 

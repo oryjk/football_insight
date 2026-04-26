@@ -26,7 +26,7 @@
 ## 本地开发
 
 ```bash
-cd /Users/carlwang/football_insight/sina_csl_scraper
+cd sina_csl_scraper
 uv sync
 uv run pytest
 uv run sina-csl-scraper scrape --season 2026 --write-db

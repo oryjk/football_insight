@@ -80,7 +80,7 @@
 ### 后端
 
 ```bash
-cd /Users/carlwang/football_insight/football_insight_service_backend_rs
+cd football_insight_service_backend_rs
 cargo test
 cargo run
 ```
@@ -88,7 +88,7 @@ cargo run
 ### 前端
 
 ```bash
-cd /Users/carlwang/football_insight/football_insight_mini
+cd football_insight_mini
 bun install
 bun run dev:h5
 bun run build:h5
@@ -98,7 +98,7 @@ bun run dev:mp-weixin
 ### 抓取器
 
 ```bash
-cd /Users/carlwang/football_insight/sina_csl_scraper
+cd sina_csl_scraper
 uv run pytest
 uv run sina-csl-scraper scrape --season 2026 --write-db
 ```
@@ -108,6 +108,6 @@ uv run sina-csl-scraper scrape --season 2026 --write-db
 如果新开窗口接手这个项目，先看：
 
 1. 本文件
-2. `/Users/carlwang/football_insight/README.md`
-3. `/Users/carlwang/football_insight/DEPLOYMENT.md`
+2. `README.md`
+3. `DEPLOYMENT.md`
 4. 各子项目 README

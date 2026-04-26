@@ -75,13 +75,13 @@ football_insight/
 
 生产环境部署 SOP 见：
 
-- [DEPLOYMENT.md](/Users/carlwang/football_insight/DEPLOYMENT.md)
+- [DEPLOYMENT.md](DEPLOYMENT.md)
 
 ## 数据抓取补充
 
 如果后续需要用浏览器方式分析页面数据，优先看这份说明：
 
-- [docs/playwright-data-extraction.md](/Users/carlwang/football_insight/docs/playwright-data-extraction.md)
+- [docs/playwright-data-extraction.md](docs/playwright-data-extraction.md)
 
 这份文档包含：
 
@@ -95,7 +95,7 @@ football_insight/
 ### 1. 先抓取并写库
 
 ```bash
-cd /Users/carlwang/football_insight/sina_csl_scraper
+cd sina_csl_scraper
 
 FI_DATABASE_URL='postgresql://football_app:***@117.72.164.211:5432/football_data?sslmode=disable' \
 FI_MINIO_ENDPOINT='https://oryjk.cn:82/minio' \
@@ -109,7 +109,7 @@ uv run sina-csl-scraper scrape --season 2026 --upload-avatars --write-db
 ### 2. 启动 Rust 后端
 
 ```bash
-cd /Users/carlwang/football_insight/football_insight_service_backend_rs
+cd football_insight_service_backend_rs
 
 DATABASE_URL='postgresql://football_app:***@117.72.164.211:5432/football_data?sslmode=disable' \
 JWT_SECRET='replace-with-a-long-random-secret' \
@@ -120,7 +120,7 @@ cargo run
 ### 3. 启动前端 H5
 
 ```bash
-cd /Users/carlwang/football_insight/football_insight_mini
+cd football_insight_mini
 
 bun install
 bun run dev:h5
@@ -129,7 +129,7 @@ bun run dev:h5
 ### 4. 启动小程序前端
 
 ```bash
-cd /Users/carlwang/football_insight/football_insight_mini
+cd football_insight_mini
 
 bun install
 bun run dev:mp-weixin
@@ -137,7 +137,7 @@ bun run dev:mp-weixin
 
 然后用微信开发者工具打开：
 
-- `/Users/carlwang/football_insight/football_insight_mini/dist/dev/mp-weixin`
+- `football_insight_mini/dist/dev/mp-weixin`
 
 ## 账号系统说明
 
@@ -192,7 +192,7 @@ bun run dev:mp-weixin
 
 当前小程序版本位于：
 
-- [football_insight_mini](/Users/carlwang/football_insight/football_insight_mini/README.md)
+- [football_insight_mini](football_insight_mini/README.md)
 
 小程序端新增了独立微信登录链路：
 
