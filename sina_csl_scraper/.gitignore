@@ -10,6 +10,8 @@ wheels/
 .venv
 .env.sync
 .auto_sync_state.json
+.auto_sync.lock
+auto_sync.log
 
 # Scraper outputs
 data/

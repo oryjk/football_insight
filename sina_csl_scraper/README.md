@@ -167,9 +167,19 @@ cd sina_csl_scraper
 ./auto_sync_latest.sh --dry-run
 ```
 
-如果你要部署到 Linux 服务器上每分钟执行一次，推荐直接这样配：
+如果你要部署到 Linux 服务器上每分钟执行一次，推荐用仓库里的模板：
 
-1. 先准备环境变量：
+```bash
+sed -n '1,120p' deploy/auto-sync.cron.example
+```
+
+当前生产定时任务跑在 `local233`，路径约定是：
+
+```text
+/home/betalpha/projects/football_insight/sina_csl_scraper
+```
+
+部署前先准备运行时环境变量：
 
 ```bash
 cd sina_csl_scraper
@@ -183,24 +193,24 @@ cp .env.sync.example .env.sync
 - `FI_AUTO_SYNC_UPLOAD_AVATARS=0`：默认关闭头像上传，避免每分钟任务依赖 MinIO
 - `FI_AUTO_SYNC_ENRICH_CORNERS=1`：默认开启雷速技术统计补全
 
-2. 服务器上先安装浏览器依赖：
+服务器上先安装浏览器依赖：
 
 ```bash
 uv sync
 uv run playwright install chromium
 ```
 
-3. 用 cron 每分钟执行一次：
+用 cron 每分钟执行一次：
 
 注意：
 
 - `pyproject.toml` 当前要求 `Python >=3.12`
-- `jd` 上当前实际通过 `UV_PYTHON` 指向已安装的 `3.13` 运行时
+- local233 当前使用用户 crontab 调度，不使用 systemd timer
 
 示例：
 
 ```cron
-* * * * * cd /root/projects/sina_csl_scraper && UV_PYTHON=/root/.local/share/uv/python/cpython-3.13.6-linux-x86_64-gnu/bin/python3.13 ./auto_sync_latest.sh >> /root/projects/sina_csl_scraper/auto_sync.log 2>&1
+* * * * * /bin/zsh -lc 'cd /home/betalpha/projects/football_insight/sina_csl_scraper && ./auto_sync_latest.sh >> /home/betalpha/projects/football_insight/sina_csl_scraper/auto_sync.log 2>&1'
 ```
 
 当前默认规则：

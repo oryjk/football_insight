@@ -1,6 +1,6 @@
 # Football Insight Workspace Guide
 
-本目录下是一个独立于报名系统主业务的足球数据产品实验项目，包含 3 个独立仓库：
+本目录下是一个独立于报名系统主业务的足球数据产品实验项目。当前是 monorepo，包含 3 个子项目：
 
 - `football_insight_service_backend_rs`
   - Rust + Axum + SQLx + PostgreSQL
@@ -41,7 +41,8 @@
 ## 当前部署约定
 
 - 生产服务器：`jd`
-- 后端项目目录：`/root/projects/football_insight_service_backend_rs`
+- 生产 monorepo 目录：`/root/projects/football_insight`
+- 后端项目目录：`/root/projects/football_insight/football_insight_service_backend_rs`
 - 前端静态目录：`/root/docker_data/nginx/html/football/`
 - Nginx 在 Docker 中运行
 

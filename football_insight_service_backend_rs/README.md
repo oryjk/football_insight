@@ -395,15 +395,15 @@ docker run -d \
 
 - 服务名：`football-insight.service`
 - unit 模板：`deploy/football-insight.service`
-- 项目目录：`/root/projects/football_insight_service_backend_rs`
-- 环境变量文件：`/root/projects/football_insight_service_backend_rs/.env`
+- 项目目录：`/root/projects/football_insight/football_insight_service_backend_rs`
+- 环境变量文件：`/root/projects/football_insight/football_insight_service_backend_rs/.env`
 - 监听端口：`8092`
 
 首次安装或更新 unit 文件：
 
 ```bash
 ssh jd
-cd /root/projects/football_insight_service_backend_rs
+cd /root/projects/football_insight/football_insight_service_backend_rs
 cp deploy/football-insight.service /etc/systemd/system/football-insight.service
 systemctl daemon-reload
 systemctl enable football-insight.service
@@ -414,8 +414,9 @@ systemctl restart football-insight.service
 
 ```bash
 ssh jd
-cd /root/projects/football_insight_service_backend_rs
+cd /root/projects/football_insight
 git pull --ff-only
+cd football_insight_service_backend_rs
 cargo build --release
 
 # 如果本次发布包含新 migration，再执行
@@ -433,14 +434,24 @@ curl -k -i https://match.oryjk.cn/api/v1/ticket-watch/current-board
 
 ## 生产日志
 
-当前生产环境后端由 systemd 启动，并把 stdout / stderr 追加到：
+应用代码会把 tracing 日志写入项目目录下的 `logs/`：
 
-- `/root/projects/football_insight_service_backend_rs/service.log`
+- 当前日志：`/root/projects/football_insight/football_insight_service_backend_rs/logs/app.log`
+- 滚动日志：`/root/projects/football_insight/football_insight_service_backend_rs/logs/app.<timestamp>.log`
+
+日志达到 10MB 后会自动滚动，当前代码最多保留 100 个滚动文件。
+
+systemd unit 会丢弃 stdout，并把 stderr 写入 journal：
+
+- `StandardOutput=null`
+- `StandardError=journal`
+
+journal 用作进程启动失败、panic 或早期 stderr 输出的兜底排查入口，不是业务日志的首选入口。
 
 常用查看方式：
 
 ```bash
-ssh jd 'tail -n 100 -f /root/projects/football_insight_service_backend_rs/service.log'
+ssh jd 'tail -n 100 -f /root/projects/football_insight/football_insight_service_backend_rs/logs/app.log'
 journalctl -u football-insight.service -n 100 --no-pager
 journalctl -u football-insight.service -f
 ```
@@ -451,12 +462,7 @@ journalctl -u football-insight.service -f
 ssh jd 'systemctl status football-insight.service --no-pager'
 ```
 
-生产环境推荐配套 `logrotate`，避免 `service.log` 无限增长。建议策略：
-
-- 按大小轮转
-- 自动压缩旧日志
-- 保留最近 7 份
-- 使用 `copytruncate`，避免轮转时必须重启服务
+历史遗留的 `service.log` 不再继续增长，不再作为当前日志入口。
 
 ## 微信接入知识
 

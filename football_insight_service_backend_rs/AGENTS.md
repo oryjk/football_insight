@@ -60,7 +60,8 @@ cargo run --bin football_insight_service_backend_rs
 ## 部署注意
 
 - 生产服务器：`jd`，可以 ssh jd 上去
-- 项目目录：`/root/projects/football_insight_service_backend_rs`
+- 生产 monorepo 目录：`/root/projects/football_insight`
+- 项目目录：`/root/projects/football_insight/football_insight_service_backend_rs`
 - 不要随意改 Nginx 非 football 路由
 - 生产后端使用 systemd 管理：`football-insight.service`
 - 改完后端通常只需要在生产目录执行 `cargo build --release`，再 `systemctl restart football-insight.service`

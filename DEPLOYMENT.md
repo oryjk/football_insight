@@ -11,9 +11,14 @@
 
 ## 生产目录
 
-- 后端项目目录：`/root/projects/football_insight_service_backend_rs`
-- 后端日志文件：`/root/projects/football_insight_service_backend_rs/service.log`
-- 后端 PID 文件：`/root/projects/football_insight_service_backend_rs/service.pid`
+- monorepo 目录：`/root/projects/football_insight`
+- 后端项目目录：`/root/projects/football_insight/football_insight_service_backend_rs`
+- scraper 生产运行机器：`local233`
+- scraper monorepo 目录：`/home/betalpha/projects/football_insight`
+- scraper 项目目录：`/home/betalpha/projects/football_insight/sina_csl_scraper`
+- 后端应用日志：`/root/projects/football_insight/football_insight_service_backend_rs/logs/app.log`
+- 后端滚动日志：`/root/projects/football_insight/football_insight_service_backend_rs/logs/app.<timestamp>.log`
+- systemd stderr 兜底日志：`journalctl -u football-insight.service`
 - 前端静态目录：`/root/docker_data/nginx/html/football/`
 
 ## Nginx 约定
@@ -67,8 +72,8 @@ curl -I https://match.oryjk.cn/football/
 
 ```bash
 ssh jd
-cd /root/projects/football_insight_service_backend_rs
-git pull
+cd /root/projects/football_insight
+git pull --ff-only
 ```
 
 ### 3. 执行数据库迁移
@@ -76,14 +81,14 @@ git pull
 如果这次改动包含 migration：
 
 ```bash
-cd /root/projects/football_insight_service_backend_rs
+cd /root/projects/football_insight/football_insight_service_backend_rs
 cargo run --bin run_migrations
 ```
 
 如果需要临时执行某一条单独的 SQL 文件，也可以直接走项目内置入口：
 
 ```bash
-cd /root/projects/football_insight_service_backend_rs
+cd /root/projects/football_insight/football_insight_service_backend_rs
 cargo run --bin run_migrations -- migrations/<your_migration>.sql
 ```
 
@@ -92,7 +97,7 @@ cargo run --bin run_migrations -- migrations/<your_migration>.sql
 ### 4. 编译
 
 ```bash
-cd /root/projects/football_insight_service_backend_rs
+cd /root/projects/football_insight/football_insight_service_backend_rs
 cargo build --release
 ```
 
@@ -100,18 +105,15 @@ cargo build --release
 
 ### 5. 重启后端
 
-当前生产环境后端以二进制方式直接运行：
+当前生产环境后端由 systemd 管理，服务名是 `football-insight.service`：
 
 ```bash
-cd /root/projects/football_insight_service_backend_rs
-
-if [ -f service.pid ]; then
-  kill "$(cat service.pid)" || true
-fi
-
-nohup ./target/release/football_insight_service_backend_rs > service.log 2>&1 &
-echo $! > service.pid
+cd /root/projects/football_insight/football_insight_service_backend_rs
+systemctl restart football-insight.service
+systemctl status football-insight.service --no-pager
 ```
+
+不要用 `nohup`、`service.pid`、裸 `cargo run` 或依赖 SSH 会话的后台进程托管生产后端。只有修改 systemd unit 文件后才需要执行 `systemctl daemon-reload`。
 
 ### 6. 后端上线后验证
 
@@ -133,15 +135,26 @@ curl https://match.oryjk.cn/api/v1/system/public-config
 
 ## 日志查看
 
+应用代码会把 tracing 日志写入 `logs/` 目录，并按 10MB 滚动；这是排查业务日志时的优先入口：
+
 ```bash
-ssh jd 'tail -n 100 -f /root/projects/football_insight_service_backend_rs/service.log'
+ssh jd 'tail -n 100 -f /root/projects/football_insight/football_insight_service_backend_rs/logs/app.log'
+```
+
+systemd unit 会丢弃 stdout，并把 stderr 写入 journal；用于排查进程启动失败、panic 或早期 stderr 输出：
+
+```bash
+journalctl -u football-insight.service -n 100 --no-pager
+journalctl -u football-insight.service -f
 ```
 
 说明：
 
-- 当前日志保留 ANSI 颜色
-- 已配置 `logrotate`
-- 生产日志会按大小轮转，不会无限增长
+- `logs/app.log` 由后端代码直接写入，不保留 ANSI 颜色
+- `logs/app.log` 达到 10MB 后会滚动为 `logs/app.<timestamp>.log`
+- 当前代码最多保留 100 个滚动文件
+- systemd unit 使用 `StandardOutput=null` 和 `StandardError=journal`
+- 历史遗留的 `service.log` 不再继续增长，不再作为当前日志入口
 
 ## 当前发布顺序建议
 
@@ -154,12 +167,12 @@ ssh jd 'tail -n 100 -f /root/projects/football_insight_service_backend_rs/servic
 ### 纯后端改动
 
 1. push 代码
-2. `jd` 上 `git pull`
+2. `jd` 上 `git pull --ff-only`
 3. 如有 migration 先执行
 4. `cargo build --release`
-5. 重启后端
+5. `systemctl restart football-insight.service`
 6. `curl` 验证接口
-7. 看 `service.log`
+7. 优先看 `logs/app.log`，必要时再看 `journalctl`
 
 ### 同时改前后端
 
@@ -167,6 +180,16 @@ ssh jd 'tail -n 100 -f /root/projects/football_insight_service_backend_rs/servic
 2. 验证接口正常
 3. 再同步前端静态文件
 4. 最后整站联调
+
+### scraper 改动
+
+1. push 代码
+2. `local233` 上 `cd /home/betalpha/projects/football_insight && git pull --ff-only`
+3. `cd sina_csl_scraper`
+4. 如依赖有变化，执行 `uv sync`，必要时执行 `uv run playwright install chromium`
+5. 保留 `.env.sync`、`.auto_sync_state.json`、`auto_sync.log`，不要提交这些运行文件
+6. crontab 模板见 `sina_csl_scraper/deploy/auto-sync.cron.example`
+7. 查看 `tail -n 100 -f /home/betalpha/projects/football_insight/sina_csl_scraper/auto_sync.log`
 
 ### 小程序改动
 

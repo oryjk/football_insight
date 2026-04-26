@@ -4,7 +4,7 @@
 
 ## Architecture
 
-三个独立子项目，数据单向流动：
+一个 monorepo 下的三个子项目，数据单向流动：
 
 ```
 新浪移动端 API → sina_csl_scraper (Python/写) → PostgreSQL → football_insight_service_backend_rs (Rust/读) → football_insight_mini (uni-app/展示)
@@ -144,7 +144,8 @@ football_insight_service_backend_rs/src/
 ## Deployment
 
 - 生产服务器：`jd`
-- 后端目录：`/root/projects/football_insight_service_backend_rs`
+- 生产 monorepo 目录：`/root/projects/football_insight`
+- 后端目录：`/root/projects/football_insight/football_insight_service_backend_rs`
 - 前端静态文件：`/root/docker_data/nginx/html/football/`
 - Nginx 运行在 Docker 中
 - 修改 Nginx 配置时只改 football 相关路径，不要动其他服务

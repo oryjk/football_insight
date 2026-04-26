@@ -1,0 +1,10 @@
+# Football Insight scraper auto sync.
+# Install on the machine responsible for writing production football_data.
+# Copy the cron line into that user's crontab after replacing paths if needed.
+#
+# Required local files, not tracked by git:
+# - /home/betalpha/projects/football_insight/sina_csl_scraper/.env.sync
+# - /home/betalpha/projects/football_insight/sina_csl_scraper/.auto_sync_state.json, created at runtime
+#
+# Current production runner: local233.
+* * * * * /bin/zsh -lc 'cd /home/betalpha/projects/football_insight/sina_csl_scraper && ./auto_sync_latest.sh >> /home/betalpha/projects/football_insight/sina_csl_scraper/auto_sync.log 2>&1'
