@@ -29,7 +29,9 @@ load_env_file
 
 BRANCH="${DEPLOY_BRANCH:-main}"
 BUILD_HOST="${BUILD_HOST:-out109}"
-BUILD_DIR="${BUILD_DIR:-/home/wangrui/projects/football_insight/football_insight_service_backend_rs}"
+BUILD_REPO_URL="${BUILD_REPO_URL:-https://github.com/oryjk/football_insight.git}"
+BUILD_REPO_DIR="${BUILD_REPO_DIR:-/home/wangrui/projects/football_insight_monorepo}"
+BUILD_DIR="${BUILD_DIR:-${BUILD_REPO_DIR}/football_insight_service_backend_rs}"
 DEPLOY_HOST="${DEPLOY_HOST:-jd}"
 DEPLOY_DIR="${DEPLOY_DIR:-/root/projects/football_insight/football_insight_service_backend_rs}"
 
@@ -90,6 +92,22 @@ if [ "${LOCAL_HEAD}" != "${REMOTE_HEAD}" ]; then
     exit 1
 fi
 
+echo "🔧 准备 ${BUILD_HOST} 构建仓库..."
+ssh "${BUILD_HOST}" \
+    "BUILD_REPO_URL='${BUILD_REPO_URL}' BUILD_REPO_DIR='${BUILD_REPO_DIR}' BRANCH='${BRANCH}' bash -s" << 'EOF'
+set -euo pipefail
+
+if [ ! -d "${BUILD_REPO_DIR}/.git" ]; then
+    rm -rf "${BUILD_REPO_DIR}"
+    git clone --branch "${BRANCH}" "${BUILD_REPO_URL}" "${BUILD_REPO_DIR}"
+fi
+
+cd "${BUILD_REPO_DIR}"
+git fetch origin "${BRANCH}"
+git checkout "${BRANCH}"
+git pull --ff-only origin "${BRANCH}"
+EOF
+
 if [ -f "${DEPLOY_ENV_FILE}" ]; then
     echo "📄 同步 ${DEPLOY_ENV_FILE} 到 ${BUILD_HOST}:${BUILD_ENV_FILE}..."
     scp "${DEPLOY_ENV_FILE}" "${BUILD_HOST}:${BUILD_ENV_FILE}" >/dev/null
@@ -103,7 +121,7 @@ printf '%s' "${HARBOR_PASSWORD}" \
 
 echo "📦 在 ${BUILD_HOST} 拉取代码、构建镜像并推送..."
 ssh "${BUILD_HOST}" \
-    "BUILD_DIR='${BUILD_DIR}' BRANCH='${BRANCH}' IMAGE_REF='${IMAGE_REF}' LATEST_REF='${LATEST_REF}' DOCKER_CONFIG='${BUILD_DOCKER_CONFIG}' BUILD_ENV_FILE='${BUILD_ENV_FILE}' zsh -ic 'bash -s'" << 'EOF'
+    "BUILD_REPO_DIR='${BUILD_REPO_DIR}' BUILD_DIR='${BUILD_DIR}' BRANCH='${BRANCH}' IMAGE_REF='${IMAGE_REF}' LATEST_REF='${LATEST_REF}' DOCKER_CONFIG='${BUILD_DOCKER_CONFIG}' BUILD_ENV_FILE='${BUILD_ENV_FILE}' zsh -ic 'bash -s'" << 'EOF'
 set -euo pipefail
 export DOCKER_CONFIG
 
@@ -111,7 +129,7 @@ if command -v proxy_on >/dev/null 2>&1; then
     proxy_on
 fi
 
-cd "${BUILD_DIR}"
+cd "${BUILD_REPO_DIR}"
 
 if [ -f "${BUILD_ENV_FILE}" ]; then
     set -a
@@ -128,6 +146,8 @@ fi
 git fetch origin "${BRANCH}"
 git checkout "${BRANCH}"
 git pull --ff-only origin "${BRANCH}"
+
+cd "${BUILD_DIR}"
 
 docker build --pull -t "${IMAGE_REF}" -t "${LATEST_REF}" .
 docker push "${IMAGE_REF}"
