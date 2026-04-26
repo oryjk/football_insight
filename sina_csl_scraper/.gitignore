@@ -12,6 +12,8 @@ wheels/
 .auto_sync_state.json
 .auto_sync.lock
 auto_sync.log
+.avatar_sync.lock
+avatar_sync.log
 
 # Scraper outputs
 data/

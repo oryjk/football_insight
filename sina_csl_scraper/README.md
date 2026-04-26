@@ -142,6 +142,29 @@ cp .env.sync.example .env.sync
 - 读取本地 `.env.sync` 里的 MinIO 配置
 - 执行 `uv run sina-csl-scraper scrape --upload-avatars --write-db`
 
+## 每日头像同步
+
+生产环境的每分钟自动同步默认不上传头像。头像更新频率低，推荐用单独脚本每天低频执行：
+
+```bash
+cd sina_csl_scraper
+./sync_avatars_daily.sh
+```
+
+这条脚本会：
+
+- 读取后端 `.env` 和本地 `.env.sync`
+- 要求 `.env.sync` 里配置 `FI_MINIO_ACCESS_KEY` 和 `FI_MINIO_SECRET_KEY`
+- 默认复用 `FI_AVATAR_SYNC_SEASON`，如果未配置则复用 `FI_AUTO_SYNC_SEASON`
+- 执行 `uv run sina-csl-scraper scrape --upload-avatars --write-db`
+- 使用 `.avatar_sync.lock` 防止重复执行
+
+crontab 模板见：
+
+```bash
+sed -n '1,120p' deploy/avatar-sync.cron.example
+```
+
 ## 自动同步
 
 如果需要“每场比赛按开球时间推导结束时间，再延后 10 分钟自动同步一次”，项目根目录还提供了：

@@ -1,0 +1,10 @@
+# Football Insight daily avatar sync.
+# Install on the machine responsible for writing production football_data.
+# Copy the cron line into that user's crontab after replacing paths if needed.
+#
+# Required local file, not tracked by git:
+# - /home/betalpha/projects/football_insight/sina_csl_scraper/.env.sync
+#
+# Current production runner: local233.
+# Runs every day at 03:30 local machine time.
+30 3 * * * /bin/zsh -lc 'cd /home/betalpha/projects/football_insight/sina_csl_scraper && ./sync_avatars_daily.sh >> /home/betalpha/projects/football_insight/sina_csl_scraper/avatar_sync.log 2>&1'

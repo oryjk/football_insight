@@ -189,7 +189,9 @@ journalctl -u football-insight.service -f
 4. 如依赖有变化，执行 `uv sync`，必要时执行 `uv run playwright install chromium`
 5. 保留 `.env.sync`、`.auto_sync_state.json`、`auto_sync.log`，不要提交这些运行文件
 6. crontab 模板见 `sina_csl_scraper/deploy/auto-sync.cron.example`
-7. 查看 `tail -n 100 -f /home/betalpha/projects/football_insight/sina_csl_scraper/auto_sync.log`
+7. 每日头像同步模板见 `sina_csl_scraper/deploy/avatar-sync.cron.example`
+8. 查看赛后同步日志：`tail -n 100 -f /home/betalpha/projects/football_insight/sina_csl_scraper/auto_sync.log`
+9. 查看头像同步日志：`tail -n 100 -f /home/betalpha/projects/football_insight/sina_csl_scraper/avatar_sync.log`
 
 ### 小程序改动
 
