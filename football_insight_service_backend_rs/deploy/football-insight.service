@@ -1,0 +1,21 @@
+[Unit]
+Description=Football Insight Rust Backend
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/projects/football_insight_service_backend_rs
+EnvironmentFile=/root/projects/football_insight_service_backend_rs/.env
+Environment=RUST_BACKTRACE=1
+ExecStart=/root/projects/football_insight_service_backend_rs/target/release/football_insight_service_backend_rs
+Restart=always
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=20
+StandardOutput=append:/root/projects/football_insight_service_backend_rs/service.log
+StandardError=append:/root/projects/football_insight_service_backend_rs/service.log
+
+[Install]
+WantedBy=multi-user.target

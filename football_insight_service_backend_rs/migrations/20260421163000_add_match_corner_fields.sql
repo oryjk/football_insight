@@ -1,0 +1,5 @@
+ALTER TABLE f_i_matches
+    ADD COLUMN IF NOT EXISTS leisu_match_id BIGINT,
+    ADD COLUMN IF NOT EXISTS home_corners INTEGER,
+    ADD COLUMN IF NOT EXISTS away_corners INTEGER,
+    ADD COLUMN IF NOT EXISTS corner_source VARCHAR(32);

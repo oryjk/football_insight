@@ -1,0 +1,1 @@
+pub mod postgres_insight_query_repository;

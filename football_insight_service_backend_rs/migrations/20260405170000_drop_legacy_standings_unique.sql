@@ -1,0 +1,2 @@
+ALTER TABLE f_i_standings
+DROP CONSTRAINT IF EXISTS f_i_standings_season_team_id_snapshot_at_key;

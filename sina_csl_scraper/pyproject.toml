@@ -1,0 +1,29 @@
+[project]
+name = "sina-csl-scraper"
+version = "0.1.0"
+description = "Scrape CSL match results, team stats, and player rankings from Sina Sports mobile APIs."
+readme = "README.md"
+authors = [
+    { name = "王睿", email = "wangrui@betalpha.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.42.83",
+    "minio>=7.2.18",
+    "playwright>=1.0.0",
+    "psycopg[binary]>=3.2.10",
+    "requests>=2.33.1",
+    "typer>=0.24.1",
+]
+
+[project.scripts]
+sina-csl-scraper = "sina_csl_scraper.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

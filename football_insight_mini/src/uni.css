@@ -1,0 +1,11 @@
+page {
+  --fi-color-primary: #ff6a00;
+  --fi-color-success: #4cd964;
+  --fi-color-warning: #f0ad4e;
+  --fi-color-error: #dd524d;
+  --fi-color-text: #333333;
+  --fi-color-text-grey: #999999;
+  --fi-color-bg: #ffffff;
+  --fi-color-bg-grey: #f6f5f2;
+  --fi-color-border: #c8c7cc;
+}

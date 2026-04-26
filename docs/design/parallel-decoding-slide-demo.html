@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Parallel Decoding Slide Demo</title>
+    <style>
+      :root {
+        --bg-start: #eef7fb;
+        --bg-end: #f7f4fb;
+        --ink: #374151;
+        --ink-soft: #6b7280;
+        --grid: rgba(120, 136, 160, 0.12);
+        --panel-border: rgba(124, 132, 151, 0.2);
+        --apple: #d76835;
+        --nvidia: #2d69d5;
+        --rtx: #12926a;
+        --spark: #6a7181;
+        --guide-fast: #e3b86f;
+        --guide-read: #d79595;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at 12% 85%, rgba(123, 212, 255, 0.18), transparent 26%),
+          radial-gradient(circle at 40% 100%, rgba(168, 143, 255, 0.12), transparent 30%),
+          linear-gradient(135deg, var(--bg-start), var(--bg-end));
+        font-family:
+          "PingFang SC",
+          "Hiragino Sans GB",
+          "Microsoft YaHei",
+          "Noto Sans SC",
+          sans-serif;
+        color: var(--ink);
+      }
+
+      .slide {
+        width: 1600px;
+        height: 900px;
+        position: relative;
+        overflow: hidden;
+        padding: 48px 44px 38px;
+      }
+
+      .wash {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at 11% 96%, rgba(85, 179, 255, 0.18), transparent 18%),
+          radial-gradient(circle at 28% 102%, rgba(133, 129, 255, 0.08), transparent 22%);
+        pointer-events: none;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 82px;
+        line-height: 1;
+        letter-spacing: -0.04em;
+        color: #464d58;
+        font-weight: 300;
+      }
+
+      .title .en {
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        font-weight: 200;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 1fr 1.18fr;
+        gap: 42px;
+        margin-top: 36px;
+        height: calc(100% - 126px);
+      }
+
+      .notes {
+        padding: 26px 12px 0 16px;
+      }
+
+      .notes ul {
+        margin: 0;
+        padding-left: 34px;
+        display: grid;
+        gap: 34px;
+      }
+
+      .notes li {
+        font-size: 34px;
+        line-height: 1.45;
+        color: #4a525d;
+      }
+
+      .notes li::marker {
+        font-size: 28px;
+        color: #818795;
+      }
+
+      .panel {
+        position: relative;
+        background: rgba(255, 255, 255, 0.82);
+        border: 1px solid var(--panel-border);
+        border-radius: 28px;
+        box-shadow:
+          0 30px 70px rgba(151, 161, 183, 0.16),
+          inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        padding: 18px 24px 22px;
+      }
+
+      .panel h2 {
+        margin: 8px 0 10px;
+        text-align: center;
+        font-size: 36px;
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        letter-spacing: -0.02em;
+        color: #101828;
+      }
+
+      .note {
+        position: absolute;
+        bottom: 12px;
+        left: 28px;
+        right: 28px;
+        text-align: center;
+        font-size: 16px;
+        color: #9aa2b1;
+        font-style: italic;
+      }
+
+      svg {
+        width: 100%;
+        height: 680px;
+        display: block;
+      }
+
+      .legend text,
+      .axis text,
+      .label,
+      .guide-text,
+      .badge-text,
+      .series-value {
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      }
+
+      .legend text {
+        font-size: 16px;
+        fill: #3b4250;
+      }
+
+      .axis text {
+        fill: #556070;
+        font-size: 14px;
+      }
+
+      .axis-title {
+        font-size: 20px;
+        font-weight: 700;
+        fill: #111827;
+      }
+
+      .series-value {
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .guide-text {
+        font-size: 14px;
+      }
+
+      .badge-text {
+        font-size: 13px;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="slide">
+      <div class="wash"></div>
+      <h1 class="title">并行处理 <span class="en">（parallel decoding）- 输出</span></h1>
+      <div class="layout">
+        <section class="notes">
+          <ul>
+            <li>并行处理的核心收益，是在多用户同时请求时提升总体吞吐量。</li>
+            <li>显存带宽更宽裕的平台，通常能把单用户速度衰减控制得更平缓。</li>
+            <li>当 prefill 占掉较多算力时，Apple Silicon 一类设备的多用户退化会更明显。</li>
+            <li>因此比较这类系统时，不能只看单用户 tok/s，还要看并发后的每用户速度曲线。</li>
+          </ul>
+        </section>
+        <section class="panel">
+          <h2>MiniMax-M2.5 - Per-User Generation Speed</h2>
+          <svg viewBox="0 0 840 680" aria-label="parallel decoding chart">
+            <defs>
+              <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.08)" />
+              </filter>
+            </defs>
+            <g id="chart-root"></g>
+          </svg>
+          <div class="note">
+            Note: 示例数据用于复刻演示页风格，不代表原视频中的精确 benchmark。
+          </div>
+        </section>
+      </div>
+    </div>
+    <script>
+      const svgNS = "http://www.w3.org/2000/svg";
+      const root = document.getElementById("chart-root");
+
+      const colors = {
+        apple: getCss("--apple"),
+        nvidia: getCss("--nvidia"),
+        rtx: getCss("--rtx"),
+        spark: getCss("--spark"),
+        guideFast: getCss("--guide-fast"),
+        guideRead: getCss("--guide-read"),
+        grid: getCss("--grid"),
+      };
+
+      const chart = { x: 86, y: 48, w: 688, h: 512 };
+      const xMax = 8;
+      const yMax = 100;
+
+      const series = [
+        {
+          name: "Apple M3 Ultra 512GB (4-bit MLX)",
+          color: colors.apple,
+          marker: "circle",
+          points: [
+            [1, 46.6],
+            [2, 33.8],
+            [4, 22.1],
+            [8, 13.6],
+          ],
+          badges: [
+            { x: 2, y: 29.5, text: "−28%" },
+            { x: 4, y: 20.5, text: "−53%" },
+            { x: 8, y: 11.8, text: "−71%" },
+          ],
+        },
+        {
+          name: "4× H200 SXM 564GB (FP8 vLLM)",
+          color: colors.nvidia,
+          marker: "square",
+          points: [
+            [1, 86.9],
+            [2, 80.0],
+            [5, 60.0],
+            [8, 62.3],
+          ],
+          badges: [
+            { x: 2, y: 73.8, text: "−8%" },
+            { x: 8, y: 57.2, text: "−28%" },
+          ],
+        },
+        {
+          name: "4× RTX Pro 6000 384GB (FP8 vLLM)",
+          color: colors.rtx,
+          marker: "diamond",
+          points: [
+            [1, 84.6],
+            [2, 72.0],
+            [3, 64.0],
+            [4, 56.4],
+          ],
+          badges: [
+            { x: 2, y: 66.5, text: "−15%" },
+            { x: 4, y: 50.7, text: "−33%" },
+          ],
+        },
+      ];
+
+      const sparkPoint = [1, 26];
+
+      drawGrid();
+      drawAxes();
+      drawGuides();
+      drawSeries();
+      drawSpark();
+      drawLegend();
+
+      function drawGrid() {
+        for (let i = 0; i <= 5; i += 1) {
+          const y = chart.y + (chart.h / 5) * i;
+          append("line", {
+            x1: chart.x,
+            y1: y,
+            x2: chart.x + chart.w,
+            y2: y,
+            stroke: colors.grid,
+            "stroke-width": 1,
+          });
+        }
+
+        for (let i = 0; i < xMax; i += 1) {
+          const x = chart.x + (chart.w / (xMax - 1)) * i;
+          append("line", {
+            x1: x,
+            y1: chart.y,
+            x2: x,
+            y2: chart.y + chart.h,
+            stroke: colors.grid,
+            "stroke-width": 1,
+          });
+        }
+      }
+
+      function drawAxes() {
+        append("line", {
+          x1: chart.x,
+          y1: chart.y,
+          x2: chart.x,
+          y2: chart.y + chart.h,
+          stroke: "#3d4755",
+          "stroke-width": 1.8,
+        });
+
+        append("line", {
+          x1: chart.x,
+          y1: chart.y + chart.h,
+          x2: chart.x + chart.w,
+          y2: chart.y + chart.h,
+          stroke: "#3d4755",
+          "stroke-width": 1.8,
+        });
+
+        for (let i = 0; i <= 5; i += 1) {
+          const value = 100 - i * 20;
+          const y = scaleY(value);
+          append("line", {
+            x1: chart.x - 8,
+            y1: y,
+            x2: chart.x,
+            y2: y,
+            stroke: "#3d4755",
+            "stroke-width": 1.4,
+          });
+          addText(String(value), chart.x - 16, y + 5, {
+            class: "axis",
+            "text-anchor": "end",
+          });
+        }
+
+        for (let i = 1; i <= xMax; i += 1) {
+          const x = scaleX(i);
+          append("line", {
+            x1: x,
+            y1: chart.y + chart.h,
+            x2: x,
+            y2: chart.y + chart.h + 8,
+            stroke: "#3d4755",
+            "stroke-width": 1.4,
+          });
+          addText(String(i), x, chart.y + chart.h + 28, {
+            class: "axis",
+            "text-anchor": "middle",
+          });
+        }
+
+        addText("Concurrent users / batch size", chart.x + chart.w / 2, chart.y + chart.h + 72, {
+          class: "axis-title",
+          "text-anchor": "middle",
+        });
+
+        const yTitle = addText("Generation tok/s per user", 0, 0, {
+          class: "axis-title",
+          transform: `translate(${chart.x - 64} ${chart.y + chart.h / 2}) rotate(-90)`,
+          "text-anchor": "middle",
+        });
+        yTitle.setAttribute("dominant-baseline", "middle");
+      }
+
+      function drawGuides() {
+        drawGuide(25, colors.guideFast, "Fast streaming (~25 tok/s)");
+        drawGuide(15, colors.guideRead, "Reading speed (~15 tok/s)");
+      }
+
+      function drawGuide(value, color, label) {
+        const y = scaleY(value);
+        append("line", {
+          x1: chart.x,
+          y1: y,
+          x2: chart.x + chart.w,
+          y2: y,
+          stroke: color,
+          "stroke-width": 2,
+          "stroke-dasharray": "7 6",
+        });
+        addText(label, chart.x + chart.w - 8, y - 8, {
+          class: "guide-text",
+          fill: color,
+          "text-anchor": "end",
+        });
+      }
+
+      function drawSeries() {
+        for (const item of series) {
+          const points = item.points.map(([x, y]) => `${scaleX(x)},${scaleY(y)}`).join(" ");
+          append("polyline", {
+            points,
+            fill: "none",
+            stroke: item.color,
+            "stroke-width": 4,
+            "stroke-linejoin": "round",
+            "stroke-linecap": "round",
+          });
+
+          for (const [x, y] of item.points) {
+            drawMarker(scaleX(x), scaleY(y), item.marker, item.color);
+            addText(y.toFixed(1), scaleX(x), scaleY(y) - 16, {
+              class: "series-value",
+              fill: item.color,
+              "text-anchor": "middle",
+            });
+          }
+
+          for (const badge of item.badges) {
+            drawBadge(badge.x, badge.y, badge.text, item.color);
+          }
+        }
+      }
+
+      function drawSpark() {
+        const [x, y] = sparkPoint;
+        const px = scaleX(x);
+        const py = scaleY(y);
+        append("polygon", {
+          points: `${px},${py - 12} ${px - 11},${py + 10} ${px + 11},${py + 10}`,
+          fill: colors.spark,
+          opacity: 0.92,
+        });
+        addText("26.0", px + 20, py + 4, {
+          class: "series-value",
+          fill: colors.spark,
+          "text-anchor": "start",
+        });
+      }
+
+      function drawLegend() {
+        const legendX = 512;
+        const legendY = 28;
+        const legendW = 272;
+        const legendH = 122;
+        append("rect", {
+          x: legendX,
+          y: legendY,
+          width: legendW,
+          height: legendH,
+          rx: 14,
+          fill: "rgba(255,255,255,0.92)",
+          stroke: "rgba(101, 116, 139, 0.28)",
+          "stroke-width": 1.2,
+          filter: "url(#soft-shadow)",
+        });
+
+        const items = [
+          { label: series[0].name, color: colors.apple, marker: "circle" },
+          { label: series[1].name, color: colors.nvidia, marker: "square" },
+          { label: series[2].name, color: colors.rtx, marker: "diamond" },
+          { label: "DGX Spark 128GB (3-bit llama.cpp)", color: colors.spark, marker: "triangle" },
+        ];
+
+        items.forEach((item, index) => {
+          const y = legendY + 26 + index * 26;
+          append("line", {
+            x1: legendX + 16,
+            y1: y,
+            x2: legendX + 48,
+            y2: y,
+            stroke: item.color,
+            "stroke-width": 4,
+          });
+          drawMarker(legendX + 32, y, item.marker, item.color, 8);
+          addText(item.label, legendX + 58, y + 6, {
+            class: "legend",
+            "text-anchor": "start",
+          });
+        });
+      }
+
+      function drawBadge(x, y, text, color) {
+        const px = scaleX(x);
+        const py = scaleY(y);
+        const width = 56 + Math.max(0, text.length - 4) * 7;
+        append("rect", {
+          x: px - width / 2,
+          y: py - 14,
+          width,
+          height: 28,
+          rx: 6,
+          fill: hexToRgba(color, 0.08),
+          stroke: hexToRgba(color, 0.6),
+          "stroke-width": 1.6,
+        });
+        addText(text, px, py + 5, {
+          class: "badge-text",
+          fill: color,
+          "text-anchor": "middle",
+        });
+      }
+
+      function drawMarker(x, y, marker, color, size = 10) {
+        if (marker === "circle") {
+          append("circle", { cx: x, cy: y, r: size, fill: color });
+          return;
+        }
+        if (marker === "square") {
+          append("rect", {
+            x: x - size,
+            y: y - size,
+            width: size * 2,
+            height: size * 2,
+            fill: color,
+          });
+          return;
+        }
+        if (marker === "diamond") {
+          append("polygon", {
+            points: `${x},${y - size - 1} ${x - size - 1},${y} ${x},${y + size + 1} ${x + size + 1},${y}`,
+            fill: color,
+          });
+          return;
+        }
+        append("polygon", {
+          points: `${x},${y - size - 2} ${x - size - 1},${y + size} ${x + size + 1},${y + size}`,
+          fill: color,
+        });
+      }
+
+      function scaleX(value) {
+        return chart.x + ((value - 1) / (xMax - 1)) * chart.w;
+      }
+
+      function scaleY(value) {
+        return chart.y + chart.h - (value / yMax) * chart.h;
+      }
+
+      function append(tag, attrs) {
+        const el = document.createElementNS(svgNS, tag);
+        Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
+        root.appendChild(el);
+        return el;
+      }
+
+      function addText(text, x, y, attrs) {
+        const node = append("text", { x, y, ...attrs });
+        node.textContent = text;
+        return node;
+      }
+
+      function getCss(name) {
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      }
+
+      function hexToRgba(hex, alpha) {
+        const sanitized = hex.replace("#", "");
+        const value = sanitized.length === 3
+          ? sanitized.split("").map((ch) => ch + ch).join("")
+          : sanitized;
+        const int = parseInt(value, 16);
+        const r = (int >> 16) & 255;
+        const g = (int >> 8) & 255;
+        const b = int & 255;
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,102 @@
+{
+	"pages": [
+		{
+			"path": "pages/home/index",
+			"style": {
+				"navigationBarTitleText": "足球洞察"
+			}
+		},
+		{
+			"path": "pages/rankings/index",
+			"style": {
+				"navigationBarTitleText": "榜单"
+			}
+		},
+		{
+			"path": "pages/insights/index",
+			"style": {
+				"navigationBarTitleText": "洞察"
+			}
+		},
+		{
+			"path": "pages/matches/index",
+			"style": {
+				"navigationBarTitleText": "赛程"
+			}
+		},
+		{
+			"path": "pages/user/index",
+			"style": {
+				"navigationBarTitleText": "我的"
+			}
+		},
+		{
+			"path": "pages/membership-purchase/index",
+			"style": {
+				"navigationBarTitleText": "开通会员"
+			}
+		},
+		{
+			"path": "pages/team-board/index",
+			"style": {
+				"navigationBarTitleText": "球队战术板"
+			}
+		},
+		{
+			"path": "pages/support/index",
+			"style": {
+				"navigationBarTitleText": "赛前助力"
+			}
+		},
+		{
+			"path": "pages/ticket-watch/index",
+			"style": {
+				"navigationBarTitleText": "余票看板"
+			}
+		}
+	],
+	"tabBar": {
+		"color": "#8c8f99",
+		"selectedColor": "#15161b",
+		"backgroundColor": "#ffffff",
+		"borderStyle": "black",
+		"list": [
+			{
+				"pagePath": "pages/home/index",
+				"text": "首页",
+				"iconPath": "static/tabbar-png/home.png",
+				"selectedIconPath": "static/tabbar-png/home-active.png"
+			},
+			{
+				"pagePath": "pages/rankings/index",
+				"text": "榜单",
+				"iconPath": "static/tabbar-png/rankings.png",
+				"selectedIconPath": "static/tabbar-png/rankings-active.png"
+			},
+			{
+				"pagePath": "pages/insights/index",
+				"text": "洞察",
+				"iconPath": "static/tabbar-png/insights.png",
+				"selectedIconPath": "static/tabbar-png/insights-active.png"
+			},
+			{
+				"pagePath": "pages/matches/index",
+				"text": "赛程",
+				"iconPath": "static/tabbar-png/matches.png",
+				"selectedIconPath": "static/tabbar-png/matches-active.png"
+			},
+			{
+				"pagePath": "pages/user/index",
+				"text": "我的",
+				"iconPath": "static/tabbar-png/user.png",
+				"selectedIconPath": "static/tabbar-png/user-active.png"
+			}
+		]
+	},
+	"globalStyle": {
+		"navigationBarTextStyle": "black",
+		"navigationBarTitleText": "足球洞察",
+		"navigationBarBackgroundColor": "#f6f5f2",
+		"backgroundColor": "#f6f5f2"
+	}
+}
