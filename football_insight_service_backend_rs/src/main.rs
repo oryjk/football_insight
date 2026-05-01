@@ -83,7 +83,8 @@ async fn main() -> anyhow::Result<()> {
                     tracing::info!(
                         method = %request.method(),
                         path = %request.uri().path(),
-                        "started processing request"
+                        query = %request.uri().query().unwrap_or(""),
+                        "开始处理请求"
                     );
                 })
                 .on_response(
@@ -93,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
                         tracing::info!(
                             status = response.status().as_u16(),
                             latency_ms = latency.as_millis(),
-                            "finished processing request"
+                            "请求处理完成"
                         );
                     },
                 )

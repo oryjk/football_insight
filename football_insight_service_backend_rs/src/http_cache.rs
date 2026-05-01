@@ -86,19 +86,18 @@ pub async fn cache_get_responses(
     let path = request.uri().path().to_string();
     let cache_key = build_cache_key(&request);
     if let Some(response) = cache.get(&cache_key).await {
-        tracing::info!(path = %path, "served response from in-memory cache");
+        tracing::info!(path = %path, "缓存命中");
         return response;
     }
 
     let response = next.run(request).await;
-    if response
+    let content_length = response
         .headers()
         .get(CONTENT_LENGTH)
         .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.parse::<usize>().ok())
-        .is_some_and(|length| length > MAX_CACHEABLE_BODY_SIZE)
-    {
-        tracing::info!("skipped caching oversized response");
+        .and_then(|value| value.parse::<usize>().ok());
+    if content_length.is_some_and(|length| length > MAX_CACHEABLE_BODY_SIZE) {
+        tracing::info!(path = %path, size = content_length, "响应体超过缓存上限，跳过缓存");
         return response;
     }
 
@@ -106,7 +105,7 @@ pub async fn cache_get_responses(
     let body_bytes = match to_bytes(body, MAX_CACHEABLE_BODY_SIZE).await {
         Ok(bytes) => bytes,
         Err(error) => {
-            tracing::warn!(error = %error, "failed to read response body for cache");
+            tracing::warn!(path = %path, error = %error, "读取响应体失败，无法缓存");
             return Response::from_parts(parts, Body::empty());
         }
     };
