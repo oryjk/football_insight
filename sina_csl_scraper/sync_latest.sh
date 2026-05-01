@@ -26,6 +26,7 @@ export FI_MINIO_ENDPOINT="${FI_MINIO_ENDPOINT:-https://oryjk.cn:82/minio}"
 export FI_MINIO_BUCKET="${FI_MINIO_BUCKET:-football-insight}"
 export FI_MINIO_REGION="${FI_MINIO_REGION:-us-east-1}"
 export FI_MINIO_PREFIX="${FI_MINIO_PREFIX:-summary}"
+export FI_SYNC_ENRICH_CORNERS="${FI_SYNC_ENRICH_CORNERS:-${FI_AUTO_SYNC_ENRICH_CORNERS:-1}}"
 
 if [[ -z "${FI_DATABASE_URL}" ]]; then
   echo "FI_DATABASE_URL or DATABASE_URL is required." >&2
@@ -41,6 +42,10 @@ ARGS=()
 if [[ $# -ge 1 && -n "${1:-}" ]]; then
   ARGS+=(--season "$1")
   shift
+fi
+
+if [[ "${FI_SYNC_ENRICH_CORNERS}" != "0" ]]; then
+  ARGS+=(--enrich-corners)
 fi
 
 exec uv run sina-csl-scraper scrape \

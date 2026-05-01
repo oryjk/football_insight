@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
@@ -11,6 +12,8 @@ from typing import Any
 import requests
 
 from .models import MatchResult, MatchTechnicalStat
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_LEISU_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -412,6 +415,12 @@ class LeisuCornerEnricher:
         for match in matches:
             leisu_match_id = self.match_id_map.get(match.match_id) or self._discover_detail_id(match)
             if leisu_match_id is None:
+                logger.warning(
+                    "Leisu detail_id not found for match %s (%s vs %s)",
+                    match.match_id,
+                    match.home_team_name,
+                    match.away_team_name,
+                )
                 enriched_matches.append(match)
                 continue
 
@@ -427,6 +436,13 @@ class LeisuCornerEnricher:
                     )
                 home_corners, away_corners = corners
             except Exception:
+                logger.exception(
+                    "Failed to enrich match %s (%s vs %s) from leisu detail %s",
+                    match.match_id,
+                    match.home_team_name,
+                    match.away_team_name,
+                    leisu_match_id,
+                )
                 enriched_matches.append(match)
                 continue
 
@@ -472,6 +488,7 @@ class LeisuCornerEnricher:
                 page_html = self.client.fetch_page(page_url)
                 candidates = self.client.parse_match_candidates(page_html)
         except Exception:
+            logger.exception("Failed to refresh Leisu candidate cache from %s", page_url)
             return None
         self._candidate_cache[page_url] = candidates
         return candidates
