@@ -121,13 +121,9 @@ printf '%s' "${HARBOR_PASSWORD}" \
 
 echo "📦 在 ${BUILD_HOST} 拉取代码、构建镜像并推送..."
 ssh "${BUILD_HOST}" \
-    "BUILD_REPO_DIR='${BUILD_REPO_DIR}' BUILD_DIR='${BUILD_DIR}' BRANCH='${BRANCH}' IMAGE_REF='${IMAGE_REF}' LATEST_REF='${LATEST_REF}' DOCKER_CONFIG='${BUILD_DOCKER_CONFIG}' BUILD_ENV_FILE='${BUILD_ENV_FILE}' zsh -ic 'bash -s'" << 'EOF'
+    "BUILD_REPO_DIR='${BUILD_REPO_DIR}' BUILD_DIR='${BUILD_DIR}' BRANCH='${BRANCH}' IMAGE_REF='${IMAGE_REF}' LATEST_REF='${LATEST_REF}' DOCKER_CONFIG='${BUILD_DOCKER_CONFIG}' BUILD_ENV_FILE='${BUILD_ENV_FILE}' zsh -ic 'proxy_on; bash -s'" << 'EOF'
 set -euo pipefail
 export DOCKER_CONFIG
-
-if command -v proxy_on >/dev/null 2>&1; then
-    proxy_on
-fi
 
 cd "${BUILD_REPO_DIR}"
 
