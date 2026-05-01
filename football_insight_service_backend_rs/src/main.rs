@@ -55,7 +55,19 @@ async fn main() -> anyhow::Result<()> {
     let app = build_router(pool, &config)
         .layer(CorsLayer::permissive())
         .layer(from_fn_with_state(
-            HttpResponseCache::new(std::time::Duration::from_secs(600)),
+            HttpResponseCache::new_with_path_ttls(
+                std::time::Duration::from_secs(600),
+                vec![
+                    (
+                        "/api/v1/live/".to_string(),
+                        std::time::Duration::from_secs(30),
+                    ),
+                    (
+                        "/api/v1/rounds/".to_string(),
+                        std::time::Duration::from_secs(30),
+                    ),
+                ],
+            ),
             cache_get_responses,
         ))
         .layer(

@@ -19,7 +19,8 @@ const MAX_CACHEABLE_BODY_SIZE: usize = 1024 * 1024 * 2;
 
 #[derive(Clone)]
 pub struct HttpResponseCache {
-    ttl: Duration,
+    default_ttl: Duration,
+    path_ttls: Vec<(String, Duration)>,
     entries: Arc<RwLock<HashMap<String, CachedResponse>>>,
 }
 
@@ -34,9 +35,27 @@ struct CachedResponse {
 impl HttpResponseCache {
     pub fn new(ttl: Duration) -> Self {
         Self {
-            ttl,
+            default_ttl: ttl,
+            path_ttls: Vec::new(),
             entries: Arc::new(RwLock::new(HashMap::new())),
         }
+    }
+
+    pub fn new_with_path_ttls(default_ttl: Duration, path_ttls: Vec<(String, Duration)>) -> Self {
+        Self {
+            default_ttl,
+            path_ttls,
+            entries: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    fn resolve_ttl(&self, path: &str) -> Duration {
+        for (prefix, ttl) in &self.path_ttls {
+            if path.starts_with(prefix) {
+                return *ttl;
+            }
+        }
+        self.default_ttl
     }
 
     async fn get(&self, key: &str) -> Option<Response<Body>> {
@@ -64,9 +83,10 @@ pub async fn cache_get_responses(
         return next.run(request).await;
     }
 
+    let path = request.uri().path().to_string();
     let cache_key = build_cache_key(&request);
     if let Some(response) = cache.get(&cache_key).await {
-        tracing::info!(path = %request.uri().path(), "served response from in-memory cache");
+        tracing::info!(path = %path, "served response from in-memory cache");
         return response;
     }
 
@@ -96,6 +116,7 @@ pub async fn cache_get_responses(
     if response.status().is_success() {
         let mut headers = response.headers().clone();
         headers.remove(CONTENT_LENGTH);
+        let ttl = cache.resolve_ttl(&path);
         cache
             .put(
                 cache_key,
@@ -103,7 +124,7 @@ pub async fn cache_get_responses(
                     status: response.status(),
                     headers,
                     body: body_bytes,
-                    expires_at: Instant::now() + cache.ttl,
+                    expires_at: Instant::now() + ttl,
                 },
             )
             .await;
