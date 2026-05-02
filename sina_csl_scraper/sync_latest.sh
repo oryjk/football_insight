@@ -40,8 +40,14 @@ fi
 
 ARGS=()
 if [[ $# -ge 1 && -n "${1:-}" ]]; then
-  ARGS+=(--season "$1")
-  shift
+  if [[ "${1}" =~ ^[0-9]+$ ]]; then
+    ARGS+=(--season "$1")
+    shift
+  else
+    echo "Usage: $0 [SEASON] [EXTRA_ARGS...]" >&2
+    echo "  SEASON must be a numeric year, e.g. 2026" >&2
+    exit 1
+  fi
 fi
 
 if [[ "${FI_SYNC_ENRICH_CORNERS}" != "0" ]]; then

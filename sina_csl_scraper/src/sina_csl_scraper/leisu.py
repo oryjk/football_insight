@@ -681,32 +681,52 @@ def _resolve_technical_stat_values(
         values = panel_values.get("控球率")
         if values is None:
             return None
-        return (_parse_int(values[0]), _parse_int(values[1]), "%")
+        home = _try_parse_int(values[0])
+        away = _try_parse_int(values[1])
+        if home is None or away is None:
+            return None
+        return (home, away, "%")
 
     if slug == "attacks":
         values = panel_values.get("进攻")
         if values is None:
             return None
-        return (_parse_int(values[0]), _parse_int(values[1]), None)
+        home = _try_parse_int(values[0])
+        away = _try_parse_int(values[1])
+        if home is None or away is None:
+            return None
+        return (home, away, None)
 
     if slug == "dangerous_attacks":
         values = panel_values.get("危险进攻")
         if values is None:
             return None
-        return (_parse_int(values[0]), _parse_int(values[1]), None)
+        home = _try_parse_int(values[0])
+        away = _try_parse_int(values[1])
+        if home is None or away is None:
+            return None
+        return (home, away, None)
 
     if slug == "penalties":
         values = panel_values.get("点球")
         if values is None:
             return None
-        return (_parse_int(values[0]), _parse_int(values[1]), None)
+        home = _try_parse_int(values[0])
+        away = _try_parse_int(values[1])
+        if home is None or away is None:
+            return None
+        return (home, away, None)
 
     shots_values = panel_values.get("射门(射正)")
     if shots_values is None:
         return None
 
-    home_shots_total, home_shots_on_target = _parse_shots_value(shots_values[0])
-    away_shots_total, away_shots_on_target = _parse_shots_value(shots_values[1])
+    home_shots = _parse_shots_value(shots_values[0])
+    away_shots = _parse_shots_value(shots_values[1])
+    if home_shots is None or away_shots is None:
+        return None
+    home_shots_total, home_shots_on_target = home_shots
+    away_shots_total, away_shots_on_target = away_shots
 
     if slug == "shots_on_target":
         return (home_shots_on_target, away_shots_on_target, None)
@@ -752,9 +772,18 @@ def _parse_int(value: str) -> int:
     return int(match.group(0))
 
 
-def _parse_shots_value(value: str) -> tuple[int, int]:
+def _try_parse_int(value: str) -> int | None:
+    try:
+        return _parse_int(value)
+    except ValueError:
+        return None
+
+
+def _parse_shots_value(value: str) -> tuple[int, int] | None:
     match = re.fullmatch(r"\s*(\d+)\((\d+)\)\s*", value)
-    if match is None:
-        parsed = _parse_int(value)
-        return (parsed, parsed)
-    return (int(match.group(1)), int(match.group(2)))
+    if match is not None:
+        return (int(match.group(1)), int(match.group(2)))
+    parsed = _try_parse_int(value)
+    if parsed is None:
+        return None
+    return (parsed, parsed)
