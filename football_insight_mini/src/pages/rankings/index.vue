@@ -296,7 +296,7 @@ import { getAvailableRounds, getMatches, getRankings } from '../../api/insight'
 import type { MatchCard, PlayerRankingCategory, RankingsViewResponse, RoundReference, StandingsTable, StandingsTableEntry, TeamRankingCategory, TeamRankingEntry } from '../../types/insight'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { type TeamSeasonMatch, resolveTeamSeasonMatches } from '../../utils/teamSeasonMatches'
-import bgImage from '../../static/rankings/bg.jpg'
+import bgImage from '../../static/rankings/bg.webp'
 import { buildStandingsPosterColumns, buildStandingsPosterMetrics, buildStandingsPosterTeamLayout } from './poster'
 import { reportPageActivity } from '../../utils/userActivity'
 

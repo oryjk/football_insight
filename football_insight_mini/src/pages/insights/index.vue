@@ -418,7 +418,7 @@ import type {
 } from '../../types/insight'
 import type { CurrentUser } from '../../types/auth'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import bgImage from '../../static/insights/bg.jpg'
+import bgImage from '../../static/insights/bg.webp'
 import { useAnimatedInteger } from '../../composables/useAnimatedInteger'
 import { resolveMembershipBenefitsLocked } from '../../utils/membershipBenefits'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'

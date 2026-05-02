@@ -640,7 +640,7 @@ import type { SupportMatchDetail, SupportProfile, SupportTeam } from '../../type
 import type { PublicSystemConfig } from '../../types/system'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { getAccessToken } from '../../utils/authStorage'
-import bgImage from '../../static/home/bg.jpg'
+import bgImage from '../../static/home/bg.webp'
 import { buildHomeBriefingMarqueeMap, splitBriefingMarqueeRows, type HomeBriefingMarqueeAccent } from '../../utils/homeBriefingMarquees'
 import { buildHeadlineTitleParts } from '../../utils/homeViewText'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
@@ -2091,6 +2091,7 @@ onShow(() => {
   max-height: 72vh;
   transform-origin: center bottom;
   animation: tech-stats-sheet-enter 280ms cubic-bezier(0.2, 0.9, 0.22, 1) both;
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom) + 100rpx);
 }
 
 .tech-stats-sheet__close {
@@ -2692,6 +2693,7 @@ onShow(() => {
   background: rgba(255,255,255,0.98);
   padding: 28rpx 24rpx 40rpx;
   box-shadow: 0 -24rpx 56rpx rgba(12,14,20,0.12);
+  overflow-y: auto;
 }
 .favorite-team-sheet__list {
   margin-top: 20rpx;

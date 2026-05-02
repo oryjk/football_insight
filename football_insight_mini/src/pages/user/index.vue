@@ -295,7 +295,7 @@ import { computed, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
 import diamondIcon from '../../static/user/diamond.svg'
-import bgImage from '../../static/user/bg.jpg'
+import bgImage from '../../static/user/bg.webp'
 import {
   bindMiniWechatAccount,
   getCurrentUser,

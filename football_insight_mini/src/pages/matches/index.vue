@@ -300,7 +300,7 @@
 import { computed, ref } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
-import bgImage from '../../static/matches/bg.jpg'
+import bgImage from '../../static/matches/bg.webp'
 import { getAvailableRounds, getMatches } from '../../api/insight'
 import type { MatchCard, RoundReference } from '../../types/insight'
 import { extractApiErrorMessage } from '../../utils/apiError'
@@ -929,11 +929,13 @@ onShow(() => {
   background: rgba(255,255,255,0.98);
   padding: 28rpx 24rpx 40rpx;
   box-shadow: 0 -24rpx 56rpx rgba(12,14,20,0.12);
+  overflow-y: auto;
 }
 .tech-stats-sheet {
   max-height: 72vh;
   transform-origin: center bottom;
   animation: tech-stats-sheet-enter 280ms cubic-bezier(0.2, 0.9, 0.22, 1) both;
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom) + 100rpx);
 }
 .tech-stats-sheet__close {
   display: inline-flex;
