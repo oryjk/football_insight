@@ -59,9 +59,12 @@ impl HttpResponseCache {
     }
 
     async fn get(&self, key: &str) -> Option<Response<Body>> {
-        let mut entries = self.entries.write().await;
-        let cached = entries.get(key)?.clone();
+        let cached = {
+            let entries = self.entries.read().await;
+            entries.get(key)?.clone()
+        };
         if cached.expires_at <= Instant::now() {
+            let mut entries = self.entries.write().await;
             entries.remove(key);
             return None;
         }
@@ -105,8 +108,11 @@ pub async fn cache_get_responses(
     let body_bytes = match to_bytes(body, MAX_CACHEABLE_BODY_SIZE).await {
         Ok(bytes) => bytes,
         Err(error) => {
-            tracing::warn!(path = %path, error = %error, "读取响应体失败，无法缓存");
-            return Response::from_parts(parts, Body::empty());
+            tracing::error!(path = %path, error = %error, "缓存层读取响应体失败");
+            return Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Body::from("缓存层处理失败"))
+                .unwrap();
         }
     };
 
@@ -148,6 +154,7 @@ fn should_cache_request(request: &Request<Body>) -> bool {
 fn matches_excluded_prefix(path: &str) -> bool {
     path.starts_with("/api/v1/auth/")
         || path.starts_with("/api/v1/ticket-watch/")
+        || path.starts_with("/api/v1/system")
         || path == "/football/wechat/webhook"
         || path == "/api/health"
 }
@@ -368,6 +375,56 @@ mod tests {
             .unwrap();
 
         assert_ne!(first_body, second_body);
+        assert_eq!(hits.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn applies_shorter_ttl_for_live_and_rounds_paths() {
+        let hits = Arc::new(AtomicUsize::new(0));
+        let cache = HttpResponseCache::new_with_path_ttls(
+            Duration::from_secs(600),
+            vec![
+                ("/api/v1/live/".to_string(), Duration::from_millis(50)),
+                ("/api/v1/rounds/".to_string(), Duration::from_millis(50)),
+            ],
+        );
+        let app = {
+            let hits = hits.clone();
+            Router::new()
+                .route(
+                    "/api/v1/live/overview",
+                    get(move || {
+                        let hits = hits.clone();
+                        async move {
+                            let value = hits.fetch_add(1, Ordering::SeqCst) + 1;
+                            format!("live-hit-{value}")
+                        }
+                    }),
+                )
+                .layer(from_fn_with_state(cache, cache_get_responses))
+        };
+
+        let request = || {
+            Request::builder()
+                .uri("/api/v1/live/overview")
+                .body(Body::empty())
+                .unwrap()
+        };
+
+        let first = app.clone().oneshot(request()).await.unwrap();
+        let first_body = to_bytes(first.into_body(), MAX_CACHEABLE_BODY_SIZE)
+            .await
+            .unwrap();
+        assert_eq!(first_body, "live-hit-1");
+
+        // 等待短 TTL 过期
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let second = app.oneshot(request()).await.unwrap();
+        let second_body = to_bytes(second.into_body(), MAX_CACHEABLE_BODY_SIZE)
+            .await
+            .unwrap();
+        assert_eq!(second_body, "live-hit-2");
         assert_eq!(hits.load(Ordering::SeqCst), 2);
     }
 }
