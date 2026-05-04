@@ -26,6 +26,9 @@ export interface OverviewMatch {
   away_team_name: string
   home_score: string
   away_score: string
+  technical_stats: MatchTechnicalStat[]
+  home_corners: number | null
+  away_corners: number | null
 }
 
 export interface OverviewPlayer {

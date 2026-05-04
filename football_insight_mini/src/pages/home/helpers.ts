@@ -81,14 +81,14 @@ function mapLiveMatchToPulseMatch(
 }
 
 function mergeRecentMatchWithLiveMatch(
-  match: Pick<OverviewMatch, 'match_id' | 'round_number' | 'match_date' | 'match_time' | 'home_team_name' | 'home_score' | 'away_team_name' | 'away_score'>,
+  match: Pick<OverviewMatch, 'match_id' | 'round_number' | 'match_date' | 'match_time' | 'home_team_name' | 'home_score' | 'away_team_name' | 'away_score' | 'technical_stats' | 'home_corners' | 'away_corners'>,
   liveMatch: Pick<MatchCard, 'technical_stats' | 'home_corners' | 'away_corners'> | undefined,
 ): HomePulseLeadMatch {
   return {
     ...match,
-    technical_stats: liveMatch?.technical_stats ?? [],
-    home_corners: liveMatch?.home_corners ?? null,
-    away_corners: liveMatch?.away_corners ?? null,
+    technical_stats: liveMatch?.technical_stats ?? match.technical_stats ?? [],
+    home_corners: liveMatch?.home_corners ?? match.home_corners ?? null,
+    away_corners: liveMatch?.away_corners ?? match.away_corners ?? null,
     status: 'finished',
   }
 }
