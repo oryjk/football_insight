@@ -51,6 +51,9 @@ pub struct OverviewMatchDto {
     pub away_team_name: String,
     pub home_score: String,
     pub away_score: String,
+    pub technical_stats: Vec<MatchTechnicalStatDto>,
+    pub home_corners: Option<i32>,
+    pub away_corners: Option<i32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -296,6 +299,9 @@ impl From<OverviewMatch> for OverviewMatchDto {
             away_team_name: value.away_team_name,
             home_score: value.home_score,
             away_score: value.away_score,
+            technical_stats: value.technical_stats.into_iter().map(Into::into).collect(),
+            home_corners: value.home_corners,
+            away_corners: value.away_corners,
         }
     }
 }

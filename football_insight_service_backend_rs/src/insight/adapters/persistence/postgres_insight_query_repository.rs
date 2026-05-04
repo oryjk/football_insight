@@ -166,7 +166,10 @@ impl PostgresInsightQueryRepository {
                 home_team_name,
                 away_team_name,
                 home_score,
-                away_score
+                away_score,
+                technical_stats,
+                home_corners,
+                away_corners
              FROM f_i_matches
              WHERE season = $1
                AND status = '3'
@@ -189,6 +192,9 @@ impl PostgresInsightQueryRepository {
             away_team_name: row.away_team_name,
             home_score: row.home_score,
             away_score: row.away_score,
+            technical_stats: row.technical_stats.0,
+            home_corners: row.home_corners,
+            away_corners: row.away_corners,
         })
         .collect();
 
@@ -1330,6 +1336,9 @@ struct OverviewMatchRow {
     away_team_name: String,
     home_score: String,
     away_score: String,
+    technical_stats: sqlx::types::Json<Vec<crate::insight::domain::match_list::MatchTechnicalStat>>,
+    home_corners: Option<i32>,
+    away_corners: Option<i32>,
 }
 
 #[derive(sqlx::FromRow)]

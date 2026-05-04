@@ -38,6 +38,9 @@ pub struct OverviewMatch {
     pub away_team_name: String,
     pub home_score: String,
     pub away_score: String,
+    pub technical_stats: Vec<crate::insight::domain::match_list::MatchTechnicalStat>,
+    pub home_corners: Option<i32>,
+    pub away_corners: Option<i32>,
 }
 
 #[derive(Debug, Clone)]
