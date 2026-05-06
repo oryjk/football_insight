@@ -13,8 +13,7 @@ use crate::ticket_watch::{
     adapters::web::dto::{
         TicketWatchBlockInterestDto, TicketWatchCurrentBoardDto, TicketWatchCurrentMatchDto,
         TicketWatchInventoryEntryDto, TicketWatchMatchSummaryDto, TicketWatchRegionDto,
-        TicketWatchTrackedInterestDto,
-        ToggleTicketWatchBlockInterestRequest,
+        TicketWatchTrackedInterestDto, ToggleTicketWatchBlockInterestRequest,
     },
     application::{
         get_current_ticket_watch_board::GetCurrentTicketWatchBoardUseCase,
@@ -22,8 +21,12 @@ use crate::ticket_watch::{
         get_match_block_interests::GetMatchBlockInterestsUseCase,
         get_match_ticket_inventory::GetMatchTicketInventoryUseCase,
         get_match_tracked_interests::GetMatchTrackedInterestsUseCase,
+        get_yukun_current_ticket_watch_match::GetYukunCurrentTicketWatchMatchUseCase,
+        get_yukun_ticket_inventory::GetYukunTicketInventoryUseCase,
         list_ticket_watch_matches::ListTicketWatchMatchesUseCase,
         list_ticket_watch_regions::ListTicketWatchRegionsUseCase,
+        list_yukun_match_ticket_regions::ListYukunMatchTicketRegionsUseCase,
+        list_yukun_ticket_watch_matches::ListYukunTicketWatchMatchesUseCase,
         toggle_match_block_interest::ToggleMatchBlockInterestUseCase,
     },
 };
@@ -38,6 +41,10 @@ pub struct TicketWatchWebState {
     pub get_match_block_interests_use_case: Arc<GetMatchBlockInterestsUseCase>,
     pub get_match_tracked_interests_use_case: Arc<GetMatchTrackedInterestsUseCase>,
     pub toggle_match_block_interest_use_case: Arc<ToggleMatchBlockInterestUseCase>,
+    pub get_yukun_ticket_inventory_use_case: Arc<GetYukunTicketInventoryUseCase>,
+    pub list_yukun_match_ticket_regions_use_case: Arc<ListYukunMatchTicketRegionsUseCase>,
+    pub list_yukun_ticket_watch_matches_use_case: Arc<ListYukunTicketWatchMatchesUseCase>,
+    pub get_yukun_current_ticket_watch_match_use_case: Arc<GetYukunCurrentTicketWatchMatchUseCase>,
     pub token_port: Arc<dyn TokenPort>,
 }
 
@@ -52,6 +59,18 @@ pub async fn get_current_ticket_watch_match_handler(
 ) -> Result<Json<TicketWatchCurrentMatchDto>, (StatusCode, String)> {
     let view = state
         .get_current_ticket_watch_match_use_case
+        .execute()
+        .await
+        .map_err(map_ticket_watch_error)?;
+
+    Ok(Json(view.into()))
+}
+
+pub async fn get_yukun_current_ticket_watch_match_handler(
+    State(state): State<Arc<TicketWatchWebState>>,
+) -> Result<Json<TicketWatchCurrentMatchDto>, (StatusCode, String)> {
+    let view = state
+        .get_yukun_current_ticket_watch_match_use_case
         .execute()
         .await
         .map_err(map_ticket_watch_error)?;
@@ -157,6 +176,46 @@ pub async fn toggle_match_block_interest_handler(
         .map_err(map_ticket_watch_error)?;
 
     Ok(Json(interest.into()))
+}
+
+pub async fn get_yukun_match_ticket_inventory_handler(
+    State(state): State<Arc<TicketWatchWebState>>,
+    Path(match_id): Path<i64>,
+    Query(query): Query<TicketWatchInventoryQuery>,
+) -> Result<Json<Vec<TicketWatchInventoryEntryDto>>, (StatusCode, String)> {
+    let inventory = state
+        .get_yukun_ticket_inventory_use_case
+        .execute(match_id, query.since.as_deref())
+        .await
+        .map_err(map_ticket_watch_error)?;
+
+    Ok(Json(inventory.into_iter().map(Into::into).collect()))
+}
+
+pub async fn list_yukun_ticket_watch_matches_handler(
+    State(state): State<Arc<TicketWatchWebState>>,
+) -> Result<Json<Vec<TicketWatchMatchSummaryDto>>, (StatusCode, String)> {
+    let matches = state
+        .list_yukun_ticket_watch_matches_use_case
+        .execute()
+        .await
+        .map_err(map_ticket_watch_error)?;
+
+    Ok(Json(matches.into_iter().map(Into::into).collect()))
+}
+
+pub async fn get_yukun_match_regions_handler(
+    State(state): State<Arc<TicketWatchWebState>>,
+    Path(match_id): Path<i64>,
+    Query(query): Query<TicketWatchInventoryQuery>,
+) -> Result<Json<Vec<TicketWatchRegionDto>>, (StatusCode, String)> {
+    let regions = state
+        .list_yukun_match_ticket_regions_use_case
+        .execute(match_id, query.since.as_deref())
+        .await
+        .map_err(map_ticket_watch_error)?;
+
+    Ok(Json(regions.into_iter().map(Into::into).collect()))
 }
 
 fn authenticate_user(

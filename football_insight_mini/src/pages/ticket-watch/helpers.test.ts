@@ -7,8 +7,10 @@ import type {
 import {
   applyBlockInterestToSections,
   applyBlockInterestsToSections,
+  buildHistoryRefluxTrend,
   buildRecentRefluxBuckets,
   buildInventorySince,
+  requireInventorySince,
   buildTrackedInterestSummary,
   formatTicketWatchMembershipBadgeTier,
   formatTicketWatchPollIntervalLabel,
@@ -32,7 +34,18 @@ import {
   resolveBlockInterestHeatLevel,
   resolveRecentRefluxPanelMode,
   selectCompletedMatches,
+  selectRefluxStatsMatches,
 } from './helpers'
+
+function captureErrorMessage(action: () => unknown): string {
+  try {
+    action()
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error)
+  }
+
+  return ''
+}
 
 describe('ticket watch polling', () => {
   test('normalizes backend-provided polling intervals', () => {
@@ -130,6 +143,146 @@ describe('selectCompletedMatches', () => {
   })
 })
 
+describe('buildHistoryRefluxTrend', () => {
+  test('keeps completed matches in display order and scales totals against the busiest match', () => {
+    const matches: TicketWatchMatchSummary[] = [
+      {
+        match_id: 574,
+        external_match_id: '78',
+        round_number: 8,
+        match_date: '2026-04-25',
+        match_time: '19:00',
+        kickoff_at: '2026-04-25T19:00:00+08:00',
+        home_team_name: '成都蓉城',
+        away_team_name: '浙江队',
+        is_current: false,
+      },
+      {
+        match_id: 573,
+        external_match_id: '76',
+        round_number: 7,
+        match_date: '2026-04-21',
+        match_time: '19:35',
+        kickoff_at: '2026-04-21T19:35:00+08:00',
+        home_team_name: '成都蓉城',
+        away_team_name: '云南玉昆',
+        is_current: false,
+      },
+      {
+        match_id: 572,
+        external_match_id: '74',
+        round_number: 4,
+        match_date: '2026-04-03',
+        match_time: '19:35',
+        kickoff_at: '2026-04-03T19:35:00+08:00',
+        home_team_name: '成都蓉城',
+        away_team_name: '青岛西海岸',
+        is_current: false,
+      },
+    ]
+
+    const result = buildHistoryRefluxTrend(matches, {
+      574: 30,
+      573: 120,
+      572: 0,
+    }, 573)
+
+    expect(result.points.map((point) => point.match_id)).toEqual([574, 573, 572])
+    expect(result.points.map((point) => point.bar_percent)).toEqual([25, 100, 0])
+    expect(result.points[1].is_selected).toBe(true)
+    expect(result.maxTotal).toBe(120)
+    expect(result.averageTotal).toBe(50)
+  })
+
+  test('marks matches without loaded totals so the UI can show a pending state', () => {
+    const matches: TicketWatchMatchSummary[] = [
+      {
+        match_id: 574,
+        external_match_id: '78',
+        round_number: 8,
+        match_date: '2026-04-25',
+        match_time: '19:00',
+        kickoff_at: '2026-04-25T19:00:00+08:00',
+        home_team_name: '成都蓉城',
+        away_team_name: '浙江队',
+        is_current: false,
+      },
+    ]
+
+    const result = buildHistoryRefluxTrend(matches, {}, null)
+
+    expect(result.loadedCount).toBe(0)
+    expect(result.points[0]?.match_id).toBe(574)
+    expect(result.points[0]?.total_occurrences).toBe(0)
+    expect(result.points[0]?.is_loaded).toBe(false)
+    expect(result.points[0]?.bar_percent).toBe(0)
+  })
+
+  test('uses match dates and opponent names instead of round labels', () => {
+    const matches: TicketWatchMatchSummary[] = [
+      {
+        match_id: 574,
+        external_match_id: '78',
+        round_number: 8,
+        match_date: '2026-04-25',
+        match_time: '19:00',
+        kickoff_at: '2026-04-25T19:00:00+08:00',
+        home_team_name: '成都蓉城',
+        away_team_name: '浙江队',
+        is_current: false,
+      },
+      {
+        match_id: 575,
+        external_match_id: '79',
+        round_number: 9,
+        match_date: '2026-05-01',
+        match_time: '19:35',
+        kickoff_at: '2026-05-01T19:35:00+08:00',
+        home_team_name: '上海申花',
+        away_team_name: '成都蓉城',
+        is_current: false,
+      },
+    ]
+
+    const result = buildHistoryRefluxTrend(matches, { 574: 30, 575: 40 }, null)
+
+    expect(result.points.map((point) => point.label)).toEqual(['04-25', '05-01'])
+    expect(result.points.map((point) => point.teams)).toEqual(['浙江队', '上海申花'])
+  })
+})
+
+describe('selectRefluxStatsMatches', () => {
+  test('excludes matches marked as unreliable for reflux statistics', () => {
+    const matches: TicketWatchMatchSummary[] = [
+      {
+        match_id: 574,
+        external_match_id: '78',
+        round_number: 8,
+        match_date: '2026-04-25',
+        match_time: '19:00',
+        kickoff_at: '2026-04-25T19:00:00+08:00',
+        home_team_name: '成都蓉城',
+        away_team_name: '浙江队',
+        is_current: false,
+      },
+      {
+        match_id: 501,
+        external_match_id: 'johor',
+        round_number: 0,
+        match_date: '2025-10-21',
+        match_time: '19:35',
+        kickoff_at: '2025-10-21T19:35:00+08:00',
+        home_team_name: '柔佛',
+        away_team_name: '成都蓉城',
+        is_current: false,
+        include_in_reflux_stats: false,
+      },
+    ]
+
+    expect(selectRefluxStatsMatches(matches).map((match) => match.match_id)).toEqual([574])
+  })
+})
+
 describe('groupInventoryByPrice', () => {
   test('groups regions by price and marks zones with inventory', () => {
     const regions: TicketWatchRegion[] = [
@@ -151,6 +304,39 @@ describe('groupInventoryByPrice', () => {
     expect(result[0].items[1].has_inventory).toBe(true)
     expect(result[0].items[1].interested_user_count).toBe(0)
     expect(result[1].price).toBe('580')
+  })
+
+  test('matches inventory by block key while keeping duplicate display names', () => {
+    const regions: TicketWatchRegion[] = [
+      { block_key: 'yukun-seat:101', block_name: '东看台-A区', price: '180', usable_count: 1, estate: 10 },
+      { block_key: 'yukun-seat:102', block_name: '东看台-A区', price: '220', usable_count: 1, estate: 11 },
+    ]
+    const inventory: TicketWatchInventoryEntry[] = [
+      { block_key: 'yukun-seat:101', block_name: '东看台-A区', occurrences: 3, latest_time: '2026-05-01T10:20:00+08:00' },
+      { block_key: 'yukun-seat:102', block_name: '东看台-A区', occurrences: 5, latest_time: '2026-05-01T10:35:00+08:00' },
+    ]
+
+    const result = groupInventoryByPrice(regions, inventory)
+
+    expect(result.length).toBe(2)
+    expect({
+      block_key: result[0].items[0].block_key,
+      block_name: result[0].items[0].block_name,
+      occurrences: result[0].items[0].occurrences,
+    }).toEqual({
+      block_key: 'yukun-seat:101',
+      block_name: '东看台-A区',
+      occurrences: 3,
+    })
+    expect({
+      block_key: result[1].items[0].block_key,
+      block_name: result[1].items[0].block_name,
+      occurrences: result[1].items[0].occurrences,
+    }).toEqual({
+      block_key: 'yukun-seat:102',
+      block_name: '东看台-A区',
+      occurrences: 5,
+    })
   })
 })
 
@@ -524,9 +710,9 @@ describe('summarizeInventoryBoard', () => {
     ])
 
     expect(result.topInterestBlocks).toEqual([
-      { block_name: '127', price: '220', interested_user_count: 18 },
-      { block_name: '532', price: '180', interested_user_count: 15 },
-      { block_name: '125', price: '220', interested_user_count: 12 },
+      { block_key: '127', block_name: '127', price: '220', interested_user_count: 18 },
+      { block_key: '532', block_name: '532', price: '180', interested_user_count: 15 },
+      { block_key: '125', block_name: '125', price: '220', interested_user_count: 12 },
     ])
   })
 })
@@ -539,6 +725,21 @@ describe('buildInventorySince', () => {
   test('returns null when sale start is missing or invalid', () => {
     expect(buildInventorySince(null)).toBeNull()
     expect(buildInventorySince('not-a-date')).toBeNull()
+  })
+})
+
+describe('requireInventorySince', () => {
+  test('returns 10 minutes after sale start', () => {
+    expect(requireInventorySince('2026-04-10T14:00:00+08:00')).toBe('2026-04-10T14:10:00+08:00')
+  })
+
+  test('throws when sale start is missing or invalid', () => {
+    expect(captureErrorMessage(() => requireInventorySince(null))).toBe(
+      'sale_start_at is required to build inventory since; refusing full inventory query',
+    )
+    expect(captureErrorMessage(() => requireInventorySince('not-a-date'))).toBe(
+      'sale_start_at is required to build inventory since; refusing full inventory query',
+    )
   })
 })
 

@@ -129,7 +129,11 @@ use crate::{
             get_match_block_interests::GetMatchBlockInterestsUseCase,
             get_match_ticket_inventory::GetMatchTicketInventoryUseCase,
             get_match_tracked_interests::GetMatchTrackedInterestsUseCase,
+            get_yukun_current_ticket_watch_match::GetYukunCurrentTicketWatchMatchUseCase,
+            get_yukun_ticket_inventory::GetYukunTicketInventoryUseCase,
             list_ticket_watch_matches::ListTicketWatchMatchesUseCase,
+            list_yukun_match_ticket_regions::ListYukunMatchTicketRegionsUseCase,
+            list_yukun_ticket_watch_matches::ListYukunTicketWatchMatchesUseCase,
             list_ticket_watch_regions::ListTicketWatchRegionsUseCase,
             toggle_match_block_interest::ToggleMatchBlockInterestUseCase,
         },
@@ -346,9 +350,21 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
             tracked_interest_cache_port.clone(),
         )),
         toggle_match_block_interest_use_case: Arc::new(ToggleMatchBlockInterestUseCase::new(
-            ticket_watch_port,
+            ticket_watch_port.clone(),
             tracked_interest_cache_port,
         )),
+        get_yukun_ticket_inventory_use_case: Arc::new(GetYukunTicketInventoryUseCase::new(
+            ticket_watch_port.clone(),
+        )),
+        list_yukun_match_ticket_regions_use_case: Arc::new(
+            ListYukunMatchTicketRegionsUseCase::new(ticket_watch_port.clone()),
+        ),
+        list_yukun_ticket_watch_matches_use_case: Arc::new(
+            ListYukunTicketWatchMatchesUseCase::new(ticket_watch_port.clone()),
+        ),
+        get_yukun_current_ticket_watch_match_use_case: Arc::new(
+            GetYukunCurrentTicketWatchMatchUseCase::new(ticket_watch_port),
+        ),
         token_port: support_web_state.token_port.clone(),
     });
     let ai_web_state = Arc::new(AiWebState {

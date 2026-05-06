@@ -88,7 +88,7 @@ describe('resolveTeamSeasonMatches', () => {
     )
 
     expect(matches.map((match) => match.matchId)).toEqual([61, 62, 63])
-    expect(matches.map((match) => match.resultLabel)).toEqual(['胜', '进行中', '未开赛'])
+    expect(matches.map((match) => match.resultLabel)).toEqual(['胜', '进', '未'])
     expect(matches.map((match) => match.opponentName)).toEqual(['河南队', '云南玉昆', '浙江队'])
   })
 

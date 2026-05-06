@@ -41,6 +41,9 @@ mod tests {
                 away_team_name: "重庆铜梁龙".to_string(),
                 home_score: "0".to_string(),
                 away_score: "1".to_string(),
+                technical_stats: vec![],
+                home_corners: None,
+                away_corners: None,
             }],
             top_scorers: vec![
                 OverviewPlayer {

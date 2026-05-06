@@ -19,6 +19,7 @@ pub struct TicketWatchMatchSummaryDto {
     pub home_team_name: String,
     pub away_team_name: String,
     pub is_current: bool,
+    pub include_in_reflux_stats: bool,
 }
 
 impl From<TicketWatchMatchSummary> for TicketWatchMatchSummaryDto {
@@ -34,6 +35,7 @@ impl From<TicketWatchMatchSummary> for TicketWatchMatchSummaryDto {
             home_team_name: value.home_team_name,
             away_team_name: value.away_team_name,
             is_current: value.is_current,
+            include_in_reflux_stats: value.include_in_reflux_stats,
         }
     }
 }
@@ -73,13 +75,18 @@ impl From<TicketWatchCurrentBoardView> for TicketWatchCurrentBoardDto {
             message: value.message,
             inventory: value.inventory.into_iter().map(Into::into).collect(),
             block_interests: value.block_interests.into_iter().map(Into::into).collect(),
-            tracked_interests: value.tracked_interests.into_iter().map(Into::into).collect(),
+            tracked_interests: value
+                .tracked_interests
+                .into_iter()
+                .map(Into::into)
+                .collect(),
         }
     }
 }
 
 #[derive(Debug, Serialize)]
 pub struct TicketWatchRegionDto {
+    pub block_key: String,
     pub block_name: String,
     pub price: String,
     pub usable_count: i32,
@@ -89,6 +96,7 @@ pub struct TicketWatchRegionDto {
 impl From<TicketWatchRegion> for TicketWatchRegionDto {
     fn from(value: TicketWatchRegion) -> Self {
         Self {
+            block_key: value.block_key,
             block_name: value.block_name,
             price: value.price,
             usable_count: value.usable_count,
@@ -99,6 +107,7 @@ impl From<TicketWatchRegion> for TicketWatchRegionDto {
 
 #[derive(Debug, Serialize)]
 pub struct TicketWatchInventoryEntryDto {
+    pub block_key: String,
     pub block_name: String,
     pub occurrences: i32,
     pub latest_time: String,
@@ -107,6 +116,7 @@ pub struct TicketWatchInventoryEntryDto {
 impl From<TicketWatchInventoryEntry> for TicketWatchInventoryEntryDto {
     fn from(value: TicketWatchInventoryEntry) -> Self {
         Self {
+            block_key: value.block_key,
             block_name: value.block_name,
             occurrences: value.occurrences,
             latest_time: value.latest_time,

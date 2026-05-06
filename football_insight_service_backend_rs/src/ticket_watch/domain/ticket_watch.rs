@@ -10,6 +10,7 @@ pub struct TicketWatchMatchSummary {
     pub home_team_name: String,
     pub away_team_name: String,
     pub is_current: bool,
+    pub include_in_reflux_stats: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -31,6 +32,7 @@ pub struct TicketWatchCurrentBoardView {
 
 #[derive(Debug, Clone)]
 pub struct TicketWatchRegion {
+    pub block_key: String,
     pub block_name: String,
     pub price: String,
     pub usable_count: i32,
@@ -39,6 +41,7 @@ pub struct TicketWatchRegion {
 
 #[derive(Debug, Clone)]
 pub struct TicketWatchInventoryEntry {
+    pub block_key: String,
     pub block_name: String,
     pub occurrences: i32,
     pub latest_time: String,

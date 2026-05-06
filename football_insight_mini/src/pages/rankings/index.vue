@@ -118,17 +118,28 @@
                 <text class="section-kicker">{{ activeTeamSectionKicker }}</text>
                 <text class="section-title">{{ activeTeamCategory.label }}</text>
               </view>
+              <view v-if="teamRankShiftMap" class="shift-legend-trigger" @click.stop="showShiftLegend = !showShiftLegend">
+                <text class="shift-legend-trigger__icon">i</text>
+              </view>
+            </view>
+
+            <view v-if="showShiftLegend" class="shift-legend">
+              <text class="shift-legend__row"><text class="shift-legend__arrow shift-legend__arrow--down">↓</text> 绿色：若无罚分，排名会下降的位数</text>
+              <text class="shift-legend__row"><text class="shift-legend__arrow shift-legend__arrow--up">↑</text> 红色：若无罚分，排名可上升的位数</text>
             </view>
 
             <view
-              v-for="entry in activeTeamCategory.entries.slice(0, 12)"
+              v-for="entry in activeTeamCategory.entries"
               :key="`${activeTeamCategory.slug}-${entry.team_id}`"
               class="ranking-row ranking-row--interactive"
               hover-class="ranking-row--pressed"
               hover-stay-time="100"
               @click="openRankingTeamSheet(entry)"
             >
-              <text class="ranking-row__rank" :class="`ranking-row__rank--${entry.rank_no}`">#{{ entry.rank_no }}</text>
+              <view class="ranking-row__rank-wrap">
+                <text class="ranking-row__rank" :class="`ranking-row__rank--${entry.rank_no}`">#{{ entry.rank_no }}</text>
+                <text v-if="getTeamRankShift(entry.team_id)" class="ranking-row__shift" :class="getTeamRankShift(entry.team_id)!.cls">{{ getTeamRankShift(entry.team_id)!.label }}</text>
+              </view>
               <image :src="entry.avatar_storage_url || ''" mode="aspectFit" class="ranking-row__avatar" />
               <view class="ranking-row__body">
                 <text class="ranking-row__name">{{ entry.team_name }}</text>
@@ -152,7 +163,7 @@
             </view>
 
             <view
-              v-for="entry in activePlayerCategory.entries.slice(0, 12)"
+              v-for="entry in activePlayerCategory.entries"
               :key="`${activePlayerCategory.slug}-${entry.player_id}`"
               class="ranking-row"
             >
@@ -216,18 +227,25 @@
             >
               <view class="team-season-match-row__meta">
                 <text>第 {{ match.roundNumber }} 轮 · {{ match.matchDate }} {{ match.matchTime }}</text>
-                <text class="team-season-match-row__result" :class="`team-season-match-row__result--${match.resultTone}`">
-                  {{ match.resultLabel }}
-                </text>
+                <view class="team-season-match-row__meta-right">
+                  <text class="team-season-match-row__venue" :class="match.isHomeTeam ? 'team-season-match-row__venue--home' : 'team-season-match-row__venue--away'">
+                    {{ match.venueLabel }}
+                  </text>
+                  <text class="team-season-match-row__result" :class="`team-season-match-row__result--${match.resultTone}`">
+                    {{ match.resultLabel }}
+                  </text>
+                </view>
               </view>
               <view class="team-season-match-row__body">
-                <text class="team-season-match-row__team" :class="{ 'team-season-match-row__team--active': match.isHomeTeam }">
-                  {{ match.homeTeamName }}
-                </text>
+                <view class="team-season-match-row__side team-season-match-row__side--left">
+                  <image class="team-season-match-row__avatar" :src="match.teamAvatar || ''" mode="aspectFit" />
+                  <text class="team-season-match-row__team team-season-match-row__team--active">{{ match.teamName }}</text>
+                </view>
                 <text class="team-season-match-row__score">{{ match.scoreText }}</text>
-                <text class="team-season-match-row__team team-season-match-row__team--away" :class="{ 'team-season-match-row__team--active': !match.isHomeTeam }">
-                  {{ match.awayTeamName }}
-                </text>
+                <view class="team-season-match-row__side team-season-match-row__side--right">
+                  <text class="team-season-match-row__team team-season-match-row__team--away">{{ match.opponentName }}</text>
+                  <image class="team-season-match-row__avatar" :src="match.opponentAvatar || ''" mode="aspectFit" />
+                </view>
               </view>
             </view>
           </scroll-view>
@@ -342,6 +360,7 @@ const standingsPosterQrModules = [
 ]
 const instance = getCurrentInstance()
 const scope = ref<'team' | 'player'>('team')
+const showShiftLegend = ref(false)
 const loading = ref(true)
 const errorMessage = ref('')
 const rankings = ref<RankingsViewResponse | null>(null)
@@ -400,6 +419,28 @@ const activeTeamMetricLabel = computed(() =>
 const activeTeamEntryLabel = computed(() =>
   activeTeamCategory.value?.slug === 'standings' ? '积分榜' : activeTeamCategory.value?.label ?? '',
 )
+const teamRankShiftMap = computed<Map<number, { shift: number; noPenaltyRank: number }> | null>(() => {
+  if (activeTeamCategory.value?.slug !== 'standings') return null
+  const withTable = standingsTables.value.find((t) => t.slug === 'standings_with_penalty')
+  const withoutTable = standingsTables.value.find((t) => t.slug === 'standings_without_penalty')
+  if (!withTable || !withoutTable) return null
+  const withoutRankByTeam = new Map(withoutTable.entries.map((e) => [e.team_id, e.rank_no]))
+  const map = new Map<number, { shift: number; noPenaltyRank: number }>()
+  for (const e of withTable.entries) {
+    const noPenaltyRank = withoutRankByTeam.get(e.team_id)
+    if (noPenaltyRank !== undefined && noPenaltyRank !== e.rank_no) {
+      map.set(e.team_id, { shift: e.rank_no - noPenaltyRank, noPenaltyRank })
+    }
+  }
+  return map.size > 0 ? map : null
+})
+
+function getTeamRankShift(teamId: number): { label: string; cls: string } | null {
+  const info = teamRankShiftMap.value?.get(teamId)
+  if (!info) return null
+  if (info.shift > 0) return { label: `↑${info.shift}`, cls: 'ranking-row__shift--up' }
+  return { label: `↓${Math.abs(info.shift)}`, cls: 'ranking-row__shift--down' }
+}
 const standingsEntryByTeamId = computed(() =>
   new Map((primaryStandingsTable.value?.entries ?? []).map((entry) => [entry.team_id, entry])),
 )
@@ -1055,6 +1096,65 @@ onShow(() => {
   background: #f6f7fb;
   overflow: hidden;
 }
+.ranking-row__shift {
+  font-size: 18rpx;
+  font-weight: 600;
+  line-height: 1;
+  margin-top: 4rpx;
+}
+.ranking-row__shift--up {
+  color: #dc2626;
+}
+.ranking-row__shift--down {
+  color: #16a34a;
+}
+.shift-legend-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: #f0f1f5;
+  flex-shrink: 0;
+}
+.shift-legend-trigger__icon {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #8f9198;
+  font-style: italic;
+}
+.shift-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  padding: 20rpx 24rpx;
+  margin-bottom: 16rpx;
+  background: #f8f9fc;
+  border-radius: 16rpx;
+  border: 2rpx solid #ececf1;
+}
+.shift-legend__row {
+  font-size: 24rpx;
+  color: #3a3a3c;
+  line-height: 1.5;
+}
+.shift-legend__arrow {
+  display: inline-block;
+  width: 36rpx;
+  font-weight: 700;
+}
+.shift-legend__arrow--down {
+  color: #16a34a;
+}
+.shift-legend__arrow--up {
+  color: #dc2626;
+}
+.shift-legend__hint {
+  font-size: 22rpx;
+  color: #8f9198;
+  margin-top: 4rpx;
+}
 .scope-toggle__button {
   display: inline-flex;
   align-items: center;
@@ -1150,8 +1250,13 @@ onShow(() => {
   transform: scale(0.99);
   background: rgba(243, 244, 247, 0.9);
 }
+.ranking-row__rank-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  flex-shrink: 0;
+}
 .ranking-row__rank {
-  width: 72rpx;
   color: #8f9198;
   font-size: 24rpx;
   font-weight: 700;
@@ -1389,42 +1494,91 @@ onShow(() => {
   color: #8f9198;
   font-size: 22rpx;
 }
+.team-season-match-row__meta-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+}
+.team-season-match-row__venue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 800;
+}
+.team-season-match-row__venue--home {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+.team-season-match-row__venue--away {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+}
+
 .team-season-match-row__result {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 96rpx;
-  padding: 8rpx 16rpx;
+  min-width: 56rpx;
+  padding: 4rpx 12rpx;
   border-radius: 999rpx;
-  font-size: 22rpx;
+  font-size: 20rpx;
   font-weight: 800;
 }
+
 .team-season-match-row__result--win {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+
+.team-season-match-row__result--draw {
+  background: rgba(234, 179, 8, 0.12);
+  color: #b45309;
+}
+
+.team-season-match-row__result--loss {
   background: rgba(34, 197, 94, 0.12);
   color: #15803d;
 }
-.team-season-match-row__result--draw {
-  background: rgba(148, 163, 184, 0.16);
-  color: #475569;
-}
-.team-season-match-row__result--loss {
-  background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
-}
+
 .team-season-match-row__result--live {
   background: rgba(249, 115, 22, 0.12);
   color: #d97706;
 }
+
 .team-season-match-row__result--scheduled {
   background: rgba(59, 130, 246, 0.12);
   color: #2563eb;
 }
+
 .team-season-match-row__body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 18rpx;
 }
+
+.team-season-match-row__side {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+.team-season-match-row__side--left {
+  justify-content: flex-start;
+}
+.team-season-match-row__side--right {
+  justify-content: flex-end;
+}
+
+.team-season-match-row__avatar {
+  width: 36rpx;
+  height: 36rpx;
+  flex-shrink: 0;
+}
+
 .team-season-match-row__team {
   color: #7b818d;
   font-size: 28rpx;
@@ -1433,12 +1587,11 @@ onShow(() => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 .team-season-match-row__team--active {
   color: #121212;
 }
-.team-season-match-row__team--away {
-  text-align: right;
-}
+
 .team-season-match-row__score {
   color: #121212;
   font-size: 40rpx;

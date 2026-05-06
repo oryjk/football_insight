@@ -10,12 +10,16 @@ export interface TeamSeasonMatch {
   awayTeamName: string
   homeScore: string
   awayScore: string
+  teamName: string
+  teamAvatar: string | null
   opponentName: string
+  opponentAvatar: string | null
   isHomeTeam: boolean
   displayStatus: MatchCard['status']
-  resultLabel: '胜' | '平' | '负' | '进行中' | '未开赛'
+  resultLabel: '胜' | '平' | '负' | '进' | '未'
   resultTone: 'win' | 'draw' | 'loss' | 'live' | 'scheduled'
   scoreText: string
+  venueLabel: '主' | '客'
 }
 
 function resolveKickoffSortValue(matchDate: string, matchTime: string): number {
@@ -55,9 +59,19 @@ export function resolveTeamSeasonMatches(
     .map((match) => {
       const isHomeTeam = match.home_team_id === team.team_id || match.home_team_name === team.team_name
       const displayStatus = resolveMatchDisplayStatus(match, nowIso)
-      const homeScore = Number(match.home_score)
-      const awayScore = Number(match.away_score)
-      const scoreText = `${match.home_score} : ${match.away_score}`
+      const homeScoreNum = Number(match.home_score)
+      const awayScoreNum = Number(match.away_score)
+      const hasScores = !Number.isNaN(homeScoreNum) && !Number.isNaN(awayScoreNum)
+
+      const leftScore = isHomeTeam ? match.home_score : match.away_score
+      const rightScore = isHomeTeam ? match.away_score : match.home_score
+      const scoreText = displayStatus === 'scheduled' || !hasScores ? 'VS' : `${leftScore} : ${rightScore}`
+
+      const teamScoreNum = isHomeTeam ? homeScoreNum : awayScoreNum
+      const opponentScoreNum = isHomeTeam ? awayScoreNum : homeScoreNum
+
+      const opponentName = isHomeTeam ? match.away_team_name : match.home_team_name
+      const venueLabel = isHomeTeam ? '主' : '客'
 
       if (displayStatus === 'live') {
         return {
@@ -69,16 +83,20 @@ export function resolveTeamSeasonMatches(
           awayTeamName: match.away_team_name,
           homeScore: match.home_score,
           awayScore: match.away_score,
-          opponentName: isHomeTeam ? match.away_team_name : match.home_team_name,
+          teamName: team.team_name,
+          teamAvatar: isHomeTeam ? match.home_team_avatar : match.away_team_avatar,
+          opponentName,
+          opponentAvatar: isHomeTeam ? match.away_team_avatar : match.home_team_avatar,
           isHomeTeam,
           displayStatus,
-          resultLabel: '进行中',
+          resultLabel: '进',
           resultTone: 'live',
           scoreText,
+          venueLabel,
         }
       }
 
-      if (displayStatus === 'scheduled' || Number.isNaN(homeScore) || Number.isNaN(awayScore)) {
+      if (displayStatus === 'scheduled' || !hasScores) {
         return {
           matchId: match.match_id,
           roundNumber: match.round_number,
@@ -88,18 +106,20 @@ export function resolveTeamSeasonMatches(
           awayTeamName: match.away_team_name,
           homeScore: match.home_score,
           awayScore: match.away_score,
-          opponentName: isHomeTeam ? match.away_team_name : match.home_team_name,
+          teamName: team.team_name,
+          teamAvatar: isHomeTeam ? match.home_team_avatar : match.away_team_avatar,
+          opponentName,
+          opponentAvatar: isHomeTeam ? match.away_team_avatar : match.home_team_avatar,
           isHomeTeam,
           displayStatus,
-          resultLabel: '未开赛',
+          resultLabel: '未',
           resultTone: 'scheduled',
-          scoreText: 'VS',
+          scoreText,
+          venueLabel,
         }
       }
 
-      const teamScore = isHomeTeam ? homeScore : awayScore
-      const opponentScore = isHomeTeam ? awayScore : homeScore
-      const resultTone = teamScore > opponentScore ? 'win' : teamScore < opponentScore ? 'loss' : 'draw'
+      const resultTone = teamScoreNum > opponentScoreNum ? 'win' : teamScoreNum < opponentScoreNum ? 'loss' : 'draw'
 
       return {
         matchId: match.match_id,
@@ -110,12 +130,16 @@ export function resolveTeamSeasonMatches(
         awayTeamName: match.away_team_name,
         homeScore: match.home_score,
         awayScore: match.away_score,
-        opponentName: isHomeTeam ? match.away_team_name : match.home_team_name,
+        teamName: team.team_name,
+        teamAvatar: isHomeTeam ? match.home_team_avatar : match.away_team_avatar,
+        opponentName,
+        opponentAvatar: isHomeTeam ? match.away_team_avatar : match.home_team_avatar,
         isHomeTeam,
         displayStatus,
         resultLabel: resultTone === 'win' ? '胜' : resultTone === 'loss' ? '负' : '平',
         resultTone,
         scoreText,
+        venueLabel,
       }
     })
 }

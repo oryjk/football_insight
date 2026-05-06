@@ -1,13 +1,42 @@
 use std::sync::Arc;
 
-use anyhow::anyhow;
-
 use crate::ticket_watch::{
-    domain::ticket_watch::TicketWatchInventoryEntry, ports::ticket_monitor_port::TicketMonitorPort,
+    domain::ticket_watch::TicketWatchInventoryEntry,
+    ports::ticket_monitor_port::TicketMonitorPort,
 };
 
-pub struct GetMatchTicketInventoryUseCase {
+pub struct GetYukunTicketInventoryUseCase {
     ticket_monitor_port: Arc<dyn TicketMonitorPort>,
+}
+
+impl GetYukunTicketInventoryUseCase {
+    pub fn new(ticket_monitor_port: Arc<dyn TicketMonitorPort>) -> Self {
+        Self {
+            ticket_monitor_port,
+        }
+    }
+
+    pub async fn execute(
+        &self,
+        match_id: i64,
+        since: Option<&str>,
+    ) -> anyhow::Result<Vec<TicketWatchInventoryEntry>> {
+        let normalized_since = since
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "sale_start_at is required to build inventory since; refusing full inventory query"
+                )
+            })?;
+
+        let (inventory, _) = self
+            .ticket_monitor_port
+            .fetch_yukun_reflux(match_id, Some(normalized_since))
+            .await?;
+
+        Ok(inventory)
+    }
 }
 
 #[cfg(test)]
@@ -17,7 +46,7 @@ mod tests {
     use async_trait::async_trait;
     use uuid::Uuid;
 
-    use super::GetMatchTicketInventoryUseCase;
+    use super::GetYukunTicketInventoryUseCase;
     use crate::ticket_watch::{
         domain::ticket_watch::{
             TicketWatchBlockInterest, TicketWatchCurrentMatchView, TicketWatchInventoryEntry,
@@ -28,7 +57,7 @@ mod tests {
 
     #[derive(Default)]
     struct StubTicketMonitorPort {
-        inventory_calls: Mutex<Vec<(i64, Option<i64>, Option<String>)>>,
+        yukun_reflux_calls: Mutex<Vec<(i64, Option<String>)>>,
     }
 
     #[async_trait]
@@ -47,16 +76,11 @@ mod tests {
 
         async fn fetch_inventory(
             &self,
-            match_id: i64,
-            fallback_match_id: Option<i64>,
-            since: Option<&str>,
+            _match_id: i64,
+            _fallback_match_id: Option<i64>,
+            _since: Option<&str>,
         ) -> anyhow::Result<Vec<TicketWatchInventoryEntry>> {
-            self.inventory_calls.lock().expect("calls").push((
-                match_id,
-                fallback_match_id,
-                since.map(str::to_string),
-            ));
-            Ok(vec![])
+            unreachable!()
         }
 
         async fn fetch_block_interests(
@@ -83,84 +107,57 @@ mod tests {
         ) -> anyhow::Result<TicketWatchBlockInterest> {
             unreachable!()
         }
+
         async fn fetch_yukun_matches(&self) -> anyhow::Result<Vec<TicketWatchMatchSummary>> {
-            Ok(vec![])
+            unreachable!()
         }
 
         async fn fetch_yukun_current_match(
             &self,
         ) -> anyhow::Result<crate::ticket_watch::domain::ticket_watch::TicketWatchCurrentMatchView> {
-            Ok(crate::ticket_watch::domain::ticket_watch::TicketWatchCurrentMatchView {
-                current_match: None,
-                group_ticket_active: false,
-                message: "".to_string(),
-            })
+            unreachable!()
         }
 
         async fn fetch_yukun_reflux(
             &self,
-            _match_id: i64,
-            _since: Option<&str>,
+            match_id: i64,
+            since: Option<&str>,
         ) -> anyhow::Result<(Vec<TicketWatchInventoryEntry>, Vec<TicketWatchRegion>)> {
+            self.yukun_reflux_calls
+                .lock()
+                .expect("calls")
+                .push((match_id, since.map(str::to_string)));
             Ok((vec![], vec![]))
         }
     }
 
     #[tokio::test]
-    async fn execute_with_since_rejects_missing_since() {
+    async fn execute_rejects_missing_since() {
         let port = Arc::new(StubTicketMonitorPort::default());
-        let use_case = GetMatchTicketInventoryUseCase::new(port.clone());
+        let use_case = GetYukunTicketInventoryUseCase::new(port.clone());
 
         let error = use_case
-            .execute_with_since(574, Some(78), None)
+            .execute(288651, None)
             .await
             .expect_err("missing since should fail");
 
         assert!(error.to_string().contains("sale_start_at"));
-        assert!(port.inventory_calls.lock().expect("calls").is_empty());
+        assert!(port.yukun_reflux_calls.lock().expect("calls").is_empty());
     }
 
     #[tokio::test]
-    async fn execute_with_since_rejects_blank_since() {
+    async fn execute_forwards_non_empty_since() {
         let port = Arc::new(StubTicketMonitorPort::default());
-        let use_case = GetMatchTicketInventoryUseCase::new(port.clone());
+        let use_case = GetYukunTicketInventoryUseCase::new(port.clone());
 
-        let error = use_case
-            .execute_with_since(574, Some(78), Some("   "))
+        use_case
+            .execute(288651, Some(" 2026-05-04T14:10:00+08:00 "))
             .await
-            .expect_err("blank since should fail");
+            .expect("execute");
 
-        assert!(error.to_string().contains("sale_start_at"));
-        assert!(port.inventory_calls.lock().expect("calls").is_empty());
-    }
-}
-
-impl GetMatchTicketInventoryUseCase {
-    pub fn new(ticket_monitor_port: Arc<dyn TicketMonitorPort>) -> Self {
-        Self {
-            ticket_monitor_port,
-        }
-    }
-
-    pub async fn execute(&self, match_id: i64) -> anyhow::Result<Vec<TicketWatchInventoryEntry>> {
-        self.execute_with_since(match_id, None, None).await
-    }
-
-    pub async fn execute_with_since(
-        &self,
-        match_id: i64,
-        fallback_match_id: Option<i64>,
-        since: Option<&str>,
-    ) -> anyhow::Result<Vec<TicketWatchInventoryEntry>> {
-        let since = since
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .ok_or_else(|| {
-                anyhow!("sale_start_at is required to build inventory since; refusing full inventory query")
-            })?;
-
-        self.ticket_monitor_port
-            .fetch_inventory(match_id, fallback_match_id, Some(since))
-            .await
+        assert_eq!(
+            port.yukun_reflux_calls.lock().expect("calls").as_slice(),
+            &[(288651, Some("2026-05-04T14:10:00+08:00".to_string()))],
+        );
     }
 }

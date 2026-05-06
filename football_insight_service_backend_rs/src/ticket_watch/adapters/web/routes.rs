@@ -6,7 +6,9 @@ use crate::ticket_watch::adapters::web::handlers::{
     TicketWatchWebState, get_current_ticket_watch_board_handler,
     get_current_ticket_watch_match_handler, get_match_block_interests_handler,
     get_match_ticket_inventory_handler, get_match_tracked_interests_handler,
-    list_ticket_watch_matches_handler, list_ticket_watch_regions_handler,
+    get_yukun_current_ticket_watch_match_handler, get_yukun_match_regions_handler,
+    get_yukun_match_ticket_inventory_handler, list_ticket_watch_matches_handler,
+    list_ticket_watch_regions_handler, list_yukun_ticket_watch_matches_handler,
     toggle_match_block_interest_handler,
 };
 
@@ -44,6 +46,22 @@ pub fn ticket_watch_routes(state: Arc<TicketWatchWebState>) -> Router {
             "/api/v1/ticket-watch/matches/{match_id}/interests/toggle",
             axum::routing::post(toggle_match_block_interest_handler),
         )
+        .route(
+            "/api/v1/ticket-watch/yukun/matches/{match_id}/inventory",
+            get(get_yukun_match_ticket_inventory_handler),
+        )
+        .route(
+            "/api/v1/ticket-watch/yukun/matches",
+            get(list_yukun_ticket_watch_matches_handler),
+        )
+        .route(
+            "/api/v1/ticket-watch/yukun/matches/{match_id}/regions",
+            get(get_yukun_match_regions_handler),
+        )
+        .route(
+            "/api/v1/ticket-watch/yukun/current-match",
+            get(get_yukun_current_ticket_watch_match_handler),
+        )
         .with_state(state)
 }
 
@@ -75,7 +93,11 @@ mod tests {
                 get_match_block_interests::GetMatchBlockInterestsUseCase,
                 get_match_ticket_inventory::GetMatchTicketInventoryUseCase,
                 get_match_tracked_interests::GetMatchTrackedInterestsUseCase,
+                get_yukun_current_ticket_watch_match::GetYukunCurrentTicketWatchMatchUseCase,
+                get_yukun_ticket_inventory::GetYukunTicketInventoryUseCase,
                 list_ticket_watch_matches::ListTicketWatchMatchesUseCase,
+                list_yukun_match_ticket_regions::ListYukunMatchTicketRegionsUseCase,
+                list_yukun_ticket_watch_matches::ListYukunTicketWatchMatchesUseCase,
                 list_ticket_watch_regions::ListTicketWatchRegionsUseCase,
                 toggle_match_block_interest::ToggleMatchBlockInterestUseCase,
             },
@@ -144,6 +166,27 @@ mod tests {
                 viewer_interested: true,
             })
         }
+        async fn fetch_yukun_matches(&self) -> anyhow::Result<Vec<TicketWatchMatchSummary>> {
+            Ok(vec![])
+        }
+
+        async fn fetch_yukun_current_match(
+            &self,
+        ) -> anyhow::Result<crate::ticket_watch::domain::ticket_watch::TicketWatchCurrentMatchView> {
+            Ok(crate::ticket_watch::domain::ticket_watch::TicketWatchCurrentMatchView {
+                current_match: None,
+                group_ticket_active: false,
+                message: "".to_string(),
+            })
+        }
+
+        async fn fetch_yukun_reflux(
+            &self,
+            _match_id: i64,
+            _since: Option<&str>,
+        ) -> anyhow::Result<(Vec<TicketWatchInventoryEntry>, Vec<TicketWatchRegion>)> {
+            Ok((vec![], vec![]))
+        }
     }
 
     struct StubTokenPort;
@@ -189,16 +232,20 @@ mod tests {
     async fn tracked_interests_route_should_exist() {
         let port = Arc::new(StubTicketMonitorPort);
         let state = Arc::new(TicketWatchWebState {
-            get_current_ticket_watch_board_use_case: Arc::new(GetCurrentTicketWatchBoardUseCase::new(
-                Arc::new(CurrentTicketWatchBoardCache::new(std::time::Duration::from_secs(2))),
-                Arc::new(GetCurrentTicketWatchMatchUseCase::new(port.clone())),
-                Arc::new(GetMatchTicketInventoryUseCase::new(port.clone())),
-                Arc::new(GetMatchBlockInterestsUseCase::new(port.clone())),
-                Arc::new(GetMatchTrackedInterestsUseCase::new(
-                    port.clone(),
-                    Arc::new(NoopTrackedInterestCachePort),
-                )),
-            )),
+            get_current_ticket_watch_board_use_case: Arc::new(
+                GetCurrentTicketWatchBoardUseCase::new(
+                    Arc::new(CurrentTicketWatchBoardCache::new(
+                        std::time::Duration::from_secs(2),
+                    )),
+                    Arc::new(GetCurrentTicketWatchMatchUseCase::new(port.clone())),
+                    Arc::new(GetMatchTicketInventoryUseCase::new(port.clone())),
+                    Arc::new(GetMatchBlockInterestsUseCase::new(port.clone())),
+                    Arc::new(GetMatchTrackedInterestsUseCase::new(
+                        port.clone(),
+                        Arc::new(NoopTrackedInterestCachePort),
+                    )),
+                ),
+            ),
             get_current_ticket_watch_match_use_case: Arc::new(
                 GetCurrentTicketWatchMatchUseCase::new(port.clone()),
             ),
@@ -219,9 +266,21 @@ mod tests {
                 Arc::new(NoopTrackedInterestCachePort),
             )),
             toggle_match_block_interest_use_case: Arc::new(ToggleMatchBlockInterestUseCase::new(
-                port,
+                port.clone(),
                 Arc::new(NoopTrackedInterestCachePort),
             )),
+            get_yukun_ticket_inventory_use_case: Arc::new(GetYukunTicketInventoryUseCase::new(
+                port.clone(),
+            )),
+            list_yukun_match_ticket_regions_use_case: Arc::new(
+                ListYukunMatchTicketRegionsUseCase::new(port.clone()),
+            ),
+            list_yukun_ticket_watch_matches_use_case: Arc::new(
+                ListYukunTicketWatchMatchesUseCase::new(port.clone()),
+            ),
+            get_yukun_current_ticket_watch_match_use_case: Arc::new(
+                GetYukunCurrentTicketWatchMatchUseCase::new(port),
+            ),
             token_port: Arc::new(StubTokenPort),
         });
         let app = ticket_watch_routes(state);
@@ -245,16 +304,20 @@ mod tests {
     async fn current_board_route_should_exist() {
         let port = Arc::new(StubTicketMonitorPort);
         let state = Arc::new(TicketWatchWebState {
-            get_current_ticket_watch_board_use_case: Arc::new(GetCurrentTicketWatchBoardUseCase::new(
-                Arc::new(CurrentTicketWatchBoardCache::new(std::time::Duration::from_secs(2))),
-                Arc::new(GetCurrentTicketWatchMatchUseCase::new(port.clone())),
-                Arc::new(GetMatchTicketInventoryUseCase::new(port.clone())),
-                Arc::new(GetMatchBlockInterestsUseCase::new(port.clone())),
-                Arc::new(GetMatchTrackedInterestsUseCase::new(
-                    port.clone(),
-                    Arc::new(NoopTrackedInterestCachePort),
-                )),
-            )),
+            get_current_ticket_watch_board_use_case: Arc::new(
+                GetCurrentTicketWatchBoardUseCase::new(
+                    Arc::new(CurrentTicketWatchBoardCache::new(
+                        std::time::Duration::from_secs(2),
+                    )),
+                    Arc::new(GetCurrentTicketWatchMatchUseCase::new(port.clone())),
+                    Arc::new(GetMatchTicketInventoryUseCase::new(port.clone())),
+                    Arc::new(GetMatchBlockInterestsUseCase::new(port.clone())),
+                    Arc::new(GetMatchTrackedInterestsUseCase::new(
+                        port.clone(),
+                        Arc::new(NoopTrackedInterestCachePort),
+                    )),
+                ),
+            ),
             get_current_ticket_watch_match_use_case: Arc::new(
                 GetCurrentTicketWatchMatchUseCase::new(port.clone()),
             ),
@@ -275,9 +338,21 @@ mod tests {
                 Arc::new(NoopTrackedInterestCachePort),
             )),
             toggle_match_block_interest_use_case: Arc::new(ToggleMatchBlockInterestUseCase::new(
-                port,
+                port.clone(),
                 Arc::new(NoopTrackedInterestCachePort),
             )),
+            get_yukun_ticket_inventory_use_case: Arc::new(GetYukunTicketInventoryUseCase::new(
+                port.clone(),
+            )),
+            list_yukun_match_ticket_regions_use_case: Arc::new(
+                ListYukunMatchTicketRegionsUseCase::new(port.clone()),
+            ),
+            list_yukun_ticket_watch_matches_use_case: Arc::new(
+                ListYukunTicketWatchMatchesUseCase::new(port.clone()),
+            ),
+            get_yukun_current_ticket_watch_match_use_case: Arc::new(
+                GetYukunCurrentTicketWatchMatchUseCase::new(port),
+            ),
             token_port: Arc::new(StubTokenPort),
         });
         let app = ticket_watch_routes(state);

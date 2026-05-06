@@ -48,7 +48,10 @@ impl GetCurrentTicketWatchBoardUseCase {
         let public_data = match self.cache.get_public_data().await {
             Some(cached) => cached,
             None => {
-                let current_match_view = self.get_current_ticket_watch_match_use_case.execute().await?;
+                let current_match_view = self
+                    .get_current_ticket_watch_match_use_case
+                    .execute()
+                    .await?;
                 let Some(current_match) = current_match_view.current_match.clone() else {
                     let public_data = CurrentBoardPublicData {
                         current_match_view,
@@ -222,6 +225,7 @@ mod tests {
                     home_team_name: "成都蓉城".to_string(),
                     away_team_name: "浙江俱乐部绿城".to_string(),
                     is_current: true,
+                    include_in_reflux_stats: true,
                 }),
                 group_ticket_active: false,
                 message: "ok".to_string(),
@@ -249,6 +253,7 @@ mod tests {
             ));
 
             Ok(vec![TicketWatchInventoryEntry {
+                block_key: "117".to_string(),
                 block_name: "117".to_string(),
                 occurrences: 31,
                 latest_time: "2026-04-23T14:18:18+08:00".to_string(),
@@ -298,6 +303,27 @@ mod tests {
         ) -> anyhow::Result<TicketWatchBlockInterest> {
             unreachable!()
         }
+        async fn fetch_yukun_matches(&self) -> anyhow::Result<Vec<TicketWatchMatchSummary>> {
+            Ok(vec![])
+        }
+
+        async fn fetch_yukun_current_match(
+            &self,
+        ) -> anyhow::Result<crate::ticket_watch::domain::ticket_watch::TicketWatchCurrentMatchView> {
+            Ok(crate::ticket_watch::domain::ticket_watch::TicketWatchCurrentMatchView {
+                current_match: None,
+                group_ticket_active: false,
+                message: "".to_string(),
+            })
+        }
+
+        async fn fetch_yukun_reflux(
+            &self,
+            _match_id: i64,
+            _since: Option<&str>,
+        ) -> anyhow::Result<(Vec<TicketWatchInventoryEntry>, Vec<TicketWatchRegion>)> {
+            Ok((vec![], vec![]))
+        }
     }
 
     struct NoopTrackedInterestCachePort;
@@ -334,7 +360,9 @@ mod tests {
         });
         let tracked_cache = Arc::new(NoopTrackedInterestCachePort);
         let use_case = GetCurrentTicketWatchBoardUseCase::new(
-            Arc::new(CurrentTicketWatchBoardCache::new(std::time::Duration::from_secs(2))),
+            Arc::new(CurrentTicketWatchBoardCache::new(
+                std::time::Duration::from_secs(2),
+            )),
             Arc::new(GetCurrentTicketWatchMatchUseCase::new(port.clone())),
             Arc::new(GetMatchTicketInventoryUseCase::new(port.clone())),
             Arc::new(GetMatchBlockInterestsUseCase::new(port.clone())),
@@ -345,7 +373,10 @@ mod tests {
         let result = use_case.execute(Some(user_id)).await.expect("result");
         let state = state.lock().expect("state");
 
-        assert_eq!(result.current_match.as_ref().map(|item| item.match_id), Some(574));
+        assert_eq!(
+            result.current_match.as_ref().map(|item| item.match_id),
+            Some(574)
+        );
         assert_eq!(result.inventory.len(), 1);
         assert_eq!(result.block_interests.len(), 1);
         assert!(result.block_interests[0].viewer_interested);
@@ -353,11 +384,7 @@ mod tests {
         assert_eq!(state.current_match_calls, 1);
         assert_eq!(
             state.inventory_calls,
-            vec![(
-                574,
-                Some(78),
-                Some("2026-04-23T14:10:00+08:00".to_string()),
-            )]
+            vec![(574, Some(78), Some("2026-04-23T14:10:00+08:00".to_string()),)]
         );
         assert_eq!(state.block_interest_calls, vec![(574, None)]);
         assert_eq!(state.tracked_calls, vec![(574, user_id)]);
@@ -371,7 +398,9 @@ mod tests {
         });
         let tracked_cache = Arc::new(NoopTrackedInterestCachePort);
         let use_case = GetCurrentTicketWatchBoardUseCase::new(
-            Arc::new(CurrentTicketWatchBoardCache::new(std::time::Duration::from_secs(2))),
+            Arc::new(CurrentTicketWatchBoardCache::new(
+                std::time::Duration::from_secs(2),
+            )),
             Arc::new(GetCurrentTicketWatchMatchUseCase::new(port.clone())),
             Arc::new(GetMatchTicketInventoryUseCase::new(port.clone())),
             Arc::new(GetMatchBlockInterestsUseCase::new(port.clone())),

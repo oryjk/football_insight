@@ -21,6 +21,23 @@
         </view>
       </view>
 
+      <view class="team-switch">
+        <button
+          class="team-switch__item"
+          :class="{ 'team-switch__item--active': selectedTeam === 'chengdurongcheng' }"
+          @click="switchTeam('chengdurongcheng')"
+        >
+          成都蓉城
+        </button>
+        <button
+          class="team-switch__item"
+          :class="{ 'team-switch__item--active': selectedTeam === 'yunnanyukun' }"
+          @click="switchTeam('yunnanyukun')"
+        >
+          云南玉昆
+        </button>
+      </view>
+
       <view class="tab-switch">
         <button
           class="tab-switch__item"
@@ -35,6 +52,13 @@
           @click="activeTab = 'history'"
         >
           历史比赛
+        </button>
+        <button
+          class="tab-switch__item"
+          :class="{ 'tab-switch__item--active': activeTab === 'history-stats' }"
+          @click="activeTab = 'history-stats'"
+        >
+          历史统计
         </button>
       </view>
 
@@ -222,7 +246,7 @@
                 <view v-if="isCurrentRecentRefluxBucketUnlocked(bucket.key) && bucket.items.length" class="recent-reflux-list">
                   <view
                     v-for="item in bucket.items.slice(0, 4)"
-                    :key="`recent-reflux-${bucket.key}-${item.block_name}`"
+                    :key="`recent-reflux-${bucket.key}-${item.block_key}`"
                     class="recent-reflux-item"
                     :class="[resolvePriceToneClass(item.price), `recent-reflux-item--${bucket.key}`]"
                   >
@@ -291,7 +315,7 @@
                 <view class="focus-grid focus-grid--triple">
                   <view
                     v-for="block in currentFocusBlocks"
-                    :key="`current-focus-${block.block_name}`"
+                    :key="`current-focus-${block.block_key}`"
                     class="focus-chip focus-chip--compact"
                     :class="resolvePriceToneClass(block.price)"
                   >
@@ -316,7 +340,7 @@
                 <view class="focus-grid focus-grid--triple">
                   <view
                     v-for="block in currentInterestFocusBlocks"
-                    :key="`current-interest-focus-${block.block_name}`"
+                    :key="`current-interest-focus-${block.block_key}`"
                     class="focus-chip focus-chip--compact focus-chip--interest"
                     :class="resolvePriceToneClass(block.price)"
                   >
@@ -409,9 +433,9 @@
               <view v-if="!isCurrentSectionCollapsed(`inventory:${section.price}`)" class="inventory-grid">
                 <button
                   v-for="item in section.items"
-                  :key="`current-${section.price}-${item.block_name}`"
+                  :key="`current-${section.price}-${resolveInventoryBlockKey(item)}`"
                   class="inventory-cell"
-                  :disabled="isInterestToggleLoading(currentMatch.match_id, item.block_name)"
+                  :disabled="isInterestToggleLoading(currentMatch.match_id, resolveInventoryBlockKey(item))"
                   hover-class="inventory-cell--pressed"
                   :class="resolveInventoryCellClass(item, section, currentMatch.match_id)"
                   @tap="handleBlockInterestToggle(currentMatch, item, 'current')"
@@ -423,7 +447,7 @@
                     <view class="inventory-cell__interest-meter">
                       <text
                         v-for="barIndex in 4"
-                        :key="`current-interest-bar-${item.block_name}-${barIndex}`"
+                        :key="`current-interest-bar-${resolveInventoryBlockKey(item)}-${barIndex}`"
                         class="inventory-cell__interest-bar"
                         :class="{ 'inventory-cell__interest-bar--active': barIndex <= resolveBlockInterestHeatLevel(item.interested_user_count) }"
                       />
@@ -496,7 +520,7 @@
         </template>
       </template>
 
-      <template v-else>
+      <template v-else-if="activeTab === 'history'">
         <view v-if="historyLoading" class="skeleton-stack">
           <view class="panel skeleton-panel">
             <view class="section-heading section-heading--compact">
@@ -636,7 +660,7 @@
                 <view class="focus-grid focus-grid--triple">
                   <view
                     v-for="block in historyFocusBlocks"
-                    :key="`history-focus-${block.block_name}`"
+                    :key="`history-focus-${block.block_key}`"
                     class="focus-chip focus-chip--compact"
                     :class="resolvePriceToneClass(block.price)"
                   >
@@ -661,7 +685,7 @@
                 <view class="focus-grid focus-grid--triple">
                   <view
                     v-for="block in historyInterestFocusBlocks"
-                    :key="`history-interest-focus-${block.block_name}`"
+                    :key="`history-interest-focus-${block.block_key}`"
                     class="focus-chip focus-chip--compact focus-chip--interest"
                     :class="resolvePriceToneClass(block.price)"
                   >
@@ -704,7 +728,7 @@
               <view v-if="!isHistorySectionCollapsed(`inventory:${section.price}`)" class="inventory-grid">
                 <view
                   v-for="item in section.items"
-                  :key="`history-${section.price}-${item.block_name}`"
+                  :key="`history-${section.price}-${resolveInventoryBlockKey(item)}`"
                   class="inventory-cell"
                   :class="resolveInventoryCellClass(item, section, displayedHistoryMatch.match_id, 'history')"
                 >
@@ -715,7 +739,7 @@
                     <view class="inventory-cell__interest-meter">
                       <text
                         v-for="barIndex in 4"
-                        :key="`history-interest-bar-${item.block_name}-${barIndex}`"
+                        :key="`history-interest-bar-${resolveInventoryBlockKey(item)}-${barIndex}`"
                         class="inventory-cell__interest-bar"
                         :class="{ 'inventory-cell__interest-bar--active': barIndex <= resolveBlockInterestHeatLevel(item.interested_user_count) }"
                       />
@@ -787,6 +811,91 @@
           </view>
         </template>
       </template>
+
+      <template v-else-if="activeTab === 'history-stats'">
+        <view v-if="historyLoading" class="skeleton-stack">
+          <view class="panel skeleton-panel">
+            <view class="section-heading section-heading--compact">
+              <view class="skeleton-copy-group">
+                <view class="skeleton-line skeleton-line--kicker" />
+                <view class="skeleton-line skeleton-line--section" />
+              </view>
+              <view class="skeleton-pill skeleton-pill--short" />
+            </view>
+
+            <view class="history-trend-summary">
+              <view v-for="index in 3" :key="`history-stats-skeleton-${index}`" class="history-trend-summary__item">
+                <view class="skeleton-line skeleton-line--label" />
+                <view class="skeleton-line skeleton-line--metric" />
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view v-else-if="historyErrorMessage" class="state-card state-card--error">
+          <text>{{ historyErrorMessage }}</text>
+        </view>
+
+        <view v-else-if="!historyMatches.length" class="state-card">
+          <text>当前没有历史比赛。</text>
+        </view>
+
+        <template v-else>
+          <view class="panel history-trend-panel">
+            <view class="section-heading section-heading--compact">
+              <view>
+                <text class="section-kicker">Replay Volume</text>
+                <text class="section-title">历史总回流走势</text>
+              </view>
+              <text class="meta-pill">
+                {{ historyTrendLoading ? '统计中' : `${historyRefluxTrend.loadedCount}/${historyRefluxTrend.totalCount} 场` }}
+              </text>
+            </view>
+
+            <view class="history-trend-summary">
+              <view class="history-trend-summary__item">
+                <text class="history-trend-summary__label">最近场</text>
+                <text class="history-trend-summary__value">{{ historyRefluxTrend.latestTotal }}</text>
+              </view>
+              <view class="history-trend-summary__item">
+                <text class="history-trend-summary__label">最高场</text>
+                <text class="history-trend-summary__value">{{ historyRefluxTrend.maxTotal }}</text>
+              </view>
+              <view class="history-trend-summary__item">
+                <text class="history-trend-summary__label">场均</text>
+                <text class="history-trend-summary__value">{{ historyRefluxTrend.averageTotal }}</text>
+              </view>
+            </view>
+
+            <scroll-view scroll-y class="history-trend-scroll" show-scrollbar="false">
+              <view class="history-trend-list">
+                <view
+                  v-for="point in historyRefluxTrend.points"
+                  :key="`history-trend-${point.match_id}`"
+                  class="history-trend-row"
+                  :class="[
+                    `history-trend-row--${point.tone}`,
+                    { 'history-trend-row--selected': point.is_selected },
+                  ]"
+                  @tap="handleHistoryMatchSelect(point.match_id)"
+                >
+                  <view class="history-trend-row__meta">
+                    <text class="history-trend-row__date">{{ point.label }}</text>
+                    <text class="history-trend-row__opponent">{{ point.teams }}</text>
+                  </view>
+                  <view class="history-trend-row__track">
+                    <view
+                      class="history-trend-row__bar"
+                      :style="{ width: formatHistoryTrendBarWidth(point) }"
+                    />
+                  </view>
+                  <text class="history-trend-row__value">{{ point.is_loaded ? point.total_occurrences : '...' }}</text>
+                </view>
+              </view>
+            </scroll-view>
+          </view>
+        </template>
+      </template>
   </view>
   <view v-if="pendingInterestSelection" class="interest-confirm-mask" @tap="closeInterestConfirm">
     <view class="interest-confirm-dialog" @tap.stop>
@@ -818,6 +927,10 @@ import {
   getTicketWatchMatches,
   getTicketWatchRegions,
   getTicketWatchTrackedInterests,
+  getYukunTicketWatchMatches,
+  getYukunCurrentTicketWatchMatch,
+  getYukunTicketWatchInventory,
+  getYukunTicketWatchRegions,
   toggleTicketWatchBlockInterest,
 } from '../../api/ticketWatch'
 import type { CurrentUser } from '../../types/auth'
@@ -851,7 +964,7 @@ import trendIcon from '../../static/ticket-watch/trend.svg'
 import {
   applyBlockInterestToSections,
   applyBlockInterestsToSections,
-  buildInventorySince,
+  buildHistoryRefluxTrend,
   buildRecentRefluxBuckets,
   buildTrackedInterestSummary,
   formatTicketWatchMembershipBadgeTier,
@@ -868,25 +981,31 @@ import {
   resolveRecentRefluxPanelMode,
   resolveRecentRefluxBucketRequiredTier,
   resolveHistoryBoardLoadStrategy,
+  requireInventorySince,
   selectCompletedMatches,
+  selectRefluxStatsMatches,
   summarizeInventoryBoard,
   type TicketWatchBoardStats,
   type TicketWatchCollapsedSectionState,
   type TicketWatchHistoryLoadReason,
+  type TicketWatchHistoryRefluxTrendPoint,
   type TicketWatchLoadReason,
   type TicketWatchRecentRefluxBucketKey,
   toggleTicketWatchSectionCollapsed,
 } from './helpers'
 
-type TicketWatchTab = 'current' | 'history'
+type TicketWatchBoardMode = 'current' | 'history'
+type TicketWatchTab = TicketWatchBoardMode | 'history-stats'
 type PendingInterestSelection = {
   match: TicketWatchMatchSummary
   item: TicketWatchGroupedInventoryItem
-  mode: TicketWatchTab
+  mode: TicketWatchBoardMode
   blockName: string
 }
+type TicketWatchTeam = 'chengdurongcheng' | 'yunnanyukun'
 
 const activeTab = ref<TicketWatchTab>('current')
+const selectedTeam = ref<TicketWatchTeam>('chengdurongcheng')
 const currentLoading = ref(true)
 const historyLoading = ref(true)
 const currentErrorMessage = ref('')
@@ -898,11 +1017,13 @@ const historyMatches = ref<TicketWatchMatchSummary[]>([])
 const selectedHistoryMatchId = ref<number | null>(null)
 const currentSections = ref<TicketWatchGroupedInventorySection[]>([])
 const historySections = ref<TicketWatchGroupedInventorySection[]>([])
+const historyTrendTotals = ref<Record<number, number>>({})
 const hasLoadedCurrentBoard = ref(false)
 const hasLoadedHistoryBoard = ref(false)
 const currentBoardRequestInFlight = ref(false)
 const historyBoardRequestInFlight = ref(false)
 const historySelectionLoading = ref(false)
+const historyTrendLoading = ref(false)
 const historyChipScrollLeft = ref(0)
 const displayedHistoryMatchId = ref<number | null>(null)
 const historySectionsCache = ref<Record<number, TicketWatchGroupedInventorySection[]>>({})
@@ -971,6 +1092,15 @@ const currentRecentRefluxPanelMode = computed(() =>
 const currentTrackedInterestSummary = computed(() => buildTrackedInterestSummary(currentTrackedInterests.value))
 const currentDecisionLines = computed(() => buildBoardDecisionLines(currentBoardStats.value, 'current'))
 const historyDecisionLines = computed(() => buildBoardDecisionLines(historyBoardStats.value, 'history'))
+const historyStatsMatches = computed(() => selectRefluxStatsMatches(historyMatches.value))
+const historyRefluxTrend = computed(() =>
+  buildHistoryRefluxTrend(
+    historyStatsMatches.value,
+    historyTrendTotals.value,
+    selectedHistoryMatchId.value,
+    selectedTeam.value === 'yunnanyukun' ? '云南玉昆' : '成都蓉城',
+  ),
+)
 const pollIntervalSeconds = computed(() =>
   normalizeTicketWatchPollIntervalSeconds(currentUser.value?.ticket_watch_poll_interval_seconds),
 )
@@ -1045,6 +1175,18 @@ function resolveFallbackMatchId(match: Pick<TicketWatchMatchSummary, 'match_id' 
   return parsed
 }
 
+function selectYukunCurrentMatch(matches: TicketWatchMatchSummary[]): TicketWatchMatchSummary | null {
+  const explicitCurrent = matches.find((match) => match.is_current)
+  if (explicitCurrent) {
+    return explicitCurrent
+  }
+
+  const now = Date.now()
+  return matches
+    .filter((match) => new Date(match.kickoff_at).getTime() >= now)
+    .sort((left, right) => new Date(left.kickoff_at).getTime() - new Date(right.kickoff_at).getTime())[0] ?? null
+}
+
 async function ensureRegions(): Promise<void> {
   if (regions.value.length) {
     return
@@ -1083,7 +1225,7 @@ async function loadCurrentTrackedInterests(matchId: number): Promise<void> {
   currentTrackedInterests.value = await getTicketWatchTrackedInterests(matchId)
 }
 
-async function refreshMatchInterests(matchId: number, mode: TicketWatchTab): Promise<void> {
+async function refreshMatchInterests(matchId: number, mode: TicketWatchBoardMode): Promise<void> {
   const interests = await getMatchInterestSections(matchId)
 
   if (mode === 'current') {
@@ -1103,8 +1245,43 @@ function buildInterestToggleKey(matchId: number, blockName: string): string {
   return `${matchId}:${blockName}`
 }
 
+function resolveInventoryBlockKey(item: Pick<TicketWatchGroupedInventoryItem, 'block_key' | 'block_name'>): string {
+  return item.block_key?.trim() || item.block_name
+}
+
 function isInterestToggleLoading(matchId: number, blockName: string): boolean {
   return Boolean(interestToggleLoading.value[buildInterestToggleKey(matchId, blockName)])
+}
+
+async function switchTeam(team: TicketWatchTeam): Promise<void> {
+  if (selectedTeam.value === team) {
+    return
+  }
+  selectedTeam.value = team
+  handleStopMonitoring()
+  resetCurrentBoard()
+  resetHistoryBoard()
+  await Promise.all([loadCurrentBoard('initial'), loadHistoryMatches('initial')])
+}
+
+function resetCurrentBoard(): void {
+  currentMatch.value = null
+  currentSections.value = []
+  currentTrackedInterests.value = []
+  currentErrorMessage.value = ''
+  hasLoadedCurrentBoard.value = false
+  currentMessage.value = '暂无当前比赛。'
+}
+
+function resetHistoryBoard(): void {
+  historyMatches.value = []
+  historySections.value = []
+  historySectionsCache.value = {}
+  historyTrendTotals.value = {}
+  selectedHistoryMatchId.value = null
+  displayedHistoryMatchId.value = null
+  historyErrorMessage.value = ''
+  hasLoadedHistoryBoard.value = false
 }
 
 async function loadCurrentBoard(reason: TicketWatchLoadReason = 'initial'): Promise<void> {
@@ -1124,20 +1301,10 @@ async function loadCurrentBoard(reason: TicketWatchLoadReason = 'initial'): Prom
   }
 
   try {
-    await ensureRegions()
-    const response = await getCurrentTicketWatchBoard()
-    currentMatch.value = response.current_match
-    currentMessage.value = response.message || (response.group_ticket_active ? '当前为套票窗口。' : '暂无当前比赛。')
-
-    if (response.current_match) {
-      currentSections.value = applyBlockInterestsToSections(
-        groupInventoryByPrice(regions.value, response.inventory),
-        response.block_interests,
-      )
-      currentTrackedInterests.value = response.tracked_interests
+    if (selectedTeam.value === 'yunnanyukun') {
+      await loadYukunCurrentBoard()
     } else {
-      currentSections.value = []
-      currentTrackedInterests.value = []
+      await loadChengduCurrentBoard()
     }
     hasLoadedCurrentBoard.value = true
   } catch (error) {
@@ -1148,6 +1315,49 @@ async function loadCurrentBoard(reason: TicketWatchLoadReason = 'initial'): Prom
     currentLoading.value = false
     currentBoardRequestInFlight.value = false
   }
+}
+
+async function loadChengduCurrentBoard(): Promise<void> {
+  await ensureRegions()
+  const response = await getCurrentTicketWatchBoard()
+  currentMatch.value = response.current_match
+  currentMessage.value = response.message || (response.group_ticket_active ? '当前为套票窗口。' : '暂无当前比赛。')
+
+  if (response.current_match) {
+    currentSections.value = applyBlockInterestsToSections(
+      groupInventoryByPrice(regions.value, response.inventory),
+      response.block_interests,
+    )
+    currentTrackedInterests.value = response.tracked_interests
+  } else {
+    currentSections.value = []
+    currentTrackedInterests.value = []
+  }
+}
+
+async function loadYukunCurrentBoard(): Promise<void> {
+  const response = await getYukunCurrentTicketWatchMatch()
+  const yukunMatch = response.current_match
+
+  if (!yukunMatch) {
+    currentMatch.value = null
+    currentMessage.value = response.message || '暂无云南玉昆的当前比赛。'
+    currentSections.value = []
+    currentTrackedInterests.value = []
+    return
+  }
+
+  currentMatch.value = yukunMatch
+  currentMessage.value = ''
+  const since = requireInventorySince(yukunMatch.sale_start_at)
+
+  const [inventory, yukunRegions] = await Promise.all([
+    getYukunTicketWatchInventory(yukunMatch.match_id, since),
+    getYukunTicketWatchRegions(yukunMatch.match_id, since),
+  ])
+
+  currentSections.value = groupInventoryByPrice(yukunRegions, inventory)
+  currentTrackedInterests.value = []
 }
 
 async function loadHistoryMatches(reason: TicketWatchHistoryLoadReason = 'initial'): Promise<void> {
@@ -1167,24 +1377,11 @@ async function loadHistoryMatches(reason: TicketWatchHistoryLoadReason = 'initia
   }
 
   try {
-    await ensureRegions()
-    const matches = await getTicketWatchMatches()
-    historyMatches.value = selectCompletedMatches(matches)
-
-    if (!historyMatches.value.length) {
-      selectedHistoryMatchId.value = null
-      historySections.value = []
-      return
+    if (selectedTeam.value === 'yunnanyukun') {
+      await loadYukunHistoryMatches()
+    } else {
+      await loadChengduHistoryMatches()
     }
-
-    if (
-      selectedHistoryMatchId.value === null ||
-      !historyMatches.value.some((match) => match.match_id === selectedHistoryMatchId.value)
-    ) {
-      selectedHistoryMatchId.value = historyMatches.value[0].match_id
-    }
-
-    await syncDisplayedHistoryMatch(selectedHistoryMatchId.value)
     hasLoadedHistoryBoard.value = true
   } catch (error) {
     historyErrorMessage.value = extractApiErrorMessage(error, '历史比赛库存加载失败，请稍后重试。')
@@ -1194,27 +1391,145 @@ async function loadHistoryMatches(reason: TicketWatchHistoryLoadReason = 'initia
   }
 }
 
+async function loadChengduHistoryMatches(): Promise<void> {
+  await ensureRegions()
+  const matches = await getTicketWatchMatches()
+  historyMatches.value = selectCompletedMatches(matches)
+  void loadHistoryRefluxTrendTotals(selectRefluxStatsMatches(historyMatches.value))
+
+  if (!historyMatches.value.length) {
+    selectedHistoryMatchId.value = null
+    historySections.value = []
+    return
+  }
+
+  if (
+    selectedHistoryMatchId.value === null ||
+    !historyMatches.value.some((match) => match.match_id === selectedHistoryMatchId.value)
+  ) {
+    selectedHistoryMatchId.value = historyMatches.value[0].match_id
+  }
+
+  await syncDisplayedHistoryMatch(selectedHistoryMatchId.value)
+}
+
+async function loadYukunHistoryMatches(): Promise<void> {
+  historyMatches.value = selectCompletedMatches(await getYukunTicketWatchMatches())
+
+  void loadHistoryRefluxTrendTotals(selectRefluxStatsMatches(historyMatches.value))
+
+  if (!historyMatches.value.length) {
+    selectedHistoryMatchId.value = null
+    historySections.value = []
+    return
+  }
+
+  if (
+    selectedHistoryMatchId.value === null ||
+    !historyMatches.value.some((match) => match.match_id === selectedHistoryMatchId.value)
+  ) {
+    selectedHistoryMatchId.value = historyMatches.value[0].match_id
+  }
+
+  await syncDisplayedHistoryMatch(selectedHistoryMatchId.value)
+}
+
 async function getHistoryInventorySections(matchId: number): Promise<TicketWatchGroupedInventorySection[]> {
   const cached = historySectionsCache.value[matchId]
   if (cached) {
     return cached
   }
 
+  if (selectedTeam.value === 'yunnanyukun') {
+    return getYukunHistoryInventorySections(matchId)
+  }
+
   const match = historyMatches.value.find((item) => item.match_id === matchId) ?? null
   const [inventory, interests] = await Promise.all([
     getTicketWatchInventorySince(
       matchId,
-      buildInventorySince(match?.sale_start_at),
+      requireInventorySince(match?.sale_start_at),
       resolveFallbackMatchId(match),
     ),
     getMatchInterestSections(matchId),
   ])
   const grouped = applyBlockInterestsToSections(groupInventoryByPrice(regions.value, inventory), interests)
+  cacheHistoryTrendTotal(matchId, sumInventoryOccurrences(inventory))
   historySectionsCache.value = {
     ...historySectionsCache.value,
     [matchId]: grouped,
   }
   return grouped
+}
+
+async function getYukunHistoryInventorySections(matchId: number): Promise<TicketWatchGroupedInventorySection[]> {
+  const match = historyMatches.value.find((item) => item.match_id === matchId) ?? null
+  const since = requireInventorySince(match?.sale_start_at)
+  const [inventory, yukunRegions] = await Promise.all([
+    getYukunTicketWatchInventory(matchId, since),
+    getYukunTicketWatchRegions(matchId, since),
+  ])
+  const grouped = groupInventoryByPrice(yukunRegions, inventory)
+  cacheHistoryTrendTotal(matchId, sumInventoryOccurrences(inventory))
+  historySectionsCache.value = {
+    ...historySectionsCache.value,
+    [matchId]: grouped,
+  }
+  return grouped
+}
+
+function sumInventoryOccurrences(inventory: Array<{ occurrences: number }>): number {
+  return inventory.reduce((sum, item) => sum + item.occurrences, 0)
+}
+
+function cacheHistoryTrendTotal(matchId: number, totalOccurrences: number): void {
+  if (historyTrendTotals.value[matchId] === totalOccurrences) {
+    return
+  }
+
+  historyTrendTotals.value = {
+    ...historyTrendTotals.value,
+    [matchId]: totalOccurrences,
+  }
+}
+
+async function loadHistoryRefluxTrendTotals(matches: TicketWatchMatchSummary[]): Promise<void> {
+  if (historyTrendLoading.value) {
+    return
+  }
+
+  const targetMatches = matches
+    .slice(0, 12)
+    .filter((match) => historyTrendTotals.value[match.match_id] === undefined)
+
+  if (!targetMatches.length) {
+    return
+  }
+
+  historyTrendLoading.value = true
+
+  try {
+    const isYukun = selectedTeam.value === 'yunnanyukun'
+    for (let i = 0; i < targetMatches.length; i += 3) {
+      const batch = targetMatches.slice(i, i + 3)
+      await Promise.all(batch.map(async (match) => {
+        const inventory = isYukun
+          ? await getYukunTicketWatchInventory(
+              match.match_id,
+              requireInventorySince(match.sale_start_at),
+            )
+          : await getTicketWatchInventorySince(
+              match.match_id,
+              requireInventorySince(match.sale_start_at),
+              resolveFallbackMatchId(match),
+            )
+        cacheHistoryTrendTotal(match.match_id, sumInventoryOccurrences(inventory))
+      }))
+    }
+  } catch {
+  } finally {
+    historyTrendLoading.value = false
+  }
 }
 
 async function syncDisplayedHistoryMatch(matchId: number | null): Promise<void> {
@@ -1266,7 +1581,7 @@ async function handleHistoryMatchSelect(matchId: number): Promise<void> {
 async function handleBlockInterestToggle(
   match: TicketWatchMatchSummary,
   item: TicketWatchGroupedInventoryItem,
-  mode: TicketWatchTab,
+  mode: TicketWatchBoardMode,
 ): Promise<void> {
   if (mode !== 'current') {
     return
@@ -1288,9 +1603,9 @@ async function handleBlockInterestToggle(
 async function submitBlockInterestToggle(
   match: TicketWatchMatchSummary,
   item: TicketWatchGroupedInventoryItem,
-  mode: TicketWatchTab,
+  mode: TicketWatchBoardMode,
 ): Promise<void> {
-  const toggleKey = buildInterestToggleKey(match.match_id, item.block_name)
+  const toggleKey = buildInterestToggleKey(match.match_id, resolveInventoryBlockKey(item))
   if (interestToggleLoading.value[toggleKey]) {
     return
   }
@@ -1486,11 +1801,19 @@ function formatRecentRefluxBucketRequiredTier(bucketKey: TicketWatchRecentReflux
   return resolveRecentRefluxBucketRequiredTier(bucketKey)
 }
 
+function formatHistoryTrendBarWidth(point: TicketWatchHistoryRefluxTrendPoint): string {
+  if (!point.is_loaded || point.total_occurrences <= 0) {
+    return '0%'
+  }
+
+  return `${Math.max(point.bar_percent, 8)}%`
+}
+
 function resolveInventoryCellClass(
   item: TicketWatchGroupedInventoryItem,
   section: TicketWatchGroupedInventorySection,
   matchId: number,
-  mode: TicketWatchTab = 'current',
+  mode: TicketWatchBoardMode = 'current',
 ): Array<string | Record<string, boolean>> {
   const occurrences = item.occurrences
   const maxOccurrences = section.items.reduce((selected, item) => Math.max(selected, item.occurrences), 0)
@@ -1505,7 +1828,7 @@ function resolveInventoryCellClass(
       'inventory-cell--heat-3': heatLevel === 3,
       'inventory-cell--heat-4': heatLevel === 4,
       'inventory-cell--wanted': item.viewer_interested,
-      'inventory-cell--busy': isInterestToggleLoading(matchId, item.block_name),
+      'inventory-cell--busy': isInterestToggleLoading(matchId, resolveInventoryBlockKey(item)),
       'inventory-cell--readonly': mode === 'history',
     },
   ]
@@ -2054,9 +2377,38 @@ onUnload(() => {
   min-height: 50rpx;
   padding: 0 22rpx;
 }
-.tab-switch {
+.team-switch {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
+  gap: 12rpx;
+  padding: 0 0 16rpx;
+  background: transparent;
+  border: 0;
+}
+.team-switch__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64rpx;
+  padding: 0 14rpx;
+  border-radius: 999rpx;
+  border: 2rpx solid rgba(235, 230, 221, 0.95);
+  background: rgba(255, 255, 255, 0.96);
+  color: #8a8d95;
+  font-size: 23rpx;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 8rpx 18rpx rgba(24, 28, 36, 0.04);
+}
+.team-switch__item--active {
+  border-color: #e63946;
+  background: #e63946;
+  color: #ffffff;
+  box-shadow: 0 10rpx 20rpx rgba(230, 57, 70, 0.12);
+}
+.tab-switch {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 12rpx;
   padding: 0;
   background: transparent;
@@ -2067,12 +2419,12 @@ onUnload(() => {
   align-items: center;
   justify-content: center;
   min-height: 64rpx;
-  padding: 0 24rpx;
+  padding: 0 14rpx;
   border-radius: 999rpx;
   border: 2rpx solid rgba(235, 230, 221, 0.95);
   background: rgba(255, 255, 255, 0.96);
   color: #8a8d95;
-  font-size: 24rpx;
+  font-size: 23rpx;
   font-weight: 700;
   text-align: center;
   box-shadow: 0 8rpx 18rpx rgba(24, 28, 36, 0.04);
@@ -3128,6 +3480,130 @@ onUnload(() => {
 .history-chip-scroll {
   width: 100%;
   margin-top: 14rpx;
+}
+.history-trend-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98));
+  border-color: rgba(227, 230, 238, 0.96);
+}
+.history-trend-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10rpx;
+  margin-top: 18rpx;
+}
+.history-trend-summary__item {
+  min-width: 0;
+  border-radius: 18rpx;
+  padding: 16rpx 14rpx;
+  background: linear-gradient(180deg, rgba(247, 248, 251, 0.98), rgba(255, 255, 255, 0.98));
+  border: 2rpx solid rgba(234, 236, 242, 0.96);
+}
+.history-trend-summary__label {
+  display: block;
+  color: #8d929e;
+  font-size: 18rpx;
+  line-height: 1;
+}
+.history-trend-summary__value {
+  display: block;
+  margin-top: 10rpx;
+  color: #15171d;
+  font-size: 34rpx;
+  font-weight: 800;
+  line-height: 1;
+}
+.history-trend-scroll {
+  width: 100%;
+  margin-top: 20rpx;
+  max-height: 620rpx;
+}
+.history-trend-list {
+  display: grid;
+  gap: 12rpx;
+  padding: 4rpx 0 2rpx;
+}
+.history-trend-row {
+  display: grid;
+  grid-template-columns: minmax(0, 178rpx) minmax(90rpx, 1fr) 92rpx;
+  align-items: center;
+  gap: 14rpx;
+  min-height: 84rpx;
+  padding: 14rpx 16rpx;
+  border-radius: 18rpx;
+  background: rgba(248, 249, 252, 0.94);
+  border: 2rpx solid rgba(234, 236, 242, 0.95);
+}
+.history-trend-row--selected {
+  background: linear-gradient(180deg, rgba(25, 27, 34, 0.98), rgba(21, 23, 29, 0.98));
+  border-color: #15171d;
+  box-shadow: 0 14rpx 24rpx rgba(21, 23, 29, 0.16);
+}
+.history-trend-row__meta {
+  min-width: 0;
+}
+.history-trend-row__date,
+.history-trend-row__opponent {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-trend-row__date {
+  color: #8d929e;
+  font-size: 18rpx;
+  font-weight: 700;
+  line-height: 1;
+}
+.history-trend-row__opponent {
+  margin-top: 8rpx;
+  color: #17191f;
+  font-size: 26rpx;
+  font-weight: 800;
+  line-height: 1.08;
+}
+.history-trend-row__track {
+  position: relative;
+  overflow: hidden;
+  height: 22rpx;
+  border-radius: 999rpx;
+  background: rgba(225, 229, 237, 0.9);
+}
+.history-trend-row__bar {
+  height: 100%;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, #99a3b4, #151b2b);
+  transition: width 0.24s ease;
+}
+.history-trend-row--low .history-trend-row__bar {
+  background: linear-gradient(90deg, #9dccaa, #34984a);
+}
+.history-trend-row--mid .history-trend-row__bar {
+  background: linear-gradient(90deg, #f2d477, #c28b13);
+}
+.history-trend-row--high .history-trend-row__bar {
+  background: linear-gradient(90deg, #f5a095, #dc3029);
+}
+.history-trend-row--empty .history-trend-row__bar {
+  background: transparent;
+}
+.history-trend-row--selected .history-trend-row__track {
+  background: rgba(255, 255, 255, 0.18);
+}
+.history-trend-row--selected .history-trend-row__bar {
+  background: linear-gradient(90deg, #f5d67a, #ffffff);
+}
+.history-trend-row__value {
+  color: #17191f;
+  font-size: 24rpx;
+  font-weight: 800;
+  line-height: 1;
+  text-align: right;
+}
+.history-trend-row--selected .history-trend-row__date,
+.history-trend-row--selected .history-trend-row__opponent,
+.history-trend-row--selected .history-trend-row__value {
+  color: #ffffff;
 }
 .history-chip-list {
   display: inline-flex;

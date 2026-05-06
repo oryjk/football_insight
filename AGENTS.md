@@ -38,6 +38,12 @@
 - database: `football_data`
 - 表前缀统一为 `f_i_`，代表 `football_insight`
 
+## 统计口径
+
+- 所有抢票、余票、回流相关统计，统一只统计“抢票开始后 10 分钟之后”的数据
+- 前端、后端、抓取器如需按比赛统计库存/回流，都必须使用 `sale_start_at + 10 minutes` 作为起算时间
+- 如果某场比赛缺少 `sale_start_at`，必须报错或跳过该统计入口；不要默默改成全量统计
+
 ## 当前部署约定
 
 - 生产服务器：`jd`
@@ -96,7 +102,10 @@ bun install
 bun run dev:h5
 bun run build:h5
 bun run dev:mp-weixin
+bun run build:mp-weixin
 ```
+
+**审核版本号**：用户说"改版本号"时，改的是 `.env.production` / `.env.development` 里的 `VITE_MINI_PROGRAM_VERSION`，同时更新 `src/api/system.ts` 里的 fallback。`manifest.json` 里的 `versionName` 只是展示用。
 
 ### 抓取器
 

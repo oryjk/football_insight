@@ -9,6 +9,7 @@ export interface TicketWatchMatchSummary {
   home_team_name: string
   away_team_name: string
   is_current: boolean
+  include_in_reflux_stats?: boolean
 }
 
 export interface TicketWatchCurrentMatchResponse {
@@ -27,6 +28,7 @@ export interface TicketWatchCurrentBoardResponse {
 }
 
 export interface TicketWatchRegion {
+  block_key?: string
   block_name: string
   price: string
   usable_count: number
@@ -34,12 +36,14 @@ export interface TicketWatchRegion {
 }
 
 export interface TicketWatchInventoryEntry {
+  block_key?: string
   block_name: string
   occurrences: number
   latest_time: string
 }
 
 export interface TicketWatchBlockInterest {
+  block_key?: string
   block_name: string
   interested_user_count: number
   viewer_interested: boolean
@@ -52,6 +56,7 @@ export interface TicketWatchTrackedInterest {
 }
 
 export interface TicketWatchGroupedInventoryItem {
+  block_key?: string
   block_name: string
   price: string
   occurrences: number

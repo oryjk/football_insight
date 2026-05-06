@@ -558,18 +558,25 @@
           >
             <view class="team-season-match-row__meta">
               <text>第 {{ match.roundNumber }} 轮 · {{ match.matchDate }} {{ match.matchTime }}</text>
-              <text class="team-season-match-row__result" :class="`team-season-match-row__result--${match.resultTone}`">
-                {{ match.resultLabel }}
-              </text>
+              <view class="team-season-match-row__meta-right">
+                <text class="team-season-match-row__venue" :class="match.isHomeTeam ? 'team-season-match-row__venue--home' : 'team-season-match-row__venue--away'">
+                  {{ match.venueLabel }}
+                </text>
+                <text class="team-season-match-row__result" :class="`team-season-match-row__result--${match.resultTone}`">
+                  {{ match.resultLabel }}
+                </text>
+              </view>
             </view>
             <view class="team-season-match-row__body">
-              <text class="team-season-match-row__team" :class="{ 'team-season-match-row__team--active': match.isHomeTeam }">
-                {{ match.homeTeamName }}
-              </text>
+              <view class="team-season-match-row__side team-season-match-row__side--left">
+                <image class="team-season-match-row__avatar" :src="match.teamAvatar || ''" mode="aspectFit" />
+                <text class="team-season-match-row__team team-season-match-row__team--active">{{ match.teamName }}</text>
+              </view>
               <text class="team-season-match-row__score">{{ match.scoreText }}</text>
-              <text class="team-season-match-row__team team-season-match-row__team--away" :class="{ 'team-season-match-row__team--active': !match.isHomeTeam }">
-                {{ match.awayTeamName }}
-              </text>
+              <view class="team-season-match-row__side team-season-match-row__side--right">
+                <text class="team-season-match-row__team team-season-match-row__team--away">{{ match.opponentName }}</text>
+                <image class="team-season-match-row__avatar" :src="match.opponentAvatar || ''" mode="aspectFit" />
+              </view>
             </view>
           </view>
         </scroll-view>
@@ -2306,31 +2313,54 @@ onShow(() => {
   color: #8f9198;
   font-size: 22rpx;
 }
+.team-season-match-row__meta-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+}
+.team-season-match-row__venue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 56rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 800;
+}
+.team-season-match-row__venue--home {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+.team-season-match-row__venue--away {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+}
 
 .team-season-match-row__result {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 96rpx;
-  padding: 8rpx 16rpx;
+  min-width: 56rpx;
+  padding: 4rpx 12rpx;
   border-radius: 999rpx;
-  font-size: 22rpx;
+  font-size: 20rpx;
   font-weight: 800;
 }
 
 .team-season-match-row__result--win {
-  background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
 }
 
 .team-season-match-row__result--draw {
-  background: rgba(148, 163, 184, 0.16);
-  color: #475569;
+  background: rgba(234, 179, 8, 0.12);
+  color: #b45309;
 }
 
 .team-season-match-row__result--loss {
-  background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
 }
 
 .team-season-match-row__result--live {
@@ -2345,9 +2375,27 @@ onShow(() => {
 
 .team-season-match-row__body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 18rpx;
+}
+
+.team-season-match-row__side {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+.team-season-match-row__side--left {
+  justify-content: flex-start;
+}
+.team-season-match-row__side--right {
+  justify-content: flex-end;
+}
+
+.team-season-match-row__avatar {
+  width: 36rpx;
+  height: 36rpx;
+  flex-shrink: 0;
 }
 
 .team-season-match-row__team {
@@ -2361,10 +2409,6 @@ onShow(() => {
 
 .team-season-match-row__team--active {
   color: #121212;
-}
-
-.team-season-match-row__team--away {
-  text-align: right;
 }
 
 .team-season-match-row__score {

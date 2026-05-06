@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use chrono::{FixedOffset, NaiveDateTime, TimeZone};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use url::form_urlencoded::byte_serialize;
 use uuid::Uuid;
 
 use crate::ticket_watch::{
@@ -112,6 +113,7 @@ impl TicketMonitorPort for HttpTicketMonitorPort {
             .into_iter()
             .flat_map(|group| group.list.into_iter())
             .map(|item| TicketWatchRegion {
+                block_key: item.name.clone(),
                 block_name: item.name,
                 price: item.price,
                 usable_count: item.usable_count,
@@ -139,6 +141,7 @@ impl TicketMonitorPort for HttpTicketMonitorPort {
                 .into_iter()
                 .map(|item| {
                     Ok(TicketWatchInventoryEntry {
+                        block_key: item.block_name.clone(),
                         block_name: item.block_name,
                         occurrences: item.occurrences,
                         latest_time: normalize_datetime(&item.latest_time)?,
@@ -222,6 +225,85 @@ impl TicketMonitorPort for HttpTicketMonitorPort {
             viewer_interested: payload.data.viewer_interested,
         })
     }
+
+    async fn fetch_yukun_matches(&self) -> anyhow::Result<Vec<TicketWatchMatchSummary>> {
+        let payload: ExternalYukunMatchListResponse = self.get_json("/api/yukun/matches").await?;
+        let mut matches = payload
+            .data
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|item| map_yukun_match_summary(item).ok())
+            .collect::<Vec<_>>();
+
+        matches.sort_by(|left, right| right.kickoff_at.cmp(&left.kickoff_at));
+        Ok(matches)
+    }
+
+    async fn fetch_yukun_current_match(&self) -> anyhow::Result<TicketWatchCurrentMatchView> {
+        let payload: ExternalYukunCurrentMatchResponse =
+            self.get_json("/api/yukun/matches/current").await?;
+
+        let has_match = payload.data.is_some();
+        let current_match = payload
+            .data
+            .and_then(|item| map_yukun_match_summary(item).ok());
+
+        Ok(TicketWatchCurrentMatchView {
+            current_match,
+            group_ticket_active: false,
+            message: if has_match {
+                "获取当前比赛成功".to_string()
+            } else {
+                "当前没有比赛".to_string()
+            },
+        })
+    }
+
+    async fn fetch_yukun_reflux(
+        &self,
+        match_id: i64,
+        since: Option<&str>,
+    ) -> anyhow::Result<(Vec<TicketWatchInventoryEntry>, Vec<TicketWatchRegion>)> {
+        let path = build_yukun_reflux_path(match_id, since)?;
+        let payload: ExternalYukunRefluxResponse = self.get_json(&path).await?;
+
+        let mut inventory_entries = Vec::new();
+        let mut regions = Vec::new();
+        let mut seen_blocks = std::collections::HashSet::new();
+
+        for group in payload.data {
+            for seat in group.seats {
+                let block_key = format!("yukun-seat:{}", seat.seat_base_id);
+                let block_name = format!("{}-{}", group.region_name, seat.estate_name);
+
+                if !seen_blocks.contains(&block_key) {
+                    seen_blocks.insert(block_key.clone());
+                    regions.push(TicketWatchRegion {
+                        block_key: block_key.clone(),
+                        block_name: block_name.clone(),
+                        price: seat.price.clone(),
+                        usable_count: 1,
+                        estate: seat.estate,
+                    });
+                }
+
+                inventory_entries.push(TicketWatchInventoryEntry {
+                    block_key,
+                    block_name,
+                    occurrences: seat.occurrences,
+                    latest_time: seat
+                        .latest_time
+                        .map(|t| normalize_datetime(&t).unwrap_or(t))
+                        .unwrap_or_default(),
+                });
+            }
+        }
+
+        inventory_entries.sort_by(|a, b| a.block_key.cmp(&b.block_key));
+        regions.sort_by(|a, b| a.block_key.cmp(&b.block_key));
+
+        Ok((inventory_entries, regions))
+    }
 }
 
 fn map_match_summary(item: ExternalMatchDto) -> anyhow::Result<TicketWatchMatchSummary> {
@@ -256,6 +338,45 @@ fn map_match_summary(item: ExternalMatchDto) -> anyhow::Result<TicketWatchMatchS
         home_team_name,
         away_team_name,
         is_current: item.is_current,
+        include_in_reflux_stats: item.include_in_reflux_stats,
+    })
+}
+
+fn map_yukun_match_summary(item: ExternalYukunMatchDto) -> anyhow::Result<TicketWatchMatchSummary> {
+    let external_match_id = item.match_id.trim().to_string();
+    let match_id = external_match_id
+        .parse::<i64>()
+        .with_context(|| format!("invalid yukun match id: {external_match_id}"))?;
+    let kickoff_source = item
+        .match_time
+        .as_deref()
+        .map(normalize_datetime)
+        .transpose()?
+        .unwrap_or_default();
+    let (match_date, match_time) = item
+        .match_time
+        .as_deref()
+        .map(split_kickoff_label)
+        .transpose()?
+        .unwrap_or_else(|| ("".to_string(), "".to_string()));
+    let sale_start_at = item
+        .begin_time
+        .as_deref()
+        .map(normalize_datetime)
+        .transpose()?;
+
+    Ok(TicketWatchMatchSummary {
+        match_id,
+        external_match_id,
+        round_number: item.round,
+        sale_start_at,
+        match_date,
+        match_time,
+        kickoff_at: kickoff_source,
+        home_team_name: item.home_name.unwrap_or_else(|| "云南玉昆".to_string()),
+        away_team_name: item.away_name.unwrap_or_else(|| "未知对手".to_string()),
+        is_current: item.is_current,
+        include_in_reflux_stats: item.begin_time.is_some(),
     })
 }
 
@@ -264,32 +385,21 @@ fn build_inventory_history_path(match_id: i64, since: Option<&str>) -> anyhow::R
     let mut url = reqwest::Url::parse(&base).context("failed to build inventory url")?;
 
     if let Some(since) = since.filter(|value| !value.trim().is_empty()) {
-        url.query_pairs_mut().append_pair("since", since);
+        let encoded = percent_encode(since);
+        url.set_query(Some(&format!("since={encoded}")));
     }
 
-    let mut path = url.path().to_string();
-    if let Some(query) = url.query() {
-        path.push('?');
-        path.push_str(query);
-    }
-
-    Ok(path)
+    Ok(url.as_str().trim_start_matches(DEFAULT_TICKET_MONITOR_BASE_URL).to_string())
 }
 
 fn build_tracked_interest_path(match_id: i64, user_id: Uuid) -> anyhow::Result<String> {
     let base =
         format!("{DEFAULT_TICKET_MONITOR_BASE_URL}/api/match/block-interest-tracking/{match_id}");
     let mut url = reqwest::Url::parse(&base).context("failed to build tracked interest url")?;
-    url.query_pairs_mut()
-        .append_pair("user_id", &user_id.to_string());
+    let encoded = percent_encode(&user_id.to_string());
+    url.set_query(Some(&format!("user_id={encoded}")));
 
-    let mut path = url.path().to_string();
-    if let Some(query) = url.query() {
-        path.push('?');
-        path.push_str(query);
-    }
-
-    Ok(path)
+    Ok(url.as_str().trim_start_matches(DEFAULT_TICKET_MONITOR_BASE_URL).to_string())
 }
 
 fn resolve_inventory_lookup_match_ids(match_id: i64, fallback_match_id: Option<i64>) -> Vec<i64> {
@@ -310,21 +420,31 @@ fn build_block_interest_path(
     let mut url = reqwest::Url::parse(&base).context("failed to build block interest url")?;
 
     if let Some(viewer_user_id) = viewer_user_id {
-        url.query_pairs_mut()
-            .append_pair("user_id", &viewer_user_id.to_string());
+        let encoded = percent_encode(&viewer_user_id.to_string());
+        url.set_query(Some(&format!("user_id={encoded}")));
     }
 
-    let mut path = url.path().to_string();
-    if let Some(query) = url.query() {
-        path.push('?');
-        path.push_str(query);
-    }
-
-    Ok(path)
+    Ok(url.as_str().trim_start_matches(DEFAULT_TICKET_MONITOR_BASE_URL).to_string())
 }
 
 fn build_toggle_block_interest_path(match_id: i64) -> String {
     format!("/api/match/block-interests/{match_id}/toggle")
+}
+
+fn build_yukun_reflux_path(match_id: i64, since: Option<&str>) -> anyhow::Result<String> {
+    let base = format!("{DEFAULT_TICKET_MONITOR_BASE_URL}/api/yukun/seats/{match_id}/reflux");
+    let mut url = reqwest::Url::parse(&base).context("failed to build yukun reflux url")?;
+
+    if let Some(since) = since.filter(|value| !value.trim().is_empty()) {
+        let encoded = percent_encode(since);
+        url.set_query(Some(&format!("since={encoded}")));
+    }
+
+    Ok(url.as_str().trim_start_matches(DEFAULT_TICKET_MONITOR_BASE_URL).to_string())
+}
+
+fn percent_encode(value: &str) -> String {
+    byte_serialize(value.as_bytes()).collect()
 }
 
 fn normalize_datetime(value: &str) -> anyhow::Result<String> {
@@ -347,6 +467,10 @@ fn split_kickoff_label(value: &str) -> anyhow::Result<(String, String)> {
 }
 
 fn parse_naive_datetime(value: &str) -> anyhow::Result<NaiveDateTime> {
+    if let Ok(parsed) = chrono::DateTime::parse_from_rfc3339(value) {
+        return Ok(parsed.naive_local());
+    }
+
     for format in [
         "%Y-%m-%dT%H:%M:%S%.f",
         "%Y-%m-%d %H:%M:%S%.f",
@@ -397,6 +521,12 @@ struct ExternalMatchDto {
     #[serde(default)]
     match_id: Option<String>,
     round: i32,
+    #[serde(default = "default_include_in_reflux_stats")]
+    include_in_reflux_stats: bool,
+}
+
+fn default_include_in_reflux_stats() -> bool {
+    true
 }
 
 #[derive(Debug, Deserialize)]
@@ -469,12 +599,65 @@ struct ExternalToggleBlockInterestRequest {
     user_id: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct ExternalYukunRefluxResponse {
+    #[serde(default)]
+    data: Vec<ExternalYukunRefluxGroup>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExternalYukunMatchListResponse {
+    #[serde(default)]
+    data: Option<Vec<ExternalYukunMatchDto>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExternalYukunCurrentMatchResponse {
+    #[serde(default)]
+    success: bool,
+    #[serde(default)]
+    data: Option<ExternalYukunMatchDto>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExternalYukunMatchDto {
+    #[serde(default)]
+    away_name: Option<String>,
+    #[serde(default)]
+    match_time: Option<String>,
+    #[serde(default)]
+    home_name: Option<String>,
+    is_current: bool,
+    match_id: String,
+    round: i32,
+    #[serde(default)]
+    begin_time: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExternalYukunRefluxGroup {
+    region_name: String,
+    #[serde(default)]
+    seats: Vec<ExternalYukunRefluxSeat>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExternalYukunRefluxSeat {
+    seat_base_id: i64,
+    estate: i32,
+    estate_name: String,
+    #[serde(default)]
+    latest_time: Option<String>,
+    occurrences: i32,
+    price: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         ExternalMatchDto, build_block_interest_path, build_inventory_history_path,
-        build_toggle_block_interest_path, build_tracked_interest_path, map_match_summary,
-        resolve_inventory_lookup_match_ids,
+        build_toggle_block_interest_path, build_tracked_interest_path,
+        build_yukun_reflux_path, map_match_summary, resolve_inventory_lookup_match_ids,
     };
     use uuid::Uuid;
 
@@ -547,6 +730,7 @@ mod tests {
             is_current: true,
             match_id: Some("74".to_string()),
             round: 4,
+            include_in_reflux_stats: true,
         })
         .expect("summary");
 
@@ -569,6 +753,7 @@ mod tests {
             is_current: false,
             match_id: Some("78".to_string()),
             round: 8,
+            include_in_reflux_stats: true,
         })
         .expect("summary");
 
@@ -577,5 +762,15 @@ mod tests {
             Some("2026-04-23T14:00:00+08:00")
         );
         assert_eq!(summary.kickoff_at, "2026-04-25T19:00:00+08:00");
+    }
+
+    #[test]
+    fn build_yukun_reflux_path_should_encode_plus_sign() {
+        let path = build_yukun_reflux_path(29, Some("2026-04-17T22:10:00+08:00")).unwrap();
+        println!("path: {}", path);
+        assert!(
+            path.contains("%2B"),
+            "plus sign should be encoded as %2B, got: {path}"
+        );
     }
 }

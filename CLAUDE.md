@@ -27,10 +27,11 @@
 ### Frontend (`football_insight_mini/`)
 
 ```bash
-bun install          # 安装依赖
-bun run dev:h5       # H5 开发服务器
-bun run build:h5     # H5 生产构建，输出到 dist/build/h5/
-bun run dev:mp-weixin   # 微信小程序开发
+bun install                # 安装依赖
+bun run dev:h5             # H5 开发服务器
+bun run build:h5           # H5 生产构建，输出到 dist/build/h5/
+bun run dev:mp-weixin      # 微信小程序开发
+bun run build:mp-weixin    # 微信小程序生产构建，输出到 dist/build/mp-weixin/
 ```
 
 ### Backend (`football_insight_service_backend_rs/`)
@@ -99,6 +100,20 @@ uv run sina-csl-scraper scrape --season 2026 --upload-avatars --write-db  # 含�
 ## Frontend Structure
 
 前端代码位于 `football_insight_mini/src/`，由 uni-app 同时产出微信小程序和 H5。
+
+### 审核版本号
+
+当用户说"改版本号"或"改审核版本号"时，指的是**提交微信小程序审核时传给后端的版本号**。
+
+这个值在三个地方使用，改版本号时必须**同时修改**：
+
+1. `.env.production` → `VITE_MINI_PROGRAM_VERSION`
+2. `.env.development` → `VITE_MINI_PROGRAM_VERSION`
+3. `src/api/system.ts` → `DEFAULT_MINI_PROGRAM_VERSION` fallback 默认值
+
+`src/manifest.json` 里的 `versionName` 只是微信小程序平台上**展示给用户看**的版本号，不影响 API 请求。
+
+**总结**：审核版本号 = `.env` 里的 `VITE_MINI_PROGRAM_VERSION`，不是 `manifest.json` 里的 `versionName`。
 
 ## Backend Structure (Hexagonal Architecture)
 

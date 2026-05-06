@@ -5,7 +5,7 @@ function normalizeEnvValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-const DEFAULT_MINI_PROGRAM_VERSION = import.meta.env.PROD ? '1.0.40' : '1.0.41'
+const DEFAULT_MINI_PROGRAM_VERSION = import.meta.env.PROD ? '1.0.42' : '1.0.42'
 
 export const MINI_PROGRAM_VERSION =
   normalizeEnvValue(import.meta.env.VITE_MINI_PROGRAM_VERSION) || DEFAULT_MINI_PROGRAM_VERSION

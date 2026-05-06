@@ -32,14 +32,30 @@ export function getTicketWatchMatches(): Promise<TicketWatchMatchSummary[]> {
   })
 }
 
+export function getYukunTicketWatchMatches(): Promise<TicketWatchMatchSummary[]> {
+  return request<TicketWatchMatchSummary[]>({
+    url: '/ticket-watch/yukun/matches',
+  })
+}
+
+export function getYukunCurrentTicketWatchMatch(): Promise<TicketWatchCurrentMatchResponse> {
+  return request<TicketWatchCurrentMatchResponse>({
+    url: '/ticket-watch/yukun/current-match',
+  })
+}
+
 export function getTicketWatchRegions(): Promise<TicketWatchRegion[]> {
   return request<TicketWatchRegion[]>({
     url: '/ticket-watch/regions',
   })
 }
 
-export function getTicketWatchInventory(matchId: number): Promise<TicketWatchInventoryEntry[]> {
-  return getTicketWatchInventorySince(matchId)
+export function getTicketWatchInventory(
+  matchId: number,
+  since: string,
+  fallbackMatchId?: number | null,
+): Promise<TicketWatchInventoryEntry[]> {
+  return getTicketWatchInventorySince(matchId, since, fallbackMatchId)
 }
 
 export function buildTicketWatchInventoryUrl(
@@ -47,11 +63,14 @@ export function buildTicketWatchInventoryUrl(
   since?: string | null,
   fallbackMatchId?: number | null,
 ): string {
+  const normalizedSince = since?.trim()
+  if (!normalizedSince) {
+    throw new Error('sale_start_at is required to build inventory since; refusing full inventory query')
+  }
+
   const queryParts: string[] = []
 
-  if (since) {
-    queryParts.push(`since=${encodeURIComponent(since)}`)
-  }
+  queryParts.push(`since=${encodeURIComponent(normalizedSince)}`)
 
   if (fallbackMatchId && fallbackMatchId !== matchId) {
     queryParts.push(`fallback_match_id=${encodeURIComponent(String(fallbackMatchId))}`)
@@ -101,5 +120,45 @@ export function toggleTicketWatchBlockInterest(
       block_name: blockName,
     },
     auth: true,
+  })
+}
+
+export function buildYukunTicketWatchInventoryUrl(
+  matchId: number,
+  since?: string | null,
+): string {
+  const normalizedSince = since?.trim()
+  if (!normalizedSince) {
+    throw new Error('sale_start_at is required to build inventory since; refusing full inventory query')
+  }
+  return `/ticket-watch/yukun/matches/${matchId}/inventory?since=${encodeURIComponent(normalizedSince)}`
+}
+
+export function getYukunTicketWatchInventory(
+  matchId: number,
+  since?: string | null,
+): Promise<TicketWatchInventoryEntry[]> {
+  return request<TicketWatchInventoryEntry[]>({
+    url: buildYukunTicketWatchInventoryUrl(matchId, since),
+  })
+}
+
+export function buildYukunTicketWatchRegionsUrl(
+  matchId: number,
+  since?: string | null,
+): string {
+  const normalizedSince = since?.trim()
+  if (!normalizedSince) {
+    throw new Error('sale_start_at is required to build regions since; refusing full regions query')
+  }
+  return `/ticket-watch/yukun/matches/${matchId}/regions?since=${encodeURIComponent(normalizedSince)}`
+}
+
+export function getYukunTicketWatchRegions(
+  matchId: number,
+  since?: string | null,
+): Promise<TicketWatchRegion[]> {
+  return request<TicketWatchRegion[]>({
+    url: buildYukunTicketWatchRegionsUrl(matchId, since),
   })
 }

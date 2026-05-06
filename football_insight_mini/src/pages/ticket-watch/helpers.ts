@@ -22,6 +22,7 @@ export interface TicketWatchCurrentLoadStrategy {
 }
 
 export interface TicketWatchBoardTopBlock {
+  block_key: string
   block_name: string
   price: string
   occurrences: number
@@ -29,6 +30,7 @@ export interface TicketWatchBoardTopBlock {
 }
 
 export interface TicketWatchBoardTopInterestBlock {
+  block_key: string
   block_name: string
   price: string
   interested_user_count: number
@@ -58,6 +60,7 @@ export type TicketWatchRecentRefluxBucketKey = 'within3' | 'within10' | 'within3
 export type TicketWatchRecentRefluxPanelMode = 'hidden' | 'locked' | 'unlocked'
 
 export interface TicketWatchRecentRefluxItem {
+  block_key: string
   block_name: string
   price: string
   occurrences: number
@@ -70,6 +73,33 @@ export interface TicketWatchRecentRefluxBucket {
   title: string
   subtitle: string
   items: TicketWatchRecentRefluxItem[]
+}
+
+export type TicketWatchHistoryRefluxTrendTone = 'empty' | 'low' | 'mid' | 'high'
+
+export interface TicketWatchHistoryRefluxTrendPoint {
+  match_id: number
+  label: string
+  teams: string
+  total_occurrences: number
+  bar_percent: number
+  is_selected: boolean
+  is_loaded: boolean
+  tone: TicketWatchHistoryRefluxTrendTone
+}
+
+export interface TicketWatchHistoryRefluxTrend {
+  points: TicketWatchHistoryRefluxTrendPoint[]
+  maxTotal: number
+  averageTotal: number
+  latestTotal: number
+  loadedCount: number
+  totalCount: number
+}
+
+function resolveTicketWatchBlockKey(block: { block_key?: string | null; block_name: string }): string {
+  const blockKey = block.block_key?.trim()
+  return blockKey || block.block_name
 }
 
 export function formatTicketWatchMembershipBadgeTier(membershipTier?: string | null): string {
@@ -122,17 +152,100 @@ export function selectCompletedMatches(
     .sort((left, right) => new Date(right.kickoff_at).getTime() - new Date(left.kickoff_at).getTime())
 }
 
+export function selectRefluxStatsMatches(
+  matches: TicketWatchMatchSummary[],
+): TicketWatchMatchSummary[] {
+  return matches.filter((match) => match.include_in_reflux_stats !== false)
+}
+
+export function buildHistoryRefluxTrend(
+  matches: TicketWatchMatchSummary[],
+  totalsByMatchId: Record<number, number | undefined>,
+  selectedMatchId: number | null,
+  primaryTeamName: string = '成都蓉城',
+): TicketWatchHistoryRefluxTrend {
+  const loadedTotals = matches
+    .map((match) => totalsByMatchId[match.match_id])
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+    .map((value) => Math.max(0, value))
+  const maxTotal = loadedTotals.reduce((selected, value) => Math.max(selected, value), 0)
+  const loadedCount = loadedTotals.length
+  const averageTotal = loadedCount
+    ? Math.round(loadedTotals.reduce((sum, value) => sum + value, 0) / loadedCount)
+    : 0
+
+  return {
+    points: matches.map((match) => {
+      const rawTotal = totalsByMatchId[match.match_id]
+      const isLoaded = typeof rawTotal === 'number' && Number.isFinite(rawTotal)
+      const total = isLoaded ? Math.max(0, rawTotal) : 0
+      const barPercent = maxTotal > 0 ? Math.round((total / maxTotal) * 100) : 0
+
+      return {
+        match_id: match.match_id,
+        label: match.match_date.slice(5),
+        teams: resolveHistoryRefluxOpponentName(match, primaryTeamName),
+        total_occurrences: total,
+        bar_percent: barPercent,
+        is_selected: selectedMatchId === match.match_id,
+        is_loaded: isLoaded,
+        tone: resolveHistoryRefluxTrendTone(barPercent, total),
+      }
+    }),
+    maxTotal,
+    averageTotal,
+    latestTotal: loadedTotals[0] ?? 0,
+    loadedCount,
+    totalCount: matches.length,
+  }
+}
+
+function resolveHistoryRefluxOpponentName(
+  match: TicketWatchMatchSummary,
+  primaryTeamName: string,
+): string {
+  if (match.home_team_name === primaryTeamName) {
+    return match.away_team_name
+  }
+
+  if (match.away_team_name === primaryTeamName) {
+    return match.home_team_name
+  }
+
+  return `${match.home_team_name} vs ${match.away_team_name}`
+}
+
+function resolveHistoryRefluxTrendTone(
+  barPercent: number,
+  totalOccurrences: number,
+): TicketWatchHistoryRefluxTrendTone {
+  if (totalOccurrences <= 0) {
+    return 'empty'
+  }
+
+  if (barPercent >= 75) {
+    return 'high'
+  }
+
+  if (barPercent >= 35) {
+    return 'mid'
+  }
+
+  return 'low'
+}
+
 export function groupInventoryByPrice(
   regions: TicketWatchRegion[],
   inventory: TicketWatchInventoryEntry[],
 ): TicketWatchGroupedInventorySection[] {
   const inventoryMap = new Map<string, TicketWatchInventoryEntry>()
-  inventory.forEach((item) => inventoryMap.set(item.block_name, item))
+  inventory.forEach((item) => inventoryMap.set(resolveTicketWatchBlockKey(item), item))
 
   const grouped = new Map<string, TicketWatchGroupedInventorySection>()
 
   regions.forEach((region) => {
-    const matched = inventoryMap.get(region.block_name)
+    const blockKey = resolveTicketWatchBlockKey(region)
+    const matched = inventoryMap.get(blockKey)
     const section = grouped.get(region.price) ?? {
       price: region.price,
       region_count: 0,
@@ -148,6 +261,7 @@ export function groupInventoryByPrice(
     }
 
     section.items.push({
+      block_key: blockKey,
       block_name: region.block_name,
       price: region.price,
       occurrences: matched?.occurrences ?? 0,
@@ -163,7 +277,10 @@ export function groupInventoryByPrice(
   return Array.from(grouped.values())
     .map((section) => ({
       ...section,
-      items: section.items.sort((left, right) => left.block_name.localeCompare(right.block_name, 'zh-CN')),
+      items: section.items.sort((left, right) => (
+        left.block_name.localeCompare(right.block_name, 'zh-CN') ||
+        resolveTicketWatchBlockKey(left).localeCompare(resolveTicketWatchBlockKey(right))
+      )),
     }))
     .sort((left, right) => Number(left.price) - Number(right.price))
 }
@@ -172,12 +289,12 @@ export function applyBlockInterestsToSections(
   sections: TicketWatchGroupedInventorySection[],
   interests: TicketWatchBlockInterest[],
 ): TicketWatchGroupedInventorySection[] {
-  const interestMap = new Map(interests.map((item) => [item.block_name, item]))
+  const interestMap = new Map(interests.map((item) => [resolveTicketWatchBlockKey(item), item]))
 
   return sections.map((section) => ({
     ...section,
     items: section.items.map((item) => {
-      const interest = interestMap.get(item.block_name)
+      const interest = interestMap.get(resolveTicketWatchBlockKey(item))
 
       return {
         ...item,
@@ -192,10 +309,12 @@ export function applyBlockInterestToSections(
   sections: TicketWatchGroupedInventorySection[],
   interest: TicketWatchBlockInterest,
 ): TicketWatchGroupedInventorySection[] {
+  const interestBlockKey = resolveTicketWatchBlockKey(interest)
+
   return sections.map((section) => ({
     ...section,
     items: section.items.map((item) => {
-      if (item.block_name !== interest.block_name) {
+      if (resolveTicketWatchBlockKey(item) !== interestBlockKey) {
         return item
       }
 
@@ -305,6 +424,7 @@ export function summarizeInventoryBoard(
       section.items
         .filter((item) => item.has_inventory && !isVipInventoryBlock(item.block_name))
         .map((item) => ({
+          block_key: resolveTicketWatchBlockKey(item),
           block_name: item.block_name,
           price: item.price,
           occurrences: item.occurrences,
@@ -325,6 +445,7 @@ export function summarizeInventoryBoard(
       section.items
         .filter((item) => item.interested_user_count > 0 && !isVipInventoryBlock(item.block_name))
         .map((item) => ({
+          block_key: resolveTicketWatchBlockKey(item),
           block_name: item.block_name,
           price: item.price,
           interested_user_count: item.interested_user_count,
@@ -391,6 +512,15 @@ export function buildInventorySince(saleStartAt?: string | null): string | null 
   }
 
   return formatDateWithOffset(date, offsetMinutes)
+}
+
+export function requireInventorySince(saleStartAt?: string | null): string {
+  const since = buildInventorySince(saleStartAt)
+  if (!since) {
+    throw new Error('sale_start_at is required to build inventory since; refusing full inventory query')
+  }
+
+  return since
 }
 
 export function resolveInventoryHeatLevel(occurrences: number, maxOccurrences: number): number {
@@ -500,6 +630,7 @@ export function buildRecentRefluxBuckets(
           : buckets[2]
 
       bucket.items.push({
+        block_key: resolveTicketWatchBlockKey(item),
         block_name: item.block_name,
         price: item.price,
         occurrences: item.occurrences,

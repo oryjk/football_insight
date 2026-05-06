@@ -155,6 +155,34 @@ mod tests {
         {
             unreachable!()
         }
+
+        async fn fetch_yukun_matches(
+            &self,
+        ) -> anyhow::Result<Vec<crate::ticket_watch::domain::ticket_watch::TicketWatchMatchSummary>>
+        {
+            Ok(vec![])
+        }
+
+        async fn fetch_yukun_current_match(
+            &self,
+        ) -> anyhow::Result<crate::ticket_watch::domain::ticket_watch::TicketWatchCurrentMatchView> {
+            Ok(crate::ticket_watch::domain::ticket_watch::TicketWatchCurrentMatchView {
+                current_match: None,
+                group_ticket_active: false,
+                message: "".to_string(),
+            })
+        }
+
+        async fn fetch_yukun_reflux(
+            &self,
+            _match_id: i64,
+            _since: Option<&str>,
+        ) -> anyhow::Result<(
+            Vec<crate::ticket_watch::domain::ticket_watch::TicketWatchInventoryEntry>,
+            Vec<crate::ticket_watch::domain::ticket_watch::TicketWatchRegion>,
+        )> {
+            Ok((vec![], vec![]))
+        }
     }
 
     struct StubTrackedInterestCachePort {

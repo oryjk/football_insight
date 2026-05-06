@@ -36,4 +36,16 @@ pub trait TicketMonitorPort: Send + Sync {
         user_id: Uuid,
         block_name: &str,
     ) -> anyhow::Result<TicketWatchBlockInterest>;
+
+    /// Fetch Yukun (Yunnan Yukun) seat reflux data.
+    /// Returns (inventory_entries, regions) where regions are derived from the reflux data itself.
+    async fn fetch_yukun_matches(&self) -> anyhow::Result<Vec<TicketWatchMatchSummary>>;
+
+    async fn fetch_yukun_current_match(&self) -> anyhow::Result<TicketWatchCurrentMatchView>;
+
+    async fn fetch_yukun_reflux(
+        &self,
+        match_id: i64,
+        since: Option<&str>,
+    ) -> anyhow::Result<(Vec<TicketWatchInventoryEntry>, Vec<TicketWatchRegion>)>;
 }

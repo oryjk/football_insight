@@ -55,6 +55,9 @@ function createRecentMatch(overrides: Partial<OverviewMatch> = {}): OverviewMatc
     home_score: '2',
     away_team_name: '上海海港',
     away_score: '1',
+    technical_stats: [],
+    home_corners: null,
+    away_corners: null,
     ...overrides,
   }
 }
@@ -533,7 +536,7 @@ describe('resolveHomeTeamSeasonMatches', () => {
       resultTone: matches[1]?.resultTone,
       opponentName: matches[1]?.opponentName,
     }).toEqual({
-      resultLabel: '进行中',
+      resultLabel: '进',
       resultTone: 'live',
       opponentName: '云南玉昆',
     })
@@ -543,7 +546,7 @@ describe('resolveHomeTeamSeasonMatches', () => {
       scoreText: matches[2]?.scoreText,
       opponentName: matches[2]?.opponentName,
     }).toEqual({
-      resultLabel: '未开赛',
+      resultLabel: '未',
       resultTone: 'scheduled',
       scoreText: 'VS',
       opponentName: '浙江队',

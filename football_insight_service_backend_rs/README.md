@@ -126,8 +126,18 @@ docker run -d \
   - `/api/v1/ticket-watch/matches`
   - `/api/v1/ticket-watch/regions`
   - `/api/v1/ticket-watch/matches/{match_id}/inventory`
+  - `/api/v1/ticket-watch/yukun/matches`
+  - `/api/v1/ticket-watch/yukun/matches/{match_id}/regions`
+  - `/api/v1/ticket-watch/yukun/matches/{match_id}/inventory`
   - `/api/v1/ticket-watch/matches/{match_id}/interests`
   - `/api/v1/ticket-watch/matches/{match_id}/interests/toggle`
+
+余票监控数据来自同机 `ticket-monitor-axum` HTTP API，不由本服务直接查询 MySQL。成都蓉城使用 `/api/v1/ticket-watch/matches`，云南玉昆使用 `/api/v1/ticket-watch/yukun/matches`；比赛摘要会返回 `sale_start_at` 和 `include_in_reflux_stats`：
+
+- `sale_start_at` 是回流统计起算时间的来源
+- 库存接口必须带 `since=sale_start_at+10分钟`；缺失或空值会直接报错，避免退回全量统计
+- `include_in_reflux_stats=false` 表示该场不纳入历史总回流走势等跨场统计
+- 区域和库存响应里的 `block_key` 是应用层唯一键，`block_name` 只用于展示；成都蓉城当前二者相同，云南玉昆使用 `rs_yukun_seat_base.id` 派生的 `yukun-seat:{seat_base_id}` 作为 `block_key`
 - 球队战术板
   - `/api/v1/team-boards/{team_id}`
   - `/api/v1/team-boards/posts/{post_id}/comments`
