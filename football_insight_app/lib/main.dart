@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'app.dart';
+import 'package:football_insight_app/app.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const FootballInsightApp());
+  runApp(const ProviderScope(child: FootballInsightApp()));
 }

@@ -11,6 +11,15 @@ class SeatRegion {
     this.isTracked = false,
   });
 
+  factory SeatRegion.fromMap(Map<String, dynamic> map) {
+    return SeatRegion(
+      blockName: map['block_name'] as String,
+      priceLevel: map['price_level'] as String?,
+      availableCount: map['available_count'] as int?,
+      isTracked: map['is_tracked'] as bool? ?? false,
+    );
+  }
+
   SeatRegion copyWith({bool? isTracked, int? availableCount}) {
     return SeatRegion(
       blockName: blockName,
