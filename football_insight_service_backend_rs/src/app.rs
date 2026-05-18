@@ -42,6 +42,15 @@ use crate::{
             reset_password_with_invite::ResetPasswordWithInviteUseCase,
         },
     },
+    auth_license::{
+        adapters::{
+            persistence::postgres_license_repository::PostgresLicenseRepository,
+            web::{handlers::AuthLicenseWebState, routes::auth_license_routes},
+        },
+        application::{
+            bind_license::BindLicenseUseCase, generate_license::GenerateLicenseUseCase,
+        },
+    },
     config::AppConfig,
     health::adapters::web::routes::health_routes,
     health::{
@@ -77,6 +86,13 @@ use crate::{
             get_order_status::GetOrderStatusUseCase,
             handle_wechat_notify::HandleWechatNotifyUseCase,
         },
+    },
+    push_notification::{
+        adapters::{
+            persistence::postgres_device_token_repository::PostgresDeviceTokenRepository,
+            web::{handlers::PushNotificationWebState, routes::push_notification_routes},
+        },
+        application::register_device_token::RegisterDeviceTokenUseCase,
     },
     reflux_subscription::{
         adapters::{
@@ -479,6 +495,21 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         wechat_pay_api_key: config.wechat_pay_api_key.clone(),
     });
 
+    let license_repository = Arc::new(PostgresLicenseRepository::new(pool.clone()));
+    let auth_license_web_state = Arc::new(AuthLicenseWebState {
+        generate_license_use_case: Arc::new(GenerateLicenseUseCase::new(
+            license_repository.clone(),
+        )),
+        bind_license_use_case: Arc::new(BindLicenseUseCase::new(license_repository)),
+        token_port: team_board_web_state.token_port.clone(),
+    });
+
+    let device_token_repository = Arc::new(PostgresDeviceTokenRepository::new(pool));
+    let push_notification_web_state = Arc::new(PushNotificationWebState {
+        register_use_case: Arc::new(RegisterDeviceTokenUseCase::new(device_token_repository)),
+        token_port: team_board_web_state.token_port.clone(),
+    });
+
     Router::new()
         .route("/", get(|| async { "football insight service" }))
         .merge(health_routes(health_use_case))
@@ -518,4 +549,6 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         .merge(team_board_routes(team_board_web_state))
         .merge(payment_routes(payment_web_state))
         .merge(reflux_subscription_routes(reflux_subscription_web_state))
+        .merge(auth_license_routes(auth_license_web_state))
+        .merge(push_notification_routes(push_notification_web_state))
 }
