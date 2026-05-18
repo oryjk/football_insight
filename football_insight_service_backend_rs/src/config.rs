@@ -91,6 +91,7 @@ pub struct AppConfig {
     pub public_base_url: String,
     pub reflux_notification_worker: RefluxNotificationWorkerConfig,
     pub smtp_email: Option<SmtpEmailConfig>,
+    pub minio: Option<MinioConfig>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -106,6 +107,17 @@ pub struct SmtpEmailConfig {
     pub username: String,
     pub password: String,
     pub from: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MinioConfig {
+    pub endpoint: String,
+    pub access_key: String,
+    pub secret_key: String,
+    pub bucket: String,
+    pub region: String,
+    pub prefix: String,
+    pub public_base_url: String,
 }
 
 impl AppConfig {
@@ -152,6 +164,7 @@ impl AppConfig {
                 .unwrap_or(60),
         };
         let smtp_email = SmtpEmailConfig::from_env();
+        let minio = MinioConfig::from_env();
 
         Ok(Self {
             port,
@@ -174,6 +187,58 @@ impl AppConfig {
             public_base_url,
             reflux_notification_worker,
             smtp_email,
+            minio,
+        })
+    }
+}
+
+impl MinioConfig {
+    fn from_env() -> Option<Self> {
+        let endpoint = std::env::var("FI_MINIO_ENDPOINT").ok()?.trim().to_string();
+        let access_key = std::env::var("FI_MINIO_ACCESS_KEY")
+            .ok()?
+            .trim()
+            .to_string();
+        let secret_key = std::env::var("FI_MINIO_SECRET_KEY").ok()?;
+        let bucket = std::env::var("FI_MINIO_BUCKET")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| "football-insight".to_string());
+        let region = std::env::var("FI_MINIO_REGION")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| "us-east-1".to_string());
+        let prefix = std::env::var("FI_MINIO_PREFIX")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| "seat-swap".to_string());
+        let public_base_url = std::env::var("FI_MINIO_PUBLIC_BASE_URL")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| {
+                format!(
+                    "{}/{}",
+                    endpoint.trim_end_matches('/'),
+                    bucket.trim_matches('/')
+                )
+            });
+
+        if endpoint.is_empty() || access_key.is_empty() || secret_key.is_empty() {
+            return None;
+        }
+
+        Some(Self {
+            endpoint,
+            access_key,
+            secret_key,
+            bucket,
+            region,
+            prefix,
+            public_base_url,
         })
     }
 }
@@ -210,7 +275,12 @@ impl SmtpEmailConfig {
 fn parse_bool_env(key: &str, default: bool) -> bool {
     std::env::var(key)
         .ok()
-        .map(|value| matches!(value.trim().to_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .map(|value| {
+            matches!(
+                value.trim().to_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
         .unwrap_or(default)
 }
 

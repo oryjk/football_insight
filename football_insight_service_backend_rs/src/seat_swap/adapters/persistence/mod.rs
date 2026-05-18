@@ -1,0 +1,1 @@
+pub mod postgres_seat_swap_repository;

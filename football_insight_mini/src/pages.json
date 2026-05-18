@@ -9,7 +9,7 @@
 		{
 			"path": "pages/rankings/index",
 			"style": {
-				"navigationBarTitleText": "榜单"
+				"navigationBarTitleText": "榜单赛程"
 			}
 		},
 		{
@@ -19,9 +19,9 @@
 			}
 		},
 		{
-			"path": "pages/matches/index",
+			"path": "pages/seat-swap/index",
 			"style": {
-				"navigationBarTitleText": "赛程"
+				"navigationBarTitleText": "换座"
 			}
 		},
 		{
@@ -69,7 +69,7 @@
 			},
 			{
 				"pagePath": "pages/rankings/index",
-				"text": "榜单",
+				"text": "榜赛",
 				"iconPath": "static/tabbar-png/rankings.png",
 				"selectedIconPath": "static/tabbar-png/rankings-active.png"
 			},
@@ -80,10 +80,10 @@
 				"selectedIconPath": "static/tabbar-png/insights-active.png"
 			},
 			{
-				"pagePath": "pages/matches/index",
-				"text": "赛程",
-				"iconPath": "static/tabbar-png/matches.png",
-				"selectedIconPath": "static/tabbar-png/matches-active.png"
+				"pagePath": "pages/seat-swap/index",
+				"text": "换座",
+				"iconPath": "static/tabbar-png/seat-swap.png",
+				"selectedIconPath": "static/tabbar-png/seat-swap-active.png"
 			},
 			{
 				"pagePath": "pages/user/index",

@@ -81,14 +81,28 @@ use crate::{
     reflux_subscription::{
         adapters::{
             persistence::postgres_reflux_subscription_repository::PostgresRefluxSubscriptionRepository,
-            web::{
-                handlers::RefluxSubscriptionWebState,
-                routes::reflux_subscription_routes,
-            },
+            web::{handlers::RefluxSubscriptionWebState, routes::reflux_subscription_routes},
         },
         application::{
             create_reflux_subscription_order::CreateRefluxSubscriptionOrderUseCase,
             get_reflux_subscription_plans::GetRefluxSubscriptionPlansUseCase,
+        },
+    },
+    seat_swap::{
+        adapters::{
+            integration::{
+                minio_evidence_storage_port::MinioEvidenceStoragePort,
+                ticket_watch_current_match_port::TicketWatchCurrentSeatSwapMatchPort,
+            },
+            persistence::postgres_seat_swap_repository::PostgresSeatSwapRepository,
+            web::{handlers::SeatSwapWebState, routes::seat_swap_routes},
+        },
+        application::{
+            cancel_matched_seat_swap::CancelMatchedSeatSwapUseCase,
+            cancel_my_seat_swap_request::CancelMySeatSwapRequestUseCase,
+            confirm_seat_swap_candidate::ConfirmSeatSwapCandidateUseCase,
+            get_current_seat_swap::GetCurrentSeatSwapUseCase,
+            upsert_my_seat_swap_request::UpsertMySeatSwapRequestUseCase,
         },
     },
     support::{
@@ -145,9 +159,9 @@ use crate::{
             get_yukun_current_ticket_watch_match::GetYukunCurrentTicketWatchMatchUseCase,
             get_yukun_ticket_inventory::GetYukunTicketInventoryUseCase,
             list_ticket_watch_matches::ListTicketWatchMatchesUseCase,
+            list_ticket_watch_regions::ListTicketWatchRegionsUseCase,
             list_yukun_match_ticket_regions::ListYukunMatchTicketRegionsUseCase,
             list_yukun_ticket_watch_matches::ListYukunTicketWatchMatchesUseCase,
-            list_ticket_watch_regions::ListTicketWatchRegionsUseCase,
             toggle_match_block_interest::ToggleMatchBlockInterestUseCase,
         },
     },
@@ -207,6 +221,11 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
     let ticket_watch_port = Arc::new(HttpTicketMonitorPort::new(
         config.ticket_monitor_base_url.clone(),
     ));
+    let seat_swap_repository = Arc::new(PostgresSeatSwapRepository::new(pool.clone()));
+    let seat_swap_current_match_port = Arc::new(TicketWatchCurrentSeatSwapMatchPort::new(
+        ticket_watch_port.clone(),
+    ));
+    let seat_swap_evidence_storage = Arc::new(MinioEvidenceStoragePort::new(config.minio.clone()));
     let tracked_interest_cache_port: Arc<
         dyn crate::ticket_watch::ports::tracked_interest_cache_port::TrackedInterestCachePort,
     > = match RedisTrackedInterestCachePort::new(&config.redis_url, 60) {
@@ -380,6 +399,30 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         ),
         token_port: support_web_state.token_port.clone(),
     });
+    let seat_swap_web_state = Arc::new(SeatSwapWebState {
+        get_current_use_case: Arc::new(GetCurrentSeatSwapUseCase::new(
+            seat_swap_repository.clone(),
+            seat_swap_current_match_port.clone(),
+        )),
+        upsert_my_request_use_case: Arc::new(UpsertMySeatSwapRequestUseCase::new(
+            seat_swap_repository.clone(),
+            seat_swap_current_match_port.clone(),
+        )),
+        cancel_my_request_use_case: Arc::new(CancelMySeatSwapRequestUseCase::new(
+            seat_swap_repository.clone(),
+            seat_swap_current_match_port.clone(),
+        )),
+        confirm_candidate_use_case: Arc::new(ConfirmSeatSwapCandidateUseCase::new(
+            seat_swap_repository.clone(),
+            seat_swap_current_match_port.clone(),
+        )),
+        cancel_matched_use_case: Arc::new(CancelMatchedSeatSwapUseCase::new(
+            seat_swap_repository,
+            seat_swap_current_match_port,
+            seat_swap_evidence_storage,
+        )),
+        token_port: support_web_state.token_port.clone(),
+    });
     let ai_web_state = Arc::new(AiWebState {
         chat_with_model_use_case,
         get_current_user_use_case: get_current_user_use_case.clone(),
@@ -460,6 +503,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         .merge(ai_routes(ai_web_state))
         .merge(support_routes(support_web_state))
         .merge(ticket_watch_routes(ticket_watch_web_state))
+        .merge(seat_swap_routes(seat_swap_web_state))
         .merge(insight_routes(
             overview_use_case,
             live_overview_use_case,

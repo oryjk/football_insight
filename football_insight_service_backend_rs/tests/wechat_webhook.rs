@@ -58,6 +58,7 @@ async fn wechat_webhook_verification_returns_plaintext_echo() {
                 poll_seconds: 60,
             },
             smtp_email: None,
+            minio: None,
         },
     );
 

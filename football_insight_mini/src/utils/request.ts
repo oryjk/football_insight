@@ -3,7 +3,7 @@ import { API_BASE_URL } from '../config/apiBase'
 const REQUEST_TIMEOUT_MS = 20000
 const GET_TIMEOUT_RETRY_COUNT = 1
 
-type HttpMethod = 'GET' | 'POST' | 'PUT'
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
 type RequestBody = object | string | ArrayBuffer | undefined
 
