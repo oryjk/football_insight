@@ -94,6 +94,11 @@ cargo test
 cargo run
 ```
 
+**生产部署脚本**：
+- `bash deploy/deploy-backend-docker.sh` — Docker 方式（out109 build → Harbor → jd 拉镜像）
+- `bash deploy/deploy-backend-binary.sh` — systemd 方式（jd 上 cargo build --release → systemctl restart）
+- 生产默认用 Docker 方式，systemd 为备用
+
 ### 前端
 
 ```bash

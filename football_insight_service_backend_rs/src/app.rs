@@ -78,6 +78,19 @@ use crate::{
             handle_wechat_notify::HandleWechatNotifyUseCase,
         },
     },
+    reflux_subscription::{
+        adapters::{
+            persistence::postgres_reflux_subscription_repository::PostgresRefluxSubscriptionRepository,
+            web::{
+                handlers::RefluxSubscriptionWebState,
+                routes::reflux_subscription_routes,
+            },
+        },
+        application::{
+            create_reflux_subscription_order::CreateRefluxSubscriptionOrderUseCase,
+            get_reflux_subscription_plans::GetRefluxSubscriptionPlansUseCase,
+        },
+    },
     support::{
         adapters::{
             persistence::postgres_support_repository::PostgresSupportRepository,
@@ -376,6 +389,8 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         token_port: team_board_web_state.token_port.clone(),
     });
     let order_repository = Arc::new(PostgresOrderRepository::new(pool.clone()));
+    let reflux_subscription_repository =
+        Arc::new(PostgresRefluxSubscriptionRepository::new(pool.clone()));
     let payment_settlement_port = Arc::new(PostgresPaymentSettlementPort::new(pool.clone()));
     let wechat_pay_port = Arc::new(HttpWechatPayPort::new(
         config.wechat_mini_app_id.clone(),
@@ -389,8 +404,21 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
     let create_membership_order_use_case = Arc::new(CreateMembershipOrderUseCase::new(
         order_repository.clone(),
         user_membership_port.clone(),
-        wechat_pay_port,
+        wechat_pay_port.clone(),
     ));
+    let reflux_subscription_web_state = Arc::new(RefluxSubscriptionWebState {
+        get_plans_use_case: Arc::new(GetRefluxSubscriptionPlansUseCase::new(
+            reflux_subscription_repository.clone(),
+        )),
+        create_order_use_case: Arc::new(CreateRefluxSubscriptionOrderUseCase::new(
+            reflux_subscription_repository.clone(),
+            order_repository.clone(),
+            user_membership_port.clone(),
+            wechat_pay_port,
+        )),
+        repository: reflux_subscription_repository.clone(),
+        token_port: team_board_web_state.token_port.clone(),
+    });
     let get_membership_product_use_case =
         Arc::new(GetMembershipProductUseCase::new(system_config_port.clone()));
     let get_order_status_use_case = Arc::new(GetOrderStatusUseCase::new(order_repository.clone()));
@@ -445,4 +473,5 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         ))
         .merge(team_board_routes(team_board_web_state))
         .merge(payment_routes(payment_web_state))
+        .merge(reflux_subscription_routes(reflux_subscription_web_state))
 }

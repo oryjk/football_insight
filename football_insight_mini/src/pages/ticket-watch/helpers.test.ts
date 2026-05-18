@@ -14,6 +14,7 @@ import {
   buildTrackedInterestSummary,
   formatTicketWatchMembershipBadgeTier,
   formatTicketWatchPollIntervalLabel,
+  formatRefluxSubscriptionPrice,
   formatTrackedInterestTime,
   formatTrackedInterestWaitLabel,
   formatInventorySectionSummary,
@@ -25,6 +26,7 @@ import {
   resolveInventoryHeatLevel,
   resolveInventoryRefluxFreshness,
   isRecentRefluxBucketUnlocked,
+  isValidNotificationEmail,
   summarizeInventoryBoard,
   isTicketWatchSectionCollapsed,
   toggleTicketWatchSectionCollapsed,
@@ -65,6 +67,20 @@ describe('ticket watch polling', () => {
   test('formats the membership badge tier copy', () => {
     expect(formatTicketWatchMembershipBadgeTier('V3')).toBe('V3 会员')
     expect(formatTicketWatchMembershipBadgeTier(undefined)).toBe('V1 会员')
+  })
+})
+
+describe('reflux subscription helpers', () => {
+  test('validates notification email format', () => {
+    expect(isValidNotificationEmail('user@example.com')).toBe(true)
+    expect(isValidNotificationEmail(' user.name+tag@example.cn ')).toBe(true)
+    expect(isValidNotificationEmail('invalid')).toBe(false)
+    expect(isValidNotificationEmail('user example@example.com')).toBe(false)
+  })
+
+  test('formats subscription prices from cents', () => {
+    expect(formatRefluxSubscriptionPrice(500)).toBe('¥5')
+    expect(formatRefluxSubscriptionPrice(550)).toBe('¥5.50')
   })
 })
 

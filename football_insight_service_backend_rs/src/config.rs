@@ -89,6 +89,23 @@ pub struct AppConfig {
     pub wechat_pay_mch_id: String,
     pub wechat_pay_api_key: String,
     pub public_base_url: String,
+    pub reflux_notification_worker: RefluxNotificationWorkerConfig,
+    pub smtp_email: Option<SmtpEmailConfig>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefluxNotificationWorkerConfig {
+    pub enabled: bool,
+    pub poll_seconds: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SmtpEmailConfig {
+    pub host: String,
+    pub port: u16,
+    pub username: String,
+    pub password: String,
+    pub from: String,
 }
 
 impl AppConfig {
@@ -126,6 +143,15 @@ impl AppConfig {
         let wechat_pay_api_key = std::env::var("WECHAT_PAY_API_KEY").unwrap_or_default();
         let public_base_url = std::env::var("PUBLIC_BASE_URL")
             .unwrap_or_else(|_| "http://127.0.0.1:8080".to_string());
+        let reflux_notification_worker = RefluxNotificationWorkerConfig {
+            enabled: parse_bool_env("FI_REFLUX_NOTIFICATION_WORKER_ENABLED", false),
+            poll_seconds: std::env::var("FI_REFLUX_NOTIFICATION_POLL_SECONDS")
+                .ok()
+                .and_then(|value| value.trim().parse::<u64>().ok())
+                .filter(|value| *value > 0)
+                .unwrap_or(60),
+        };
+        let smtp_email = SmtpEmailConfig::from_env();
 
         Ok(Self {
             port,
@@ -146,8 +172,46 @@ impl AppConfig {
             wechat_pay_mch_id,
             wechat_pay_api_key,
             public_base_url,
+            reflux_notification_worker,
+            smtp_email,
         })
     }
+}
+
+impl SmtpEmailConfig {
+    fn from_env() -> Option<Self> {
+        let host = std::env::var("FI_SMTP_HOST").ok()?.trim().to_string();
+        let username = std::env::var("FI_SMTP_USERNAME").ok()?.trim().to_string();
+        let password = std::env::var("FI_SMTP_PASSWORD").ok()?;
+        let from = std::env::var("FI_SMTP_FROM")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| username.clone());
+        let port = std::env::var("FI_SMTP_PORT")
+            .ok()
+            .and_then(|value| value.trim().parse::<u16>().ok())
+            .unwrap_or(465);
+
+        if host.is_empty() || username.is_empty() || password.is_empty() {
+            return None;
+        }
+
+        Some(Self {
+            host,
+            port,
+            username,
+            password,
+            from,
+        })
+    }
+}
+
+fn parse_bool_env(key: &str, default: bool) -> bool {
+    std::env::var(key)
+        .ok()
+        .map(|value| matches!(value.trim().to_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(default)
 }
 
 #[cfg(test)]

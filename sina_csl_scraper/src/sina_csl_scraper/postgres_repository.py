@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
-from typing import Any
+from typing import Any, Mapping
 from uuid import uuid4
 
 import psycopg
@@ -10,6 +11,28 @@ from psycopg.types.json import Jsonb
 from .models import MatchResult, PlayerProfile, RankingDataset, StandingEntry, TeamProfile
 from .sync import SyncPayload
 from .team_insights import build_team_insights
+
+
+def merge_existing_avatar_storage(
+    *,
+    teams: list[TeamProfile],
+    players: list[PlayerProfile],
+    team_avatar_storage_urls: Mapping[int, str],
+    player_avatar_storage_urls: Mapping[int, str],
+) -> tuple[list[TeamProfile], list[PlayerProfile]]:
+    merged_teams = [
+        team
+        if team.avatar_storage_url
+        else replace(team, avatar_storage_url=team_avatar_storage_urls.get(team.team_id))
+        for team in teams
+    ]
+    merged_players = [
+        player
+        if player.avatar_storage_url
+        else replace(player, avatar_storage_url=player_avatar_storage_urls.get(player.player_id))
+        for player in players
+    ]
+    return merged_teams, merged_players
 
 
 class PostgresInsightSyncRepository:
@@ -626,12 +649,19 @@ class PostgresInsightSyncRepository:
         payload: SyncPayload,
         snapshot_at: datetime,
     ) -> int:
+        team_avatar_storage_urls, player_avatar_storage_urls = self._load_existing_avatar_storage_urls()
+        teams, players = merge_existing_avatar_storage(
+            teams=payload.teams,
+            players=payload.players,
+            team_avatar_storage_urls=team_avatar_storage_urls,
+            player_avatar_storage_urls=player_avatar_storage_urls,
+        )
         team_insights = build_team_insights(
             season=season,
             round_number=round_number,
             snapshot_kind=snapshot_kind,
-            teams=payload.teams,
-            players=payload.players,
+            teams=teams,
+            players=players,
             matches=payload.matches,
             standings=payload.standings,
             team_rankings=payload.team_rankings,
@@ -720,6 +750,36 @@ class PostgresInsightSyncRepository:
                 )
 
         return len(team_insights)
+
+    def _load_existing_avatar_storage_urls(self) -> tuple[dict[int, str], dict[int, str]]:
+        with self.data_connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT team_id, avatar_storage_url
+                FROM f_i_teams
+                WHERE avatar_storage_url IS NOT NULL
+                """
+            )
+            team_avatar_storage_urls = {
+                int(team_id): str(avatar_storage_url)
+                for team_id, avatar_storage_url in cursor.fetchall()
+                if avatar_storage_url
+            }
+
+            cursor.execute(
+                """
+                SELECT player_id, avatar_storage_url
+                FROM f_i_players
+                WHERE avatar_storage_url IS NOT NULL
+                """
+            )
+            player_avatar_storage_urls = {
+                int(player_id): str(avatar_storage_url)
+                for player_id, avatar_storage_url in cursor.fetchall()
+                if avatar_storage_url
+            }
+
+        return team_avatar_storage_urls, player_avatar_storage_urls
 
     def _ensure_category(
         self,

@@ -4,7 +4,10 @@ import {
   buildUserAccountInfoItems,
   buildUserBenefitItems,
   buildUserUpgradeSteps,
+  canShowMembershipPurchaseEntry,
   formatMembershipExpiryLabel,
+  formatNotificationEmailLabel,
+  isValidNotificationEmail,
   resolveCurrentUserInviteCode,
 } from './helpers'
 import type { MembershipTierGuide } from '../../utils/membershipRules'
@@ -52,6 +55,40 @@ describe('formatMembershipExpiryLabel', () => {
       '2026-04-23T23:59:59Z',
       new Date('2026-04-24T00:00:00Z').getTime(),
     )).toBe('已过期')
+  })
+})
+
+describe('notification email helpers', () => {
+  test('validates email syntax', () => {
+    expect(isValidNotificationEmail('user@example.com')).toBe(true)
+    expect(isValidNotificationEmail(' user.name+tag@example.cn ')).toBe(true)
+    expect(isValidNotificationEmail('invalid')).toBe(false)
+    expect(isValidNotificationEmail('user example@example.com')).toBe(false)
+  })
+
+  test('formats notification email fallback label', () => {
+    expect(formatNotificationEmailLabel(' user@example.com ')).toBe('user@example.com')
+    expect(formatNotificationEmailLabel(null)).toBe('未填写')
+  })
+})
+
+describe('canShowMembershipPurchaseEntry', () => {
+  test('shows purchase entry for expiring V9 memberships so users can renew', () => {
+    expect(canShowMembershipPurchaseEntry(
+      true,
+      true,
+      'V9',
+      '2027-05-08T04:00:00Z',
+    )).toBe(true)
+  })
+
+  test('hides purchase entry for lifetime V9 memberships', () => {
+    expect(canShowMembershipPurchaseEntry(true, true, 'V9', null)).toBe(false)
+  })
+
+  test('keeps purchase entry for lower tiers with wechat binding', () => {
+    expect(canShowMembershipPurchaseEntry(true, true, 'V8', null)).toBe(true)
+    expect(canShowMembershipPurchaseEntry(true, false, 'V8', null)).toBe(false)
   })
 })
 

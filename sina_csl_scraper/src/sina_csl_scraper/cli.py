@@ -19,6 +19,7 @@ from .catalog import build_player_profiles, build_team_profiles
 from .client import SinaCslClient, serialize_datasets
 from .constants import DEFAULT_LEAGUE_ID
 from .leisu import LeisuBrowserClient, LeisuCornerEnricher, load_leisu_match_map
+from .models import MatchResult
 from .postgres_repository import PostgresInsightSyncRepository
 from .sync import InsightSyncService, SyncPayload
 
@@ -42,6 +43,14 @@ def _env_default(name: str, default: str | None = None) -> str | None:
     return os.getenv(name, default)
 
 
+def _merge_enriched_matches(
+    matches: list[MatchResult],
+    enriched_matches: list[MatchResult],
+) -> list[MatchResult]:
+    enriched_by_id = {match.match_id: match for match in enriched_matches}
+    return [enriched_by_id.get(match.match_id, match) for match in matches]
+
+
 def run_scrape(
     season: int | None = None,
     output_dir: Path = Path("data"),
@@ -61,6 +70,7 @@ def run_scrape(
     leisu_match_map: Path | None = Path(_env_default("FI_LEISU_MATCH_MAP")) if _env_default("FI_LEISU_MATCH_MAP") else None,
     client: SinaCslClient | None = None,
     corner_enricher: LeisuCornerEnricher | None = None,
+    enrich_match_ids: set[int] | None = None,
 ) -> dict[str, Any]:
     client = client or SinaCslClient(league_id=league_id)
     league_info = client.fetch_league_info()
@@ -70,20 +80,27 @@ def run_scrape(
     standings = client.fetch_standings(target_season)
     matches = client.fetch_all_matches(target_season, max_round=league_info.max_round)
     if enrich_corners:
-        owns_corner_enricher = corner_enricher is None
-        if corner_enricher is None:
-            leisu_map = load_leisu_match_map(leisu_match_map) if leisu_match_map and leisu_match_map.exists() else {}
-            corner_client = LeisuBrowserClient()
-            corner_client.warmup()
-            corner_enricher = LeisuCornerEnricher(
-                client=corner_client,
-                match_id_map=leisu_map,
-            )
-        try:
-            matches = corner_enricher.enrich_matches(matches)
-        finally:
-            if owns_corner_enricher:
-                corner_enricher.close()
+        enrichment_targets = (
+            [match for match in matches if match.match_id in enrich_match_ids]
+            if enrich_match_ids is not None
+            else matches
+        )
+        if enrichment_targets:
+            owns_corner_enricher = corner_enricher is None
+            if corner_enricher is None:
+                leisu_map = load_leisu_match_map(leisu_match_map) if leisu_match_map and leisu_match_map.exists() else {}
+                corner_client = LeisuBrowserClient()
+                corner_client.warmup()
+                corner_enricher = LeisuCornerEnricher(
+                    client=corner_client,
+                    match_id_map=leisu_map,
+                )
+            try:
+                enriched_matches = corner_enricher.enrich_matches(enrichment_targets)
+                matches = _merge_enriched_matches(matches, enriched_matches)
+            finally:
+                if owns_corner_enricher:
+                    corner_enricher.close()
     team_rankings = client.fetch_all_team_rankings(target_season)
     player_rankings = client.fetch_all_player_rankings(
         target_season,
@@ -443,6 +460,7 @@ def auto_sync_due(
         minio_public_base_url=minio_public_base_url,
         enrich_corners=enrich_corners,
         leisu_match_map=leisu_match_map,
+        enrich_match_ids=set(decision.active_match_ids) | set(decision.newly_due_match_ids),
     )
 
     save_auto_sync_state(

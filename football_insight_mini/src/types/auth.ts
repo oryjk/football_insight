@@ -59,3 +59,7 @@ export interface MiniWechatBindPayload {
   display_name: string
   avatar_data_url: string
 }
+
+export interface NotificationEmailResponse {
+  email: string | null
+}

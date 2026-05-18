@@ -49,7 +49,12 @@ impl CreateMembershipOrderUseCase {
             .await?
             .unwrap_or_else(|| "V1".to_string());
 
-        if membership_tier_rank(&input.target_tier) <= membership_tier_rank(&current_tier) {
+        let is_v9_renewal =
+            current_tier.trim().eq_ignore_ascii_case("V9")
+                && input.target_tier.trim().eq_ignore_ascii_case("V9");
+        if !is_v9_renewal
+            && membership_tier_rank(&input.target_tier) <= membership_tier_rank(&current_tier)
+        {
             anyhow::bail!("请选择高于当前等级的会员档位");
         }
         let price = calculate_membership_checkout_price(
@@ -277,6 +282,38 @@ mod tests {
         assert_eq!(
             *wechat_pay_port.amounts.lock().expect("wechat amounts"),
             vec![3500]
+        );
+    }
+
+    #[tokio::test]
+    async fn execute_creates_order_when_v9_user_renews_v9() {
+        let repository = Arc::new(FakeOrderRepository::default());
+        let wechat_pay_port = Arc::new(FakeWechatPayPort::default());
+        let use_case = CreateMembershipOrderUseCase::new(
+            repository.clone(),
+            Arc::new(FakeUserMembershipPort {
+                open_id: Some("openid".to_string()),
+                membership_tier: Some("V9".to_string()),
+            }),
+            wechat_pay_port.clone(),
+        );
+
+        use_case
+            .execute(CreateMembershipOrderInput {
+                user_id: Uuid::new_v4(),
+                target_tier: "V9".to_string(),
+                products: default_membership_product_options(),
+            })
+            .await
+            .expect("V9 renewal order should be created");
+
+        let created_orders = repository.created_orders.lock().expect("created orders");
+        assert_eq!(created_orders.len(), 1);
+        assert_eq!(created_orders[0].amount_cents, 9900);
+        assert_eq!(created_orders[0].product_type, "membership:V9");
+        assert_eq!(
+            *wechat_pay_port.amounts.lock().expect("wechat amounts"),
+            vec![9900]
         );
     }
 }

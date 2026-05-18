@@ -21,6 +21,11 @@ pub struct PostgresAuthRepository {
     pool: PgPool,
 }
 
+struct ReferralMembershipUpgrade {
+    next_tier: String,
+    should_upgrade: bool,
+}
+
 impl PostgresAuthRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
@@ -33,6 +38,28 @@ impl PostgresAuthRepository {
 
     fn generate_wechat_account_identifier(open_id: &str) -> String {
         format!("wx_{}", open_id)
+    }
+
+    fn resolve_referral_membership_upgrade(
+        referral_count: i64,
+        current_tier: &str,
+        membership_tier_rules: &[MembershipTierRule],
+    ) -> ReferralMembershipUpgrade {
+        let next_tier =
+            resolve_referrer_membership_tier_from_rules(referral_count, membership_tier_rules);
+
+        ReferralMembershipUpgrade {
+            next_tier: next_tier.to_string(),
+            should_upgrade: membership_tier_rank(next_tier) > membership_tier_rank(current_tier),
+        }
+    }
+
+    fn is_referral_tier(tier: &str, membership_tier_rules: &[MembershipTierRule]) -> bool {
+        let normalized_tier = tier.trim().to_uppercase();
+        membership_tier_rules.iter().any(|rule| {
+            rule.code.trim().eq_ignore_ascii_case(&normalized_tier)
+                && rule.kind.trim().eq_ignore_ascii_case("referral")
+        })
     }
 
     async fn load_membership_tier_rules(&self) -> anyhow::Result<Vec<MembershipTierRule>> {
@@ -173,27 +200,36 @@ impl PostgresAuthRepository {
         .fetch_one(&mut **tx)
         .await?;
 
-        let current_tier = sqlx::query_scalar::<_, String>(
-            "SELECT membership_tier FROM f_i_users WHERE id = $1 LIMIT 1",
+        let current_user = sqlx::query(
+            "SELECT membership_tier, membership_expires_at FROM f_i_users WHERE id = $1 LIMIT 1",
         )
         .bind(referrer_user_id)
         .fetch_one(&mut **tx)
         .await?;
+        let current_tier: String = current_user.get("membership_tier");
+        let current_expires_at: Option<DateTime<Utc>> = current_user.get("membership_expires_at");
+        let current_effective_tier =
+            resolve_effective_membership_tier(&current_tier, current_expires_at, Utc::now());
 
         let membership_tier_rules = Self::load_membership_tier_rules_in_tx(tx).await?;
-        let next_tier =
-            resolve_referrer_membership_tier_from_rules(referral_count, &membership_tier_rules);
-        if membership_tier_rank(next_tier) > membership_tier_rank(&current_tier) {
+        let upgrade = Self::resolve_referral_membership_upgrade(
+            referral_count,
+            &current_effective_tier,
+            &membership_tier_rules,
+        );
+        if upgrade.should_upgrade && Self::is_referral_tier(&upgrade.next_tier, &membership_tier_rules)
+        {
             sqlx::query(
                 r#"
                 UPDATE f_i_users
                    SET membership_tier = $2,
+                       membership_expires_at = NOW() + INTERVAL '1 year',
                        updated_at = NOW()
                  WHERE id = $1
                 "#,
             )
             .bind(referrer_user_id)
-            .bind(next_tier)
+            .bind(&upgrade.next_tier)
             .execute(&mut **tx)
             .await?;
         }
@@ -512,6 +548,53 @@ impl PostgresAuthRepository {
 
         tx.commit().await?;
         Ok(user.into_auth_user(&membership_tier_rules))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PostgresAuthRepository;
+    use crate::auth::domain::membership::MembershipTierRule;
+
+    #[test]
+    fn referral_threshold_upgrade_requires_expiring_membership_window() {
+        let rules = vec![
+            MembershipTierRule::new("V3", "invite", Some(0), 120),
+            MembershipTierRule::new("V4", "referral", Some(10), 60),
+        ];
+
+        let upgrade =
+            PostgresAuthRepository::resolve_referral_membership_upgrade(10, "V3", &rules);
+
+        assert_eq!(upgrade.next_tier, "V4");
+        assert!(upgrade.should_upgrade);
+    }
+
+    #[test]
+    fn referral_record_does_not_refresh_expiration_without_tier_upgrade() {
+        let rules = vec![
+            MembershipTierRule::new("V3", "invite", Some(0), 120),
+            MembershipTierRule::new("V4", "referral", Some(10), 60),
+        ];
+
+        let upgrade =
+            PostgresAuthRepository::resolve_referral_membership_upgrade(11, "V4", &rules);
+
+        assert_eq!(upgrade.next_tier, "V4");
+        assert!(!upgrade.should_upgrade);
+    }
+
+    #[test]
+    fn referral_expiration_only_applies_to_referral_tiers() {
+        let rules = vec![
+            MembershipTierRule::new("V2", "standard", Some(2), 300),
+            MembershipTierRule::new("V3", "invite", Some(4), 120),
+            MembershipTierRule::new("V4", "referral", Some(10), 60),
+        ];
+
+        assert!(!PostgresAuthRepository::is_referral_tier("V2", &rules));
+        assert!(!PostgresAuthRepository::is_referral_tier("V3", &rules));
+        assert!(PostgresAuthRepository::is_referral_tier("V4", &rules));
     }
 }
 

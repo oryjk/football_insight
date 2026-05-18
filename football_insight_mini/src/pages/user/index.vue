@@ -86,23 +86,87 @@
           <view class="purchase-entry__body">
             <view class="purchase-entry__eyebrow">
               <image class="purchase-entry__eyebrow-icon" :src="diamondIcon" mode="aspectFit" />
-              <text>会员升级通道</text>
+              <text>{{ purchaseEntryEyebrow }}</text>
             </view>
-            <text class="purchase-entry__label">V6-V9 会员充值</text>
-            <text class="purchase-entry__hint">V6 起解锁最近回流速览，购买后立即生效。</text>
+            <text class="purchase-entry__label">{{ purchaseEntryLabel }}</text>
+            <text class="purchase-entry__hint">{{ purchaseEntryHint }}</text>
           </view>
           <view class="purchase-entry__aside">
-            <text class="purchase-entry__cta">立即开通</text>
+            <text class="purchase-entry__cta">{{ purchaseEntryCta }}</text>
             <text class="purchase-entry__arrow">›</text>
           </view>
         </view>
       </view>
 
-      <FiLoading
-        v-if="loading"
-        title="账号状态加载中"
-        caption="正在确认你当前的小程序登录状态。"
-      />
+      <view v-if="loading" class="skeleton-stack">
+        <view class="hero-card account-hero skeleton-panel skeleton-account-hero">
+          <view class="hero-card__top hero-card__top--member">
+            <view class="skeleton-copy-group">
+              <view class="skeleton-line skeleton-line--kicker" />
+              <view class="skeleton-line skeleton-line--title" />
+            </view>
+            <view class="skeleton-pill skeleton-pill--short" />
+          </view>
+
+          <view class="skeleton-profile-row">
+            <view class="skeleton-line skeleton-line--avatar" />
+            <view class="skeleton-profile-body">
+              <view class="skeleton-line skeleton-line--profile-name" />
+              <view class="skeleton-line skeleton-line--profile-badge" />
+            </view>
+            <view class="skeleton-line skeleton-line--medal" />
+          </view>
+
+          <view class="skeleton-invite-row">
+            <view class="skeleton-copy-group">
+              <view class="skeleton-line skeleton-line--label" />
+              <view class="skeleton-line skeleton-line--invite-code" />
+            </view>
+            <view class="skeleton-button skeleton-button--compact" />
+          </view>
+        </view>
+
+        <view class="panel skeleton-panel">
+          <view class="skeleton-line skeleton-line--section" />
+          <view class="skeleton-account-grid">
+            <view
+              v-for="index in 5"
+              :key="`user-account-skeleton-${index}`"
+              class="skeleton-account-cell"
+            >
+              <view class="skeleton-line skeleton-line--account-icon" />
+              <view class="skeleton-copy-group">
+                <view class="skeleton-line skeleton-line--label" />
+                <view class="skeleton-line skeleton-line--account-value" />
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view class="panel skeleton-panel">
+          <view class="privilege-panel__header">
+            <view class="skeleton-line skeleton-line--section" />
+            <view class="skeleton-pill skeleton-pill--short" />
+          </view>
+          <view class="skeleton-privilege-grid">
+            <view
+              v-for="index in 4"
+              :key="`user-privilege-skeleton-${index}`"
+              class="skeleton-privilege-card"
+            >
+              <view class="skeleton-line skeleton-line--privilege-icon" />
+              <view class="skeleton-line skeleton-line--privilege-title" />
+              <view class="skeleton-line skeleton-line--privilege-caption" />
+            </view>
+          </view>
+        </view>
+
+        <view class="panel skeleton-panel">
+          <view class="skeleton-line skeleton-line--section" />
+          <view class="skeleton-line skeleton-line--body" />
+          <view class="skeleton-line skeleton-line--body skeleton-line--body-short" />
+        </view>
+      </view>
 
       <template v-else-if="currentUser">
         <view class="panel info-panel">
@@ -123,6 +187,16 @@
               </view>
             </view>
           </view>
+        </view>
+
+        <view class="panel notification-email-panel">
+          <view class="notification-email-panel__body">
+            <text class="notification-email-panel__title">回流提醒邮箱</text>
+            <text class="notification-email-panel__value">{{ notificationEmailLabel }}</text>
+          </view>
+          <button class="notification-email-panel__action" @click="openNotificationEmailSheet">
+            {{ notificationEmail ? '编辑' : '填写' }}
+          </button>
         </view>
 
         <view class="panel privilege-panel" :class="currentMembershipGuide.toneClass">
@@ -284,6 +358,31 @@
           </view>
         </view>
       </view>
+      <view v-if="notificationEmailSheetVisible" class="sheet-mask" @tap="closeNotificationEmailSheet">
+        <view class="sheet-card" @tap.stop="consumeSheetTap">
+          <view class="section-heading section-heading--compact">
+            <view>
+              <text class="section-kicker">邮箱提醒</text>
+              <text class="section-title">编辑回流提醒邮箱</text>
+            </view>
+          </view>
+          <text class="account-form-panel__summary">
+            订阅回流提醒后，新增回流会发送到这个邮箱。
+          </text>
+          <input
+            v-model="notificationEmailForm"
+            class="auth-input"
+            type="text"
+            placeholder="请输入邮箱地址"
+          />
+          <view class="sheet-actions">
+            <button class="primary-action primary-action--ghost" @click="closeNotificationEmailSheet">取消</button>
+            <button class="primary-action" :disabled="notificationEmailSaving" @click="saveNotificationEmail">
+              {{ notificationEmailSaving ? '保存中...' : '保存邮箱' }}
+            </button>
+          </view>
+        </view>
+      </view>
       </template>
     </view>
   </scroll-view>
@@ -293,14 +392,15 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import FiLoading from '../../components/FiLoading.vue'
 import diamondIcon from '../../static/user/diamond.svg'
 import bgImage from '../../static/user/bg.webp'
 import {
   bindMiniWechatAccount,
   getCurrentUser,
+  getNotificationEmail,
   loginWithMiniWechat,
   logout,
+  updateNotificationEmail,
 } from '../../api/auth'
 import { getPublicSystemConfig } from '../../api/system'
 import type { CurrentUser, MiniWechatBindingRequiredResponse } from '../../types/auth'
@@ -312,7 +412,10 @@ import {
   buildUserAccountInfoItems,
   buildUserBenefitItems,
   buildUserUpgradeSteps,
+  canShowMembershipPurchaseEntry,
   formatMembershipExpiryLabel,
+  formatNotificationEmailLabel,
+  isValidNotificationEmail,
   resolveCurrentUserInviteCode,
   type UserAccountInfoItem,
   type UserBenefitItem,
@@ -329,6 +432,10 @@ const loading = ref(true)
 const currentUser = ref<CurrentUser | null>(null)
 const publicConfig = ref<PublicSystemConfig | null>(null)
 const systemConfigUnderReview = ref(false)
+const notificationEmail = ref('')
+const notificationEmailForm = ref('')
+const notificationEmailSheetVisible = ref(false)
+const notificationEmailSaving = ref(false)
 
 const miniWechatBindState = ref<MiniWechatBindingRequiredResponse | null>(null)
 const miniWechatBindForm = reactive({
@@ -357,6 +464,9 @@ const joinedAtLabel = computed(() => {
 
 const membershipExpiresAtLabel = computed(() =>
   formatMembershipExpiryLabel(currentUser.value?.membership_expires_at),
+)
+const notificationEmailLabel = computed(() =>
+  formatNotificationEmailLabel(notificationEmail.value),
 )
 
 interface MembershipMeta {
@@ -422,11 +532,30 @@ function resolveMembershipMeta(tier: string | undefined): MembershipMeta {
 
 const currentMembershipMeta = computed(() => resolveMembershipMeta(currentUser.value?.membership_tier))
 const canPurchaseMembership = computed(() =>
-  Boolean(
-    currentUser.value
-    && currentUser.value.has_wechat_binding
-    && currentUser.value.membership_tier !== 'V9',
+  canShowMembershipPurchaseEntry(
+    Boolean(currentUser.value),
+    Boolean(currentUser.value?.has_wechat_binding),
+    currentUser.value?.membership_tier,
+    currentUser.value?.membership_expires_at,
   ),
+)
+const canRenewCurrentV9Membership = computed(() =>
+  currentMembershipMeta.value.code === 'V9'
+  && Boolean(currentUser.value?.membership_expires_at?.trim()),
+)
+const purchaseEntryEyebrow = computed(() =>
+  canRenewCurrentV9Membership.value ? '会员续费通道' : '会员升级通道',
+)
+const purchaseEntryLabel = computed(() =>
+  canRenewCurrentV9Membership.value ? 'V9 会员续费' : 'V6-V9 会员充值',
+)
+const purchaseEntryHint = computed(() =>
+  canRenewCurrentV9Membership.value
+    ? '当前 V9 有效期可续费，支付成功后延长一年。'
+    : 'V6 起解锁最近回流速览，购买后立即生效。',
+)
+const purchaseEntryCta = computed(() =>
+  canRenewCurrentV9Membership.value ? '立即续费' : '立即开通',
 )
 const membershipTierGuides = computed<MembershipTierGuide[]>(() =>
   buildMembershipTierGuides(publicConfig.value?.membership_tier_rules),
@@ -522,9 +651,10 @@ async function loadUser(): Promise<void> {
     return
   }
 
-  const [userResult, publicConfigResult] = await Promise.allSettled([
+  const [userResult, publicConfigResult, notificationEmailResult] = await Promise.allSettled([
     getCurrentUser(),
     getPublicSystemConfig(),
+    getNotificationEmail(),
   ])
 
   if (userResult.status === 'fulfilled') {
@@ -533,11 +663,50 @@ async function loadUser(): Promise<void> {
     currentUser.value = null
   }
 
+  if (notificationEmailResult.status === 'fulfilled') {
+    notificationEmail.value = notificationEmailResult.value.email?.trim() || ''
+  } else {
+    notificationEmail.value = ''
+  }
+
   if (publicConfigResult.status === 'fulfilled') {
     publicConfig.value = publicConfigResult.value
   }
 
   loading.value = false
+}
+
+function openNotificationEmailSheet(): void {
+  notificationEmailForm.value = notificationEmail.value
+  notificationEmailSheetVisible.value = true
+}
+
+function closeNotificationEmailSheet(): void {
+  if (notificationEmailSaving.value) {
+    return
+  }
+
+  notificationEmailSheetVisible.value = false
+}
+
+async function saveNotificationEmail(): Promise<void> {
+  const email = notificationEmailForm.value.trim()
+  if (!isValidNotificationEmail(email)) {
+    uni.showToast({ title: '请填写有效邮箱', icon: 'none' })
+    return
+  }
+
+  notificationEmailSaving.value = true
+  try {
+    const result = await updateNotificationEmail(email)
+    notificationEmail.value = result.email?.trim() || email
+    notificationEmailSheetVisible.value = false
+    uni.showToast({ title: '邮箱已保存', icon: 'success' })
+  } catch (error) {
+    uni.showToast({ title: extractApiErrorMessage(error, '邮箱保存失败'), icon: 'none' })
+  } finally {
+    notificationEmailSaving.value = false
+  }
 }
 
 async function handleLogout(): Promise<void> {
@@ -772,6 +941,219 @@ onShow(() => {
   box-shadow: 0 20rpx 48rpx rgba(26,28,36,0.06);
   backdrop-filter: blur(18rpx);
   -webkit-backdrop-filter: blur(18rpx);
+}
+.skeleton-stack {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 16rpx;
+}
+.skeleton-panel {
+  position: relative;
+  overflow: hidden;
+}
+.skeleton-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.66) 48%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: translateX(-100%);
+  animation: skeleton-shimmer 1.35s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+.skeleton-copy-group {
+  display: grid;
+  gap: 10rpx;
+  min-width: 0;
+}
+.skeleton-line,
+.skeleton-pill,
+.skeleton-button,
+.skeleton-account-cell,
+.skeleton-privilege-card {
+  background: linear-gradient(180deg, rgba(248, 246, 239, 0.96), rgba(235, 230, 216, 0.9));
+  border: 2rpx solid rgba(232, 222, 198, 0.72);
+}
+.skeleton-line {
+  border-radius: 999rpx;
+}
+.skeleton-line--kicker {
+  width: 150rpx;
+  height: 24rpx;
+}
+.skeleton-line--title {
+  width: 330rpx;
+  max-width: 100%;
+  height: 44rpx;
+  border-radius: 22rpx;
+}
+.skeleton-line--section {
+  width: 220rpx;
+  max-width: 100%;
+  height: 38rpx;
+  border-radius: 22rpx;
+}
+.skeleton-line--label {
+  width: 112rpx;
+  height: 22rpx;
+}
+.skeleton-line--body {
+  width: 90%;
+  height: 26rpx;
+  margin-top: 20rpx;
+}
+.skeleton-line--body-short {
+  width: 62%;
+}
+.skeleton-pill {
+  width: 150rpx;
+  height: 52rpx;
+  border-radius: 999rpx;
+  flex-shrink: 0;
+}
+.skeleton-pill--short {
+  width: 112rpx;
+}
+.skeleton-button {
+  width: 150rpx;
+  height: 60rpx;
+  border-radius: 999rpx;
+  flex-shrink: 0;
+}
+.skeleton-button--compact {
+  width: 160rpx;
+  height: 58rpx;
+}
+.skeleton-account-hero {
+  min-height: 330rpx;
+}
+.skeleton-profile-row {
+  margin-top: 28rpx;
+  display: flex;
+  align-items: center;
+  gap: 22rpx;
+}
+.skeleton-line--avatar {
+  width: 122rpx;
+  height: 122rpx;
+  border-radius: 999rpx;
+  flex-shrink: 0;
+}
+.skeleton-profile-body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 18rpx;
+}
+.skeleton-line--profile-name {
+  width: 260rpx;
+  height: 46rpx;
+  border-radius: 22rpx;
+}
+.skeleton-line--profile-badge {
+  width: 180rpx;
+  height: 46rpx;
+  border-radius: 999rpx;
+}
+.skeleton-line--medal {
+  width: 146rpx;
+  height: 146rpx;
+  border-radius: 42rpx;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, rgba(246, 229, 180, 0.98), rgba(220, 181, 91, 0.82));
+}
+.skeleton-invite-row {
+  margin-top: 26rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 28rpx;
+  border: 2rpx solid rgba(232, 212, 166, 0.82);
+  background: rgba(255, 252, 244, 0.74);
+}
+.skeleton-line--invite-code {
+  width: 310rpx;
+  height: 34rpx;
+  border-radius: 18rpx;
+}
+.skeleton-account-grid {
+  margin-top: 24rpx;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-radius: 28rpx;
+  overflow: hidden;
+  border: 2rpx solid rgba(234, 226, 209, 0.92);
+}
+.skeleton-account-cell {
+  min-height: 104rpx;
+  padding: 20rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  border-width: 0 2rpx 2rpx 0;
+  border-radius: 0;
+}
+.skeleton-account-cell:nth-child(2n) {
+  border-right-width: 0;
+}
+.skeleton-account-cell:nth-last-child(1) {
+  grid-column: span 2;
+  border-bottom-width: 0;
+}
+.skeleton-line--account-icon {
+  width: 54rpx;
+  height: 54rpx;
+  border-radius: 999rpx;
+  flex-shrink: 0;
+}
+.skeleton-line--account-value {
+  width: 130rpx;
+  height: 30rpx;
+  border-radius: 18rpx;
+}
+.skeleton-privilege-grid {
+  margin-top: 24rpx;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12rpx;
+}
+.skeleton-privilege-card {
+  min-height: 150rpx;
+  padding: 18rpx 12rpx;
+  border-radius: 24rpx;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 12rpx;
+}
+.skeleton-line--privilege-icon {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 999rpx;
+}
+.skeleton-line--privilege-title {
+  width: 82rpx;
+  height: 26rpx;
+}
+.skeleton-line--privilege-caption {
+  width: 98rpx;
+  height: 22rpx;
+}
+@keyframes skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 .account-hero {
   background: linear-gradient(180deg, rgba(255,255,255,0.78), rgba(255,255,255,0.55));
@@ -1339,6 +1721,43 @@ onShow(() => {
   color: #7a808d;
   font-size: 23rpx;
   line-height: 1.55;
+}
+.notification-email-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+.notification-email-panel__body {
+  min-width: 0;
+  display: grid;
+  gap: 10rpx;
+}
+.notification-email-panel__title {
+  color: #15161b;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+.notification-email-panel__value {
+  color: #747985;
+  font-size: 24rpx;
+  line-height: 1.4;
+  word-break: break-all;
+}
+.notification-email-panel__action {
+  flex-shrink: 0;
+  min-width: 128rpx;
+  height: 68rpx;
+  padding: 0 26rpx;
+  border-radius: 999rpx;
+  background: #15161b;
+  color: #ffffff;
+  font-size: 26rpx;
+  font-weight: 800;
+  line-height: 68rpx;
+}
+.notification-email-panel__action::after {
+  border: none;
 }
 .logout-action {
   width: 100%;

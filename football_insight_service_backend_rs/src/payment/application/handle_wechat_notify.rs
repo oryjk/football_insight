@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use crate::payment::{
-    domain::order::membership_tier_from_product_type,
+    domain::order::{membership_tier_from_product_type, parse_reflux_subscription_product_type},
     ports::{order_repository::OrderRepository, payment_settlement_port::PaymentSettlementPort},
 };
 
@@ -57,10 +57,26 @@ impl HandleWechatNotifyUseCase {
             return Ok(NotifyHandleResult::Success);
         }
 
-        let target_tier = membership_tier_from_product_type(&order.product_type);
-        self.payment_settlement_port
-            .settle_membership_order(&out_trade_no, &transaction_id, order.user_id, &target_tier)
-            .await?;
+        if let Some(product) = parse_reflux_subscription_product_type(&order.product_type) {
+            self.payment_settlement_port
+                .settle_reflux_subscription_order(
+                    &out_trade_no,
+                    &transaction_id,
+                    order.user_id,
+                    product,
+                )
+                .await?;
+        } else {
+            let target_tier = membership_tier_from_product_type(&order.product_type);
+            self.payment_settlement_port
+                .settle_membership_order(
+                    &out_trade_no,
+                    &transaction_id,
+                    order.user_id,
+                    &target_tier,
+                )
+                .await?;
+        }
 
         Ok(NotifyHandleResult::Success)
     }
@@ -120,12 +136,23 @@ mod tests {
         ) -> anyhow::Result<()> {
             anyhow::bail!("payment settlement failed")
         }
+
+        async fn settle_reflux_subscription_order(
+            &self,
+            _order_no: &str,
+            _transaction_id: &str,
+            _user_id: Uuid,
+            _product: crate::payment::domain::order::RefluxSubscriptionProductType,
+        ) -> anyhow::Result<()> {
+            anyhow::bail!("payment settlement failed")
+        }
     }
 
     #[derive(Default)]
     struct CountingPaymentSettlementPort {
         calls: Mutex<usize>,
         tiers: Mutex<Vec<String>>,
+        reflux_products: Mutex<Vec<crate::payment::domain::order::RefluxSubscriptionProductType>>,
     }
 
     #[async_trait]
@@ -139,6 +166,21 @@ mod tests {
         ) -> anyhow::Result<()> {
             *self.calls.lock().expect("calls") += 1;
             self.tiers.lock().expect("tiers").push(tier.to_string());
+            Ok(())
+        }
+
+        async fn settle_reflux_subscription_order(
+            &self,
+            _order_no: &str,
+            _transaction_id: &str,
+            _user_id: Uuid,
+            product: crate::payment::domain::order::RefluxSubscriptionProductType,
+        ) -> anyhow::Result<()> {
+            *self.calls.lock().expect("calls") += 1;
+            self.reflux_products
+                .lock()
+                .expect("reflux products")
+                .push(product);
             Ok(())
         }
     }
@@ -280,5 +322,54 @@ mod tests {
             settlement_port.tiers.lock().expect("tiers").as_slice(),
             ["V7"]
         );
+    }
+
+    #[tokio::test]
+    async fn execute_dispatches_reflux_subscription_order() {
+        let user_id = Uuid::parse_str("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb").unwrap();
+        let repository = Arc::new(FakeOrderRepository {
+            order: Mutex::new(Some(PaymentOrder {
+                id: Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap(),
+                order_no: "202605180001".to_string(),
+                user_id,
+                amount_cents: 500,
+                status: OrderStatus::Pending,
+                prepay_id: None,
+                transaction_id: None,
+                product_type: "reflux_subscription:single_match:chengdu:571".to_string(),
+                paid_at: None,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            })),
+        });
+        let settlement_port = Arc::new(CountingPaymentSettlementPort::default());
+        let use_case = HandleWechatNotifyUseCase::new(repository, settlement_port.clone());
+
+        let result = use_case
+            .execute(
+                [
+                    ("return_code".to_string(), "SUCCESS".to_string()),
+                    ("result_code".to_string(), "SUCCESS".to_string()),
+                    ("out_trade_no".to_string(), "202605180001".to_string()),
+                    ("transaction_id".to_string(), "wx_txn_reflux".to_string()),
+                    ("total_fee".to_string(), "500".to_string()),
+                ]
+                .into_iter()
+                .collect(),
+            )
+            .await
+            .expect("reflux notify should settle");
+
+        assert!(matches!(result, NotifyHandleResult::Success));
+        assert_eq!(*settlement_port.calls.lock().expect("calls"), 1);
+        assert_eq!(settlement_port.tiers.lock().expect("tiers").len(), 0);
+        let products = settlement_port
+            .reflux_products
+            .lock()
+            .expect("reflux products");
+        assert_eq!(products.len(), 1);
+        assert_eq!(products[0].plan_code, "single_match");
+        assert_eq!(products[0].team_code, "chengdu");
+        assert_eq!(products[0].match_id, Some(571));
     }
 }

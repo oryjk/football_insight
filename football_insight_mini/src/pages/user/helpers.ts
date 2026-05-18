@@ -133,6 +133,27 @@ export function buildUserUpgradeSteps(
   }))
 }
 
+export function canShowMembershipPurchaseEntry(
+  hasUser: boolean,
+  hasWechatBinding: boolean,
+  membershipTier: string | null | undefined,
+  membershipExpiresAt: string | null | undefined,
+): boolean {
+  if (!hasUser || !hasWechatBinding) {
+    return false
+  }
+
+  const normalizedTier = typeof membershipTier === 'string'
+    ? membershipTier.trim().toUpperCase()
+    : ''
+
+  if (normalizedTier !== 'V9') {
+    return true
+  }
+
+  return typeof membershipExpiresAt === 'string' && membershipExpiresAt.trim().length > 0
+}
+
 export function formatMembershipExpiryLabel(
   expiresAt: string | null | undefined,
   nowMs = Date.now(),
@@ -152,6 +173,16 @@ export function formatMembershipExpiryLabel(
   }
 
   return `有效至 ${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
+}
+
+export function isValidNotificationEmail(email: string): boolean {
+  const normalized = email.trim()
+  return normalized.length > 0 && normalized.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)
+}
+
+export function formatNotificationEmailLabel(email: string | null | undefined): string {
+  const normalized = typeof email === 'string' ? email.trim() : ''
+  return normalized || '未填写'
 }
 
 function parseMembershipTierNumber(code: string): number {

@@ -243,20 +243,7 @@ impl TicketMonitorPort for HttpTicketMonitorPort {
         let payload: ExternalYukunCurrentMatchResponse =
             self.get_json("/api/yukun/matches/current").await?;
 
-        let has_match = payload.data.is_some();
-        let current_match = payload
-            .data
-            .and_then(|item| map_yukun_match_summary(item).ok());
-
-        Ok(TicketWatchCurrentMatchView {
-            current_match,
-            group_ticket_active: false,
-            message: if has_match {
-                "获取当前比赛成功".to_string()
-            } else {
-                "当前没有比赛".to_string()
-            },
-        })
+        map_yukun_current_match_view(payload)
     }
 
     async fn fetch_yukun_reflux(
@@ -377,6 +364,34 @@ fn map_yukun_match_summary(item: ExternalYukunMatchDto) -> anyhow::Result<Ticket
         away_team_name: item.away_name.unwrap_or_else(|| "未知对手".to_string()),
         is_current: item.is_current,
         include_in_reflux_stats: item.begin_time.is_some(),
+    })
+}
+
+fn map_yukun_current_match_view(
+    payload: ExternalYukunCurrentMatchResponse,
+) -> anyhow::Result<TicketWatchCurrentMatchView> {
+    if !payload.success {
+        return Ok(TicketWatchCurrentMatchView {
+            current_match: None,
+            group_ticket_active: false,
+            message: "获取当前比赛失败".to_string(),
+        });
+    }
+
+    let has_match = payload.data.is_some();
+    let current_match = payload
+        .data
+        .map(map_yukun_match_summary)
+        .transpose()?;
+
+    Ok(TicketWatchCurrentMatchView {
+        current_match,
+        group_ticket_active: false,
+        message: if has_match {
+            "获取当前比赛成功".to_string()
+        } else {
+            "当前没有比赛".to_string()
+        },
     })
 }
 
@@ -655,9 +670,10 @@ struct ExternalYukunRefluxSeat {
 #[cfg(test)]
 mod tests {
     use super::{
-        ExternalMatchDto, build_block_interest_path, build_inventory_history_path,
-        build_toggle_block_interest_path, build_tracked_interest_path,
-        build_yukun_reflux_path, map_match_summary, resolve_inventory_lookup_match_ids,
+        ExternalMatchDto, ExternalYukunCurrentMatchResponse, ExternalYukunMatchDto,
+        build_block_interest_path, build_inventory_history_path, build_toggle_block_interest_path,
+        build_tracked_interest_path, build_yukun_reflux_path, map_match_summary,
+        map_yukun_current_match_view, resolve_inventory_lookup_match_ids,
     };
     use uuid::Uuid;
 
@@ -772,5 +788,25 @@ mod tests {
             path.contains("%2B"),
             "plus sign should be encoded as %2B, got: {path}"
         );
+    }
+
+    #[test]
+    fn yukun_current_match_should_respect_failed_success_flag() {
+        let view = map_yukun_current_match_view(ExternalYukunCurrentMatchResponse {
+            success: false,
+            data: Some(ExternalYukunMatchDto {
+                away_name: Some("上海申花".to_string()),
+                match_time: Some("2026-05-01 19:35:00".to_string()),
+                home_name: Some("云南玉昆".to_string()),
+                is_current: true,
+                match_id: "288651".to_string(),
+                round: 10,
+                begin_time: Some("2026-05-01 14:00:00".to_string()),
+            }),
+        })
+        .expect("view");
+
+        assert!(view.current_match.is_none());
+        assert_eq!(view.message, "获取当前比赛失败");
     }
 }

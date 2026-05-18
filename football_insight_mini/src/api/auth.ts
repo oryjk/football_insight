@@ -4,6 +4,7 @@ import type {
   LoginPayload,
   MiniWechatBindPayload,
   MiniWechatLoginResponse,
+  NotificationEmailResponse,
   RegisterPayload,
   ResetPasswordPayload,
 } from '../types/auth'
@@ -88,4 +89,20 @@ export async function logout(): Promise<void> {
   } finally {
     setAccessToken(null)
   }
+}
+
+export function getNotificationEmail(): Promise<NotificationEmailResponse> {
+  return request<NotificationEmailResponse>({
+    url: '/ticket-watch/reflux-subscriptions/email',
+    auth: true,
+  })
+}
+
+export function updateNotificationEmail(email: string): Promise<NotificationEmailResponse> {
+  return request<NotificationEmailResponse>({
+    url: '/ticket-watch/reflux-subscriptions/email',
+    method: 'PUT',
+    auth: true,
+    data: { email },
+  })
 }

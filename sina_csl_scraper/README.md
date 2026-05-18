@@ -103,6 +103,7 @@ uv run sina-csl-scraper scrape \
 
 - scraper 仍然以新浪赛程为主数据源
 - 角球补全是 best-effort，不会阻塞原有抓取
+- 手动执行 `scrape --enrich-corners` 时，会尝试补全当前抓取到的全部比赛；自动同步任务会只补全本次触发的进行中/刚到点比赛，避免每分钟把整个赛季都跑一遍雷速页面
 - 当前通过雷速完场页 / 实时页发现详情页，再用详情页里的角球事件文本累计主客队角球数
 - 如果自动发现失败、没有映射、详情页抓取失败、或页面里没有可解析角球事件，则 `home_corners` / `away_corners` 保持为空
 - `matches.json` 会额外写出 `leisu_match_id`、`home_corners`、`away_corners`、`corner_source`
@@ -159,6 +160,8 @@ cd sina_csl_scraper
 - 执行 `uv run sina-csl-scraper scrape --upload-avatars --write-db`
 - 使用 `.avatar_sync.lock` 防止重复执行
 
+普通自动同步即使不带 `--upload-avatars`，也会在预计算 `f_i_team_insights` 前复用数据库里已有的球队/球员 `avatar_storage_url`，避免洞察页头像被每分钟同步覆盖为空。
+
 crontab 模板见：
 
 ```bash
@@ -180,7 +183,8 @@ cd sina_csl_scraper
 - 读取本地 `.env.sync` 里的 MinIO 配置
 - 默认开启雷速技术统计补全，包括角球
 - 默认按“比赛开始 + 120 分钟 + 10 分钟”判断是否到达同步窗口
-- 只要发现有新的到期比赛窗口，就执行一次完整同步
+- 只要发现有新的到期比赛窗口或进行中比赛到达刷新间隔，就执行一次新浪完整同步
+- 雷速技术统计只补全本次触发的进行中/刚到点比赛，不再每次遍历整个赛季的比赛
 - 把上次已处理窗口记录到 `.auto_sync_state.json`，避免重复拉取同一场
 - 如果系统安装了 `flock`，脚本会自动加锁，避免每分钟重复触发时并发跑多份进程
 

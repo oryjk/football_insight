@@ -63,7 +63,11 @@ class FakeSinaClient:
 
 
 class FakeCornerEnricher:
+    def __init__(self) -> None:
+        self.received_match_ids: list[int] = []
+
     def enrich_matches(self, matches: list[MatchResult]) -> list[MatchResult]:
+        self.received_match_ids = [match.match_id for match in matches]
         return [
             MatchResult(
                 match_id=matches[0].match_id,
@@ -102,6 +106,46 @@ class FakeCornerEnricher:
                     },
                 ],
             )
+        ]
+
+
+class FakeMultiMatchSinaClient(FakeSinaClient):
+    def fetch_all_matches(self, season: int, max_round: int | None = None) -> list[MatchResult]:
+        return [
+            MatchResult(
+                match_id=288579,
+                season=2026,
+                round_number=1,
+                round_name="第1轮",
+                date="2026-03-08",
+                time="19:00",
+                status="3",
+                home_team_id=110645,
+                home_team_name="武汉三镇",
+                home_score="0",
+                away_team_id=136,
+                away_team_name="北京国安",
+                away_score="2",
+                home_logo="home.png",
+                away_logo="away.png",
+            ),
+            MatchResult(
+                match_id=288580,
+                season=2026,
+                round_number=1,
+                round_name="第1轮",
+                date="2026-03-08",
+                time="19:35",
+                status="1",
+                home_team_id=1,
+                home_team_name="上海海港",
+                home_score="",
+                away_team_id=2,
+                away_team_name="深圳新鹏城",
+                away_score="",
+                home_logo="home2.png",
+                away_logo="away2.png",
+            ),
         ]
 
 
@@ -155,3 +199,23 @@ def test_run_scrape_writes_enriched_corner_fields_into_matches_json(tmp_path) ->
             ],
         }
     ]
+
+
+def test_run_scrape_enriches_only_requested_matches_and_keeps_full_schedule(tmp_path) -> None:
+    enricher = FakeCornerEnricher()
+
+    run_scrape(
+        season=2026,
+        output_dir=tmp_path,
+        client=FakeMultiMatchSinaClient(),
+        corner_enricher=enricher,
+        enrich_corners=True,
+        enrich_match_ids={288579},
+    )
+
+    matches_payload = json.loads((tmp_path / "2026" / "matches.json").read_text(encoding="utf-8"))
+
+    assert enricher.received_match_ids == [288579]
+    assert [match["match_id"] for match in matches_payload] == [288579, 288580]
+    assert matches_payload[0]["home_corners"] == 4
+    assert matches_payload[1]["home_corners"] is None

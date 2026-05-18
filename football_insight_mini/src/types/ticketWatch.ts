@@ -73,3 +73,51 @@ export interface TicketWatchGroupedInventorySection {
   total_occurrences: number
   items: TicketWatchGroupedInventoryItem[]
 }
+
+export interface RefluxSubscriptionPlan {
+  code: string
+  scope: 'single_match' | 'season' | 'lifetime'
+  team_code: string
+  season?: number | null
+  title: string
+  description: string
+  price_cents: number
+  expires_at?: string | null
+}
+
+export interface RefluxNotificationTarget {
+  channel: string
+  target: string
+}
+
+export interface RefluxSubscriptionSummary {
+  scope: 'single_match' | 'season' | 'lifetime'
+  team_code: string
+  season?: number | null
+  match_id?: number | null
+  starts_at: string
+  expires_at?: string | null
+}
+
+export interface RefluxSubscriptionPlansResponse {
+  plans: RefluxSubscriptionPlan[]
+  active_subscriptions: RefluxSubscriptionSummary[]
+  email_target?: RefluxNotificationTarget | null
+}
+
+export interface RefluxSubscriptionStatusResponse {
+  subscribed: boolean
+  active_subscriptions: RefluxSubscriptionSummary[]
+  email_target?: RefluxNotificationTarget | null
+}
+
+export interface CreateRefluxSubscriptionOrderResponse {
+  order_no: string
+  params: {
+    timeStamp: string
+    nonceStr: string
+    package: string
+    signType: string
+    paySign: string
+  }
+}

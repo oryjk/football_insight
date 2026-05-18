@@ -6,6 +6,9 @@ import type {
   TicketWatchMatchSummary,
   TicketWatchRegion,
   TicketWatchTrackedInterest,
+  RefluxSubscriptionPlansResponse,
+  RefluxSubscriptionStatusResponse,
+  CreateRefluxSubscriptionOrderResponse,
 } from '../types/ticketWatch'
 import { request } from '../utils/request'
 
@@ -160,5 +163,53 @@ export function getYukunTicketWatchRegions(
 ): Promise<TicketWatchRegion[]> {
   return request<TicketWatchRegion[]>({
     url: buildYukunTicketWatchRegionsUrl(matchId, since),
+  })
+}
+
+export function getRefluxSubscriptionPlans(
+  teamCode: string,
+  matchId?: number | null,
+): Promise<RefluxSubscriptionPlansResponse> {
+  const query = [`team_code=${encodeURIComponent(teamCode)}`]
+  if (matchId) {
+    query.push(`match_id=${encodeURIComponent(String(matchId))}`)
+  }
+
+  return request<RefluxSubscriptionPlansResponse>({
+    url: `/ticket-watch/reflux-subscriptions/plans?${query.join('&')}`,
+    auth: true,
+  })
+}
+
+export function getRefluxSubscriptionStatus(
+  teamCode: string,
+  season: number,
+  matchId?: number | null,
+): Promise<RefluxSubscriptionStatusResponse> {
+  const query = [
+    `team_code=${encodeURIComponent(teamCode)}`,
+    `season=${encodeURIComponent(String(season))}`,
+  ]
+  if (matchId) {
+    query.push(`match_id=${encodeURIComponent(String(matchId))}`)
+  }
+
+  return request<RefluxSubscriptionStatusResponse>({
+    url: `/ticket-watch/reflux-subscriptions/status?${query.join('&')}`,
+    auth: true,
+  })
+}
+
+export function createRefluxSubscriptionOrder(input: {
+  plan_code: string
+  team_code: string
+  match_id?: number | null
+  email: string
+}): Promise<CreateRefluxSubscriptionOrderResponse> {
+  return request<CreateRefluxSubscriptionOrderResponse>({
+    url: '/ticket-watch/reflux-subscriptions/order',
+    method: 'POST',
+    auth: true,
+    data: input,
   })
 }

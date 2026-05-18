@@ -7,7 +7,7 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use cbc::cipher::{BlockEncryptMut, KeyIvInit, block_padding::Pkcs7};
 use football_insight_service_backend_rs::{
     app::build_router,
-    config::{AppConfig, DatabasePoolConfig},
+    config::{AppConfig, DatabasePoolConfig, RefluxNotificationWorkerConfig},
 };
 use sha1::{Digest, Sha1};
 use sqlx::postgres::PgPoolOptions;
@@ -53,6 +53,11 @@ async fn wechat_webhook_verification_returns_plaintext_echo() {
             wechat_pay_mch_id: String::new(),
             wechat_pay_api_key: String::new(),
             public_base_url: "http://127.0.0.1:8080".to_string(),
+            reflux_notification_worker: RefluxNotificationWorkerConfig {
+                enabled: false,
+                poll_seconds: 60,
+            },
+            smtp_email: None,
         },
     );
 

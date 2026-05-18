@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from sina_csl_scraper.models import MatchResult, PlayerProfile, TeamProfile
-from sina_csl_scraper.postgres_repository import PostgresInsightSyncRepository
+from sina_csl_scraper.postgres_repository import (
+    PostgresInsightSyncRepository,
+    merge_existing_avatar_storage,
+)
 
 
 class FakeCursor:
@@ -70,6 +73,26 @@ def test_upsert_players_preserves_existing_avatar_fields_when_new_values_are_nul
     assert "avatar_object_name = COALESCE(EXCLUDED.avatar_object_name, f_i_players.avatar_object_name)" in sql
     assert "avatar_storage_url = COALESCE(EXCLUDED.avatar_storage_url, f_i_players.avatar_storage_url)" in sql
     assert params == [(10, "费利佩", 1, "成都蓉城", None, None, None)]
+
+
+def test_merge_existing_avatar_storage_fills_missing_team_and_player_avatar_urls() -> None:
+    teams, players = merge_existing_avatar_storage(
+        teams=[
+            TeamProfile(team_id=1, team_name="成都蓉城"),
+            TeamProfile(team_id=2, team_name="上海申花", avatar_storage_url="fresh-team.png"),
+        ],
+        players=[
+            PlayerProfile(player_id=10, player_name="费利佩", team_id=1, team_name="成都蓉城"),
+            PlayerProfile(player_id=11, player_name="路易斯", team_id=2, team_name="上海申花", avatar_storage_url="fresh-player.png"),
+        ],
+        team_avatar_storage_urls={1: "existing-team.png", 2: "stale-team.png"},
+        player_avatar_storage_urls={10: "existing-player.png", 11: "stale-player.png"},
+    )
+
+    assert teams[0].avatar_storage_url == "existing-team.png"
+    assert teams[1].avatar_storage_url == "fresh-team.png"
+    assert players[0].avatar_storage_url == "existing-player.png"
+    assert players[1].avatar_storage_url == "fresh-player.png"
 
 
 def test_upsert_matches_preserves_existing_leisu_fields_when_new_values_are_null() -> None:

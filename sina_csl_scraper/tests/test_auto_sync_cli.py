@@ -96,3 +96,73 @@ def test_auto_sync_due_logs_active_refresh_without_ambiguous_due_name(monkeypatc
     assert "active_match_ids=288620,288621" in result.stdout
     assert "latest_completed_due_at=2026-04-18T22:10:00+08:00" in result.stdout
     assert "latest_due_at=" not in result.stdout
+
+
+def test_auto_sync_due_limits_corner_enrichment_to_triggered_match_ids(monkeypatch, tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr("sina_csl_scraper.cli.SinaCslClient", FakeSinaClient)
+    monkeypatch.setattr("sina_csl_scraper.cli.save_auto_sync_state", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "sina_csl_scraper.cli.load_auto_sync_state",
+        lambda path: AutoSyncState(
+            last_processed_due_at=datetime.fromisoformat("2026-04-18T21:45:00+08:00"),
+        ),
+    )
+    monkeypatch.setattr(
+        "sina_csl_scraper.cli.build_auto_sync_decision",
+        lambda *args, **kwargs: AutoSyncDecision(
+            should_run=True,
+            latest_due_at=datetime.fromisoformat("2026-04-18T22:10:00+08:00"),
+            newly_due_match_ids=(288619,),
+            active_match_ids=(288620,),
+        ),
+    )
+
+    def fake_run_scrape(**kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
+        return {"season": 2026, "run_id": None, "matches": 0}
+
+    monkeypatch.setattr("sina_csl_scraper.cli.run_scrape", fake_run_scrape)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "auto-sync-due",
+            "--state-file",
+            str(tmp_path / ".auto_sync_state.json"),
+            "--enrich-corners",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert captured["enrich_corners"] is True
+    assert captured["enrich_match_ids"] == {288619, 288620}
+
+
+def test_scrape_command_keeps_manual_corner_enrichment_unfiltered(monkeypatch, tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run_scrape(**kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
+        return {"season": 2026, "run_id": None, "matches": 0}
+
+    monkeypatch.setattr("sina_csl_scraper.cli.run_scrape", fake_run_scrape)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "scrape",
+            "--season",
+            "2026",
+            "--output-dir",
+            str(tmp_path),
+            "--enrich-corners",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert captured["enrich_corners"] is True
+    assert "enrich_match_ids" not in captured

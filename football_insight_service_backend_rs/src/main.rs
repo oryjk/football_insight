@@ -7,6 +7,7 @@ use football_insight_service_backend_rs::{
     config::AppConfig,
     http_cache::{HttpResponseCache, cache_get_responses},
     logging::init_tracing,
+    reflux_subscription::worker::spawn_reflux_notification_worker,
 };
 use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
@@ -51,6 +52,8 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("failed to connect to postgres")?;
     tracing::info!("postgres connection established");
+
+    spawn_reflux_notification_worker(pool.clone(), &config);
 
     let app = build_router(pool, &config)
         .layer(CorsLayer::permissive())
@@ -102,7 +105,10 @@ async fn main() -> anyhow::Result<()> {
         );
 
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
-    let listener = TcpListener::bind(addr).await?;
+    tracing::info!(address = %addr, "binding server socket");
+    let listener = TcpListener::bind(addr)
+        .await
+        .with_context(|| format!("failed to bind server socket on {addr}"))?;
 
     tracing::info!(address = %addr, "football_insight_service_backend_rs listening");
     axum::serve(listener, app).await?;

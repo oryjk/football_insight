@@ -203,6 +203,12 @@
                 <image class="watch-monitor-actions__button-icon-image" :src="playCircleIcon" mode="aspectFit" />
                 {{ isMonitoringActive ? '停止监控' : '开始监控' }}
               </button>
+              <button
+                class="watch-monitor-actions__button watch-monitor-actions__button--subscribe"
+                @tap="openRefluxSubscriptionSheet"
+              >
+                订阅提醒
+              </button>
             </view>
 
             <text class="watch-match-card__note watch-match-card__note--reference">
@@ -913,6 +919,46 @@
       </view>
     </view>
   </view>
+  <view v-else-if="refluxSubscriptionSheetVisible" class="subscription-mask" @tap="closeRefluxSubscriptionSheet">
+    <view class="subscription-dialog" @tap.stop>
+      <view class="subscription-dialog__head">
+        <text class="subscription-dialog__title">订阅回流提醒</text>
+        <button class="subscription-dialog__close" @tap="closeRefluxSubscriptionSheet">×</button>
+      </view>
+      <text class="subscription-dialog__match">
+        {{ currentMatch?.home_team_name }} VS {{ currentMatch?.away_team_name }}
+      </text>
+      <input
+        v-model="refluxSubscriptionEmail"
+        class="subscription-dialog__input"
+        type="text"
+        placeholder="填写接收提醒的邮箱"
+      />
+      <view class="subscription-plan-list">
+        <button
+          v-for="plan in refluxSubscriptionPlans"
+          :key="plan.code"
+          class="subscription-plan"
+          :class="{ 'subscription-plan--active': selectedRefluxSubscriptionPlanCode === plan.code }"
+          @tap="selectedRefluxSubscriptionPlanCode = plan.code"
+        >
+          <view>
+            <text class="subscription-plan__title">{{ plan.title }}</text>
+            <text class="subscription-plan__desc">{{ plan.description }}</text>
+          </view>
+          <text class="subscription-plan__price">{{ formatRefluxSubscriptionPrice(plan.price_cents) }}</text>
+        </button>
+      </view>
+      <text v-if="refluxSubscriptionSubscribed" class="subscription-dialog__status">当前比赛已开通提醒</text>
+      <button
+        class="subscription-dialog__action"
+        :disabled="refluxSubscriptionSubmitting || !selectedRefluxSubscriptionPlanCode"
+        @tap="submitRefluxSubscriptionOrder"
+      >
+        {{ refluxSubscriptionSubmitting ? '处理中...' : '微信支付并开通' }}
+      </button>
+    </view>
+  </view>
   <view v-else-if="!pageEntered" class="page page--entry-mask" />
 </template>
 
@@ -921,7 +967,10 @@ import { computed, getCurrentInstance, nextTick, ref, watch } from 'vue'
 import { onHide, onReady, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import { getCurrentUser } from '../../api/auth'
 import {
+  createRefluxSubscriptionOrder,
   getCurrentTicketWatchBoard,
+  getRefluxSubscriptionPlans,
+  getRefluxSubscriptionStatus,
   getTicketWatchBlockInterests,
   getTicketWatchInventorySince,
   getTicketWatchMatches,
@@ -933,6 +982,7 @@ import {
   getYukunTicketWatchRegions,
   toggleTicketWatchBlockInterest,
 } from '../../api/ticketWatch'
+import { getOrderStatus } from '../../api/payment'
 import type { CurrentUser } from '../../types/auth'
 import type {
   TicketWatchBlockInterest,
@@ -941,6 +991,7 @@ import type {
   TicketWatchMatchSummary,
   TicketWatchRegion,
   TicketWatchTrackedInterest,
+  RefluxSubscriptionPlan,
 } from '../../types/ticketWatch'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { resolveMembershipBenefitsLocked } from '../../utils/membershipBenefits'
@@ -968,6 +1019,7 @@ import {
   buildRecentRefluxBuckets,
   buildTrackedInterestSummary,
   formatTicketWatchMembershipBadgeTier,
+  formatRefluxSubscriptionPrice,
   formatTrackedInterestTime,
   formatTrackedInterestWaitLabel,
   groupInventoryByPrice,
@@ -978,6 +1030,7 @@ import {
   resolveInventoryHeatLevel,
   resolveInventoryPriceTone,
   isRecentRefluxBucketUnlocked,
+  isValidNotificationEmail,
   resolveRecentRefluxPanelMode,
   resolveRecentRefluxBucketRequiredTier,
   resolveHistoryBoardLoadStrategy,
@@ -1034,6 +1087,13 @@ const viewerMembershipTier = ref('V1')
 const systemConfigUnderReview = ref(false)
 const pendingInterestSelection = ref<PendingInterestSelection | null>(null)
 const isMonitoringActive = ref(false)
+const refluxSubscriptionSheetVisible = ref(false)
+const refluxSubscriptionLoading = ref(false)
+const refluxSubscriptionSubmitting = ref(false)
+const refluxSubscriptionPlans = ref<RefluxSubscriptionPlan[]>([])
+const selectedRefluxSubscriptionPlanCode = ref('')
+const refluxSubscriptionEmail = ref('')
+const refluxSubscriptionSubscribed = ref(false)
 const currentTrackedInterests = ref<TicketWatchTrackedInterest[]>([])
 const currentCollapsedSections = ref<TicketWatchCollapsedSectionState>({})
 const historyCollapsedSections = ref<TicketWatchCollapsedSectionState>({})
@@ -1801,6 +1861,136 @@ function formatRecentRefluxBucketRequiredTier(bucketKey: TicketWatchRecentReflux
   return resolveRecentRefluxBucketRequiredTier(bucketKey)
 }
 
+function resolveSelectedTeamCode(): string {
+  return selectedTeam.value
+}
+
+function inferCurrentMatchSeason(): number {
+  const match = currentMatch.value
+  const rawYear = match?.kickoff_at?.slice(0, 4) || match?.match_date?.slice(0, 4)
+  const year = Number.parseInt(rawYear || '', 10)
+  return Number.isFinite(year) && year > 0 ? year : 2026
+}
+
+async function openRefluxSubscriptionSheet(): Promise<void> {
+  if (refluxSubscriptionLoading.value) {
+    return
+  }
+
+  if (!currentMatch.value) {
+    uni.showToast({ title: '暂无当前比赛', icon: 'none' })
+    return
+  }
+
+  if (!currentUser.value) {
+    goToUserPage()
+    return
+  }
+
+  refluxSubscriptionSheetVisible.value = true
+  refluxSubscriptionLoading.value = true
+
+  try {
+    const [plans, status] = await Promise.all([
+      getRefluxSubscriptionPlans(resolveSelectedTeamCode(), currentMatch.value.match_id),
+      getRefluxSubscriptionStatus(
+        resolveSelectedTeamCode(),
+        inferCurrentMatchSeason(),
+        currentMatch.value.match_id,
+      ),
+    ])
+
+    refluxSubscriptionPlans.value = plans.plans
+    selectedRefluxSubscriptionPlanCode.value = plans.plans[0]?.code ?? ''
+    refluxSubscriptionEmail.value = status.email_target?.target || plans.email_target?.target || ''
+    refluxSubscriptionSubscribed.value = status.subscribed
+  } catch (error) {
+    uni.showToast({ title: extractApiErrorMessage(error, '订阅套餐加载失败'), icon: 'none' })
+    refluxSubscriptionSheetVisible.value = false
+  } finally {
+    refluxSubscriptionLoading.value = false
+  }
+}
+
+function closeRefluxSubscriptionSheet(): void {
+  if (refluxSubscriptionSubmitting.value) {
+    return
+  }
+
+  refluxSubscriptionSheetVisible.value = false
+}
+
+async function waitForPaidOrder(orderNo: string): Promise<boolean> {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const status = await getOrderStatus(orderNo)
+    if (status.status === 'paid') {
+      return true
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1200))
+  }
+
+  return false
+}
+
+async function submitRefluxSubscriptionOrder(): Promise<void> {
+  const match = currentMatch.value
+  if (!match || refluxSubscriptionSubmitting.value) {
+    return
+  }
+
+  const email = refluxSubscriptionEmail.value.trim()
+  if (!isValidNotificationEmail(email)) {
+    uni.showToast({ title: '请填写有效邮箱', icon: 'none' })
+    return
+  }
+
+  if (!selectedRefluxSubscriptionPlanCode.value) {
+    uni.showToast({ title: '请选择订阅套餐', icon: 'none' })
+    return
+  }
+
+  refluxSubscriptionSubmitting.value = true
+
+  try {
+    const order = await createRefluxSubscriptionOrder({
+      plan_code: selectedRefluxSubscriptionPlanCode.value,
+      team_code: resolveSelectedTeamCode(),
+      match_id: match.match_id,
+      email,
+    })
+
+    uni.requestPayment({
+      provider: 'wxpay',
+      timeStamp: order.params.timeStamp,
+      nonceStr: order.params.nonceStr,
+      package: order.params.package,
+      signType: order.params.signType,
+      paySign: order.params.paySign,
+      success: async () => {
+        const paid = await waitForPaidOrder(order.order_no)
+        if (paid) {
+          uni.showToast({ title: '订阅已开通', icon: 'success' })
+          refluxSubscriptionSubscribed.value = true
+          refluxSubscriptionSheetVisible.value = false
+        } else {
+          uni.showToast({ title: '支付成功，开通确认中', icon: 'none' })
+        }
+      },
+      fail: (err: any) => {
+        const msg = err?.errMsg || '支付取消'
+        uni.showToast({
+          title: msg.includes('cancel') || msg.includes('关闭') || msg.includes('fail') ? '支付已取消' : '支付失败',
+          icon: 'none',
+        })
+      },
+    })
+  } catch (error) {
+    uni.showToast({ title: extractApiErrorMessage(error, '订阅下单失败'), icon: 'none' })
+  } finally {
+    refluxSubscriptionSubmitting.value = false
+  }
+}
+
 function formatHistoryTrendBarWidth(point: TicketWatchHistoryRefluxTrendPoint): string {
   if (!point.is_loaded || point.total_occurrences <= 0) {
     return '0%'
@@ -2229,6 +2419,126 @@ onUnload(() => {
   background: #15161b;
   color: #ffffff;
 }
+.subscription-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 21;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 28rpx;
+  background: rgba(17, 19, 24, 0.32);
+}
+.subscription-dialog {
+  width: 100%;
+  max-width: 680rpx;
+  display: grid;
+  gap: 20rpx;
+  padding: 30rpx 28rpx 26rpx;
+  border-radius: 30rpx;
+  background: #fffefa;
+  border: 2rpx solid rgba(236, 230, 216, 0.96);
+  box-shadow: 0 28rpx 66rpx rgba(22, 24, 30, 0.2);
+}
+.subscription-dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+.subscription-dialog__title {
+  color: #15171d;
+  font-size: 34rpx;
+  font-weight: 800;
+}
+.subscription-dialog__close {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999rpx;
+  background: #f2f0eb;
+  color: #6b6f78;
+  font-size: 34rpx;
+  line-height: 1;
+}
+.subscription-dialog__close::after {
+  border: none;
+}
+.subscription-dialog__match,
+.subscription-dialog__status {
+  color: #686e78;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+.subscription-dialog__status {
+  color: #1f8d5a;
+  font-weight: 700;
+}
+.subscription-dialog__input {
+  min-height: 78rpx;
+  padding: 0 24rpx;
+  border-radius: 20rpx;
+  background: #f7f6f2;
+  border: 2rpx solid rgba(226, 220, 207, 0.96);
+  color: #15171d;
+  font-size: 28rpx;
+}
+.subscription-plan-list {
+  display: grid;
+  gap: 14rpx;
+}
+.subscription-plan {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  padding: 22rpx;
+  border-radius: 20rpx;
+  background: #ffffff;
+  border: 2rpx solid rgba(228, 231, 239, 0.96);
+  text-align: left;
+}
+.subscription-plan::after {
+  border: none;
+}
+.subscription-plan--active {
+  border-color: #15171d;
+  box-shadow: 0 12rpx 28rpx rgba(22, 24, 30, 0.1);
+}
+.subscription-plan__title,
+.subscription-plan__desc {
+  display: block;
+}
+.subscription-plan__title {
+  color: #15171d;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+.subscription-plan__desc {
+  margin-top: 8rpx;
+  color: #737985;
+  font-size: 22rpx;
+  line-height: 1.45;
+}
+.subscription-plan__price {
+  color: #a56b12;
+  font-size: 30rpx;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+.subscription-dialog__action {
+  min-height: 82rpx;
+  border-radius: 22rpx;
+  background: #15171d;
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 800;
+}
+.subscription-dialog__action::after {
+  border: none;
+}
 .hero-card, .panel, .state-card {
   animation: none;
   background: rgba(255,255,255,0.96);
@@ -2568,8 +2878,9 @@ onUnload(() => {
   gap: 16rpx;
 }
 .watch-monitor-actions {
-  display: flex;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14rpx;
 }
 .watch-monitor-actions__button {
   width: 100%;
@@ -2600,6 +2911,11 @@ onUnload(() => {
   background: linear-gradient(180deg, #eef1f6, #e5e9f0);
   color: #5c6370;
   box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.82);
+}
+.watch-monitor-actions__button--subscribe {
+  background: linear-gradient(180deg, #f4efe4, #ebe3d3);
+  color: #5e4a24;
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.75);
 }
 .membership-lock-panel {
   display: flex;

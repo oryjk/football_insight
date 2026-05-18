@@ -8,6 +8,7 @@ pub mod http_cache;
 pub mod insight;
 pub mod logging;
 pub mod payment;
+pub mod reflux_subscription;
 pub mod support;
 pub mod system_config;
 pub mod team_board;

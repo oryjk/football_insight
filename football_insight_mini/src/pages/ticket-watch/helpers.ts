@@ -97,6 +97,20 @@ export interface TicketWatchHistoryRefluxTrend {
   totalCount: number
 }
 
+export function isValidNotificationEmail(email: string): boolean {
+  const normalized = email.trim()
+  return normalized.length > 0 && normalized.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)
+}
+
+export function formatRefluxSubscriptionPrice(priceCents: number): string {
+  if (!Number.isFinite(priceCents)) {
+    return '¥0'
+  }
+
+  const yuan = priceCents / 100
+  return Number.isInteger(yuan) ? `¥${yuan}` : `¥${yuan.toFixed(2)}`
+}
+
 function resolveTicketWatchBlockKey(block: { block_key?: string | null; block_name: string }): string {
   const blockKey = block.block_key?.trim()
   return blockKey || block.block_name

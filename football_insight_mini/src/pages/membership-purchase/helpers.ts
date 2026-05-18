@@ -21,10 +21,17 @@ export function normalizeMembershipProductOptions(
 export function filterMembershipProductOptionsForUpgrade(
   options: MembershipProductOption[],
   currentTier: string | null | undefined,
+  membershipExpiresAt?: string | null,
 ): MembershipProductOption[] {
   const currentRank = parseTierRank(currentTier || 'V1')
+  const canRenewCurrentTier = currentRank >= parseTierRank('V9')
+    && typeof membershipExpiresAt === 'string'
+    && membershipExpiresAt.trim().length > 0
 
-  return options.filter((option) => parseTierRank(option.target_tier) > currentRank)
+  return options.filter((option) => {
+    const targetRank = parseTierRank(option.target_tier)
+    return targetRank > currentRank || (canRenewCurrentTier && targetRank === currentRank)
+  })
 }
 
 export function formatMembershipPrice(priceCents: number | undefined): string {

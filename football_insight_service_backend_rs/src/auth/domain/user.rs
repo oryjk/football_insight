@@ -87,12 +87,7 @@ pub fn resolve_effective_membership_tier(
     membership_expires_at: Option<DateTime<Utc>>,
     now: DateTime<Utc>,
 ) -> String {
-    let is_paid_tier = matches!(
-        membership_tier.trim().to_uppercase().as_str(),
-        "V6" | "V7" | "V8" | "V9"
-    );
-
-    if is_paid_tier && membership_expires_at.is_some_and(|expires_at| expires_at <= now) {
+    if membership_expires_at.is_some_and(|expires_at| expires_at <= now) {
         return "V3".to_string();
     }
 
@@ -128,7 +123,7 @@ mod tests {
     }
 
     #[test]
-    fn paid_membership_tier_falls_back_to_v3_after_expiration() {
+    fn expiring_membership_tier_falls_back_to_v3_after_expiration() {
         let now = Utc.with_ymd_and_hms(2026, 4, 24, 12, 0, 0).unwrap();
 
         assert_eq!(
@@ -148,5 +143,13 @@ mod tests {
             "V8"
         );
         assert_eq!(resolve_effective_membership_tier("V8", None, now), "V8");
+        assert_eq!(
+            resolve_effective_membership_tier(
+                "V4",
+                Some(Utc.with_ymd_and_hms(2026, 4, 24, 11, 59, 59).unwrap()),
+                now,
+            ),
+            "V3"
+        );
     }
 }

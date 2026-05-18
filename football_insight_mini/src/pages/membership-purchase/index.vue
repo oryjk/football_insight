@@ -147,7 +147,11 @@ const systemConfigUnderReview = ref(false)
 
 const allProductOptions = computed(() => normalizeMembershipProductOptions(product.value))
 const productOptions = computed(() =>
-  filterMembershipProductOptionsForUpgrade(allProductOptions.value, currentUser.value?.membership_tier),
+  filterMembershipProductOptionsForUpgrade(
+    allProductOptions.value,
+    currentUser.value?.membership_tier,
+    currentUser.value?.membership_expires_at,
+  ),
 )
 const emptyProductTitle = computed(() =>
   allProductOptions.value.length ? '当前已是最高会员档位' : '会员价格暂未加载',

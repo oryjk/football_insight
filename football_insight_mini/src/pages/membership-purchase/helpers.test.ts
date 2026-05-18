@@ -68,6 +68,14 @@ describe('filterMembershipProductOptionsForUpgrade', () => {
     expect(filterMembershipProductOptionsForUpgrade(backendProductOptions, 'V9')).toEqual([])
     expect(filterMembershipProductOptionsForUpgrade(backendProductOptions, 'V3').map((item) => item.target_tier)).toEqual(['V6', 'V7', 'V8', 'V9'])
   })
+
+  test('keeps current V9 product when V9 membership has an expiration date for renewal', () => {
+    expect(filterMembershipProductOptionsForUpgrade(
+      backendProductOptions,
+      'V9',
+      '2027-05-08T04:00:00Z',
+    ).map((item) => item.target_tier)).toEqual(['V9'])
+  })
 })
 
 describe('formatMembershipPrice', () => {

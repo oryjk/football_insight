@@ -142,6 +142,56 @@ pub fn membership_product_type_for_tier(target_tier: &str) -> String {
     format!("membership:{}", target_tier.trim().to_uppercase())
 }
 
+pub fn reflux_subscription_product_type(
+    plan_code: &str,
+    team_code: &str,
+    match_id: Option<i64>,
+) -> String {
+    format!(
+        "reflux_subscription:{}:{}:{}",
+        plan_code.trim(),
+        team_code.trim(),
+        match_id
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| "-".to_string())
+    )
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefluxSubscriptionProductType {
+    pub plan_code: String,
+    pub team_code: String,
+    pub match_id: Option<i64>,
+}
+
+pub fn parse_reflux_subscription_product_type(
+    product_type: &str,
+) -> Option<RefluxSubscriptionProductType> {
+    let parts = product_type.trim().split(':').collect::<Vec<_>>();
+    if parts.len() != 4 || parts[0] != "reflux_subscription" {
+        return None;
+    }
+
+    let plan_code = parts[1].trim().to_string();
+    let team_code = parts[2].trim().to_string();
+    let match_id_value = parts[3].trim();
+    let match_id = if match_id_value.is_empty() || match_id_value == "-" {
+        None
+    } else {
+        Some(match_id_value.parse::<i64>().ok()?)
+    };
+
+    if plan_code.is_empty() || team_code.is_empty() {
+        return None;
+    }
+
+    Some(RefluxSubscriptionProductType {
+        plan_code,
+        team_code,
+        match_id,
+    })
+}
+
 pub fn membership_tier_from_product_type(product_type: &str) -> String {
     product_type
         .trim()
@@ -158,8 +208,10 @@ pub fn calculate_membership_checkout_price(
 ) -> anyhow::Result<MembershipCheckoutPrice> {
     let current_tier = current_tier.trim().to_uppercase();
     let target_tier = target_tier.trim().to_uppercase();
+    let is_v9_renewal = current_tier == "V9" && target_tier == "V9";
 
-    if crate::auth::domain::membership::membership_tier_rank(&target_tier)
+    if !is_v9_renewal
+        && crate::auth::domain::membership::membership_tier_rank(&target_tier)
         <= crate::auth::domain::membership::membership_tier_rank(&current_tier)
     {
         anyhow::bail!("请选择高于当前等级的会员档位");
@@ -204,7 +256,10 @@ pub fn calculate_membership_checkout_price(
 
 #[cfg(test)]
 mod tests {
-    use super::{calculate_membership_checkout_price, default_membership_product_options};
+    use super::{
+        calculate_membership_checkout_price, default_membership_product_options,
+        parse_reflux_subscription_product_type, reflux_subscription_product_type,
+    };
 
     #[test]
     fn calculate_membership_checkout_price_charges_difference_plus_upgrade_fee() {
@@ -245,5 +300,48 @@ mod tests {
             .expect_err("same tier should be rejected");
 
         assert!(error.to_string().contains("高于当前等级"));
+    }
+
+    #[test]
+    fn calculate_membership_checkout_price_allows_v9_renewal_at_full_price() {
+        let products = default_membership_product_options();
+
+        let price =
+            calculate_membership_checkout_price(&products, "V9", "V9").expect("V9 renewal price");
+
+        assert_eq!(price.original_price_cents, 9900);
+        assert_eq!(price.pay_price_cents, 9900);
+        assert_eq!(price.upgrade_fee_cents, 0);
+    }
+
+    #[test]
+    fn reflux_subscription_product_type_round_trips_single_match() {
+        let product_type = reflux_subscription_product_type("single_match", "chengdu", Some(571));
+
+        let parsed = parse_reflux_subscription_product_type(&product_type)
+            .expect("reflux subscription product type");
+
+        assert_eq!(parsed.plan_code, "single_match");
+        assert_eq!(parsed.team_code, "chengdu");
+        assert_eq!(parsed.match_id, Some(571));
+    }
+
+    #[test]
+    fn reflux_subscription_product_type_round_trips_season_without_match() {
+        let product_type = reflux_subscription_product_type("season_2026", "yunnanyukun", None);
+
+        let parsed = parse_reflux_subscription_product_type(&product_type)
+            .expect("reflux subscription product type");
+
+        assert_eq!(parsed.plan_code, "season_2026");
+        assert_eq!(parsed.team_code, "yunnanyukun");
+        assert_eq!(parsed.match_id, None);
+    }
+
+    #[test]
+    fn parse_reflux_subscription_product_type_rejects_other_products() {
+        assert!(parse_reflux_subscription_product_type("membership:V9").is_none());
+        assert!(parse_reflux_subscription_product_type("reflux_subscription::chengdu:571").is_none());
+        assert!(parse_reflux_subscription_product_type("reflux_subscription:single_match::571").is_none());
     }
 }
