@@ -8,6 +8,7 @@
 # Local agent/tooling state
 .claude/
 .playwright-mcp/
+.superpowers/
 .git-backups/
 task_plan.md
 findings.md
