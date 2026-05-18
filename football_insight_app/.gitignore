@@ -43,3 +43,15 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase config files (contain secrets)
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+
+# Apple signing
+*.p8
+*.cer
+*.mobileprovision
+
+# env
+.env

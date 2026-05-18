@@ -1,17 +1,26 @@
-# football_insight_app
+# Football Insight App
 
-A new Flutter project.
+回流监控 Flutter 客户端，支持 Android + iOS。
 
-## Getting Started
+## 功能
 
-This project is a starting point for a Flutter application.
+- License 绑定码登录（微信小程序生成）
+- 回流监控列表（实时回流状态、张数、区域）
+- 看台区域关注
+- 历史回流统计
+- 推送通知（FCM + APNs）
 
-A few resources to get you started if this is your first Flutter project:
+## 开发
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```bash
+flutter pub get
+flutter run
+flutter test
+flutter analyze
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Firebase 配置
+
+1. Android: 将 `google-services.json` 放到 `android/app/`
+2. iOS: 将 `GoogleService-Info.plist` 放到 `ios/Runner/`
+3. 不要提交这些文件到 git
