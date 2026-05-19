@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type {
+  RefluxSubscriptionPlan,
+  RefluxSubscriptionSummary,
   TicketWatchInventoryEntry,
   TicketWatchMatchSummary,
   TicketWatchRegion,
@@ -20,6 +22,7 @@ import {
   formatInventorySectionSummary,
   getInventoryEmptyStateLabel,
   isVipInventoryBlock,
+  isRefluxSubscriptionActiveForCurrentMatch,
   normalizeTicketWatchPollIntervalSeconds,
   prioritizeInventorySections,
   resolveInventoryPriceTone,
@@ -36,6 +39,7 @@ import {
   resolveBlockInterestHeatLevel,
   resolveRecentRefluxPanelMode,
   selectCompletedMatches,
+  selectPurchasableRefluxSubscriptionPlans,
   selectRefluxStatsMatches,
 } from './helpers'
 
@@ -81,6 +85,114 @@ describe('reflux subscription helpers', () => {
   test('formats subscription prices from cents', () => {
     expect(formatRefluxSubscriptionPrice(500)).toBe('¥5')
     expect(formatRefluxSubscriptionPrice(550)).toBe('¥5.50')
+  })
+
+  test('hides the current match single-match plan after it is already active', () => {
+    const plans: RefluxSubscriptionPlan[] = [
+      {
+        code: 'chengdu-match-288600',
+        scope: 'single_match',
+        team_code: 'chengdurongcheng',
+        season: 2026,
+        title: '单场回流提醒',
+        description: '仅当前比赛可用',
+        price_cents: 500,
+      },
+      {
+        code: 'chengdu-season-2026',
+        scope: 'season',
+        team_code: 'chengdurongcheng',
+        season: 2026,
+        title: '赛季回流提醒',
+        description: '覆盖本赛季',
+        price_cents: 1990,
+      },
+    ]
+    const activeSubscriptions: RefluxSubscriptionSummary[] = [
+      {
+        scope: 'single_match',
+        team_code: 'chengdurongcheng',
+        season: 2026,
+        match_id: 288600,
+        starts_at: '2026-05-19T12:00:00+08:00',
+      },
+    ]
+
+    expect(
+      selectPurchasableRefluxSubscriptionPlans(
+        plans,
+        activeSubscriptions,
+        'chengdurongcheng',
+        288600,
+      ).map((plan) => plan.scope),
+    ).toEqual(['season'])
+  })
+
+  test('keeps the single-match plan when the active single-match subscription is for another match', () => {
+    const plans: RefluxSubscriptionPlan[] = [
+      {
+        code: 'chengdu-match-288600',
+        scope: 'single_match',
+        team_code: 'chengdurongcheng',
+        title: '单场回流提醒',
+        description: '仅当前比赛可用',
+        price_cents: 500,
+      },
+    ]
+    const activeSubscriptions: RefluxSubscriptionSummary[] = [
+      {
+        scope: 'single_match',
+        team_code: 'chengdurongcheng',
+        match_id: 288599,
+        starts_at: '2026-05-19T12:00:00+08:00',
+      },
+    ]
+
+    expect(
+      selectPurchasableRefluxSubscriptionPlans(
+        plans,
+        activeSubscriptions,
+        'chengdurongcheng',
+        288600,
+      ).map((plan) => plan.scope),
+    ).toEqual(['single_match'])
+  })
+
+  test('treats a matching season subscription as active for the current match', () => {
+    expect(
+      isRefluxSubscriptionActiveForCurrentMatch(
+        [
+          {
+            scope: 'season',
+            team_code: 'chengdurongcheng',
+            season: 2026,
+            starts_at: '2026-05-19T12:00:00+08:00',
+          },
+        ],
+        'chengdurongcheng',
+        2026,
+        288600,
+      ),
+    ).toBe(true)
+  })
+
+  test('treats a matching single-match subscription as active for the current match', () => {
+    expect(
+      isRefluxSubscriptionActiveForCurrentMatch(
+        [
+          {
+            scope: 'single_match',
+            team_code: 'chengdurongcheng',
+            season: 2026,
+            match_id: 288600,
+            starts_at: '2026-05-19T12:00:00+08:00',
+          },
+        ],
+        'chengdurongcheng',
+        2026,
+        288600,
+      ),
+    ).toBe(true)
   })
 })
 

@@ -59,10 +59,10 @@ async fn wechat_webhook_verification_returns_plaintext_echo() {
             },
             smtp_email: None,
             minio: None,
-            jpush: JPushConfig {
+            jpush: Some(JPushConfig {
                 app_key: String::new(),
                 master_secret: String::new(),
-            },
+            }),
         },
     );
 

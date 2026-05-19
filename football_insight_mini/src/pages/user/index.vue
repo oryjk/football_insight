@@ -5,7 +5,7 @@
     <scroll-view scroll-y class="page-scroll">
       <view class="page">
       <template v-if="systemConfigUnderReview">
-        <view class="hero-card account-hero">
+        <view class="hero-card account-hero account-hero--guest">
           <view class="hero-card__top">
             <view>
               <text class="eyebrow">我的</text>
@@ -19,7 +19,7 @@
       <template v-else>
       <view
         class="hero-card account-hero"
-        :class="currentUser ? [currentMembershipMeta.heroClass, currentMembershipGuide.toneClass] : ''"
+        :class="currentUser ? [currentMembershipMeta.heroClass, currentMembershipGuide.toneClass] : 'account-hero--guest'"
       >
         <view class="hero-card__top" :class="{ 'hero-card__top--member': currentUser }">
           <template v-if="currentUser">
@@ -30,7 +30,7 @@
           </template>
           <template v-else>
             <view>
-              <text class="eyebrow">会员中心</text>
+              <text class="eyebrow">账号登录</text>
               <text class="hero-card__title">{{ accountHeadline }}</text>
             </view>
             <text v-if="accountHeroBadge" class="meta-note meta-note--hero">{{ accountHeroBadge }}</text>
@@ -264,43 +264,30 @@
       </template>
 
       <view v-else class="panel account-form-panel">
-        <view class="section-heading section-heading--compact">
+        <view class="section-heading section-heading--compact account-form-panel__heading">
           <view>
             <text class="section-kicker">登录方式</text>
-            <text class="section-title">微信登录后查看会员身份</text>
+            <text class="section-title">使用微信快速登录</text>
           </view>
-          <text class="meta-note">V1 / V3</text>
+          <text class="meta-note">微信登录</text>
         </view>
 
         <text class="account-form-panel__summary">
-          邀请码会员默认为 V3，首次绑定时可选填推荐码，推荐成功后会继续升级到 V4-V9。
+          登录后可以保存你的主队、邮箱提醒和个人设置。首次登录时按提示补充头像和昵称即可。
         </text>
-
-        <view class="tier-preview-grid">
-          <view class="tier-preview-card tier-preview-card--v3">
-            <text class="tier-preview-card__eyebrow">邀请码会员</text>
-            <text class="tier-preview-card__title">V3 身份徽章</text>
-            <text class="tier-preview-card__body">通过邀请码完成首次绑定。</text>
-          </view>
-          <view class="tier-preview-card tier-preview-card--v1">
-            <text class="tier-preview-card__eyebrow">标准会员</text>
-            <text class="tier-preview-card__title">V1 基础身份</text>
-            <text class="tier-preview-card__body">非邀请码链路默认进入 V1。</text>
-          </view>
-        </view>
 
         <view v-if="isH5" class="mini-wechat-entry mini-wechat-entry--disabled">
           <view class="mini-wechat-entry__notice">
             <text class="mini-wechat-entry__tag">H5 暂不支持登录</text>
             <text class="mini-wechat-entry__title">请在微信小程序中完成登录</text>
             <text class="mini-wechat-entry__desc">
-              当前网页端仅支持浏览基础内容，会员身份、升级和邀请码相关操作请前往微信小程序处理。
+              当前网页端仅支持浏览基础内容，登录和账号设置请前往微信小程序处理。
             </text>
           </view>
         </view>
         <view v-else class="mini-wechat-entry">
           <button class="primary-action mini-wechat-entry__button" @click="handleMiniWechatLogin">微信一键登录</button>
-          <text class="form-footnote">首次登录时补充邀请码、头像和昵称即可。</text>
+          <text class="form-footnote">登录后可以继续使用主队、提醒和个人设置。</text>
         </view>
       </view>
 
@@ -613,7 +600,7 @@ const upgradeSteps = computed<UserUpgradeStep[]>(() =>
 
 const accountHeadline = computed(() => {
   if (!currentUser.value) {
-    return '登录后查看你的会员身份'
+    return '登录后继续使用你的账号'
   }
 
   return '当前会员身份'
@@ -630,8 +617,8 @@ const accountHeroBadge = computed(() => {
 const accountSummary = computed(() => {
   if (!currentUser.value) {
     return isH5
-      ? 'H5 端暂不支持登录，请前往微信小程序查看会员身份。'
-      : '登录后会自动生成会员身份和等级徽章。'
+      ? 'H5 端暂不支持登录，请前往微信小程序使用账号功能。'
+      : '登录后可以保存你的主队、提醒和个人设置。'
   }
 
   return currentUser.value.has_wechat_binding
@@ -1156,11 +1143,11 @@ onShow(() => {
   }
 }
 .account-hero {
-  background: linear-gradient(180deg, rgba(255,255,255,0.78), rgba(255,255,255,0.55));
+  background: #ffffff;
   border-width: 1rpx;
-  border-color: rgba(255,255,255,0.42);
-  backdrop-filter: blur(24rpx);
-  -webkit-backdrop-filter: blur(24rpx);
+  border-color: rgba(229, 232, 238, 0.96);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   animation: fi-fade-in-up 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .account-hero--v3 {
@@ -1550,49 +1537,21 @@ onShow(() => {
   display: grid;
   gap: 12rpx;
 }
-.tier-preview-grid {
-  margin-top: 22rpx;
-  display: grid;
-  gap: 14rpx;
+.account-form-panel {
+  padding: 28rpx 24rpx 26rpx;
+  background: #ffffff;
+  border-color: rgba(229, 232, 238, 0.98);
+  box-shadow: 0 18rpx 42rpx rgba(25, 28, 36, 0.06);
 }
-.tier-preview-card {
-  border-radius: 28rpx;
-  padding: 22rpx 22rpx 24rpx;
-  border: 2rpx solid var(--page-border);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 248, 252, 0.98));
-}
-.tier-preview-card--v3 {
-  background: linear-gradient(180deg, rgba(255, 250, 240, 0.98), rgba(250, 240, 219, 0.98));
-  border-color: var(--page-border-warm);
-}
-.tier-preview-card--v1 {
-  background: linear-gradient(180deg, rgba(249, 251, 255, 0.98), rgba(239, 243, 250, 0.98));
-}
-.tier-preview-card__eyebrow {
-  color: #7b818f;
-  font-size: 22rpx;
-  font-weight: 700;
-  letter-spacing: 1rpx;
-}
-.tier-preview-card__title {
-  display: block;
-  margin-top: 10rpx;
-  color: #15161b;
-  font-size: 34rpx;
-  font-weight: 800;
-}
-.tier-preview-card__body {
-  display: block;
-  margin-top: 10rpx;
-  color: #6c7280;
-  font-size: 24rpx;
-  line-height: 1.6;
+.account-form-panel__heading {
+  padding-bottom: 18rpx;
+  border-bottom: 2rpx solid rgba(235, 237, 242, 0.98);
 }
 .mini-wechat-entry {
-  margin-top: 20rpx;
+  margin-top: 26rpx;
   display: flex;
   flex-direction: column;
-  gap: 12rpx;
+  gap: 14rpx;
 }
 
 .mini-wechat-entry--disabled {
@@ -1602,8 +1561,8 @@ onShow(() => {
 .mini-wechat-entry__notice {
   padding: 24rpx 22rpx;
   border-radius: 28rpx;
-  border: 2rpx solid var(--page-border-warm);
-  background: linear-gradient(180deg, rgba(252, 250, 245, 0.98), rgba(246, 241, 231, 0.96));
+  border: 2rpx solid rgba(229, 232, 238, 0.98);
+  background: #ffffff;
   display: grid;
   gap: 12rpx;
 }
@@ -1637,7 +1596,9 @@ onShow(() => {
 
 .mini-wechat-entry__button {
   align-self: stretch;
-  background: linear-gradient(135deg, #111318, #20252f);
+  min-height: 88rpx;
+  background: #15161b;
+  font-weight: 900;
 }
 .watch-list__item {
   position: relative;
@@ -2064,6 +2025,15 @@ onShow(() => {
     radial-gradient(circle at 82% 18%, var(--member-highlight), transparent 34%),
     radial-gradient(circle at 78% 52%, var(--member-wash), transparent 40%);
   pointer-events: none;
+}
+
+.account-hero--guest {
+  border-color: rgba(229, 232, 238, 0.96);
+  box-shadow: 0 18rpx 40rpx rgba(25, 28, 36, 0.06);
+}
+
+.account-hero--guest::before {
+  display: none;
 }
 
 .hero-card__top--member {

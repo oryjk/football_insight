@@ -92,7 +92,7 @@ pub struct AppConfig {
     pub reflux_notification_worker: RefluxNotificationWorkerConfig,
     pub smtp_email: Option<SmtpEmailConfig>,
     pub minio: Option<MinioConfig>,
-    pub jpush: JPushConfig,
+    pub jpush: Option<JPushConfig>,
 }
 
 #[derive(Debug, Clone)]
@@ -172,11 +172,7 @@ impl AppConfig {
         };
         let smtp_email = SmtpEmailConfig::from_env();
         let minio = MinioConfig::from_env();
-        let jpush = JPushConfig {
-            app_key: std::env::var("JPUSH_APP_KEY").context("JPUSH_APP_KEY is required")?,
-            master_secret: std::env::var("JPUSH_MASTER_SECRET")
-                .context("JPUSH_MASTER_SECRET is required")?,
-        };
+        let jpush = JPushConfig::from_env();
 
         Ok(Self {
             port,
@@ -252,6 +248,20 @@ impl MinioConfig {
             region,
             prefix,
             public_base_url,
+        })
+    }
+}
+
+impl JPushConfig {
+    fn from_env() -> Option<Self> {
+        let app_key = std::env::var("JPUSH_APP_KEY").ok()?.trim().to_string();
+        let master_secret = std::env::var("JPUSH_MASTER_SECRET").ok()?;
+        if app_key.is_empty() || master_secret.trim().is_empty() {
+            return None;
+        }
+        Some(Self {
+            app_key,
+            master_secret,
         })
     }
 }

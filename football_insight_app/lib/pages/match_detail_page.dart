@@ -1,111 +1,83 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:football_insight_app/models/reflux_event.dart';
-import 'package:football_insight_app/models/seat_region.dart';
 import 'package:football_insight_app/providers/ticket_watch_provider.dart';
 import 'package:football_insight_app/widgets/reflux_timeline_widget.dart';
 import 'package:football_insight_app/widgets/region_selector_widget.dart';
 
-class MatchDetailPage extends ConsumerStatefulWidget {
+class MatchDetailPage extends ConsumerWidget {
   final int matchId;
 
   const MatchDetailPage({super.key, required this.matchId});
 
   @override
-  ConsumerState<MatchDetailPage> createState() => _MatchDetailPageState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final inventoryAsync = ref.watch(matchInventoryProvider(matchId));
+    final interestsAsync = ref.watch(matchBlockInterestsProvider(matchId));
+    final theme = Theme.of(context);
 
-class _MatchDetailPageState extends ConsumerState<MatchDetailPage> {
-  List<SeatRegion> _regions = [];
-  List<RefluxEvent> _events = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadData();
-  }
-
-  Future<void> _loadData() async {
-    try {
-      final service = ref.read(ticketWatchServiceProvider);
-      final inventoryFuture = service.getInventory(widget.matchId);
-      final regionsFuture = service.getRegions();
-
-      final inventory = await inventoryFuture;
-      final regionsData = await regionsFuture;
-
-      if (mounted) {
-        setState(() {
-          _events =
-              (inventory['events'] as List<dynamic>?)
-                  ?.map((e) => RefluxEvent.fromMap(e as Map<String, dynamic>))
-                  .toList() ??
-                  [];
-          _regions =
-              regionsData
-                  .map((r) => SeatRegion.fromMap(r as Map<String, dynamic>))
-                  .toList();
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('加载失败: $e')));
-      }
-    }
-  }
-
-  Future<void> _toggleRegion(String blockName) async {
-    try {
-      final service = ref.read(ticketWatchServiceProvider);
-      await service.toggleBlockInterest(widget.matchId, blockName);
-      setState(() {
-        _regions =
-            _regions.map((r) {
-              if (r.blockName == blockName) {
-                return r.copyWith(isTracked: !r.isTracked);
-              }
-              return r;
-            }).toList();
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('操作失败: $e')));
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('比赛详情')),
       body: RefreshIndicator(
-        onRefresh: _loadData,
+        onRefresh: () async {
+          ref.invalidate(matchInventoryProvider(matchId));
+          ref.invalidate(matchBlockInterestsProvider(matchId));
+          await Future.wait([
+            ref.read(matchInventoryProvider(matchId).future),
+            ref.read(matchBlockInterestsProvider(matchId).future),
+          ]);
+        },
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text(
-              '关注区域',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+            Text('关注区域', style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
-            RegionSelectorWidget(
-              regions: _regions,
-              onToggle: _toggleRegion,
+            interestsAsync.when(
+              loading: () => const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (e, _) => Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text('加载失败: $e'),
+              ),
+              data: (interests) => RegionSelectorWidget(
+                interests: interests,
+                onToggle: (blockName) => _toggle(ref, context, blockName),
+              ),
             ),
             const Divider(height: 32),
-            Text(
-              '回流时间线',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+            Text('回流时间线', style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
-            RefluxTimelineWidget(events: _events),
+            inventoryAsync.when(
+              loading: () => const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (e, _) => Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text('加载失败: $e'),
+              ),
+              data: (entries) => RefluxTimelineWidget(entries: entries),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _toggle(
+    WidgetRef ref,
+    BuildContext context,
+    String blockName,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(ticketWatchServiceProvider)
+          .toggleBlockInterest(matchId, blockName);
+      ref.invalidate(matchBlockInterestsProvider(matchId));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('操作失败: $e')));
+    }
   }
 }

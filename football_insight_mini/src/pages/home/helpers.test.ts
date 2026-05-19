@@ -19,6 +19,7 @@ import {
   resolveHomeHasAuthToken,
   resolveHomeSupportNextMatchLabel,
   resolveHomeSupportWindowShortLabel,
+  isHomeAuthExpiredMessage,
 } from './helpers'
 
 function createLiveMatch(overrides: Partial<MatchCard> = {}): MatchCard {
@@ -152,6 +153,20 @@ describe('resolveHomeHasAuthToken', () => {
     expect(resolveHomeHasAuthToken('')).toBe(false)
     expect(resolveHomeHasAuthToken('   ')).toBe(false)
     expect(resolveHomeHasAuthToken(null)).toBe(false)
+  })
+})
+
+describe('isHomeAuthExpiredMessage', () => {
+  test('recognizes common expired or missing login messages', () => {
+    expect(isHomeAuthExpiredMessage('请求失败（401）')).toBe(true)
+    expect(isHomeAuthExpiredMessage('请先登录')).toBe(true)
+    expect(isHomeAuthExpiredMessage('Unauthorized')).toBe(true)
+    expect(isHomeAuthExpiredMessage('invalid token')).toBe(true)
+    expect(isHomeAuthExpiredMessage('token expired')).toBe(true)
+  })
+
+  test('does not treat backend data errors as login expiration', () => {
+    expect(isHomeAuthExpiredMessage('error occurred while decoding column 0')).toBe(false)
   })
 })
 

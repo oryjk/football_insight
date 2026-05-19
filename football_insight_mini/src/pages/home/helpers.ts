@@ -101,6 +101,16 @@ export function resolveHomeHasAuthToken(token: string | null): boolean {
   return typeof token === 'string' && token.trim().length > 0
 }
 
+export function isHomeAuthExpiredMessage(message: string): boolean {
+  const normalized = message.trim().toLowerCase()
+  return normalized.includes('401')
+    || normalized.includes('登录')
+    || normalized.includes('unauthorized')
+    || normalized.includes('not logged in')
+    || normalized.includes('invalid token')
+    || normalized.includes('token expired')
+}
+
 export function resolveHomeAiEntryTapResult(options: {
   expanded: boolean
   hasAuthToken: boolean

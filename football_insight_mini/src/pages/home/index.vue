@@ -167,7 +167,6 @@
           <text class="support-home-panel__summary">
             登录后才能关注主队、参与赛前助力，并把比赛页面转发出去拉票。
           </text>
-          <button class="support-home-panel__action" @click="handleSupportLogin">去登录</button>
         </template>
 
         <template v-else-if="!supportFavoriteTeam">
@@ -619,6 +618,14 @@
         </view>
       </view>
     </view>
+
+    <view v-if="loginPromptVisible" class="login-float">
+      <view class="login-float__copy">
+        <text class="login-float__title">请先登录</text>
+        <text class="login-float__desc">重新登录后，可以继续关注主队和使用会员功能。</text>
+      </view>
+      <button class="login-float__action" @click="handleSupportLogin">去登录</button>
+    </view>
   </view>
 </template>
 
@@ -646,7 +653,7 @@ import type {
 import type { SupportMatchDetail, SupportProfile, SupportTeam } from '../../types/support'
 import type { PublicSystemConfig } from '../../types/system'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { getAccessToken } from '../../utils/authStorage'
+import { getAccessToken, setAccessToken } from '../../utils/authStorage'
 import bgImage from '../../static/home/bg.webp'
 import { buildHomeBriefingMarqueeMap, splitBriefingMarqueeRows, type HomeBriefingMarqueeAccent } from '../../utils/homeBriefingMarquees'
 import { buildHeadlineTitleParts } from '../../utils/homeViewText'
@@ -660,6 +667,7 @@ import {
   resolveHomeGuideNote,
   resolveHomeGuideReferenceRoundNumber,
   resolveHomeHasAuthToken,
+  isHomeAuthExpiredMessage,
   resolveHomePulseLeadMatch,
   resolveHomePulseMatches,
   resolveHomePulseTechStats,
@@ -708,6 +716,7 @@ const supportTeams = ref<SupportTeam[]>([])
 const favoriteTeamSheetVisible = ref(false)
 const selectedFavoriteTeamId = ref<number | null>(null)
 const hasAuthToken = ref(resolveHomeHasAuthToken(getAccessToken()))
+const loginPromptVisible = ref(false)
 
 const standings = computed<OverviewStanding[]>(() => overview.value?.standings_top ?? [])
 const scorers = computed<OverviewPlayer[]>(() => overview.value?.top_scorers ?? [])
@@ -1092,12 +1101,14 @@ async function loadSupportData() {
   supportLoading.value = true
   supportErrorMessage.value = ''
   hasAuthToken.value = resolveHomeHasAuthToken(getAccessToken())
+  loginPromptVisible.value = false
 
   try {
     supportTeams.value = await listSupportTeams()
 
     if (!hasAuthToken.value) {
       supportProfile.value = null
+      loginPromptVisible.value = true
       return
     }
 
@@ -1106,14 +1117,12 @@ async function loadSupportData() {
   } catch (error) {
     const message = extractApiErrorMessage(error, '助力入口加载失败，请稍后重试。')
 
-    if (
-      message.includes('401')
-      || message.includes('未登录')
-      || message.includes('Unauthorized')
-      || message.includes('not logged in')
-    ) {
+    if (isHomeAuthExpiredMessage(message)) {
+      setAccessToken(null)
+      hasAuthToken.value = false
       supportProfile.value = null
       supportErrorMessage.value = ''
+      loginPromptVisible.value = true
       return
     }
 
@@ -1128,6 +1137,7 @@ async function loadCurrentAiUser() {
 
   if (!hasAuthToken.value) {
     currentAiUser.value = null
+    loginPromptVisible.value = true
     return
   }
 
@@ -1135,6 +1145,12 @@ async function loadCurrentAiUser() {
     currentAiUser.value = await getCurrentUser()
   } catch {
     currentAiUser.value = null
+  }
+
+  if (!currentAiUser.value && hasAuthToken.value) {
+    setAccessToken(null)
+    hasAuthToken.value = false
+    loginPromptVisible.value = true
   }
 }
 
@@ -1265,6 +1281,56 @@ onShow(() => {
 .skeleton-stack {
   display: grid;
   gap: 24rpx;
+}
+.login-float {
+  position: fixed;
+  left: 28rpx;
+  right: 28rpx;
+  bottom: 12rpx;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20rpx;
+  padding: 22rpx 24rpx;
+  border-radius: 28rpx;
+  background: rgba(21, 23, 29, 0.96);
+  box-shadow: 0 20rpx 46rpx rgba(16, 18, 24, 0.24);
+}
+.login-float__copy {
+  min-width: 0;
+  display: grid;
+  gap: 6rpx;
+}
+.login-float__title,
+.login-float__desc {
+  display: block;
+}
+.login-float__title {
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+.login-float__desc {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 22rpx;
+  line-height: 1.35;
+}
+.login-float__action {
+  min-width: 148rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999rpx;
+  background: #ffffff;
+  color: #15171d;
+  font-size: 26rpx;
+  font-weight: 800;
+  line-height: 1;
+}
+.login-float__action::after {
+  border: none;
 }
 .skeleton-panel {
   position: relative;

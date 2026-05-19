@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:football_insight_app/models/match_card.dart';
-import 'package:football_insight_app/models/reflux_event.dart';
+import 'package:football_insight_app/models/current_board.dart';
 import 'package:football_insight_app/providers/ticket_watch_provider.dart';
 import 'package:football_insight_app/widgets/match_card_widget.dart';
 import 'package:football_insight_app/widgets/notification_banner.dart';
@@ -26,78 +25,105 @@ class HomePage extends ConsumerWidget {
       ),
       body: boardAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('加载失败: $e')),
-        data: (board) {
-          final matchesData = board['matches'] as List<dynamic>?;
-          final notification = board['notification'] as String?;
-          final matches = matchesData
-                  ?.map((m) => MatchCard.fromMap(m as Map<String, dynamic>))
-                  .toList() ??
-              [];
-
-          return RefreshIndicator(
-            onRefresh: () => ref.refresh(currentBoardProvider.future),
-            child: CustomScrollView(
-              slivers: [
-                if (notification != null)
-                  SliverToBoxAdapter(
-                    child: NotificationBanner(message: notification),
-                  ),
-                if (matches.isEmpty)
-                  const SliverFillRemaining(
-                    child: Center(child: Text('暂无比赛数据')),
-                  )
-                else
-                  SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final match = matches[index];
-                        return MatchCardWidget(
-                          match: match,
-                          onTap: () => context.go(
-                            '/match-detail',
-                            extra: {'matchId': match.matchId},
-                          ),
-                        );
-                      },
-                      childCount: matches.length,
-                    ),
-                  ),
-                SliverToBoxAdapter(
-                  child: _buildRefluxSummary(context, board),
-                ),
-              ],
-            ),
-          );
-        },
+        error: (e, _) => _ErrorView(
+          message: '加载失败: $e',
+          onRetry: () => ref.invalidate(currentBoardProvider),
+        ),
+        data: (board) => _BoardView(board: board, ref: ref),
       ),
     );
   }
+}
 
-  Widget _buildRefluxSummary(BuildContext context, Map<String, dynamic> board) {
-    final items = board['inventory_items'] as List<dynamic>?;
-    if (items == null || items.isEmpty) return const SizedBox.shrink();
+class _BoardView extends StatelessWidget {
+  final CurrentBoard board;
+  final WidgetRef ref;
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  const _BoardView({required this.board, required this.ref});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final match = board.currentMatch;
+    final inventory = board.inventory;
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(currentBoardProvider);
+        await ref.read(currentBoardProvider.future);
+      },
+      child: ListView(
         children: [
-          Text(
-            '最近回流',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          if (board.message.isNotEmpty)
+            NotificationBanner(message: board.message),
+          if (match == null)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: Text('当前没有进行中的比赛')),
+            )
+          else
+            MatchCardWidget(
+              match: match,
+              onTap: () => context.go(
+                '/match-detail',
+                extra: {'matchId': match.matchId},
+              ),
+            ),
+          if (board.groupTicketActive)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: NotificationBanner(
+                message: '团购票正在售卖中',
+                icon: Icons.group,
+              ),
+            ),
           const SizedBox(height: 8),
-          ...items.take(5).map((item) {
-            final event = RefluxEvent.fromMap(item as Map<String, dynamic>);
-            return ListTile(
-              dense: true,
-              leading: const Icon(Icons.confirmation_num, size: 20),
-              title: Text(event.blockName),
-              subtitle: Text('${event.ticketCount}张 · ${event.timeLabel}'),
-            );
-          }),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text('最近回流', style: theme.textTheme.titleMedium),
+          ),
+          if (inventory.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: Text('暂无回流记录')),
+            )
+          else
+            ...inventory.take(8).map((entry) {
+              return ListTile(
+                dense: true,
+                leading: const Icon(Icons.confirmation_num, size: 20),
+                title: Text(entry.blockName),
+                subtitle: Text('${entry.occurrences} 次 · ${entry.latestTimeLabel}'),
+              );
+            }),
+          const SizedBox(height: 16),
         ],
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ErrorView({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off, size: 48),
+            const SizedBox(height: 12),
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: onRetry, child: const Text('重试')),
+          ],
+        ),
       ),
     );
   }

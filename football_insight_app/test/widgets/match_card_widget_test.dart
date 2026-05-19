@@ -5,21 +5,21 @@ import 'package:football_insight_app/widgets/match_card_widget.dart';
 
 void main() {
   group('MatchCardWidget', () {
-    testWidgets('displays team names and round number', (tester) async {
-      const match = MatchCard(
-        matchId: 1,
-        homeTeamName: '成都蓉城',
-        awayTeamName: '上海海港',
-        matchDate: '2026-05-20',
-        matchTime: '19:35',
-        roundNumber: 12,
-      );
+    const match = MatchCard(
+      matchId: 1,
+      externalMatchId: 'csl-2026-12',
+      roundNumber: 12,
+      matchDate: '2026-05-20',
+      matchTime: '19:35',
+      kickoffAt: '2026-05-20T19:35:00+08:00',
+      homeTeamName: '成都蓉城',
+      awayTeamName: '上海海港',
+    );
 
+    testWidgets('displays team names and round number', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(
-            body: MatchCardWidget(match: match),
-          ),
+          home: Scaffold(body: MatchCardWidget(match: match)),
         ),
       );
 
@@ -30,41 +30,28 @@ void main() {
       expect(find.text('VS'), findsOneWidget);
     });
 
-    testWidgets('displays scores when available', (tester) async {
-      const match = MatchCard(
+    testWidgets('shows current badge when isCurrent', (tester) async {
+      const currentMatch = MatchCard(
         matchId: 1,
-        homeTeamName: '成都蓉城',
-        awayTeamName: '上海海港',
+        externalMatchId: 'x',
+        roundNumber: 12,
         matchDate: '2026-05-20',
         matchTime: '19:35',
-        roundNumber: 12,
-        homeScore: 2,
-        awayScore: 1,
+        kickoffAt: '',
+        homeTeamName: 'A',
+        awayTeamName: 'B',
+        isCurrent: true,
       );
-
       await tester.pumpWidget(
         const MaterialApp(
-          home: Scaffold(
-            body: MatchCardWidget(match: match),
-          ),
+          home: Scaffold(body: MatchCardWidget(match: currentMatch)),
         ),
       );
-
-      expect(find.text('2 - 1'), findsOneWidget);
-      expect(find.text('VS'), findsNothing);
+      expect(find.text('本轮'), findsOneWidget);
     });
 
     testWidgets('calls onTap when tapped', (tester) async {
       var tapped = false;
-      const match = MatchCard(
-        matchId: 1,
-        homeTeamName: 'A',
-        awayTeamName: 'B',
-        matchDate: '2026-01-01',
-        matchTime: '15:00',
-        roundNumber: 1,
-      );
-
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(

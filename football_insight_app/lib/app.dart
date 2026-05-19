@@ -10,13 +10,15 @@ import 'package:go_router/go_router.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
-
-  final isLoggedIn = authState.value != null;
+  final isLoggedIn = authState.valueOrNull != null;
   final isLoading = authState.isLoading;
 
   return GoRouter(
+    initialLocation: '/',
     redirect: (context, state) {
-      if (isLoading) return null;
+      if (isLoading) {
+        return state.matchedLocation == '/login' ? null : '/login';
+      }
       final isLoginRoute = state.matchedLocation == '/login';
       if (!isLoggedIn && !isLoginRoute) return '/login';
       if (isLoggedIn && isLoginRoute) return '/';

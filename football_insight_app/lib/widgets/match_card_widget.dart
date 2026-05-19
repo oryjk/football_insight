@@ -38,6 +38,24 @@ class MatchCardWidget extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  if (match.isCurrent)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.tertiaryContainer,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '本轮',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onTertiaryContainer,
+                        ),
+                      ),
+                    ),
                   const Spacer(),
                   Text(
                     '${match.matchDate} ${match.matchTime}',
@@ -60,7 +78,13 @@ class MatchCardWidget extends StatelessWidget {
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: _buildScore(theme),
+                    child: Text(
+                      'VS',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: theme.colorScheme.outline,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                   Expanded(
                     child: Text(
@@ -72,28 +96,16 @@ class MatchCardWidget extends StatelessWidget {
                   ),
                 ],
               ),
+              if (match.saleStartAt != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '开售: ${match.saleStartAt}',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildScore(ThemeData theme) {
-    if (match.homeScore != null && match.awayScore != null) {
-      return Text(
-        '${match.homeScore} - ${match.awayScore}',
-        style: theme.textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: theme.colorScheme.primary,
-        ),
-      );
-    }
-    return Text(
-      'VS',
-      style: theme.textTheme.titleMedium?.copyWith(
-        color: theme.colorScheme.outline,
-        fontWeight: FontWeight.bold,
       ),
     );
   }

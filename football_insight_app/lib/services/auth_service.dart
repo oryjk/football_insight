@@ -22,23 +22,39 @@ class AuthService {
       '/api/v1/auth/bind-license',
       data: {'license_key': licenseKey},
     );
-    final data = response.data;
-    final token = data['access_token'] as String;
+    final data = response.data as Map<String, dynamic>;
+    final token = data['access_token'] as String?;
+    if (token == null || token.isEmpty) {
+      throw const AuthFailure('未拿到 access_token');
+    }
     await _tokenStorage.saveToken(token);
-    final user = UserProfile.fromMap(data['user']);
+    final rawUser = data['user'];
+    final user = rawUser is Map<String, dynamic>
+        ? UserProfile.fromMap(rawUser)
+        : await getMe();
     return AuthResult(accessToken: token, user: user);
   }
 
   Future<UserProfile> getMe() async {
     final response = await _dio.get('/api/v1/auth/me');
-    return UserProfile.fromMap(response.data);
+    final data = response.data;
+    if (data is! Map<String, dynamic>) {
+      throw const AuthFailure('/auth/me 返回格式异常');
+    }
+    return UserProfile.fromMap(data);
   }
 
   Future<void> logout() async {
     await _tokenStorage.clearToken();
   }
 
-  Future<bool> isLoggedIn() async {
-    return _tokenStorage.hasToken();
-  }
+  Future<bool> isLoggedIn() => _tokenStorage.hasToken();
+}
+
+class AuthFailure implements Exception {
+  final String message;
+  const AuthFailure(this.message);
+
+  @override
+  String toString() => 'AuthFailure: $message';
 }

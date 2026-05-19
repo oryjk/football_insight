@@ -4,6 +4,13 @@ use sqlx::PgPool;
 
 use crate::{
     config::AppConfig,
+    push_notification::{
+        adapters::{
+            integration::jpush_sender::JPushSender,
+            persistence::postgres_device_token_repository::PostgresDeviceTokenRepository,
+        },
+        ports::push_sender::PushSender,
+    },
     reflux_subscription::{
         adapters::{
             integration::smtp_email_sender::{SmtpEmailSender, SmtpEmailSenderConfig},
@@ -12,6 +19,7 @@ use crate::{
         application::{
             process_reflux_notification_jobs::ProcessRefluxNotificationJobsUseCase,
             process_reflux_notifications::ProcessRefluxNotificationsUseCase,
+            process_reflux_push_jobs::ProcessRefluxPushJobsUseCase,
         },
     },
     ticket_watch::adapters::integration::http_ticket_monitor_port::HttpTicketMonitorPort,
@@ -41,7 +49,7 @@ pub fn spawn_reflux_notification_worker(pool: PgPool, config: &AppConfig) {
             return;
         }
     };
-    let repository = Arc::new(PostgresRefluxSubscriptionRepository::new(pool));
+    let repository = Arc::new(PostgresRefluxSubscriptionRepository::new(pool.clone()));
     let enqueue_use_case = Arc::new(ProcessRefluxNotificationsUseCase::new(
         repository.clone(),
         Arc::new(HttpTicketMonitorPort::new(config.ticket_monitor_base_url.clone())),
@@ -50,6 +58,21 @@ pub fn spawn_reflux_notification_worker(pool: PgPool, config: &AppConfig) {
         repository.clone(),
         email_sender,
     ));
+
+    let push_use_case: Option<Arc<dyn PushSender>> = config.jpush.as_ref().map(|jpush_config| {
+        Arc::new(JPushSender::new(
+            jpush_config.app_key.clone(),
+            jpush_config.master_secret.clone(),
+        )) as Arc<dyn PushSender>
+    });
+    let push_jobs_use_case = push_use_case.map(|sender| {
+        ProcessRefluxPushJobsUseCase::new(
+            repository.clone(),
+            Arc::new(PostgresDeviceTokenRepository::new(pool.clone())),
+            sender,
+        )
+    });
+
     let poll_seconds = config.reflux_notification_worker.poll_seconds;
 
     tokio::spawn(async move {
@@ -77,6 +100,19 @@ pub fn spawn_reflux_notification_worker(pool: PgPool, config: &AppConfig) {
                 }
                 Err(error) => {
                     tracing::error!(error = %error, "failed to process reflux notification email jobs");
+                }
+            }
+
+            if let Some(ref push_jobs) = push_jobs_use_case {
+                match push_jobs.execute(50).await {
+                    Ok(pushed_count) => {
+                        if pushed_count > 0 {
+                            tracing::info!(pushed_count, "processed reflux notification push jobs");
+                        }
+                    }
+                    Err(error) => {
+                        tracing::error!(error = %error, "failed to process reflux notification push jobs");
+                    }
                 }
             }
         }

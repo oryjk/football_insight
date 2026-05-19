@@ -870,7 +870,7 @@ impl PostgresInsightQueryRepository {
         season: i32,
         round_number: i32,
     ) -> anyhow::Result<Option<DateTime<Utc>>> {
-        let kickoff = sqlx::query_scalar::<_, NaiveDateTime>(
+        let kickoff = sqlx::query_scalar::<_, Option<NaiveDateTime>>(
             r#"
             SELECT MIN(match_date::timestamp + match_time::time)
               FROM f_i_matches
@@ -882,7 +882,7 @@ impl PostgresInsightQueryRepository {
         .bind(round_number)
         .fetch_optional(&self.pool)
         .await
-        .map_err(anyhow::Error::from)?;
+        .map(|item| item.flatten())?;
 
         Ok(kickoff.and_then(Self::china_local_naive_to_utc))
     }
@@ -903,7 +903,7 @@ impl PostgresInsightQueryRepository {
             .fetch_next_round_first_kickoff(season, round_number)
             .await?;
 
-        sqlx::query_scalar::<_, DateTime<Utc>>(
+        sqlx::query_scalar::<_, Option<DateTime<Utc>>>(
             r#"
             SELECT MAX(snapshot_at)
               FROM f_i_team_ranking_snapshots
@@ -920,6 +920,7 @@ impl PostgresInsightQueryRepository {
         .bind(next_round_start)
         .fetch_optional(&self.pool)
         .await
+        .map(|item| item.flatten())
         .map_err(Into::into)
     }
 

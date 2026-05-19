@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationToggleNotifier extends StateNotifier<bool> {
   static const _key = 'notification_enabled';
+
   NotificationToggleNotifier() : super(false) {
     _load();
   }

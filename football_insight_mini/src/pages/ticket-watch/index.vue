@@ -205,9 +205,10 @@
               </button>
               <button
                 class="watch-monitor-actions__button watch-monitor-actions__button--subscribe"
+                :class="{ 'watch-monitor-actions__button--subscribed': refluxSubscriptionSubscribed }"
                 @tap="openRefluxSubscriptionSheet"
               >
-                订阅提醒
+                {{ refluxSubscriptionSubscribed ? '已开通' : '订阅提醒' }}
               </button>
             </view>
 
@@ -928,13 +929,19 @@
       <text class="subscription-dialog__match">
         {{ currentMatch?.home_team_name }} VS {{ currentMatch?.away_team_name }}
       </text>
+      <view v-if="refluxSubscriptionSubscribed" class="subscription-opened-card">
+        <text class="subscription-opened-card__title">已开通回流提醒</text>
+        <text class="subscription-opened-card__desc">有回流命中时会通知到以下邮箱</text>
+        <text class="subscription-opened-card__email">{{ refluxSubscriptionEmail || '暂无邮箱记录' }}</text>
+      </view>
       <input
+        v-else
         v-model="refluxSubscriptionEmail"
         class="subscription-dialog__input"
         type="text"
         placeholder="填写接收提醒的邮箱"
       />
-      <view class="subscription-plan-list">
+      <view v-if="!refluxSubscriptionSubscribed" class="subscription-plan-list">
         <button
           v-for="plan in refluxSubscriptionPlans"
           :key="plan.code"
@@ -951,6 +958,7 @@
       </view>
       <text v-if="refluxSubscriptionSubscribed" class="subscription-dialog__status">当前比赛已开通提醒</text>
       <button
+        v-if="!refluxSubscriptionSubscribed"
         class="subscription-dialog__action"
         :disabled="refluxSubscriptionSubmitting || !selectedRefluxSubscriptionPlanCode"
         @tap="submitRefluxSubscriptionOrder"
@@ -1023,6 +1031,7 @@ import {
   formatTrackedInterestTime,
   formatTrackedInterestWaitLabel,
   groupInventoryByPrice,
+  isRefluxSubscriptionActiveForCurrentMatch,
   isTicketWatchSectionCollapsed,
   prioritizeInventorySections,
   resolveCurrentBoardLoadStrategy,
@@ -1036,6 +1045,7 @@ import {
   resolveHistoryBoardLoadStrategy,
   requireInventorySince,
   selectCompletedMatches,
+  selectPurchasableRefluxSubscriptionPlans,
   selectRefluxStatsMatches,
   summarizeInventoryBoard,
   type TicketWatchBoardStats,
@@ -1094,6 +1104,7 @@ const refluxSubscriptionPlans = ref<RefluxSubscriptionPlan[]>([])
 const selectedRefluxSubscriptionPlanCode = ref('')
 const refluxSubscriptionEmail = ref('')
 const refluxSubscriptionSubscribed = ref(false)
+const refluxSubscriptionStatusLoading = ref(false)
 const currentTrackedInterests = ref<TicketWatchTrackedInterest[]>([])
 const currentCollapsedSections = ref<TicketWatchCollapsedSectionState>({})
 const historyCollapsedSections = ref<TicketWatchCollapsedSectionState>({})
@@ -1285,6 +1296,37 @@ async function loadCurrentTrackedInterests(matchId: number): Promise<void> {
   currentTrackedInterests.value = await getTicketWatchTrackedInterests(matchId)
 }
 
+async function refreshRefluxSubscriptionStatus(): Promise<void> {
+  const match = currentMatch.value
+  if (!match || !currentUser.value || refluxSubscriptionStatusLoading.value) {
+    return
+  }
+
+  refluxSubscriptionStatusLoading.value = true
+
+  try {
+    const status = await getRefluxSubscriptionStatus(
+      resolveSelectedTeamCode(),
+      inferCurrentMatchSeason(),
+      match.match_id,
+    )
+
+    refluxSubscriptionEmail.value = status.email_target?.target || ''
+    refluxSubscriptionSubscribed.value = status.subscribed
+      || isRefluxSubscriptionActiveForCurrentMatch(
+        status.active_subscriptions,
+        resolveSelectedTeamCode(),
+        inferCurrentMatchSeason(),
+        match.match_id,
+      )
+  } catch {
+    refluxSubscriptionSubscribed.value = false
+    refluxSubscriptionEmail.value = ''
+  } finally {
+    refluxSubscriptionStatusLoading.value = false
+  }
+}
+
 async function refreshMatchInterests(matchId: number, mode: TicketWatchBoardMode): Promise<void> {
   const interests = await getMatchInterestSections(matchId)
 
@@ -1328,6 +1370,8 @@ function resetCurrentBoard(): void {
   currentMatch.value = null
   currentSections.value = []
   currentTrackedInterests.value = []
+  refluxSubscriptionSubscribed.value = false
+  refluxSubscriptionEmail.value = ''
   currentErrorMessage.value = ''
   hasLoadedCurrentBoard.value = false
   currentMessage.value = '暂无当前比赛。'
@@ -1389,9 +1433,12 @@ async function loadChengduCurrentBoard(): Promise<void> {
       response.block_interests,
     )
     currentTrackedInterests.value = response.tracked_interests
+    void refreshRefluxSubscriptionStatus()
   } else {
     currentSections.value = []
     currentTrackedInterests.value = []
+    refluxSubscriptionSubscribed.value = false
+    refluxSubscriptionEmail.value = ''
   }
 }
 
@@ -1409,6 +1456,7 @@ async function loadYukunCurrentBoard(): Promise<void> {
 
   currentMatch.value = yukunMatch
   currentMessage.value = ''
+  void refreshRefluxSubscriptionStatus()
   const since = requireInventorySince(yukunMatch.sale_start_at)
 
   const [inventory, yukunRegions] = await Promise.all([
@@ -1900,10 +1948,23 @@ async function openRefluxSubscriptionSheet(): Promise<void> {
       ),
     ])
 
-    refluxSubscriptionPlans.value = plans.plans
-    selectedRefluxSubscriptionPlanCode.value = plans.plans[0]?.code ?? ''
+    const availablePlans = selectPurchasableRefluxSubscriptionPlans(
+      plans.plans,
+      plans.active_subscriptions,
+      resolveSelectedTeamCode(),
+      currentMatch.value.match_id,
+    )
+
+    refluxSubscriptionPlans.value = availablePlans
+    selectedRefluxSubscriptionPlanCode.value = availablePlans[0]?.code ?? ''
     refluxSubscriptionEmail.value = status.email_target?.target || plans.email_target?.target || ''
     refluxSubscriptionSubscribed.value = status.subscribed
+      || isRefluxSubscriptionActiveForCurrentMatch(
+        status.active_subscriptions,
+        resolveSelectedTeamCode(),
+        inferCurrentMatchSeason(),
+        currentMatch.value.match_id,
+      )
   } catch (error) {
     uni.showToast({ title: extractApiErrorMessage(error, '订阅套餐加载失败'), icon: 'none' })
     refluxSubscriptionSheetVisible.value = false
@@ -2426,19 +2487,22 @@ onUnload(() => {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 28rpx;
+  padding: 0;
   background: rgba(17, 19, 24, 0.32);
+  animation: subscription-mask-fade-in 180ms ease-out both;
 }
 .subscription-dialog {
   width: 100%;
-  max-width: 680rpx;
   display: grid;
   gap: 20rpx;
-  padding: 30rpx 28rpx 26rpx;
-  border-radius: 30rpx;
+  box-sizing: border-box;
+  padding: 34rpx 28rpx calc(24rpx + env(safe-area-inset-bottom));
+  border-radius: 32rpx 32rpx 0 0;
   background: #fffefa;
   border: 2rpx solid rgba(236, 230, 216, 0.96);
+  border-bottom: 0;
   box-shadow: 0 28rpx 66rpx rgba(22, 24, 30, 0.2);
+  animation: subscription-dialog-slide-up 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .subscription-dialog__head {
   display: flex;
@@ -2485,6 +2549,35 @@ onUnload(() => {
   color: #15171d;
   font-size: 28rpx;
 }
+.subscription-opened-card {
+  display: grid;
+  gap: 10rpx;
+  padding: 24rpx;
+  border-radius: 22rpx;
+  background: #f2fbf6;
+  border: 2rpx solid rgba(123, 202, 159, 0.42);
+}
+.subscription-opened-card__title,
+.subscription-opened-card__desc,
+.subscription-opened-card__email {
+  display: block;
+}
+.subscription-opened-card__title {
+  color: #167348;
+  font-size: 30rpx;
+  font-weight: 900;
+}
+.subscription-opened-card__desc {
+  color: #5e7469;
+  font-size: 24rpx;
+  line-height: 1.45;
+}
+.subscription-opened-card__email {
+  color: #15171d;
+  font-size: 28rpx;
+  font-weight: 800;
+  word-break: break-all;
+}
 .subscription-plan-list {
   display: grid;
   gap: 14rpx;
@@ -2529,15 +2622,37 @@ onUnload(() => {
   flex-shrink: 0;
 }
 .subscription-dialog__action {
-  min-height: 82rpx;
+  height: 82rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border-radius: 22rpx;
   background: #15171d;
   color: #ffffff;
   font-size: 30rpx;
   font-weight: 800;
+  line-height: 1;
+  text-align: center;
 }
 .subscription-dialog__action::after {
   border: none;
+}
+
+@keyframes subscription-mask-fade-in {
+  from { background: rgba(17, 19, 24, 0); }
+  to { background: rgba(17, 19, 24, 0.32); }
+}
+
+@keyframes subscription-dialog-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(72rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .hero-card, .panel, .state-card {
   animation: none;
@@ -2916,6 +3031,11 @@ onUnload(() => {
   background: linear-gradient(180deg, #f4efe4, #ebe3d3);
   color: #5e4a24;
   box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.75);
+}
+.watch-monitor-actions__button--subscribed {
+  background: linear-gradient(180deg, #eaf8ef, #dff1e6);
+  color: #167348;
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.82);
 }
 .membership-lock-panel {
   display: flex;

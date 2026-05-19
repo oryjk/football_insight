@@ -9,14 +9,16 @@ class RefluxStats {
   final List<HourlyRefluxCount> hourlyBreakdown;
   final int totalRefluxEvents;
   final String? peakHourLabel;
+  final bool isMock;
 
   const RefluxStats({
     required this.hourlyBreakdown,
     required this.totalRefluxEvents,
     this.peakHourLabel,
+    this.isMock = false,
   });
 
-  static RefluxStats fromMockData() {
+  static RefluxStats mock() {
     final hours = List.generate(
       24,
       (i) => HourlyRefluxCount(
@@ -28,6 +30,7 @@ class RefluxStats {
       hourlyBreakdown: hours,
       totalRefluxEvents: hours.fold(0, (sum, h) => sum + h.totalCount),
       peakHourLabel: '20:00-21:00',
+      isMock: true,
     );
   }
 }

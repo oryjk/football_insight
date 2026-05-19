@@ -4,23 +4,25 @@
 
 ## 功能
 
-- License 绑定码登录（微信小程序生成）
-- 回流监控列表（实时回流状态、张数、区域）
-- 看台区域关注
-- 历史回流统计
-- 推送通知（FCM + APNs）
+- License 绑定码登录（在微信小程序内生成）
+- 当前比赛回流面板（实时回流次数、最近回流时间）
+- 看台区域关注（block_interests 切换）
+- 历史回流统计（mock 数据，待接入真实接口）
+
+## 配置
+
+后端 API 地址通过 `--dart-define=API_BASE_URL=...` 注入。默认值 `https://match.oryjk.cn`。
 
 ## 开发
 
 ```bash
 flutter pub get
-flutter run
-flutter test
+flutter run                                            # 默认连默认 baseUrl
+flutter run --dart-define=API_BASE_URL=http://127.0.0.1:8080
 flutter analyze
+flutter test
 ```
 
-## Firebase 配置
+## 推送
 
-1. Android: 将 `google-services.json` 放到 `android/app/`
-2. iOS: 将 `GoogleService-Info.plist` 放到 `ios/Runner/`
-3. 不要提交这些文件到 git
+推送通道暂未启用。如需接入，依赖 `jpush_flutter` 等极光 SDK + 原生侧 AppKey/Channel/权限配置。

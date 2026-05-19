@@ -17,13 +17,31 @@ class StatsPage extends ConsumerWidget {
         error: (e, _) => Center(child: Text('加载失败: $e')),
         data: (stats) {
           final maxCount = stats.hourlyBreakdown
-                  .map((h) => h.totalCount)
-                  .reduce((a, b) => a > b ? a : b)
-                  .toDouble();
+              .map((h) => h.totalCount)
+              .fold<int>(0, (a, b) => a > b ? a : b)
+              .toDouble();
 
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              if (stats.isMock)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.errorContainer.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber, color: theme.colorScheme.error),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text('当前为模拟数据，统计接口尚未接入'),
+                      ),
+                    ],
+                  ),
+                ),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -54,20 +72,15 @@ class StatsPage extends ConsumerWidget {
               Text('小时分布', style: theme.textTheme.titleMedium),
               const SizedBox(height: 8),
               ...stats.hourlyBreakdown.where((h) => h.totalCount > 0).map((h) {
-                final label =
-                    '${h.hour.toString().padLeft(2, '0')}:00';
-                final fraction =
-                    maxCount > 0 ? h.totalCount / maxCount : 0.0;
+                final label = '${h.hour.toString().padLeft(2, '0')}:00';
+                final fraction = maxCount > 0 ? h.totalCount / maxCount : 0.0;
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2),
                   child: Row(
                     children: [
                       SizedBox(
                         width: 48,
-                        child: Text(
-                          label,
-                          style: theme.textTheme.bodySmall,
-                        ),
+                        child: Text(label, style: theme.textTheme.bodySmall),
                       ),
                       const SizedBox(width: 8),
                       Expanded(

@@ -18,7 +18,7 @@ class SettingsPage extends ConsumerWidget {
         children: [
           SwitchListTile(
             title: const Text('推送通知'),
-            subtitle: const Text('接收回流提醒'),
+            subtitle: const Text('推送通道尚未启用 · 仅记录本地偏好'),
             value: notificationEnabled,
             onChanged: (v) {
               ref.read(notificationToggleProvider.notifier).toggle(v);
