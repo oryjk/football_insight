@@ -31,41 +31,46 @@
           <button class="info-row__action" @tap="goToUserPage">去登录</button>
         </view>
 
-        <view class="stadium-wrap">
-          <StadiumMap
-            :mode="mainMapMode"
-            :regions="regions"
-            :badges="regionBadgeCounts"
-            :filter-key="browsingFilterKey"
-            :current-key="currentView?.my_request?.current_region_key || ''"
-            :desired-keys="myDesiredKeys"
-            @region-tap="handleMainMapTap"
-          />
-        </view>
-
-        <view class="legend">
-          <view class="legend__items">
-            <template v-if="currentView?.my_request">
-              <view class="legend__item">
-                <view class="legend__dot legend__dot--current"></view>
-                <text>我的当前</text>
-              </view>
-              <view class="legend__item">
-                <view class="legend__dot legend__dot--desired"></view>
-                <text>我的目标</text>
-              </view>
-            </template>
-            <view v-else class="legend__item">
-              <view class="legend__dot legend__dot--hot"></view>
-              <text>有发布</text>
-            </view>
+        <view class="seat-map-panel">
+          <view class="seat-map-panel__head">
+            <text class="seat-map-panel__title">座位区域</text>
+            <text class="seat-map-panel__hint">点分区可切换</text>
           </view>
-          <text class="legend__hint">点分区可筛选</text>
+          <view class="stadium-wrap">
+            <StadiumMap
+              :mode="mainMapMode"
+              :regions="regions"
+              :badges="regionBadgeCounts"
+              :filter-key="browsingFilterKey"
+              :current-key="currentView?.my_request?.current_region_key || ''"
+              :desired-keys="myDesiredKeys"
+              @region-tap="handleMainMapTap"
+            />
+          </view>
+          <view class="legend">
+            <view class="legend__items">
+              <template v-if="currentView?.my_request">
+                <view class="legend__item">
+                  <view class="legend__dot legend__dot--current"></view>
+                  <text>我的当前</text>
+                </view>
+                <view class="legend__item">
+                  <view class="legend__dot legend__dot--desired"></view>
+                  <text>我的目标</text>
+                </view>
+              </template>
+              <view v-else class="legend__item">
+                <view class="legend__dot legend__dot--hot"></view>
+                <text>有发布</text>
+              </view>
+            </view>
+            <text class="legend__hint">点分区可筛选</text>
+          </view>
         </view>
 
         <view v-if="browsingFilterKey" class="filter-row">
           <view class="filter-row__main">
-            <text class="filter-row__label">来自 {{ browsingFilterName || browsingFilterKey }}</text>
+            <text class="filter-row__label">想换到 {{ browsingFilterName || browsingFilterKey }}</text>
             <text class="filter-row__count">{{ filteredCandidates.length }} 条</text>
           </view>
           <button class="filter-row__clear" @tap="clearFilter">✕ 清除</button>
@@ -83,6 +88,7 @@
 
           <template v-for="group in seatSwapRegionGroups" :key="group.region_key">
             <view
+              :id="buildSeatSwapRegionAnchorId(group.region_key)"
               class="group-row"
               :class="{ 'group-row--open': isRegionGroupExpanded(group.region_key) }"
               @tap="toggleRegionGroup(group.region_key)"
@@ -291,7 +297,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import FiBottomSheet from '../../components/FiBottomSheet.vue'
 import SeatSwapCandidateCard from '../../components/SeatSwapCandidateCard.vue'
@@ -313,13 +319,19 @@ import { getAccessToken } from '../../utils/authStorage'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { formatDatetime } from '../../utils/format'
 import {
+  buildSeatSwapRegionAnchorId,
+  buildSeatSwapMockCurrentResponse,
+  buildSeatSwapMockRegions,
   canConfirmCurrentSeatRegion,
   canConfirmDesiredSeatRegions,
+  countSeatSwapDesiredRegions,
+  filterSeatSwapRequestsByDesiredRegion,
   filterOutMySeatSwapRequest,
   formatSeatLabel,
   groupSeatSwapRequestsByRegion,
   hasSeatSwapFormErrors,
   previousSeatSwapStep,
+  resolveSeatSwapBrowseFilterKey,
   resolveSeatSwapCandidateAction,
   statusLabel,
   toggleDesiredSeatRegion,
@@ -328,6 +340,9 @@ import {
   type SeatSwapSelectionStep,
   type SeatSwapFormState,
 } from './helpers'
+
+const USE_SEAT_SWAP_MOCK_LARGE_DATA =
+  import.meta.env.DEV && String(import.meta.env.VITE_SEAT_SWAP_MOCK_LARGE_DATA || '').trim() === '1'
 
 const loading = ref(true)
 const submitting = ref(false)
@@ -393,17 +408,13 @@ const seatSwapRegionGroups = computed(() => groupSeatSwapRequestsByRegion(displa
 
 const filteredCandidates = computed<SeatSwapCandidate[]>(() => {
   if (!browsingFilterKey.value) return []
-  return displayCandidates.value.filter((c) => c.current_region_key === browsingFilterKey.value)
+  return filterSeatSwapRequestsByDesiredRegion(displayCandidates.value, browsingFilterKey.value)
 })
 
 const browsingFilterName = computed(() => findRegion(browsingFilterKey.value)?.block_name || '')
 
 const regionBadgeCounts = computed<Record<string, number>>(() => {
-  const counts: Record<string, number> = {}
-  for (const c of displayCandidates.value) {
-    counts[c.current_region_key] = (counts[c.current_region_key] || 0) + 1
-  }
-  return counts
+  return countSeatSwapDesiredRegions(displayCandidates.value)
 })
 
 const myDesiredKeys = computed<string[]>(() =>
@@ -552,6 +563,16 @@ async function loadPage(): Promise<void> {
   errorMessage.value = ''
   isLoggedIn.value = !!getAccessToken()
   try {
+    if (USE_SEAT_SWAP_MOCK_LARGE_DATA) {
+      currentView.value = buildSeatSwapMockCurrentResponse({
+        candidateCount: 96,
+        includeMyRequest: true,
+      })
+      regions.value = buildSeatSwapMockRegions()
+      syncExpandedRegionKeys()
+      return
+    }
+
     const [view, regionList] = await Promise.all([
       getCurrentSeatSwap(),
       getTicketWatchRegions(),
@@ -567,15 +588,35 @@ async function loadPage(): Promise<void> {
 }
 
 function handleMainMapTap(key: string): void {
-  if (browsingFilterKey.value === key) {
-    browsingFilterKey.value = ''
-  } else {
-    browsingFilterKey.value = key
+  const hasBadge = Boolean(regionBadgeCounts.value[key])
+  const nextFilterKey = resolveSeatSwapBrowseFilterKey(browsingFilterKey.value, key)
+
+  if (hasBadge) {
+    browsingFilterKey.value = nextFilterKey
+    if (nextFilterKey) {
+      void scrollToSeatSwapRegion(key)
+    }
+    return
   }
+
+  browsingFilterKey.value = nextFilterKey
 }
 
 function clearFilter(): void {
   browsingFilterKey.value = ''
+}
+
+async function scrollToSeatSwapRegion(regionKey: string): Promise<void> {
+  await new Promise<void>((resolve) => {
+    nextTick(() => {
+      uni.pageScrollTo({
+        selector: `#${buildSeatSwapRegionAnchorId(regionKey)}`,
+        duration: 220,
+        success: () => resolve(),
+        fail: () => resolve(),
+      })
+    })
+  })
 }
 
 function handleSheetMapTap(key: string): void {
@@ -874,7 +915,7 @@ function goToUserPage(): void {
 }
 
 onShow(() => {
-  loadPage()
+  void loadPage()
 })
 </script>
 
@@ -882,7 +923,6 @@ onShow(() => {
 .page-root {
   position: relative;
   min-height: 100vh;
-  overflow: hidden;
 }
 
 .page {
@@ -1018,14 +1058,43 @@ onShow(() => {
 }
 
 .stadium-wrap {
+  margin: 0 -24rpx;
+}
+
+.seat-map-panel {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   margin: 4rpx -24rpx 0;
+  padding: 10rpx 24rpx 6rpx;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 8rpx 20rpx rgba(46, 38, 27, 0.06);
+}
+
+.seat-map-panel__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 0 4rpx 2rpx;
+}
+
+.seat-map-panel__title {
+  color: #121212;
+  font-size: 24rpx;
+  font-weight: 500;
+}
+
+.seat-map-panel__hint {
+  color: #8f7c5f;
+  font-size: 20rpx;
 }
 
 .legend {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8rpx 4rpx 14rpx;
+  padding: 2rpx 4rpx 6rpx;
   color: #988f84;
   font-size: 22rpx;
 }
@@ -1127,11 +1196,9 @@ onShow(() => {
 .group-row__caret {
   flex-shrink: 0;
   font-size: 22rpx;
-  color: #8f7c5f;
-  padding: 6rpx 18rpx;
-  border-radius: 999rpx;
-  background: linear-gradient(180deg, rgba(255, 251, 242, 0.98), rgba(248, 241, 227, 0.94));
-  border: 1rpx solid rgba(230, 220, 198, 0.92);
+  color: rgba(143, 124, 95, 0.9);
+  padding: 6rpx 4rpx;
+  line-height: 1.2;
 }
 
 .filter-row {

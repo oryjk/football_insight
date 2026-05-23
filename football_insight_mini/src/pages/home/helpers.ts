@@ -101,6 +101,13 @@ export function resolveHomeHasAuthToken(token: string | null): boolean {
   return typeof token === 'string' && token.trim().length > 0
 }
 
+export function shouldShowHomeSupportLoading(options: {
+  loading: boolean
+  hasCachedProfile: boolean
+}): boolean {
+  return options.loading && !options.hasCachedProfile
+}
+
 export function isHomeAuthExpiredMessage(message: string): boolean {
   const normalized = message.trim().toLowerCase()
   return normalized.includes('401')

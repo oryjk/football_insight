@@ -950,26 +950,36 @@ onShow(() => {
   font-size: 24rpx;
 }
 .tech-stats-sheet__summary {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   margin-top: 18rpx;
-  padding: 24rpx;
-  border-radius: 28rpx;
-  border: 2rpx solid rgba(255, 145, 41, 0.16);
-  background:
-    radial-gradient(circle at top right, rgba(255, 145, 41, 0.12), transparent 36%),
-    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,246,239,0.92));
+  padding: 22rpx 24rpx;
+  border-radius: 24rpx;
+  border: 2rpx solid rgba(232, 233, 238, 0.95);
+  background: #ffffff;
+  box-shadow: 0 12rpx 28rpx rgba(18, 20, 28, 0.06);
 }
 .tech-stats-sheet__teams {
   display: block;
   color: #121212;
-  font-size: 32rpx;
-  line-height: 1.4;
+  font-size: 30rpx;
+  line-height: 1.35;
   font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .tech-stats-sheet__meta {
   display: block;
   margin-top: 10rpx;
   color: #8f9198;
   font-size: 24rpx;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .tech-stats-sheet__list {
   margin-top: 24rpx;
@@ -1008,9 +1018,9 @@ onShow(() => {
   text-align: center;
 }
 .tech-stat-row__track {
-  height: 16rpx;
+  height: 14rpx;
   border-radius: 999rpx;
-  background: #16171c;
+  background: #eceef3;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -1021,17 +1031,17 @@ onShow(() => {
 .tech-stat-row__fill {
   height: 100%;
   border-radius: 999rpx;
-  background: linear-gradient(90deg, #ff8b2b, #f59e0b);
+  background: #15161b;
   transform: scaleX(0);
   animation: tech-stat-fill-grow 480ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
   animation-delay: calc(var(--tech-stat-delay, 120ms) + 70ms);
 }
 .tech-stat-row__fill--home {
-  background: linear-gradient(90deg, #f6b14b, #f08a12);
+  background: #f59e0b;
   transform-origin: right center;
 }
 .tech-stat-row__fill--away {
-  background: linear-gradient(90deg, #f08a12, #f6b14b);
+  background: #f59e0b;
   transform-origin: left center;
 }
 .tech-stats-sheet__footnote {

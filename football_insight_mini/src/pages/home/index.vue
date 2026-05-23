@@ -151,10 +151,11 @@
             <text class="support-home-panel__context-label">{{ supportPanelBadge }}</text>
             <text class="support-home-panel__context-note">{{ supportPanelContextNote }}</text>
           </view>
+          <text v-if="supportRefreshing" class="support-home-panel__refreshing">更新中</text>
         </view>
 
         <FiLoading
-          v-if="supportLoading"
+          v-if="showSupportLoading"
           title="助力入口加载中"
           caption="正在确认你的主队和下一场比赛。"
         />
@@ -674,6 +675,7 @@ import {
   resolveHomeTeamSeasonMatches,
   resolveHomeSupportNextMatchLabel,
   resolveHomeSupportWindowShortLabel,
+  shouldShowHomeSupportLoading,
 } from './helpers'
 
 type HeroGuide =
@@ -763,6 +765,13 @@ const topAssist = computed(() => assistCategory.value?.entries[0] ?? null)
 const isBriefingReady = computed(() => !loading.value && !errorMessage.value && !!overview.value)
 const supportFavoriteTeam = computed(() => supportProfile.value?.favorite_team ?? null)
 const supportNextMatch = computed<SupportMatchDetail | null>(() => supportProfile.value?.next_match ?? null)
+const showSupportLoading = computed(() =>
+  shouldShowHomeSupportLoading({
+    loading: supportLoading.value,
+    hasCachedProfile: !!supportProfile.value,
+  }),
+)
+const supportRefreshing = computed(() => supportLoading.value && !!supportProfile.value)
 const supportPanelBadge = computed(() => {
   if (!hasAuthToken.value) {
     return '登录后开启'
@@ -1098,20 +1107,22 @@ async function loadPage() {
 }
 
 async function loadSupportData() {
-  supportLoading.value = true
   supportErrorMessage.value = ''
   hasAuthToken.value = resolveHomeHasAuthToken(getAccessToken())
   loginPromptVisible.value = false
 
+  if (!hasAuthToken.value) {
+    supportProfile.value = null
+    supportTeams.value = []
+    loginPromptVisible.value = true
+    supportLoading.value = false
+    return
+  }
+
+  supportLoading.value = true
+
   try {
     supportTeams.value = await listSupportTeams()
-
-    if (!hasAuthToken.value) {
-      supportProfile.value = null
-      loginPromptVisible.value = true
-      return
-    }
-
     supportProfile.value = await getSupportProfile()
     selectedFavoriteTeamId.value = supportProfile.value.favorite_team?.team_id ?? supportTeams.value[0]?.team_id ?? null
   } catch (error) {
@@ -2181,21 +2192,27 @@ onShow(() => {
 }
 
 .tech-stats-sheet__summary {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   margin-top: 18rpx;
-  padding: 24rpx;
-  border-radius: 28rpx;
-  border: 2rpx solid rgba(255, 145, 41, 0.16);
-  background:
-    radial-gradient(circle at top right, rgba(255, 145, 41, 0.12), transparent 36%),
-    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,246,239,0.92));
+  padding: 22rpx 24rpx;
+  border-radius: 24rpx;
+  border: 2rpx solid rgba(232, 233, 238, 0.95);
+  background: #ffffff;
+  box-shadow: 0 12rpx 28rpx rgba(18, 20, 28, 0.06);
 }
 
 .tech-stats-sheet__teams {
   display: block;
   color: #121212;
-  font-size: 32rpx;
-  line-height: 1.4;
+  font-size: 30rpx;
+  line-height: 1.35;
   font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tech-stats-sheet__meta {
@@ -2203,6 +2220,10 @@ onShow(() => {
   margin-top: 10rpx;
   color: #8f9198;
   font-size: 24rpx;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tech-stats-sheet__list {
@@ -2248,9 +2269,9 @@ onShow(() => {
 }
 
 .tech-stat-row__track {
-  height: 16rpx;
+  height: 14rpx;
   border-radius: 999rpx;
-  background: #16171c;
+  background: #eceef3;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -2263,19 +2284,19 @@ onShow(() => {
 .tech-stat-row__fill {
   height: 100%;
   border-radius: 999rpx;
-  background: linear-gradient(90deg, #ff8b2b, #f59e0b);
+  background: #15161b;
   transform: scaleX(0);
   animation: tech-stat-fill-grow 480ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
   animation-delay: calc(var(--tech-stat-delay, 120ms) + 70ms);
 }
 
 .tech-stat-row__fill--home {
-  background: linear-gradient(90deg, #f6b14b, #f08a12);
+  background: #f59e0b;
   transform-origin: right center;
 }
 
 .tech-stat-row__fill--away {
-  background: linear-gradient(90deg, #f08a12, #f6b14b);
+  background: #f59e0b;
   transform-origin: left center;
 }
 
@@ -2674,6 +2695,15 @@ onShow(() => {
   color: #8f9198;
   font-size: 22rpx;
   line-height: 1.2;
+}
+.support-home-panel__refreshing {
+  justify-self: start;
+  color: #a3916f;
+  font-size: 20rpx;
+  line-height: 1;
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  background: rgba(214, 184, 131, 0.12);
 }
 .support-home-panel__action {
   margin-top: 18rpx;

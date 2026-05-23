@@ -19,6 +19,7 @@ import {
   resolveHomeHasAuthToken,
   resolveHomeSupportNextMatchLabel,
   resolveHomeSupportWindowShortLabel,
+  shouldShowHomeSupportLoading,
   isHomeAuthExpiredMessage,
 } from './helpers'
 
@@ -153,6 +154,22 @@ describe('resolveHomeHasAuthToken', () => {
     expect(resolveHomeHasAuthToken('')).toBe(false)
     expect(resolveHomeHasAuthToken('   ')).toBe(false)
     expect(resolveHomeHasAuthToken(null)).toBe(false)
+  })
+})
+
+describe('shouldShowHomeSupportLoading', () => {
+  test('shows the blocking support loader only before any profile is available', () => {
+    expect(shouldShowHomeSupportLoading({
+      loading: true,
+      hasCachedProfile: false,
+    })).toBe(true)
+  })
+
+  test('keeps the current support panel visible while refreshing cached data', () => {
+    expect(shouldShowHomeSupportLoading({
+      loading: true,
+      hasCachedProfile: true,
+    })).toBe(false)
   })
 })
 

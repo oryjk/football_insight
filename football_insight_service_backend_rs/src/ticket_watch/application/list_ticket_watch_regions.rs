@@ -10,7 +10,7 @@ const PHOENIX_HILL_REGION_BLOCKS: &[&str] = &[
     "127", "128", "129", "130", "131", "132", "501", "502", "503", "504", "505", "506", "507",
     "508", "509", "510", "511", "512", "513", "514", "515", "516", "517", "518", "519", "520",
     "521", "522", "523", "524", "525", "526", "527", "528", "529", "530", "531", "532", "533",
-    "534", "535", "536",
+    "534", "535", "536", "VIP1", "VIP2", "VIP3",
 ];
 
 pub struct ListTicketWatchRegionsUseCase {
@@ -158,6 +158,9 @@ mod tests {
 
         assert!(regions.iter().any(|region| region.block_key == "116"));
         assert!(regions.iter().any(|region| region.block_key == "536"));
+        assert!(regions.iter().any(|region| region.block_key == "VIP1"));
+        assert!(regions.iter().any(|region| region.block_key == "VIP2"));
+        assert!(regions.iter().any(|region| region.block_key == "VIP3"));
         assert_eq!(
             regions
                 .iter()

@@ -27,9 +27,11 @@ describe('stadium region utilities', () => {
     expect(resolveSeatSwapRegionColorGroup('116')).toBe('green')
     expect(resolveSeatSwapRegionColorGroup('505')).toBe('purple')
     expect(resolveSeatSwapRegionColorGroup('130')).toBe('yellow')
+    expect(resolveSeatSwapRegionColorGroup('118')).toBe('navy')
     expect(resolveSeatSwapRegionColorGroup('520')).toBe('navy')
     expect(resolveSeatSwapRegionColorGroup('127')).toBe('red')
-    expect(resolveSeatSwapRegionColorGroup('VIP')).toBe('muted')
+    expect(resolveSeatSwapRegionColorGroup('VIP1')).toBe('vip')
+    expect(resolveSeatSwapRegionColorGroup('VIP')).toBe('vip')
   })
 
   test('formats seat swap labels consistently across page and card components', () => {

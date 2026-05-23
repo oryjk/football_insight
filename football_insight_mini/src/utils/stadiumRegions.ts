@@ -1,6 +1,6 @@
 export interface SeatSwapRegionLayout {
-  ring: 'inner' | 'outer'
-  side: 'right' | 'top' | 'left' | 'bottom'
+  ring: 'inner' | 'outer' | 'vip'
+  side: 'right' | 'top' | 'left' | 'bottom' | 'vip'
   left: number
   top: number
   width: number
@@ -14,6 +14,7 @@ export type SeatSwapRegionColorGroup =
   | 'yellow'
   | 'navy'
   | 'red'
+  | 'vip'
   | 'muted'
 
 const regionColorGroups: Record<Exclude<SeatSwapRegionColorGroup, 'muted'>, number[]> = {
@@ -21,11 +22,16 @@ const regionColorGroups: Record<Exclude<SeatSwapRegionColorGroup, 'muted'>, numb
   green: [102, 103, 104, 105, 106, 107, 108, 116, 117, 123, 513, 514, 515, 531, 532, 533],
   purple: [504, 505, 506, 507, 521, 522, 523, 524, 525],
   yellow: [109, 110, 111, 112, 113, 125, 126, 130, 131],
-  navy: [508, 509, 510, 518, 519, 520, 526, 527, 528],
+  navy: [118, 508, 509, 510, 518, 519, 520, 526, 527, 528],
   red: [127, 129],
+  vip: [],
 }
 
 export function resolveSeatSwapRegionColorGroup(name: string): SeatSwapRegionColorGroup {
+  if (name.trim().toUpperCase().startsWith('VIP')) {
+    return 'vip'
+  }
+
   const number = Number.parseInt(name, 10)
   for (const [group, regions] of Object.entries(regionColorGroups)) {
     if (regions.includes(number)) {
@@ -36,6 +42,11 @@ export function resolveSeatSwapRegionColorGroup(name: string): SeatSwapRegionCol
 }
 
 export function resolveSeatSwapRegionLayout(name: string): SeatSwapRegionLayout | null {
+  const vipLayout = resolveVipLayout(name)
+  if (vipLayout) {
+    return vipLayout
+  }
+
   const number = Number.parseInt(name, 10)
   if (Number.isNaN(number)) {
     return null
@@ -101,52 +112,141 @@ export function seatSwapStatusLabel(status: string): string {
   }
 }
 
+interface RingMetrics {
+  ring: SeatSwapRegionLayout['ring']
+  leftColumnX: number
+  rightColumnX: number
+  topLeftX: number
+  topRightX: number
+  bottomLeftX: number
+  bottomRightX: number
+  topY: number
+  bottomY: number
+  sideTopY: number
+  sideBottomY: number
+  horizontalItemW: number
+  verticalItemW: number
+  itemH: number
+  cornerY: number
+}
+
+interface RingSegment {
+  start: number
+  count: number
+  side: SeatSwapRegionLayout['side']
+}
+
+const innerRingMetrics: RingMetrics = {
+  ring: 'inner',
+  leftColumnX: 15,
+  rightColumnX: 85,
+  topLeftX: 21,
+  topRightX: 79,
+  bottomLeftX: 21,
+  bottomRightX: 79,
+  topY: 16.5,
+  bottomY: 73.5,
+  sideTopY: 25.5,
+  sideBottomY: 64.5,
+  horizontalItemW: 6.8,
+  verticalItemW: 6.2,
+  itemH: 5,
+  cornerY: 2.8,
+}
+
+const outerRingMetrics: RingMetrics = {
+  ring: 'outer',
+  leftColumnX: 6,
+  rightColumnX: 94,
+  topLeftX: 14,
+  topRightX: 86,
+  bottomLeftX: 14,
+  bottomRightX: 86,
+  topY: 8,
+  bottomY: 84,
+  sideTopY: 19,
+  sideBottomY: 73,
+  horizontalItemW: 8.2,
+  verticalItemW: 6.2,
+  itemH: 5,
+  cornerY: 3,
+}
+
+const innerRingSegments: RingSegment[] = [
+  { start: 101, count: 7, side: 'right' },
+  { start: 108, count: 9, side: 'top' },
+  { start: 117, count: 7, side: 'left' },
+  { start: 124, count: 9, side: 'bottom' },
+]
+
+const outerRingSegments: RingSegment[] = [
+  { start: 501, count: 9, side: 'right' },
+  { start: 510, count: 9, side: 'top' },
+  { start: 519, count: 9, side: 'left' },
+  { start: 528, count: 9, side: 'bottom' },
+]
+
+const vipLayouts: Record<string, SeatSwapRegionLayout> = {
+  VIP1: { ring: 'vip', side: 'vip', left: 37.2, top: 76.3, width: 8.2, height: 3.8 },
+  VIP2: { ring: 'vip', side: 'vip', left: 45.9, top: 76.3, width: 8.2, height: 3.8 },
+  VIP3: { ring: 'vip', side: 'vip', left: 54.6, top: 76.3, width: 8.2, height: 3.8 },
+}
+
 function resolveCounterclockwiseRing(
   index: number,
   total: number,
   ring: SeatSwapRegionLayout['ring'],
 ): SeatSwapRegionLayout {
-  const isOuter = ring === 'outer'
-  const metrics = isOuter
-    ? { left: 6, right: 94, top: 8, bottom: 84, itemW: 8.6, itemH: 8.4, cornerX: 7, cornerY: 8 }
-    : { left: 15, right: 85, top: 18, bottom: 73, itemW: 7.2, itemH: 8.2, cornerX: 6, cornerY: 7 }
-  const sideCount = total / 4
-  const sideIndex = Math.floor(index / sideCount)
-  const offset = index % sideCount
-  const progress = (offset + 1) / (sideCount + 1)
-  const cornerProgress = Math.abs(progress - 0.5) * 2
-  const cornerCurve = Math.pow(cornerProgress, 2.2)
-  const side = resolveRoundedTrackSide(sideIndex)
+  const number = ring === 'inner' ? 101 + index : 501 + index
+  const metrics = ring === 'inner' ? innerRingMetrics : outerRingMetrics
+  const segments = ring === 'inner' ? innerRingSegments : outerRingSegments
+  const segment = segments.find((item) => number >= item.start && number < item.start + item.count)
 
-  let centerX = metrics.right
-  let centerY = metrics.bottom - progress * (metrics.bottom - metrics.top)
+  if (!segment) {
+    throw new Error(`Unsupported seat swap ${ring} ring index ${index} of ${total}`)
+  }
 
-  if (side === 'right') {
-    centerX = metrics.right - metrics.cornerX * cornerCurve
-  } else if (side === 'top') {
-    centerX = metrics.right - progress * (metrics.right - metrics.left)
-    centerY = metrics.top + metrics.cornerY * cornerCurve
-  } else if (side === 'left') {
-    centerX = metrics.left + metrics.cornerX * cornerCurve
-    centerY = metrics.top + progress * (metrics.bottom - metrics.top)
+  const offset = number - segment.start
+  const progress = segment.count === 1 ? 0 : offset / (segment.count - 1)
+  const cornerWeight = resolveCornerWeight(progress)
+  const itemW = segment.side === 'top' || segment.side === 'bottom'
+    ? metrics.horizontalItemW
+    : metrics.verticalItemW
+  let centerX = metrics.rightColumnX
+  let centerY = metrics.sideBottomY
+
+  if (segment.side === 'right') {
+    centerX = metrics.rightColumnX
+    centerY = interpolate(metrics.sideBottomY, metrics.sideTopY, progress)
+  } else if (segment.side === 'top') {
+    centerX = interpolate(metrics.topRightX, metrics.topLeftX, progress)
+    centerY = metrics.topY + metrics.cornerY * cornerWeight
+  } else if (segment.side === 'left') {
+    centerX = metrics.leftColumnX
+    centerY = interpolate(metrics.sideTopY, metrics.sideBottomY, progress)
   } else {
-    centerX = metrics.left + progress * (metrics.right - metrics.left)
-    centerY = metrics.bottom - metrics.cornerY * cornerCurve
+    centerX = interpolate(metrics.bottomLeftX, metrics.bottomRightX, progress)
+    centerY = metrics.bottomY - metrics.cornerY * cornerWeight
   }
 
   return {
     ring,
-    side,
-    left: centerX - metrics.itemW / 2,
+    side: segment.side,
+    left: centerX - itemW / 2,
     top: centerY - metrics.itemH / 2,
-    width: metrics.itemW,
+    width: itemW,
     height: metrics.itemH,
   }
 }
 
-function resolveRoundedTrackSide(sideIndex: number): SeatSwapRegionLayout['side'] {
-  if (sideIndex === 0) return 'right'
-  if (sideIndex === 1) return 'top'
-  if (sideIndex === 2) return 'left'
-  return 'bottom'
+function interpolate(start: number, end: number, progress: number): number {
+  return start + (end - start) * progress
+}
+
+function resolveCornerWeight(progress: number): number {
+  return Math.pow(Math.abs(progress - 0.5) * 2, 1.4)
+}
+
+function resolveVipLayout(name: string): SeatSwapRegionLayout | null {
+  return vipLayouts[name.trim().toUpperCase()] || null
 }

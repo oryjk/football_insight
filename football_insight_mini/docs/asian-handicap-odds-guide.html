@@ -1,0 +1,765 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>亚洲让球盘与赔率入门</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #171717;
+      --muted: #62615d;
+      --paper: #f7f3ea;
+      --panel: #fffaf0;
+      --line: #d8ccb9;
+      --dark: #1f2b2a;
+      --green: #0f7a5f;
+      --red: #b94734;
+      --gold: #b68224;
+      --blue: #285f91;
+      --shadow: 0 18px 44px rgba(46, 38, 22, 0.13);
+      font-family: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--paper);
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(23, 23, 23, 0.035) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(23, 23, 23, 0.03) 1px, transparent 1px),
+        var(--paper);
+      background-size: 32px 32px;
+      line-height: 1.7;
+    }
+
+    a { color: inherit; }
+
+    .shell {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+    }
+
+    header {
+      padding: 40px 0 24px;
+      border-bottom: 2px solid var(--ink);
+      background:
+        radial-gradient(circle at 12% 16%, rgba(15, 122, 95, 0.12), transparent 28%),
+        radial-gradient(circle at 92% 6%, rgba(182, 130, 36, 0.14), transparent 22%);
+    }
+
+    .kicker {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 14px;
+      padding: 5px 9px;
+      border: 1px solid var(--ink);
+      background: #fff;
+      font-size: 12px;
+      letter-spacing: 0;
+      font-weight: 800;
+    }
+
+    h1 {
+      max-width: 920px;
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(40px, 7vw, 86px);
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 760px;
+      margin: 18px 0 0;
+      font-size: clamp(17px, 2vw, 21px);
+      color: #383633;
+    }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid var(--ink);
+      background: rgba(247, 243, 234, 0.94);
+      backdrop-filter: blur(10px);
+    }
+
+    .nav .shell {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 10px 0;
+    }
+
+    .nav a {
+      white-space: nowrap;
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      background: #fffaf0;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    main { padding: 28px 0 64px; }
+
+    section {
+      margin: 28px 0;
+      padding: 26px;
+      border: 1px solid var(--line);
+      background: rgba(255, 250, 240, 0.84);
+      box-shadow: var(--shadow);
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(26px, 4vw, 42px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      line-height: 1.25;
+    }
+
+    p { margin: 0 0 14px; }
+
+    .grid {
+      display: grid;
+      gap: 18px;
+    }
+
+    .two { grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr); }
+    .three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    .note {
+      padding: 14px;
+      border-left: 5px solid var(--green);
+      background: #eff8f3;
+      color: #203c33;
+      font-weight: 700;
+    }
+
+    .warning {
+      border-left-color: var(--red);
+      background: #fff0ea;
+      color: #553026;
+    }
+
+    .board {
+      border: 2px solid var(--ink);
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .scoreline {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      background: var(--dark);
+      color: #fff;
+    }
+
+    .team {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .team strong {
+      font-size: 18px;
+      line-height: 1.15;
+    }
+
+    .team span {
+      color: rgba(255,255,255,0.72);
+      font-size: 12px;
+    }
+
+    .score {
+      min-width: 78px;
+      padding: 6px 10px;
+      border: 1px solid rgba(255,255,255,0.28);
+      text-align: center;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 32px;
+      line-height: 1;
+    }
+
+    .ticket {
+      padding: 16px;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .half {
+      min-height: 116px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      background: #fbf6ea;
+    }
+
+    .half b {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--blue);
+      font-size: 15px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 4px 8px;
+      border: 1px solid var(--ink);
+      background: #fff;
+      font-weight: 900;
+      line-height: 1.1;
+    }
+
+    .pill.green { background: #dff4e8; color: #0d6c48; }
+    .pill.red { background: #ffe1da; color: #9e321f; }
+    .pill.gold { background: #fff0c5; color: #7a520d; }
+    .pill.blue { background: #e1effa; color: #1d557f; }
+
+    .ruler {
+      margin: 20px 0 8px;
+      padding: 18px 12px 12px;
+      border: 1px solid var(--ink);
+      background: #fff;
+    }
+
+    .line {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      height: 80px;
+      align-items: end;
+      border-bottom: 3px solid var(--ink);
+    }
+
+    .mark {
+      position: relative;
+      display: grid;
+      justify-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .mark::after {
+      content: "";
+      width: 2px;
+      height: 16px;
+      background: var(--ink);
+    }
+
+    .marker {
+      position: absolute;
+      left: 50%;
+      bottom: 28px;
+      width: 22px;
+      height: 22px;
+      transform: translateX(-50%) rotate(45deg);
+      border: 2px solid var(--ink);
+      background: var(--gold);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 15px;
+    }
+
+    th, td {
+      padding: 11px 10px;
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--dark);
+      color: #fff;
+      font-size: 13px;
+    }
+
+    tr:nth-child(even) td { background: #fcf7ec; }
+
+    code {
+      padding: 2px 6px;
+      border: 1px solid var(--line);
+      background: #fff;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    .formula {
+      padding: 18px;
+      border: 2px solid var(--ink);
+      background: #fff;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: clamp(15px, 2vw, 18px);
+      line-height: 1.8;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      padding: 15px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .card strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 18px;
+    }
+
+    .calculator {
+      border: 2px solid var(--ink);
+      background: #fff;
+    }
+
+    .calc-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 0;
+      border-bottom: 2px solid var(--ink);
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      padding: 12px;
+      border-right: 1px solid var(--line);
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--muted);
+    }
+
+    label:last-child { border-right: 0; }
+
+    input, select {
+      width: 100%;
+      min-height: 40px;
+      padding: 8px 9px;
+      border: 1px solid var(--ink);
+      border-radius: 0;
+      background: #fffaf0;
+      color: var(--ink);
+      font: inherit;
+      font-weight: 800;
+    }
+
+    .calc-result {
+      display: grid;
+      grid-template-columns: 0.75fr 1.25fr;
+      gap: 0;
+    }
+
+    .big-result {
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      padding: 22px;
+      border-right: 2px solid var(--ink);
+      text-align: center;
+    }
+
+    .big-result b {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(34px, 5vw, 56px);
+      line-height: 1;
+    }
+
+    .detail {
+      padding: 18px;
+    }
+
+    .detail ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .footer {
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    @media (max-width: 860px) {
+      section { padding: 18px; }
+      .two, .three, .cards, .calc-result { grid-template-columns: 1fr; }
+      .calc-grid { grid-template-columns: 1fr 1fr; }
+      .big-result { border-right: 0; border-bottom: 2px solid var(--ink); }
+      .scoreline { grid-template-columns: 1fr; }
+      .score { width: 100%; }
+    }
+
+    @media print {
+      .nav { display: none; }
+      body { background: #fff; }
+      section { break-inside: avoid; box-shadow: none; }
+      .shell { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="shell">
+      <div class="kicker">看懂聊天记录：盘口 / 水位 / 临场</div>
+      <h1>亚洲让球盘与赔率入门</h1>
+      <p class="lead">这份小抄只解释规则和聊天黑话。里面的球队名是真实球队，盘口和比分是假设案例，不代表真实赛前信息，也不是投注建议。</p>
+    </div>
+  </header>
+
+  <nav class="nav">
+    <div class="shell">
+      <a href="#quick">先记一句话</a>
+      <a href="#quarter">-0.25 图解</a>
+      <a href="#examples">球队例子</a>
+      <a href="#odds">赔率和水位</a>
+      <a href="#live">临场变盘</a>
+      <a href="#calculator">结算计算器</a>
+      <a href="#cheatsheet">速查表</a>
+    </div>
+  </nav>
+
+  <main class="shell">
+    <section id="quick" class="grid two">
+      <div>
+        <h2>先记一句话</h2>
+        <p>聊天里说“阿森纳临场变成 <code>-0.25</code>”，意思不是阿森纳已经落后 0.25 球，而是下注结算时，阿森纳要先被扣掉 0.25 球。</p>
+        <div class="formula">
+          你买的队：阿森纳 -0.25<br>
+          结算比分：阿森纳真实进球 - 0.25  vs  对手真实进球
+        </div>
+        <p>但足球不能真的扣 0.25 球，所以 <code>-0.25</code> 会被拆成两张半额票：一半是平手盘 <code>0</code>，一半是半球盘 <code>-0.5</code>。</p>
+      </div>
+      <div class="board">
+        <div class="scoreline">
+          <div class="team">
+            <strong>阿森纳</strong>
+            <span>你买：-0.25</span>
+          </div>
+          <div class="score">1 : 1</div>
+          <div class="team">
+            <strong>曼城</strong>
+            <span>受让：+0.25</span>
+          </div>
+        </div>
+        <div class="ticket">
+          <h3>如果最终打平会怎样？</h3>
+          <div class="split">
+            <div class="half">
+              <b>半张票：阿森纳 0</b>
+              真实比分 1:1，平手盘打平，所以这半张票走水。
+            </div>
+            <div class="half">
+              <b>半张票：阿森纳 -0.5</b>
+              阿森纳要赢球才行，打平不够，所以这半张票输。
+            </div>
+          </div>
+          <p style="margin-top: 12px;"><span class="pill red">最终：输半</span></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="quarter">
+      <h2>-0.25 到底站在哪</h2>
+      <p><code>-0.25</code> 夹在 <code>0</code> 和 <code>-0.5</code> 中间。它的态度是：“这队略强，但强得不够硬”。所以赢球全赢，打平输一半，输球全输。</p>
+      <div class="ruler">
+        <div class="line">
+          <div class="mark">+0.5<br>受让半球</div>
+          <div class="mark">+0.25<br>受让平/半</div>
+          <div class="mark">0<br>平手</div>
+          <div class="mark"><span class="marker"></span>-0.25<br>让平/半</div>
+          <div class="mark">-0.5<br>让半球</div>
+        </div>
+      </div>
+      <div class="cards">
+        <div class="card">
+          <strong>买让球方：-0.25</strong>
+          赢球全赢；打平输半；输球全输。它比平手盘更危险一点，因为平局不退全款。
+        </div>
+        <div class="card">
+          <strong>买受让方：+0.25</strong>
+          赢球全赢；打平赢半；输球全输。它比单纯买不败更细，因为平局只赢一半。
+        </div>
+      </div>
+    </section>
+
+    <section id="examples">
+      <h2>真实球队名的假设例子</h2>
+      <div class="grid three">
+        <div class="board">
+          <div class="scoreline">
+            <div class="team"><strong>上海海港</strong><span>买：-0.25</span></div>
+            <div class="score">2 : 1</div>
+            <div class="team"><strong>山东泰山</strong><span>+0.25</span></div>
+          </div>
+          <div class="ticket">
+            <p><span class="pill green">海港全赢</span></p>
+            <p>买 <code>-0.25</code> 的队赢球，半张 <code>0</code> 赢，半张 <code>-0.5</code> 也赢。</p>
+          </div>
+        </div>
+        <div class="board">
+          <div class="scoreline">
+            <div class="team"><strong>阿森纳</strong><span>买：-0.25</span></div>
+            <div class="score">1 : 1</div>
+            <div class="team"><strong>曼城</strong><span>+0.25</span></div>
+          </div>
+          <div class="ticket">
+            <p><span class="pill red">阿森纳输半</span></p>
+            <p>平手那半退钱，半球那半输了。所以聊天里常说“打平死一半”。</p>
+          </div>
+        </div>
+        <div class="board">
+          <div class="scoreline">
+            <div class="team"><strong>巴塞罗那</strong><span>买：-0.25</span></div>
+            <div class="score">0 : 1</div>
+            <div class="team"><strong>皇马</strong><span>+0.25</span></div>
+          </div>
+          <div class="ticket">
+            <p><span class="pill red">巴萨全输</span></p>
+            <p>让球方真实比分都输了，拆成两半后也都输。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="odds" class="grid two">
+      <div>
+        <h2>赔率和“水位”是什么</h2>
+        <p>中文聊天里常见的 <code>0.90</code>、<code>0.82</code>、<code>1.02</code> 多半是港赔/水位。它表示每下注 100，赢了能赚多少。</p>
+        <table>
+          <thead>
+            <tr><th>说法</th><th>意思</th><th>下注 100 赢了赚</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>0.80</code> 低水</td><td>回报偏低，市场认为这边更容易打出，或资金更热</td><td>80</td></tr>
+            <tr><td><code>0.90</code> 中水</td><td>比较常见的报价</td><td>90</td></tr>
+            <tr><td><code>1.05</code> 高水</td><td>回报偏高，风险也被定价得更高</td><td>105</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div class="note">
+          水位低不等于一定会赢；水位高也不等于一定不会赢。它只是市场价格。
+        </div>
+        <div class="formula" style="margin-top: 14px;">
+          港赔 0.90 = 欧赔 1.90<br>
+          港赔 1.05 = 欧赔 2.05<br>
+          盈利 = 本金 × 港赔 × 赢的比例
+        </div>
+        <p style="margin-top: 14px;">比如你买 <code>阿森纳 -0.25</code>，本金 100，水位 0.90。阿森纳赢球：赚 90。阿森纳打平：输半，亏 50。阿森纳输球：亏 100。</p>
+      </div>
+    </section>
+
+    <section id="live">
+      <h2>“临场变成 -0.25”在聊什么</h2>
+      <p>临场就是开赛前一段时间。盘口变化通常是信息和资金重新定价：首发、伤停、轮换、天气、战意、市场资金流向，都可能让盘口从一个位置挪到另一个位置。</p>
+      <table>
+        <thead>
+          <tr><th>聊天记录</th><th>大白话翻译</th><th>不要误读成</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>主队从 <code>0</code> 升到 <code>-0.25</code></td>
+            <td>主队从“五五开”被抬成“略占优”。买主队现在打平会输半。</td>
+            <td>主队一定会赢。</td>
+          </tr>
+          <tr>
+            <td>主队从 <code>-0.5</code> 降到 <code>-0.25</code></td>
+            <td>主队优势被削弱。原来必须赢，现在还是必须赢才全赢，但打平只输半。</td>
+            <td>主队彻底不行。</td>
+          </tr>
+          <tr>
+            <td><code>-0.25</code> 低水变高水</td>
+            <td>盘口没动，但买这边的回报变高，说明价格在松动。</td>
+            <td>盘口没有变化就等于没变化。</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="note warning" style="margin-top: 14px;">看聊天时至少同时看三件事：盘口、两边水位、变化时间。只截一句“临场 -0.25”，信息是不完整的。</div>
+    </section>
+
+    <section id="calculator">
+      <h2>结算计算器</h2>
+      <p>用它把聊天里的盘口翻译成钱。默认例子：买阿森纳 <code>-0.25</code>，本金 100，水位 0.90，比分 1:1。</p>
+      <div class="calculator">
+        <div class="calc-grid">
+          <label>你买的队
+            <input id="teamName" value="阿森纳">
+          </label>
+          <label>盘口
+            <select id="handicap">
+              <option value="-1">-1</option>
+              <option value="-0.75">-0.75</option>
+              <option value="-0.5">-0.5</option>
+              <option value="-0.25" selected>-0.25</option>
+              <option value="0">0</option>
+              <option value="0.25">+0.25</option>
+              <option value="0.5">+0.5</option>
+              <option value="0.75">+0.75</option>
+              <option value="1">+1</option>
+            </select>
+          </label>
+          <label>水位/港赔
+            <input id="oddsValue" type="number" step="0.01" value="0.9">
+          </label>
+          <label>本金
+            <input id="stake" type="number" step="1" value="100">
+          </label>
+          <label>真实比分
+            <input id="score" value="1-1">
+          </label>
+        </div>
+        <div class="calc-result">
+          <div class="big-result">
+            <span>结算</span>
+            <b id="resultTitle">输半</b>
+            <span id="profitLine">盈亏：-50.00</span>
+          </div>
+          <div class="detail">
+            <ul id="resultDetail"></ul>
+            <div class="legend">
+              <span class="pill green">全赢</span>
+              <span class="pill blue">赢半</span>
+              <span class="pill gold">走水</span>
+              <span class="pill red">输半 / 全输</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="cheatsheet">
+      <h2>盘口速查表</h2>
+      <table>
+        <thead>
+          <tr><th>盘口</th><th>常见叫法</th><th>买让球方时怎么赢</th><th>平局怎么结算</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>0</code></td><td>平手</td><td>赢球全赢</td><td>走水</td></tr>
+          <tr><td><code>-0.25</code></td><td>让平/半</td><td>赢球全赢</td><td>输半</td></tr>
+          <tr><td><code>-0.5</code></td><td>让半球</td><td>赢球全赢</td><td>全输</td></tr>
+          <tr><td><code>-0.75</code></td><td>让半/一</td><td>赢两球全赢；赢一球赢半</td><td>全输</td></tr>
+          <tr><td><code>-1</code></td><td>让一球</td><td>赢两球全赢</td><td>全输；赢一球走水</td></tr>
+          <tr><td><code>+0.25</code></td><td>受让平/半</td><td>本队赢球全赢</td><td>赢半</td></tr>
+          <tr><td><code>+0.5</code></td><td>受让半球</td><td>本队赢球或打平都全赢</td><td>全赢</td></tr>
+        </tbody>
+      </table>
+      <p class="footer">提醒：本页仅用于理解赔率文本和结算规则，不构成任何博彩、投注或投资建议。</p>
+    </section>
+  </main>
+
+  <script>
+    const fields = ["teamName", "handicap", "oddsValue", "stake", "score"].map((id) => document.getElementById(id));
+    const resultTitle = document.getElementById("resultTitle");
+    const profitLine = document.getElementById("profitLine");
+    const resultDetail = document.getElementById("resultDetail");
+
+    function splitHandicap(value) {
+      const h = Number(value);
+      const doubled = h * 2;
+      if (Math.abs(doubled - Math.round(doubled)) < 1e-9) return [h, h];
+      const low = Math.floor(h * 2) / 2;
+      const high = Math.ceil(h * 2) / 2;
+      return [low, high];
+    }
+
+    function settleOne(scoreFor, scoreAgainst, handicap, stakePart, odds) {
+      const adjusted = scoreFor + handicap - scoreAgainst;
+      if (adjusted > 0) {
+        return { label: "赢", profit: stakePart * odds };
+      }
+      if (adjusted === 0) {
+        return { label: "走水", profit: 0 };
+      }
+      return { label: "输", profit: -stakePart };
+    }
+
+    function classify(profit, stake, odds) {
+      const maxProfit = stake * odds;
+      if (Math.abs(profit - maxProfit) < 0.01) return "全赢";
+      if (profit > 0) return "赢半";
+      if (Math.abs(profit) < 0.01) return "走水";
+      if (Math.abs(profit + stake) < 0.01) return "全输";
+      return "输半";
+    }
+
+    function parseScore(text) {
+      const match = String(text).trim().match(/^(\d+)\s*[-:：]\s*(\d+)$/);
+      if (!match) return null;
+      return [Number(match[1]), Number(match[2])];
+    }
+
+    function update() {
+      const team = document.getElementById("teamName").value || "你买的队";
+      const handicap = Number(document.getElementById("handicap").value);
+      const odds = Number(document.getElementById("oddsValue").value);
+      const stake = Number(document.getElementById("stake").value);
+      const score = parseScore(document.getElementById("score").value);
+
+      if (!score || Number.isNaN(odds) || Number.isNaN(stake) || odds < 0 || stake <= 0) {
+        resultTitle.textContent = "请检查输入";
+        profitLine.textContent = "比分格式示例：1-1";
+        resultDetail.innerHTML = "<li>水位不能为负，本金必须大于 0。</li>";
+        return;
+      }
+
+      const [scoreFor, scoreAgainst] = score;
+      const halves = splitHandicap(handicap);
+      const partStake = stake / halves.length;
+      const rows = halves.map((h) => settleOne(scoreFor, scoreAgainst, h, partStake, odds));
+      const profit = rows.reduce((sum, row) => sum + row.profit, 0);
+      const title = classify(profit, stake, odds);
+
+      resultTitle.textContent = title;
+      profitLine.textContent = `盈亏：${profit >= 0 ? "+" : ""}${profit.toFixed(2)}`;
+      resultDetail.innerHTML = rows.map((row, index) => {
+        const h = halves[index] > 0 ? `+${halves[index]}` : `${halves[index]}`;
+        const adjusted = scoreFor + halves[index] - scoreAgainst;
+        return `<li>第 ${index + 1} 份：${team} ${h}，调整后差值 ${adjusted.toFixed(2)}，结果 ${row.label}，盈亏 ${row.profit >= 0 ? "+" : ""}${row.profit.toFixed(2)}。</li>`;
+      }).join("");
+    }
+
+    fields.forEach((field) => field.addEventListener("input", update));
+    update();
+  </script>
+</body>
+</html>

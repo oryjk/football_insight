@@ -1,14 +1,24 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
+  buildSeatSwapMockCurrentResponse,
+  buildSeatSwapMockRegions,
+  buildSeatSwapRegionAnchorId,
+  canInteractSeatSwapMap,
   canConfirmCurrentSeatRegion,
   canConfirmDesiredSeatRegions,
   canPublishSeatSwapRequest,
   filterOutMySeatSwapRequest,
+  filterSeatSwapRequestsByDesiredRegion,
   formatSeatLabel,
   groupSeatSwapRequestsByRegion,
+  countSeatSwapDesiredRegions,
   previousSeatSwapStep,
+  resolveSeatSwapBrowseFilterKey,
+  resolveSeatSwapStickyMapThreshold,
+  readSeatSwapViewportScrollTop,
   resolveSeatSwapCandidateAction,
+  shouldShowSeatSwapStickyMap,
   statusLabel,
   toggleDesiredSeatRegion,
   validateSeatSwapForm,
@@ -136,6 +146,42 @@ describe('seat swap request grouping', () => {
     ])
   })
 
+  test('counts and filters published requests by desired regions for the stadium badge', () => {
+    const requests = [
+      {
+        request_id: '1',
+        current_region_key: '131',
+        current_region_name: '131',
+        created_at: '2026-05-19T12:00:00+08:00',
+        desired_seats: [
+          { region_key: '531', region_name: '531' },
+          { region_key: '532', region_name: '532' },
+        ],
+      },
+      {
+        request_id: '2',
+        current_region_key: '132',
+        current_region_name: '132',
+        created_at: '2026-05-19T12:01:00+08:00',
+        desired_seats: [
+          { region_key: '531', region_name: '531' },
+          { region_key: '131', region_name: '131' },
+        ],
+      },
+    ]
+
+    expect(countSeatSwapDesiredRegions(requests)).toEqual({
+      131: 1,
+      531: 2,
+      532: 1,
+    })
+    expect(filterSeatSwapRequestsByDesiredRegion(requests, '531').map((request) => request.request_id)).toEqual([
+      '1',
+      '2',
+    ])
+    expect(filterSeatSwapRequestsByDesiredRegion(requests, '132')).toEqual([])
+  })
+
   test('formats seat labels without requiring row and seat number', () => {
     expect(formatSeatLabel({
       current_region_name: '101',
@@ -174,6 +220,81 @@ describe('seat swap candidate actions', () => {
   })
 })
 
+describe('seat swap sticky map', () => {
+  test('shows the sticky mini map only after the page has scrolled past the threshold', () => {
+    expect(shouldShowSeatSwapStickyMap(0, 360)).toBe(false)
+    expect(shouldShowSeatSwapStickyMap(359, 360)).toBe(false)
+    expect(shouldShowSeatSwapStickyMap(360, 360)).toBe(true)
+    expect(shouldShowSeatSwapStickyMap(520, 360)).toBe(true)
+  })
+
+  test('does not show the sticky mini map before a measured threshold is ready', () => {
+    expect(shouldShowSeatSwapStickyMap(520, Number.POSITIVE_INFINITY)).toBe(false)
+  })
+
+  test('reads viewport scrollTop from selector query results', () => {
+    expect(readSeatSwapViewportScrollTop({ scrollTop: 520 })).toBe(520)
+    expect(readSeatSwapViewportScrollTop({ top: 520 })).toBeNull()
+    expect(readSeatSwapViewportScrollTop(null)).toBeNull()
+  })
+
+  test('falls back to a default threshold when sticky-map measurement is unavailable', () => {
+    expect(resolveSeatSwapStickyMapThreshold({
+      mapTop: null,
+      viewportScrollTop: null,
+      topOffsetPx: 32,
+      fallbackThreshold: 420,
+    })).toBe(420)
+  })
+})
+
+describe('seat swap map interaction', () => {
+  test('keeps the stadium map tappable in published mode', () => {
+    expect(canInteractSeatSwapMap('browse')).toBe(true)
+    expect(canInteractSeatSwapMap('filter')).toBe(true)
+    expect(canInteractSeatSwapMap('published')).toBe(true)
+    expect(canInteractSeatSwapMap('review')).toBe(false)
+  })
+
+  test('builds stable anchor ids for region groups', () => {
+    expect(buildSeatSwapRegionAnchorId('531')).toBe('seat-swap-group-531')
+    expect(buildSeatSwapRegionAnchorId('VIP2')).toBe('seat-swap-group-VIP2')
+  })
+
+  test('toggles the selected browse region off when tapped again', () => {
+    expect(resolveSeatSwapBrowseFilterKey('', '531')).toBe('531')
+    expect(resolveSeatSwapBrowseFilterKey('531', '531')).toBe('')
+    expect(resolveSeatSwapBrowseFilterKey('531', '532')).toBe('532')
+  })
+})
+
+describe('seat swap mock data', () => {
+  test('builds a large candidate list for scroll and sticky-map testing', () => {
+    const mockView = buildSeatSwapMockCurrentResponse({
+      candidateCount: 72,
+      includeMyRequest: true,
+    })
+
+    expect(mockView.available).toBe(true)
+    expect(mockView.current_match?.home_team_name).toBe('成都蓉城')
+    expect(mockView.candidates.length).toBe(72)
+    expect(Boolean(mockView.my_request?.request_id)).toBe(true)
+    expect(new Set(mockView.candidates.map((candidate) => candidate.current_region_key)).size > 8).toBe(true)
+    expect(
+      mockView.candidates.some((candidate) => candidate.desired_seats.length > 1),
+    ).toBe(true)
+  })
+
+  test('builds a region list that can drive the stadium map in mock mode', () => {
+    const regions = buildSeatSwapMockRegions()
+
+    expect(regions.length > 40).toBe(true)
+    expect(regions.some((region) => region.block_key === '101')).toBe(true)
+    expect(regions.some((region) => region.block_key === '531')).toBe(true)
+    expect(regions.some((region) => region.block_key === 'VIP2')).toBe(true)
+  })
+})
+
 describe('seat swap stadium region layout', () => {
   function layoutBounds(start: number, end: number) {
     const layouts = Array.from({ length: end - start + 1 }, (_, index) =>
@@ -186,6 +307,10 @@ describe('seat swap stadium region layout', () => {
     const maxBottom = Math.max(...layouts.map((layout) => layout.top + layout.height))
 
     return {
+      minLeft,
+      maxRight,
+      minTop,
+      maxBottom,
       centerX: (minLeft + maxRight) / 2,
       width: maxRight - minLeft,
       height: maxBottom - minTop,
@@ -195,25 +320,29 @@ describe('seat swap stadium region layout', () => {
   test('places the 100-level ring from 101 at the lower-right and counterclockwise', () => {
     const first = resolveSeatSwapRegionLayout('101')
     const next = resolveSeatSwapRegionLayout('102')
-    const bottomStart = resolveSeatSwapRegionLayout('125')
+    const topStart = resolveSeatSwapRegionLayout('108')
+    const bottomStart = resolveSeatSwapRegionLayout('124')
     const last = resolveSeatSwapRegionLayout('132')
 
     expect(first?.ring).toBe('inner')
     expect(first?.side).toBe('right')
     expect(next?.side).toBe('right')
     expect((next?.top || 0) < (first?.top || 0)).toBe(true)
+    expect((first?.left || 0) > 80).toBe(true)
+    expect((first?.top || 0) > 60).toBe(true)
+    expect(topStart?.side).toBe('top')
     expect(bottomStart?.side).toBe('bottom')
     expect((bottomStart?.left || 0) < (first?.left || 0)).toBe(true)
     expect(last?.side).toBe('bottom')
-    expect((last?.left || 0) < (first?.left || 0)).toBe(true)
+    expect((last?.left || 0) > (bottomStart?.left || 0)).toBe(true)
   })
 
   test('places 100-level regions on a rounded stadium bowl instead of straight stadium edges', () => {
     const rightLower = resolveSeatSwapRegionLayout('101')
-    const topStart = resolveSeatSwapRegionLayout('109')
-    const topMiddle = resolveSeatSwapRegionLayout('113')
+    const topStart = resolveSeatSwapRegionLayout('108')
+    const topMiddle = resolveSeatSwapRegionLayout('112')
     const leftMiddle = resolveSeatSwapRegionLayout('117')
-    const bottomStart = resolveSeatSwapRegionLayout('125')
+    const bottomStart = resolveSeatSwapRegionLayout('124')
     const bottomMiddle = resolveSeatSwapRegionLayout('129')
 
     expect(rightLower?.side).toBe('right')
@@ -230,9 +359,9 @@ describe('seat swap stadium region layout', () => {
 
   test('keeps 100-level corner regions from overlapping their neighboring side', () => {
     const cornerPairs = [
-      ['108', '109'],
+      ['107', '108'],
       ['116', '117'],
-      ['124', '125'],
+      ['123', '124'],
       ['132', '101'],
     ] as const
 
@@ -243,6 +372,7 @@ describe('seat swap stadium region layout', () => {
       expect(Boolean(left)).toBe(true)
       expect(Boolean(right)).toBe(true)
       expect(`${left?.left},${left?.top}` === `${right?.left},${right?.top}`).toBe(false)
+      expect(rectanglesOverlap(left!, right!)).toBe(false)
     }
   })
 
@@ -250,14 +380,18 @@ describe('seat swap stadium region layout', () => {
     const inner = resolveSeatSwapRegionLayout('101')
     const outer = resolveSeatSwapRegionLayout('501')
     const outerNext = resolveSeatSwapRegionLayout('502')
+    const outerTopStart = resolveSeatSwapRegionLayout('510')
     const outerTop = resolveSeatSwapRegionLayout('514')
+    const outerBottomStart = resolveSeatSwapRegionLayout('528')
 
     expect(outer?.ring).toBe('outer')
     expect(outer?.side).toBe('right')
     expect(outerNext?.side).toBe('right')
     expect((outerNext?.top || 0) < (outer?.top || 0)).toBe(true)
     expect((outer?.left || 0) > (inner?.left || 0)).toBe(true)
+    expect(outerTopStart?.side).toBe('top')
     expect((outerTop?.top || 0) < (inner?.top || 0)).toBe(true)
+    expect(outerBottomStart?.side).toBe('bottom')
   })
 
   test('centers the region bowl and uses most of the available width', () => {
@@ -266,8 +400,23 @@ describe('seat swap stadium region layout', () => {
 
     expect(Math.abs(inner.centerX - 50) < 2).toBe(true)
     expect(Math.abs(outer.centerX - 50) < 2).toBe(true)
-    expect(inner.width > 70).toBe(true)
+    expect(inner.width > 72).toBe(true)
+    expect(inner.width < 82).toBe(true)
     expect(outer.width > 88).toBe(true)
+    expect(outer.width < 96).toBe(true)
+  })
+
+  test('uses wider horizontal regions without pushing the bowl to the page edge', () => {
+    const innerTop = resolveSeatSwapRegionLayout('113')
+    const innerSide = resolveSeatSwapRegionLayout('104')
+    const outerTop = resolveSeatSwapRegionLayout('514')
+    const outerSide = resolveSeatSwapRegionLayout('506')
+    const outer = layoutBounds(501, 536)
+
+    expect((innerTop?.width || 0) > (innerSide?.width || 0)).toBe(true)
+    expect((outerTop?.width || 0) > (outerSide?.width || 0)).toBe(true)
+    expect(outer.minLeft >= 2).toBe(true)
+    expect(outer.maxRight <= 98).toBe(true)
   })
 
   test('keeps 500-level corner regions from overlapping their neighboring side', () => {
@@ -285,13 +434,64 @@ describe('seat swap stadium region layout', () => {
       expect(Boolean(left)).toBe(true)
       expect(Boolean(right)).toBe(true)
       expect(`${left?.left},${left?.top}` === `${right?.left},${right?.top}`).toBe(false)
+      expect(rectanglesOverlap(left!, right!)).toBe(false)
     }
   })
 
-  test('does not force unknown regions into the two-ring map', () => {
+  test('keeps all rendered stadium regions independently tappable', () => {
+    const regions = [...range(101, 132), ...range(501, 536), 'VIP1', 'VIP2', 'VIP3'].map((name) => {
+      const layout = resolveSeatSwapRegionLayout(name)
+      expect(Boolean(layout)).toBe(true)
+      return { name, layout: layout! }
+    })
+
+    for (let index = 0; index < regions.length; index += 1) {
+      for (let compareIndex = index + 1; compareIndex < regions.length; compareIndex += 1) {
+        const pair = `${regions[index].name}/${regions[compareIndex].name}`
+        expect(`${pair}:${rectanglesOverlap(regions[index].layout, regions[compareIndex].layout)}`).toBe(
+          `${pair}:false`,
+        )
+      }
+    }
+  })
+
+  test('places vip regions between 100-level and 500-level bottom stands', () => {
+    const innerBottom = resolveSeatSwapRegionLayout('128')
+    const outerBottom = resolveSeatSwapRegionLayout('532')
+    const vip1 = resolveSeatSwapRegionLayout('VIP1')
+    const vip2 = resolveSeatSwapRegionLayout('VIP2')
+    const vip3 = resolveSeatSwapRegionLayout('VIP3')
+
+    expect(vip1?.ring).toBe('vip')
+    expect(vip2?.ring).toBe('vip')
+    expect(vip3?.ring).toBe('vip')
+    expect((vip1?.top || 0) > (innerBottom?.top || 0)).toBe(true)
+    expect((vip1?.top || 0) < (outerBottom?.top || 0)).toBe(true)
+    expect((vip2?.left || 0) > (vip1?.left || 0)).toBe(true)
+    expect((vip3?.left || 0) > (vip2?.left || 0)).toBe(true)
+  })
+
+  test('does not force unknown regions into the stadium map', () => {
     expect(resolveSeatSwapRegionLayout('VIP')).toBeNull()
+    expect(resolveSeatSwapRegionLayout('UNKNOWN')).toBeNull()
   })
 })
+
+function rectanglesOverlap(
+  a: NonNullable<ReturnType<typeof resolveSeatSwapRegionLayout>>,
+  b: NonNullable<ReturnType<typeof resolveSeatSwapRegionLayout>>,
+): boolean {
+  return (
+    a.left < b.left + b.width &&
+    a.left + a.width > b.left &&
+    a.top < b.top + b.height &&
+    a.top + a.height > b.top
+  )
+}
+
+function range(start: number, end: number): string[] {
+  return Array.from({ length: end - start + 1 }, (_, index) => String(start + index))
+}
 
 describe('seat swap stadium selection flow', () => {
   test('confirms the current region only after a region is selected', () => {

@@ -2,6 +2,17 @@
   <view class="stadium-map" :class="{ 'stadium-map--review': mode === 'review' }">
     <view v-if="hint" class="stadium-map__hint">{{ hint }}</view>
     <view class="stadium-map__field">
+      <view class="stadium-price-legend" aria-hidden="true">
+        <view
+          v-for="item in priceLegendItems"
+          :key="item.grade"
+          class="stadium-price-legend__ticket"
+          :class="`stadium-price-legend__ticket--${item.colorGroup}`"
+        >
+          <text class="stadium-price-legend__grade">{{ item.grade }}</text>
+          <text class="stadium-price-legend__price">{{ item.price }}</text>
+        </view>
+      </view>
       <button
         v-for="region in renderedRegions"
         :key="region.key"
@@ -20,6 +31,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { TicketWatchRegion } from '../types/ticketWatch'
+import { canInteractSeatSwapMap } from '../pages/seat-swap/helpers'
 import {
   resolveSeatSwapRegionColorGroup,
   resolveSeatSwapRegionLayout,
@@ -59,8 +71,16 @@ const emit = defineEmits<{
   (e: 'region-tap', key: string): void
 }>()
 
-const interactiveModes: Mode[] = ['browse', 'filter', 'select-current', 'select-desired']
 const hasStagedDesiredKeys = computed(() => props.stagedDesiredKeys.length > 0)
+const priceLegendItems = [
+  { grade: 'VIP', price: '1288元', colorGroup: 'vip' },
+  { grade: 'S类', price: '400元', colorGroup: 'red' },
+  { grade: 'A类', price: '220元', colorGroup: 'yellow' },
+  { grade: 'B类', price: '180元', colorGroup: 'green' },
+  { grade: 'C类', price: '150元', colorGroup: 'blue' },
+  { grade: 'D类', price: '120元', colorGroup: 'navy' },
+  { grade: 'E类', price: '100元', colorGroup: 'purple' },
+] as const
 
 function regionKey(region: TicketWatchRegion): string {
   return region.block_key || region.block_name
@@ -136,7 +156,7 @@ const renderedRegions = computed(() =>
 
 function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   if (disabled || unmapped) return
-  if (!interactiveModes.includes(props.mode)) return
+  if (!canInteractSeatSwapMap(props.mode)) return
   emit('region-tap', key)
 }
 </script>
@@ -158,7 +178,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
 .stadium-map__field {
   position: relative;
   width: 100%;
-  height: 640rpx;
+  height: 520rpx;
   background: transparent;
   overflow: visible;
 }
@@ -236,7 +256,81 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
 .stadium-region--yellow { background: #f4c23a; }
 .stadium-region--navy { background: #0f215e; color: #fff; }
 .stadium-region--red { background: #ec3b20; color: #fff; }
+.stadium-region--vip { background: #b90000; color: #fff; }
 .stadium-region--muted { background: #d9dee7; }
+
+.stadium-price-legend {
+  position: absolute;
+  left: 24%;
+  right: 24%;
+  top: 32%;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7rpx 8rpx;
+  pointer-events: none;
+}
+
+.stadium-price-legend__ticket {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 34rpx;
+  min-width: 106rpx;
+  overflow: hidden;
+  border-radius: 7rpx;
+  color: #fff;
+  box-shadow: 0 6rpx 12rpx rgba(18, 25, 20, 0.12);
+}
+
+.stadium-price-legend__ticket::before,
+.stadium-price-legend__ticket::after {
+  position: absolute;
+  left: 36%;
+  width: 9rpx;
+  height: 9rpx;
+  border-radius: 999rpx;
+  background: #f3f2ef;
+  content: '';
+  transform: translateX(-50%);
+}
+
+.stadium-price-legend__ticket::before {
+  top: -5rpx;
+}
+
+.stadium-price-legend__ticket::after {
+  bottom: -5rpx;
+}
+
+.stadium-price-legend__grade {
+  display: flex;
+  width: 42rpx;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  border-right: 1rpx solid rgba(255, 255, 255, 0.38);
+  font-size: 18rpx;
+  font-weight: 900;
+}
+
+.stadium-price-legend__price {
+  flex: 1;
+  padding: 0 11rpx;
+  font-size: 18rpx;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.stadium-price-legend__ticket--blue { background: #336fbd; }
+.stadium-price-legend__ticket--green { background: #46ab59; }
+.stadium-price-legend__ticket--purple { background: #6c369b; }
+.stadium-price-legend__ticket--yellow { background: #f4c23a; color: #fff; }
+.stadium-price-legend__ticket--navy { background: #0f215e; }
+.stadium-price-legend__ticket--red { background: #ec3b20; }
+.stadium-price-legend__ticket--vip { background: #b90000; }
 
 .stadium-region--current {
   transform: scale(1.06);

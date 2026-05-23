@@ -4,20 +4,6 @@
     <view class="page-bg-fade"></view>
     <scroll-view scroll-y class="page-scroll">
       <view class="page">
-      <view class="hero-card">
-        <view class="hero-card__top">
-          <view>
-            <text class="eyebrow">Rankings</text>
-            <text class="hero-card__title">榜单不是表格，而是联赛秩序</text>
-          </view>
-          <text class="meta-note meta-note--hero">球队榜 / 球员榜</text>
-        </view>
-
-        <text class="hero-card__summary">
-          榜单里的进球、助攻、射门和传球等数据，展示的都是抓取时点的赛季累计值，不是单轮统计。
-        </text>
-      </view>
-
       <FiLoading
         v-if="loading"
         title="榜单加载中"
@@ -30,18 +16,6 @@
 
       <template v-else>
         <view v-if="previewStandingsTables.length" class="panel standings-launcher">
-          <view class="section-heading section-heading--compact">
-            <view>
-              <text class="section-kicker">积分榜总览</text>
-              <text class="section-title">完整积分榜单独看</text>
-            </view>
-            <text class="meta-note">独立图片入口</text>
-          </view>
-
-          <text class="standings-launcher__intro">
-            这里展示的是完整积分榜图片入口，不受下方球队榜、球员榜和分类切换控制。
-          </text>
-
           <view class="standings-launcher__grid">
             <view
               v-for="table in previewStandingsTables"
@@ -61,18 +35,13 @@
 
               <view class="standings-launcher-card__footer">
                 <text>{{ table.entries.length }} 支球队</text>
-                <button class="standings-launcher-card__info" @click.stop="toggleStandingsInfo(table.slug)">i</button>
-              </view>
-
-              <view v-if="activeStandingsInfoSlug === table.slug" class="standings-launcher-card__popover">
-                <text>{{ getStandingsPreviewSummary(table) }}</text>
-                <button class="standings-launcher-card__popover-close" @click.stop="activeStandingsInfoSlug = null">关闭</button>
+                <text class="standings-launcher-card__action">打开图片</text>
               </view>
             </view>
           </view>
         </view>
 
-        <view class="panel rankings-controls">
+        <view class="rankings-controls">
           <view class="scope-toggle">
             <view
               class="scope-toggle__button"
@@ -90,25 +59,27 @@
             </view>
           </view>
 
-          <scroll-view
-            scroll-x
-            class="pill-row"
-            :scroll-left="categoryScrollLeft"
-            scroll-with-animation
-          >
-            <view class="pill-row__list">
-              <view
-                v-for="item in categoryOptions"
-                :id="`ranking-category-${item.slug}`"
-                :key="item.slug"
-                class="pill-row__item"
-                :class="{ active: item.slug === activeCategorySlug }"
-                @click="activeCategorySlug = item.slug"
-              >
-                <text class="pill-row__item-text">{{ item.label }}</text>
+          <view class="category-tabs-wrap">
+            <scroll-view
+              scroll-x
+              class="pill-row"
+              :scroll-left="categoryScrollLeft"
+              scroll-with-animation
+            >
+              <view class="pill-row__list">
+                <view
+                  v-for="item in categoryOptions"
+                  :id="`ranking-category-${item.slug}`"
+                  :key="item.slug"
+                  class="pill-row__item"
+                  :class="{ active: item.slug === activeCategorySlug }"
+                  @click="activeCategorySlug = item.slug"
+                >
+                  <text class="pill-row__item-text">{{ item.label }}</text>
+                </view>
               </view>
-            </view>
-          </scroll-view>
+            </scroll-view>
+          </view>
         </view>
 
         <view v-if="scope === 'team' && activeTeamCategory" class="panel ranking-surface">
@@ -118,19 +89,27 @@
                 <text class="section-kicker">{{ activeTeamSectionKicker }}</text>
                 <text class="section-title">{{ activeTeamCategory.label }}</text>
               </view>
-              <view v-if="teamRankShiftMap" class="shift-legend-trigger" @click.stop="showShiftLegend = !showShiftLegend">
-                <text class="shift-legend-trigger__icon">i</text>
+              <view v-if="isStandingsTeamCategory" class="standings-mode-toggle">
+                <view
+                  class="standings-mode-toggle__item"
+                  :class="{ active: standingsRankingMode === 'with_penalty' }"
+                  @click.stop="standingsRankingMode = 'with_penalty'"
+                >
+                  <text>含罚分</text>
+                </view>
+                <view
+                  class="standings-mode-toggle__item"
+                  :class="{ active: standingsRankingMode === 'without_penalty' }"
+                  @click.stop="standingsRankingMode = 'without_penalty'"
+                >
+                  <text>无罚分</text>
+                </view>
               </view>
             </view>
 
-            <view v-if="showShiftLegend" class="shift-legend">
-              <text class="shift-legend__row"><text class="shift-legend__arrow shift-legend__arrow--down">↓</text> 绿色：若无罚分，排名会下降的位数</text>
-              <text class="shift-legend__row"><text class="shift-legend__arrow shift-legend__arrow--up">↑</text> 红色：若无罚分，排名可上升的位数</text>
-            </view>
-
             <view
-              v-for="entry in activeTeamCategory.entries"
-              :key="`${activeTeamCategory.slug}-${entry.team_id}`"
+              v-for="entry in activeTeamRankingEntries"
+              :key="`${activeTeamCategory.slug}-${standingsRankingMode}-${entry.team_id}`"
               class="ranking-row ranking-row--interactive"
               hover-class="ranking-row--pressed"
               hover-stay-time="100"
@@ -138,7 +117,6 @@
             >
               <view class="ranking-row__rank-wrap">
                 <text class="ranking-row__rank" :class="`ranking-row__rank--${entry.rank_no}`">#{{ entry.rank_no }}</text>
-                <text v-if="getTeamRankShift(entry.team_id)" class="ranking-row__shift" :class="getTeamRankShift(entry.team_id)!.cls">{{ getTeamRankShift(entry.team_id)!.label }}</text>
               </view>
               <image :src="entry.avatar_storage_url || ''" mode="aspectFit" class="ranking-row__avatar" />
               <view class="ranking-row__body">
@@ -187,25 +165,35 @@
           <view class="section-heading section-heading--compact">
             <view>
               <text class="section-kicker">球队赛季战绩</text>
-              <text class="section-title">{{ selectedRankingTeam.team.team_name }}</text>
+              <view class="team-season-sheet__title">
+                <image
+                  :src="selectedRankingTeamAvatar"
+                  mode="aspectFit"
+                  class="team-season-sheet__title-avatar"
+                />
+                <text class="section-title team-season-sheet__title-name">{{ selectedRankingTeam.team.team_name }}</text>
+              </view>
             </view>
             <button class="standings-sheet__close" @click="closeRankingTeamSheet">关闭</button>
           </view>
 
           <view class="team-season-sheet__summary">
             <view class="team-season-sheet__summary-main">
-              <image
-                :src="selectedRankingTeamAvatar"
-                mode="aspectFit"
-                class="team-season-sheet__summary-avatar"
-              />
-              <view class="team-season-sheet__summary-copy">
-                <text class="team-season-sheet__summary-name">{{ selectedRankingTeam.team.team_name }}</text>
-                <text class="team-season-sheet__summary-meta">{{ selectedRankingTeamStandingsMeta }}</text>
-                <text class="team-season-sheet__summary-note">{{ selectedRankingTeamCategoryMeta }}</text>
+              <view class="team-season-sheet__summary-meta-grid">
+                <view class="team-season-sheet__summary-metric">
+                  <text class="team-season-sheet__summary-value">{{ selectedRankingTeamStandingRankText }}</text>
+                  <text class="team-season-sheet__summary-label">积分榜排名</text>
+                </view>
+                <view class="team-season-sheet__summary-metric">
+                  <text class="team-season-sheet__summary-value">{{ selectedRankingTeamCategoryScoreText }}</text>
+                  <text class="team-season-sheet__summary-label">{{ selectedRankingTeamCategoryLabelText }}</text>
+                </view>
+                <view class="team-season-sheet__summary-metric">
+                  <text class="team-season-sheet__summary-value">{{ selectedRankingTeamRecordText }}</text>
+                  <text class="team-season-sheet__summary-label">赛季战绩</text>
+                </view>
               </view>
             </view>
-            <text class="team-season-sheet__summary-record">{{ selectedRankingTeamRecord }}</text>
           </view>
 
           <FiLoading
@@ -266,6 +254,13 @@
             <view class="standings-sheet__actions">
               <button
                 v-if="posterImagePath"
+                class="standings-sheet__share"
+                open-type="share"
+              >
+                分享
+              </button>
+              <button
+                v-if="posterImagePath"
                 class="standings-sheet__save"
                 @click="savePosterImage"
               >
@@ -294,7 +289,16 @@
             <view v-for="entry in selectedStandingsTable.entries" :key="`${selectedStandingsTable.slug}-${entry.team_id}`" class="standings-sheet__row">
               <text class="standings-sheet__rank">{{ entry.rank_no }}</text>
               <text class="standings-sheet__name">{{ entry.team_name }}</text>
-              <text class="standings-sheet__points">{{ getDisplayedPoints(selectedStandingsTable, entry) }}</text>
+              <view class="standings-sheet__metrics">
+                <view
+                  v-for="metric in getStandingsFallbackMetrics(selectedStandingsTable, entry)"
+                  :key="metric.label"
+                  class="standings-sheet__metric"
+                >
+                  <text class="standings-sheet__metric-value">{{ metric.value }}</text>
+                  <text class="standings-sheet__metric-label">{{ metric.label }}</text>
+                </view>
+              </view>
             </view>
           </view>
         </view>
@@ -315,7 +319,7 @@ import type { MatchCard, PlayerRankingCategory, RankingsViewResponse, RoundRefer
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { type TeamSeasonMatch, resolveTeamSeasonMatches } from '../../utils/teamSeasonMatches'
 import bgImage from '../../static/rankings/bg.webp'
-import { buildStandingsPosterColumns, buildStandingsPosterMetrics, buildStandingsPosterTeamLayout } from './poster'
+import { buildStandingsFallbackMetrics, buildStandingsPosterColumns, buildStandingsPosterMetrics, buildStandingsPosterSharePath, buildStandingsPosterShareTitle, buildStandingsPosterTeamLayout, buildStandingsRankingEntries, type StandingsRankingMode } from './poster'
 import { reportPageActivity } from '../../utils/userActivity'
 
 const standingsPosterHintText = '图片右下角已附公众号二维码水印，可直接保存或转发。'
@@ -360,14 +364,13 @@ const standingsPosterQrModules = [
 ]
 const instance = getCurrentInstance()
 const scope = ref<'team' | 'player'>('team')
-const showShiftLegend = ref(false)
+const standingsRankingMode = ref<StandingsRankingMode>('with_penalty')
 const loading = ref(true)
 const errorMessage = ref('')
 const rankings = ref<RankingsViewResponse | null>(null)
 const activeCategorySlug = ref('')
 const categoryScrollLeft = ref(0)
 const selectedStandingsPosterSlug = ref<string | null>(null)
-const activeStandingsInfoSlug = ref<string | null>(null)
 const posterImagePath = ref('')
 const posterGenerating = ref(false)
 const posterErrorMessage = ref('')
@@ -377,6 +380,13 @@ const rounds = ref<RoundReference[]>([])
 const allSeasonMatches = ref<MatchCard[] | null>(null)
 const teamSeasonMatchesLoading = ref(false)
 const teamSeasonMatchesErrorMessage = ref('')
+const pendingAutoOpenStandingsSlug = ref<string | null>(null)
+
+interface StandingsPosterSharePayload {
+  title: string
+  path: string
+  imageUrl?: string
+}
 
 interface SelectedRankingTeamSheet {
   team: TeamRankingEntry
@@ -407,9 +417,33 @@ const categoryOptions = computed(() =>
 )
 const activeTeamCategory = computed(() => teamCategories.value.find((item) => item.slug === activeCategorySlug.value) ?? null)
 const activePlayerCategory = computed(() => playerCategories.value.find((item) => item.slug === activeCategorySlug.value) ?? null)
+const isStandingsTeamCategory = computed(() => activeTeamCategory.value?.slug === 'standings')
+const activeTeamRankingEntries = computed<TeamRankingEntry[]>(() => {
+  if (!activeTeamCategory.value) {
+    return []
+  }
+
+  if (!isStandingsTeamCategory.value) {
+    return activeTeamCategory.value.entries
+  }
+
+  return buildStandingsRankingEntries(standingsTables.value, standingsRankingMode.value)
+})
 const selectedStandingsTable = computed(() =>
   previewStandingsTables.value.find((item) => item.slug === selectedStandingsPosterSlug.value) ?? null,
 )
+const selectedStandingsSharePayload = computed<StandingsPosterSharePayload | null>(() => {
+  if (!selectedStandingsTable.value) {
+    return null
+  }
+
+  const imageUrl = posterImagePath.value || undefined
+  return {
+    title: buildStandingsPosterShareTitle(rankings.value?.current_season ?? new Date().getFullYear(), selectedStandingsTable.value),
+    path: buildStandingsPosterSharePath(selectedStandingsTable.value),
+    ...(imageUrl ? { imageUrl } : {}),
+  }
+})
 const activeTeamSectionKicker = computed(() =>
   activeTeamCategory.value?.slug === 'standings' ? '实时球队排名' : '实时球队累计榜',
 )
@@ -419,28 +453,6 @@ const activeTeamMetricLabel = computed(() =>
 const activeTeamEntryLabel = computed(() =>
   activeTeamCategory.value?.slug === 'standings' ? '积分榜' : activeTeamCategory.value?.label ?? '',
 )
-const teamRankShiftMap = computed<Map<number, { shift: number; noPenaltyRank: number }> | null>(() => {
-  if (activeTeamCategory.value?.slug !== 'standings') return null
-  const withTable = standingsTables.value.find((t) => t.slug === 'standings_with_penalty')
-  const withoutTable = standingsTables.value.find((t) => t.slug === 'standings_without_penalty')
-  if (!withTable || !withoutTable) return null
-  const withoutRankByTeam = new Map(withoutTable.entries.map((e) => [e.team_id, e.rank_no]))
-  const map = new Map<number, { shift: number; noPenaltyRank: number }>()
-  for (const e of withTable.entries) {
-    const noPenaltyRank = withoutRankByTeam.get(e.team_id)
-    if (noPenaltyRank !== undefined && noPenaltyRank !== e.rank_no) {
-      map.set(e.team_id, { shift: e.rank_no - noPenaltyRank, noPenaltyRank })
-    }
-  }
-  return map.size > 0 ? map : null
-})
-
-function getTeamRankShift(teamId: number): { label: string; cls: string } | null {
-  const info = teamRankShiftMap.value?.get(teamId)
-  if (!info) return null
-  if (info.shift > 0) return { label: `↑${info.shift}`, cls: 'ranking-row__shift--up' }
-  return { label: `↓${Math.abs(info.shift)}`, cls: 'ranking-row__shift--down' }
-}
 const standingsEntryByTeamId = computed(() =>
   new Map((primaryStandingsTable.value?.entries ?? []).map((entry) => [entry.team_id, entry])),
 )
@@ -463,21 +475,28 @@ const selectedRankingTeamMatches = computed<TeamSeasonMatch[]>(() => {
 
   return resolveTeamSeasonMatches(selectedRankingTeam.value.team, allSeasonMatches.value)
 })
-const selectedRankingTeamStandingsMeta = computed(() => {
+const selectedRankingTeamStandingRankText = computed(() => {
   if (selectedRankingStandingsEntry.value) {
-    return `当前积分榜第 ${selectedRankingStandingsEntry.value.rank_no} · ${selectedRankingStandingsEntry.value.points} 分`
+    return `第 ${selectedRankingStandingsEntry.value.rank_no}`
   }
 
-  return '积分榜位置待同步'
+  return '待同步'
 })
-const selectedRankingTeamCategoryMeta = computed(() => {
+const selectedRankingTeamCategoryScoreText = computed(() => {
   if (!selectedRankingTeam.value) {
-    return ''
+    return '-'
   }
 
-  return `当前${selectedRankingTeam.value.categoryLabel}第 ${selectedRankingTeam.value.team.rank_no} · ${selectedRankingTeam.value.team.score_value} ${selectedRankingTeam.value.metricLabel}`
+  return `${selectedRankingTeam.value.team.score_value} ${selectedRankingTeam.value.metricLabel}`
 })
-const selectedRankingTeamRecord = computed(() => {
+const selectedRankingTeamCategoryLabelText = computed(() => {
+  if (!selectedRankingTeam.value) {
+    return '当前榜单'
+  }
+
+  return selectedRankingTeam.value.categoryLabel
+})
+const selectedRankingTeamRecordParts = computed(() => {
   const finishedMatches = selectedRankingTeamMatches.value.filter((match) =>
     match.resultTone === 'win' || match.resultTone === 'draw' || match.resultTone === 'loss',
   )
@@ -485,7 +504,16 @@ const selectedRankingTeamRecord = computed(() => {
   const draws = finishedMatches.filter((match) => match.resultTone === 'draw').length
   const losses = finishedMatches.filter((match) => match.resultTone === 'loss').length
 
-  return `已赛 ${finishedMatches.length} 场 · ${wins}胜 ${draws}平 ${losses}负`
+  return {
+    finishedMatches: finishedMatches.length,
+    wins,
+    draws,
+    losses,
+  }
+})
+const selectedRankingTeamRecordText = computed(() => {
+  const record = selectedRankingTeamRecordParts.value
+  return `${record.wins}胜 ${record.draws}平 ${record.losses}负`
 })
 
 watch(
@@ -532,6 +560,10 @@ function getStandingsPreviewSummary(table: StandingsTable): string {
 
 function getDisplayedPoints(table: StandingsTable, entry: StandingsTableEntry): number {
   return table.slug === 'standings_without_penalty' ? entry.points_without_penalty : entry.points
+}
+
+function getStandingsFallbackMetrics(table: StandingsTable, entry: StandingsTableEntry) {
+  return buildStandingsFallbackMetrics(table, entry)
 }
 
 function buildPosterSubtitle(table: StandingsTable): string {
@@ -589,7 +621,6 @@ async function centerActiveCategory(): Promise<void> {
 
 async function openStandingsSheet(slug: string): Promise<void> {
   selectedStandingsPosterSlug.value = slug
-  activeStandingsInfoSlug.value = null
   posterErrorMessage.value = ''
   posterImagePath.value = ''
 
@@ -607,13 +638,20 @@ async function openStandingsSheet(slug: string): Promise<void> {
   await generatePoster(table)
 }
 
+async function openSharedStandingsPoster(slug: string): Promise<void> {
+  const table = previewStandingsTables.value.find((item) => item.slug === slug) ?? null
+  if (!table) {
+    pendingAutoOpenStandingsSlug.value = slug
+    return
+  }
+
+  pendingAutoOpenStandingsSlug.value = null
+  await openStandingsSheet(table.slug)
+}
+
 function closeStandingsSheet(): void {
   selectedStandingsPosterSlug.value = null
   posterErrorMessage.value = ''
-}
-
-function toggleStandingsInfo(slug: string): void {
-  activeStandingsInfoSlug.value = activeStandingsInfoSlug.value === slug ? null : slug
 }
 
 function consumeSheetTap(): void {}
@@ -687,7 +725,7 @@ async function generatePoster(table: StandingsTable): Promise<void> {
   posterGenerating.value = true
 
   try {
-    const context = uni.createCanvasContext(canvasId)
+    const context = uni.createCanvasContext(canvasId, instance)
     const posterEntries = table.entries.slice(0, maxRows)
     const posterLogoPaths = await resolvePosterLogoPaths(posterEntries)
 
@@ -775,7 +813,7 @@ async function generatePoster(table: StandingsTable): Promise<void> {
         destHeight: height,
         success: (result) => resolve(result.tempFilePath),
         fail: (error) => reject(error),
-      })
+      }, instance)
     })
 
     posterCache.set(table.slug, tempFilePath)
@@ -925,6 +963,10 @@ async function loadPage(): Promise<void> {
     if (!options.some((item) => item.slug === activeCategorySlug.value)) {
       activeCategorySlug.value = options[0]?.slug ?? ''
     }
+
+    if (pendingAutoOpenStandingsSlug.value) {
+      await openSharedStandingsPoster(pendingAutoOpenStandingsSlug.value)
+    }
   } catch (error) {
     errorMessage.value = extractApiErrorMessage(error, '榜单加载失败，请稍后重试。')
   } finally {
@@ -936,33 +978,38 @@ onShow(() => {
   reportPageActivity('rankings')
   void loadPage()
 })
+
+defineExpose({
+  getStandingsPosterSharePayload: () => selectedStandingsSharePayload.value,
+  openSharedStandingsPoster,
+})
 </script>
 
 <style scoped lang="css">
 .page-root { position: relative; }
 .page-scroll { height: 100vh; position: relative; z-index: 1; }
 .page { padding: 128rpx 16rpx 40rpx; display: flex; flex-direction: column; gap: 16rpx; }
-.hero-card, .panel, .state-card {
+.panel, .state-card {
   background: rgba(255,255,255,0.94);
   border-radius: 36rpx;
   padding: 20rpx;
   border: 2rpx solid rgba(236, 236, 241, 0.95);
   box-shadow: 0 20rpx 48rpx rgba(26,28,36,0.06);
 }
-.hero-card__top, .section-heading, .standings-launcher-card__header, .standings-launcher-card__footer {
+.section-heading, .standings-launcher-card__header, .standings-launcher-card__footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-.hero-card__top, .section-heading, .standings-launcher-card__header { align-items: flex-start; gap: 12rpx; }
-.eyebrow, .section-kicker {
+.section-heading, .standings-launcher-card__header { align-items: flex-start; gap: 12rpx; }
+.section-kicker {
   margin: 0;
   color: #8f9198;
   font-size: 22rpx;
   font-weight: 700;
   letter-spacing: 3rpx;
 }
-.hero-card__title, .section-title, .standings-launcher-card__title {
+.section-title, .standings-launcher-card__title {
   display: block;
   margin-top: 10rpx;
   color: #2a2c31;
@@ -971,14 +1018,14 @@ onShow(() => {
   font-weight: 800;
 }
 .section-title, .standings-launcher-card__title { font-size: 44rpx; }
-.hero-card__summary, .standings-launcher__intro, .standings-launcher-card__summary {
+.standings-launcher-card__summary {
   display: block;
   margin-top: 18rpx;
   color: #6b707b;
   font-size: 28rpx;
   line-height: 1.7;
 }
-.hero-card__badge, .meta-pill {
+.meta-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -993,183 +1040,135 @@ onShow(() => {
   color: #93876a;
   font-size: 24rpx;
 }
-.meta-note {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex: 0 0 auto;
-  flex-shrink: 0;
-  max-width: 100%;
-  white-space: nowrap;
-  line-height: 1;
-  color: #a3916f;
-  font-size: 24rpx;
-  font-weight: 700;
-  letter-spacing: 1rpx;
-  padding: 8rpx 0 0;
+.standings-launcher {
+  display: grid;
+  gap: 0;
+  padding-top: 4rpx;
+  padding-bottom: 8rpx;
 }
-.meta-note::before {
-  content: '';
-  width: 12rpx;
-  height: 12rpx;
-  margin-right: 10rpx;
-  border-radius: 999rpx;
-  background: linear-gradient(180deg, rgba(214, 184, 131, 0.9), rgba(197, 163, 103, 0.72));
-  box-shadow: 0 0 0 6rpx rgba(214, 184, 131, 0.14);
+.standings-launcher__grid {
+  display: grid;
+  gap: 0;
+  border-top: 2rpx solid rgba(235, 236, 241, 0.86);
 }
-.meta-note--hero { padding-top: 14rpx; }
-.standings-launcher { display: grid; gap: 14rpx; }
-.standings-launcher__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12rpx; }
 .standings-launcher-card {
   position: relative;
   display: grid;
-  gap: 12rpx;
-  padding: 22rpx;
-  border-radius: 24rpx;
-  border: 2rpx solid rgba(230, 232, 239, 0.9);
-  background: linear-gradient(180deg, rgba(252, 252, 255, 0.98), rgba(248, 249, 252, 0.96));
+  gap: 8rpx;
+  padding: 22rpx 0;
+  border-bottom: 2rpx solid rgba(235, 236, 241, 0.86);
+  background: transparent;
 }
-.standings-launcher-card__footer, .standings-launcher-card__summary { font-size: 22rpx; color: #757986; }
-.standings-launcher-card__info {
-  display: inline-flex;
+.standings-launcher-card__header {
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 40rpx;
-  height: 40rpx;
-  border-radius: 999rpx;
-  background: #f6f7fb;
-  color: #6d7280;
+}
+.standings-launcher-card__title {
+  font-size: 32rpx;
+  margin-top: 8rpx;
+  line-height: 1.18;
+}
+.standings-launcher-card__summary {
+  margin-top: 0;
   font-size: 24rpx;
-  line-height: 1;
+  line-height: 1.5;
+  color: #747986;
 }
-.standings-launcher-card__popover {
-  position: absolute;
-  right: 18rpx;
-  bottom: 72rpx;
-  width: 320rpx;
-  padding: 20rpx;
-  border-radius: 22rpx;
-  background: rgba(255,255,255,0.98);
-  box-shadow: 0 20rpx 44rpx rgba(18,18,18,0.12);
-  display: grid;
-  gap: 12rpx;
-}
-.standings-launcher-card__popover text, .standings-launcher-card__popover-close {
+.standings-launcher-card__footer {
+  margin-top: 4rpx;
+  color: #9a9ea8;
   font-size: 22rpx;
-  color: #565b67;
-  line-height: 1.6;
 }
-.standings-launcher-card__popover-close {
+.standings-launcher-card__action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  white-space: nowrap;
+  color: #121212;
+  font-size: 22rpx;
+  font-weight: 800;
   line-height: 1;
-  justify-self: flex-end;
-  padding: 10rpx 16rpx;
-  border-radius: 999rpx;
-  background: #f6f7fb;
+  white-space: nowrap;
 }
 .rankings-controls {
   display: grid;
-  gap: 24rpx;
+  gap: 18rpx;
   width: 100%;
-  padding: 20rpx;
+  padding: 2rpx 4rpx 8rpx;
   overflow: hidden;
 }
 .scope-toggle {
   display: flex;
-  align-items: stretch;
+  align-items: flex-end;
   width: 100%;
-  gap: 8rpx;
-  padding: 8rpx;
-  border: 2rpx solid #ececf1;
-  border-radius: 24rpx;
-  background: #f6f7fb;
-  overflow: hidden;
+  gap: 34rpx;
+  padding: 0 8rpx;
+  border-bottom: 2rpx solid rgba(231, 232, 238, 0.9);
 }
-.ranking-row__shift {
-  font-size: 18rpx;
-  font-weight: 600;
-  line-height: 1;
-  margin-top: 4rpx;
+.standings-mode-toggle {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rpx;
+  flex: 0 0 auto;
+  padding: 3rpx;
+  border-radius: 999rpx;
+  background: rgba(242, 243, 247, 0.92);
 }
-.ranking-row__shift--up {
-  color: #dc2626;
-}
-.ranking-row__shift--down {
-  color: #16a34a;
-}
-.shift-legend-trigger {
+.standings-mode-toggle__item {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44rpx;
-  height: 44rpx;
-  border-radius: 50%;
-  background: #f0f1f5;
-  flex-shrink: 0;
-}
-.shift-legend-trigger__icon {
+  min-width: 96rpx;
+  padding: 12rpx 16rpx;
+  border-radius: 999rpx;
+  color: #7b818d;
   font-size: 22rpx;
+  line-height: 1;
+  white-space: nowrap;
+}
+.standings-mode-toggle__item.active {
+  color: #121212;
   font-weight: 700;
-  color: #8f9198;
-  font-style: italic;
-}
-.shift-legend {
-  display: flex;
-  flex-direction: column;
-  gap: 8rpx;
-  padding: 20rpx 24rpx;
-  margin-bottom: 16rpx;
-  background: #f8f9fc;
-  border-radius: 16rpx;
-  border: 2rpx solid #ececf1;
-}
-.shift-legend__row {
-  font-size: 24rpx;
-  color: #3a3a3c;
-  line-height: 1.5;
-}
-.shift-legend__arrow {
-  display: inline-block;
-  width: 36rpx;
-  font-weight: 700;
-}
-.shift-legend__arrow--down {
-  color: #16a34a;
-}
-.shift-legend__arrow--up {
-  color: #dc2626;
-}
-.shift-legend__hint {
-  font-size: 22rpx;
-  color: #8f9198;
-  margin-top: 4rpx;
+  background: #ffffff;
+  box-shadow: 0 6rpx 14rpx rgba(18,18,18,0.05);
 }
 .scope-toggle__button {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 1 1 0;
+  flex: 0 0 auto;
   min-width: 0;
-  min-height: 76rpx;
-  border-radius: 18rpx;
-  padding: 18rpx 22rpx;
+  min-height: 68rpx;
+  padding: 12rpx 0 20rpx;
   text-align: center;
   background: transparent;
-  color: #8f9198;
-  font-size: 26rpx;
+  color: #7f8490;
+  font-size: 28rpx;
+  font-weight: 700;
   white-space: nowrap;
   line-height: 1;
   overflow: hidden;
   box-sizing: border-box;
 }
+.scope-toggle__button::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -2rpx;
+  width: 0;
+  height: 4rpx;
+  border-radius: 999rpx;
+  background: #15161b;
+  transform: translateX(-50%);
+  transition: width 160ms ease;
+}
 .scope-toggle__button-text {
   display: block;
   width: 100%;
   text-align: center;
+}
+.category-tabs-wrap {
+  display: grid;
+  overflow: hidden;
 }
 .pill-row__item {
   display: inline-flex;
@@ -1186,11 +1185,17 @@ onShow(() => {
   line-height: 1;
   box-sizing: border-box;
 }
-.scope-toggle__button.active, .pill-row__item.active {
+.scope-toggle__button.active {
   color: #121212;
-  font-weight: 600;
-  background: #ffffff;
-  box-shadow: 0 8rpx 18rpx rgba(18, 18, 18, 0.06);
+  font-weight: 900;
+}
+.scope-toggle__button.active::after {
+  width: 100%;
+}
+.pill-row__item.active {
+  color: #ffffff;
+  font-weight: 800;
+  background: #15161b;
 }
 .pill-row {
   width: 100%;
@@ -1199,14 +1204,15 @@ onShow(() => {
 }
 .pill-row__list {
   display: inline-flex;
-  gap: 12rpx;
+  gap: 10rpx;
   min-width: max-content;
-  padding-bottom: 4rpx;
+  padding: 0 8rpx 4rpx;
 }
 .pill-row__item {
-  background: #f1f2f6;
+  background: rgba(239, 240, 244, 0.92);
   border-radius: 999rpx;
   font-size: 24rpx;
+  color: #696f7a;
 }
 .pill-row__item-text {
   display: block;
@@ -1307,11 +1313,11 @@ onShow(() => {
   border-bottom: 0;
   padding-bottom: 0;
 }
-.ranking-surface .section-heading {
-  justify-content: flex-start;
-}
 .ranking-surface .section-heading--compact {
   align-items: flex-start;
+}
+.ranking-surface .section-heading--compact > view:first-child {
+  min-width: 0;
 }
 .ranking-surface .section-title {
   font-size: 50rpx;
@@ -1341,7 +1347,8 @@ onShow(() => {
   align-items: center;
   gap: 12rpx;
 }
-.standings-sheet__close {
+.standings-sheet__close,
+.standings-sheet__share {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1352,6 +1359,10 @@ onShow(() => {
   background: #f6f7fb;
   font-size: 24rpx;
   color: #6d7280;
+}
+.standings-sheet__share {
+  background: rgba(21, 22, 27, 0.92);
+  color: #ffffff;
 }
 .standings-sheet__save {
   display: inline-flex;
@@ -1390,67 +1401,103 @@ onShow(() => {
 .standings-sheet__list { margin-top: 18rpx; display: grid; gap: 12rpx; }
 .standings-sheet__row {
   display: grid;
-  grid-template-columns: 52rpx 1fr auto;
+  grid-template-columns: 52rpx minmax(0, 1fr) auto;
   gap: 16rpx;
   align-items: center;
   padding: 18rpx 0;
   border-bottom: 2rpx solid #eff1f5;
 }
-.standings-sheet__rank, .standings-sheet__name, .standings-sheet__points { font-size: 28rpx; }
+.standings-sheet__rank, .standings-sheet__name, .standings-sheet__metric-value { font-size: 28rpx; }
 .standings-sheet__rank { color: #8f9198; }
 .standings-sheet__name { color: #121212; font-weight: 700; }
-.standings-sheet__points { color: #f97316; font-weight: 800; }
+.standings-sheet__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 64rpx);
+  gap: 10rpx;
+  justify-content: end;
+}
+.standings-sheet__metric {
+  display: grid;
+  justify-items: end;
+  gap: 4rpx;
+  min-width: 0;
+}
+.standings-sheet__metric-value { color: #121212; font-weight: 800; line-height: 1; }
+.standings-sheet__metric:first-child .standings-sheet__metric-value { color: #f97316; }
+.standings-sheet__metric-label {
+  color: #8f9198;
+  font-size: 20rpx;
+  line-height: 1;
+  white-space: nowrap;
+}
 .standings-sheet--team-season {
   max-height: 82vh;
 }
+.team-season-sheet__title {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  min-width: 0;
+  margin-top: 8rpx;
+}
+.team-season-sheet__title-avatar {
+  width: 56rpx;
+  height: 56rpx;
+  flex: 0 0 auto;
+}
+.team-season-sheet__title-name {
+  min-width: 0;
+  margin-top: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .team-season-sheet__summary {
   margin-top: 18rpx;
-  padding: 24rpx;
-  border-radius: 28rpx;
-  border: 2rpx solid rgba(255, 145, 41, 0.16);
-  background:
-    radial-gradient(circle at top right, rgba(255, 145, 41, 0.12), transparent 36%),
-    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,246,239,0.92));
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
+  padding: 22rpx 24rpx;
+  border-radius: 24rpx;
+  border: 2rpx solid rgba(232, 233, 238, 0.95);
+  background: #ffffff;
+  display: block;
 }
 .team-season-sheet__summary-main {
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
+  display: block;
   min-width: 0;
 }
-.team-season-sheet__summary-avatar {
-  width: 82rpx;
-  height: 82rpx;
-  flex: 0 0 auto;
+.team-season-sheet__summary-meta-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(160rpx, 1.45fr);
+  align-items: center;
+  gap: 12rpx;
+  min-width: 0;
 }
-.team-season-sheet__summary-copy {
+.team-season-sheet__summary-metric {
   min-width: 0;
   display: grid;
-  gap: 8rpx;
+  gap: 6rpx;
+  padding-left: 14rpx;
+  border-left: 2rpx solid rgba(235, 236, 241, 0.95);
 }
-.team-season-sheet__summary-name {
+.team-season-sheet__summary-metric:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+.team-season-sheet__summary-value {
   color: #121212;
-  font-size: 32rpx;
-  line-height: 1.2;
+  font-size: 28rpx;
+  line-height: 1.1;
   font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.team-season-sheet__summary-meta,
-.team-season-sheet__summary-record,
-.team-season-sheet__summary-note {
+.team-season-sheet__summary-label {
   color: #8f9198;
-  font-size: 24rpx;
-}
-.team-season-sheet__summary-note {
-  color: #9c7e45;
-}
-.team-season-sheet__summary-record {
-  flex: 0 0 auto;
-  text-align: right;
-  font-weight: 700;
+  font-size: 20rpx;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .team-season-sheet__list {
   margin-top: 22rpx;

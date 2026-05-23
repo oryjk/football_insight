@@ -12,15 +12,19 @@
       </view>
       <view class="seat-swap-candidate__id">
         <text class="seat-swap-candidate__name">{{ candidate.display_name }}</text>
-        <text class="seat-swap-candidate__seat">{{ formatSeatSwapSeatLabel(candidate) }}</text>
+        <view class="seat-swap-candidate__seat">
+          <text class="seat-swap-candidate__seat-label">可换出</text>
+          <text class="seat-swap-candidate__seat-value">{{ formatSeatSwapSeatLabel(candidate) }}</text>
+        </view>
       </view>
-      <text class="seat-swap-candidate__status" :class="statusClass">
-        {{ seatSwapStatusLabel(candidate.status) }}
+      <text v-if="statusText" class="seat-swap-candidate__status" :class="statusClass">
+        {{ statusText }}
       </text>
     </view>
-    <text class="seat-swap-candidate__wants">
-      想换:<text class="seat-swap-candidate__wants-value">{{ desiredSeatText }}</text>
-    </text>
+    <view class="seat-swap-candidate__wants">
+      <text class="seat-swap-candidate__wants-label">想换到</text>
+      <text class="seat-swap-candidate__wants-value">{{ desiredSeatText }}</text>
+    </view>
     <view v-if="candidate.contact" class="seat-swap-candidate__contact">
       <text v-if="candidate.contact.wechat_id" class="seat-swap-candidate__contact-line">
         微信:{{ candidate.contact.wechat_id }}
@@ -66,6 +70,7 @@ const emit = defineEmits<{
 }>()
 
 const fallbackInitial = computed(() => (props.candidate.display_name || '球').slice(0, 1))
+const statusText = computed(() => seatSwapStatusLabel(props.candidate.status))
 const statusClass = computed(() => ({
   'seat-swap-candidate__status--hot': props.candidate.status !== 'matched',
 }))
@@ -118,10 +123,36 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 }
 
 .seat-swap-candidate__seat {
-  display: block;
-  margin-top: 4rpx;
-  color: #8f7c5f;
-  font-size: 22rpx;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  margin-top: 8rpx;
+  overflow: hidden;
+  border-radius: 22rpx;
+  background: linear-gradient(180deg, rgba(255, 247, 232, 0.95), rgba(251, 240, 215, 0.88));
+  color: #6e4f16;
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.52);
+}
+
+.seat-swap-candidate__seat-label {
+  flex-shrink: 0;
+  padding: 7rpx 10rpx 7rpx 12rpx;
+  background: rgba(244, 194, 58, 0.18);
+  color: rgba(129, 95, 31, 0.88);
+  font-size: 20rpx;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.seat-swap-candidate__seat-value {
+  min-width: 0;
+  padding: 7rpx 14rpx 7rpx 10rpx;
+  overflow: hidden;
+  font-size: 26rpx;
+  font-weight: 800;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .seat-swap-candidate__status {
@@ -143,17 +174,37 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 }
 
 .seat-swap-candidate__wants {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  max-width: calc(100% - 80rpx);
   margin-top: 12rpx;
-  padding-left: 80rpx;
-  color: #988f84;
-  font-size: 22rpx;
-  line-height: 1.5;
+  margin-left: 80rpx;
+  overflow: hidden;
+  border-radius: 22rpx;
+  background: linear-gradient(180deg, rgba(237, 249, 242, 0.96), rgba(227, 244, 233, 0.9));
+  color: #175c31;
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.5);
+}
+
+.seat-swap-candidate__wants-label {
+  flex-shrink: 0;
+  padding: 7rpx 10rpx 7rpx 12rpx;
+  background: rgba(70, 171, 89, 0.12);
+  color: rgba(24, 103, 67, 0.88);
+  font-size: 20rpx;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .seat-swap-candidate__wants-value {
-  color: #121212;
-  font-weight: 400;
+  min-width: 0;
+  padding: 7rpx 14rpx 7rpx 10rpx;
+  overflow: hidden;
+  font-size: 24rpx;
+  font-weight: 700;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .seat-swap-candidate__contact {
