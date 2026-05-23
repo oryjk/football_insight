@@ -9,7 +9,9 @@
     "build:h5": "uni build",
     "build:mp-weixin": "uni build -p mp-weixin",
     "sync:mp-weixin:windows": "bash scripts/sync-mp-weixin-dist.sh",
-    "type-check": "vue-tsc --noEmit"
+    "type-check": "vue-tsc --noEmit",
+    "mp:preview": "node scripts/mini-ci.mjs preview",
+    "mp:upload": "node scripts/mini-ci.mjs upload"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4080420251103001",

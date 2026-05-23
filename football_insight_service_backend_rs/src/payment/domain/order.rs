@@ -212,7 +212,7 @@ pub fn calculate_membership_checkout_price(
 
     if !is_v9_renewal
         && crate::auth::domain::membership::membership_tier_rank(&target_tier)
-        <= crate::auth::domain::membership::membership_tier_rank(&current_tier)
+            <= crate::auth::domain::membership::membership_tier_rank(&current_tier)
     {
         anyhow::bail!("请选择高于当前等级的会员档位");
     }
@@ -341,7 +341,12 @@ mod tests {
     #[test]
     fn parse_reflux_subscription_product_type_rejects_other_products() {
         assert!(parse_reflux_subscription_product_type("membership:V9").is_none());
-        assert!(parse_reflux_subscription_product_type("reflux_subscription::chengdu:571").is_none());
-        assert!(parse_reflux_subscription_product_type("reflux_subscription:single_match::571").is_none());
+        assert!(
+            parse_reflux_subscription_product_type("reflux_subscription::chengdu:571").is_none()
+        );
+        assert!(
+            parse_reflux_subscription_product_type("reflux_subscription:single_match::571")
+                .is_none()
+        );
     }
 }

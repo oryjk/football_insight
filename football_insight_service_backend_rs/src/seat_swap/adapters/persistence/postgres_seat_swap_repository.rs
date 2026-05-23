@@ -34,12 +34,14 @@ impl SeatSwapRepository for PostgresSeatSwapRepository {
                 r.match_id,
                 r.user_id,
                 COALESCE(u.display_name, u.account_identifier, '球迷') AS display_name,
+                u.avatar_url,
                 r.current_region_key,
                 r.current_region_name,
                 r.current_row,
                 r.current_seat_no,
                 r.wechat_id,
                 r.phone_number,
+                r.seat_swap_notice_enabled,
                 r.status,
                 r.matched_request_id,
                 r.created_at,
@@ -74,12 +76,14 @@ impl SeatSwapRepository for PostgresSeatSwapRepository {
                 r.match_id,
                 r.user_id,
                 COALESCE(u.display_name, u.account_identifier, '球迷') AS display_name,
+                u.avatar_url,
                 r.current_region_key,
                 r.current_region_name,
                 r.current_row,
                 r.current_seat_no,
                 r.wechat_id,
                 r.phone_number,
+                r.seat_swap_notice_enabled,
                 r.status,
                 r.matched_request_id,
                 r.created_at,
@@ -115,12 +119,14 @@ impl SeatSwapRepository for PostgresSeatSwapRepository {
                 r.match_id,
                 r.user_id,
                 COALESCE(u.display_name, u.account_identifier, '球迷') AS display_name,
+                u.avatar_url,
                 r.current_region_key,
                 r.current_region_name,
                 r.current_row,
                 r.current_seat_no,
                 r.wechat_id,
                 r.phone_number,
+                r.seat_swap_notice_enabled,
                 r.status,
                 r.matched_request_id,
                 r.created_at,
@@ -167,6 +173,64 @@ impl SeatSwapRepository for PostgresSeatSwapRepository {
         }))
     }
 
+    async fn list_confirmations_by_request(
+        &self,
+        match_id: i64,
+        request_id: Uuid,
+    ) -> anyhow::Result<Vec<SeatSwapConfirmation>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT request_id, target_request_id, confirmed_by_user_id
+            FROM f_i_seat_swap_confirmations
+            WHERE match_id = $1
+              AND request_id = $2
+            ORDER BY created_at ASC
+            "#,
+        )
+        .bind(match_id)
+        .bind(request_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| SeatSwapConfirmation {
+                request_id: row.get("request_id"),
+                target_request_id: row.get("target_request_id"),
+                confirmed_by_user_id: row.get("confirmed_by_user_id"),
+            })
+            .collect())
+    }
+
+    async fn find_confirmation_between(
+        &self,
+        match_id: i64,
+        request_id: Uuid,
+        target_request_id: Uuid,
+    ) -> anyhow::Result<Option<SeatSwapConfirmation>> {
+        let row = sqlx::query(
+            r#"
+            SELECT request_id, target_request_id, confirmed_by_user_id
+            FROM f_i_seat_swap_confirmations
+            WHERE match_id = $1
+              AND request_id = $2
+              AND target_request_id = $3
+            LIMIT 1
+            "#,
+        )
+        .bind(match_id)
+        .bind(request_id)
+        .bind(target_request_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|row| SeatSwapConfirmation {
+            request_id: row.get("request_id"),
+            target_request_id: row.get("target_request_id"),
+            confirmed_by_user_id: row.get("confirmed_by_user_id"),
+        }))
+    }
+
     async fn upsert_request(
         &self,
         input: UpsertSeatSwapRequestInput,
@@ -200,6 +264,7 @@ impl SeatSwapRepository for PostgresSeatSwapRepository {
                     current_seat_no = $6,
                     wechat_id = $7,
                     phone_number = $8,
+                    seat_swap_notice_enabled = $9,
                     status = 'active',
                     matched_request_id = NULL,
                     updated_at = NOW()
@@ -216,6 +281,7 @@ impl SeatSwapRepository for PostgresSeatSwapRepository {
             .bind(&input.current_seat_no)
             .bind(&input.wechat_id)
             .bind(&input.phone_number)
+            .bind(input.mini_program_notice_enabled)
             .execute(&mut *tx)
             .await?;
         } else {
@@ -231,11 +297,12 @@ impl SeatSwapRepository for PostgresSeatSwapRepository {
                     current_seat_no,
                     wechat_id,
                     phone_number,
+                    seat_swap_notice_enabled,
                     status,
                     created_at,
                     updated_at
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', NOW(), NOW())
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', NOW(), NOW())
                 "#,
             )
             .bind(final_request_id)
@@ -247,6 +314,7 @@ impl SeatSwapRepository for PostgresSeatSwapRepository {
             .bind(&input.current_seat_no)
             .bind(&input.wechat_id)
             .bind(&input.phone_number)
+            .bind(input.mini_program_notice_enabled)
             .execute(&mut *tx)
             .await?;
         }
@@ -342,10 +410,9 @@ impl SeatSwapRepository for PostgresSeatSwapRepository {
                 created_at
             )
             VALUES ($1, $2, $3, $4, $5, NOW())
-            ON CONFLICT (match_id, confirmed_by_user_id)
+            ON CONFLICT (match_id, request_id, target_request_id)
             DO UPDATE SET
-                request_id = EXCLUDED.request_id,
-                target_request_id = EXCLUDED.target_request_id,
+                confirmed_by_user_id = EXCLUDED.confirmed_by_user_id,
                 created_at = NOW()
             "#,
         )
@@ -364,8 +431,60 @@ impl SeatSwapRepository for PostgresSeatSwapRepository {
         })
     }
 
-    async fn mark_matched(&self, request_id: Uuid, target_request_id: Uuid) -> anyhow::Result<()> {
+    async fn delete_confirmation(
+        &self,
+        match_id: i64,
+        request_id: Uuid,
+        target_request_id: Uuid,
+        user_id: Uuid,
+    ) -> anyhow::Result<bool> {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM f_i_seat_swap_confirmations
+            WHERE match_id = $1
+              AND request_id = $2
+              AND target_request_id = $3
+              AND confirmed_by_user_id = $4
+            "#,
+        )
+        .bind(match_id)
+        .bind(request_id)
+        .bind(target_request_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
+    async fn mark_matched(
+        &self,
+        request_id: Uuid,
+        target_request_id: Uuid,
+    ) -> anyhow::Result<bool> {
         let mut tx = self.pool.begin().await?;
+        let locked_statuses = sqlx::query(
+            r#"
+            SELECT id, status
+            FROM f_i_seat_swap_requests
+            WHERE id IN ($1, $2)
+            FOR UPDATE
+            "#,
+        )
+        .bind(request_id)
+        .bind(target_request_id)
+        .fetch_all(&mut *tx)
+        .await?;
+
+        if locked_statuses.len() != 2
+            || locked_statuses
+                .iter()
+                .any(|row| row.get::<String, _>("status") != "active")
+        {
+            tx.rollback().await?;
+            return Ok(false);
+        }
+
         sqlx::query(
             r#"
             UPDATE f_i_seat_swap_requests
@@ -390,10 +509,29 @@ impl SeatSwapRepository for PostgresSeatSwapRepository {
         )
         .bind(target_request_id)
         .bind(request_id)
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query(
+            r#"
+            DELETE FROM f_i_seat_swap_confirmations
+            WHERE match_id = (
+                SELECT match_id
+                FROM f_i_seat_swap_requests
+                WHERE id = $1
+                LIMIT 1
+            )
+              AND (
+                  request_id IN ($1, $2)
+                  OR target_request_id IN ($1, $2)
+              )
+            "#,
+        )
+        .bind(request_id)
+        .bind(target_request_id)
         .execute(&mut *tx)
         .await?;
         tx.commit().await?;
-        Ok(())
+        Ok(true)
     }
 
     async fn update_status(
@@ -483,6 +621,7 @@ impl PostgresSeatSwapRepository {
             user: SeatSwapUser {
                 user_id: row.get("user_id"),
                 display_name: row.get("display_name"),
+                avatar_url: row.get("avatar_url"),
             },
             current_region_key: row.get("current_region_key"),
             current_region_name: row.get("current_region_name"),
@@ -492,6 +631,7 @@ impl PostgresSeatSwapRepository {
             contact: SeatSwapContact::new(wechat_id, phone_number).map_err(|error| {
                 anyhow::anyhow!("invalid seat swap contact in database: {error:?}")
             })?,
+            seat_swap_notice_enabled: row.get("seat_swap_notice_enabled"),
             status: SeatSwapRequestStatus::try_from(status.as_str()).map_err(|error| {
                 anyhow::anyhow!("invalid seat swap status in database: {error:?}")
             })?,

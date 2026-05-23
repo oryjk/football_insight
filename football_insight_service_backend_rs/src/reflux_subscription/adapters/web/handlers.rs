@@ -21,7 +21,10 @@ use crate::{
             },
             get_reflux_subscription_plans::GetRefluxSubscriptionPlansUseCase,
         },
-        domain::subscription::{is_valid_notification_email, subscription_matches_current_match},
+        domain::subscription::{
+            RefluxSubscriptionError, is_valid_notification_email,
+            subscription_matches_current_match,
+        },
         ports::reflux_subscription_repository::RefluxSubscriptionRepository,
     },
 };
@@ -170,15 +173,37 @@ fn authenticate_user(
 }
 
 fn map_reflux_subscription_error(error: anyhow::Error) -> (StatusCode, String) {
-    let message = error.to_string();
-    if message.contains("邮箱")
-        || message.contains("套餐")
-        || message.contains("比赛")
-        || message.contains("绑定微信")
-    {
-        return (StatusCode::BAD_REQUEST, message);
+    if let Some(reflux_error) = error.downcast_ref::<RefluxSubscriptionError>() {
+        return (StatusCode::BAD_REQUEST, reflux_error.to_string());
     }
 
+    let message = error.to_string();
     tracing::error!(error = %message, "reflux subscription request failed");
     (StatusCode::INTERNAL_SERVER_ERROR, message)
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::anyhow;
+    use axum::http::StatusCode;
+
+    use super::map_reflux_subscription_error;
+    use crate::reflux_subscription::domain::subscription::RefluxSubscriptionError;
+
+    #[test]
+    fn maps_typed_reflux_validation_errors_to_bad_request() {
+        let (status, message) =
+            map_reflux_subscription_error(RefluxSubscriptionError::InvalidPlan.into());
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(message, "请选择有效的提醒套餐");
+    }
+
+    #[test]
+    fn keeps_unknown_reflux_errors_as_internal_server_error() {
+        let (status, message) = map_reflux_subscription_error(anyhow!("smtp unavailable"));
+
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(message, "smtp unavailable");
+    }
 }

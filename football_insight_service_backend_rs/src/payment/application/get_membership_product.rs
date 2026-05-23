@@ -39,11 +39,10 @@ mod tests {
 
     #[tokio::test]
     async fn execute_returns_v6_to_v9_membership_products_by_default() {
-        let use_case = GetMembershipProductUseCase::new(std::sync::Arc::new(
-            FakeSystemConfigPort {
+        let use_case =
+            GetMembershipProductUseCase::new(std::sync::Arc::new(FakeSystemConfigPort {
                 value: Mutex::new(None),
-            },
-        ));
+            }));
 
         let catalog = use_case.execute().await.expect("catalog");
 

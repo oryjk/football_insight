@@ -49,9 +49,8 @@ impl CreateMembershipOrderUseCase {
             .await?
             .unwrap_or_else(|| "V1".to_string());
 
-        let is_v9_renewal =
-            current_tier.trim().eq_ignore_ascii_case("V9")
-                && input.target_tier.trim().eq_ignore_ascii_case("V9");
+        let is_v9_renewal = current_tier.trim().eq_ignore_ascii_case("V9")
+            && input.target_tier.trim().eq_ignore_ascii_case("V9");
         if !is_v9_renewal
             && membership_tier_rank(&input.target_tier) <= membership_tier_rank(&current_tier)
         {
@@ -154,6 +153,13 @@ mod tests {
             _tier: &str,
         ) -> anyhow::Result<()> {
             unreachable!()
+        }
+
+        async fn is_seat_swap_notice_enabled(
+            &self,
+            _user_id: Uuid,
+        ) -> anyhow::Result<Option<bool>> {
+            Ok(Some(false))
         }
     }
 

@@ -7,7 +7,7 @@ use crate::seat_swap::{
         get_current_seat_swap::{SeatSwapCandidateView, SeatSwapCurrentView, SeatSwapRequestView},
         upsert_my_seat_swap_request::{UpsertDesiredSeatInput, UpsertMySeatSwapRequestInput},
     },
-    domain::{SeatSwapContact, SeatSwapCurrentMatch, SeatSwapDesiredSeat},
+    domain::{SeatSwapContact, SeatSwapCurrentMatch, SeatSwapDesiredSeat, SeatSwapError},
     ports::evidence_storage_port::SeatSwapEvidenceUpload,
 };
 
@@ -32,6 +32,7 @@ pub struct SeatSwapRequestDto {
     pub request_id: Uuid,
     pub user_id: Uuid,
     pub display_name: String,
+    pub avatar_url: Option<String>,
     pub current_region_key: String,
     pub current_region_name: String,
     pub current_row: String,
@@ -40,6 +41,7 @@ pub struct SeatSwapRequestDto {
     pub contact: Option<SeatSwapContactDto>,
     pub status: String,
     pub created_at: String,
+    pub seat_swap_notice_enabled: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -47,6 +49,7 @@ pub struct SeatSwapCandidateDto {
     pub request_id: Uuid,
     pub user_id: Uuid,
     pub display_name: String,
+    pub avatar_url: Option<String>,
     pub current_region_key: String,
     pub current_region_name: String,
     pub current_row: String,
@@ -79,6 +82,8 @@ pub struct UpsertSeatSwapRequestDto {
     pub current_seat_no: String,
     pub wechat_id: Option<String>,
     pub phone_number: Option<String>,
+    pub seat_swap_notice_enabled: Option<bool>,
+    pub mini_program_notice_enabled: Option<bool>,
     pub desired_seats: Vec<SeatSwapDesiredSeatDto>,
 }
 
@@ -118,6 +123,7 @@ impl From<SeatSwapRequestView> for SeatSwapRequestDto {
             request_id: value.request_id,
             user_id: value.user_id,
             display_name: value.display_name,
+            avatar_url: value.avatar_url,
             current_region_key: value.current_region_key,
             current_region_name: value.current_region_name,
             current_row: value.current_row,
@@ -126,6 +132,7 @@ impl From<SeatSwapRequestView> for SeatSwapRequestDto {
             contact: value.contact.map(Into::into),
             status: value.status,
             created_at: value.created_at,
+            seat_swap_notice_enabled: value.seat_swap_notice_enabled,
         }
     }
 }
@@ -136,6 +143,7 @@ impl From<SeatSwapCandidateView> for SeatSwapCandidateDto {
             request_id: value.request_id,
             user_id: value.user_id,
             display_name: value.display_name,
+            avatar_url: value.avatar_url,
             current_region_key: value.current_region_key,
             current_region_name: value.current_region_name,
             current_row: value.current_row,
@@ -177,6 +185,10 @@ impl From<UpsertSeatSwapRequestDto> for UpsertMySeatSwapRequestInput {
             current_seat_no: value.current_seat_no,
             wechat_id: value.wechat_id,
             phone_number: value.phone_number,
+            mini_program_notice_enabled: value
+                .seat_swap_notice_enabled
+                .or(value.mini_program_notice_enabled)
+                .unwrap_or(false),
             desired_seats: value
                 .desired_seats
                 .into_iter()
@@ -192,12 +204,15 @@ impl From<UpsertSeatSwapRequestDto> for UpsertMySeatSwapRequestInput {
 }
 
 impl CancelMatchedSeatSwapRequestDto {
-    pub fn into_input(self, target_request_id: Uuid) -> anyhow::Result<CancelMatchedSeatSwapInput> {
+    pub fn into_input(
+        self,
+        target_request_id: Uuid,
+    ) -> Result<CancelMatchedSeatSwapInput, SeatSwapError> {
         let bytes = base64::Engine::decode(
             &base64::engine::general_purpose::STANDARD,
             self.evidence_base64,
         )
-        .map_err(|_| anyhow::anyhow!("截图数据无效"))?;
+        .map_err(|_| SeatSwapError::InvalidCancelEvidence)?;
         Ok(CancelMatchedSeatSwapInput {
             target_request_id,
             reason: self.reason,
@@ -207,5 +222,56 @@ impl CancelMatchedSeatSwapRequestDto {
                 bytes,
             },
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::UpsertSeatSwapRequestDto;
+    use crate::seat_swap::application::upsert_my_seat_swap_request::UpsertMySeatSwapRequestInput;
+
+    #[test]
+    fn prefers_canonical_notice_field_when_deserializing() {
+        let dto: UpsertSeatSwapRequestDto = serde_json::from_value(json!({
+            "current_region_key": "A",
+            "current_region_name": "A区",
+            "current_row": "8",
+            "current_seat_no": "15",
+            "seat_swap_notice_enabled": true,
+            "mini_program_notice_enabled": false,
+            "desired_seats": [
+                {
+                    "region_key": "B",
+                    "region_name": "B区"
+                }
+            ]
+        }))
+        .expect("deserialize dto");
+
+        let input: UpsertMySeatSwapRequestInput = dto.into();
+        assert!(input.mini_program_notice_enabled);
+    }
+
+    #[test]
+    fn keeps_legacy_notice_field_compatible_when_deserializing() {
+        let dto: UpsertSeatSwapRequestDto = serde_json::from_value(json!({
+            "current_region_key": "A",
+            "current_region_name": "A区",
+            "current_row": "8",
+            "current_seat_no": "15",
+            "mini_program_notice_enabled": true,
+            "desired_seats": [
+                {
+                    "region_key": "B",
+                    "region_name": "B区"
+                }
+            ]
+        }))
+        .expect("deserialize dto");
+
+        let input: UpsertMySeatSwapRequestInput = dto.into();
+        assert!(input.mini_program_notice_enabled);
     }
 }

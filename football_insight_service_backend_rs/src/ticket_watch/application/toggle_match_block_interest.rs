@@ -133,12 +133,15 @@ mod tests {
 
         async fn fetch_yukun_current_match(
             &self,
-        ) -> anyhow::Result<crate::ticket_watch::domain::ticket_watch::TicketWatchCurrentMatchView> {
-            Ok(crate::ticket_watch::domain::ticket_watch::TicketWatchCurrentMatchView {
-                current_match: None,
-                group_ticket_active: false,
-                message: "".to_string(),
-            })
+        ) -> anyhow::Result<crate::ticket_watch::domain::ticket_watch::TicketWatchCurrentMatchView>
+        {
+            Ok(
+                crate::ticket_watch::domain::ticket_watch::TicketWatchCurrentMatchView {
+                    current_match: None,
+                    group_ticket_active: false,
+                    message: "".to_string(),
+                },
+            )
         }
 
         async fn fetch_yukun_reflux(

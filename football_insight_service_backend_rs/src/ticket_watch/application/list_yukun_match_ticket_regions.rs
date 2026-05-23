@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use crate::ticket_watch::{
-    domain::ticket_watch::TicketWatchRegion,
-    ports::ticket_monitor_port::TicketMonitorPort,
+    domain::ticket_watch::TicketWatchRegion, ports::ticket_monitor_port::TicketMonitorPort,
 };
 
 pub struct ListYukunMatchTicketRegionsUseCase {

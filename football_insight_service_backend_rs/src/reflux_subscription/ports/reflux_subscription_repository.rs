@@ -43,16 +43,17 @@ pub trait RefluxSubscriptionRepository: Send + Sync {
         &self,
         user_id: Uuid,
     ) -> anyhow::Result<Vec<UserRefluxSubscription>>;
-    async fn get_user_email_target(&self, user_id: Uuid) -> anyhow::Result<Option<NotificationTarget>>;
+    async fn get_user_email_target(
+        &self,
+        user_id: Uuid,
+    ) -> anyhow::Result<Option<NotificationTarget>>;
     async fn upsert_user_email_target(
         &self,
         user_id: Uuid,
         email: &str,
     ) -> anyhow::Result<NotificationTarget>;
-    async fn create_subscription(
-        &self,
-        input: CreateRefluxSubscriptionInput,
-    ) -> anyhow::Result<()>;
+    async fn create_subscription(&self, input: CreateRefluxSubscriptionInput)
+    -> anyhow::Result<()>;
     async fn create_notification_job(
         &self,
         input: CreateNotificationJobInput,

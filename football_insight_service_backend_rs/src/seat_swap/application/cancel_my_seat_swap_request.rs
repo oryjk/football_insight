@@ -3,7 +3,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::seat_swap::{
-    domain::SeatSwapRequestStatus,
+    domain::{SeatSwapError, SeatSwapRequestStatus},
     ports::{
         current_match_port::CurrentSeatSwapMatchPort, seat_swap_repository::SeatSwapRepository,
     },
@@ -25,9 +25,9 @@ impl CancelMySeatSwapRequestUseCase {
         }
     }
 
-    pub async fn execute(&self, user_id: Uuid) -> anyhow::Result<()> {
+    pub async fn execute(&self, user_id: Uuid) -> Result<(), SeatSwapError> {
         let Some(current_match) = self.current_match_port.current_match().await? else {
-            anyhow::bail!("当前暂无可换座比赛");
+            return Err(SeatSwapError::NoCurrentMatch);
         };
         let request = self
             .repository
@@ -38,7 +38,7 @@ impl CancelMySeatSwapRequestUseCase {
             .as_ref()
             .is_some_and(|request| request.status == SeatSwapRequestStatus::Matched)
         {
-            anyhow::bail!("已正式匹配的换座需要提交撤销说明和截图");
+            return Err(SeatSwapError::MatchedRequestNeedsEvidenceCancellation);
         }
 
         self.repository
@@ -57,7 +57,9 @@ mod tests {
 
     use super::*;
     use crate::seat_swap::{
-        domain::{SeatSwapContact, SeatSwapCurrentMatch, SeatSwapRequest, SeatSwapUser},
+        domain::{
+            SeatSwapContact, SeatSwapCurrentMatch, SeatSwapError, SeatSwapRequest, SeatSwapUser,
+        },
         ports::{
             current_match_port::CurrentSeatSwapMatchPort,
             seat_swap_repository::{SeatSwapConfirmation, SeatSwapRepository},
@@ -137,6 +139,7 @@ mod tests {
             user: SeatSwapUser {
                 user_id: USER_ID,
                 display_name: "测试用户".to_string(),
+                avatar_url: None,
             },
             current_region_key: "A".to_string(),
             current_region_name: "A区".to_string(),
@@ -144,6 +147,7 @@ mod tests {
             current_seat_no: "15".to_string(),
             desired_seats: vec![],
             contact: SeatSwapContact::new(Some("wx".to_string()), None).expect("contact"),
+            seat_swap_notice_enabled: false,
             status: SeatSwapRequestStatus::Matched,
             matched_request_id: Some(Uuid::from_u128(0xcccccccccccccccccccccccccccccccc)),
             created_at: Utc.with_ymd_and_hms(2026, 5, 18, 12, 0, 0).unwrap(),
@@ -165,7 +169,10 @@ mod tests {
             .await
             .expect_err("matched request should require evidence cancellation");
 
-        assert!(error.to_string().contains("撤销说明和截图"));
+        assert!(matches!(
+            error,
+            SeatSwapError::MatchedRequestNeedsEvidenceCancellation
+        ));
         assert_eq!(*repository.cancel_calls.lock().expect("cancel calls"), 0);
     }
 }

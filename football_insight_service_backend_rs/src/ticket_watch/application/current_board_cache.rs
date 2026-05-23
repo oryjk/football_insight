@@ -29,8 +29,7 @@ struct CacheEntry<T> {
 pub struct CurrentTicketWatchBoardCache {
     ttl: Duration,
     public_data: Arc<RwLock<Option<CacheEntry<CurrentBoardPublicData>>>>,
-    tracked_interests:
-        Arc<RwLock<HashMap<String, CacheEntry<Vec<TicketWatchTrackedInterest>>>>>,
+    tracked_interests: Arc<RwLock<HashMap<String, CacheEntry<Vec<TicketWatchTrackedInterest>>>>>,
 }
 
 impl CurrentTicketWatchBoardCache {
@@ -97,4 +96,3 @@ impl CurrentTicketWatchBoardCache {
 fn build_tracked_interest_cache_key(match_id: i64, user_id: Uuid) -> String {
     format!("{match_id}:{user_id}")
 }
-

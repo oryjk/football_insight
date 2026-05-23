@@ -12,8 +12,8 @@ use crate::{
     },
     reflux_subscription::{
         domain::subscription::{
-            RefluxSubscriptionPlan, RefluxSubscriptionScope, is_valid_notification_email,
-            normalize_team_code,
+            RefluxSubscriptionError, RefluxSubscriptionPlan, RefluxSubscriptionScope,
+            is_valid_notification_email, normalize_team_code,
         },
         ports::reflux_subscription_repository::RefluxSubscriptionRepository,
     },
@@ -47,7 +47,7 @@ impl CreateRefluxSubscriptionOrderUseCase {
     ) -> anyhow::Result<CreateRefluxSubscriptionOrderOutput> {
         let email = input.email.trim();
         if !is_valid_notification_email(email) {
-            anyhow::bail!("请输入有效的邮箱地址");
+            return Err(RefluxSubscriptionError::InvalidNotificationEmail.into());
         }
 
         let team_code = normalize_team_code(&input.team_code);
@@ -55,7 +55,7 @@ impl CreateRefluxSubscriptionOrderUseCase {
             .repository
             .find_enabled_plan(&team_code, &input.plan_code)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("请选择有效的提醒套餐"))?;
+            .ok_or(RefluxSubscriptionError::InvalidPlan)?;
 
         validate_match_binding(&plan, input.match_id)?;
 
@@ -63,7 +63,7 @@ impl CreateRefluxSubscriptionOrderUseCase {
             .user_membership_port
             .get_user_open_id(input.user_id)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("请先绑定微信"))?;
+            .ok_or(RefluxSubscriptionError::WechatBindingRequired)?;
 
         self.repository
             .upsert_user_email_target(input.user_id, email)
@@ -95,9 +95,12 @@ impl CreateRefluxSubscriptionOrderUseCase {
     }
 }
 
-fn validate_match_binding(plan: &RefluxSubscriptionPlan, match_id: Option<i64>) -> anyhow::Result<()> {
+fn validate_match_binding(
+    plan: &RefluxSubscriptionPlan,
+    match_id: Option<i64>,
+) -> anyhow::Result<()> {
     if plan.scope == RefluxSubscriptionScope::SingleMatch && match_id.is_none() {
-        anyhow::bail!("单场订阅需要选择比赛");
+        return Err(RefluxSubscriptionError::MatchRequiredForSingleMatchPlan.into());
     }
 
     Ok(())
@@ -245,6 +248,13 @@ mod tests {
         ) -> anyhow::Result<()> {
             unreachable!()
         }
+
+        async fn is_seat_swap_notice_enabled(
+            &self,
+            _user_id: Uuid,
+        ) -> anyhow::Result<Option<bool>> {
+            Ok(Some(false))
+        }
     }
 
     #[derive(Default)]
@@ -358,7 +368,11 @@ mod tests {
 
         assert!(!output.order_no.is_empty());
         assert_eq!(
-            repository.saved_emails.lock().expect("saved emails").as_slice(),
+            repository
+                .saved_emails
+                .lock()
+                .expect("saved emails")
+                .as_slice(),
             ["user@example.com"]
         );
         let created_orders = order_repository

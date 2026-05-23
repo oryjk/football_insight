@@ -59,6 +59,62 @@ pub enum SeatSwapValidationError {
     InvalidStatus,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum SeatSwapError {
+    #[error("当前暂无可换座比赛")]
+    NoCurrentMatch,
+    #[error("已正式匹配的换座不能更新，请先按撤销流程处理")]
+    MatchedRequestCannotUpdate,
+    #[error("已正式匹配的换座需要提交撤销说明和截图")]
+    MatchedRequestNeedsEvidenceCancellation,
+    #[error("对方已经匹配成功，不能再确认")]
+    TargetAlreadyMatched,
+    #[error("换座对象已撤销，不能再确认")]
+    TargetAlreadyCancelled,
+    #[error("被别人抢先了，请刷新后重新匹配")]
+    MatchAlreadyTaken,
+    #[error("请选择有效的当前分区")]
+    InvalidCurrentRegion,
+    #[error("请输入当前排号")]
+    CurrentRowRequired,
+    #[error("请输入当前座号")]
+    CurrentSeatNoRequired,
+    #[error("请至少选择一个想换到的分区")]
+    DesiredSeatRequired,
+    #[error("请选择有效的目标分区")]
+    InvalidDesiredRegion,
+    #[error("请至少填写微信号或手机号")]
+    ContactRequired,
+    #[error("请输入 11 位手机号")]
+    InvalidPhoneNumber,
+    #[error("请先发布我的换座请求")]
+    MyRequestRequired,
+    #[error("换座对象不存在")]
+    TargetRequestNotFound,
+    #[error("只能确认当前比赛的换座对象")]
+    ConfirmTargetNotCurrentMatch,
+    #[error("当前没有待取消的匹配确认")]
+    ConfirmationNotFound,
+    #[error("请填写撤销说明")]
+    CancelReasonRequired,
+    #[error("请上传双方达成一致的截图")]
+    CancelEvidenceRequired,
+    #[error("截图数据无效")]
+    InvalidCancelEvidence,
+    #[error("换座请求不存在")]
+    RequestNotFound,
+    #[error("只能撤销已正式匹配的换座")]
+    CanOnlyCancelMatchedRequest,
+    #[error(transparent)]
+    Internal(#[from] anyhow::Error),
+}
+
+impl SeatSwapError {
+    pub fn is_bad_request(&self) -> bool {
+        !matches!(self, Self::Internal(_))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SeatSwapDesiredSeat {
     pub region_key: String,
@@ -102,6 +158,7 @@ impl SeatSwapContact {
 pub struct SeatSwapUser {
     pub user_id: Uuid,
     pub display_name: String,
+    pub avatar_url: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -115,6 +172,7 @@ pub struct SeatSwapRequest {
     pub current_seat_no: String,
     pub desired_seats: Vec<SeatSwapDesiredSeat>,
     pub contact: SeatSwapContact,
+    pub seat_swap_notice_enabled: bool,
     pub status: SeatSwapRequestStatus,
     pub matched_request_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
@@ -172,6 +230,7 @@ mod tests {
             user: SeatSwapUser {
                 user_id: Uuid::new_v4(),
                 display_name: "测试用户".to_string(),
+                avatar_url: Some("https://img.example.com/avatar.png".to_string()),
             },
             current_region_key: region_key.to_string(),
             current_region_name: format!("{region_key}区"),
@@ -187,6 +246,7 @@ mod tests {
                 })
                 .collect(),
             contact: SeatSwapContact::new(Some("wechat".to_string()), None).expect("contact"),
+            seat_swap_notice_enabled: false,
             status: SeatSwapRequestStatus::Active,
             matched_request_id: None,
             created_at: Utc.with_ymd_and_hms(2026, 5, 18, 12, 0, 0).unwrap(),

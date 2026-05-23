@@ -1,5 +1,17 @@
 use chrono::{DateTime, Utc};
 
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum RefluxSubscriptionError {
+    #[error("请输入有效的邮箱地址")]
+    InvalidNotificationEmail,
+    #[error("请选择有效的提醒套餐")]
+    InvalidPlan,
+    #[error("请先绑定微信")]
+    WechatBindingRequired,
+    #[error("单场订阅需要选择比赛")]
+    MatchRequiredForSingleMatchPlan,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RefluxSubscriptionScope {
     SingleMatch,
@@ -128,7 +140,10 @@ pub fn subscription_matches_current_match(
         return false;
     }
 
-    if subscription.expires_at.is_some_and(|expires_at| expires_at <= now) {
+    if subscription
+        .expires_at
+        .is_some_and(|expires_at| expires_at <= now)
+    {
         return false;
     }
 
@@ -174,14 +189,21 @@ mod tests {
         subscription_matches_current_match,
     };
 
-    fn plan(code: &str, team_code: &str, price_cents: i32, sort_order: i32) -> RefluxSubscriptionPlan {
+    fn plan(
+        code: &str,
+        team_code: &str,
+        price_cents: i32,
+        sort_order: i32,
+    ) -> RefluxSubscriptionPlan {
         super::tests_support::test_plan(code, team_code, price_cents, sort_order)
     }
 
     #[test]
     fn validates_notification_email_format() {
         assert!(is_valid_notification_email("user@example.com"));
-        assert!(is_valid_notification_email(" user.name+tag@football.example.cn "));
+        assert!(is_valid_notification_email(
+            " user.name+tag@football.example.cn "
+        ));
         assert!(!is_valid_notification_email("invalid"));
         assert!(!is_valid_notification_email("@example.com"));
         assert!(!is_valid_notification_email("user@"));
@@ -203,9 +225,16 @@ mod tests {
         assert_eq!(
             plans
                 .iter()
-                .map(|plan| (plan.code.as_str(), plan.team_code.as_str(), plan.price_cents))
+                .map(|plan| (
+                    plan.code.as_str(),
+                    plan.team_code.as_str(),
+                    plan.price_cents
+                ))
                 .collect::<Vec<_>>(),
-            vec![("single_match", "chengdu", 600), ("season_2026", "global", 5000)]
+            vec![
+                ("single_match", "chengdu", 600),
+                ("season_2026", "global", 5000)
+            ]
         );
     }
 
@@ -222,9 +251,27 @@ mod tests {
             expires_at: None,
         };
 
-        assert!(subscription_matches_current_match(&subscription, "chengdu", 2026, 571, now));
-        assert!(!subscription_matches_current_match(&subscription, "chengdu", 2026, 572, now));
-        assert!(!subscription_matches_current_match(&subscription, "yunnanyukun", 2026, 571, now));
+        assert!(subscription_matches_current_match(
+            &subscription,
+            "chengdu",
+            2026,
+            571,
+            now
+        ));
+        assert!(!subscription_matches_current_match(
+            &subscription,
+            "chengdu",
+            2026,
+            572,
+            now
+        ));
+        assert!(!subscription_matches_current_match(
+            &subscription,
+            "yunnanyukun",
+            2026,
+            571,
+            now
+        ));
     }
 
     #[test]
@@ -240,8 +287,20 @@ mod tests {
             expires_at: Some(now + chrono::Duration::days(30)),
         };
 
-        assert!(subscription_matches_current_match(&subscription, "chengdu", 2026, 571, now));
-        assert!(!subscription_matches_current_match(&subscription, "chengdu", 2027, 571, now));
+        assert!(subscription_matches_current_match(
+            &subscription,
+            "chengdu",
+            2026,
+            571,
+            now
+        ));
+        assert!(!subscription_matches_current_match(
+            &subscription,
+            "chengdu",
+            2027,
+            571,
+            now
+        ));
         assert!(!subscription_matches_current_match(
             &subscription,
             "chengdu",

@@ -329,8 +329,14 @@ mod tests {
 
         let parsed = parse_xml(xml);
 
-        assert_eq!(parsed.get("return_code").map(String::as_str), Some("SUCCESS"));
-        assert_eq!(parsed.get("result_code").map(String::as_str), Some("SUCCESS"));
+        assert_eq!(
+            parsed.get("return_code").map(String::as_str),
+            Some("SUCCESS")
+        );
+        assert_eq!(
+            parsed.get("result_code").map(String::as_str),
+            Some("SUCCESS")
+        );
         assert_eq!(parsed.get("prepay_id").map(String::as_str), Some("wx123"));
     }
 

@@ -105,7 +105,12 @@ pub async fn get_round_matches_handler(
         .await
         .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
     let dto: MatchListResponseDto = matches.into();
-    tracing::info!(season, round_number, match_count = dto.matches.len(), "轮次比赛列表查询完成");
+    tracing::info!(
+        season,
+        round_number,
+        match_count = dto.matches.len(),
+        "轮次比赛列表查询完成"
+    );
     Ok(Json(dto))
 }
 
@@ -129,6 +134,10 @@ pub async fn get_overview_handler(
         .await
         .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
     let dto: InsightOverviewResponseDto = overview.into();
-    tracing::info!(recent_match_count = dto.recent_matches.len(), standing_count = dto.standings_top.len(), "概览数据查询完成");
+    tracing::info!(
+        recent_match_count = dto.recent_matches.len(),
+        standing_count = dto.standings_top.len(),
+        "概览数据查询完成"
+    );
     Ok(Json(dto))
 }

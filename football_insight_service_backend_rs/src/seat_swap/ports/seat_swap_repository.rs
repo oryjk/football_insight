@@ -20,6 +20,7 @@ pub struct UpsertSeatSwapRequestInput {
     pub current_seat_no: String,
     pub wechat_id: Option<String>,
     pub phone_number: Option<String>,
+    pub mini_program_notice_enabled: bool,
     pub desired_seats: Vec<SeatSwapDesiredSeat>,
 }
 
@@ -58,6 +59,28 @@ pub trait SeatSwapRepository: Send + Sync {
         request_id: Uuid,
     ) -> anyhow::Result<Option<SeatSwapConfirmation>>;
 
+    async fn list_confirmations_by_request(
+        &self,
+        match_id: i64,
+        request_id: Uuid,
+    ) -> anyhow::Result<Vec<SeatSwapConfirmation>> {
+        Ok(self
+            .find_confirmation(match_id, request_id)
+            .await?
+            .into_iter()
+            .collect())
+    }
+
+    async fn find_confirmation_between(
+        &self,
+        match_id: i64,
+        request_id: Uuid,
+        target_request_id: Uuid,
+    ) -> anyhow::Result<Option<SeatSwapConfirmation>> {
+        let confirmation = self.find_confirmation(match_id, request_id).await?;
+        Ok(confirmation.filter(|item| item.target_request_id == target_request_id))
+    }
+
     async fn upsert_request(
         &self,
         input: UpsertSeatSwapRequestInput,
@@ -86,7 +109,22 @@ pub trait SeatSwapRepository: Send + Sync {
         anyhow::bail!("seat swap repository confirmation is not implemented")
     }
 
-    async fn mark_matched(&self, request_id: Uuid, target_request_id: Uuid) -> anyhow::Result<()> {
+    async fn delete_confirmation(
+        &self,
+        match_id: i64,
+        request_id: Uuid,
+        target_request_id: Uuid,
+        user_id: Uuid,
+    ) -> anyhow::Result<bool> {
+        let _ = (match_id, request_id, target_request_id, user_id);
+        anyhow::bail!("seat swap repository confirmation delete is not implemented")
+    }
+
+    async fn mark_matched(
+        &self,
+        request_id: Uuid,
+        target_request_id: Uuid,
+    ) -> anyhow::Result<bool> {
         let _ = (request_id, target_request_id);
         anyhow::bail!("seat swap repository match update is not implemented")
     }

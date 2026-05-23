@@ -2,10 +2,13 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use crate::seat_swap::ports::{
-    current_match_port::CurrentSeatSwapMatchPort,
-    evidence_storage_port::{SeatSwapEvidenceStoragePort, SeatSwapEvidenceUpload},
-    seat_swap_repository::{MatchedCancellationInput, SeatSwapRepository},
+use crate::seat_swap::{
+    domain::SeatSwapError,
+    ports::{
+        current_match_port::CurrentSeatSwapMatchPort,
+        evidence_storage_port::{SeatSwapEvidenceStoragePort, SeatSwapEvidenceUpload},
+        seat_swap_repository::{MatchedCancellationInput, SeatSwapRepository},
+    },
 };
 
 pub struct CancelMatchedSeatSwapUseCase {
@@ -37,25 +40,25 @@ impl CancelMatchedSeatSwapUseCase {
         &self,
         user_id: Uuid,
         input: CancelMatchedSeatSwapInput,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), SeatSwapError> {
         let Some(current_match) = self.current_match_port.current_match().await? else {
-            anyhow::bail!("当前暂无可换座比赛");
+            return Err(SeatSwapError::NoCurrentMatch);
         };
         let reason = input.reason.trim().to_string();
         if reason.is_empty() {
-            anyhow::bail!("请填写撤销说明");
+            return Err(SeatSwapError::CancelReasonRequired);
         }
         if input.evidence.bytes.is_empty() {
-            anyhow::bail!("请上传双方达成一致的截图");
+            return Err(SeatSwapError::CancelEvidenceRequired);
         }
 
         let mine = self
             .repository
             .find_request_by_user(current_match.match_id, user_id)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("换座请求不存在"))?;
+            .ok_or(SeatSwapError::RequestNotFound)?;
         if mine.matched_request_id != Some(input.target_request_id) {
-            anyhow::bail!("只能撤销已正式匹配的换座");
+            return Err(SeatSwapError::CanOnlyCancelMatchedRequest);
         }
         let evidence = self
             .evidence_storage

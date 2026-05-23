@@ -217,7 +217,8 @@ impl PostgresAuthRepository {
             &current_effective_tier,
             &membership_tier_rules,
         );
-        if upgrade.should_upgrade && Self::is_referral_tier(&upgrade.next_tier, &membership_tier_rules)
+        if upgrade.should_upgrade
+            && Self::is_referral_tier(&upgrade.next_tier, &membership_tier_rules)
         {
             sqlx::query(
                 r#"
@@ -563,8 +564,7 @@ mod tests {
             MembershipTierRule::new("V4", "referral", Some(10), 60),
         ];
 
-        let upgrade =
-            PostgresAuthRepository::resolve_referral_membership_upgrade(10, "V3", &rules);
+        let upgrade = PostgresAuthRepository::resolve_referral_membership_upgrade(10, "V3", &rules);
 
         assert_eq!(upgrade.next_tier, "V4");
         assert!(upgrade.should_upgrade);
@@ -577,8 +577,7 @@ mod tests {
             MembershipTierRule::new("V4", "referral", Some(10), 60),
         ];
 
-        let upgrade =
-            PostgresAuthRepository::resolve_referral_membership_upgrade(11, "V4", &rules);
+        let upgrade = PostgresAuthRepository::resolve_referral_membership_upgrade(11, "V4", &rules);
 
         assert_eq!(upgrade.next_tier, "V4");
         assert!(!upgrade.should_upgrade);
@@ -1195,5 +1194,16 @@ impl crate::auth::ports::user_membership_port::UserMembershipPort for PostgresAu
         .await?;
 
         Ok(())
+    }
+
+    async fn is_seat_swap_notice_enabled(&self, user_id: Uuid) -> anyhow::Result<Option<bool>> {
+        let value = sqlx::query_scalar::<_, bool>(
+            "SELECT seat_swap_notice_enabled FROM f_i_users WHERE id = $1 LIMIT 1",
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(value)
     }
 }

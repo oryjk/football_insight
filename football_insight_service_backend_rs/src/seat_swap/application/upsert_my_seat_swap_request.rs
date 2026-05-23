@@ -3,7 +3,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::seat_swap::{
-    domain::{SeatSwapContact, SeatSwapDesiredSeat, SeatSwapRequestStatus},
+    domain::{SeatSwapContact, SeatSwapDesiredSeat, SeatSwapError, SeatSwapRequestStatus},
     ports::{
         current_match_port::CurrentSeatSwapMatchPort,
         seat_swap_repository::{SeatSwapRepository, UpsertSeatSwapRequestInput},
@@ -23,6 +23,7 @@ pub struct UpsertMySeatSwapRequestInput {
     pub current_seat_no: String,
     pub wechat_id: Option<String>,
     pub phone_number: Option<String>,
+    pub mini_program_notice_enabled: bool,
     pub desired_seats: Vec<UpsertDesiredSeatInput>,
 }
 
@@ -49,9 +50,9 @@ impl UpsertMySeatSwapRequestUseCase {
         &self,
         user_id: Uuid,
         input: UpsertMySeatSwapRequestInput,
-    ) -> anyhow::Result<crate::seat_swap::domain::SeatSwapRequest> {
+    ) -> Result<crate::seat_swap::domain::SeatSwapRequest, SeatSwapError> {
         let Some(current_match) = self.current_match_port.current_match().await? else {
-            anyhow::bail!("当前暂无可换座比赛");
+            return Err(SeatSwapError::NoCurrentMatch);
         };
 
         let existing_request = self
@@ -62,7 +63,7 @@ impl UpsertMySeatSwapRequestUseCase {
             .as_ref()
             .is_some_and(|request| request.status == SeatSwapRequestStatus::Matched)
         {
-            anyhow::bail!("已正式匹配的换座不能更新，请先按撤销流程处理");
+            return Err(SeatSwapError::MatchedRequestCannotUpdate);
         }
 
         let regions = self.current_match_port.current_regions().await?;
@@ -70,13 +71,19 @@ impl UpsertMySeatSwapRequestUseCase {
             |region_key: &str| regions.iter().any(|region| region.region_key == region_key);
 
         if !is_valid_region(&input.current_region_key) {
-            anyhow::bail!("请选择有效的当前分区");
+            return Err(SeatSwapError::InvalidCurrentRegion);
         }
 
-        let current_row = normalize_required(input.current_row, "请输入当前排号")?;
-        let current_seat_no = normalize_required(input.current_seat_no, "请输入当前座号")?;
+        let current_row = normalize_to_string(input.current_row);
+        let current_seat_no = normalize_to_string(input.current_seat_no);
+        if current_row.is_empty() {
+            return Err(SeatSwapError::CurrentRowRequired);
+        }
+        if current_seat_no.is_empty() {
+            return Err(SeatSwapError::CurrentSeatNoRequired);
+        }
         if input.desired_seats.is_empty() {
-            anyhow::bail!("请至少选择一个想换到的分区");
+            return Err(SeatSwapError::DesiredSeatRequired);
         }
 
         let desired_seats = input
@@ -84,7 +91,7 @@ impl UpsertMySeatSwapRequestUseCase {
             .into_iter()
             .map(|seat| {
                 if !is_valid_region(&seat.region_key) {
-                    anyhow::bail!("请选择有效的目标分区");
+                    return Err(SeatSwapError::InvalidDesiredRegion);
                 }
                 Ok(SeatSwapDesiredSeat {
                     region_key: seat.region_key,
@@ -93,10 +100,16 @@ impl UpsertMySeatSwapRequestUseCase {
                     desired_seat_no: normalize_optional(seat.desired_seat_no),
                 })
             })
-            .collect::<anyhow::Result<Vec<_>>>()?;
+            .collect::<Result<Vec<_>, SeatSwapError>>()?;
 
-        let contact = SeatSwapContact::new(input.wechat_id, input.phone_number)
-            .map_err(|_| anyhow::anyhow!("请至少填写微信号或手机号"))?;
+        let contact = SeatSwapContact::new(input.wechat_id, input.phone_number).map_err(
+            |error| match error {
+                crate::seat_swap::domain::SeatSwapValidationError::InvalidPhoneNumber => {
+                    SeatSwapError::InvalidPhoneNumber
+                }
+                _ => SeatSwapError::ContactRequired,
+            },
+        )?;
 
         self.repository
             .upsert_request(UpsertSeatSwapRequestInput {
@@ -108,18 +121,16 @@ impl UpsertMySeatSwapRequestUseCase {
                 current_seat_no,
                 wechat_id: contact.wechat_id,
                 phone_number: contact.phone_number,
+                mini_program_notice_enabled: input.mini_program_notice_enabled,
                 desired_seats,
             })
             .await
+            .map_err(SeatSwapError::from)
     }
 }
 
-fn normalize_required(value: String, message: &str) -> anyhow::Result<String> {
-    let value = value.trim().to_string();
-    if value.is_empty() {
-        anyhow::bail!(message.to_string());
-    }
-    Ok(value)
+fn normalize_to_string(value: String) -> String {
+    value.trim().to_string()
 }
 
 fn normalize_optional(value: Option<String>) -> Option<String> {
@@ -241,6 +252,7 @@ mod tests {
             current_seat_no: "15".to_string(),
             wechat_id: Some("wx".to_string()),
             phone_number: None,
+            mini_program_notice_enabled: false,
             desired_seats: vec![UpsertDesiredSeatInput {
                 region_key: "A".to_string(),
                 region_name: "A区".to_string(),
@@ -257,6 +269,7 @@ mod tests {
             user: SeatSwapUser {
                 user_id: USER_ID,
                 display_name: "测试用户".to_string(),
+                avatar_url: None,
             },
             current_region_key: "A".to_string(),
             current_region_name: "A区".to_string(),
@@ -264,6 +277,7 @@ mod tests {
             current_seat_no: "15".to_string(),
             desired_seats: vec![],
             contact: SeatSwapContact::new(Some("wx".to_string()), None).expect("contact"),
+            seat_swap_notice_enabled: false,
             status: SeatSwapRequestStatus::Matched,
             matched_request_id: Some(Uuid::from_u128(0xcccccccccccccccccccccccccccccccc)),
             created_at: Utc.with_ymd_and_hms(2026, 5, 18, 12, 0, 0).unwrap(),
@@ -278,7 +292,7 @@ mod tests {
             .await
             .expect_err("missing match should fail");
 
-        assert!(error.to_string().contains("当前暂无可换座比赛"));
+        assert!(matches!(error, SeatSwapError::NoCurrentMatch));
     }
 
     #[tokio::test]
@@ -297,7 +311,53 @@ mod tests {
         .await
         .expect_err("contact should fail");
 
-        assert!(error.to_string().contains("至少填写微信号或手机号"));
+        assert!(matches!(error, SeatSwapError::ContactRequired));
+    }
+
+    #[tokio::test]
+    async fn rejects_missing_current_row() {
+        let repository = StubRepository::default();
+        let use_case = use_case_with_repository(
+            repository,
+            Some(SeatSwapCurrentMatch {
+                match_id: 574,
+                home_team_name: "成都蓉城".to_string(),
+                away_team_name: "上海申花".to_string(),
+                kickoff_at: "2026-05-18T19:35:00+08:00".to_string(),
+            }),
+        );
+        let mut input = valid_input();
+        input.current_row = "   ".to_string();
+
+        let error = use_case
+            .execute(USER_ID, input)
+            .await
+            .expect_err("missing current row should fail");
+
+        assert!(matches!(error, SeatSwapError::CurrentRowRequired));
+    }
+
+    #[tokio::test]
+    async fn rejects_missing_current_seat_no() {
+        let repository = StubRepository::default();
+        let use_case = use_case_with_repository(
+            repository,
+            Some(SeatSwapCurrentMatch {
+                match_id: 574,
+                home_team_name: "成都蓉城".to_string(),
+                away_team_name: "上海申花".to_string(),
+                kickoff_at: "2026-05-18T19:35:00+08:00".to_string(),
+            }),
+        );
+        let mut input = valid_input();
+        input.current_seat_no = "".to_string();
+
+        let error = use_case
+            .execute(USER_ID, input)
+            .await
+            .expect_err("missing current seat no should fail");
+
+        assert!(matches!(error, SeatSwapError::CurrentSeatNoRequired));
     }
 
     #[tokio::test]
@@ -319,6 +379,6 @@ mod tests {
         .await
         .expect_err("matched request should not be updated");
 
-        assert!(error.to_string().contains("已正式匹配"));
+        assert!(matches!(error, SeatSwapError::MatchedRequestCannotUpdate));
     }
 }

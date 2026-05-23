@@ -379,10 +379,7 @@ fn map_yukun_current_match_view(
     }
 
     let has_match = payload.data.is_some();
-    let current_match = payload
-        .data
-        .map(map_yukun_match_summary)
-        .transpose()?;
+    let current_match = payload.data.map(map_yukun_match_summary).transpose()?;
 
     Ok(TicketWatchCurrentMatchView {
         current_match,
@@ -404,7 +401,10 @@ fn build_inventory_history_path(match_id: i64, since: Option<&str>) -> anyhow::R
         url.set_query(Some(&format!("since={encoded}")));
     }
 
-    Ok(url.as_str().trim_start_matches(DEFAULT_TICKET_MONITOR_BASE_URL).to_string())
+    Ok(url
+        .as_str()
+        .trim_start_matches(DEFAULT_TICKET_MONITOR_BASE_URL)
+        .to_string())
 }
 
 fn build_tracked_interest_path(match_id: i64, user_id: Uuid) -> anyhow::Result<String> {
@@ -414,7 +414,10 @@ fn build_tracked_interest_path(match_id: i64, user_id: Uuid) -> anyhow::Result<S
     let encoded = percent_encode(&user_id.to_string());
     url.set_query(Some(&format!("user_id={encoded}")));
 
-    Ok(url.as_str().trim_start_matches(DEFAULT_TICKET_MONITOR_BASE_URL).to_string())
+    Ok(url
+        .as_str()
+        .trim_start_matches(DEFAULT_TICKET_MONITOR_BASE_URL)
+        .to_string())
 }
 
 fn resolve_inventory_lookup_match_ids(match_id: i64, fallback_match_id: Option<i64>) -> Vec<i64> {
@@ -439,7 +442,10 @@ fn build_block_interest_path(
         url.set_query(Some(&format!("user_id={encoded}")));
     }
 
-    Ok(url.as_str().trim_start_matches(DEFAULT_TICKET_MONITOR_BASE_URL).to_string())
+    Ok(url
+        .as_str()
+        .trim_start_matches(DEFAULT_TICKET_MONITOR_BASE_URL)
+        .to_string())
 }
 
 fn build_toggle_block_interest_path(match_id: i64) -> String {
@@ -455,7 +461,10 @@ fn build_yukun_reflux_path(match_id: i64, since: Option<&str>) -> anyhow::Result
         url.set_query(Some(&format!("since={encoded}")));
     }
 
-    Ok(url.as_str().trim_start_matches(DEFAULT_TICKET_MONITOR_BASE_URL).to_string())
+    Ok(url
+        .as_str()
+        .trim_start_matches(DEFAULT_TICKET_MONITOR_BASE_URL)
+        .to_string())
 }
 
 fn percent_encode(value: &str) -> String {

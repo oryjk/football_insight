@@ -1,17 +1,6 @@
 <template>
   <view class="page-root">
-    <image class="page-bg-img" :src="bgImage" mode="aspectFill" />
-    <view class="page-bg-fade"></view>
     <view class="page">
-      <view class="hero-card">
-        <view>
-          <text class="eyebrow">Seat Swap</text>
-          <text class="hero-title">当前比赛换座</text>
-          <text class="hero-copy">只撮合成都蓉城当前比赛，双向匹配后再交换联系方式。</text>
-        </view>
-        <text class="hero-badge">{{ currentView?.available ? '开放中' : '待比赛' }}</text>
-      </view>
-
       <view v-if="loading" class="state-card">
         <text>正在加载换座池...</text>
       </view>
@@ -22,154 +11,295 @@
       </view>
 
       <template v-else>
-        <view class="panel match-panel">
-          <view class="section-heading">
-            <view>
-              <text class="section-kicker">当前比赛</text>
-              <text class="section-title">{{ matchTitle }}</text>
-            </view>
-            <text class="meta-pill">{{ currentView?.candidates.length || 0 }} 条意向</text>
+        <view class="hero-card">
+          <view class="hero-card__icon-box">
+            <text class="hero-card__icon-mark">↔</text>
           </view>
-          <text class="panel-copy">{{ matchCopy }}</text>
+          <view class="hero-card__body">
+            <text class="eyebrow">当前比赛 · 换座撮合</text>
+            <text class="hero-card__title">{{ matchTitle }}</text>
+            <text v-if="matchSummary" class="hero-card__summary">{{ matchSummary }}</text>
+          </view>
+          <text class="meta-pill">{{ candidatesCount }} 条意向</text>
         </view>
 
-        <view v-if="!isLoggedIn" class="panel login-panel">
-          <text class="section-title">登录后发布我的座位</text>
-          <text class="panel-copy">未登录可以浏览脱敏意向；发布、确认和查看联系方式需要登录。</text>
-          <button class="primary-action" @tap="goToUserPage">去登录</button>
+        <view v-if="!currentView?.available" class="info-row">
+          <text class="info-row__text">换座撮合只在成都蓉城当前比赛开放。</text>
+        </view>
+        <view v-else-if="!isLoggedIn" class="info-row info-row--login">
+          <text class="info-row__text">未登录可浏览脱敏意向;发布、确认和查看联系方式需要登录。</text>
+          <button class="info-row__action" @tap="goToUserPage">去登录</button>
         </view>
 
-        <view v-if="currentView?.available && isLoggedIn" class="panel form-panel">
-          <view class="section-heading">
-            <view>
-              <text class="section-kicker">我的请求</text>
-              <text class="section-title">{{ currentView.my_request ? '更新换座意向' : '发布换座意向' }}</text>
-            </view>
-            <text v-if="currentView.my_request" class="meta-pill">已发布</text>
-          </view>
-
-          <view class="field">
-            <text class="field-label">当前分区</text>
-            <picker :range="regionNames" :value="currentRegionIndex" @change="selectCurrentRegion">
-              <view class="picker-box">{{ form.current_region_name || '请选择当前分区' }}</view>
-            </picker>
-            <text v-if="formErrors.current_region_key" class="field-error">{{ formErrors.current_region_key }}</text>
-          </view>
-
-          <view class="field-row">
-            <view class="field field--half">
-              <text class="field-label">当前排</text>
-              <input v-model="form.current_row" class="input" placeholder="如 8" />
-              <text v-if="formErrors.current_row" class="field-error">{{ formErrors.current_row }}</text>
-            </view>
-            <view class="field field--half">
-              <text class="field-label">当前号</text>
-              <input v-model="form.current_seat_no" class="input" placeholder="如 15" />
-              <text v-if="formErrors.current_seat_no" class="field-error">{{ formErrors.current_seat_no }}</text>
-            </view>
-          </view>
-
-          <view class="field">
-            <view class="field-head">
-              <text class="field-label">想换到</text>
-              <button class="mini-action" @tap="addDesiredSeat">添加</button>
-            </view>
-            <view
-              v-for="(seat, index) in form.desired_seats"
-              :key="`desired-${index}`"
-              class="desired-row"
-            >
-              <picker :range="regionNames" :value="desiredRegionIndex(seat.region_key)" :data-index="index" @change="selectDesiredRegion">
-                <view class="picker-box picker-box--compact">{{ seat.region_name || '目标分区' }}</view>
-              </picker>
-              <input v-model="seat.desired_row" class="input input--short" placeholder="排(选填)" />
-              <input v-model="seat.desired_seat_no" class="input input--short" placeholder="号(选填)" />
-              <button class="icon-action" @tap="removeDesiredSeat(index)">×</button>
-            </view>
-            <text v-if="formErrors.desired_seats" class="field-error">{{ formErrors.desired_seats }}</text>
-          </view>
-
-          <view class="field-row">
-            <view class="field field--half">
-              <text class="field-label">微信号</text>
-              <input v-model="form.wechat_id" class="input" placeholder="至少填一项" />
-            </view>
-            <view class="field field--half">
-              <text class="field-label">手机号</text>
-              <input v-model="form.phone_number" class="input" type="number" placeholder="至少填一项" />
-            </view>
-          </view>
-          <text v-if="formErrors.contact" class="field-error">{{ formErrors.contact }}</text>
-          <text v-if="formErrors.phone_number" class="field-error">{{ formErrors.phone_number }}</text>
-
-          <view class="form-actions">
-            <button class="primary-action" :disabled="submitting" @tap="submitForm">
-              {{ submitting ? '提交中...' : '保存换座请求' }}
-            </button>
-            <button v-if="currentView.my_request?.status === 'active'" class="ghost-action" @tap="deleteRequest">撤销</button>
-          </view>
+        <view class="stadium-wrap">
+          <StadiumMap
+            :mode="mainMapMode"
+            :regions="regions"
+            :badges="regionBadgeCounts"
+            :filter-key="browsingFilterKey"
+            :current-key="currentView?.my_request?.current_region_key || ''"
+            :desired-keys="myDesiredKeys"
+            @region-tap="handleMainMapTap"
+          />
         </view>
 
-        <view v-if="currentView?.my_request?.status === 'matched'" class="panel cancel-panel">
-          <text class="section-title">已匹配成功</text>
-          <text class="panel-copy">如线下协商取消，需要填写说明并上传双方达成一致的截图。</text>
-          <textarea v-model="cancelReason" class="textarea" placeholder="撤销说明" />
-          <button class="ghost-action" @tap="chooseEvidence">选择截图</button>
-          <text v-if="evidenceFileName" class="evidence-name">{{ evidenceFileName }}</text>
-          <button class="danger-action" @tap="submitMatchedCancel">提交撤销申请</button>
-        </view>
-
-        <view class="panel">
-          <view class="section-heading">
-            <view>
-              <text class="section-kicker">换座池</text>
-              <text class="section-title">当前候选</text>
-            </view>
-            <text class="meta-pill">{{ currentView?.candidates.length || 0 }}</text>
-          </view>
-
-          <view v-if="!currentView?.candidates.length" class="empty-copy">
-            <text>当前还没有其他换座意向。</text>
-          </view>
-
-          <view
-            v-for="candidate in currentView?.candidates"
-            :key="candidate.request_id"
-            class="candidate-card"
-            :class="{ 'candidate-card--hot': candidate.status !== 'display_only' }"
-          >
-            <view class="candidate-card__head">
-              <view>
-                <text class="candidate-name">{{ candidate.display_name }}</text>
-                <text class="candidate-seat">{{ formatSeatLabel(candidate) }}</text>
+        <view class="legend">
+          <view class="legend__items">
+            <template v-if="currentView?.my_request">
+              <view class="legend__item">
+                <view class="legend__dot legend__dot--current"></view>
+                <text>我的当前</text>
               </view>
-              <text class="status-pill">{{ statusLabel(candidate.status) }}</text>
+              <view class="legend__item">
+                <view class="legend__dot legend__dot--desired"></view>
+                <text>我的目标</text>
+              </view>
+            </template>
+            <view v-else class="legend__item">
+              <view class="legend__dot legend__dot--hot"></view>
+              <text>有发布</text>
             </view>
-            <text class="candidate-wants">想换：{{ desiredSeatText(candidate.desired_seats) }}</text>
-
-            <view v-if="candidate.contact" class="contact-box">
-              <text v-if="candidate.contact.wechat_id">微信：{{ candidate.contact.wechat_id }}</text>
-              <text v-if="candidate.contact.phone_number">手机：{{ candidate.contact.phone_number }}</text>
-            </view>
-
-            <button
-              v-if="candidate.status !== 'display_only' && candidate.status !== 'matched' && isLoggedIn"
-              class="primary-action primary-action--small"
-              @tap="confirmCandidate(candidate.request_id)"
-            >
-              确认换座
-            </button>
           </view>
+          <text class="legend__hint">点分区可筛选</text>
         </view>
+
+        <view v-if="browsingFilterKey" class="filter-row">
+          <view class="filter-row__main">
+            <text class="filter-row__label">来自 {{ browsingFilterName || browsingFilterKey }}</text>
+            <text class="filter-row__count">{{ filteredCandidates.length }} 条</text>
+          </view>
+          <button class="filter-row__clear" @tap="clearFilter">✕ 清除</button>
+        </view>
+
+        <template v-if="!browsingFilterKey">
+          <view class="section-row">
+            <text class="section-row__title">换座池</text>
+            <text class="section-row__sub">共 {{ candidatesCount }} 条</text>
+          </view>
+
+          <view v-if="!seatSwapRegionGroups.length" class="empty-row">
+            <text>当前还没有换座意向。</text>
+          </view>
+
+          <template v-for="group in seatSwapRegionGroups" :key="group.region_key">
+            <view
+              class="group-row"
+              :class="{ 'group-row--open': isRegionGroupExpanded(group.region_key) }"
+              @tap="toggleRegionGroup(group.region_key)"
+            >
+              <view class="group-row__main">
+                <text class="group-row__name">{{ group.region_name }}</text>
+                <text class="group-row__count">{{ group.requests.length }} 条</text>
+                <text v-if="groupHasMyDesired(group)" class="group-row__hit">命中我的目标</text>
+              </view>
+              <text class="group-row__caret">{{ isRegionGroupExpanded(group.region_key) ? '收起' : '展开' }}</text>
+            </view>
+            <template v-if="isRegionGroupExpanded(group.region_key)">
+              <SeatSwapCandidateCard
+                v-for="candidate in group.requests"
+                :key="candidate.request_id"
+                :candidate="candidate"
+                :action="candidateAction(candidate)"
+                @confirm="confirmCandidate"
+                @cancel-confirmation="cancelCandidateConfirmation"
+              />
+            </template>
+          </template>
+        </template>
+
+        <template v-else>
+          <view v-if="!filteredCandidates.length" class="empty-row">
+            <text>该分区暂无换座意向。</text>
+          </view>
+          <SeatSwapCandidateCard
+            v-for="candidate in filteredCandidates"
+            :key="candidate.request_id"
+            :candidate="candidate"
+            :action="candidateAction(candidate)"
+            @confirm="confirmCandidate"
+            @cancel-confirmation="cancelCandidateConfirmation"
+          />
+        </template>
       </template>
     </view>
+
+    <view v-if="!loading && !errorMessage && currentView?.available" class="dock">
+      <button
+        v-if="!currentView?.my_request"
+        class="dock-cta"
+        @tap="handleDockCtaTap"
+      >
+        <text class="dock-cta__icon">+</text>
+        <text class="dock-cta__label">{{ isLoggedIn ? '发布我的换座' : '登录后发布' }}</text>
+      </button>
+      <view v-else class="dock-status" @tap="openManageSheet">
+        <view class="dock-status__head">
+          <view class="dock-status__label">
+            <view class="dock-status__dot"></view>
+            <text>{{ myRequestStatusLabel }}</text>
+          </view>
+          <text class="dock-status__manage">管理 ›</text>
+        </view>
+        <view class="dock-status__body">
+          <text class="dock-status__seat dock-status__seat--current">{{ formatSeatLabel(currentView.my_request) }}</text>
+          <text class="dock-status__arrow">→</text>
+          <text class="dock-status__seat dock-status__seat--desired">{{ myDesiredSummary }}</text>
+        </view>
+      </view>
+    </view>
+
+    <FiBottomSheet
+      v-model:visible="publishSheetVisible"
+      :eyebrow="publishSheetEyebrow"
+      :title="publishSheetTitle"
+    >
+      <view class="steps">
+        <view
+          v-for="item in selectionSteps"
+          :key="item.step"
+          class="steps__item"
+          :class="{
+            'steps__item--active': selectionStep === item.step,
+            'steps__item--done': item.index < selectionStepIndex,
+          }"
+          @tap="jumpToStep(item.step)"
+        >
+          <text>{{ item.index }} · {{ item.label }}</text>
+        </view>
+      </view>
+
+      <StadiumMap
+        :mode="sheetMapMode"
+        :regions="regions"
+        :staged-current-key="stagedCurrentRegionKey"
+        :staged-desired-keys="stagedDesiredKeys"
+        :current-key="form.current_region_key"
+        :desired-keys="confirmedDesiredKeys"
+        @region-tap="handleSheetMapTap"
+      />
+
+      <template v-if="selectionStep === 'select_current'">
+        <view class="selected-tags">
+          <text v-if="stagedCurrentRegionName" class="tag tag--current">已选 · {{ stagedCurrentRegionName }}</text>
+          <text v-else class="tag tag--empty">点选你现在的分区</text>
+        </view>
+        <view class="row-input">
+          <view class="row-input__field">
+            <text class="row-input__label">当前排</text>
+            <input v-model="form.current_row" class="input-box" placeholder="如 8" />
+            <text v-if="formErrors.current_row" class="field-error">{{ formErrors.current_row }}</text>
+          </view>
+          <view class="row-input__field">
+            <text class="row-input__label">当前号</text>
+            <input v-model="form.current_seat_no" class="input-box" placeholder="如 15" />
+            <text v-if="formErrors.current_seat_no" class="field-error">{{ formErrors.current_seat_no }}</text>
+          </view>
+        </view>
+        <text v-if="formErrors.current_region_key" class="field-error">{{ formErrors.current_region_key }}</text>
+      </template>
+
+      <template v-else-if="selectionStep === 'select_desired'">
+        <view class="selected-tags">
+          <text class="tag tag--current">当前 · {{ form.current_region_name }}</text>
+          <text
+            v-for="seat in stagedDesiredSeats"
+            :key="`tag-${seat.region_key}`"
+            class="tag tag--desired"
+          >
+            {{ seat.region_name }}
+          </text>
+          <text v-if="!stagedDesiredSeats.length" class="tag tag--empty">点选你想换到的分区(可多选)</text>
+        </view>
+        <view v-if="stagedDesiredSeats.length" class="desired-rows">
+          <view
+            v-for="seat in stagedDesiredSeats"
+            :key="`desired-${seat.region_key}`"
+            class="desired-rows__item"
+          >
+            <text class="desired-rows__name">{{ seat.region_name }}</text>
+            <input v-model="seat.desired_row" class="input-box input-box--short" placeholder="排" />
+            <input v-model="seat.desired_seat_no" class="input-box input-box--short" placeholder="号" />
+          </view>
+        </view>
+        <text v-if="formErrors.desired_seats" class="field-error">{{ formErrors.desired_seats }}</text>
+      </template>
+
+      <template v-else>
+        <view class="summary-card">
+          <view class="summary-card__row">
+            <text class="summary-card__label">当前</text>
+            <text class="summary-card__value">{{ formatSeatLabel(form) }}</text>
+          </view>
+          <view class="summary-card__row">
+            <text class="summary-card__label">目标</text>
+            <text class="summary-card__value">{{ confirmedDesiredSummary }}</text>
+          </view>
+        </view>
+        <view class="row-input">
+          <view class="row-input__field">
+            <text class="row-input__label">微信号</text>
+            <input v-model="form.wechat_id" class="input-box" placeholder="至少填一项" />
+          </view>
+          <view class="row-input__field">
+            <text class="row-input__label">手机号</text>
+            <input v-model="form.phone_number" class="input-box" type="number" placeholder="11 位手机号" />
+          </view>
+        </view>
+        <text v-if="formErrors.contact" class="field-error">{{ formErrors.contact }}</text>
+        <text v-if="formErrors.phone_number" class="field-error">{{ formErrors.phone_number }}</text>
+      </template>
+
+      <template #footer>
+        <view class="sheet-actions">
+          <button v-if="selectionStep !== 'select_current'" class="btn-ghost" @tap="goPreviousSelectionStep">上一步</button>
+          <button
+            v-if="selectionStep === 'select_current'"
+            class="btn-primary"
+            :disabled="!canConfirmCurrentSelection"
+            @tap="confirmCurrentSelection"
+          >下一步 →</button>
+          <button
+            v-else-if="selectionStep === 'select_desired'"
+            class="btn-primary"
+            :disabled="!canConfirmDesiredSelection"
+            @tap="confirmDesiredSelection"
+          >下一步 →</button>
+          <button
+            v-else
+            class="btn-primary"
+            :disabled="submitting"
+            @tap="submitForm"
+          >{{ submitting ? '提交中...' : (currentView?.my_request ? '更新发布' : '发布换座') }}</button>
+        </view>
+      </template>
+    </FiBottomSheet>
+
+    <SeatSwapManageSheet
+      v-model:visible="manageSheetVisible"
+      v-model:cancel-reason="cancelReason"
+      :request="currentView?.my_request"
+      :status-label="myRequestStatusLabel"
+      :desired-summary="myDesiredSummary"
+      :evidence-file-name="evidenceFileName"
+      @close="closeManageSheet"
+      @edit="openEditFromManage"
+      @delete="deleteRequest"
+      @choose-evidence="chooseEvidence"
+      @submit-matched-cancel="submitMatchedCancel"
+    />
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
+import FiBottomSheet from '../../components/FiBottomSheet.vue'
+import SeatSwapCandidateCard from '../../components/SeatSwapCandidateCard.vue'
+import SeatSwapManageSheet from '../../components/SeatSwapManageSheet.vue'
+import StadiumMap from '../../components/StadiumMap.vue'
 import {
+  MINI_SEAT_SWAP_SUBSCRIBE_TEMPLATE_ID,
+  cancelSeatSwapCandidateConfirmation,
   confirmSeatSwapCandidate,
   deleteMySeatSwapRequest,
   getCurrentSeatSwap,
@@ -177,19 +307,27 @@ import {
   cancelMatchedSeatSwap,
 } from '../../api/seatSwap'
 import { getTicketWatchRegions } from '../../api/ticketWatch'
-import type { SeatSwapCurrentResponse, SeatSwapDesiredSeat } from '../../types/seatSwap'
+import type { SeatSwapCurrentResponse, SeatSwapCandidate } from '../../types/seatSwap'
 import type { TicketWatchRegion } from '../../types/ticketWatch'
 import { getAccessToken } from '../../utils/authStorage'
 import { extractApiErrorMessage } from '../../utils/apiError'
+import { formatDatetime } from '../../utils/format'
 import {
+  canConfirmCurrentSeatRegion,
+  canConfirmDesiredSeatRegions,
+  filterOutMySeatSwapRequest,
   formatSeatLabel,
+  groupSeatSwapRequestsByRegion,
   hasSeatSwapFormErrors,
+  previousSeatSwapStep,
+  resolveSeatSwapCandidateAction,
   statusLabel,
+  toggleDesiredSeatRegion,
   validateSeatSwapForm,
   type SeatSwapFormErrors,
+  type SeatSwapSelectionStep,
   type SeatSwapFormState,
 } from './helpers'
-import bgImage from '../../static/seat-swap/bg.webp'
 
 const loading = ref(true)
 const submitting = ref(false)
@@ -198,19 +336,22 @@ const currentView = ref<SeatSwapCurrentResponse | null>(null)
 const regions = ref<TicketWatchRegion[]>([])
 const isLoggedIn = ref(false)
 const formErrors = ref<SeatSwapFormErrors>({})
+
+const publishSheetVisible = ref(false)
+const manageSheetVisible = ref(false)
+const browsingFilterKey = ref('')
+
+const selectionStep = ref<SeatSwapSelectionStep>('select_current')
+const stagedCurrentRegionKey = ref('')
+const stagedDesiredSeats = ref<SeatSwapFormState['desired_seats']>([])
+const expandedRegionKeys = ref<string[]>([])
+const pendingConfirmTarget = ref<SeatSwapCandidate | null>(null)
+const miniProgramNoticeEnabled = ref(false)
+
 const cancelReason = ref('')
 const evidenceFileName = ref('')
 const evidenceBase64 = ref('')
 const evidenceContentType = ref('image/jpeg')
-
-interface PickerChangeEvent {
-  detail: {
-    value: number | string
-  }
-  currentTarget?: {
-    dataset?: Record<string, unknown>
-  }
-}
 
 const form = reactive<SeatSwapFormState>({
   current_region_key: '',
@@ -219,38 +360,172 @@ const form = reactive<SeatSwapFormState>({
   current_seat_no: '',
   wechat_id: '',
   phone_number: '',
-  desired_seats: [
-    {
-      region_key: '',
-      region_name: '',
-      desired_row: '',
-      desired_seat_no: '',
-    },
-  ],
+  desired_seats: [],
 })
 
-const regionNames = computed(() => regions.value.map((region) => region.block_name))
-const currentRegionIndex = computed(() =>
-  Math.max(0, regions.value.findIndex((region) => (region.block_key || region.block_name) === form.current_region_key)),
-)
+const selectionSteps: Array<{ step: SeatSwapSelectionStep; index: number; label: string }> = [
+  { step: 'select_current', index: 1, label: '当前' },
+  { step: 'select_desired', index: 2, label: '目标' },
+  { step: 'ready_to_publish', index: 3, label: '联系' },
+]
+
 const matchTitle = computed(() => {
-  const match = currentView.value?.current_match
-  return match ? `${match.home_team_name} VS ${match.away_team_name}` : '暂无当前比赛'
+  const m = currentView.value?.current_match
+  return m ? `${m.home_team_name} VS ${m.away_team_name}` : '暂无当前比赛'
 })
-const matchCopy = computed(() => {
-  if (!currentView.value?.available) {
-    return '换座撮合只在成都蓉城当前比赛开放。'
+
+const matchSummary = computed(() => {
+  const raw = currentView.value?.current_match?.kickoff_at
+  if (!raw) return ''
+  return `${formatDatetime(raw)} · 凤凰山专业足球场`
+})
+
+const candidatesCount = computed(() => currentView.value?.candidates.length || 0)
+
+const displayCandidates = computed<SeatSwapCandidate[]>(() => {
+  return filterOutMySeatSwapRequest(
+    currentView.value?.candidates || [],
+    currentView.value?.my_request?.request_id,
+  )
+})
+
+const seatSwapRegionGroups = computed(() => groupSeatSwapRequestsByRegion(displayCandidates.value))
+
+const filteredCandidates = computed<SeatSwapCandidate[]>(() => {
+  if (!browsingFilterKey.value) return []
+  return displayCandidates.value.filter((c) => c.current_region_key === browsingFilterKey.value)
+})
+
+const browsingFilterName = computed(() => findRegion(browsingFilterKey.value)?.block_name || '')
+
+const regionBadgeCounts = computed<Record<string, number>>(() => {
+  const counts: Record<string, number> = {}
+  for (const c of displayCandidates.value) {
+    counts[c.current_region_key] = (counts[c.current_region_key] || 0) + 1
   }
-  return currentView.value.current_match?.kickoff_at || '当前比赛换座池已开放'
+  return counts
 })
+
+const myDesiredKeys = computed<string[]>(() =>
+  currentView.value?.my_request?.desired_seats.map((s) => s.region_key) || [],
+)
+
+const myDesiredSummary = computed(() => {
+  const names = currentView.value?.my_request?.desired_seats.map((s) => s.region_name) || []
+  return names.length ? names.join(' / ') : '未选择'
+})
+
+const myRequestStatusLabel = computed(() => statusLabel(currentView.value?.my_request?.status || ''))
+
+const mainMapMode = computed<'browse' | 'filter' | 'published'>(() => {
+  if (browsingFilterKey.value) return 'filter'
+  if (currentView.value?.my_request) return 'published'
+  return 'browse'
+})
+
+const sheetMapMode = computed<'select-current' | 'select-desired' | 'review'>(() => {
+  if (selectionStep.value === 'select_current') return 'select-current'
+  if (selectionStep.value === 'select_desired') return 'select-desired'
+  return 'review'
+})
+
+const stagedCurrentRegionName = computed(() => findRegion(stagedCurrentRegionKey.value)?.block_name || '')
+const stagedDesiredKeys = computed<string[]>(() => stagedDesiredSeats.value.map((s) => s.region_key).filter(Boolean))
+const confirmedDesiredKeys = computed<string[]>(() => form.desired_seats.map((s) => s.region_key).filter(Boolean))
+const confirmedDesiredSummary = computed(() => {
+  const names = form.desired_seats.map((s) => s.region_name)
+  return names.length ? names.join(' / ') : '未选择'
+})
+
+const selectionStepIndex = computed(() => {
+  if (selectionStep.value === 'select_current') return 1
+  if (selectionStep.value === 'select_desired') return 2
+  return 3
+})
+
+const publishSheetEyebrow = computed(() => `第 ${selectionStepIndex.value} 步 / 共 3 步`)
+
+const publishSheetTitle = computed(() => {
+  if (selectionStep.value === 'select_current') return '点选你的当前分区'
+  if (selectionStep.value === 'select_desired') {
+    return pendingConfirmTarget.value ? '已为你预填目标分区' : '点选你想换到的分区'
+  }
+  return '补充联系方式并发布'
+})
+
+const canConfirmCurrentSelection = computed(() =>
+  canConfirmCurrentSeatRegion(
+    stagedCurrentRegionKey.value,
+    form.current_row,
+    form.current_seat_no,
+  ),
+)
+const canConfirmDesiredSelection = computed(() => canConfirmDesiredSeatRegions(stagedDesiredSeats.value))
 
 function regionKey(region: TicketWatchRegion): string {
   return region.block_key || region.block_name
 }
 
+function findRegion(key: string): TicketWatchRegion | undefined {
+  if (!key) return undefined
+  return regions.value.find((r) => regionKey(r) === key)
+}
+
+function groupHasMyDesired(group: { region_key: string }): boolean {
+  return myDesiredKeys.value.includes(group.region_key)
+}
+
+function candidateAction(c: SeatSwapCandidate): ReturnType<typeof resolveSeatSwapCandidateAction> {
+  const mineId = currentView.value?.my_request?.request_id
+  return resolveSeatSwapCandidateAction({
+    candidateStatus: c.status,
+    candidateRequestId: c.request_id,
+    myRequestId: mineId,
+    isLoggedIn: isLoggedIn.value,
+  })
+}
+
+function syncExpandedRegionKeys(): void {
+  const available = seatSwapRegionGroups.value.map((g) => g.region_key)
+  expandedRegionKeys.value = expandedRegionKeys.value.filter((k) => available.includes(k))
+  if (!expandedRegionKeys.value.length && available.length) {
+    const hit = available.find((k) => myDesiredKeys.value.includes(k))
+    expandedRegionKeys.value = [hit || available[0]]
+  }
+}
+
+function isRegionGroupExpanded(key: string): boolean {
+  return expandedRegionKeys.value.includes(key)
+}
+
+function toggleRegionGroup(key: string): void {
+  if (isRegionGroupExpanded(key)) {
+    expandedRegionKeys.value = expandedRegionKeys.value.filter((k) => k !== key)
+  } else {
+    expandedRegionKeys.value = [...expandedRegionKeys.value, key]
+  }
+}
+
+function resetFormForNewRequest(): void {
+  form.current_region_key = ''
+  form.current_region_name = ''
+  form.current_row = ''
+  form.current_seat_no = ''
+  form.wechat_id = ''
+  form.phone_number = ''
+  form.desired_seats = []
+  formErrors.value = {}
+  stagedCurrentRegionKey.value = ''
+  stagedDesiredSeats.value = []
+  selectionStep.value = 'select_current'
+  pendingConfirmTarget.value = null
+  miniProgramNoticeEnabled.value = false
+}
+
 function fillFormFromMine(): void {
   const mine = currentView.value?.my_request
   if (!mine) {
+    resetFormForNewRequest()
     return
   }
   form.current_region_key = mine.current_region_key
@@ -259,12 +534,17 @@ function fillFormFromMine(): void {
   form.current_seat_no = mine.current_seat_no
   form.wechat_id = mine.contact?.wechat_id || ''
   form.phone_number = mine.contact?.phone_number || ''
-  form.desired_seats = mine.desired_seats.map((seat) => ({
-    region_key: seat.region_key,
-    region_name: seat.region_name,
-    desired_row: seat.desired_row || '',
-    desired_seat_no: seat.desired_seat_no || '',
+  form.desired_seats = mine.desired_seats.map((s) => ({
+    region_key: s.region_key,
+    region_name: s.region_name,
+    desired_row: s.desired_row || '',
+    desired_seat_no: s.desired_seat_no || '',
   }))
+  stagedCurrentRegionKey.value = mine.current_region_key
+  stagedDesiredSeats.value = form.desired_seats.map((s) => ({ ...s }))
+  formErrors.value = {}
+  selectionStep.value = 'ready_to_publish'
+  miniProgramNoticeEnabled.value = Boolean(mine.seat_swap_notice_enabled)
 }
 
 async function loadPage(): Promise<void> {
@@ -278,67 +558,158 @@ async function loadPage(): Promise<void> {
     ])
     currentView.value = view
     regions.value = regionList
-    fillFormFromMine()
-  } catch (error) {
-    errorMessage.value = extractApiErrorMessage(error, '换座池加载失败')
+    syncExpandedRegionKeys()
+  } catch (err) {
+    errorMessage.value = extractApiErrorMessage(err, '换座池加载失败')
   } finally {
     loading.value = false
   }
 }
 
-function selectCurrentRegion(event: PickerChangeEvent): void {
-  const region = regions.value[Number(event.detail.value)]
+function handleMainMapTap(key: string): void {
+  if (browsingFilterKey.value === key) {
+    browsingFilterKey.value = ''
+  } else {
+    browsingFilterKey.value = key
+  }
+}
+
+function clearFilter(): void {
+  browsingFilterKey.value = ''
+}
+
+function handleSheetMapTap(key: string): void {
+  const region = findRegion(key)
   if (!region) return
+  formErrors.value = {}
+  if (selectionStep.value === 'select_current') {
+    stagedCurrentRegionKey.value = key
+  } else if (selectionStep.value === 'select_desired') {
+    if (key === form.current_region_key) return
+    stagedDesiredSeats.value = toggleDesiredSeatRegion(stagedDesiredSeats.value, {
+      region_key: key,
+      region_name: region.block_name,
+    })
+  }
+}
+
+function confirmCurrentSelection(): void {
+  const errors: SeatSwapFormErrors = {}
+  if (!stagedCurrentRegionKey.value.trim()) {
+    errors.current_region_key = '请选择当前分区'
+  }
+  if (!form.current_row.trim()) {
+    errors.current_row = '请输入当前排号'
+  }
+  if (!form.current_seat_no.trim()) {
+    errors.current_seat_no = '请输入当前座号'
+  }
+  if (hasSeatSwapFormErrors(errors)) {
+    formErrors.value = errors
+    return
+  }
+
+  const region = findRegion(stagedCurrentRegionKey.value)
+  if (!region) {
+    formErrors.value = { current_region_key: '请选择当前分区' }
+    return
+  }
   form.current_region_key = regionKey(region)
   form.current_region_name = region.block_name
+  if (pendingConfirmTarget.value && stagedDesiredSeats.value.length) {
+    form.desired_seats = stagedDesiredSeats.value.map((s) => ({ ...s }))
+    selectionStep.value = 'ready_to_publish'
+    return
+  }
+  selectionStep.value = 'select_desired'
 }
 
-function desiredRegionIndex(key: string): number {
-  return Math.max(0, regions.value.findIndex((region) => regionKey(region) === key))
+function confirmDesiredSelection(): void {
+  if (!canConfirmDesiredSeatRegions(stagedDesiredSeats.value)) {
+    formErrors.value = { desired_seats: '请选择想换到的分区' }
+    return
+  }
+  form.desired_seats = stagedDesiredSeats.value.map((s) => ({ ...s }))
+  selectionStep.value = 'ready_to_publish'
 }
 
-function selectDesiredRegion(event: PickerChangeEvent): void {
-  const index = Number(event.currentTarget?.dataset?.index)
-  const region = regions.value[Number(event.detail.value)]
-  if (!region || !form.desired_seats[index]) return
-  form.desired_seats[index].region_key = regionKey(region)
-  form.desired_seats[index].region_name = region.block_name
+function goPreviousSelectionStep(): void {
+  if (selectionStep.value === 'ready_to_publish') {
+    stagedDesiredSeats.value = form.desired_seats.map((s) => ({ ...s }))
+  }
+  selectionStep.value = previousSeatSwapStep(selectionStep.value)
 }
 
-function addDesiredSeat(): void {
-  form.desired_seats.push({
-    region_key: '',
-    region_name: '',
-    desired_row: '',
-    desired_seat_no: '',
-  })
+function jumpToStep(target: SeatSwapSelectionStep): void {
+  const order: SeatSwapSelectionStep[] = ['select_current', 'select_desired', 'ready_to_publish']
+  const currentIdx = order.indexOf(selectionStep.value)
+  const targetIdx = order.indexOf(target)
+  if (targetIdx >= currentIdx) return
+  if (target === 'select_current') {
+    stagedCurrentRegionKey.value = form.current_region_key || stagedCurrentRegionKey.value
+  } else if (target === 'select_desired') {
+    stagedDesiredSeats.value = form.desired_seats.map((s) => ({ ...s }))
+  }
+  selectionStep.value = target
 }
 
-function removeDesiredSeat(index: number): void {
-  if (form.desired_seats.length <= 1) return
-  form.desired_seats.splice(index, 1)
+function openPublishSheet(): void {
+  if (currentView.value?.my_request) {
+    fillFormFromMine()
+  } else {
+    resetFormForNewRequest()
+  }
+  publishSheetVisible.value = true
 }
 
-function desiredSeatText(seats: SeatSwapDesiredSeat[]): string {
-  return seats
-    .map((seat) => {
-      const extra = [seat.desired_row ? `${seat.desired_row}排` : '', seat.desired_seat_no ? `${seat.desired_seat_no}号` : '']
-        .filter(Boolean)
-        .join(' ')
-      return extra ? `${seat.region_name} ${extra}` : seat.region_name
-    })
-    .join('、')
+function openPublishSheetForCandidate(candidate: SeatSwapCandidate): void {
+  resetFormForNewRequest()
+  pendingConfirmTarget.value = candidate
+  stagedDesiredSeats.value = [
+    {
+      region_key: candidate.current_region_key,
+      region_name: candidate.current_region_name,
+      desired_row: candidate.current_row || '',
+      desired_seat_no: candidate.current_seat_no || '',
+    },
+  ]
+  form.desired_seats = stagedDesiredSeats.value.map((seat) => ({ ...seat }))
+  selectionStep.value = 'select_current'
+  publishSheetVisible.value = true
+}
+
+function openManageSheet(): void {
+  cancelReason.value = ''
+  evidenceFileName.value = ''
+  evidenceBase64.value = ''
+  manageSheetVisible.value = true
+}
+
+function closeManageSheet(): void {
+  manageSheetVisible.value = false
+}
+
+function openEditFromManage(): void {
+  manageSheetVisible.value = false
+  openPublishSheet()
+}
+
+function handleDockCtaTap(): void {
+  if (!isLoggedIn.value) {
+    goToUserPage()
+    return
+  }
+  openPublishSheet()
 }
 
 async function submitForm(): Promise<void> {
   const errors = validateSeatSwapForm(form)
   formErrors.value = errors
-  if (hasSeatSwapFormErrors(errors)) {
-    return
-  }
+  if (hasSeatSwapFormErrors(errors)) return
 
   submitting.value = true
   try {
+    const subscribeAccepted = await requestSeatSwapSubscribeMessage()
     await upsertMySeatSwapRequest({
       current_region_key: form.current_region_key,
       current_region_name: form.current_region_name,
@@ -346,17 +717,24 @@ async function submitForm(): Promise<void> {
       current_seat_no: form.current_seat_no,
       wechat_id: form.wechat_id || null,
       phone_number: form.phone_number || null,
-      desired_seats: form.desired_seats.map((seat) => ({
-        region_key: seat.region_key,
-        region_name: seat.region_name,
-        desired_row: seat.desired_row || null,
-        desired_seat_no: seat.desired_seat_no || null,
+      seat_swap_notice_enabled: subscribeAccepted,
+      desired_seats: form.desired_seats.map((s) => ({
+        region_key: s.region_key,
+        region_name: s.region_name,
+        desired_row: s.desired_row || null,
+        desired_seat_no: s.desired_seat_no || null,
       })),
     })
-    uni.showToast({ title: '已保存', icon: 'success' })
+    if (pendingConfirmTarget.value) {
+      await confirmSeatSwapCandidate(pendingConfirmTarget.value.request_id)
+      uni.showToast({ title: '已确认换座', icon: 'success' })
+    } else {
+      uni.showToast({ title: '发布成功', icon: 'success' })
+    }
+    publishSheetVisible.value = false
     await loadPage()
-  } catch (error) {
-    uni.showToast({ title: extractApiErrorMessage(error, '保存失败'), icon: 'none' })
+  } catch (err) {
+    uni.showToast({ title: extractApiErrorMessage(err, '发布失败'), icon: 'none' })
   } finally {
     submitting.value = false
   }
@@ -364,22 +742,82 @@ async function submitForm(): Promise<void> {
 
 async function deleteRequest(): Promise<void> {
   try {
+    manageSheetVisible.value = false
     await deleteMySeatSwapRequest()
+    if (currentView.value) {
+      currentView.value = {
+        ...currentView.value,
+        my_request: null,
+        candidates: filterOutMySeatSwapRequest(
+          currentView.value.candidates,
+          currentView.value.my_request?.request_id,
+        ),
+      }
+    }
+    resetFormForNewRequest()
+    miniProgramNoticeEnabled.value = false
     uni.showToast({ title: '已撤销', icon: 'success' })
     await loadPage()
-  } catch (error) {
-    uni.showToast({ title: extractApiErrorMessage(error, '撤销失败'), icon: 'none' })
+  } catch (err) {
+    manageSheetVisible.value = true
+    uni.showToast({ title: extractApiErrorMessage(err, '撤销失败'), icon: 'none' })
   }
 }
 
 async function confirmCandidate(requestId: string): Promise<void> {
+  const mine = currentView.value?.my_request
+  if (!mine) {
+    const candidate = currentView.value?.candidates.find((item) => item.request_id === requestId)
+    if (!candidate) {
+      uni.showToast({ title: '换座对象不存在', icon: 'none' })
+      return
+    }
+    openPublishSheetForCandidate(candidate)
+    return
+  }
+
   try {
     await confirmSeatSwapCandidate(requestId)
     uni.showToast({ title: '已确认', icon: 'success' })
     await loadPage()
-  } catch (error) {
-    uni.showToast({ title: extractApiErrorMessage(error, '确认失败'), icon: 'none' })
+  } catch (err) {
+    uni.showToast({ title: extractApiErrorMessage(err, '确认失败'), icon: 'none' })
   }
+}
+
+async function cancelCandidateConfirmation(requestId: string): Promise<void> {
+  try {
+    await cancelSeatSwapCandidateConfirmation(requestId)
+    uni.showToast({ title: '已取消匹配', icon: 'success' })
+    await loadPage()
+  } catch (err) {
+    uni.showToast({ title: extractApiErrorMessage(err, '取消失败'), icon: 'none' })
+  }
+}
+
+async function requestSeatSwapSubscribeMessage(): Promise<boolean> {
+  if (!MINI_SEAT_SWAP_SUBSCRIBE_TEMPLATE_ID) {
+    return miniProgramNoticeEnabled.value
+  }
+
+  // #ifdef MP-WEIXIN
+  return await new Promise<boolean>((resolve) => {
+    uni.requestSubscribeMessage({
+      tmplIds: [MINI_SEAT_SWAP_SUBSCRIBE_TEMPLATE_ID],
+      success: (result) => {
+        const subscribeResult = result as unknown as Record<string, string | undefined>
+        const accepted = subscribeResult[MINI_SEAT_SWAP_SUBSCRIBE_TEMPLATE_ID] === 'accept'
+        miniProgramNoticeEnabled.value = accepted
+        resolve(accepted)
+      },
+      fail: () => {
+        resolve(miniProgramNoticeEnabled.value)
+      },
+    })
+  })
+  // #endif
+
+  return miniProgramNoticeEnabled.value
 }
 
 function chooseEvidence(): void {
@@ -407,7 +845,7 @@ function chooseEvidence(): void {
 
 async function submitMatchedCancel(): Promise<void> {
   const matchedId = currentView.value?.my_request?.request_id
-  const target = currentView.value?.candidates.find((candidate) => candidate.status === 'matched')
+  const target = currentView.value?.candidates.find((c) => c.status === 'matched')
   if (!matchedId || !target) {
     uni.showToast({ title: '暂无可撤销的匹配', icon: 'none' })
     return
@@ -424,9 +862,10 @@ async function submitMatchedCancel(): Promise<void> {
       evidence_base64: evidenceBase64.value,
     })
     uni.showToast({ title: '已提交撤销', icon: 'success' })
+    manageSheetVisible.value = false
     await loadPage()
-  } catch (error) {
-    uni.showToast({ title: extractApiErrorMessage(error, '提交撤销失败'), icon: 'none' })
+  } catch (err) {
+    uni.showToast({ title: extractApiErrorMessage(err, '提交撤销失败'), icon: 'none' })
   }
 }
 
@@ -443,7 +882,6 @@ onShow(() => {
 .page-root {
   position: relative;
   min-height: 100vh;
-  background: #f6f5f2;
   overflow: hidden;
 }
 
@@ -451,237 +889,673 @@ onShow(() => {
   position: relative;
   z-index: 1;
   min-height: 100vh;
-  padding: 28rpx 24rpx 140rpx;
+  padding: 28rpx 24rpx 240rpx;
   box-sizing: border-box;
 }
 
-.page-bg-img {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 600rpx;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.page-bg-fade {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 600rpx;
-  background: linear-gradient(180deg, transparent 45%, rgba(246,245,242,0.56) 78%, #f6f5f2 100%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.hero-card,
-.panel,
-.state-card {
-  border: 1rpx solid rgba(20, 22, 28, 0.08);
-  border-radius: 32rpx;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 18rpx 42rpx rgba(30, 30, 36, 0.08);
-}
-
-.hero-card {
-  display: flex;
-  justify-content: space-between;
-  gap: 24rpx;
-  padding: 34rpx;
-}
-
-.eyebrow,
-.section-kicker {
-  display: block;
-  color: #9297a3;
-  font-size: 24rpx;
-  font-weight: 800;
-  letter-spacing: 0;
-}
-
-.hero-title {
-  display: block;
-  margin-top: 10rpx;
-  color: #17191f;
-  font-size: 48rpx;
-  font-weight: 900;
-}
-
-.hero-copy,
-.panel-copy,
-.empty-copy {
-  display: block;
-  margin-top: 14rpx;
-  color: #6f7480;
-  font-size: 28rpx;
-  line-height: 1.65;
-}
-
-.hero-badge,
-.meta-pill,
-.status-pill {
-  align-self: flex-start;
-  border-radius: 999rpx;
-  padding: 10rpx 18rpx;
-  background: #f3ead9;
-  color: #9b7a42;
-  font-size: 24rpx;
-  font-weight: 800;
-}
-
-.panel,
 .state-card {
   margin-top: 22rpx;
   padding: 28rpx;
+  border: 1rpx solid rgba(238, 233, 224, 0.95);
+  border-radius: 28rpx;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12rpx 26rpx rgba(46, 38, 27, 0.06);
+  text-align: center;
 }
 
 .state-card--error {
   color: #b42318;
 }
 
-.section-heading,
-.field-head,
-.candidate-card__head,
-.form-actions,
-.field-row {
+.hero-card {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  gap: 18rpx;
+  padding: 24rpx;
+  border: 2rpx solid rgba(238, 233, 224, 0.95);
+  border-radius: 28rpx;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12rpx 26rpx rgba(46, 38, 27, 0.06);
+  margin-bottom: 16rpx;
+}
+
+.hero-card__icon-box {
+  flex-shrink: 0;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 18rpx;
+  background: linear-gradient(180deg, #f7efe1, #f1e3ca);
+  border: 2rpx solid rgba(220, 201, 165, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, 0.85);
+}
+
+.hero-card__icon-mark {
+  color: #927445;
+  font-size: 36rpx;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.hero-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.eyebrow {
+  display: block;
+  color: #8f7c5f;
+  font-size: 20rpx;
+  font-weight: 400;
+}
+
+.hero-card__title {
+  display: block;
+  margin-top: 6rpx;
+  color: #121212;
+  font-size: 32rpx;
+  line-height: 1.18;
+  font-weight: 400;
+}
+
+.hero-card__summary {
+  display: block;
+  margin-top: 6rpx;
+  color: #988f84;
+  font-size: 22rpx;
+  line-height: 1.45;
+}
+
+.meta-pill {
+  flex-shrink: 0;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  line-height: 1;
+  padding: 12rpx 20rpx;
+  border-radius: 999rpx;
+  border: 2rpx solid rgba(230, 220, 198, 0.92);
+  background: linear-gradient(180deg, rgba(255, 251, 242, 0.98), rgba(248, 241, 227, 0.94));
+  color: #9c855c;
+  font-size: 22rpx;
+  font-weight: 400;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 18rpx 22rpx;
+  margin-bottom: 14rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 251, 242, 0.6);
+  border: 1rpx dashed rgba(220, 201, 165, 0.6);
+}
+
+.info-row__text {
+  flex: 1;
+  color: #8f7c5f;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.info-row__action {
+  flex-shrink: 0;
+  padding: 10rpx 20rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(180deg, #20242c, #191d26);
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 400;
+}
+
+.info-row__action::after {
+  border: 0;
+}
+
+.stadium-wrap {
+  margin: 4rpx -24rpx 0;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8rpx 4rpx 14rpx;
+  color: #988f84;
+  font-size: 22rpx;
+}
+
+.legend__items {
+  display: flex;
+  align-items: center;
+  gap: 22rpx;
+}
+
+.legend__item {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+}
+
+.legend__dot {
+  display: inline-block;
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+}
+
+.legend__dot--current {
+  background: #d89b34;
+}
+
+.legend__dot--desired {
+  background: #1d8a55;
+}
+
+.legend__dot--hot {
+  background: linear-gradient(180deg, #20242c, #191d26);
+}
+
+.legend__hint {
+  color: #8f7c5f;
+}
+
+.section-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 20rpx 8rpx 12rpx;
+}
+
+.section-row__title {
+  color: #121212;
+  font-size: 30rpx;
+  font-weight: 400;
+}
+
+.section-row__sub {
+  color: #8f7c5f;
+  font-size: 22rpx;
+}
+
+.group-row {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 18rpx;
+  padding: 22rpx 12rpx;
+  border-top: 1rpx solid rgba(220, 211, 192, 0.5);
 }
 
-.section-title {
-  display: block;
-  color: #17191f;
-  font-size: 34rpx;
-  font-weight: 900;
+.group-row:first-of-type {
+  border-top: 0;
 }
 
-.field {
-  margin-top: 22rpx;
-}
-
-.field--half {
+.group-row__main {
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-wrap: wrap;
 }
 
-.field-label {
-  display: block;
-  margin-bottom: 10rpx;
-  color: #505663;
+.group-row__name {
+  color: #121212;
+  font-size: 28rpx;
+  font-weight: 400;
+}
+
+.group-row__count {
+  color: #8f7c5f;
+  font-size: 22rpx;
+}
+
+.group-row__hit {
+  font-size: 20rpx;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(180deg, #eaf8ef, #dff1e6);
+  color: #167348;
+  border: 1rpx solid rgba(29, 138, 85, 0.3);
+}
+
+.group-row__caret {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  color: #8f7c5f;
+  padding: 6rpx 18rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(180deg, rgba(255, 251, 242, 0.98), rgba(248, 241, 227, 0.94));
+  border: 1rpx solid rgba(230, 220, 198, 0.92);
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18rpx 8rpx;
+  margin-bottom: 8rpx;
+  border-bottom: 1rpx solid rgba(220, 211, 192, 0.5);
+}
+
+.filter-row__main {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.filter-row__label {
+  color: #121212;
+  font-size: 28rpx;
+  font-weight: 400;
+}
+
+.filter-row__count {
+  color: #8f7c5f;
+  font-size: 22rpx;
+}
+
+.filter-row__clear {
+  flex-shrink: 0;
+  background: linear-gradient(180deg, rgba(255, 251, 242, 0.98), rgba(248, 241, 227, 0.94));
+  border: 1rpx solid rgba(230, 220, 198, 0.92);
+  color: #9c855c;
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 400;
+}
+
+.filter-row__clear::after {
+  border: 0;
+}
+
+.empty-row {
+  padding: 32rpx 12rpx;
+  text-align: center;
+  color: #988f84;
   font-size: 24rpx;
-  font-weight: 800;
 }
 
-.picker-box,
-.input,
-.textarea {
-  min-height: 78rpx;
-  border: 1rpx solid #e4e6ec;
-  border-radius: 18rpx;
-  padding: 18rpx 20rpx;
-  background: #fbfbfd;
-  color: #17191f;
+.dock {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: calc(24rpx + var(--window-bottom));
+  z-index: 8;
+}
+
+.dock-cta {
+  width: 100%;
+  padding: 26rpx 30rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(180deg, #20242c, #191d26);
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14rpx;
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.08), 0 16rpx 36rpx rgba(21, 22, 27, 0.24);
+  letter-spacing: 1rpx;
+}
+
+.dock-cta::after {
+  border: 0;
+}
+
+.dock-cta__icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  line-height: 1;
+}
+
+.dock-cta__label {
   font-size: 28rpx;
 }
 
-.picker-box--compact {
-  min-width: 190rpx;
+.dock-status {
+  padding: 22rpx 26rpx;
+  border-radius: 28rpx;
+  background: linear-gradient(180deg, #1f2128, #15161b);
+  color: #fff;
+  box-shadow: 0 16rpx 36rpx rgba(21, 22, 27, 0.32);
 }
 
-.input--short {
-  width: 150rpx;
+.dock-status__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.dock-status__label {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  font-size: 24rpx;
+  font-weight: 400;
+}
+
+.dock-status__dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #f6b44e, #d89b34);
+  box-shadow: 0 0 0 6rpx rgba(216, 155, 52, 0.18);
+}
+
+.dock-status__manage {
+  font-size: 22rpx;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.78);
+  padding: 6rpx 16rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.dock-status__body {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex-wrap: wrap;
+  font-size: 22rpx;
+}
+
+.dock-status__seat {
+  padding: 6rpx 14rpx;
+  border-radius: 12rpx;
+  font-weight: 400;
+}
+
+.dock-status__seat--current {
+  background: linear-gradient(180deg, #f7efe1, #f1e3ca);
+  color: #927445;
+}
+
+.dock-status__seat--desired {
+  background: linear-gradient(180deg, #eaf8ef, #dff1e6);
+  color: #167348;
+}
+
+.dock-status__arrow {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.steps {
+  display: flex;
+  gap: 10rpx;
+  margin: 0 0 18rpx;
+}
+
+.steps__item {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64rpx;
+  padding: 12rpx 10rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(180deg, rgba(255, 251, 242, 0.98), rgba(248, 241, 227, 0.94));
+  border: 1rpx solid rgba(230, 220, 198, 0.92);
+  color: #9c855c;
+  font-size: 21rpx;
+  font-weight: 400;
+  line-height: 1.2;
+  box-sizing: border-box;
+}
+
+.steps__item--done {
+  background: linear-gradient(180deg, #eaf8ef, #dff1e6);
+  border-color: rgba(29, 138, 85, 0.3);
+  color: #167348;
+}
+
+.steps__item--active {
+  background: linear-gradient(180deg, #20242c, #191d26);
+  color: #fff;
+  border-color: #15161b;
+}
+
+.selected-tags {
+  display: flex;
+  gap: 10rpx;
+  flex-wrap: wrap;
+  margin: 18rpx 0 0;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 400;
+  border: 1rpx solid transparent;
+  line-height: 1;
+}
+
+.tag--current {
+  background: linear-gradient(180deg, #f7efe1, #f1e3ca);
+  color: #927445;
+  border-color: rgba(220, 201, 165, 0.7);
+}
+
+.tag--desired {
+  background: linear-gradient(180deg, #eaf8ef, #dff1e6);
+  color: #167348;
+  border-color: rgba(29, 138, 85, 0.3);
+}
+
+.tag--empty {
+  background: rgba(255, 251, 242, 0.6);
+  color: #988f84;
+  border-color: rgba(230, 220, 198, 0.92);
+  border-style: dashed;
+}
+
+.row-input {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 12rpx;
+}
+
+.row-input--full {
+  flex-direction: column;
+}
+
+.row-input__field {
+  flex: 1;
+}
+
+.row-input__label {
+  display: block;
+  color: #8f7c5f;
+  font-size: 22rpx;
+  font-weight: 400;
+  margin-bottom: 6rpx;
+}
+
+.input-box {
+  width: 100%;
+  height: 72rpx;
+  padding: 0 18rpx;
+  background: rgba(255, 251, 242, 0.6);
+  border: 1rpx solid rgba(230, 220, 198, 0.92);
+  border-radius: 16rpx;
+  font-size: 26rpx;
+  font-weight: 400;
+  color: #121212;
+  box-sizing: border-box;
+}
+
+.input-box--short {
+  width: 140rpx;
+  flex-shrink: 0;
 }
 
 .textarea {
   width: 100%;
-  height: 150rpx;
+  min-height: 140rpx;
+  padding: 14rpx 18rpx;
+  background: rgba(255, 251, 242, 0.6);
+  border: 1rpx solid rgba(230, 220, 198, 0.92);
+  border-radius: 16rpx;
+  font-size: 26rpx;
+  color: #121212;
+  box-sizing: border-box;
+}
+
+.desired-rows {
+  margin-top: 16rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.desired-rows__item {
+  display: flex;
+  align-items: stretch;
+  gap: 12rpx;
+}
+
+.desired-rows__name {
+  flex: 1;
+  height: 72rpx;
+  padding: 0 18rpx;
+  border-radius: 16rpx;
+  background: linear-gradient(180deg, #eaf8ef, #dff1e6);
+  color: #167348;
+  font-size: 24rpx;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
   box-sizing: border-box;
 }
 
 .field-error {
   display: block;
-  margin-top: 8rpx;
+  margin-top: 12rpx;
   color: #b42318;
+  font-size: 22rpx;
+}
+
+.summary-card {
+  padding: 18rpx 22rpx;
+  margin: 18rpx 0 0;
+  border-radius: 16rpx;
+  background: rgba(255, 251, 242, 0.6);
+  border: 1rpx solid rgba(230, 220, 198, 0.92);
+}
+
+.summary-card__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16rpx;
+  padding: 6rpx 0;
+}
+
+.summary-card__label {
+  color: #8f7c5f;
+  font-size: 22rpx;
+}
+
+.summary-card__value {
+  color: #121212;
+  font-size: 24rpx;
+  font-weight: 400;
+  text-align: right;
+  flex: 1;
+}
+
+.btn-primary {
+  flex: 1;
+  padding: 20rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(180deg, #20242c, #191d26);
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 400;
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.08), 0 6rpx 14rpx rgba(21, 22, 27, 0.16);
+}
+
+.btn-primary[disabled] {
+  background: linear-gradient(180deg, #c6cad3, #b9bec8);
+  box-shadow: none;
+}
+
+.btn-primary--danger {
+  background: linear-gradient(180deg, #c4321c, #a82716);
+}
+
+.btn-primary::after {
+  border: 0;
+}
+
+.btn-ghost {
+  flex-shrink: 0;
+  padding: 20rpx 28rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(180deg, rgba(255, 251, 242, 0.98), rgba(248, 241, 227, 0.94));
+  border: 1rpx solid rgba(230, 220, 198, 0.92);
+  color: #9c855c;
+  font-size: 26rpx;
+  font-weight: 400;
+}
+
+.btn-ghost--danger {
+  border-color: rgba(180, 35, 24, 0.3);
+  color: #b42318;
+  background: linear-gradient(180deg, rgba(252, 235, 232, 0.9), rgba(250, 228, 224, 0.9));
+}
+
+.btn-ghost::after {
+  border: 0;
+}
+
+.ghost-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 16rpx;
+  padding: 12rpx 22rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(180deg, rgba(255, 251, 242, 0.98), rgba(248, 241, 227, 0.94));
+  border: 1rpx solid rgba(230, 220, 198, 0.92);
+  color: #9c855c;
   font-size: 24rpx;
 }
 
-.desired-row {
+.ghost-action::after {
+  border: 0;
+}
+
+.sheet-actions {
+  width: 100%;
   display: flex;
   align-items: center;
-  gap: 10rpx;
-  margin-top: 12rpx;
+  gap: 16rpx;
 }
 
-.primary-action,
-.ghost-action,
-.danger-action,
-.mini-action,
-.icon-action {
-  border-radius: 999rpx;
-  padding: 18rpx 26rpx;
-  font-size: 26rpx;
-  font-weight: 900;
-}
-
-.primary-action {
-  background: #15161b;
-  color: #fff;
-}
-
-.primary-action--small {
-  margin-top: 18rpx;
-  padding: 14rpx 22rpx;
-  font-size: 24rpx;
-}
-
-.ghost-action,
-.mini-action,
-.icon-action {
-  background: #eef0f4;
-  color: #2f333b;
-}
-
-.danger-action {
-  margin-top: 16rpx;
-  background: #b42318;
-  color: #fff;
-}
-
-.candidate-card {
-  margin-top: 18rpx;
-  border-radius: 24rpx;
-  padding: 22rpx;
-  background: #f7f8fa;
-}
-
-.candidate-card--hot {
-  background: #fff8ea;
-}
-
-.candidate-name {
-  display: block;
-  color: #17191f;
-  font-size: 30rpx;
-  font-weight: 900;
-}
-
-.candidate-seat,
-.candidate-wants,
-.contact-box,
-.evidence-name {
-  display: block;
-  margin-top: 8rpx;
-  color: #687080;
-  font-size: 25rpx;
-  line-height: 1.5;
-}
-
-.contact-box {
-  border-radius: 18rpx;
-  padding: 16rpx;
-  background: rgba(255, 255, 255, 0.78);
+.sheet-actions .btn-primary:only-child {
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 </style>

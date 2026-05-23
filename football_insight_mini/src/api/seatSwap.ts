@@ -5,6 +5,9 @@ import type {
 } from '../types/seatSwap'
 import { request } from '../utils/request'
 
+export const MINI_SEAT_SWAP_SUBSCRIBE_TEMPLATE_ID =
+  (import.meta.env.VITE_MINI_SEAT_SWAP_SUBSCRIBE_TEMPLATE_ID || '').trim()
+
 export function getCurrentSeatSwap(): Promise<SeatSwapCurrentResponse> {
   return request<SeatSwapCurrentResponse>({
     url: '/seat-swap/current',
@@ -33,6 +36,14 @@ export function confirmSeatSwapCandidate(targetRequestId: string): Promise<void>
   return request<void>({
     url: `/seat-swap/matches/${targetRequestId}/confirm`,
     method: 'POST',
+    auth: true,
+  })
+}
+
+export function cancelSeatSwapCandidateConfirmation(targetRequestId: string): Promise<void> {
+  return request<void>({
+    url: `/seat-swap/matches/${targetRequestId}/confirm`,
+    method: 'DELETE',
     auth: true,
   })
 }

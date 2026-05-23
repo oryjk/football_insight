@@ -404,7 +404,9 @@ docker run -d \
 当前生产环境后端优先使用 Docker 管理，同时保留 systemd 备用部署方式：
 
 - Docker 容器名：`football-insight-service-backend-rs`
-- Docker 发布脚本：`deploy_jd_docker.sh`
+- Docker 发布脚本：
+  - `deploy_jd_docker.sh`
+  - `deploy_peiqian_docker.sh`
 - systemd 备用服务名：`football-insight.service`
 - systemd unit 模板：`deploy/football-insight.service`
 - 项目目录：`/root/projects/football_insight/football_insight_service_backend_rs`
@@ -413,25 +415,43 @@ docker run -d \
 
 常规后端发布优先走 Docker：
 
+部署到 `jd`：
+
 ```bash
 cd football_insight_service_backend_rs
 ./deploy_jd_docker.sh
 ```
 
-这个脚本会在 `out109` 构建镜像并推送 Harbor，再到 `jd` 拉取镜像并重建容器。运行前需要确认当前提交已经 push，并在本地 `.env` 或环境变量里提供 Harbor 凭据，例如 `HARBOR_PASSWORD`。不要提交真实 `.env`。
+这个脚本会在 `out109` 构建镜像并推送 Harbor，再到 `jd` 拉取镜像并重建容器。
 
-如果本次发布包含新 migration，再在 `jd` 执行：
+部署到 `peiqian`：
 
 ```bash
-ssh jd
+cd football_insight_service_backend_rs
+./deploy_peiqian_docker.sh
+```
+
+这个脚本会在 `out109` 构建镜像并推送 Harbor，再到 `peiqian` 拉取镜像并重建容器。脚本还会确保 `peiqian:/root/projects/football_insight` 上存在 monorepo 工作区，并使用运行时环境文件 `/root/projects/football_insight/football-insight-service-backend-rs.env` 启动容器。
+
+两个脚本运行前都需要确认当前提交已经 push，并在本地 `.env` 或环境变量里提供 Harbor 凭据，例如 `HARBOR_PASSWORD`。不要提交真实 `.env`。
+
+如果本次发布包含新 migration：
+
+- 部署到 `jd`，在 `jd` 执行
+- 部署到 `peiqian`，在 `peiqian` 执行
+
+例如 `peiqian`：
+
+```bash
+ssh peiqian
 cd /root/projects/football_insight/football_insight_service_backend_rs
 cargo run --release --bin run_migrations
 ```
 
-systemd 备用部署首次安装或更新 unit 文件：
+systemd 备用部署首次安装或更新 unit 文件时，按目标机分别执行。比如 `peiqian`：
 
 ```bash
-ssh jd
+ssh peiqian
 cd /root/projects/football_insight/football_insight_service_backend_rs
 cp deploy/football-insight.service /etc/systemd/system/football-insight.service
 systemctl daemon-reload
@@ -439,10 +459,10 @@ systemctl enable football-insight.service
 systemctl restart football-insight.service
 ```
 
-systemd 备用发布流程：
+systemd 备用发布流程示例（`peiqian`）：
 
 ```bash
-ssh jd
+ssh peiqian
 cd /root/projects/football_insight
 git pull --ff-only
 cd football_insight_service_backend_rs
@@ -473,7 +493,7 @@ curl -k -i https://match.oryjk.cn/api/v1/ticket-watch/current-board
 Docker 容器 stdout/stderr 作为进程级兜底日志：
 
 ```bash
-ssh jd 'docker logs --tail 100 football-insight-service-backend-rs'
+ssh peiqian 'docker logs --tail 100 football-insight-service-backend-rs'
 ```
 
 systemd 备用部署下，unit 会丢弃 stdout，并把 stderr 写入 journal：
@@ -486,15 +506,15 @@ journal 用作进程启动失败、panic 或早期 stderr 输出的兜底排查�
 常用查看方式：
 
 ```bash
-ssh jd 'tail -n 100 -f /root/projects/football_insight/football_insight_service_backend_rs/logs/app.log'
-ssh jd 'docker logs --tail 100 football-insight-service-backend-rs'
-ssh jd 'journalctl -u football-insight.service -n 100 --no-pager'
+ssh peiqian 'tail -n 100 -f /root/projects/football_insight/football_insight_service_backend_rs/logs/app.log'
+ssh peiqian 'docker logs --tail 100 football-insight-service-backend-rs'
+ssh peiqian 'journalctl -u football-insight.service -n 100 --no-pager'
 ```
 
 服务状态查看：
 
 ```bash
-ssh jd 'docker ps --filter name=football-insight-service-backend-rs'
+ssh peiqian 'docker ps --filter name=football-insight-service-backend-rs'
 ```
 
 历史遗留的 `service.log` 不再继续增长，不再作为当前日志入口。

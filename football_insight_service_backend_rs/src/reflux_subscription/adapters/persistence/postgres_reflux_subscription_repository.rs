@@ -3,12 +3,12 @@ use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 use crate::reflux_subscription::{
+    application::process_reflux_notification_jobs::should_retry_email_job,
     domain::subscription::{
         NotificationTarget, RefluxEmailSubscriber, RefluxNotificationJob, RefluxSubscriptionPlan,
         RefluxSubscriptionScope, RefluxSubscriptionStatus, UserRefluxSubscription,
         normalize_team_code,
     },
-    application::process_reflux_notification_jobs::should_retry_email_job,
     ports::reflux_subscription_repository::{
         CreateNotificationJobInput, CreateRefluxSubscriptionInput, RefluxSubscriptionRepository,
     },

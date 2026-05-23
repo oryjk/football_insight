@@ -81,8 +81,8 @@ mod tests {
     #[tokio::test]
     async fn execute_returns_review_status_for_matched_version() {
         let now = Utc.with_ymd_and_hms(2026, 4, 24, 20, 0, 0).unwrap();
-        let use_case = GetMiniProgramReviewConfigUseCase::new(std::sync::Arc::new(
-            FakeReviewConfigPort {
+        let use_case =
+            GetMiniProgramReviewConfigUseCase::new(std::sync::Arc::new(FakeReviewConfigPort {
                 config: Some(MiniProgramReviewConfig {
                     mini_program_app_id: "".to_string(),
                     mini_program_version: "1.2.3".to_string(),
@@ -90,8 +90,7 @@ mod tests {
                     created_at: now,
                     updated_at: now,
                 }),
-            },
-        ));
+            }));
 
         let view = use_case
             .execute(None, "1.2.3".to_string())

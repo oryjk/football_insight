@@ -54,10 +54,11 @@ mod tests {
 
     use super::GetRefluxSubscriptionPlansUseCase;
     use crate::reflux_subscription::{
-        domain::subscription::{NotificationTarget, RefluxSubscriptionPlan, UserRefluxSubscription},
+        domain::subscription::{
+            NotificationTarget, RefluxSubscriptionPlan, UserRefluxSubscription,
+        },
         ports::reflux_subscription_repository::{
-            CreateNotificationJobInput, CreateRefluxSubscriptionInput,
-            RefluxSubscriptionRepository,
+            CreateNotificationJobInput, CreateRefluxSubscriptionInput, RefluxSubscriptionRepository,
         },
     };
 
@@ -137,7 +138,10 @@ mod tests {
         let use_case = GetRefluxSubscriptionPlansUseCase::new(repository);
 
         let view = use_case
-            .execute(Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap(), "chengdu")
+            .execute(
+                Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap(),
+                "chengdu",
+            )
             .await
             .expect("plans");
 
@@ -146,4 +150,3 @@ mod tests {
         assert_eq!(view.plans[0].price_cents, 600);
     }
 }
-

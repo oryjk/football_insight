@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     payment::adapters::web::dto::WxPayParamsDto,
     reflux_subscription::domain::subscription::{
-        NotificationTarget, RefluxSubscriptionPlan, RefluxSubscriptionScope,
-        UserRefluxSubscription,
+        NotificationTarget, RefluxSubscriptionPlan, RefluxSubscriptionScope, UserRefluxSubscription,
     },
 };
 

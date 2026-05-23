@@ -31,6 +31,7 @@ pub struct SeatSwapRequestView {
     pub request_id: Uuid,
     pub user_id: Uuid,
     pub display_name: String,
+    pub avatar_url: Option<String>,
     pub current_region_key: String,
     pub current_region_name: String,
     pub current_row: String,
@@ -39,6 +40,7 @@ pub struct SeatSwapRequestView {
     pub contact: Option<SeatSwapContact>,
     pub status: String,
     pub created_at: String,
+    pub seat_swap_notice_enabled: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +48,7 @@ pub struct SeatSwapCandidateView {
     pub request_id: Uuid,
     pub user_id: Uuid,
     pub display_name: String,
+    pub avatar_url: Option<String>,
     pub current_region_key: String,
     pub current_region_name: String,
     pub current_row: String,
@@ -91,13 +94,13 @@ impl GetCurrentSeatSwapUseCase {
                     .find(|request| request.user.user_id == user_id)
             })
             .cloned();
-        let my_confirmation = match my_request.as_ref() {
+        let my_confirmations = match my_request.as_ref() {
             Some(request) => {
                 self.repository
-                    .find_confirmation(current_match.match_id, request.id)
+                    .list_confirmations_by_request(current_match.match_id, request.id)
                     .await?
             }
-            None => None,
+            None => Vec::new(),
         };
 
         let mut candidates = Vec::new();
@@ -109,14 +112,18 @@ impl GetCurrentSeatSwapUseCase {
                 continue;
             }
 
-            let peer_confirmation = self
-                .repository
-                .find_confirmation(current_match.match_id, request.id)
-                .await?;
+            let peer_confirmation = match my_request.as_ref() {
+                Some(mine) => {
+                    self.repository
+                        .find_confirmation_between(current_match.match_id, request.id, mine.id)
+                        .await?
+                }
+                None => None,
+            };
             let status = resolve_candidate_status(
                 my_request.as_ref(),
                 request,
-                my_confirmation.as_ref(),
+                &my_confirmations,
                 peer_confirmation.as_ref(),
             );
             let show_contact = should_show_contact(viewer_user_id, &status);
@@ -137,7 +144,7 @@ impl GetCurrentSeatSwapUseCase {
 fn resolve_candidate_status(
     my_request: Option<&SeatSwapRequest>,
     peer: &SeatSwapRequest,
-    my_confirmation: Option<&SeatSwapConfirmation>,
+    my_confirmations: &[SeatSwapConfirmation],
     peer_confirmation: Option<&SeatSwapConfirmation>,
 ) -> SeatSwapCandidateStatus {
     let Some(mine) = my_request else {
@@ -148,11 +155,9 @@ fn resolve_candidate_status(
         return SeatSwapCandidateStatus::Matched;
     }
 
-    if !mine.has_bidirectional_match_with(peer) {
-        return SeatSwapCandidateStatus::DisplayOnly;
-    }
-
-    let i_confirmed_peer = my_confirmation.is_some_and(|item| item.target_request_id == peer.id);
+    let i_confirmed_peer = my_confirmations
+        .iter()
+        .any(|item| item.target_request_id == peer.id);
     let peer_confirmed_me = peer_confirmation.is_some_and(|item| item.target_request_id == mine.id);
 
     match (i_confirmed_peer, peer_confirmed_me) {
@@ -179,6 +184,7 @@ fn to_request_view(request: &SeatSwapRequest, show_contact: bool) -> SeatSwapReq
         request_id: request.id,
         user_id: request.user.user_id,
         display_name: request.user.display_name.clone(),
+        avatar_url: request.user.avatar_url.clone(),
         current_region_key: request.current_region_key.clone(),
         current_region_name: request.current_region_name.clone(),
         current_row: request.current_row.clone(),
@@ -187,6 +193,7 @@ fn to_request_view(request: &SeatSwapRequest, show_contact: bool) -> SeatSwapReq
         contact: show_contact.then(|| request.contact.clone()),
         status: request.status.as_str().to_string(),
         created_at: request.created_at.to_rfc3339(),
+        seat_swap_notice_enabled: request.seat_swap_notice_enabled,
     }
 }
 
@@ -199,6 +206,7 @@ fn to_candidate_view(
         request_id: request.id,
         user_id: request.user.user_id,
         display_name: request.user.display_name.clone(),
+        avatar_url: request.user.avatar_url.clone(),
         current_region_key: request.current_region_key.clone(),
         current_region_name: request.current_region_name.clone(),
         current_row: request.current_row.clone(),
@@ -255,6 +263,7 @@ mod tests {
 
     struct StubSeatSwapRepository {
         requests: Vec<SeatSwapRequest>,
+        confirmations: Vec<SeatSwapConfirmation>,
     }
 
     #[async_trait]
@@ -281,9 +290,42 @@ mod tests {
         async fn find_confirmation(
             &self,
             _match_id: i64,
-            _request_id: Uuid,
+            request_id: Uuid,
         ) -> anyhow::Result<Option<SeatSwapConfirmation>> {
-            Ok(None)
+            Ok(self
+                .confirmations
+                .iter()
+                .find(|confirmation| confirmation.request_id == request_id)
+                .cloned())
+        }
+
+        async fn find_confirmation_between(
+            &self,
+            _match_id: i64,
+            request_id: Uuid,
+            target_request_id: Uuid,
+        ) -> anyhow::Result<Option<SeatSwapConfirmation>> {
+            Ok(self
+                .confirmations
+                .iter()
+                .find(|confirmation| {
+                    confirmation.request_id == request_id
+                        && confirmation.target_request_id == target_request_id
+                })
+                .cloned())
+        }
+
+        async fn list_confirmations_by_request(
+            &self,
+            _match_id: i64,
+            request_id: Uuid,
+        ) -> anyhow::Result<Vec<SeatSwapConfirmation>> {
+            Ok(self
+                .confirmations
+                .iter()
+                .filter(|confirmation| confirmation.request_id == request_id)
+                .cloned()
+                .collect())
         }
     }
 
@@ -299,6 +341,7 @@ mod tests {
             user: SeatSwapUser {
                 user_id,
                 display_name: format!("用户{}", &user_id.to_string()[..4]),
+                avatar_url: Some("https://img.example.com/avatar.png".to_string()),
             },
             current_region_key: current_region_key.to_string(),
             current_region_name: format!("{current_region_key}区"),
@@ -315,6 +358,7 @@ mod tests {
                 .collect(),
             contact: SeatSwapContact::new(Some(format!("wx-{current_region_key}")), None)
                 .expect("contact"),
+            seat_swap_notice_enabled: false,
             status: SeatSwapRequestStatus::Active,
             matched_request_id: None,
             created_at: Utc.with_ymd_and_hms(2026, 5, 18, 12, 0, 0).unwrap(),
@@ -324,19 +368,51 @@ mod tests {
 
     fn build_use_case_with_pool(requests: Vec<SeatSwapRequest>) -> GetCurrentSeatSwapUseCase {
         GetCurrentSeatSwapUseCase::new(
-            Arc::new(StubSeatSwapRepository { requests }),
+            Arc::new(StubSeatSwapRepository {
+                requests,
+                confirmations: Vec::new(),
+            }),
+            Arc::new(StubCurrentMatchPort),
+        )
+    }
+
+    fn build_use_case_with_confirmations(
+        requests: Vec<SeatSwapRequest>,
+        confirmations: Vec<SeatSwapConfirmation>,
+    ) -> GetCurrentSeatSwapUseCase {
+        GetCurrentSeatSwapUseCase::new(
+            Arc::new(StubSeatSwapRepository {
+                requests,
+                confirmations,
+            }),
             Arc::new(StubCurrentMatchPort),
         )
     }
 
     #[tokio::test]
-    async fn hides_contacts_for_display_only_candidates() {
+    async fn exposes_contacts_for_any_candidate_when_i_have_published() {
         let use_case = build_use_case_with_pool(vec![
             request_fixture(1, USER_A, "A", vec!["B"]),
             request_fixture(2, USER_B, "C", vec!["A"]),
         ]);
 
         let view = use_case.execute(Some(USER_A)).await.expect("view");
+
+        assert_eq!(
+            view.candidates[0].status,
+            SeatSwapCandidateStatus::Communicable
+        );
+        assert!(view.candidates[0].contact.is_some());
+    }
+
+    #[tokio::test]
+    async fn keeps_candidates_display_only_without_my_request() {
+        let use_case = build_use_case_with_pool(vec![
+            request_fixture(1, USER_A, "A", vec!["B"]),
+            request_fixture(2, USER_B, "C", vec!["A"]),
+        ]);
+
+        let view = use_case.execute(None).await.expect("view");
 
         assert_eq!(
             view.candidates[0].status,
@@ -359,5 +435,90 @@ mod tests {
             SeatSwapCandidateStatus::Communicable
         );
         assert!(view.candidates[0].contact.is_some());
+    }
+
+    #[tokio::test]
+    async fn includes_avatar_url_in_candidate_view() {
+        let use_case = build_use_case_with_pool(vec![
+            request_fixture(1, USER_A, "A", vec!["B"]),
+            request_fixture(2, USER_B, "B", vec!["A"]),
+        ]);
+
+        let view = use_case.execute(Some(USER_A)).await.expect("view");
+
+        assert_eq!(
+            view.candidates[0].avatar_url.as_deref(),
+            Some("https://img.example.com/avatar.png")
+        );
+    }
+
+    #[tokio::test]
+    async fn marks_multiple_outgoing_confirmations_as_waiting_for_peer() {
+        let use_case = build_use_case_with_confirmations(
+            vec![
+                request_fixture(1, USER_A, "A", vec!["B", "C"]),
+                request_fixture(2, USER_B, "B", vec!["A"]),
+                request_fixture(
+                    3,
+                    Uuid::from_u128(0xcccccccccccccccccccccccccccccccc),
+                    "C",
+                    vec!["A"],
+                ),
+            ],
+            vec![
+                SeatSwapConfirmation {
+                    request_id: Uuid::from_u128(1),
+                    target_request_id: Uuid::from_u128(2),
+                    confirmed_by_user_id: USER_A,
+                },
+                SeatSwapConfirmation {
+                    request_id: Uuid::from_u128(1),
+                    target_request_id: Uuid::from_u128(3),
+                    confirmed_by_user_id: USER_A,
+                },
+            ],
+        );
+
+        let view = use_case.execute(Some(USER_A)).await.expect("view");
+
+        assert_eq!(
+            view.candidates
+                .iter()
+                .map(|candidate| candidate.status.clone())
+                .collect::<Vec<_>>(),
+            vec![
+                SeatSwapCandidateStatus::WaitingPeerConfirmation,
+                SeatSwapCandidateStatus::WaitingPeerConfirmation,
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn detects_peer_confirmation_even_when_peer_confirmed_multiple_targets() {
+        let use_case = build_use_case_with_confirmations(
+            vec![
+                request_fixture(1, USER_A, "A", vec!["B"]),
+                request_fixture(2, USER_B, "B", vec!["A"]),
+            ],
+            vec![
+                SeatSwapConfirmation {
+                    request_id: Uuid::from_u128(2),
+                    target_request_id: Uuid::from_u128(99),
+                    confirmed_by_user_id: USER_B,
+                },
+                SeatSwapConfirmation {
+                    request_id: Uuid::from_u128(2),
+                    target_request_id: Uuid::from_u128(1),
+                    confirmed_by_user_id: USER_B,
+                },
+            ],
+        );
+
+        let view = use_case.execute(Some(USER_A)).await.expect("view");
+
+        assert_eq!(
+            view.candidates[0].status,
+            SeatSwapCandidateStatus::PeerConfirmedMe
+        );
     }
 }

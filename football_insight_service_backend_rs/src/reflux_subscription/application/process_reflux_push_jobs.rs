@@ -278,11 +278,8 @@ mod tests {
         });
         let push_sender = Arc::new(FakePushSender::default());
 
-        let use_case = ProcessRefluxPushJobsUseCase::new(
-            reflux_repo,
-            token_repo,
-            push_sender.clone(),
-        );
+        let use_case =
+            ProcessRefluxPushJobsUseCase::new(reflux_repo, token_repo, push_sender.clone());
 
         let count = use_case.execute(50).await.expect("execute");
         assert_eq!(count, 2);
@@ -298,11 +295,8 @@ mod tests {
         let token_repo = Arc::new(FakeTokenRepository::default());
         let push_sender = Arc::new(FakePushSender::default());
 
-        let use_case = ProcessRefluxPushJobsUseCase::new(
-            reflux_repo,
-            token_repo,
-            push_sender.clone(),
-        );
+        let use_case =
+            ProcessRefluxPushJobsUseCase::new(reflux_repo, token_repo, push_sender.clone());
 
         let count = use_case.execute(50).await.expect("execute");
         assert_eq!(count, 0);
@@ -332,11 +326,8 @@ mod tests {
             }
         }
 
-        let use_case = ProcessRefluxPushJobsUseCase::new(
-            reflux_repo,
-            token_repo,
-            Arc::new(FailingPushSender),
-        );
+        let use_case =
+            ProcessRefluxPushJobsUseCase::new(reflux_repo, token_repo, Arc::new(FailingPushSender));
 
         let count = use_case.execute(50).await.expect("execute");
         assert_eq!(count, 0);

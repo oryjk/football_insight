@@ -27,7 +27,8 @@ pub fn reflux_subscription_routes(state: Arc<RefluxSubscriptionWebState>) -> Rou
         )
         .route(
             "/api/v1/ticket-watch/reflux-subscriptions/email",
-            get(get_reflux_notification_email_handler).put(update_reflux_notification_email_handler),
+            get(get_reflux_notification_email_handler)
+                .put(update_reflux_notification_email_handler),
         )
         .with_state(state)
 }

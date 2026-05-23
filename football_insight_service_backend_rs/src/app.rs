@@ -1,554 +1,86 @@
 use std::sync::Arc;
 
 use axum::{Router, routing::get};
-use chrono::Duration;
 use sqlx::PgPool;
 
 use crate::{
-    activity::{
-        adapters::{
-            persistence::postgres_user_activity_repository::PostgresUserActivityRepository,
-            web::{handlers::ActivityWebState, routes::activity_routes},
-        },
-        application::record_page_activity::RecordPageActivityUseCase,
-    },
-    ai::{
-        adapters::{
-            integration::rig_openai_chat_port::{DisabledAiChatPort, RigOpenAiChatPort},
-            web::{handlers::AiWebState, routes::ai_routes},
-        },
-        application::chat_with_model::ChatWithModelUseCase,
-        ports::ai_chat_port::AiChatPort,
-    },
-    auth::{
-        adapters::{
-            integration::current_standard_match_port::HttpCurrentStandardMatchPort,
-            integration::wechat_crypto_port::OfficialWechatCryptoPort,
-            integration::wechat_oauth_port::OfficialWechatOauthPort,
-            persistence::postgres_auth_repository::PostgresAuthRepository,
-            security::argon2_password_port::Argon2PasswordPort,
-            security::jwt_token_port::JwtTokenPort,
-            web::{handlers::AuthWebConfig, routes::auth_routes},
-        },
-        application::{
-            bind_wechat_account::BindWechatAccountUseCase,
-            bind_wechat_mini_program_account::BindWechatMiniProgramAccountUseCase,
-            get_current_user::GetCurrentUserUseCase,
-            handle_wechat_webhook::HandleWechatWebhookUseCase,
-            login_with_mini_wechat::CompleteMiniWechatLoginUseCase,
-            login_with_password::LoginWithPasswordUseCase,
-            login_with_wechat::CompleteWechatLoginUseCase, logout::LogoutUseCase,
-            register_with_invite::RegisterWithInviteUseCase,
-            reset_password_with_invite::ResetPasswordWithInviteUseCase,
-        },
-    },
-    auth_license::{
-        adapters::{
-            persistence::postgres_license_repository::PostgresLicenseRepository,
-            web::{handlers::AuthLicenseWebState, routes::auth_license_routes},
-        },
-        application::{
-            bind_license::BindLicenseUseCase, generate_license::GenerateLicenseUseCase,
-        },
-    },
-    config::AppConfig,
-    health::adapters::web::routes::health_routes,
-    health::{
-        adapters::persistence::postgres_health_port::PostgresHealthPort,
-        application::get_health::GetHealthUseCase,
-    },
-    insight::{
-        adapters::{
-            persistence::postgres_insight_query_repository::PostgresInsightQueryRepository,
-            web::routes::insight_routes,
-        },
-        application::{
-            get_live_matches::GetLiveMatchesUseCase, get_live_overview::GetLiveOverviewUseCase,
-            get_live_rankings::GetLiveRankingsUseCase,
-            get_live_team_insights::GetLiveTeamInsightsUseCase, get_overview::GetOverviewUseCase,
-            get_round_matches::GetRoundMatchesUseCase, get_round_overview::GetRoundOverviewUseCase,
-            get_round_rankings::GetRoundRankingsUseCase,
-            list_available_rounds::ListAvailableRoundsUseCase,
-        },
-    },
-    payment::{
-        adapters::{
-            integration::wechat_pay_port::HttpWechatPayPort,
-            persistence::{
-                postgres_order_repository::PostgresOrderRepository,
-                postgres_payment_settlement_port::PostgresPaymentSettlementPort,
-            },
-            web::{handlers::PaymentWebState, routes::payment_routes},
-        },
-        application::{
-            create_membership_order::CreateMembershipOrderUseCase,
-            get_membership_product::GetMembershipProductUseCase,
-            get_order_status::GetOrderStatusUseCase,
-            handle_wechat_notify::HandleWechatNotifyUseCase,
-        },
-    },
-    push_notification::{
-        adapters::{
-            persistence::postgres_device_token_repository::PostgresDeviceTokenRepository,
-            web::{handlers::PushNotificationWebState, routes::push_notification_routes},
-        },
-        application::register_device_token::RegisterDeviceTokenUseCase,
-    },
-    reflux_subscription::{
-        adapters::{
-            persistence::postgres_reflux_subscription_repository::PostgresRefluxSubscriptionRepository,
-            web::{handlers::RefluxSubscriptionWebState, routes::reflux_subscription_routes},
-        },
-        application::{
-            create_reflux_subscription_order::CreateRefluxSubscriptionOrderUseCase,
-            get_reflux_subscription_plans::GetRefluxSubscriptionPlansUseCase,
-        },
-    },
-    seat_swap::{
-        adapters::{
-            integration::{
-                minio_evidence_storage_port::MinioEvidenceStoragePort,
-                ticket_watch_current_match_port::TicketWatchCurrentSeatSwapMatchPort,
-            },
-            persistence::postgres_seat_swap_repository::PostgresSeatSwapRepository,
-            web::{handlers::SeatSwapWebState, routes::seat_swap_routes},
-        },
-        application::{
-            cancel_matched_seat_swap::CancelMatchedSeatSwapUseCase,
-            cancel_my_seat_swap_request::CancelMySeatSwapRequestUseCase,
-            confirm_seat_swap_candidate::ConfirmSeatSwapCandidateUseCase,
-            get_current_seat_swap::GetCurrentSeatSwapUseCase,
-            upsert_my_seat_swap_request::UpsertMySeatSwapRequestUseCase,
-        },
-    },
-    support::{
-        adapters::{
-            persistence::postgres_support_repository::PostgresSupportRepository,
-            web::{handlers::SupportWebState, routes::support_routes},
-        },
-        application::{
-            cast_match_support_vote::CastMatchSupportVoteUseCase,
-            get_match_support_detail::GetMatchSupportDetailUseCase,
-            get_support_profile::GetSupportProfileUseCase,
-            list_support_teams::ListSupportTeamsUseCase, set_favorite_team::SetFavoriteTeamUseCase,
-        },
-    },
-    system_config::{
-        adapters::{
-            persistence::{
-                postgres_mini_program_review_config_port::PostgresMiniProgramReviewConfigPort,
-                postgres_system_config_port::PostgresSystemConfigPort,
-            },
-            web::routes::system_config_routes,
-        },
-        application::{
-            get_mini_program_review_config::GetMiniProgramReviewConfigUseCase,
-            get_public_system_config::GetPublicSystemConfigUseCase,
-        },
-    },
-    team_board::{
-        adapters::{
-            persistence::postgres_team_board_repository::PostgresTeamBoardRepository,
-            web::{handlers::TeamBoardWebState, routes::team_board_routes},
-        },
-        application::{
-            add_team_board_comment::AddTeamBoardCommentUseCase,
-            create_team_board_post::CreateTeamBoardPostUseCase,
-            get_team_board::GetTeamBoardUseCase,
-            toggle_team_board_post_like::ToggleTeamBoardPostLikeUseCase,
-        },
-    },
-    ticket_watch::{
-        adapters::{
-            integration::http_ticket_monitor_port::HttpTicketMonitorPort,
-            integration::noop_tracked_interest_cache_port::NoopTrackedInterestCachePort,
-            integration::redis_tracked_interest_cache_port::RedisTrackedInterestCachePort,
-            web::{handlers::TicketWatchWebState, routes::ticket_watch_routes},
-        },
-        application::{
-            current_board_cache::CurrentTicketWatchBoardCache,
-            get_current_ticket_watch_board::GetCurrentTicketWatchBoardUseCase,
-            get_current_ticket_watch_match::GetCurrentTicketWatchMatchUseCase,
-            get_match_block_interests::GetMatchBlockInterestsUseCase,
-            get_match_ticket_inventory::GetMatchTicketInventoryUseCase,
-            get_match_tracked_interests::GetMatchTrackedInterestsUseCase,
-            get_yukun_current_ticket_watch_match::GetYukunCurrentTicketWatchMatchUseCase,
-            get_yukun_ticket_inventory::GetYukunTicketInventoryUseCase,
-            list_ticket_watch_matches::ListTicketWatchMatchesUseCase,
-            list_ticket_watch_regions::ListTicketWatchRegionsUseCase,
-            list_yukun_match_ticket_regions::ListYukunMatchTicketRegionsUseCase,
-            list_yukun_ticket_watch_matches::ListYukunTicketWatchMatchesUseCase,
-            toggle_match_block_interest::ToggleMatchBlockInterestUseCase,
-        },
-    },
+    activity::bootstrap::build_activity_routes, ai::bootstrap::build_ai_routes,
+    auth::bootstrap::build_auth, auth_license::bootstrap::build_auth_license_routes,
+    config::AppConfig, health::bootstrap::build_health_routes, insight::bootstrap::build_insight,
+    payment::bootstrap::build_payment,
+    push_notification::bootstrap::build_push_notification_routes,
+    reflux_subscription::bootstrap::build_reflux_subscription_routes,
+    seat_swap::bootstrap::build_seat_swap_routes, support::bootstrap::build_support_routes,
+    system_config::bootstrap::build_system_config_routes,
+    team_board::bootstrap::build_team_board_routes, ticket_watch::bootstrap::build_ticket_watch,
 };
 
 pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
-    let insight_repository = Arc::new(PostgresInsightQueryRepository::new(pool.clone()));
-    let overview_use_case = Arc::new(GetOverviewUseCase::new(insight_repository.clone()));
-    let live_overview_use_case = Arc::new(GetLiveOverviewUseCase::new(insight_repository.clone()));
-    let live_rankings_use_case = Arc::new(GetLiveRankingsUseCase::new(insight_repository.clone()));
-    let live_team_insights_use_case =
-        Arc::new(GetLiveTeamInsightsUseCase::new(insight_repository.clone()));
-    let live_matches_use_case = Arc::new(GetLiveMatchesUseCase::new(insight_repository.clone()));
-    let round_overview_use_case =
-        Arc::new(GetRoundOverviewUseCase::new(insight_repository.clone()));
-    let round_rankings_use_case =
-        Arc::new(GetRoundRankingsUseCase::new(insight_repository.clone()));
-    let round_matches_use_case = Arc::new(GetRoundMatchesUseCase::new(insight_repository.clone()));
-    let available_rounds_use_case =
-        Arc::new(ListAvailableRoundsUseCase::new(insight_repository.clone()));
-    let health_use_case = Arc::new(GetHealthUseCase::new(Arc::new(PostgresHealthPort::new(
-        pool.clone(),
-    ))));
-    let system_config_port = Arc::new(PostgresSystemConfigPort::new(pool.clone()));
-    let system_config_use_case = Arc::new(GetPublicSystemConfigUseCase::new(
-        system_config_port.clone(),
-        insight_repository.clone(),
-    ));
-    let mini_program_review_config_use_case = Arc::new(GetMiniProgramReviewConfigUseCase::new(
-        Arc::new(PostgresMiniProgramReviewConfigPort::new(pool.clone())),
-    ));
+    let insight = build_insight(pool.clone());
+    let health_routes = build_health_routes(pool.clone());
+    let system_config = build_system_config_routes(pool.clone(), insight.repository.clone());
 
-    let auth_repository = Arc::new(PostgresAuthRepository::new(pool.clone()));
-    let user_activity_repository = Arc::new(PostgresUserActivityRepository::new(pool.clone()));
-    let support_repository = Arc::new(PostgresSupportRepository::new(pool.clone()));
-    let team_board_repository = Arc::new(PostgresTeamBoardRepository::new(pool.clone()));
-    let password_port = Arc::new(Argon2PasswordPort);
-    let token_port = Arc::new(JwtTokenPort::new(config.jwt_secret.clone()));
-    let wechat_oauth_port = Arc::new(OfficialWechatOauthPort::new(
-        config.wechat_app_id.clone(),
-        config.wechat_app_secret.clone(),
-    ));
-    let mini_wechat_oauth_port = Arc::new(OfficialWechatOauthPort::new(
-        config.wechat_mini_app_id.clone(),
-        config.wechat_mini_app_secret.clone(),
-    ));
-    let wechat_crypto_port = Arc::new(
-        OfficialWechatCryptoPort::new(
-            config.wechat_webhook_token.clone(),
-            config.wechat_encoding_aes_key.clone(),
-        )
-        .expect("invalid wechat webhook config"),
+    let auth = build_auth(
+        pool.clone(),
+        config,
+        system_config.system_config_port.clone(),
     );
-    let current_standard_match_port = Arc::new(HttpCurrentStandardMatchPort::new(
-        config.ticket_monitor_base_url.clone(),
-    ));
-    let ticket_watch_port = Arc::new(HttpTicketMonitorPort::new(
-        config.ticket_monitor_base_url.clone(),
-    ));
-    let seat_swap_repository = Arc::new(PostgresSeatSwapRepository::new(pool.clone()));
-    let seat_swap_current_match_port = Arc::new(TicketWatchCurrentSeatSwapMatchPort::new(
-        ticket_watch_port.clone(),
-    ));
-    let seat_swap_evidence_storage = Arc::new(MinioEvidenceStoragePort::new(config.minio.clone()));
-    let tracked_interest_cache_port: Arc<
-        dyn crate::ticket_watch::ports::tracked_interest_cache_port::TrackedInterestCachePort,
-    > = match RedisTrackedInterestCachePort::new(&config.redis_url, 60) {
-        Ok(port) => Arc::new(port),
-        Err(error) => {
-            tracing::warn!(error = %error, "failed to initialize tracked interest redis cache, fallback to noop");
-            Arc::new(NoopTrackedInterestCachePort)
-        }
-    };
-    let register_with_invite_use_case = Arc::new(RegisterWithInviteUseCase::new(
-        auth_repository.clone(),
-        password_port.clone(),
-        token_port.clone(),
-        Duration::days(30),
-    ));
-    let login_with_password_use_case = Arc::new(LoginWithPasswordUseCase::new(
-        auth_repository.clone(),
-        password_port,
-        token_port.clone(),
-        Duration::days(30),
-    ));
-    let reset_password_with_invite_use_case = Arc::new(ResetPasswordWithInviteUseCase::new(
-        auth_repository.clone(),
-        Arc::new(Argon2PasswordPort),
-    ));
-    let complete_wechat_login_use_case = Arc::new(CompleteWechatLoginUseCase::new(
-        auth_repository.clone(),
-        wechat_oauth_port,
-        token_port.clone(),
-        Duration::days(30),
-        Duration::minutes(10),
-    ));
-    let complete_mini_wechat_login_use_case = Arc::new(CompleteMiniWechatLoginUseCase::new(
-        auth_repository.clone(),
-        mini_wechat_oauth_port,
-        token_port.clone(),
-        Duration::days(30),
-        Duration::minutes(10),
-    ));
-    let bind_wechat_account_use_case = Arc::new(BindWechatAccountUseCase::new(
-        auth_repository.clone(),
-        Arc::new(Argon2PasswordPort),
-        token_port.clone(),
-        Duration::days(30),
-    ));
-    let bind_mini_wechat_account_use_case = Arc::new(BindWechatMiniProgramAccountUseCase::new(
-        auth_repository.clone(),
-        token_port.clone(),
-        Duration::days(30),
-    ));
-    let get_current_user_use_case = Arc::new(GetCurrentUserUseCase::new(
-        auth_repository.clone(),
-        token_port.clone(),
-    ));
-    let record_page_activity_use_case = Arc::new(RecordPageActivityUseCase::new(
-        user_activity_repository.clone(),
-    ));
-    let list_support_teams_use_case =
-        Arc::new(ListSupportTeamsUseCase::new(support_repository.clone()));
-    let get_support_profile_use_case =
-        Arc::new(GetSupportProfileUseCase::new(support_repository.clone()));
-    let set_favorite_team_use_case =
-        Arc::new(SetFavoriteTeamUseCase::new(support_repository.clone()));
-    let get_match_support_detail_use_case = Arc::new(GetMatchSupportDetailUseCase::new(
-        support_repository.clone(),
-    ));
-    let cast_match_support_vote_use_case =
-        Arc::new(CastMatchSupportVoteUseCase::new(support_repository));
-    let ai_chat_port: Arc<dyn AiChatPort> = match config.openai_api_key.clone() {
-        Some(openai_api_key) => Arc::new(RigOpenAiChatPort::new(
-            openai_api_key,
-            config.ai_chat_model.clone(),
-            config.openai_base_url.clone(),
-            system_config_port.clone(),
-            insight_repository.clone(),
-        )),
-        None => Arc::new(DisabledAiChatPort::new()),
-    };
-    let chat_with_model_use_case = Arc::new(ChatWithModelUseCase::new(ai_chat_port));
-    let logout_use_case = Arc::new(LogoutUseCase::new());
-    let wechat_webhook_use_case = Arc::new(HandleWechatWebhookUseCase::new(
-        auth_repository.clone(),
-        wechat_crypto_port,
-        current_standard_match_port,
-        system_config_port.clone(),
-    ));
-    let auth_web_config = Arc::new(AuthWebConfig {
-        wechat_app_id: config.wechat_app_id.clone(),
-    });
-    let get_team_board_use_case = Arc::new(GetTeamBoardUseCase::new(
-        team_board_repository.clone(),
-        insight_repository.clone(),
-    ));
-    let create_team_board_post_use_case = Arc::new(CreateTeamBoardPostUseCase::new(
-        team_board_repository.clone(),
-        insight_repository.clone(),
-    ));
-    let add_team_board_comment_use_case = Arc::new(AddTeamBoardCommentUseCase::new(
-        team_board_repository.clone(),
-    ));
-    let toggle_team_board_post_like_use_case =
-        Arc::new(ToggleTeamBoardPostLikeUseCase::new(team_board_repository));
-    let team_board_web_state = Arc::new(TeamBoardWebState {
-        get_team_board_use_case,
-        create_team_board_post_use_case,
-        add_team_board_comment_use_case,
-        toggle_team_board_post_like_use_case,
-        token_port,
-    });
-    let support_web_state = Arc::new(SupportWebState {
-        list_support_teams_use_case,
-        get_support_profile_use_case,
-        set_favorite_team_use_case,
-        get_match_support_detail_use_case,
-        cast_match_support_vote_use_case,
-        token_port: team_board_web_state.token_port.clone(),
-    });
-    let ticket_watch_web_state = Arc::new(TicketWatchWebState {
-        get_current_ticket_watch_board_use_case: Arc::new(GetCurrentTicketWatchBoardUseCase::new(
-            Arc::new(CurrentTicketWatchBoardCache::new(
-                std::time::Duration::from_secs(2),
-            )),
-            Arc::new(GetCurrentTicketWatchMatchUseCase::new(
-                ticket_watch_port.clone(),
-            )),
-            Arc::new(GetMatchTicketInventoryUseCase::new(
-                ticket_watch_port.clone(),
-            )),
-            Arc::new(GetMatchBlockInterestsUseCase::new(
-                ticket_watch_port.clone(),
-            )),
-            Arc::new(GetMatchTrackedInterestsUseCase::new(
-                ticket_watch_port.clone(),
-                tracked_interest_cache_port.clone(),
-            )),
-        )),
-        get_current_ticket_watch_match_use_case: Arc::new(GetCurrentTicketWatchMatchUseCase::new(
-            ticket_watch_port.clone(),
-        )),
-        list_ticket_watch_matches_use_case: Arc::new(ListTicketWatchMatchesUseCase::new(
-            ticket_watch_port.clone(),
-        )),
-        list_ticket_watch_regions_use_case: Arc::new(ListTicketWatchRegionsUseCase::new(
-            ticket_watch_port.clone(),
-        )),
-        get_match_ticket_inventory_use_case: Arc::new(GetMatchTicketInventoryUseCase::new(
-            ticket_watch_port.clone(),
-        )),
-        get_match_block_interests_use_case: Arc::new(GetMatchBlockInterestsUseCase::new(
-            ticket_watch_port.clone(),
-        )),
-        get_match_tracked_interests_use_case: Arc::new(GetMatchTrackedInterestsUseCase::new(
-            ticket_watch_port.clone(),
-            tracked_interest_cache_port.clone(),
-        )),
-        toggle_match_block_interest_use_case: Arc::new(ToggleMatchBlockInterestUseCase::new(
-            ticket_watch_port.clone(),
-            tracked_interest_cache_port,
-        )),
-        get_yukun_ticket_inventory_use_case: Arc::new(GetYukunTicketInventoryUseCase::new(
-            ticket_watch_port.clone(),
-        )),
-        list_yukun_match_ticket_regions_use_case: Arc::new(
-            ListYukunMatchTicketRegionsUseCase::new(ticket_watch_port.clone()),
-        ),
-        list_yukun_ticket_watch_matches_use_case: Arc::new(
-            ListYukunTicketWatchMatchesUseCase::new(ticket_watch_port.clone()),
-        ),
-        get_yukun_current_ticket_watch_match_use_case: Arc::new(
-            GetYukunCurrentTicketWatchMatchUseCase::new(ticket_watch_port),
-        ),
-        token_port: support_web_state.token_port.clone(),
-    });
-    let seat_swap_web_state = Arc::new(SeatSwapWebState {
-        get_current_use_case: Arc::new(GetCurrentSeatSwapUseCase::new(
-            seat_swap_repository.clone(),
-            seat_swap_current_match_port.clone(),
-        )),
-        upsert_my_request_use_case: Arc::new(UpsertMySeatSwapRequestUseCase::new(
-            seat_swap_repository.clone(),
-            seat_swap_current_match_port.clone(),
-        )),
-        cancel_my_request_use_case: Arc::new(CancelMySeatSwapRequestUseCase::new(
-            seat_swap_repository.clone(),
-            seat_swap_current_match_port.clone(),
-        )),
-        confirm_candidate_use_case: Arc::new(ConfirmSeatSwapCandidateUseCase::new(
-            seat_swap_repository.clone(),
-            seat_swap_current_match_port.clone(),
-        )),
-        cancel_matched_use_case: Arc::new(CancelMatchedSeatSwapUseCase::new(
-            seat_swap_repository,
-            seat_swap_current_match_port,
-            seat_swap_evidence_storage,
-        )),
-        token_port: support_web_state.token_port.clone(),
-    });
-    let ai_web_state = Arc::new(AiWebState {
-        chat_with_model_use_case,
-        get_current_user_use_case: get_current_user_use_case.clone(),
-    });
-    let activity_web_state = Arc::new(ActivityWebState {
-        record_page_activity_use_case,
-        token_port: team_board_web_state.token_port.clone(),
-    });
-    let order_repository = Arc::new(PostgresOrderRepository::new(pool.clone()));
-    let reflux_subscription_repository =
-        Arc::new(PostgresRefluxSubscriptionRepository::new(pool.clone()));
-    let payment_settlement_port = Arc::new(PostgresPaymentSettlementPort::new(pool.clone()));
-    let wechat_pay_port = Arc::new(HttpWechatPayPort::new(
-        config.wechat_mini_app_id.clone(),
-        config.wechat_pay_mch_id.clone(),
-        config.wechat_pay_api_key.clone(),
-        config.public_base_url.clone(),
-    ));
+    let activity_routes = build_activity_routes(pool.clone(), auth.token_port.clone());
+    let ai_routes = build_ai_routes(
+        config,
+        system_config.system_config_port.clone(),
+        insight.repository.clone(),
+        auth.get_current_user_use_case.clone(),
+    );
+    let team_board_routes = build_team_board_routes(
+        pool.clone(),
+        insight.repository.clone(),
+        auth.token_port.clone(),
+    );
+    let support_routes = build_support_routes(pool.clone(), auth.token_port.clone());
+    let ticket_watch = build_ticket_watch(config, auth.token_port.clone());
     let user_membership_port: Arc<
         dyn crate::auth::ports::user_membership_port::UserMembershipPort,
-    > = auth_repository.clone();
-    let create_membership_order_use_case = Arc::new(CreateMembershipOrderUseCase::new(
-        order_repository.clone(),
+    > = auth.auth_repository.clone();
+    let seat_swap_routes = build_seat_swap_routes(
+        pool.clone(),
+        config,
+        ticket_watch.ticket_monitor_port.clone(),
+        auth.token_port.clone(),
         user_membership_port.clone(),
-        wechat_pay_port.clone(),
-    ));
-    let reflux_subscription_web_state = Arc::new(RefluxSubscriptionWebState {
-        get_plans_use_case: Arc::new(GetRefluxSubscriptionPlansUseCase::new(
-            reflux_subscription_repository.clone(),
-        )),
-        create_order_use_case: Arc::new(CreateRefluxSubscriptionOrderUseCase::new(
-            reflux_subscription_repository.clone(),
-            order_repository.clone(),
-            user_membership_port.clone(),
-            wechat_pay_port,
-        )),
-        repository: reflux_subscription_repository.clone(),
-        token_port: team_board_web_state.token_port.clone(),
-    });
-    let get_membership_product_use_case =
-        Arc::new(GetMembershipProductUseCase::new(system_config_port.clone()));
-    let get_order_status_use_case = Arc::new(GetOrderStatusUseCase::new(order_repository.clone()));
-    let handle_wechat_notify_use_case = Arc::new(HandleWechatNotifyUseCase::new(
-        order_repository.clone(),
-        payment_settlement_port,
-    ));
-    let payment_web_state = Arc::new(PaymentWebState {
-        create_membership_order_use_case,
-        get_membership_product_use_case,
-        get_order_status_use_case,
-        handle_wechat_notify_use_case,
-        token_port: team_board_web_state.token_port.clone(),
-        user_membership_port,
-        wechat_pay_api_key: config.wechat_pay_api_key.clone(),
-    });
+    );
+    let payment = build_payment(
+        pool.clone(),
+        config,
+        system_config.system_config_port.clone(),
+        user_membership_port.clone(),
+        auth.token_port.clone(),
+    );
+    let reflux_subscription_routes = build_reflux_subscription_routes(
+        pool.clone(),
+        payment.order_repository.clone(),
+        user_membership_port.clone(),
+        payment.wechat_pay_port.clone(),
+        auth.token_port.clone(),
+    );
 
-    let license_repository = Arc::new(PostgresLicenseRepository::new(pool.clone()));
-    let auth_license_web_state = Arc::new(AuthLicenseWebState {
-        generate_license_use_case: Arc::new(GenerateLicenseUseCase::new(
-            license_repository.clone(),
-        )),
-        bind_license_use_case: Arc::new(BindLicenseUseCase::new(license_repository)),
-        token_port: team_board_web_state.token_port.clone(),
-    });
-
-    let device_token_repository = Arc::new(PostgresDeviceTokenRepository::new(pool));
-    let push_notification_web_state = Arc::new(PushNotificationWebState {
-        register_use_case: Arc::new(RegisterDeviceTokenUseCase::new(device_token_repository)),
-        token_port: team_board_web_state.token_port.clone(),
-    });
+    let auth_license_routes = build_auth_license_routes(pool.clone(), auth.token_port.clone());
+    let push_notification_routes = build_push_notification_routes(pool, auth.token_port.clone());
 
     Router::new()
         .route("/", get(|| async { "football insight service" }))
-        .merge(health_routes(health_use_case))
-        .merge(system_config_routes(
-            system_config_use_case,
-            mini_program_review_config_use_case,
-        ))
-        .merge(auth_routes(
-            register_with_invite_use_case,
-            login_with_password_use_case,
-            reset_password_with_invite_use_case,
-            complete_wechat_login_use_case,
-            bind_wechat_account_use_case,
-            complete_mini_wechat_login_use_case,
-            bind_mini_wechat_account_use_case,
-            get_current_user_use_case,
-            logout_use_case,
-            wechat_webhook_use_case,
-            auth_web_config,
-        ))
-        .merge(activity_routes(activity_web_state))
-        .merge(ai_routes(ai_web_state))
-        .merge(support_routes(support_web_state))
-        .merge(ticket_watch_routes(ticket_watch_web_state))
-        .merge(seat_swap_routes(seat_swap_web_state))
-        .merge(insight_routes(
-            overview_use_case,
-            live_overview_use_case,
-            live_rankings_use_case,
-            live_team_insights_use_case,
-            live_matches_use_case,
-            round_overview_use_case,
-            round_rankings_use_case,
-            round_matches_use_case,
-            available_rounds_use_case,
-        ))
-        .merge(team_board_routes(team_board_web_state))
-        .merge(payment_routes(payment_web_state))
-        .merge(reflux_subscription_routes(reflux_subscription_web_state))
-        .merge(auth_license_routes(auth_license_web_state))
-        .merge(push_notification_routes(push_notification_web_state))
+        .merge(health_routes)
+        .merge(system_config.routes)
+        .merge(auth.routes)
+        .merge(activity_routes)
+        .merge(ai_routes)
+        .merge(support_routes)
+        .merge(ticket_watch.routes)
+        .merge(seat_swap_routes)
+        .merge(insight.routes)
+        .merge(team_board_routes)
+        .merge(payment.routes)
+        .merge(reflux_subscription_routes)
+        .merge(auth_license_routes)
+        .merge(push_notification_routes)
 }

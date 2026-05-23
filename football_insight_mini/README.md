@@ -158,3 +158,31 @@ bun run build:mp-weixin
 - 工作区总说明: [football_insight](../README.md)
 - 后端: [football_insight_service_backend_rs](../football_insight_service_backend_rs/README.md)
 - 抓取器: [sina_csl_scraper](../sina_csl_scraper/README.md)
+
+## 微信 CI 上传
+
+本项目已经接入本机共享的微信小程序 CI CLI，可以直接在项目内执行：
+
+```bash
+bun run mp:preview
+bun run mp:upload
+```
+
+首次使用前：
+
+1. 复制 `.env.ci.local.example` 为 `.env.ci.local`
+2. 填写真实私钥路径 `MINI_PROGRAM_PRIVATE_KEY_PATH`
+3. 如需覆盖机器人编号，可修改 `MINI_PROGRAM_CI_ROBOT`
+
+示例：
+
+```bash
+bun run mp:preview -- --robot 2 --desc "本地预览"
+bun run mp:upload -- --robot 2 --version 1.0.43 --desc "提交体验版"
+```
+
+说明：
+
+- 命令会先自动执行 `bun run build:mp-weixin`
+- 然后调用微信官方 `miniprogram-ci`
+- `preview` 默认在 `dist/build/mp-weixin/preview-qrcode.jpg` 输出预览二维码

@@ -93,6 +93,8 @@ pub struct AppConfig {
     pub smtp_email: Option<SmtpEmailConfig>,
     pub minio: Option<MinioConfig>,
     pub jpush: Option<JPushConfig>,
+    pub seat_swap_mini_subscribe_template_id: String,
+    pub seat_swap_mini_subscribe_page: String,
 }
 
 #[derive(Debug, Clone)]
@@ -173,6 +175,10 @@ impl AppConfig {
         let smtp_email = SmtpEmailConfig::from_env();
         let minio = MinioConfig::from_env();
         let jpush = JPushConfig::from_env();
+        let seat_swap_mini_subscribe_template_id =
+            std::env::var("WECHAT_MINI_SEAT_SWAP_SUBSCRIBE_TEMPLATE_ID").unwrap_or_default();
+        let seat_swap_mini_subscribe_page = std::env::var("WECHAT_MINI_SEAT_SWAP_SUBSCRIBE_PAGE")
+            .unwrap_or_else(|_| "pages/seat-swap/index".to_string());
 
         Ok(Self {
             port,
@@ -197,6 +203,8 @@ impl AppConfig {
             smtp_email,
             minio,
             jpush,
+            seat_swap_mini_subscribe_template_id,
+            seat_swap_mini_subscribe_page,
         })
     }
 }

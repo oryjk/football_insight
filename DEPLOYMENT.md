@@ -4,15 +4,19 @@
 
 ## 生产环境
 
-- 服务器别名：`jd`
-- 服务器登录：`ssh jd`
+- 默认生产服务器别名：`jd`
+- 默认生产服务器登录：`ssh jd`
+- 备用生产服务器别名：`peiqian`
+- 备用生产服务器登录：`ssh peiqian`
 - 前端访问地址：`https://match.oryjk.cn/football/`
 - 后端接口前缀：`https://match.oryjk.cn/api/v1/`
+- `match.oryjk.cn` 当前对应 `jd`；`jd` 与 `peiqian` 之间通过 WireGuard 联通
 
 ## 生产目录
 
 - monorepo 目录：`/root/projects/football_insight`
 - 后端项目目录：`/root/projects/football_insight/football_insight_service_backend_rs`
+- `peiqian` 运行时 env 文件：`/root/projects/football_insight/football-insight-service-backend-rs.env`
 - scraper 生产运行机器：`local233`
 - scraper monorepo 目录：`/home/betalpha/projects/football_insight`
 - scraper 项目目录：`/home/betalpha/projects/football_insight/sina_csl_scraper`
@@ -24,7 +28,8 @@
 
 ## Nginx 约定
 
-- `jd` 上 Nginx 运行在 Docker 容器里
+- `jd` 是当前线上域名入口机
+- `peiqian` 当前已确认本机后端 `8092` 和 `ticket-monitor-axum` `4000` 正常监听
 - 当前只允许修改 football 相关路径
 - 如果发现路由冲突，不要直接修改其他服务配置，先确认
 - 如果修改了 Nginx 配置：
@@ -78,21 +83,30 @@ curl -I https://match.oryjk.cn/football/
 
 ### 2. Docker 发布
 
+部署到 `jd`：
+
 ```bash
 cd football_insight_service_backend_rs
 ./deploy_jd_docker.sh
 ```
 
-Docker 发布脚本会完成：
+部署到 `peiqian`：
+
+```bash
+cd football_insight_service_backend_rs
+./deploy_peiqian_docker.sh
+```
+
+两个 Docker 发布脚本都会完成：
 
 - 检查本地提交已经 push 到 `origin/main`
 - 在 `out109` 拉取最新 monorepo
 - 在 `out109` 构建 Docker 镜像并推送到 Harbor
-- 在 `jd` 拉取镜像
-- 停用旧 `football-insight.service`
-- 重建并启动 `football-insight-service-backend-rs` 容器
-- 挂载 `/root/projects/football_insight/football_insight_service_backend_rs/logs` 到容器 `/app/logs`
-- 验证 `http://127.0.0.1:8092/api/health`
+
+其中：
+
+- `deploy_jd_docker.sh` 会在 `jd` 拉取镜像并重启容器
+- `deploy_peiqian_docker.sh` 会在 `peiqian` 拉取镜像并重启容器，并自动补齐 `peiqian:/root/projects/football_insight` monorepo 工作区（首次部署时）
 
 发布前需要在本地 `football_insight_service_backend_rs/.env` 或环境变量中提供 Harbor 凭据，例如 `HARBOR_PASSWORD`。不要提交真实 `.env`。
 
@@ -102,6 +116,14 @@ Docker 发布脚本会完成：
 
 ```bash
 ssh jd
+cd /root/projects/football_insight/football_insight_service_backend_rs
+cargo run --release --bin run_migrations
+```
+
+如部署到 `peiqian`：
+
+```bash
+ssh peiqian
 cd /root/projects/football_insight/football_insight_service_backend_rs
 cargo run --release --bin run_migrations
 ```
@@ -117,7 +139,7 @@ cargo run --release --bin run_migrations -- migrations/<your_migration>.sql
 
 ### 4. systemd 备用发布
 
-只有明确不用 Docker 时，才走 systemd 备用流程：
+只有明确不用 Docker 时，才走 systemd 备用流程。下面示例是 `jd`：
 
 ```bash
 ssh jd
@@ -134,8 +156,23 @@ systemctl status football-insight.service --no-pager
 ### 5. 后端上线后验证
 
 ```bash
+部署到 `jd`：
+
+```bash
 ssh jd 'docker ps --filter name=football-insight-service-backend-rs'
 ssh jd 'curl http://127.0.0.1:8092/api/health'
+```
+
+部署到 `peiqian`：
+
+```bash
+ssh peiqian 'docker ps --filter name=football-insight-service-backend-rs'
+ssh peiqian 'curl http://127.0.0.1:8092/api/health'
+```
+
+线上入口验证：
+
+```bash
 curl https://match.oryjk.cn/api/v1/live/overview
 curl https://match.oryjk.cn/api/v1/system/public-config
 ```
@@ -191,8 +228,10 @@ ssh jd 'journalctl -u football-insight.service -n 100 --no-pager'
 ### 纯后端改动
 
 1. push 代码
-2. 优先执行 `football_insight_service_backend_rs/deploy_jd_docker.sh`
-3. 如有 migration，再在 `jd` 执行 `cargo run --release --bin run_migrations`
+2. 选择目标机：
+   - `football_insight_service_backend_rs/deploy_jd_docker.sh`
+   - `football_insight_service_backend_rs/deploy_peiqian_docker.sh`
+3. 如有 migration，在对应目标机执行 `cargo run --release --bin run_migrations`
 4. `curl` 验证接口
 5. 优先看 `logs/app.log`，必要时再看 `docker logs`
 
@@ -217,7 +256,7 @@ ssh jd 'journalctl -u football-insight.service -n 100 --no-pager'
 
 ### 小程序改动
 
-小程序不通过 `jd` 上的 Nginx 发布，发布流程是：
+小程序不通过 `jd` 上的 Nginx Docker 发布脚本，发布流程是：
 
 1. 本地 `bun run build:mp-weixin`
 2. 用微信开发者工具打开 `dist/build/mp-weixin`
@@ -225,7 +264,7 @@ ssh jd 'journalctl -u football-insight.service -n 100 --no-pager'
 
 ## 风险点
 
-- `jd` 上 Nginx 承载了其他服务，不要顺手改非 football 路由
+- 不要把“后端已发布到 `peiqian`”和“线上域名入口已经切到 `peiqian`”混为一谈
 - 后端部署前如果忘了 push，服务器拉不到最新代码
 - 有 migration 时，如果只重启服务不跑迁移，接口可能变成 `500`
 - 如果后端代码改了，本地验证前必须先重启本地后端，不要在旧进程上验证新逻辑

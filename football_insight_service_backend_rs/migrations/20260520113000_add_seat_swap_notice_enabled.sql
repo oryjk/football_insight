@@ -1,0 +1,2 @@
+ALTER TABLE f_i_users
+ADD COLUMN IF NOT EXISTS seat_swap_notice_enabled BOOLEAN NOT NULL DEFAULT FALSE;

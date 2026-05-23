@@ -19,10 +19,7 @@ impl SettleRefluxSubscriptionOrderUseCase {
         Self { repository }
     }
 
-    pub async fn execute(
-        &self,
-        input: SettleRefluxSubscriptionOrderInput,
-    ) -> anyhow::Result<()> {
+    pub async fn execute(&self, input: SettleRefluxSubscriptionOrderInput) -> anyhow::Result<()> {
         let team_code = normalize_team_code(&input.team_code);
         let plan = self
             .repository
@@ -80,7 +77,9 @@ fn resolve_subscription_expires_at(
     starts_at: chrono::DateTime<Utc>,
 ) -> Option<chrono::DateTime<Utc>> {
     match plan.scope {
-        RefluxSubscriptionScope::SingleMatch => plan.expires_at.or(Some(starts_at + chrono::Duration::days(7))),
+        RefluxSubscriptionScope::SingleMatch => plan
+            .expires_at
+            .or(Some(starts_at + chrono::Duration::days(7))),
         RefluxSubscriptionScope::Season => plan.expires_at,
         RefluxSubscriptionScope::Lifetime => None,
     }
@@ -131,8 +130,7 @@ mod tests {
             UserRefluxSubscription,
         },
         ports::reflux_subscription_repository::{
-            CreateNotificationJobInput, CreateRefluxSubscriptionInput,
-            RefluxSubscriptionRepository,
+            CreateNotificationJobInput, CreateRefluxSubscriptionInput, RefluxSubscriptionRepository,
         },
     };
 

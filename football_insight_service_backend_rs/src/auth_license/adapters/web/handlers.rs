@@ -59,7 +59,12 @@ pub async fn bind_license_handler(
     let token = state
         .token_port
         .issue_token(result.user_id, &result.license_key, expires_at)
-        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "token issue failed".to_string()))?;
+        .map_err(|_| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "token issue failed".to_string(),
+            )
+        })?;
     Ok(Json(BindLicenseResponse {
         access_token: token,
         user: serde_json::json!({"id": result.user_id.to_string()}),

@@ -71,8 +71,7 @@ mod tests {
             .single()
             .expect("valid expiration");
 
-        let settlement =
-            resolve_membership_settlement("V9", Some(existing_expires_at), "V9", now);
+        let settlement = resolve_membership_settlement("V9", Some(existing_expires_at), "V9", now);
 
         assert_eq!(settlement.effective_tier, "V9");
         assert!(settlement.should_refresh_paid_expiration);
@@ -133,8 +132,7 @@ impl PaymentSettlementPort for PostgresPaymentSettlementPort {
         let (current_tier, current_expires_at) = current_user
             .map(|row| {
                 let membership_tier: String = row.get("membership_tier");
-                let membership_expires_at: Option<DateTime<Utc>> =
-                    row.get("membership_expires_at");
+                let membership_expires_at: Option<DateTime<Utc>> = row.get("membership_expires_at");
 
                 (membership_tier, membership_expires_at)
             })

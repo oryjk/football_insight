@@ -21,6 +21,7 @@ export interface SeatSwapRequest {
   request_id: string
   user_id: string
   display_name: string
+  avatar_url?: string | null
   current_region_key: string
   current_region_name: string
   current_row: string
@@ -29,6 +30,7 @@ export interface SeatSwapRequest {
   contact?: SeatSwapContact | null
   status: string
   created_at: string
+  seat_swap_notice_enabled?: boolean
 }
 
 export interface SeatSwapCandidate extends SeatSwapRequest {
@@ -49,6 +51,7 @@ export interface UpsertSeatSwapRequestPayload {
   current_seat_no: string
   wechat_id?: string | null
   phone_number?: string | null
+  seat_swap_notice_enabled?: boolean
   desired_seats: SeatSwapDesiredSeat[]
 }
 

@@ -95,7 +95,9 @@ cargo run
 ```
 
 **生产部署脚本**：
-- `bash deploy/deploy-backend-docker.sh` — Docker 方式（out109 build → Harbor → jd 拉镜像）
+- `./deploy_jd_docker.sh` — Docker 方式（out109 build → Harbor → jd 拉镜像）
+- `./deploy_peiqian_docker.sh` — Docker 方式（out109 build → Harbor → peiqian 拉镜像）
+- `bash deploy/deploy-backend-docker.sh` — 旧 Docker 脚本，默认部署到 jd
 - `bash deploy/deploy-backend-binary.sh` — systemd 方式（jd 上 cargo build --release → systemctl restart）
 - 生产默认用 Docker 方式，systemd 为备用
 

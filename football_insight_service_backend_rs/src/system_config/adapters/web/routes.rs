@@ -64,11 +64,8 @@ mod tests {
     use crate::{
         insight::{
             domain::{
-                match_list::MatchListView,
-                overview::InsightOverview,
-                rankings::RankingsView,
-                round_reference::RoundReference,
-                team_insight::TeamInsightsView,
+                match_list::MatchListView, overview::InsightOverview, rankings::RankingsView,
+                round_reference::RoundReference, team_insight::TeamInsightsView,
             },
             ports::insight_query_repository::InsightQueryRepository,
         },

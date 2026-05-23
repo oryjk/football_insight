@@ -59,16 +59,19 @@ cargo run --bin football_insight_service_backend_rs
 
 ## 部署注意
 
-- 生产服务器：`jd`，可以 ssh jd 上去
+- 默认生产服务器：`jd`，可以 ssh jd 上去
+- 备用生产服务器：`peiqian`，可以 `ssh peiqian` 上去
 - 生产 monorepo 目录：`/root/projects/football_insight`
 - 项目目录：`/root/projects/football_insight/football_insight_service_backend_rs`
 - 不要随意改 Nginx 非 football 路由
 - 生产后端优先使用 Docker 管理：容器名 `football-insight-service-backend-rs`
-- 常规后端发布优先运行 `./deploy_jd_docker.sh`
+- 部署到 `jd` 时运行 `./deploy_jd_docker.sh`
+- 部署到 `peiqian` 时运行 `./deploy_peiqian_docker.sh`
 - systemd `football-insight.service` 保留为备用部署方式
 - 不要再用裸 `cargo run`、前台进程或只依赖 SSH 会话的后台进程托管生产后端
 - 只有修改 systemd unit 文件后才需要 `systemctl daemon-reload`
 - 只有修改 Nginx 配置后才需要 reload/restart Nginx；普通后端发布不需要重启 Nginx
+- 当前已确认 `peiqian` 本机 8092 在监听且容器健康；`match.oryjk.cn` 仍对应 `jd`，两台机器通过 WireGuard 联通
 - 发布后至少验证：
   - `docker ps --filter name=football-insight-service-backend-rs`
   - `curl -i http://127.0.0.1:8092/`

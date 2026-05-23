@@ -22,10 +22,10 @@ impl RegisterDeviceTokenUseCase {
             return Err(anyhow::anyhow!("device token cannot be empty"));
         }
         if platform != "jpush" && platform != "fcm" && platform != "apns" {
-            return Err(anyhow::anyhow!(
-                "platform must be jpush, fcm or apns"
-            ));
+            return Err(anyhow::anyhow!("platform must be jpush, fcm or apns"));
         }
-        self.repository.upsert(user_id, device_token, platform).await
+        self.repository
+            .upsert(user_id, device_token, platform)
+            .await
     }
 }

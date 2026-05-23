@@ -7,7 +7,10 @@ use crate::{
         domain::{SeatSwapCurrentMatch, SeatSwapRegion},
         ports::current_match_port::CurrentSeatSwapMatchPort,
     },
-    ticket_watch::ports::ticket_monitor_port::TicketMonitorPort,
+    ticket_watch::{
+        application::list_ticket_watch_regions::complete_phoenix_hill_regions,
+        ports::ticket_monitor_port::TicketMonitorPort,
+    },
 };
 
 pub struct TicketWatchCurrentSeatSwapMatchPort {
@@ -42,10 +45,10 @@ impl CurrentSeatSwapMatchPort for TicketWatchCurrentSeatSwapMatchPort {
     }
 
     async fn current_regions(&self) -> anyhow::Result<Vec<SeatSwapRegion>> {
-        Ok(self
-            .ticket_monitor_port
-            .fetch_regions()
-            .await?
+        let regions =
+            complete_phoenix_hill_regions(self.ticket_monitor_port.fetch_regions().await?);
+
+        Ok(regions
             .into_iter()
             .map(|region| SeatSwapRegion {
                 region_key: region.block_key,

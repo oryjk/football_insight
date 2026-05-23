@@ -52,7 +52,9 @@ pub fn spawn_reflux_notification_worker(pool: PgPool, config: &AppConfig) {
     let repository = Arc::new(PostgresRefluxSubscriptionRepository::new(pool.clone()));
     let enqueue_use_case = Arc::new(ProcessRefluxNotificationsUseCase::new(
         repository.clone(),
-        Arc::new(HttpTicketMonitorPort::new(config.ticket_monitor_base_url.clone())),
+        Arc::new(HttpTicketMonitorPort::new(
+            config.ticket_monitor_base_url.clone(),
+        )),
     ));
     let send_use_case = Arc::new(ProcessRefluxNotificationJobsUseCase::new(
         repository.clone(),

@@ -96,9 +96,9 @@ mod tests {
                 get_yukun_current_ticket_watch_match::GetYukunCurrentTicketWatchMatchUseCase,
                 get_yukun_ticket_inventory::GetYukunTicketInventoryUseCase,
                 list_ticket_watch_matches::ListTicketWatchMatchesUseCase,
+                list_ticket_watch_regions::ListTicketWatchRegionsUseCase,
                 list_yukun_match_ticket_regions::ListYukunMatchTicketRegionsUseCase,
                 list_yukun_ticket_watch_matches::ListYukunTicketWatchMatchesUseCase,
-                list_ticket_watch_regions::ListTicketWatchRegionsUseCase,
                 toggle_match_block_interest::ToggleMatchBlockInterestUseCase,
             },
             domain::ticket_watch::{
@@ -172,12 +172,15 @@ mod tests {
 
         async fn fetch_yukun_current_match(
             &self,
-        ) -> anyhow::Result<crate::ticket_watch::domain::ticket_watch::TicketWatchCurrentMatchView> {
-            Ok(crate::ticket_watch::domain::ticket_watch::TicketWatchCurrentMatchView {
-                current_match: None,
-                group_ticket_active: false,
-                message: "".to_string(),
-            })
+        ) -> anyhow::Result<crate::ticket_watch::domain::ticket_watch::TicketWatchCurrentMatchView>
+        {
+            Ok(
+                crate::ticket_watch::domain::ticket_watch::TicketWatchCurrentMatchView {
+                    current_match: None,
+                    group_ticket_active: false,
+                    message: "".to_string(),
+                },
+            )
         }
 
         async fn fetch_yukun_reflux(

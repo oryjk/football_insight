@@ -34,7 +34,12 @@ impl ProcessRefluxNotificationsUseCase {
     pub async fn execute(&self) -> anyhow::Result<usize> {
         let mut created_jobs = 0usize;
 
-        if let Some(match_info) = self.ticket_monitor_port.fetch_current_match().await?.current_match {
+        if let Some(match_info) = self
+            .ticket_monitor_port
+            .fetch_current_match()
+            .await?
+            .current_match
+        {
             created_jobs += self
                 .process_match("chengdurongcheng", &match_info, TeamRefluxSource::Chengdu)
                 .await?;
@@ -60,12 +65,10 @@ impl ProcessRefluxNotificationsUseCase {
         match_info: &TicketWatchMatchSummary,
         source: TeamRefluxSource,
     ) -> anyhow::Result<usize> {
-        let sale_start_at = parse_ticket_datetime(
-            match_info
-                .sale_start_at
-                .as_deref()
-                .ok_or_else(|| anyhow::anyhow!("match {} missing sale_start_at", match_info.match_id))?,
-        )?;
+        let sale_start_at =
+            parse_ticket_datetime(match_info.sale_start_at.as_deref().ok_or_else(|| {
+                anyhow::anyhow!("match {} missing sale_start_at", match_info.match_id)
+            })?)?;
         let min_start_at = sale_start_at + Duration::minutes(10);
         let cursor = self
             .repository
@@ -181,7 +184,12 @@ fn infer_match_season(match_info: &TicketWatchMatchSummary) -> Option<i32> {
         .kickoff_at
         .get(0..4)
         .and_then(|value| value.parse::<i32>().ok())
-        .or_else(|| match_info.match_date.get(0..4).and_then(|value| value.parse::<i32>().ok()))
+        .or_else(|| {
+            match_info
+                .match_date
+                .get(0..4)
+                .and_then(|value| value.parse::<i32>().ok())
+        })
 }
 
 fn parse_ticket_datetime(value: &str) -> anyhow::Result<DateTime<Utc>> {

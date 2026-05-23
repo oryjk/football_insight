@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>换座位 · 设计 Mock (方案 A · 扁平化)</title>
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --bg-grad-top: rgba(233, 234, 241, 0.95);
+    --bg-grad-fade: rgba(244, 243, 246, 0.6);
+
+    --ink: #121212;
+    --ink-2: #5b5f6a;
+    --ink-3: #988f84;
+    --eyebrow: #8f7c5f;
+
+    --card-bg: rgba(255, 255, 255, 0.96);
+    --card-border: rgba(238, 233, 224, 0.95);
+    --card-shadow: 0 6px 13px rgba(46, 38, 27, 0.06);
+
+    --pill-bg: linear-gradient(180deg, rgba(255, 251, 242, 0.98), rgba(248, 241, 227, 0.94));
+    --pill-border: rgba(230, 220, 198, 0.92);
+    --pill-text: #9c855c;
+
+    --divider: rgba(220, 211, 192, 0.5);
+
+    --dark: #15161b;
+    --dark-grad: linear-gradient(180deg, #20242c, #191d26);
+
+    --accent-current: #d89b34;
+    --accent-current-soft: #f6b44e;
+    --accent-desired: #1d8a55;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body {
+    font-family: "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    background: linear-gradient(180deg, #1e1f24 0%, #14161a 100%);
+    min-height: 100vh;
+    padding: 56px 24px 80px;
+    color: #fff;
+  }
+  .stage-header { text-align: center; margin-bottom: 40px; }
+  .stage-header h1 { font-size: 20px; font-weight: 600; letter-spacing: 0.4px; margin-bottom: 6px; }
+  .stage-header p { color: #8e93a0; font-size: 13px; }
+  .stage { display: flex; gap: 28px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+  .frame { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 360px; }
+  .frame__caption { font-size: 12px; color: #b8bcc6; font-weight: 500; line-height: 1.6; text-align: center; max-width: 340px; }
+  .frame__caption strong { color: #fff; display: block; margin-bottom: 3px; font-size: 13px; font-weight: 700; }
+
+  /* ==== Phone shell ==== */
+  .phone {
+    width: 360px;
+    height: 720px;
+    background:
+      linear-gradient(180deg, var(--bg-grad-top) 0, var(--bg-grad-fade) 90px),
+      var(--bg);
+    border-radius: 42px;
+    border: 8px solid #1d1e22;
+    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .statusbar {
+    height: 30px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 22px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .navbar {
+    height: 40px;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: 0.4px;
+  }
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 14px 100px;
+    position: relative;
+  }
+
+  /* ==== 唯一一种"卡片":hero / candidate 共用 ==== */
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 13px 14px;
+    box-shadow: var(--card-shadow);
+  }
+
+  /* ==== Hero(比赛信息),沿用 .hero-card 结构 ==== */
+  .hero-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .hero-card__icon-box {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #f7efe1, #f1e3ca);
+    border: 1px solid rgba(220, 201, 165, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  }
+  .hero-card__icon-mark {
+    color: #927445;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .hero-card__body { flex: 1; min-width: 0; }
+  .eyebrow {
+    display: block;
+    color: var(--eyebrow);
+    font-size: 11px;
+    font-weight: 400;
+  }
+  .hero-card__title {
+    display: block;
+    margin-top: 2px;
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.2;
+  }
+  .hero-card__summary {
+    display: block;
+    margin-top: 3px;
+    color: var(--ink-3);
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .meta-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    white-space: nowrap;
+    line-height: 1;
+    padding: 6px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--pill-border);
+    background: var(--pill-bg);
+    color: var(--pill-text);
+    font-size: 11px;
+    font-weight: 400;
+  }
+
+  /* ==== 球场图(无外卡片,直接铺) ==== */
+  .pitch {
+    position: relative;
+    width: 100%;
+    height: 200px;
+    border-radius: 14px;
+    background:
+      radial-gradient(ellipse at 50% 50%, rgba(255, 251, 242, 0.5), rgba(241, 234, 219, 0.45)),
+      #ece5d3;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 0 0 1px rgba(220, 211, 192, 0.4);
+    overflow: visible;
+    margin-bottom: 8px;
+  }
+  .pitch__field {
+    position: absolute;
+    left: 30%;
+    top: 38%;
+    width: 40%;
+    height: 24%;
+    background: repeating-linear-gradient(90deg, #b8d8b8 0 16%, #aed0ae 16% 32%);
+    border-radius: 3px;
+    border: 1px solid rgba(70, 130, 80, 0.35);
+  }
+  .pitch__field::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    border-left: 1px dashed rgba(255, 255, 255, 0.6);
+  }
+  .region {
+    position: absolute;
+    border-radius: 3px;
+    font-size: 8px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  }
+  .region--blue { background: #336fbd; }
+  .region--green { background: #46ab59; }
+  .region--purple { background: #6c369b; }
+  .region--yellow { background: #f4c23a; color: #5a4612; }
+  .region--navy { background: #0f215e; }
+  .region--red { background: #ec3b20; }
+  .region__badge {
+    position: absolute;
+    top: -7px;
+    right: -7px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    background: var(--dark-grad);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid #fffaef;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+  }
+  .region--highlighted-current {
+    outline: 3px solid rgba(216, 155, 52, 0.85);
+    outline-offset: 1px;
+    z-index: 3;
+    transform: scale(1.18);
+  }
+  .region--highlighted-desired {
+    outline: 3px solid rgba(29, 138, 85, 0.85);
+    outline-offset: 1px;
+    z-index: 3;
+    transform: scale(1.18);
+  }
+  .region--filter-on {
+    outline: 2.5px solid var(--ink);
+    outline-offset: 1px;
+    z-index: 4;
+    transform: scale(1.22);
+  }
+  .region--dimmed { opacity: 0.42; }
+
+  /* 球场下方图例 */
+  .legend {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 4px 14px;
+    color: var(--ink-3);
+    font-size: 11px;
+  }
+  .legend__items { display: flex; align-items: center; gap: 12px; }
+  .legend__dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+  .legend__dot--current { background: var(--accent-current); }
+  .legend__dot--desired { background: var(--accent-desired); }
+  .legend__dot--hot { background: #20242c; width: 7px; height: 7px; }
+
+  /* ==== Section title row(无卡片) ==== */
+  .section-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 12px 4px 8px;
+  }
+  .section-row__title {
+    font-size: 15px;
+    color: var(--ink);
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+  .section-row__sub {
+    font-size: 11px;
+    color: var(--eyebrow);
+  }
+
+  /* ==== 分区分组 header(无卡片框,扁平 row) ==== */
+  .group-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 6px;
+    border-top: 1px solid var(--divider);
+  }
+  .group-row:first-of-type { border-top: none; }
+  .group-row--open {
+    border-top-color: transparent;
+  }
+  .group-row__main { display: flex; align-items: center; gap: 8px; }
+  .group-row__name {
+    font-size: 14px;
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .group-row__count {
+    font-size: 11px;
+    color: var(--eyebrow);
+    font-weight: 400;
+  }
+  .group-row__hit {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #eaf8ef, #dff1e6);
+    color: #167348;
+    border: 1px solid rgba(29, 138, 85, 0.3);
+    font-weight: 400;
+    margin-left: 4px;
+  }
+  .group-row__caret {
+    font-size: 11px;
+    color: var(--eyebrow);
+    font-weight: 400;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--pill-bg);
+    border: 1px solid var(--pill-border);
+  }
+
+  /* ==== Candidate 卡片(扁平铺开,无外层容器) ==== */
+  .candidate {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 12px 13px;
+    margin-bottom: 8px;
+    box-shadow: var(--card-shadow);
+  }
+  .candidate__user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .candidate__avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 28%, #fff, #ecedf2 70%);
+    border: 1px solid var(--card-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4b5563;
+    font-weight: 500;
+    font-size: 11px;
+    flex: 0 0 auto;
+  }
+  .candidate__name { font-size: 13px; font-weight: 500; color: var(--ink); line-height: 1.2; }
+  .candidate__seat { font-size: 10px; color: var(--ink-3); margin-top: 1px; }
+  .candidate__status {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 400;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--pill-border);
+    background: var(--pill-bg);
+    color: var(--pill-text);
+  }
+  .candidate__status--hot {
+    border-color: rgba(29, 138, 85, 0.35);
+    background: linear-gradient(180deg, #eaf8ef, #dff1e6);
+    color: #167348;
+  }
+  .candidate__wants {
+    font-size: 11px;
+    color: var(--ink-3);
+    padding-left: 38px;
+    margin-bottom: 9px;
+    line-height: 1.5;
+  }
+  .candidate__wants strong { color: var(--ink); font-weight: 500; }
+  .btn-confirm {
+    width: 100%;
+    background: var(--dark-grad);
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 9px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 9px rgba(21, 22, 27, 0.14);
+  }
+
+  /* ==== 筛选条(扁平,不卡片化) ==== */
+  .filter-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 4px 12px;
+    border-bottom: 1px solid var(--divider);
+    margin-bottom: 4px;
+  }
+  .filter-row__main { display: flex; align-items: center; gap: 8px; }
+  .filter-row__label { font-size: 14px; font-weight: 500; color: var(--ink); }
+  .filter-row__count { font-size: 11px; color: var(--eyebrow); }
+  .filter-row__clear {
+    background: var(--pill-bg);
+    border: 1px solid var(--pill-border);
+    color: var(--pill-text);
+    border-radius: 999px;
+    padding: 5px 11px;
+    font-size: 11px;
+    font-weight: 400;
+  }
+
+  /* ==== 底部 dock ==== */
+  .dock {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+    z-index: 5;
+  }
+  .cta {
+    width: 100%;
+    background: var(--dark-grad);
+    color: #fff;
+    border: none;
+    border-radius: 18px;
+    padding: 14px;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 24px rgba(21, 22, 27, 0.24);
+    letter-spacing: 0.4px;
+  }
+  .cta__icon {
+    font-size: 16px;
+    display: inline-flex;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.13);
+    align-items: center;
+    justify-content: center;
+    font-weight: 400;
+  }
+
+  /* ==== 已发布状态条 ==== */
+  .status-bar {
+    background: var(--card-bg);
+    border: 1px solid var(--pill-border);
+    border-radius: 18px;
+    padding: 12px 14px;
+    box-shadow: 0 12px 28px rgba(46, 38, 27, 0.1);
+  }
+  .status-bar__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .status-bar__label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink);
+  }
+  .status-bar__dot {
+    width: 7px;
+    height: 7px;
+    background: linear-gradient(180deg, var(--accent-current-soft), var(--accent-current));
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgba(216, 155, 52, 0.14);
+  }
+  .status-bar__manage {
+    font-size: 11px;
+    color: var(--eyebrow);
+    font-weight: 400;
+    padding: 4px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--pill-border);
+    background: var(--pill-bg);
+  }
+  .status-bar__body {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  .status-bar__seat-current {
+    color: #927445;
+    font-weight: 500;
+    padding: 3px 9px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #f7efe1, #f1e3ca);
+    border: 1px solid rgba(220, 201, 165, 0.6);
+  }
+  .status-bar__arrow { color: var(--ink-3); }
+  .status-bar__seat-desired {
+    color: #167348;
+    font-weight: 500;
+    padding: 3px 9px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #eaf8ef, #dff1e6);
+    border: 1px solid rgba(29, 138, 85, 0.3);
+  }
+
+  /* ==== 抽屉 ==== */
+  .scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 17, 22, 0.42);
+    z-index: 10;
+  }
+  .sheet {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 86%;
+    background:
+      linear-gradient(180deg, rgba(255, 251, 242, 1), rgba(255, 255, 255, 0.98));
+    border-radius: 22px 22px 0 0;
+    z-index: 11;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 -16px 32px rgba(12, 14, 20, 0.18);
+    border-top: 1px solid var(--card-border);
+  }
+  .sheet__handle {
+    width: 36px;
+    height: 4px;
+    background: rgba(143, 124, 95, 0.28);
+    border-radius: 999px;
+    margin: 10px auto 6px;
+  }
+  .sheet__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 18px 10px;
+  }
+  .sheet__title { font-size: 16px; font-weight: 500; color: var(--ink); }
+  .sheet__close {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--pill-bg);
+    border: 1px solid var(--pill-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--pill-text);
+    font-size: 12px;
+    font-weight: 400;
+  }
+  .steps {
+    display: flex;
+    gap: 6px;
+    padding: 0 18px 12px;
+  }
+  .steps__item {
+    flex: 1;
+    text-align: center;
+    padding: 8px 4px;
+    background: rgba(255, 251, 242, 0.7);
+    border: 1px solid var(--pill-border);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--pill-text);
+  }
+  .steps__item--active {
+    background: var(--dark-grad);
+    border-color: var(--dark);
+    color: #fff;
+    font-weight: 500;
+  }
+  .sheet__body { flex: 1; overflow-y: auto; padding: 0 18px 14px; }
+  .pitch--large { height: 226px; margin-bottom: 12px; }
+
+  .selected-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 400;
+    border: 1px solid transparent;
+    line-height: 1;
+  }
+  .tag--current {
+    background: linear-gradient(180deg, #f7efe1, #f1e3ca);
+    color: #927445;
+    border-color: rgba(220, 201, 165, 0.7);
+  }
+
+  .row-input {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .row-input__field { flex: 1; }
+  .row-input__label {
+    font-size: 10px;
+    color: var(--eyebrow);
+    font-weight: 400;
+    margin-bottom: 4px;
+    display: block;
+  }
+  .input-box {
+    width: 100%;
+    height: 36px;
+    background: rgba(255, 251, 242, 0.5);
+    border: 1px solid var(--pill-border);
+    border-radius: 10px;
+    padding: 0 12px;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--ink);
+    outline: none;
+    font-family: inherit;
+  }
+
+  .sheet__footer {
+    display: flex;
+    gap: 10px;
+    padding: 12px 18px 18px;
+    border-top: 1px solid var(--card-border);
+    background: rgba(255, 251, 242, 0.6);
+  }
+  .btn-primary {
+    flex: 1;
+    background: var(--dark-grad);
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 13px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 12px rgba(21, 22, 27, 0.16);
+    letter-spacing: 0.4px;
+  }
+
+  .blurred { filter: blur(2.5px) brightness(0.98); opacity: 0.55; pointer-events: none; }
+
+  .style-note {
+    margin: 50px auto 0;
+    max-width: 1100px;
+    padding: 20px 28px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    color: #c4c8d3;
+    font-size: 13px;
+    line-height: 1.8;
+  }
+  .style-note h3 { color: #fff; font-size: 13px; margin-bottom: 8px; font-weight: 600; }
+  .style-note ul { list-style: none; }
+  .style-note code {
+    background: rgba(255, 255, 255, 0.08);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #e6c98c;
+  }
+</style>
+</head>
+<body>
+  <div class="stage-header">
+    <h1>换座位 · 设计 Mock(扁平化)</h1>
+    <p>每屏只剩 1 个 Hero 卡 + 候选卡若干 + 底部 dock,层级扁平</p>
+  </div>
+
+  <div class="stage">
+
+    <!-- ① 浏览态 -->
+    <div class="frame">
+      <div class="phone">
+        <div class="statusbar"><span>9:41</span><span>●●●</span></div>
+        <div class="navbar">换座位</div>
+        <div class="content">
+
+          <div class="card hero-card">
+            <div class="hero-card__icon-box">
+              <span class="hero-card__icon-mark">↔</span>
+            </div>
+            <div class="hero-card__body">
+              <span class="eyebrow">当前比赛 · 换座撮合</span>
+              <span class="hero-card__title">蓉城 VS 山东泰山</span>
+              <span class="hero-card__summary">周日 19:35 · 凤凰山专业足球场</span>
+            </div>
+            <span class="meta-pill">12 条意向</span>
+          </div>
+
+          <div class="pitch" data-pitch="1"></div>
+          <div class="legend">
+            <div class="legend__items">
+              <span><i class="legend__dot legend__dot--hot"></i>有意向</span>
+            </div>
+            <span>点分区可筛选</span>
+          </div>
+
+          <div class="section-row">
+            <span class="section-row__title">换座池</span>
+            <span class="section-row__sub">共 12 条</span>
+          </div>
+
+          <div class="group-row group-row--open">
+            <div class="group-row__main">
+              <span class="group-row__name">127 南看台</span>
+              <span class="group-row__count">5 条发布</span>
+            </div>
+            <span class="group-row__caret">收起</span>
+          </div>
+          <div class="candidate">
+            <div class="candidate__user">
+              <div class="candidate__avatar">Z</div>
+              <div>
+                <div class="candidate__name">Z先生</div>
+                <div class="candidate__seat">127 · 8排 15号</div>
+              </div>
+              <div class="candidate__status candidate__status--hot">可沟通</div>
+            </div>
+            <div class="candidate__wants">想换：<strong>511 · 513</strong></div>
+            <button class="btn-confirm">确认换座</button>
+          </div>
+          <div class="candidate">
+            <div class="candidate__user">
+              <div class="candidate__avatar">L</div>
+              <div>
+                <div class="candidate__name">L先生</div>
+                <div class="candidate__seat">127 · 12排</div>
+              </div>
+              <div class="candidate__status">仅展示</div>
+            </div>
+            <div class="candidate__wants">想换：<strong>521</strong></div>
+          </div>
+
+          <div class="group-row">
+            <div class="group-row__main">
+              <span class="group-row__name">102 北看台</span>
+              <span class="group-row__count">3 条</span>
+            </div>
+            <span class="group-row__caret">展开</span>
+          </div>
+          <div class="group-row">
+            <div class="group-row__main">
+              <span class="group-row__name">521 东看台</span>
+              <span class="group-row__count">2 条</span>
+            </div>
+            <span class="group-row__caret">展开</span>
+          </div>
+          <div class="group-row">
+            <div class="group-row__main">
+              <span class="group-row__name">511 西看台</span>
+              <span class="group-row__count">2 条</span>
+            </div>
+            <span class="group-row__caret">展开</span>
+          </div>
+
+        </div>
+        <div class="dock">
+          <button class="cta">
+            <span class="cta__icon">+</span>
+            <span>发布我的换座</span>
+          </button>
+        </div>
+      </div>
+      <div class="frame__caption">
+        <strong>① 浏览态</strong>
+        Hero 卡 + 球场图直铺 + 池子直铺,候选卡之间无嵌套外框
+      </div>
+    </div>
+
+    <!-- ② 筛选态 -->
+    <div class="frame">
+      <div class="phone">
+        <div class="statusbar"><span>9:41</span><span>●●●</span></div>
+        <div class="navbar">换座位</div>
+        <div class="content">
+
+          <div class="card hero-card">
+            <div class="hero-card__icon-box">
+              <span class="hero-card__icon-mark">↔</span>
+            </div>
+            <div class="hero-card__body">
+              <span class="eyebrow">当前比赛 · 换座撮合</span>
+              <span class="hero-card__title">蓉城 VS 山东泰山</span>
+              <span class="hero-card__summary">周日 19:35 · 凤凰山专业足球场</span>
+            </div>
+            <span class="meta-pill">12 条意向</span>
+          </div>
+
+          <div class="pitch" data-pitch="2"></div>
+          <div class="legend">
+            <div class="legend__items">
+              <span>已选 127 区</span>
+            </div>
+            <span>点空白处取消</span>
+          </div>
+
+          <div class="filter-row">
+            <div class="filter-row__main">
+              <span class="filter-row__label">来自 127 南看台</span>
+              <span class="filter-row__count">5 条</span>
+            </div>
+            <button class="filter-row__clear">✕ 清除</button>
+          </div>
+
+          <div class="candidate">
+            <div class="candidate__user">
+              <div class="candidate__avatar">Z</div>
+              <div>
+                <div class="candidate__name">Z先生</div>
+                <div class="candidate__seat">127 · 8排 15号</div>
+              </div>
+              <div class="candidate__status candidate__status--hot">可沟通</div>
+            </div>
+            <div class="candidate__wants">想换：<strong>511 · 513</strong></div>
+            <button class="btn-confirm">确认换座</button>
+          </div>
+          <div class="candidate">
+            <div class="candidate__user">
+              <div class="candidate__avatar">L</div>
+              <div>
+                <div class="candidate__name">L先生</div>
+                <div class="candidate__seat">127 · 12排</div>
+              </div>
+              <div class="candidate__status">仅展示</div>
+            </div>
+            <div class="candidate__wants">想换：<strong>521</strong></div>
+          </div>
+          <div class="candidate">
+            <div class="candidate__user">
+              <div class="candidate__avatar">W</div>
+              <div>
+                <div class="candidate__name">W先生</div>
+                <div class="candidate__seat">127 · 3排</div>
+              </div>
+              <div class="candidate__status candidate__status--hot">可沟通</div>
+            </div>
+            <div class="candidate__wants">想换：<strong>512</strong></div>
+            <button class="btn-confirm">确认换座</button>
+          </div>
+
+        </div>
+        <div class="dock">
+          <button class="cta">
+            <span class="cta__icon">+</span>
+            <span>发布我的换座</span>
+          </button>
+        </div>
+      </div>
+      <div class="frame__caption">
+        <strong>② 筛选态</strong>
+        球场图选中分区 → 一条 filter row + 纯候选列表,层级最少
+      </div>
+    </div>
+
+    <!-- ③ 已发布态 -->
+    <div class="frame">
+      <div class="phone">
+        <div class="statusbar"><span>9:41</span><span>●●●</span></div>
+        <div class="navbar">换座位</div>
+        <div class="content">
+
+          <div class="card hero-card">
+            <div class="hero-card__icon-box">
+              <span class="hero-card__icon-mark">↔</span>
+            </div>
+            <div class="hero-card__body">
+              <span class="eyebrow">当前比赛 · 换座撮合</span>
+              <span class="hero-card__title">蓉城 VS 山东泰山</span>
+              <span class="hero-card__summary">周日 19:35 · 凤凰山专业足球场</span>
+            </div>
+            <span class="meta-pill">12 条意向</span>
+          </div>
+
+          <div class="pitch" data-pitch="3"></div>
+          <div class="legend">
+            <div class="legend__items">
+              <span><i class="legend__dot legend__dot--current"></i>我的当前</span>
+              <span><i class="legend__dot legend__dot--desired"></i>我的目标</span>
+            </div>
+          </div>
+
+          <div class="section-row">
+            <span class="section-row__title">换座池</span>
+            <span class="section-row__sub">共 12 条</span>
+          </div>
+
+          <div class="group-row group-row--open">
+            <div class="group-row__main">
+              <span class="group-row__name">511 西看台</span>
+              <span class="group-row__count">2 条</span>
+              <span class="group-row__hit">命中我的目标</span>
+            </div>
+            <span class="group-row__caret">收起</span>
+          </div>
+          <div class="candidate">
+            <div class="candidate__user">
+              <div class="candidate__avatar">M</div>
+              <div>
+                <div class="candidate__name">M先生</div>
+                <div class="candidate__seat">511 · 5排 10号</div>
+              </div>
+              <div class="candidate__status candidate__status--hot">可沟通</div>
+            </div>
+            <div class="candidate__wants">想换：<strong>127 · 128</strong></div>
+            <button class="btn-confirm">确认换座</button>
+          </div>
+
+          <div class="group-row">
+            <div class="group-row__main">
+              <span class="group-row__name">127 南看台</span>
+              <span class="group-row__count">5 条</span>
+            </div>
+            <span class="group-row__caret">展开</span>
+          </div>
+          <div class="group-row">
+            <div class="group-row__main">
+              <span class="group-row__name">102 北看台</span>
+              <span class="group-row__count">3 条</span>
+            </div>
+            <span class="group-row__caret">展开</span>
+          </div>
+
+        </div>
+        <div class="dock">
+          <div class="status-bar">
+            <div class="status-bar__head">
+              <div class="status-bar__label">
+                <span class="status-bar__dot"></span>
+                <span>我已发布 · 等待匹配</span>
+              </div>
+              <span class="status-bar__manage">管理 ›</span>
+            </div>
+            <div class="status-bar__body">
+              <span class="status-bar__seat-current">127 · 8排 15号</span>
+              <span class="status-bar__arrow">→</span>
+              <span class="status-bar__seat-desired">511 / 513</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="frame__caption">
+        <strong>③ 已发布态</strong>
+        球场图高亮我的座位 · 命中目标的分组带绿色标签
+      </div>
+    </div>
+
+    <!-- ④ 发布抽屉 -->
+    <div class="frame">
+      <div class="phone">
+        <div class="statusbar"><span>9:41</span><span>●●●</span></div>
+        <div class="navbar blurred">换座位</div>
+        <div class="content blurred">
+          <div class="card hero-card">
+            <div class="hero-card__icon-box">
+              <span class="hero-card__icon-mark">↔</span>
+            </div>
+            <div class="hero-card__body">
+              <span class="eyebrow">当前比赛</span>
+              <span class="hero-card__title">蓉城 VS 山东泰山</span>
+            </div>
+            <span class="meta-pill">12</span>
+          </div>
+          <div class="pitch" data-pitch="1"></div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet">
+          <div class="sheet__handle"></div>
+          <div class="sheet__head">
+            <div>
+              <span class="eyebrow">第 1 步</span>
+              <div class="sheet__title">点选你的当前分区</div>
+            </div>
+            <button class="sheet__close">✕</button>
+          </div>
+          <div class="steps">
+            <div class="steps__item steps__item--active">① 当前</div>
+            <div class="steps__item">② 目标</div>
+            <div class="steps__item">③ 联系</div>
+          </div>
+          <div class="sheet__body">
+            <div class="pitch pitch--large" data-pitch="sheet"></div>
+            <div class="selected-tags">
+              <span class="tag tag--current">已选 · 127 南看台</span>
+            </div>
+            <div class="row-input">
+              <div class="row-input__field">
+                <span class="row-input__label">排（选填）</span>
+                <input class="input-box" placeholder="如 8" value="8">
+              </div>
+              <div class="row-input__field">
+                <span class="row-input__label">号（选填）</span>
+                <input class="input-box" placeholder="如 15" value="15">
+              </div>
+            </div>
+          </div>
+          <div class="sheet__footer">
+            <button class="btn-primary">下一步 →</button>
+          </div>
+        </div>
+      </div>
+      <div class="frame__caption">
+        <strong>④ 发布抽屉</strong>
+        步骤 pill + 大球场图 + 排号输入 · 内部本来就扁平
+      </div>
+    </div>
+
+  </div>
+
+  <div class="style-note">
+    <h3>扁平化改动</h3>
+    <ul>
+      <li>· <strong>去掉外层 panel/pool</strong>:球场图、换座池标题、分区分组都直接铺在页面背景上</li>
+      <li>· <strong>分区分组改成 row</strong>:不再是嵌套卡片,只是一行带分隔线的 header(收起态)或 header + 候选卡片(展开态)</li>
+      <li>· <strong>filter-bar 改为 filter-row</strong>:去掉卡片框,只有底部一条 divider 暗示分割</li>
+      <li>· <strong>候选卡片暴露到顶层</strong>:不再被外层 panel 包裹,所有候选都是页面背景上的独立小卡</li>
+      <li>· 每屏顶层只有 <code>Hero Card</code> + <code>n × Candidate Card</code> + <code>Dock</code>,无嵌套</li>
+    </ul>
+  </div>
+
+<script>
+const layout = {
+  outer: [
+    { name: '503', color: 'yellow', x: 14, y: 6 },
+    { name: '504', color: 'purple', x: 28, y: 5 },
+    { name: '505', color: 'purple', x: 42, y: 5 },
+    { name: '506', color: 'purple', x: 56, y: 5 },
+    { name: '507', color: 'purple', x: 70, y: 6 },
+    { name: '511', color: 'blue', x: 84, y: 22 },
+    { name: '512', color: 'blue', x: 88, y: 42 },
+    { name: '513', color: 'green', x: 84, y: 62 },
+    { name: '521', color: 'purple', x: 70, y: 80 },
+    { name: '522', color: 'purple', x: 56, y: 82 },
+    { name: '523', color: 'purple', x: 42, y: 82 },
+    { name: '524', color: 'purple', x: 28, y: 82 },
+    { name: '525', color: 'yellow', x: 14, y: 80 },
+    { name: '534', color: 'blue', x: 4, y: 62 },
+    { name: '518', color: 'navy', x: 0, y: 42 },
+    { name: '517', color: 'blue', x: 4, y: 22 },
+  ],
+  inner: [
+    { name: '104', color: 'green', x: 28, y: 22 },
+    { name: '105', color: 'green', x: 40, y: 21 },
+    { name: '106', color: 'green', x: 52, y: 21 },
+    { name: '107', color: 'green', x: 64, y: 22 },
+    { name: '110', color: 'yellow', x: 74, y: 40 },
+    { name: '127', color: 'red', x: 74, y: 56 },
+    { name: '128', color: 'yellow', x: 64, y: 66 },
+    { name: '129', color: 'red', x: 52, y: 67 },
+    { name: '130', color: 'yellow', x: 40, y: 67 },
+    { name: '131', color: 'yellow', x: 28, y: 66 },
+    { name: '117', color: 'green', x: 18, y: 56 },
+    { name: '113', color: 'yellow', x: 18, y: 40 },
+  ],
+};
+
+const badges_state1 = { '127': 5, '102': 3, '521': 2, '511': 2, '513': 1, '128': 1 };
+
+function renderPitch(el, state) {
+  const field = document.createElement('div');
+  field.className = 'pitch__field';
+  el.appendChild(field);
+
+  const all = [
+    ...layout.outer.map(r => ({ ...r, ring: 'outer' })),
+    ...layout.inner.map(r => ({ ...r, ring: 'inner' })),
+  ];
+
+  all.forEach(r => {
+    const div = document.createElement('div');
+    div.className = `region region--${r.color}`;
+    div.textContent = r.name;
+    const w = r.ring === 'outer' ? 11 : 10;
+    const h = r.ring === 'outer' ? 10 : 9;
+    div.style.left = r.x + '%';
+    div.style.top = r.y + '%';
+    div.style.width = w + '%';
+    div.style.height = h + '%';
+
+    if (state === '1') {
+      const cnt = badges_state1[r.name];
+      if (cnt) {
+        const badge = document.createElement('span');
+        badge.className = 'region__badge';
+        badge.textContent = cnt;
+        div.appendChild(badge);
+      }
+    } else if (state === '2') {
+      if (r.name === '127') div.classList.add('region--filter-on');
+      else div.classList.add('region--dimmed');
+    } else if (state === '3') {
+      if (r.name === '127') div.classList.add('region--highlighted-current');
+      else if (r.name === '511' || r.name === '513') div.classList.add('region--highlighted-desired');
+      else div.classList.add('region--dimmed');
+    } else if (state === 'sheet') {
+      if (r.name === '127') div.classList.add('region--highlighted-current');
+    }
+    el.appendChild(div);
+  });
+}
+
+document.querySelectorAll('.pitch').forEach(el => {
+  renderPitch(el, el.dataset.pitch);
+});
+</script>
+</body>
+</html>

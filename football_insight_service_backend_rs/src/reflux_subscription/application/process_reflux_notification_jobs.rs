@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-use crate::reflux_subscription::{
-    ports::{
-        email_sender::EmailSender, reflux_subscription_repository::RefluxSubscriptionRepository,
-    },
+use crate::reflux_subscription::ports::{
+    email_sender::EmailSender, reflux_subscription_repository::RefluxSubscriptionRepository,
 };
 
 const MAX_EMAIL_ATTEMPTS: i32 = 3;
@@ -25,7 +23,10 @@ impl ProcessRefluxNotificationJobsUseCase {
     }
 
     pub async fn execute(&self, limit: i64) -> anyhow::Result<usize> {
-        let jobs = self.repository.list_pending_notification_jobs(limit).await?;
+        let jobs = self
+            .repository
+            .list_pending_notification_jobs(limit)
+            .await?;
         let mut sent_count = 0usize;
 
         for job in jobs {
@@ -42,11 +43,7 @@ impl ProcessRefluxNotificationJobsUseCase {
                 Err(error) => {
                     let attempts = job.attempts + 1;
                     self.repository
-                        .mark_notification_job_failed(
-                            job.id,
-                            attempts,
-                            &format!("{error:#}"),
-                        )
+                        .mark_notification_job_failed(job.id, attempts, &format!("{error:#}"))
                         .await?;
                 }
             }
@@ -168,7 +165,12 @@ mod tests {
 
     #[async_trait]
     impl EmailSender for FakeEmailSender {
-        async fn send_html(&self, _to: &str, _subject: &str, _body_html: &str) -> anyhow::Result<()> {
+        async fn send_html(
+            &self,
+            _to: &str,
+            _subject: &str,
+            _body_html: &str,
+        ) -> anyhow::Result<()> {
             if self.should_fail {
                 anyhow::bail!("smtp failed");
             }

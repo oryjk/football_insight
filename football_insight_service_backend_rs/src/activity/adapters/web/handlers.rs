@@ -12,6 +12,7 @@ use crate::{
     activity::{
         adapters::web::dto::RecordPageActivityRequest,
         application::record_page_activity::{RecordPageActivityInput, RecordPageActivityUseCase},
+        domain::page_key::ActivityError,
     },
     auth::ports::token_port::TokenPort,
 };
@@ -60,13 +61,37 @@ fn extract_bearer_token(headers: &HeaderMap) -> Option<&str> {
 }
 
 fn map_activity_error(error: anyhow::Error) -> (StatusCode, String) {
-    let message = error.to_string();
-
-    if message.contains("unsupported activity page key") {
-        tracing::warn!(error = %message, "activity page-view request rejected");
-        return (StatusCode::BAD_REQUEST, "页面标识不支持".to_string());
+    if let Some(activity_error) = error.downcast_ref::<ActivityError>() {
+        tracing::warn!(error = %activity_error, "activity page-view request rejected");
+        return (StatusCode::BAD_REQUEST, activity_error.to_string());
     }
 
+    let message = error.to_string();
     tracing::error!(error = %message, "activity page-view request failed");
     (StatusCode::INTERNAL_SERVER_ERROR, message)
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::anyhow;
+    use axum::http::StatusCode;
+
+    use super::map_activity_error;
+    use crate::activity::domain::page_key::ActivityError;
+
+    #[test]
+    fn maps_typed_activity_validation_error_to_bad_request() {
+        let (status, message) = map_activity_error(ActivityError::UnsupportedPageKey.into());
+
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(message, "页面标识不支持");
+    }
+
+    #[test]
+    fn keeps_unknown_activity_errors_as_internal_server_error() {
+        let (status, message) = map_activity_error(anyhow!("db write failed"));
+
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(message, "db write failed");
+    }
 }
