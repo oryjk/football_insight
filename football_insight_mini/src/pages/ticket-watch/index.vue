@@ -3005,14 +3005,12 @@ onUnload(() => {
   justify-content: center;
   gap: 12rpx;
   border-radius: 22rpx;
-  background: linear-gradient(180deg, #20242c, #191d26);
+  background: #15161b;
   color: #ffffff;
   font-size: 30rpx;
   font-weight: 800;
   text-align: center;
-  box-shadow:
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.08),
-    0 8rpx 18rpx rgba(21, 22, 27, 0.14);
+  box-shadow: 0 8rpx 18rpx rgba(21, 22, 27, 0.12);
 }
 .watch-monitor-actions__button-icon-image {
   width: 30rpx;
@@ -3023,19 +3021,22 @@ onUnload(() => {
   border: none;
 }
 .watch-monitor-actions__button--ghost {
-  background: linear-gradient(180deg, #eef1f6, #e5e9f0);
+  background: #f6f7fb;
   color: #5c6370;
-  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.82);
+  border: 2rpx solid rgba(232, 233, 238, 0.95);
+  box-shadow: none;
 }
 .watch-monitor-actions__button--subscribe {
-  background: linear-gradient(180deg, #f4efe4, #ebe3d3);
-  color: #5e4a24;
-  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.75);
+  background: #f6f7fb;
+  color: #5c6370;
+  border: 2rpx solid rgba(232, 233, 238, 0.95);
+  box-shadow: none;
 }
 .watch-monitor-actions__button--subscribed {
-  background: linear-gradient(180deg, #eaf8ef, #dff1e6);
+  background: #eef8f2;
   color: #167348;
-  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.82);
+  border: 2rpx solid rgba(29, 138, 85, 0.24);
+  box-shadow: none;
 }
 .membership-lock-panel {
   display: flex;
@@ -3761,8 +3762,8 @@ onUnload(() => {
   gap: 14rpx;
   padding: 16rpx 18rpx;
   border-radius: 18rpx;
-  background: linear-gradient(180deg, rgba(250, 248, 242, 0.94), rgba(255,255,255,1));
-  border: 2rpx solid rgba(229, 223, 205, 0.76);
+  background: #ffffff;
+  border: 2rpx solid rgba(232, 233, 238, 0.95);
 }
 .decision-item__dot {
   width: 14rpx;

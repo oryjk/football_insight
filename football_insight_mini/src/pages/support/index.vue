@@ -233,7 +233,7 @@ const stanceDescription = computed(() => {
 
 const rankingNote = computed(() => {
   if (!favoriteTeam.value) {
-    return '关注主队后，这里会展示它在本赛季的助力排名。'
+    return '关注主队后可查看本赛季助力排名。'
   }
 
   const rank = favoriteTeam.value.season_support_rank

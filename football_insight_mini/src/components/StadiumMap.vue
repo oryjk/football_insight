@@ -170,7 +170,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   display: block;
   margin-bottom: 10rpx;
   text-align: center;
-  color: #8f7c5f;
+  color: #8f9198;
   font-size: 22rpx;
   font-weight: 400;
 }
@@ -230,7 +230,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   height: 28rpx;
   padding: 0 6rpx;
   border-radius: 999rpx;
-  background: linear-gradient(180deg, #20242c, #191d26);
+  background: #15161b;
   color: #fff;
   font-size: 18rpx;
   font-weight: 800;
@@ -238,7 +238,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2rpx solid rgba(255, 251, 242, 0.96);
+  border: 2rpx solid rgba(255, 255, 255, 0.96);
   box-shadow: 0 4rpx 8rpx rgba(0, 0, 0, 0.18);
   z-index: 4;
 }
@@ -381,12 +381,12 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
 }
 
 .stadium-map--review .stadium-region--review-current {
-  background: linear-gradient(180deg, #f7efe1, #f1e3ca);
-  outline: 6rpx solid rgba(216, 155, 52, 0.45);
+  background: #f6f7fb;
+  outline: 6rpx solid rgba(154, 160, 170, 0.34);
 }
 
 .stadium-map--review .stadium-region--review-desired {
-  background: linear-gradient(180deg, #eaf8ef, #dff1e6);
+  background: #eef8f2;
   outline: 6rpx solid rgba(29, 138, 85, 0.45);
 }
 </style>

@@ -1035,9 +1035,9 @@ defineExpose({
   box-sizing: border-box;
   padding: 14rpx 24rpx;
   border-radius: 999rpx;
-  border: 2rpx solid rgba(229, 223, 205, 0.92);
-  background: linear-gradient(180deg, rgba(252, 250, 245, 0.98), rgba(247, 243, 232, 0.94));
-  color: #93876a;
+  border: 2rpx solid rgba(232, 233, 238, 0.95);
+  background: #f6f7fb;
+  color: #6d7280;
   font-size: 24rpx;
 }
 .standings-launcher {
