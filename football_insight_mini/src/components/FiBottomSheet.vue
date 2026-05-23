@@ -120,8 +120,8 @@ function handleMaskTap() {
   display: flex;
   flex-direction: column;
   border-radius: 36rpx 36rpx 0 0;
-  background: linear-gradient(180deg, rgba(255, 251, 242, 1), rgba(255, 255, 255, 0.98));
-  border-top: 1rpx solid rgba(238, 233, 224, 0.95);
+  background: #ffffff;
+  border-top: 1rpx solid rgba(232, 233, 238, 0.95);
   box-shadow: 0 -24rpx 56rpx rgba(12, 14, 20, 0.12);
   animation: fi-sheet-up 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
   overflow: hidden;
@@ -136,7 +136,7 @@ function handleMaskTap() {
   width: 56rpx;
   height: 6rpx;
   border-radius: 999rpx;
-  background: rgba(143, 124, 95, 0.28);
+  background: rgba(145, 150, 160, 0.32);
   margin: 18rpx auto 6rpx;
 }
 
@@ -156,7 +156,7 @@ function handleMaskTap() {
 
 .fi-sheet-card__eyebrow {
   display: block;
-  color: #8f7c5f;
+  color: #8f9198;
   font-size: 20rpx;
   font-weight: 400;
   margin-bottom: 4rpx;
@@ -177,9 +177,9 @@ function handleMaskTap() {
   height: 52rpx;
   padding: 0;
   border-radius: 50%;
-  background: linear-gradient(180deg, rgba(255, 251, 242, 0.98), rgba(248, 241, 227, 0.94));
-  border: 1rpx solid rgba(230, 220, 198, 0.92);
-  color: #9c855c;
+  background: #f6f7fb;
+  border: 1rpx solid rgba(232, 233, 238, 0.95);
+  color: #6d7280;
   font-size: 24rpx;
   font-weight: 400;
   display: flex;
@@ -203,8 +203,8 @@ function handleMaskTap() {
 .fi-sheet-card__footer {
   flex-shrink: 0;
   padding: 18rpx 30rpx calc(28rpx + env(safe-area-inset-bottom));
-  border-top: 1rpx solid rgba(238, 233, 224, 0.95);
-  background: rgba(255, 251, 242, 0.6);
+  border-top: 1rpx solid rgba(232, 233, 238, 0.95);
+  background: #ffffff;
   display: flex;
   gap: 16rpx;
 }

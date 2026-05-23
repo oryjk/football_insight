@@ -506,7 +506,6 @@
           </view>
         </view>
 
-        <text class="tech-stats-sheet__footnote">当前展示雷速提供的比赛技术统计，后续会继续补充更多指标。</text>
       </view>
     </view>
 
@@ -519,24 +518,35 @@
         <view class="section-heading section-heading--compact">
           <view>
             <text class="section-kicker">球队赛季战绩</text>
-            <text class="section-title">{{ selectedStandingsTeam.team_name }}</text>
+            <view class="team-season-sheet__title">
+              <image
+                :src="selectedStandingsTeam.avatar_storage_url || ''"
+                mode="aspectFit"
+                class="team-season-sheet__title-avatar"
+              />
+              <text class="section-title team-season-sheet__title-name">{{ selectedStandingsTeam.team_name }}</text>
+            </view>
           </view>
           <button class="tech-stats-sheet__close" @click="closeStandingsTeamSheet">关闭</button>
         </view>
 
         <view class="team-season-sheet__summary">
           <view class="team-season-sheet__summary-main">
-            <image
-              :src="selectedStandingsTeam.avatar_storage_url || ''"
-              mode="aspectFit"
-              class="team-season-sheet__summary-avatar"
-            />
-            <view class="team-season-sheet__summary-copy">
-              <text class="team-season-sheet__summary-name">{{ selectedStandingsTeam.team_name }}</text>
-              <text class="team-season-sheet__summary-meta">当前第 {{ selectedStandingsTeam.rank_no }} · {{ selectedStandingsTeam.points }} 分</text>
+            <view class="team-season-sheet__summary-meta-grid">
+              <view class="team-season-sheet__summary-metric">
+                <text class="team-season-sheet__summary-value">第 {{ selectedStandingsTeam.rank_no }}</text>
+                <text class="team-season-sheet__summary-label">积分榜排名</text>
+              </view>
+              <view class="team-season-sheet__summary-metric">
+                <text class="team-season-sheet__summary-value">{{ selectedStandingsTeam.points }} 分</text>
+                <text class="team-season-sheet__summary-label">当前积分</text>
+              </view>
+              <view class="team-season-sheet__summary-metric">
+                <text class="team-season-sheet__summary-value">{{ selectedStandingsTeamRecordText }}</text>
+                <text class="team-season-sheet__summary-label">赛季战绩</text>
+              </view>
             </view>
           </view>
-          <text class="team-season-sheet__summary-record">{{ selectedStandingsTeamRecord }}</text>
         </view>
 
         <FiLoading
@@ -740,7 +750,7 @@ const selectedStandingsTeamMatches = computed<HomeTeamSeasonMatch[]>(() => {
 
   return resolveHomeTeamSeasonMatches(selectedStandingsTeam.value, allSeasonMatches.value)
 })
-const selectedStandingsTeamRecord = computed(() => {
+const selectedStandingsTeamRecordParts = computed(() => {
   const finishedMatches = selectedStandingsTeamMatches.value.filter((match) =>
     match.resultTone === 'win' || match.resultTone === 'draw' || match.resultTone === 'loss',
   )
@@ -748,7 +758,16 @@ const selectedStandingsTeamRecord = computed(() => {
   const draws = finishedMatches.filter((match) => match.resultTone === 'draw').length
   const losses = finishedMatches.filter((match) => match.resultTone === 'loss').length
 
-  return `已赛 ${finishedMatches.length} 场 · ${wins}胜 ${draws}平 ${losses}负`
+  return {
+    finishedMatches: finishedMatches.length,
+    wins,
+    draws,
+    losses,
+  }
+})
+const selectedStandingsTeamRecordText = computed(() => {
+  const record = selectedStandingsTeamRecordParts.value
+  return `${record.wins}胜 ${record.draws}平 ${record.losses}负`
 })
 const topTeam = computed<OverviewStanding | null>(() => standings.value[0] ?? null)
 const topScorer = computed<OverviewPlayer | null>(() => scorers.value[0] ?? null)
@@ -2300,64 +2319,80 @@ onShow(() => {
   transform-origin: left center;
 }
 
-.tech-stats-sheet__footnote {
-  display: block;
-  margin-top: 24rpx;
-  color: #8f9198;
-  font-size: 24rpx;
-  line-height: 1.6;
+.team-season-sheet__title {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  min-width: 0;
+  margin-top: 8rpx;
+}
+
+.team-season-sheet__title-avatar {
+  width: 56rpx;
+  height: 56rpx;
+  flex: 0 0 auto;
+}
+
+.team-season-sheet__title-name {
+  min-width: 0;
+  margin-top: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .team-season-sheet__summary {
   margin-top: 18rpx;
-  padding: 24rpx;
-  border-radius: 28rpx;
-  border: 2rpx solid rgba(255, 145, 41, 0.16);
-  background:
-    radial-gradient(circle at top right, rgba(255, 145, 41, 0.12), transparent 36%),
-    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,246,239,0.92));
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
+  padding: 22rpx 24rpx;
+  border-radius: 24rpx;
+  border: 2rpx solid rgba(232, 233, 238, 0.95);
+  background: #ffffff;
+  display: block;
 }
 
 .team-season-sheet__summary-main {
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
+  display: block;
   min-width: 0;
 }
 
-.team-season-sheet__summary-avatar {
-  width: 82rpx;
-  height: 82rpx;
-  flex: 0 0 auto;
-}
-
-.team-season-sheet__summary-copy {
-  min-width: 0;
+.team-season-sheet__summary-meta-grid {
   display: grid;
-  gap: 8rpx;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(160rpx, 1.45fr);
+  align-items: center;
+  gap: 12rpx;
+  min-width: 0;
 }
 
-.team-season-sheet__summary-name {
+.team-season-sheet__summary-metric {
+  display: grid;
+  gap: 6rpx;
+  min-width: 0;
+  padding-left: 14rpx;
+  border-left: 2rpx solid rgba(235, 236, 241, 0.95);
+}
+
+.team-season-sheet__summary-metric:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.team-season-sheet__summary-value {
   color: #121212;
-  font-size: 32rpx;
-  line-height: 1.2;
+  font-size: 28rpx;
+  line-height: 1.1;
   font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.team-season-sheet__summary-meta,
-.team-season-sheet__summary-record {
+.team-season-sheet__summary-label {
   color: #8f9198;
-  font-size: 24rpx;
-}
-
-.team-season-sheet__summary-record {
-  flex: 0 0 auto;
-  text-align: right;
-  font-weight: 700;
+  font-size: 20rpx;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .team-season-sheet__list {

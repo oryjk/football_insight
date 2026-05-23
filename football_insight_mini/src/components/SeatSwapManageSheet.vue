@@ -97,8 +97,8 @@ function normalizeInputValue(event: Event): string {
   padding: 18rpx 22rpx;
   margin: 18rpx 0 0;
   border-radius: 16rpx;
-  background: rgba(255, 251, 242, 0.6);
-  border: 1rpx solid rgba(230, 220, 198, 0.92);
+  background: #ffffff;
+  border: 1rpx solid rgba(232, 233, 238, 0.95);
 }
 
 .seat-swap-manage__summary-row {
@@ -110,7 +110,7 @@ function normalizeInputValue(event: Event): string {
 }
 
 .seat-swap-manage__summary-label {
-  color: #8f7c5f;
+  color: #8f9198;
   font-size: 22rpx;
 }
 
@@ -142,7 +142,7 @@ function normalizeInputValue(event: Event): string {
 
 .seat-swap-manage__field-label {
   display: block;
-  color: #8f7c5f;
+  color: #8f9198;
   font-size: 22rpx;
   font-weight: 400;
   margin-bottom: 6rpx;
@@ -152,8 +152,8 @@ function normalizeInputValue(event: Event): string {
   width: 100%;
   min-height: 140rpx;
   padding: 14rpx 18rpx;
-  background: rgba(255, 251, 242, 0.6);
-  border: 1rpx solid rgba(230, 220, 198, 0.92);
+  background: #ffffff;
+  border: 1rpx solid rgba(232, 233, 238, 0.95);
   border-radius: 16rpx;
   font-size: 26rpx;
   color: #121212;
@@ -190,15 +190,15 @@ function normalizeInputValue(event: Event): string {
   flex: 1;
   padding: 20rpx;
   border-radius: 999rpx;
-  background: linear-gradient(180deg, #20242c, #191d26);
+  background: #15161b;
   color: #fff;
   font-size: 28rpx;
   font-weight: 400;
-  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.08), 0 6rpx 14rpx rgba(21, 22, 27, 0.16);
+  box-shadow: 0 8rpx 18rpx rgba(21, 22, 27, 0.12);
 }
 
 .seat-swap-manage__primary--danger {
-  background: linear-gradient(180deg, #c4321c, #a82716);
+  background: #b42318;
 }
 
 .seat-swap-manage__primary::after {
@@ -209,9 +209,9 @@ function normalizeInputValue(event: Event): string {
   flex-shrink: 0;
   padding: 20rpx 28rpx;
   border-radius: 999rpx;
-  background: linear-gradient(180deg, rgba(255, 251, 242, 0.98), rgba(248, 241, 227, 0.94));
-  border: 1rpx solid rgba(230, 220, 198, 0.92);
-  color: #9c855c;
+  background: #ffffff;
+  border: 1rpx solid rgba(232, 233, 238, 0.95);
+  color: #6d7280;
   font-size: 26rpx;
   font-weight: 400;
 }
@@ -219,7 +219,7 @@ function normalizeInputValue(event: Event): string {
 .seat-swap-manage__ghost--danger {
   border-color: rgba(180, 35, 24, 0.3);
   color: #b42318;
-  background: linear-gradient(180deg, rgba(252, 235, 232, 0.9), rgba(250, 228, 224, 0.9));
+  background: #fff7f6;
 }
 
 .seat-swap-manage__ghost::after {

@@ -2498,8 +2498,8 @@ onUnload(() => {
   box-sizing: border-box;
   padding: 34rpx 28rpx calc(24rpx + env(safe-area-inset-bottom));
   border-radius: 32rpx 32rpx 0 0;
-  background: #fffefa;
-  border: 2rpx solid rgba(236, 230, 216, 0.96);
+  background: #ffffff;
+  border: 2rpx solid rgba(232, 233, 238, 0.96);
   border-bottom: 0;
   box-shadow: 0 28rpx 66rpx rgba(22, 24, 30, 0.2);
   animation: subscription-dialog-slide-up 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -2522,7 +2522,7 @@ onUnload(() => {
   align-items: center;
   justify-content: center;
   border-radius: 999rpx;
-  background: #f2f0eb;
+  background: #f6f7fb;
   color: #6b6f78;
   font-size: 34rpx;
   line-height: 1;
@@ -2544,8 +2544,8 @@ onUnload(() => {
   min-height: 78rpx;
   padding: 0 24rpx;
   border-radius: 20rpx;
-  background: #f7f6f2;
-  border: 2rpx solid rgba(226, 220, 207, 0.96);
+  background: #ffffff;
+  border: 2rpx solid rgba(232, 233, 238, 0.96);
   color: #15171d;
   font-size: 28rpx;
 }
@@ -2616,7 +2616,7 @@ onUnload(() => {
   line-height: 1.45;
 }
 .subscription-plan__price {
-  color: #a56b12;
+  color: #15171d;
   font-size: 30rpx;
   font-weight: 900;
   flex-shrink: 0;
@@ -2659,8 +2659,8 @@ onUnload(() => {
   background: rgba(255,255,255,0.96);
   border-radius: 28rpx;
   padding: 24rpx;
-  border: 2rpx solid rgba(238, 233, 224, 0.95);
-  box-shadow: 0 12rpx 26rpx rgba(46, 38, 27, 0.06);
+  border: 2rpx solid rgba(232, 233, 238, 0.95);
+  box-shadow: 0 12rpx 26rpx rgba(26, 28, 36, 0.06);
 }
 .hero-card {
   display: flex;
@@ -2684,8 +2684,8 @@ onUnload(() => {
   width: 64rpx;
   height: 64rpx;
   border-radius: 18rpx;
-  background: linear-gradient(180deg, #f7efe1, #f1e3ca);
-  border: 2rpx solid rgba(220, 201, 165, 0.7);
+  background: #f6f7fb;
+  border: 2rpx solid rgba(232, 233, 238, 0.95);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2724,7 +2724,7 @@ onUnload(() => {
 }
 .eyebrow, .section-kicker {
   margin: 0;
-  color: #8f7c5f;
+  color: #8f9198;
   font-size: 20rpx;
   font-weight: 400;
   letter-spacing: 0;
@@ -2761,7 +2761,7 @@ onUnload(() => {
 .hero-card__summary {
   display: block;
   margin-top: 6rpx;
-  color: #988f84;
+  color: #8f9198;
   font-size: 20rpx;
   line-height: 1.45;
 }
@@ -2774,9 +2774,9 @@ onUnload(() => {
   line-height: 1;
   padding: 12rpx 20rpx;
   border-radius: 999rpx;
-  border: 2rpx solid rgba(230, 220, 198, 0.92);
-  background: linear-gradient(180deg, rgba(255, 251, 242, 0.98), rgba(248, 241, 227, 0.94));
-  color: #9c855c;
+  border: 2rpx solid rgba(232, 233, 238, 0.95);
+  background: #f6f7fb;
+  color: #6d7280;
   font-size: 22rpx;
 }
 .collapse-pill {

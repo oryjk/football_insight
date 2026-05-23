@@ -83,8 +83,8 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   padding: 22rpx;
   border-radius: 22rpx;
   background: rgba(255, 255, 255, 0.96);
-  border: 1rpx solid rgba(238, 233, 224, 0.95);
-  box-shadow: 0 8rpx 18rpx rgba(46, 38, 27, 0.04);
+  border: 1rpx solid rgba(232, 233, 238, 0.95);
+  box-shadow: 0 8rpx 18rpx rgba(26, 28, 36, 0.04);
 }
 
 .seat-swap-candidate__user {
@@ -129,16 +129,15 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   margin-top: 8rpx;
   overflow: hidden;
   border-radius: 22rpx;
-  background: linear-gradient(180deg, rgba(255, 247, 232, 0.95), rgba(251, 240, 215, 0.88));
-  color: #6e4f16;
-  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.52);
+  background: #f6f7fb;
+  color: #4b515d;
 }
 
 .seat-swap-candidate__seat-label {
   flex-shrink: 0;
   padding: 7rpx 10rpx 7rpx 12rpx;
-  background: rgba(244, 194, 58, 0.18);
-  color: rgba(129, 95, 31, 0.88);
+  background: rgba(21, 22, 27, 0.06);
+  color: #6d7280;
   font-size: 20rpx;
   font-weight: 600;
   line-height: 1;
@@ -159,16 +158,16 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   flex-shrink: 0;
   padding: 6rpx 14rpx;
   border-radius: 999rpx;
-  background: linear-gradient(180deg, rgba(255, 251, 242, 0.98), rgba(248, 241, 227, 0.94));
-  border: 1rpx solid rgba(230, 220, 198, 0.92);
-  color: #9c855c;
+  background: #f6f7fb;
+  border: 1rpx solid rgba(232, 233, 238, 0.95);
+  color: #6d7280;
   font-size: 20rpx;
   font-weight: 400;
   line-height: 1;
 }
 
 .seat-swap-candidate__status--hot {
-  background: linear-gradient(180deg, #eaf8ef, #dff1e6);
+  background: #eef8f2;
   border-color: rgba(29, 138, 85, 0.35);
   color: #167348;
 }
@@ -181,7 +180,7 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   margin-left: 80rpx;
   overflow: hidden;
   border-radius: 22rpx;
-  background: linear-gradient(180deg, rgba(237, 249, 242, 0.96), rgba(227, 244, 233, 0.9));
+  background: #eef8f2;
   color: #175c31;
   box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.5);
 }
@@ -211,7 +210,7 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   margin-top: 12rpx;
   padding: 16rpx 18rpx;
   border-radius: 16rpx;
-  background: rgba(255, 251, 242, 0.6);
+  background: #f6f7fb;
   font-size: 22rpx;
   color: #6f6a5f;
   display: flex;
@@ -228,11 +227,11 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   width: 100%;
   padding: 14rpx 22rpx;
   border-radius: 999rpx;
-  background: linear-gradient(180deg, #20242c, #191d26);
+  background: #15161b;
   color: #fff;
   font-size: 24rpx;
   font-weight: 400;
-  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.08), 0 8rpx 18rpx rgba(21, 22, 27, 0.14);
+  box-shadow: 0 8rpx 18rpx rgba(21, 22, 27, 0.12);
 }
 
 .seat-swap-candidate__action::after {

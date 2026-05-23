@@ -288,7 +288,6 @@
             </view>
           </view>
 
-          <text class="tech-stats-sheet__footnote">当前展示雷速提供的比赛技术统计，后续会继续补充更多指标。</text>
         </view>
       </view>
     </view>
@@ -1038,13 +1037,6 @@ onShow(() => {
 .tech-stat-row__fill--away {
   background: #f59e0b;
   transform-origin: left center;
-}
-.tech-stats-sheet__footnote {
-  display: block;
-  margin-top: 24rpx;
-  color: #8f9198;
-  font-size: 24rpx;
-  line-height: 1.6;
 }
 .state-card--error text { font-size: 28rpx; color: #c03a2b; }
 .state-card--empty {

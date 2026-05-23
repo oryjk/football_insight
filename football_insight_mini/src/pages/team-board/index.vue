@@ -490,9 +490,9 @@ onShow(() => {
   box-sizing: border-box;
   padding: 14rpx 24rpx;
   border-radius: 999rpx;
-  border: 2rpx solid rgba(229, 223, 205, 0.92);
-  background: linear-gradient(180deg, rgba(252, 250, 245, 0.98), rgba(247, 243, 232, 0.94));
-  color: #93876a;
+  border: 2rpx solid rgba(232, 233, 238, 0.95);
+  background: #f6f7fb;
+  color: #6d7280;
   font-size: 24rpx;
 }
 .team-board-hero__back-row { margin-bottom: 16rpx; }
@@ -514,14 +514,16 @@ onShow(() => {
 }
 .team-board-launcher__grid {
   margin-top: 18rpx;
+  border-top: 2rpx solid rgba(235, 236, 241, 0.86);
 }
 .team-board-launcher__card {
   display: grid;
   gap: 10rpx;
-  padding: 22rpx;
-  border-radius: 24rpx;
-  border: 2rpx solid rgba(230, 232, 239, 0.9);
-  background: linear-gradient(180deg, rgba(252, 252, 255, 0.98), rgba(248, 249, 252, 0.96));
+  padding: 22rpx 0;
+  border-radius: 0;
+  border: 0;
+  border-bottom: 2rpx solid rgba(235, 236, 241, 0.86);
+  background: transparent;
   text-align: left;
 }
 .team-board-launcher__meta {

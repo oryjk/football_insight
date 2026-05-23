@@ -24,12 +24,8 @@
             <text class="section-kicker">Ticket Watch</text>
             <text class="section-title">回流看板</text>
           </view>
-          <text class="meta-note">实时 + 历史</text>
+          <text class="meta-pill">打开</text>
         </view>
-
-        <text class="insights-ticket-watch-entry__copy">
-          当前比赛按秒刷新分区回流，历史比赛按场次回看库存热区。这个入口放在洞察页，更符合“比赛供给变化也是一种观察信号”的产品语义。
-        </text>
       </view>
 
       <FiLoading
@@ -782,9 +778,9 @@ onShow(async () => {
   box-sizing: border-box;
   padding: 14rpx 24rpx;
   border-radius: 999rpx;
-  border: 2rpx solid rgba(229, 223, 205, 0.92);
-  background: linear-gradient(180deg, rgba(252, 250, 245, 0.98), rgba(247, 243, 232, 0.94));
-  color: #93876a;
+  border: 2rpx solid rgba(232, 233, 238, 0.95);
+  background: #f6f7fb;
+  color: #6d7280;
   font-size: 24rpx;
 }
 
@@ -797,7 +793,7 @@ onShow(async () => {
   max-width: 100%;
   white-space: nowrap;
   line-height: 1;
-  color: #a3916f;
+  color: #8f9198;
   font-size: 24rpx;
   font-weight: 700;
   letter-spacing: 1rpx;
@@ -810,8 +806,8 @@ onShow(async () => {
   height: 12rpx;
   margin-right: 10rpx;
   border-radius: 999rpx;
-  background: linear-gradient(180deg, rgba(214, 184, 131, 0.9), rgba(197, 163, 103, 0.72));
-  box-shadow: 0 0 0 6rpx rgba(214, 184, 131, 0.14);
+  background: #9aa0aa;
+  box-shadow: 0 0 0 6rpx rgba(154, 160, 170, 0.12);
 }
 
 .meta-note--hero {
