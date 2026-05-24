@@ -1,5 +1,6 @@
 <template>
   <view class="page-root">
+    <FiBrandNav />
     <view class="page">
       <view v-if="loading" class="state-card">
         <text>正在加载换座池...</text>
@@ -52,11 +53,11 @@
               <template v-if="currentView?.my_request">
                 <view class="legend__item">
                   <view class="legend__dot legend__dot--current"></view>
-                  <text>我的当前</text>
+                  <text>当前座位</text>
                 </view>
                 <view class="legend__item">
                   <view class="legend__dot legend__dot--desired"></view>
-                  <text>我的目标</text>
+                  <text>目标座位</text>
                 </view>
               </template>
               <view v-else class="legend__item">
@@ -70,7 +71,7 @@
 
         <view v-if="browsingFilterKey" class="filter-row">
           <view class="filter-row__main">
-            <text class="filter-row__label">想换到 {{ browsingFilterName || browsingFilterKey }}</text>
+            <text class="filter-row__label">目标座位 {{ browsingFilterName || browsingFilterKey }}</text>
             <text class="filter-row__count">{{ filteredCandidates.length }} 条</text>
           </view>
           <button class="filter-row__clear" @tap="clearFilter">✕ 清除</button>
@@ -96,7 +97,7 @@
               <view class="group-row__main">
                 <text class="group-row__name">{{ group.region_name }}</text>
                 <text class="group-row__count">{{ group.requests.length }} 条</text>
-                <text v-if="groupHasMyDesired(group)" class="group-row__hit">命中我的目标</text>
+                <text v-if="groupHasMyDesired(group)" class="group-row__hit">命中目标座位</text>
               </view>
               <text class="group-row__caret">{{ isRegionGroupExpanded(group.region_key) ? '收起' : '展开' }}</text>
             </view>
@@ -139,17 +140,12 @@
         <text class="dock-cta__label">{{ isLoggedIn ? '发布我的换座' : '登录后发布' }}</text>
       </button>
       <view v-else class="dock-status" @tap="openManageSheet">
-        <view class="dock-status__head">
-          <view class="dock-status__label">
-            <view class="dock-status__dot"></view>
-            <text>{{ myRequestStatusLabel }}</text>
-          </view>
-          <text class="dock-status__manage">管理 ›</text>
-        </view>
         <view class="dock-status__body">
+          <view class="dock-status__dot"></view>
           <text class="dock-status__seat dock-status__seat--current">{{ formatSeatLabel(currentView.my_request) }}</text>
           <text class="dock-status__arrow">→</text>
           <text class="dock-status__seat dock-status__seat--desired">{{ myDesiredSummary }}</text>
+          <text class="dock-status__manage">管理 ›</text>
         </view>
       </view>
     </view>
@@ -206,7 +202,7 @@
 
       <template v-else-if="selectionStep === 'select_desired'">
         <view class="selected-tags">
-          <text class="tag tag--current">当前 · {{ form.current_region_name }}</text>
+          <text class="tag tag--current">当前座位 · {{ form.current_region_name }}</text>
           <text
             v-for="seat in stagedDesiredSeats"
             :key="`tag-${seat.region_key}`"
@@ -214,7 +210,7 @@
           >
             {{ seat.region_name }}
           </text>
-          <text v-if="!stagedDesiredSeats.length" class="tag tag--empty">点选你想换到的分区(可多选)</text>
+          <text v-if="!stagedDesiredSeats.length" class="tag tag--empty">点选目标座位分区(可多选)</text>
         </view>
         <view v-if="stagedDesiredSeats.length" class="desired-rows">
           <view
@@ -299,6 +295,7 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
+import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiBottomSheet from '../../components/FiBottomSheet.vue'
 import SeatSwapCandidateCard from '../../components/SeatSwapCandidateCard.vue'
 import SeatSwapManageSheet from '../../components/SeatSwapManageSheet.vue'
@@ -457,9 +454,9 @@ const selectionStepIndex = computed(() => {
 const publishSheetEyebrow = computed(() => `第 ${selectionStepIndex.value} 步 / 共 3 步`)
 
 const publishSheetTitle = computed(() => {
-  if (selectionStep.value === 'select_current') return '点选你的当前分区'
+  if (selectionStep.value === 'select_current') return '点选当前座位分区'
   if (selectionStep.value === 'select_desired') {
-    return pendingConfirmTarget.value ? '已为你预填目标分区' : '点选你想换到的分区'
+    return pendingConfirmTarget.value ? '已为你预填目标座位分区' : '点选目标座位分区'
   }
   return '补充联系方式并发布'
 })
@@ -637,7 +634,7 @@ function handleSheetMapTap(key: string): void {
 function confirmCurrentSelection(): void {
   const errors: SeatSwapFormErrors = {}
   if (!stagedCurrentRegionKey.value.trim()) {
-    errors.current_region_key = '请选择当前分区'
+    errors.current_region_key = '请选择当前座位分区'
   }
   if (!form.current_row.trim()) {
     errors.current_row = '请输入当前排号'
@@ -652,7 +649,7 @@ function confirmCurrentSelection(): void {
 
   const region = findRegion(stagedCurrentRegionKey.value)
   if (!region) {
-    formErrors.value = { current_region_key: '请选择当前分区' }
+    formErrors.value = { current_region_key: '请选择当前座位分区' }
     return
   }
   form.current_region_key = regionKey(region)
@@ -667,7 +664,7 @@ function confirmCurrentSelection(): void {
 
 function confirmDesiredSelection(): void {
   if (!canConfirmDesiredSeatRegions(stagedDesiredSeats.value)) {
-    formErrors.value = { desired_seats: '请选择想换到的分区' }
+    formErrors.value = { desired_seats: '请选择目标座位分区' }
     return
   }
   form.desired_seats = stagedDesiredSeats.value.map((s) => ({ ...s }))
@@ -928,8 +925,11 @@ onShow(() => {
 .page {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
-  padding: 28rpx 24rpx 240rpx;
+  min-height: calc(100vh - var(--fi-brand-nav-height));
+  padding-top: calc(var(--fi-brand-nav-height) + 28rpx);
+  padding-right: 24rpx;
+  padding-bottom: 240rpx;
+  padding-left: 24rpx;
   box-sizing: border-box;
 }
 
@@ -1062,7 +1062,7 @@ onShow(() => {
 
 .seat-map-panel {
   position: sticky;
-  top: 0;
+  top: var(--fi-brand-nav-height);
   z-index: 5;
   margin: 4rpx -24rpx 0;
   padding: 10rpx 24rpx 6rpx;
@@ -1118,7 +1118,7 @@ onShow(() => {
 }
 
 .legend__dot--current {
-  background: #9aa0aa;
+  background: #e23b2e;
 }
 
 .legend__dot--desired {
@@ -1294,29 +1294,15 @@ onShow(() => {
 }
 
 .dock-status {
-  padding: 22rpx 26rpx;
-  border-radius: 28rpx;
+  padding: 20rpx 22rpx;
+  border-radius: 26rpx;
   background: #15161b;
   color: #fff;
   box-shadow: 0 16rpx 36rpx rgba(21, 22, 27, 0.32);
 }
 
-.dock-status__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12rpx;
-}
-
-.dock-status__label {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  font-size: 24rpx;
-  font-weight: 400;
-}
-
 .dock-status__dot {
+  flex: 0 0 auto;
   width: 14rpx;
   height: 14rpx;
   border-radius: 50%;
@@ -1325,10 +1311,12 @@ onShow(() => {
 }
 
 .dock-status__manage {
+  flex: 0 0 auto;
+  margin-left: auto;
   font-size: 22rpx;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.78);
-  padding: 6rpx 16rpx;
+  color: rgba(255, 255, 255, 0.84);
+  padding: 12rpx 18rpx;
   border-radius: 999rpx;
   background: rgba(255, 255, 255, 0.12);
 }
@@ -1337,27 +1325,35 @@ onShow(() => {
   display: flex;
   align-items: center;
   gap: 12rpx;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   font-size: 22rpx;
+  min-width: 0;
 }
 
 .dock-status__seat {
-  padding: 6rpx 14rpx;
+  min-width: 0;
+  padding: 8rpx 14rpx;
   border-radius: 12rpx;
   font-weight: 400;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dock-status__seat--current {
-  background: #f6f7fb;
-  color: #4b515d;
+  background: #fff1f0;
+  color: #b42318;
 }
 
 .dock-status__seat--desired {
+  flex: 1 1 auto;
   background: #eef8f2;
   color: #167348;
 }
 
 .dock-status__arrow {
+  flex: 0 0 auto;
   color: rgba(255, 255, 255, 0.4);
 }
 
@@ -1417,9 +1413,9 @@ onShow(() => {
 }
 
 .tag--current {
-  background: #f6f7fb;
-  color: #4b515d;
-  border-color: rgba(232, 233, 238, 0.95);
+  background: #fff1f0;
+  color: #b42318;
+  border-color: rgba(226, 59, 46, 0.24);
 }
 
 .tag--desired {

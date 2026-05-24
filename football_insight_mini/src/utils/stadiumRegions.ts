@@ -163,7 +163,7 @@ const outerRingMetrics: RingMetrics = {
   bottomLeftX: 14,
   bottomRightX: 86,
   topY: 8,
-  bottomY: 84,
+  bottomY: 88,
   sideTopY: 19,
   sideBottomY: 73,
   horizontalItemW: 8.2,
@@ -187,9 +187,9 @@ const outerRingSegments: RingSegment[] = [
 ]
 
 const vipLayouts: Record<string, SeatSwapRegionLayout> = {
-  VIP1: { ring: 'vip', side: 'vip', left: 37.2, top: 76.3, width: 8.2, height: 3.8 },
-  VIP2: { ring: 'vip', side: 'vip', left: 45.9, top: 76.3, width: 8.2, height: 3.8 },
-  VIP3: { ring: 'vip', side: 'vip', left: 54.6, top: 76.3, width: 8.2, height: 3.8 },
+  VIP1: { ring: 'vip', side: 'vip', left: 37.2, top: 77.3, width: 8.2, height: 3.8 },
+  VIP2: { ring: 'vip', side: 'vip', left: 45.9, top: 77.3, width: 8.2, height: 3.8 },
+  VIP3: { ring: 'vip', side: 'vip', left: 54.6, top: 77.3, width: 8.2, height: 3.8 },
 }
 
 function resolveCounterclockwiseRing(

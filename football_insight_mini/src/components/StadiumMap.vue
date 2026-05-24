@@ -22,7 +22,6 @@
         @tap="handleTap(region.key, region.disabled, region.unmapped)"
       >
         <text class="stadium-region__name">{{ region.name }}</text>
-        <text v-if="region.badge" class="stadium-region__badge">{{ region.badge }}</text>
       </button>
     </view>
   </view>
@@ -31,7 +30,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { TicketWatchRegion } from '../types/ticketWatch'
-import { canInteractSeatSwapMap } from '../pages/seat-swap/helpers'
+import {
+  canInteractSeatSwapMap,
+  shouldDimSeatSwapRegion,
+} from '../pages/seat-swap/helpers'
 import {
   resolveSeatSwapRegionColorGroup,
   resolveSeatSwapRegionLayout,
@@ -116,15 +118,20 @@ const renderedRegions = computed(() =>
     const reviewCurrent = isReview && isCurrent
     const reviewDesired = isReview && isDesired
 
-    const dimmed =
-      (isPublished && !isCurrent && !isDesired) ||
-      (isFilter && !isFilterMatched && !!props.filterKey) ||
-      (isSelectCurrent && !isStagedCurrent && !!props.stagedCurrentKey) ||
-      (isSelectDesired && !isStagedCurrent && !isStagedDesired && hasStagedDesiredKeys.value)
+    const dimmed = shouldDimSeatSwapRegion({
+      mode,
+      hasFilterKey: Boolean(props.filterKey),
+      isFilterMatched,
+      hasStagedCurrentKey: Boolean(props.stagedCurrentKey),
+      isStagedCurrent,
+      hasStagedDesiredKeys: hasStagedDesiredKeys.value,
+      isStagedDesired,
+      isCurrent,
+      isDesired,
+    })
 
     const disabled = isSelectDesired && isStagedCurrent
 
-    const badge = props.badges[key] || props.badges[name] || 0
     const unmapped = !position
 
     return {
@@ -135,7 +142,6 @@ const renderedRegions = computed(() =>
         : '',
       disabled,
       unmapped,
-      badge,
       classes: [
         !isReview && `stadium-region--${colorGroup}`,
         {
@@ -220,27 +226,6 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.stadium-region__badge {
-  position: absolute;
-  top: -10rpx;
-  right: -10rpx;
-  min-width: 28rpx;
-  height: 28rpx;
-  padding: 0 6rpx;
-  border-radius: 999rpx;
-  background: #15161b;
-  color: #fff;
-  font-size: 18rpx;
-  font-weight: 800;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2rpx solid rgba(255, 255, 255, 0.96);
-  box-shadow: 0 4rpx 8rpx rgba(0, 0, 0, 0.18);
-  z-index: 4;
 }
 
 .stadium-region--unmapped {
@@ -351,8 +336,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
 }
 
 .stadium-region--dimmed {
-  opacity: 0.28;
-  filter: grayscale(1);
+  opacity: 0.82;
 }
 
 .stadium-region--disabled {
@@ -381,8 +365,8 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
 }
 
 .stadium-map--review .stadium-region--review-current {
-  background: #f6f7fb;
-  outline: 6rpx solid rgba(154, 160, 170, 0.34);
+  background: #fff1f0;
+  outline: 6rpx solid rgba(226, 59, 46, 0.34);
 }
 
 .stadium-map--review .stadium-region--review-desired {

@@ -16,6 +16,7 @@ onHide(() => {
 @import "./uni.css";
 
 page {
+  --fi-brand-nav-height: calc(var(--status-bar-height) + 154rpx);
   min-height: 100%;
   background:
     linear-gradient(180deg, rgba(233, 234, 241, 0.95) 0, rgba(244, 243, 246, 0.6) 180rpx),

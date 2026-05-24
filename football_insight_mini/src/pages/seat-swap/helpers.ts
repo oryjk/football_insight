@@ -60,8 +60,9 @@ export interface SeatSwapDesiredRegionItem {
 
 const DEFAULT_SEAT_SWAP_MOCK_REGIONS = [
   '101', '102', '103', '104', '105', '106', '107', '108',
-  '109', '110', '111', '112', '113', '116', '117', '118',
-  '123', '124', '125', '126', '127', '128', '129', '130',
+  '109', '110', '111', '112', '113', '114', '115', '116',
+  '117', '118', '119', '120', '121', '122', '123', '124',
+  '125', '126', '127', '128', '129', '130',
   '131', '132', '501', '502', '503', '504', '505', '506',
   '507', '508', '509', '510', '511', '512', '513', '514',
   '515', '516', '517', '518', '519', '520', '521', '522',
@@ -168,7 +169,7 @@ export function validateSeatSwapForm(form: SeatSwapFormState): SeatSwapFormError
   const errors: SeatSwapFormErrors = {}
 
   if (!form.current_region_key.trim()) {
-    errors.current_region_key = '请选择当前分区'
+    errors.current_region_key = '请选择当前座位分区'
   }
 
   if (!form.current_row.trim()) {
@@ -180,7 +181,7 @@ export function validateSeatSwapForm(form: SeatSwapFormState): SeatSwapFormError
   }
 
   if (!form.desired_seats.length || form.desired_seats.some((seat) => !seat.region_key.trim())) {
-    errors.desired_seats = '请选择想换到的分区'
+    errors.desired_seats = '请选择目标座位分区'
   }
 
   const phone = form.phone_number.trim()
@@ -226,6 +227,32 @@ export function buildSeatSwapRegionAnchorId(regionKey: string): string {
 
 export function resolveSeatSwapBrowseFilterKey(currentKey: string, tappedKey: string): string {
   return currentKey === tappedKey ? '' : tappedKey
+}
+
+export function shouldDimSeatSwapRegion(input: {
+  mode: 'browse' | 'filter' | 'published' | 'select-current' | 'select-desired' | 'review'
+  hasFilterKey: boolean
+  isFilterMatched: boolean
+  hasStagedCurrentKey: boolean
+  isStagedCurrent: boolean
+  hasStagedDesiredKeys: boolean
+  isStagedDesired: boolean
+  isCurrent: boolean
+  isDesired: boolean
+}): boolean {
+  if (input.mode === 'published') {
+    return !input.isCurrent && !input.isDesired
+  }
+
+  if (input.mode === 'select-current') {
+    return input.hasStagedCurrentKey && !input.isStagedCurrent
+  }
+
+  if (input.mode === 'select-desired') {
+    return !input.isStagedCurrent && !input.isStagedDesired && input.hasStagedDesiredKeys
+  }
+
+  return false
 }
 
 export function readSeatSwapViewportScrollTop(value: unknown): number | null {

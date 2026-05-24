@@ -33,8 +33,6 @@ export interface HomeGuideLeaders {
   source: 'live' | 'previous_round'
 }
 
-export type HomeAiEntryTapResult = 'expand' | 'open-chat' | 'prompt-login'
-
 export interface HomePulseTechStat {
   key: string
   label: string
@@ -42,6 +40,12 @@ export interface HomePulseTechStat {
   awayValue: string
   homeBarPercent: number
   awayBarPercent: number
+}
+
+export interface HomeLoadPlan {
+  critical: string[]
+  deferred: string[]
+  onDemand: string[]
 }
 
 export interface HomeTeamSeasonMatch {
@@ -118,15 +122,14 @@ export function isHomeAuthExpiredMessage(message: string): boolean {
     || normalized.includes('token expired')
 }
 
-export function resolveHomeAiEntryTapResult(options: {
-  expanded: boolean
-  hasAuthToken: boolean
-}): HomeAiEntryTapResult {
-  if (!options.expanded) {
-    return 'expand'
+export function resolveHomeLoadPlan(hasAuthToken: boolean): HomeLoadPlan {
+  return {
+    critical: ['overview'],
+    deferred: hasAuthToken
+      ? ['rankings', 'matches', 'rounds', 'public-config', 'support-profile', 'support-teams']
+      : ['rankings', 'matches', 'rounds', 'public-config'],
+    onDemand: hasAuthToken ? ['auth-me'] : ['auth-me', 'support-teams'],
   }
-
-  return options.hasAuthToken ? 'open-chat' : 'prompt-login'
 }
 
 export function resolveHomeSupportWindowShortLabel(
@@ -155,6 +158,37 @@ export function resolveHomeSupportNextMatchLabel(
   }
 
   return match.status === 'finished' ? '比赛已完赛' : '比赛已开始'
+}
+
+export function resolveHomeSupportTeamRankLabel(rankNo: number | null | undefined): string {
+  return rankNo && rankNo > 0 ? `积分榜第 ${rankNo}` : '排名待同步'
+}
+
+export function resolveHomeSupportMatchWeekdayLabel(matchDate: string | null | undefined): string {
+  const normalizedDate = matchDate?.trim()
+  if (!normalizedDate) {
+    return ''
+  }
+
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalizedDate)
+  if (!dateMatch) {
+    return ''
+  }
+
+  const year = Number(dateMatch[1])
+  const monthIndex = Number(dateMatch[2]) - 1
+  const day = Number(dateMatch[3])
+  const parsedDate = new Date(year, monthIndex, day)
+
+  if (
+    parsedDate.getFullYear() !== year
+    || parsedDate.getMonth() !== monthIndex
+    || parsedDate.getDate() !== day
+  ) {
+    return ''
+  }
+
+  return ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][parsedDate.getDay()]
 }
 
 export function resolveHomePulseLeadMatch(

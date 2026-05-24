@@ -17,6 +17,7 @@ import {
   resolveSeatSwapBrowseFilterKey,
   resolveSeatSwapStickyMapThreshold,
   readSeatSwapViewportScrollTop,
+  shouldDimSeatSwapRegion,
   resolveSeatSwapCandidateAction,
   shouldShowSeatSwapStickyMap,
   statusLabel,
@@ -74,7 +75,7 @@ describe('seat swap form validation', () => {
       desired_seats: [{ region_key: '', region_name: '', desired_row: '', desired_seat_no: '' }],
     })
 
-    expect(errors.desired_seats).toBe('请选择想换到的分区')
+    expect(errors.desired_seats).toBe('请选择目标座位分区')
   })
 })
 
@@ -266,6 +267,32 @@ describe('seat swap map interaction', () => {
     expect(resolveSeatSwapBrowseFilterKey('531', '531')).toBe('')
     expect(resolveSeatSwapBrowseFilterKey('531', '532')).toBe('532')
   })
+
+  test('does not gray out non-selected regions in browse and filter modes', () => {
+    expect(shouldDimSeatSwapRegion({
+      mode: 'browse',
+      hasFilterKey: false,
+      isFilterMatched: false,
+      hasStagedCurrentKey: false,
+      isStagedCurrent: false,
+      hasStagedDesiredKeys: false,
+      isStagedDesired: false,
+      isCurrent: false,
+      isDesired: false,
+    })).toBe(false)
+
+    expect(shouldDimSeatSwapRegion({
+      mode: 'filter',
+      hasFilterKey: true,
+      isFilterMatched: false,
+      hasStagedCurrentKey: false,
+      isStagedCurrent: false,
+      hasStagedDesiredKeys: false,
+      isStagedDesired: false,
+      isCurrent: false,
+      isDesired: false,
+    })).toBe(false)
+  })
 })
 
 describe('seat swap mock data', () => {
@@ -287,11 +314,18 @@ describe('seat swap mock data', () => {
 
   test('builds a region list that can drive the stadium map in mock mode', () => {
     const regions = buildSeatSwapMockRegions()
+    const regionKeys = new Set(regions.map((region) => region.block_key || region.block_name))
 
     expect(regions.length > 40).toBe(true)
-    expect(regions.some((region) => region.block_key === '101')).toBe(true)
-    expect(regions.some((region) => region.block_key === '531')).toBe(true)
-    expect(regions.some((region) => region.block_key === 'VIP2')).toBe(true)
+    expect(regionKeys.has('101')).toBe(true)
+    expect(regionKeys.has('531')).toBe(true)
+    expect(regionKeys.has('VIP2')).toBe(true)
+    for (let region = 101; region <= 132; region += 1) {
+      expect(regionKeys.has(String(region))).toBe(true)
+    }
+    for (let region = 501; region <= 536; region += 1) {
+      expect(regionKeys.has(String(region))).toBe(true)
+    }
   })
 })
 

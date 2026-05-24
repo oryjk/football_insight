@@ -2,7 +2,7 @@
   <view class="page-root">
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" />
     <view class="page-bg-fade"></view>
-    <scroll-view scroll-y class="page-scroll">
+    <view class="page-scroll">
       <view class="page">
       <FiLoading
         v-if="loading"
@@ -303,10 +303,10 @@
           </view>
         </view>
       </view>
-
-      <canvas canvas-id="standingsPosterCanvas" class="standings-poster-canvas" />
     </view>
-  </scroll-view>
+  </view>
+
+  <canvas canvas-id="standingsPosterCanvas" class="standings-poster-canvas" />
   </view>
 </template>
 
@@ -987,8 +987,12 @@ defineExpose({
 
 <style scoped lang="css">
 .page-root { position: relative; }
-.page-scroll { height: 100vh; position: relative; z-index: 1; }
-.page { padding: 128rpx 16rpx 40rpx; display: flex; flex-direction: column; gap: 16rpx; }
+.page-scroll {
+  padding-top: calc(var(--fi-brand-nav-height) + 96rpx);
+  position: relative;
+  z-index: 1;
+}
+.page { padding: 24rpx 16rpx 40rpx; display: flex; flex-direction: column; gap: 16rpx; }
 .panel, .state-card {
   background: rgba(255,255,255,0.94);
   border-radius: 36rpx;

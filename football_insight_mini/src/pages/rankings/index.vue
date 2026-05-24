@@ -1,5 +1,6 @@
 <template>
   <view class="page-root">
+    <FiBrandNav />
     <view class="mode-shell">
       <view class="mode-toggle">
         <button
@@ -19,17 +20,19 @@
       </view>
     </view>
 
-    <RankingsContent
-      v-if="activeMode === 'rankings'"
-      ref="rankingsContentRef"
-    />
-    <MatchesContent v-else />
+    <view :class="{ 'mode-content--hidden': activeMode !== 'rankings' }">
+      <RankingsContent ref="rankingsContentRef" />
+    </view>
+    <view :class="{ 'mode-content--hidden': activeMode !== 'matches' }">
+      <MatchesContent />
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
 import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
+import FiBrandNav from '../../components/FiBrandNav.vue'
 import RankingsContent from './RankingsContent.vue'
 import MatchesContent from '../matches/MatchesContent.vue'
 
@@ -87,7 +90,7 @@ onShareAppMessage(() => {
   position: fixed;
   left: 0;
   right: 0;
-  top: 0;
+  top: var(--fi-brand-nav-height);
   z-index: 30;
   padding: 18rpx 26rpx 10rpx;
   background: rgba(247, 248, 250, 0.86);
@@ -127,5 +130,9 @@ onShareAppMessage(() => {
   background: #15161b;
   color: #ffffff;
   box-shadow: 0 8rpx 18rpx rgba(21, 22, 27, 0.12);
+}
+
+.mode-content--hidden {
+  display: none;
 }
 </style>

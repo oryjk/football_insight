@@ -3,31 +3,36 @@
 		{
 			"path": "pages/home/index",
 			"style": {
-				"navigationBarTitleText": "足球洞察"
+				"navigationBarTitleText": "足球洞察",
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/rankings/index",
 			"style": {
-				"navigationBarTitleText": "榜单赛程"
+				"navigationBarTitleText": "榜单赛程",
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/insights/index",
 			"style": {
-				"navigationBarTitleText": "洞察"
+				"navigationBarTitleText": "洞察",
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/seat-swap/index",
 			"style": {
-				"navigationBarTitleText": "换座"
+				"navigationBarTitleText": "换座",
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/user/index",
 			"style": {
-				"navigationBarTitleText": "我的"
+				"navigationBarTitleText": "我的",
+				"navigationStyle": "custom"
 			}
 		},
 		{

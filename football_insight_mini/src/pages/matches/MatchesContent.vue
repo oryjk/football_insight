@@ -2,22 +2,8 @@
   <view class="page-root">
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" />
     <view class="page-bg-fade"></view>
-    <scroll-view scroll-y class="page-scroll">
+    <view class="page-scroll">
       <view class="page">
-      <view class="hero-card">
-        <view class="hero-card__top">
-          <view>
-            <text class="eyebrow">Matches</text>
-            <text class="hero-card__title">先看赛季进度，再看下一场对阵</text>
-          </view>
-          <text class="meta-note meta-note--hero">赛程 / 赛果</text>
-        </view>
-
-        <text class="hero-card__summary">
-          顶部先给你当前赛季打到哪里了，再把这一轮还没踢的比赛和下一轮赛程放到前面。下面仍然保留最近完赛结果，方便继续复盘。
-        </text>
-      </view>
-
       <FiLoading
         v-if="loading"
         title="赛季进度加载中"
@@ -291,7 +277,7 @@
         </view>
       </view>
     </view>
-  </scroll-view>
+  </view>
   </view>
 </template>
 
@@ -484,6 +470,7 @@ async function loadPage(): Promise<void> {
 
     rounds.value = roundsResponse
     matches.value = liveMatchesResponse.matches
+    loading.value = false
 
     const futureRoundNumbers = roundsResponse
       .filter((round) => round.status === 'current' || round.status === 'upcoming')
@@ -491,7 +478,7 @@ async function loadPage(): Promise<void> {
       .slice(0, 2)
 
     if (futureRoundNumbers.length) {
-      const futureResponses = await Promise.all(
+      const futureResponses = await Promise.allSettled(
         futureRoundNumbers.map((roundNumber) =>
           getMatches({ mode: 'round', season, roundNumber }),
         ),
@@ -500,7 +487,12 @@ async function loadPage(): Promise<void> {
       const merged = new Map<number, MatchCard>()
       liveMatchesResponse.matches.forEach((match) => merged.set(match.match_id, match))
       futureResponses.forEach((response) => {
-        response.matches.forEach((match) => merged.set(match.match_id, match))
+        if (response.status !== 'fulfilled') {
+          console.warn('[matches] failed to load future round matches', response.reason)
+          return
+        }
+
+        response.value.matches.forEach((match) => merged.set(match.match_id, match))
       })
       matches.value = Array.from(merged.values())
     }
@@ -540,7 +532,11 @@ onShow(() => {
 
 <style scoped lang="css">
 .page-root { position: relative; }
-.page-scroll { height: 100vh; position: relative; z-index: 1; }
+.page-scroll {
+  padding-top: calc(var(--fi-brand-nav-height) + 96rpx);
+  position: relative;
+  z-index: 1;
+}
 
 @keyframes dot-blink {
   0%, 100% { opacity: 1; transform: scale(1.3); }
@@ -554,7 +550,7 @@ onShow(() => {
 
 .page {
   position: relative;
-  padding: 128rpx 16rpx 40rpx;
+  padding: 24rpx 16rpx 40rpx;
   display: flex;
   flex-direction: column;
   gap: 16rpx;
@@ -578,7 +574,7 @@ onShow(() => {
   pointer-events: none;
   z-index: 0;
 }
-.hero-card, .panel, .state-card {
+.panel, .state-card {
   position: relative;
   z-index: 1;
   background: rgba(255,255,255,0.72);
@@ -596,12 +592,12 @@ onShow(() => {
   border: 2rpx solid rgba(236, 236, 241, 0.95);
   box-shadow: 0 28rpx 60rpx rgba(26,28,36,0.08);
 }
-.hero-card__top, .section-heading, .match-card__meta {
+.section-heading, .match-card__meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-.hero-card__top, .section-heading { align-items: flex-start; gap: 12rpx; }
+.section-heading { align-items: flex-start; gap: 12rpx; }
 .eyebrow, .section-kicker {
   margin: 0;
   color: #8f9198;
@@ -609,7 +605,7 @@ onShow(() => {
   font-weight: 700;
   letter-spacing: 3rpx;
 }
-.hero-card__title, .section-title {
+.section-title {
   display: block;
   margin-top: 10rpx;
   color: #2a2c31;
@@ -618,14 +614,7 @@ onShow(() => {
   font-weight: 800;
 }
 .section-title { font-size: 44rpx; }
-.hero-card__summary {
-  display: block;
-  margin-top: 18rpx;
-  color: #6b707b;
-  font-size: 28rpx;
-  line-height: 1.7;
-}
-.hero-card__badge, .meta-pill {
+.meta-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;

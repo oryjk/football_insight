@@ -12,15 +12,17 @@ import {
   resolveHomePulseTechStats,
   resolveHomeTeamSeasonMatches,
   resolveHomeGuideNote,
-  resolveHomeAiEntryTapResult,
   resolveHomeGuideLeaders,
   resolveHomePulseLeadMatch,
   resolveHomePulseMatches,
   resolveHomeHasAuthToken,
   resolveHomeSupportNextMatchLabel,
+  resolveHomeSupportTeamRankLabel,
+  resolveHomeSupportMatchWeekdayLabel,
   resolveHomeSupportWindowShortLabel,
   shouldShowHomeSupportLoading,
   isHomeAuthExpiredMessage,
+  resolveHomeLoadPlan,
 } from './helpers'
 
 function createLiveMatch(overrides: Partial<MatchCard> = {}): MatchCard {
@@ -187,18 +189,21 @@ describe('isHomeAuthExpiredMessage', () => {
   })
 })
 
-describe('resolveHomeAiEntryTapResult', () => {
-  test('expands the compact ai entry on the first tap', () => {
-    expect(resolveHomeAiEntryTapResult({ expanded: false, hasAuthToken: true })).toBe('expand')
-    expect(resolveHomeAiEntryTapResult({ expanded: false, hasAuthToken: false })).toBe('expand')
+describe('resolveHomeLoadPlan', () => {
+  test('keeps only overview on the first-paint critical path for logged-out users', () => {
+    expect(resolveHomeLoadPlan(false)).toEqual({
+      critical: ['overview'],
+      deferred: ['rankings', 'matches', 'rounds', 'public-config'],
+      onDemand: ['auth-me', 'support-teams'],
+    })
   })
 
-  test('opens chat after expansion when the user is logged in', () => {
-    expect(resolveHomeAiEntryTapResult({ expanded: true, hasAuthToken: true })).toBe('open-chat')
-  })
-
-  test('prompts login after expansion when the user is logged out', () => {
-    expect(resolveHomeAiEntryTapResult({ expanded: true, hasAuthToken: false })).toBe('prompt-login')
+  test('loads the favorite-team profile after first paint for logged-in users', () => {
+    expect(resolveHomeLoadPlan(true)).toEqual({
+      critical: ['overview'],
+      deferred: ['rankings', 'matches', 'rounds', 'public-config', 'support-profile', 'support-teams'],
+      onDemand: ['auth-me'],
+    })
   })
 })
 
@@ -218,6 +223,28 @@ describe('resolveHomeSupportNextMatchLabel', () => {
   test('keeps finished or started copy when the match is already closed', () => {
     expect(resolveHomeSupportNextMatchLabel({ support_window_status: 'closed', status: 'finished' })).toBe('比赛已完赛')
     expect(resolveHomeSupportNextMatchLabel({ support_window_status: 'closed', status: 'live' })).toBe('比赛已开始')
+  })
+})
+
+describe('resolveHomeSupportTeamRankLabel', () => {
+  test('formats league ranks for the favorite-team next-match card', () => {
+    expect(resolveHomeSupportTeamRankLabel(1)).toBe('积分榜第 1')
+    expect(resolveHomeSupportTeamRankLabel(8)).toBe('积分榜第 8')
+    expect(resolveHomeSupportTeamRankLabel(null)).toBe('排名待同步')
+    expect(resolveHomeSupportTeamRankLabel(0)).toBe('排名待同步')
+  })
+})
+
+describe('resolveHomeSupportMatchWeekdayLabel', () => {
+  test('formats fixture dates as fan-friendly weekdays', () => {
+    expect(resolveHomeSupportMatchWeekdayLabel('2026-05-30')).toBe('周六')
+    expect(resolveHomeSupportMatchWeekdayLabel('2026-05-27')).toBe('周三')
+  })
+
+  test('returns empty text for missing or invalid dates', () => {
+    expect(resolveHomeSupportMatchWeekdayLabel(null)).toBe('')
+    expect(resolveHomeSupportMatchWeekdayLabel('')).toBe('')
+    expect(resolveHomeSupportMatchWeekdayLabel('not-a-date')).toBe('')
   })
 })
 

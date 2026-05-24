@@ -22,6 +22,24 @@ describe('stadium region utilities', () => {
     expect((top?.top || 0) < (inner?.top || 0)).toBe(true)
   })
 
+  test('keeps the lower 500-level ring below the VIP seats without overlap', () => {
+    const outerBottom = resolveSeatSwapRegionLayout('532')
+    const vip2 = resolveSeatSwapRegionLayout('VIP2')
+
+    expect(Boolean(outerBottom)).toBe(true)
+    expect(Boolean(vip2)).toBe(true)
+    expect((outerBottom?.top || 0) - ((vip2?.top || 0) + (vip2?.height || 0)) >= 2).toBe(true)
+  })
+
+  test('keeps a visible gap between the lower 100-level ring and the VIP seats', () => {
+    const innerBottom = resolveSeatSwapRegionLayout('128')
+    const vip2 = resolveSeatSwapRegionLayout('VIP2')
+
+    expect(Boolean(innerBottom)).toBe(true)
+    expect(Boolean(vip2)).toBe(true)
+    expect((vip2?.top || 0) - ((innerBottom?.top || 0) + (innerBottom?.height || 0)) >= 1.2).toBe(true)
+  })
+
   test('exposes Chengdu seat region color groups for shared stadium rendering', () => {
     expect(resolveSeatSwapRegionColorGroup('511')).toBe('blue')
     expect(resolveSeatSwapRegionColorGroup('116')).toBe('green')

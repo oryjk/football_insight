@@ -1,8 +1,9 @@
 <template>
   <view class="page-root">
+    <FiBrandNav />
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" />
     <view class="page-bg-fade"></view>
-    <scroll-view scroll-y class="page-scroll">
+    <view class="page-scroll">
       <view class="page">
       <template v-if="systemConfigUnderReview">
         <view class="hero-card account-hero account-hero--guest">
@@ -371,13 +372,14 @@
       </view>
       </template>
     </view>
-  </scroll-view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
+import FiBrandNav from '../../components/FiBrandNav.vue'
 import diamondIcon from '../../static/user/diamond.svg'
 import bgImage from '../../static/user/bg.webp'
 import {
@@ -881,7 +883,11 @@ onShow(() => {
 
 <style scoped lang="css">
 .page-root { position: relative; }
-.page-scroll { height: 100vh; position: relative; z-index: 1; }
+.page-scroll {
+  padding-top: var(--fi-brand-nav-height);
+  position: relative;
+  z-index: 1;
+}
 
 @keyframes fi-fade-in-up {
   from { opacity: 0; transform: translateY(30rpx); }

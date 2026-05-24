@@ -1,40 +1,15 @@
 <template>
   <view class="home-page-shell">
+    <FiBrandNav open-on-current-page @open-ai="openAiFromBrandNav" />
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" />
     <view class="page-bg-fade"></view>
-    <scroll-view scroll-y class="page-scroll">
-      <view class="page" @tap="collapseAiEntry">
+    <view class="page-scroll">
+      <view class="page">
         <view class="hero-card hero-card--home">
         <view class="hero-card__top">
           <view class="hero-card__heading">
             <text class="eyebrow">Football Insight</text>
             <text class="hero-card__title">这一轮之后，谁在改变联赛格局</text>
-          </view>
-          <view
-            class="ai-entry"
-            :class="{ 'ai-entry--expanded': aiEntryExpanded }"
-            hover-class="ai-entry--pressed"
-            hover-stay-time="120"
-            @tap.stop="handleAiEntryTap"
-          >
-            <view class="ai-entry__bubble">
-              <text class="ai-entry__bubble-text">嗡嗡嗡~ AI 对话</text>
-              <text class="ai-entry__bubble-arrow">›</text>
-            </view>
-
-            <view class="ai-entry__charm">
-              <view class="ai-entry__avatar-shell">
-                <view class="ai-entry__avatar-glow"></view>
-                <image :src="aiRonaldinhoAvatar" mode="aspectFill" class="ai-entry__avatar" />
-                <view class="ai-entry__status">
-                  <view class="ai-entry__status-dot"></view>
-                </view>
-              </view>
-
-              <view class="ai-entry__tag">
-                <text class="ai-entry__tag-text">AI 洞察</text>
-              </view>
-            </view>
           </view>
         </view>
 
@@ -142,11 +117,10 @@
       <view class="panel support-home-panel">
         <view class="support-home-panel__header">
           <view class="support-home-panel__heading">
-            <text class="section-kicker">我的主队</text>
-            <text class="section-title">下一场先为谁站队</text>
+            <text class="section-title support-home-panel__title">我的主队</text>
           </view>
 
-          <view class="support-home-panel__context">
+          <view v-if="!supportFavoriteTeam" class="support-home-panel__context">
             <view class="support-home-panel__context-dot"></view>
             <text class="support-home-panel__context-label">{{ supportPanelBadge }}</text>
             <text class="support-home-panel__context-note">{{ supportPanelContextNote }}</text>
@@ -179,7 +153,9 @@
 
         <template v-else-if="supportNextMatch">
           <view class="support-home-panel__favorite">
-            <image :src="supportFavoriteTeam.avatar_storage_url || ''" mode="aspectFit" class="support-home-panel__favorite-avatar" />
+            <view class="support-home-panel__favorite-avatar-shell">
+              <image :src="supportFavoriteTeam.avatar_storage_url || ''" mode="aspectFit" class="support-home-panel__favorite-avatar" />
+            </view>
             <view class="support-home-panel__favorite-body">
               <text class="support-home-panel__favorite-name">{{ supportFavoriteTeam.team_name }}</text>
               <text class="support-home-panel__favorite-note">{{ supportFavoriteTeamLabel }}</text>
@@ -189,13 +165,27 @@
 
           <view class="support-home-match-card" @click="openSupportMatch">
             <view class="support-home-match-card__meta">
-              <text>第 {{ supportNextMatch.round_number }} 轮</text>
-              <text>{{ supportNextMatch.match_date }} {{ supportNextMatch.match_time }}</text>
+              <view class="support-home-match-card__meta-pill support-home-match-card__meta-pill--round">
+                <text>第 {{ supportNextMatch.round_number }} 轮</text>
+              </view>
+              <view class="support-home-match-card__meta-pill support-home-match-card__meta-pill--time">
+                <text v-if="supportNextMatchWeekdayLabel" class="support-home-match-card__weekday">{{ supportNextMatchWeekdayLabel }}</text>
+                <view class="support-home-match-card__datetime">
+                  <text>{{ supportNextMatch.match_date }}</text>
+                  <text>{{ supportNextMatch.match_time }}</text>
+                </view>
+              </view>
             </view>
             <view class="support-home-match-card__teams">
-              <text class="support-home-match-card__team">{{ supportNextMatch.home_team.team_name }}</text>
+              <view class="support-home-match-card__team-block">
+                <text class="support-home-match-card__team">{{ supportNextMatch.home_team.team_name }}</text>
+                <text class="support-home-match-card__rank">{{ supportNextMatchHomeRankLabel }}</text>
+              </view>
               <text class="support-home-match-card__vs">{{ supportWindowShortLabel }}</text>
-              <text class="support-home-match-card__team support-home-match-card__team--away">{{ supportNextMatch.away_team.team_name }}</text>
+              <view class="support-home-match-card__team-block support-home-match-card__team-block--away">
+                <text class="support-home-match-card__team support-home-match-card__team--away">{{ supportNextMatch.away_team.team_name }}</text>
+                <text class="support-home-match-card__rank support-home-match-card__rank--away">{{ supportNextMatchAwayRankLabel }}</text>
+              </view>
             </view>
             <view class="support-home-match-card__bar">
               <view class="support-home-match-card__bar-home" :style="{ width: `${supportNextMatch.home_team.support_share_pct}%` }" />
@@ -203,7 +193,7 @@
             </view>
             <view class="support-home-match-card__footer">
               <text>{{ supportNextMatchLabel }}</text>
-              <text>点击进入助力页</text>
+              <text class="support-home-match-card__action">进入助力页</text>
             </view>
           </view>
         </template>
@@ -449,7 +439,7 @@
 
       </template>
       </view>
-    </scroll-view>
+    </view>
 
     <FiAiChatSheet
       :visible="aiChatVisible"
@@ -642,6 +632,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiAiChatSheet from '../../components/FiAiChatSheet.vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
@@ -649,7 +640,6 @@ import { getCurrentUser } from '../../api/auth'
 import { getAvailableRounds, getMatches, getOverview, getRankings } from '../../api/insight'
 import { getSupportProfile, listSupportTeams, setFavoriteTeam } from '../../api/support'
 import { getPublicSystemConfig } from '../../api/system'
-import aiRonaldinhoAvatar from '../../static/ai/ronaldinho-avatar.png'
 import type { CurrentUser } from '../../types/auth'
 import type {
   InsightOverviewResponse,
@@ -670,20 +660,23 @@ import { buildHomeBriefingMarqueeMap, splitBriefingMarqueeRows, type HomeBriefin
 import { buildHeadlineTitleParts } from '../../utils/homeViewText'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
 import { reportPageActivity } from '../../utils/userActivity'
+import { consumeOpenAiChatIntent } from '../../utils/aiEntryIntent'
 import {
   type HomeTeamSeasonMatch,
   type HomePulseLeadMatch,
-  resolveHomeAiEntryTapResult,
   resolveHomeGuideLeaders,
   resolveHomeGuideNote,
   resolveHomeGuideReferenceRoundNumber,
   resolveHomeHasAuthToken,
   isHomeAuthExpiredMessage,
+  resolveHomeLoadPlan,
   resolveHomePulseLeadMatch,
   resolveHomePulseMatches,
   resolveHomePulseTechStats,
   resolveHomeTeamSeasonMatches,
   resolveHomeSupportNextMatchLabel,
+  resolveHomeSupportTeamRankLabel,
+  resolveHomeSupportMatchWeekdayLabel,
   resolveHomeSupportWindowShortLabel,
   shouldShowHomeSupportLoading,
 } from './helpers'
@@ -715,7 +708,6 @@ const guideRankings = ref<RankingsViewResponse | null>(null)
 const publicConfig = ref<PublicSystemConfig | null>(null)
 const currentAiUser = ref<CurrentUser | null>(null)
 const aiChatVisible = ref(false)
-const aiEntryExpanded = ref(false)
 const selectedPulseMatch = ref<HomePulseLeadMatch | null>(null)
 const selectedStandingsTeam = ref<OverviewStanding | null>(null)
 const allSeasonMatches = ref<MatchCard[] | null>(null)
@@ -725,6 +717,7 @@ const supportLoading = ref(true)
 const supportErrorMessage = ref('')
 const supportProfile = ref<SupportProfile | null>(null)
 const supportTeams = ref<SupportTeam[]>([])
+const supportTeamsLoading = ref(false)
 const favoriteTeamSheetVisible = ref(false)
 const selectedFavoriteTeamId = ref<number | null>(null)
 const hasAuthToken = ref(resolveHomeHasAuthToken(getAccessToken()))
@@ -823,6 +816,20 @@ const supportWindowShortLabel = computed(() => {
 })
 const supportNextMatchLabel = computed(() => {
   return resolveHomeSupportNextMatchLabel(supportNextMatch.value)
+})
+const supportNextMatchWeekdayLabel = computed(() => {
+  return resolveHomeSupportMatchWeekdayLabel(supportNextMatch.value?.match_date)
+})
+const supportTeamRankMap = computed(() => {
+  return new Map(supportTeams.value.map((team) => [team.team_id, team.rank_no]))
+})
+const supportNextMatchHomeRankLabel = computed(() => {
+  const teamId = supportNextMatch.value?.home_team.team_id
+  return resolveHomeSupportTeamRankLabel(teamId ? supportTeamRankMap.value.get(teamId) : null)
+})
+const supportNextMatchAwayRankLabel = computed(() => {
+  const teamId = supportNextMatch.value?.away_team.team_id
+  return resolveHomeSupportTeamRankLabel(teamId ? supportTeamRankMap.value.get(teamId) : null)
 })
 
 onShareAppMessage(() => ({
@@ -1099,29 +1106,55 @@ async function loadPage() {
   errorMessage.value = ''
 
   try {
-    const [overviewResponse, rankingsResponse, liveMatchesResponse, roundsResponse, publicSystemConfig] = await Promise.all([
-      getOverview({ mode: 'live', season: currentSeason, roundNumber: null }),
+    const loadPlan = resolveHomeLoadPlan(hasAuthToken.value)
+    if (!loadPlan.critical.includes('overview')) {
+      throw new Error('首页首屏加载计划缺少 overview')
+    }
+
+    overview.value = await getOverview({ mode: 'live', season: currentSeason, roundNumber: null })
+    void loadDeferredHomeData()
+  } catch (error) {
+    errorMessage.value = extractApiErrorMessage(error, '首页数据加载失败，请稍后重试。')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function loadDeferredHomeData() {
+  try {
+    const [rankingsResponse, liveMatchesResponse, roundsResponse, publicSystemConfig] = await Promise.all([
       getRankings({ mode: 'live', season: currentSeason, roundNumber: null }),
       getMatches({ mode: 'live', season: currentSeason, roundNumber: null }),
       getAvailableRounds(currentSeason),
       getPublicSystemConfig(),
     ])
 
-    const guideReferenceRoundNumber = resolveHomeGuideReferenceRoundNumber(roundsResponse)
-    const guideRankingsResponse = guideReferenceRoundNumber === null
-      ? null
-      : await getRankings({ mode: 'round', season: currentSeason, roundNumber: guideReferenceRoundNumber })
-
-    overview.value = overviewResponse
     rankings.value = rankingsResponse
     liveMatches.value = liveMatchesResponse.matches
     rounds.value = roundsResponse
-    guideRankings.value = guideRankingsResponse
     publicConfig.value = publicSystemConfig
+
+    const guideReferenceRoundNumber = resolveHomeGuideReferenceRoundNumber(roundsResponse)
+    guideRankings.value = guideReferenceRoundNumber === null
+      ? null
+      : await getRankings({ mode: 'round', season: currentSeason, roundNumber: guideReferenceRoundNumber })
   } catch (error) {
-    errorMessage.value = extractApiErrorMessage(error, '首页数据加载失败，请稍后重试。')
+    console.warn('[home] deferred data load failed', error)
+  }
+}
+
+async function loadSupportTeams() {
+  if (supportTeams.value.length || supportTeamsLoading.value) {
+    return
+  }
+
+  supportTeamsLoading.value = true
+  try {
+    supportTeams.value = await listSupportTeams()
+  } catch (error) {
+    console.warn('[home] support teams load failed', error)
   } finally {
-    loading.value = false
+    supportTeamsLoading.value = false
   }
 }
 
@@ -1141,9 +1174,9 @@ async function loadSupportData() {
   supportLoading.value = true
 
   try {
-    supportTeams.value = await listSupportTeams()
     supportProfile.value = await getSupportProfile()
-    selectedFavoriteTeamId.value = supportProfile.value.favorite_team?.team_id ?? supportTeams.value[0]?.team_id ?? null
+    selectedFavoriteTeamId.value = supportProfile.value.favorite_team?.team_id ?? selectedFavoriteTeamId.value
+    void loadSupportTeams()
   } catch (error) {
     const message = extractApiErrorMessage(error, '助力入口加载失败，请稍后重试。')
 
@@ -1216,6 +1249,20 @@ function promptAiLogin() {
   })
 }
 
+async function openAiChatDirectly(): Promise<void> {
+  const user = await ensureAiUser()
+  if (!user) {
+    promptAiLogin()
+    return
+  }
+
+  aiChatVisible.value = true
+}
+
+function openAiFromBrandNav(): void {
+  void openAiChatDirectly()
+}
+
 function handleSupportLogin() {
   rememberPostLoginRedirect({
     type: 'switchTab',
@@ -1226,7 +1273,8 @@ function handleSupportLogin() {
   })
 }
 
-function openFavoriteTeamSheet() {
+async function openFavoriteTeamSheet() {
+  await loadSupportTeams()
   selectedFavoriteTeamId.value = supportFavoriteTeam.value?.team_id ?? supportTeams.value[0]?.team_id ?? null
   favoriteTeamSheetVisible.value = true
 }
@@ -1261,49 +1309,19 @@ function openSupportMatch() {
   })
 }
 
-async function handleAiEntryTap() {
-  const tapResult = resolveHomeAiEntryTapResult({
-    expanded: aiEntryExpanded.value,
-    hasAuthToken: hasAuthToken.value,
-  })
-
-  if (tapResult === 'expand') {
-    aiEntryExpanded.value = true
-    return
-  }
-
-  if (tapResult === 'prompt-login') {
-    aiEntryExpanded.value = false
-    promptAiLogin()
-    return
-  }
-
-  const user = await ensureAiUser()
-  if (!user) {
-    aiEntryExpanded.value = false
-    promptAiLogin()
-    return
-  }
-
-  aiEntryExpanded.value = false
-  aiChatVisible.value = true
-}
-
 function handleCloseAiChat() {
   aiChatVisible.value = false
-  aiEntryExpanded.value = false
-}
-
-function collapseAiEntry() {
-  aiEntryExpanded.value = false
 }
 
 onShow(() => {
   reportPageActivity('home')
   hasAuthToken.value = resolveHomeHasAuthToken(getAccessToken())
   void loadPage()
-  void loadCurrentAiUser()
   void loadSupportData()
+
+  if (consumeOpenAiChatIntent()) {
+    void openAiChatDirectly()
+  }
 })
 </script>
 
@@ -1551,9 +1569,10 @@ onShow(() => {
 }
 
 .page-scroll {
-  height: 100vh;
+  padding-top: var(--fi-brand-nav-height);
   position: relative;
   z-index: 1;
+  box-sizing: border-box;
 }
 
 .page {
@@ -1579,11 +1598,11 @@ onShow(() => {
 }
 
 .hero-card--home {
-  padding: 24rpx 22rpx 22rpx;
-  border-radius: 40rpx;
-  background:
-    radial-gradient(circle at top center, rgba(255, 255, 255, 0.98), rgba(250, 250, 252, 0.92) 42%, rgba(247, 248, 251, 0.95) 100%),
-    rgba(255, 255, 255, 0.96);
+  padding: 26rpx 24rpx 20rpx;
+  border-radius: 36rpx;
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(229, 231, 236, 0.98);
+  box-shadow: 0 18rpx 46rpx rgba(26, 28, 36, 0.07);
 }
 
 .hero-card__top,
@@ -1627,10 +1646,10 @@ onShow(() => {
 
 .hero-card__title {
   max-width: none;
-  font-size: 48rpx;
-  line-height: 1.08;
-  letter-spacing: -0.02em;
-  color: #2a2c31;
+  font-size: 46rpx;
+  line-height: 1.12;
+  letter-spacing: 0;
+  color: #17181d;
 }
 
 .hero-card__badge,
@@ -1678,33 +1697,34 @@ onShow(() => {
 }
 
 .hero-card__guide {
-  margin-top: 28rpx;
-  padding-top: 28rpx;
-  border-top: 2rpx solid #ececf1;
+  margin-top: 24rpx;
+  padding: 22rpx 0 0;
+  border-top: 2rpx solid rgba(231, 232, 238, 0.94);
 }
 
 .hero-card__guide-title {
-  color: #121212;
-  font-size: 40rpx;
+  color: #191b20;
+  font-size: 30rpx;
   font-weight: 800;
   display: flex;
   align-items: center;
-  gap: 10rpx;
+  gap: 12rpx;
 }
 
 .hero-card__guide-title::before {
   content: '';
-  width: 4rpx;
-  height: 32rpx;
-  background: linear-gradient(180deg, #f97316, #ea580c);
+  width: 8rpx;
+  height: 8rpx;
+  background: #f97316;
   border-radius: 999rpx;
+  box-shadow: 0 0 0 8rpx rgba(249, 115, 22, 0.12);
 }
 
 .hero-card__guide-copy {
-  margin-top: 14rpx;
-  color: #6b707b;
-  font-size: 28rpx;
-  line-height: 1.65;
+  margin-top: 12rpx;
+  color: #606672;
+  font-size: 27rpx;
+  line-height: 1.62;
 }
 
 .hero-card__guide-note {
@@ -1714,258 +1734,114 @@ onShow(() => {
   line-height: 1.55;
 }
 
-.ai-entry {
-  position: relative;
-  display: block;
-  width: 54rpx;
-  height: 54rpx;
-  flex: 0 0 54rpx;
-  flex-shrink: 0;
-  min-height: 54rpx;
-  overflow: visible;
-}
-
-.ai-entry--pressed {
-  transform: scale(0.97);
-}
-
-.ai-entry__bubble {
-  position: absolute;
-  right: calc(100% + 12rpx);
-  top: 50%;
-  z-index: 3;
-  max-width: 0;
-  opacity: 0;
-  overflow: hidden;
-  display: inline-flex;
-  align-items: center;
-  gap: 8rpx;
-  padding: 0;
-  border-radius: 999rpx;
-  border: 2rpx solid rgba(221, 225, 234, 0);
-  background: rgba(255, 255, 255, 0.52);
-  box-shadow: 0 14rpx 28rpx rgba(31, 37, 45, 0.07);
-  backdrop-filter: blur(20rpx);
-  white-space: nowrap;
-  transform: translate(16rpx, -50%);
-  transform-origin: right center;
-  transition:
-    max-width 240ms ease,
-    opacity 180ms ease,
-    transform 240ms ease,
-    padding 240ms ease,
-    border-color 240ms ease;
-}
-
-.ai-entry--expanded .ai-entry__bubble {
-  max-width: 256rpx;
-  opacity: 1;
-  padding: 14rpx 18rpx;
-  border-color: rgba(221, 225, 234, 0.96);
-  transform: translate(0, -50%);
-}
-
-.ai-entry__bubble-text {
-  color: #48505b;
-  font-size: 22rpx;
-  line-height: 1;
-}
-
-.ai-entry__bubble-arrow {
-  color: #7e8794;
-  font-size: 24rpx;
-  line-height: 1;
-}
-
-.ai-entry__charm {
-  position: relative;
-  width: 54rpx;
-  height: 54rpx;
-}
-
-.ai-entry__avatar-shell {
-  position: relative;
-  width: 54rpx;
-  height: 54rpx;
-  flex: 0 0 auto;
-  animation: ai-entry-float 3.2s ease-in-out infinite;
-}
-
-.ai-entry__avatar-glow {
-  position: absolute;
-  inset: -6rpx;
-  border-radius: 999rpx;
-  background: radial-gradient(circle, rgba(255, 213, 106, 0.44), rgba(255, 213, 106, 0));
-  opacity: 0.88;
-}
-
-.ai-entry__avatar {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  border-radius: 999rpx;
-  border: 2rpx solid rgba(255, 255, 255, 0.94);
-  box-shadow: 0 10rpx 18rpx rgba(25, 29, 36, 0.12);
-}
-
-.ai-entry__status {
-  position: absolute;
-  right: -3rpx;
-  bottom: -3rpx;
-  width: 20rpx;
-  height: 20rpx;
-  border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.94);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8rpx 16rpx rgba(24, 27, 33, 0.12);
-}
-
-.ai-entry__status-dot {
-  width: 9rpx;
-  height: 9rpx;
-  border-radius: 999rpx;
-  background: #1db35f;
-  box-shadow: 0 0 0 0 rgba(29, 179, 95, 0.45);
-  animation: ai-entry-status-pulse 1.8s ease-out infinite;
-}
-
-.ai-entry__tag {
-  position: absolute;
-  left: 42rpx;
-  top: 50%;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6rpx 10rpx;
-  border-radius: 999rpx;
-  border: 2rpx solid rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.42);
-  backdrop-filter: blur(14rpx);
-  transform: translateY(-50%);
-  box-shadow: 0 10rpx 20rpx rgba(31, 37, 45, 0.05);
-  pointer-events: none;
-}
-
-.ai-entry__tag-text {
-  color: #6f735f;
-  font-size: 16rpx;
-  line-height: 1;
-}
-
 .inline-highlight {
   display: inline;
-  color: #121212;
+  color: #17181d;
   font-weight: 700;
   padding: 0 0.08em;
-  background-image: linear-gradient(90deg, rgba(255, 132, 20, 0.98) 0%, rgba(255, 161, 32, 0.98) 56%, rgba(255, 205, 74, 0.94) 100%);
+  background-image: linear-gradient(90deg, rgba(249, 115, 22, 0.28), rgba(249, 115, 22, 0.28));
   background-repeat: no-repeat;
-  background-size: 100% 0.42em;
+  background-size: 100% 0.36em;
   background-position: left bottom;
 }
 
 .briefing-grid {
-  margin-top: 20rpx;
+  margin-top: 22rpx;
   display: grid;
-  gap: 10rpx;
+  gap: 0;
+  border-top: 2rpx solid rgba(231, 232, 238, 0.88);
 }
 
 .briefing-card {
   position: relative;
-  overflow: hidden;
-  min-height: 240rpx;
-  padding: 18rpx 14rpx 18rpx 28rpx;
-  border-radius: 28rpx;
-  border: 2rpx solid #ececf1;
-}
-
-.briefing-card--leader {
-  background:
-    radial-gradient(circle at 84% 22%, rgba(234, 88, 12, 0.10), transparent 36%),
-    linear-gradient(135deg, rgba(255, 247, 237, 0.98), rgba(255, 255, 255, 0.96) 52%, rgba(255, 250, 245, 0.98) 100%);
-}
-
-.briefing-card--scorer {
-  background:
-    radial-gradient(circle at 82% 24%, rgba(249, 115, 22, 0.12), transparent 40%),
-    linear-gradient(135deg, rgba(255, 247, 237, 0.98), rgba(255, 255, 255, 0.96) 52%, rgba(255, 250, 245, 0.98) 100%);
-}
-
-.briefing-card--assist {
-  background:
-    radial-gradient(circle at 82% 24%, rgba(245, 158, 11, 0.12), transparent 40%),
-    linear-gradient(135deg, rgba(255, 251, 235, 0.98), rgba(255, 255, 255, 0.96) 52%, rgba(255, 250, 245, 0.98) 100%);
+  overflow: visible;
+  min-height: 150rpx;
+  padding: 20rpx 0 20rpx 20rpx;
+  border-radius: 0;
+  border: 0;
+  border-bottom: 2rpx solid rgba(231, 232, 238, 0.88);
+  background: transparent;
 }
 
 .briefing-card::before {
   content: '';
   position: absolute;
-  inset: 0 auto 0 0;
-  width: 10rpx;
-  border-radius: 28rpx 0 0 28rpx;
+  left: 0;
+  top: 26rpx;
+  bottom: 26rpx;
+  width: 4rpx;
+  border-radius: 999rpx;
 }
 
 .briefing-card--leader::before {
-  background: linear-gradient(180deg, #ea580c 0%, #c2410c 100%);
+  background: #ea580c;
 }
 
 .briefing-card--scorer::before {
-  background: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
+  background: #f97316;
 }
 
 .briefing-card--assist::before {
-  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+  background: #f59e0b;
 }
 
 .briefing-card__label {
-  color: #8f9198;
-  font-size: 24rpx;
+  color: #8a8f9a;
+  font-size: 22rpx;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .briefing-card__body {
-  height: calc(100% - 32rpx);
+  margin-top: 14rpx;
   display: grid;
-  grid-template-columns: minmax(188rpx, 0.9fr) minmax(0, 1.36fr) 124rpx;
-  column-gap: 10rpx;
+  grid-template-columns: minmax(210rpx, 0.95fr) minmax(0, 1.35fr) 120rpx;
+  column-gap: 16rpx;
   align-items: center;
 }
 
 .briefing-card__main {
-  display: grid;
-  align-content: start;
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
   min-width: 0;
 }
 
 .briefing-card__leader-logo,
 .briefing-card__entity-group {
-  min-height: 78rpx;
-  margin-bottom: 4rpx;
+  flex: 0 0 auto;
 }
 
 .briefing-card__leader-logo {
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 18rpx;
+  background: #f7f8fa;
+  border: 2rpx solid rgba(231, 232, 238, 0.92);
 }
 
 .briefing-card__leader-logo-image {
-  width: 76rpx;
-  height: 76rpx;
+  width: 48rpx;
+  height: 48rpx;
 }
 
 .briefing-card__entity-group {
   display: flex;
   align-items: center;
+  min-width: 78rpx;
 }
 
 .briefing-card__entity-avatar {
-  width: 66rpx;
-  height: 66rpx;
+  width: 54rpx;
+  height: 54rpx;
   border-radius: 999rpx;
-  margin-right: -12rpx;
+  margin-right: -14rpx;
   border: 4rpx solid rgba(255, 255, 255, 0.96);
-  background: #ffffff;
+  background: #f7f8fa;
+  box-shadow: 0 8rpx 18rpx rgba(24, 27, 33, 0.07);
 }
 
 .briefing-card__entity-avatar:last-child {
@@ -1974,19 +1850,20 @@ onShow(() => {
 
 .briefing-card__title-block {
   display: grid;
-  gap: 6rpx;
+  gap: 5rpx;
+  min-width: 0;
 }
 
 .briefing-card__value {
-  color: #121212;
-  font-size: 32rpx;
-  line-height: 1.04;
+  color: #17181d;
+  font-size: 30rpx;
+  line-height: 1.12;
   font-weight: 800;
 }
 
 .briefing-card__subvalue {
-  color: #8f9198;
-  font-size: 20rpx;
+  color: #8a8f9a;
+  font-size: 21rpx;
   line-height: 1.22;
 }
 
@@ -1994,7 +1871,7 @@ onShow(() => {
   display: grid;
   align-self: stretch;
   align-content: center;
-  gap: 4rpx;
+  gap: 6rpx;
   overflow: hidden;
   min-width: 0;
   padding-right: 0;
@@ -2008,7 +1885,7 @@ onShow(() => {
 .briefing-card__marquee-track {
   display: inline-flex;
   align-items: center;
-  gap: 24rpx;
+  gap: 20rpx;
   min-width: max-content;
   animation-name: briefing-marquee-scroll;
   animation-timing-function: linear;
@@ -2018,9 +1895,9 @@ onShow(() => {
 .briefing-card__marquee-item {
   position: relative;
   padding-left: 16rpx;
-  color: rgba(84, 89, 99, 0.92);
-  font-size: 22rpx;
-  line-height: 1.28;
+  color: rgba(86, 91, 101, 0.88);
+  font-size: 21rpx;
+  line-height: 1.3;
 }
 
 .briefing-card__marquee-item::before {
@@ -2033,7 +1910,7 @@ onShow(() => {
 
 .briefing-card__metric {
   display: grid;
-  width: 124rpx;
+  width: 120rpx;
   align-content: center;
   justify-items: end;
   justify-self: end;
@@ -2044,17 +1921,16 @@ onShow(() => {
 
 .briefing-card__metric-value {
   color: #f97316;
-  font-size: 58rpx;
-  line-height: 0.92;
+  font-size: 50rpx;
+  line-height: 0.95;
   font-weight: 800;
 }
 
 .briefing-card__metric-label {
-  color: #121212;
-  font-size: 24rpx;
+  color: #31343b;
+  font-size: 22rpx;
   font-weight: 700;
   line-height: 1.18;
-  background-image: linear-gradient(to top, #ffb347 0, #ffb347 0.4em, transparent 0.4em, transparent 100%);
 }
 
 @keyframes briefing-marquee-scroll {
@@ -2699,11 +2575,15 @@ onShow(() => {
 }
 .support-home-panel__header {
   display: grid;
-  gap: 14rpx;
+  gap: 12rpx;
 }
 .support-home-panel__heading {
   display: grid;
-  gap: 8rpx;
+  gap: 0;
+}
+.support-home-panel__title {
+  font-size: 36rpx;
+  line-height: 1.12;
 }
 .support-home-panel__context {
   display: flex;
@@ -2717,11 +2597,11 @@ onShow(() => {
   width: 10rpx;
   height: 10rpx;
   border-radius: 999rpx;
-  background: linear-gradient(180deg, #f6b44e, #d89b34);
-  box-shadow: 0 0 0 6rpx rgba(216, 155, 52, 0.14);
+  background: #26a269;
+  box-shadow: 0 0 0 6rpx rgba(38, 162, 105, 0.12);
 }
 .support-home-panel__context-label {
-  color: #9c7e45;
+  color: #2f7f5f;
   font-size: 24rpx;
   font-weight: 700;
   line-height: 1.2;
@@ -2757,10 +2637,36 @@ onShow(() => {
   color: #5f6673;
 }
 .support-home-panel__favorite {
-  margin-top: 18rpx;
+  position: relative;
+  margin-top: 22rpx;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18rpx;
+  padding: 22rpx 0 24rpx;
+  border-top: 2rpx solid rgba(231, 232, 238, 0.92);
+  border-bottom: 2rpx solid rgba(231, 232, 238, 0.92);
+}
+.support-home-panel__favorite::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 22rpx;
+  bottom: 22rpx;
+  width: 4rpx;
+  border-radius: 999rpx;
+  background: #26a269;
+}
+.support-home-panel__favorite-avatar-shell {
+  margin-left: 18rpx;
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 24rpx;
+  background: #f7f9f8;
+  border: 2rpx solid rgba(223, 229, 226, 0.96);
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  justify-content: center;
 }
 .support-home-panel__favorite-avatar,
 .favorite-team-sheet__avatar {
@@ -2775,8 +2681,10 @@ onShow(() => {
 .support-home-panel__favorite-name,
 .favorite-team-sheet__name {
   color: #121212;
-  font-size: 30rpx;
-  font-weight: 700;
+  display: block;
+  font-size: 36rpx;
+  line-height: 1;
+  font-weight: 800;
 }
 .support-home-panel__favorite-note,
 .favorite-team-sheet__note {
@@ -2786,21 +2694,21 @@ onShow(() => {
   font-size: 22rpx;
 }
 .support-home-panel__switch {
-  padding: 14rpx 20rpx;
+  padding: 14rpx 22rpx;
   border-radius: 999rpx;
   background: #f5f6fa;
   color: #5f6673;
-  font-size: 22rpx;
+  font-size: 23rpx;
+  font-weight: 700;
   line-height: 1;
 }
 .support-home-match-card {
   margin-top: 18rpx;
-  padding: 22rpx;
-  border-radius: 28rpx;
-  border: 2rpx solid rgba(255, 140, 43, 0.22);
-  background:
-    radial-gradient(circle at top right, rgba(255, 145, 41, 0.12), transparent 34%),
-    linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,246,239,0.96));
+  padding: 22rpx 20rpx;
+  border-radius: 24rpx;
+  border: 2rpx solid rgba(229, 231, 236, 0.98);
+  background: #ffffff;
+  box-shadow: 0 10rpx 28rpx rgba(18, 20, 28, 0.04);
 }
 .support-home-match-card__meta,
 .support-home-match-card__footer {
@@ -2810,17 +2718,73 @@ onShow(() => {
   color: #8f9198;
   font-size: 22rpx;
 }
+.support-home-match-card__meta {
+  gap: 12rpx;
+}
+.support-home-match-card__meta-pill {
+  min-height: 44rpx;
+  border-radius: 999rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  font-size: 22rpx;
+  line-height: 1;
+  font-weight: 800;
+}
+.support-home-match-card__meta-pill--round {
+  padding: 0 18rpx;
+  background: #15161b;
+  color: #ffffff;
+}
+.support-home-match-card__meta-pill--time {
+  margin-left: auto;
+  gap: 10rpx;
+  padding: 6rpx 14rpx 6rpx 8rpx;
+  background: #f5f6fa;
+  color: #5d6673;
+}
+.support-home-match-card__weekday {
+  min-width: 58rpx;
+  padding: 9rpx 12rpx;
+  border-radius: 999rpx;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #15161b;
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 950;
+  line-height: 1;
+}
+.support-home-match-card__datetime {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  white-space: nowrap;
+}
 .support-home-match-card__teams {
-  margin-top: 14rpx;
+  margin-top: 18rpx;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 14rpx;
+  gap: 16rpx;
   align-items: center;
+}
+.support-home-match-card__team-block {
+  min-width: 0;
+  display: grid;
+  gap: 8rpx;
+}
+.support-home-match-card__team-block--away {
+  justify-items: end;
 }
 .support-home-match-card__team {
   color: #121212;
-  font-size: 30rpx;
-  font-weight: 700;
+  font-size: 32rpx;
+  line-height: 1.12;
+  font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2828,26 +2792,51 @@ onShow(() => {
 .support-home-match-card__team--away {
   text-align: right;
 }
+.support-home-match-card__rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  min-height: 32rpx;
+  padding: 0 12rpx;
+  border-radius: 999rpx;
+  background: #f5f6fa;
+  color: #6d7280;
+  font-size: 20rpx;
+  font-weight: 800;
+  line-height: 1;
+}
+.support-home-match-card__rank--away {
+  justify-self: end;
+}
 .support-home-match-card__vs {
   color: #f97316;
-  font-size: 22rpx;
-  font-weight: 700;
+  font-size: 24rpx;
+  font-weight: 900;
+  line-height: 1;
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  background: rgba(249, 115, 22, 0.08);
 }
 .support-home-match-card__bar {
-  margin-top: 16rpx;
-  height: 14rpx;
+  margin-top: 18rpx;
+  height: 12rpx;
   border-radius: 999rpx;
   overflow: hidden;
-  background: #ececf1;
+  background: #eef0f4;
   display: flex;
 }
 .support-home-match-card__bar-home {
   height: 100%;
-  background: linear-gradient(90deg, #ff8b2b, #ffb347);
+  background: #26a269;
 }
 .support-home-match-card__bar-away {
   height: 100%;
-  background: linear-gradient(90deg, #4d8dff, #7bb4ff);
+  background: #a7adb8;
+}
+.support-home-match-card__action {
+  color: #f97316;
+  font-weight: 800;
 }
 .sheet-mask {
   position: fixed;
@@ -2905,24 +2894,6 @@ onShow(() => {
 .primary-action--ghost {
   background: #f6f7fb;
   color: #6d7280;
-}
-
-@keyframes ai-entry-float {
-  0%, 100% {
-    transform: translateY(0) rotate(-1.5deg);
-  }
-  50% {
-    transform: translateY(-4rpx) rotate(1.5deg);
-  }
-}
-
-@keyframes ai-entry-status-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(29, 179, 95, 0.45);
-  }
-  100% {
-    box-shadow: 0 0 0 14rpx rgba(29, 179, 95, 0);
-  }
 }
 
 @keyframes tech-stats-mask-fade {

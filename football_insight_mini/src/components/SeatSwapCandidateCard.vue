@@ -13,7 +13,7 @@
       <view class="seat-swap-candidate__id">
         <text class="seat-swap-candidate__name">{{ candidate.display_name }}</text>
         <view class="seat-swap-candidate__seat">
-          <text class="seat-swap-candidate__seat-label">可换出</text>
+          <text class="seat-swap-candidate__seat-label">当前座位</text>
           <text class="seat-swap-candidate__seat-value">{{ formatSeatSwapSeatLabel(candidate) }}</text>
         </view>
       </view>
@@ -22,7 +22,7 @@
       </text>
     </view>
     <view class="seat-swap-candidate__wants">
-      <text class="seat-swap-candidate__wants-label">想换到</text>
+      <text class="seat-swap-candidate__wants-label">目标座位</text>
       <text class="seat-swap-candidate__wants-value">{{ desiredSeatText }}</text>
     </view>
     <view v-if="candidate.contact" class="seat-swap-candidate__contact">
@@ -129,15 +129,15 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   margin-top: 8rpx;
   overflow: hidden;
   border-radius: 22rpx;
-  background: #f6f7fb;
-  color: #4b515d;
+  background: #fff1f0;
+  color: #b42318;
 }
 
 .seat-swap-candidate__seat-label {
   flex-shrink: 0;
   padding: 7rpx 10rpx 7rpx 12rpx;
-  background: rgba(21, 22, 27, 0.06);
-  color: #6d7280;
+  background: rgba(226, 59, 46, 0.12);
+  color: #b42318;
   font-size: 20rpx;
   font-weight: 600;
   line-height: 1;

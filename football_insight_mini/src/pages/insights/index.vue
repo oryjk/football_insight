@@ -1,8 +1,9 @@
 <template>
   <view class="page-root">
+    <FiBrandNav />
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" />
     <view class="page-bg-fade"></view>
-    <scroll-view scroll-y class="page-scroll">
+    <view class="page-scroll">
       <view class="page">
         <view class="hero-card">
         <view class="hero-card__top">
@@ -395,13 +396,14 @@
         <text>当前还没有可展示的球队洞察数据。</text>
       </view>
     </view>
-  </scroll-view>
+  </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, getCurrentInstance, nextTick, ref, watch } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
+import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiLoading from '../../components/FiLoading.vue'
 import { getCurrentUser } from '../../api/auth'
 import { getLiveTeamInsights } from '../../api/insight'
@@ -688,7 +690,7 @@ onShow(async () => {
 <style scoped lang="css">
 .page-root { position: relative; }
 .page-scroll {
-  height: 100vh;
+  padding-top: var(--fi-brand-nav-height);
   position: relative;
   z-index: 1;
 }
