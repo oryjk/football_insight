@@ -1,14 +1,13 @@
 import type { PublicSystemConfig, SystemConfig } from '../types/system'
+import { MINI_PROGRAM_VERSION as GENERATED_MINI_PROGRAM_VERSION } from '../config/generatedMiniProgramVersion'
 import { request } from '../utils/request'
 
 function normalizeEnvValue(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-const DEFAULT_MINI_PROGRAM_VERSION = import.meta.env.PROD ? '1.0.43' : '1.0.43'
-
 export const MINI_PROGRAM_VERSION =
-  normalizeEnvValue(import.meta.env.VITE_MINI_PROGRAM_VERSION) || DEFAULT_MINI_PROGRAM_VERSION
+  GENERATED_MINI_PROGRAM_VERSION || normalizeEnvValue(import.meta.env.VITE_MINI_PROGRAM_VERSION)
 export const MINI_PROGRAM_APP_ID = normalizeEnvValue(import.meta.env.VITE_MINI_PROGRAM_APP_ID)
 
 export function getPublicSystemConfig(): Promise<PublicSystemConfig> {
