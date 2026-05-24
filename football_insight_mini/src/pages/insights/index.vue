@@ -1,6 +1,6 @@
 <template>
   <view class="page-root">
-    <FiBrandNav />
+    <FiBrandNav open-on-current-page @open-ai="openAiFromBrandNav" />
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" />
     <view class="page-bg-fade"></view>
     <view class="page-scroll">
@@ -396,7 +396,14 @@
         <text>当前还没有可展示的球队洞察数据。</text>
       </view>
     </view>
-  </view>
+    </view>
+
+    <FiAiChatSheet
+      :visible="aiChatVisible"
+      :current-user="currentAiUser"
+      :ai-chat-mode="aiPublicConfig?.ai_chat_mode"
+      @close="closeAiChat"
+    />
   </view>
 </template>
 
@@ -404,6 +411,7 @@
 import { computed, getCurrentInstance, nextTick, ref, watch } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
+import FiAiChatSheet from '../../components/FiAiChatSheet.vue'
 import FiLoading from '../../components/FiLoading.vue'
 import { getCurrentUser } from '../../api/auth'
 import { getLiveTeamInsights } from '../../api/insight'
@@ -422,6 +430,7 @@ import { resolveMembershipBenefitsLocked } from '../../utils/membershipBenefits'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
 import { reportPageActivity } from '../../utils/userActivity'
+import { useAiChatSheet } from '../../composables/useAiChatSheet'
 
 const instance = getCurrentInstance()
 const userLoading = ref(true)
@@ -438,6 +447,13 @@ const assistsForPlayerExpanded = ref(false)
 const goalsAgainstOpponentExpanded = ref(false)
 const ticketWatchNavigating = ref(false)
 const systemConfigUnderReview = ref(false)
+const {
+  aiChatVisible,
+  currentAiUser,
+  aiPublicConfig,
+  openAiChat,
+  closeAiChat,
+} = useAiChatSheet()
 const membershipBenefitsLocked = computed(() =>
   resolveMembershipBenefitsLocked(currentUser.value),
 )
@@ -558,6 +574,10 @@ function openTicketWatch(): void {
       ticketWatchNavigating.value = false
     },
   })
+}
+
+function openAiFromBrandNav(): void {
+  void openAiChat()
 }
 
 function hasRectShape(value: unknown): value is { left: number; width: number } {

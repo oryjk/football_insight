@@ -8,7 +8,7 @@ use axum::{
     body::{Body, Bytes, to_bytes},
     extract::State,
     http::{
-        HeaderMap, Method, Request, Response, StatusCode,
+        HeaderMap, HeaderValue, Method, Request, Response, StatusCode,
         header::{AUTHORIZATION, CONTENT_LENGTH},
     },
     middleware::Next,
@@ -16,6 +16,9 @@ use axum::{
 use tokio::sync::RwLock;
 
 const MAX_CACHEABLE_BODY_SIZE: usize = 1024 * 1024 * 2;
+const X_CACHE_HEADER: &str = "x-cache";
+const CACHE_HIT: &str = "HIT";
+const CACHE_MISS: &str = "MISS";
 
 #[derive(Clone)]
 pub struct HttpResponseCache {
@@ -88,8 +91,11 @@ pub async fn cache_get_responses(
 
     let path = request.uri().path().to_string();
     let cache_key = build_cache_key(&request);
-    if let Some(response) = cache.get(&cache_key).await {
+    if let Some(mut response) = cache.get(&cache_key).await {
         tracing::info!(path = %path, "缓存命中");
+        response
+            .headers_mut()
+            .insert(X_CACHE_HEADER, HeaderValue::from_static(CACHE_HIT));
         return response;
     }
 
@@ -116,11 +122,12 @@ pub async fn cache_get_responses(
         }
     };
 
-    let response = Response::from_parts(parts, Body::from(body_bytes.clone()));
+    let mut response = Response::from_parts(parts, Body::from(body_bytes.clone()));
 
     if response.status().is_success() {
         let mut headers = response.headers().clone();
         headers.remove(CONTENT_LENGTH);
+        headers.remove(X_CACHE_HEADER);
         let ttl = cache.resolve_ttl(&path);
         cache
             .put(
@@ -133,6 +140,9 @@ pub async fn cache_get_responses(
                 },
             )
             .await;
+        response
+            .headers_mut()
+            .insert(X_CACHE_HEADER, HeaderValue::from_static(CACHE_MISS));
     }
 
     response
@@ -152,6 +162,10 @@ fn should_cache_request(request: &Request<Body>) -> bool {
 }
 
 fn matches_excluded_prefix(path: &str) -> bool {
+    if path == "/api/v1/system/public-config" {
+        return false;
+    }
+
     path.starts_with("/api/v1/auth/")
         || path.starts_with("/api/v1/ticket-watch/")
         || path.starts_with("/api/v1/system")
@@ -261,6 +275,61 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn marks_cache_miss_then_hit_for_cacheable_requests() {
+        let hits = Arc::new(AtomicUsize::new(0));
+        let cache = HttpResponseCache::new(Duration::from_secs(600));
+        let app = {
+            let hits = hits.clone();
+            Router::new()
+                .route(
+                    "/api/v1/live/rankings",
+                    get(move || {
+                        let hits = hits.clone();
+                        async move {
+                            let value = hits.fetch_add(1, Ordering::SeqCst) + 1;
+                            format!("rankings-hit-{value}")
+                        }
+                    }),
+                )
+                .layer(from_fn_with_state(cache, cache_get_responses))
+        };
+
+        let first = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/live/rankings")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let first_cache = first.headers().get("x-cache").cloned();
+        let first_body = to_bytes(first.into_body(), MAX_CACHEABLE_BODY_SIZE)
+            .await
+            .unwrap();
+
+        let second = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/live/rankings")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let second_cache = second.headers().get("x-cache").cloned();
+        let second_body = to_bytes(second.into_body(), MAX_CACHEABLE_BODY_SIZE)
+            .await
+            .unwrap();
+
+        assert_eq!(first_cache.unwrap(), "MISS");
+        assert_eq!(second_cache.unwrap(), "HIT");
+        assert_eq!(first_body, second_body);
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
     async fn does_not_cache_excluded_auth_routes() {
         let hits = Arc::new(AtomicUsize::new(0));
         let cache = HttpResponseCache::new(Duration::from_secs(600));
@@ -301,6 +370,70 @@ mod tests {
             .unwrap();
 
         assert_eq!(hits.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn caches_public_system_config_but_not_other_system_routes() {
+        let public_hits = Arc::new(AtomicUsize::new(0));
+        let review_hits = Arc::new(AtomicUsize::new(0));
+        let cache = HttpResponseCache::new(Duration::from_secs(600));
+        let app = {
+            let public_hits = public_hits.clone();
+            let review_hits = review_hits.clone();
+            Router::new()
+                .route(
+                    "/api/v1/system/public-config",
+                    get(move || {
+                        let public_hits = public_hits.clone();
+                        async move {
+                            let value = public_hits.fetch_add(1, Ordering::SeqCst) + 1;
+                            format!("public-config-hit-{value}")
+                        }
+                    }),
+                )
+                .route(
+                    "/api/v1/system/mini-program-review",
+                    get(move || {
+                        let review_hits = review_hits.clone();
+                        async move {
+                            let value = review_hits.fetch_add(1, Ordering::SeqCst) + 1;
+                            format!("review-hit-{value}")
+                        }
+                    }),
+                )
+                .layer(from_fn_with_state(cache, cache_get_responses))
+        };
+
+        let public_request = || {
+            Request::builder()
+                .uri("/api/v1/system/public-config")
+                .body(Body::empty())
+                .unwrap()
+        };
+        let review_request = || {
+            Request::builder()
+                .uri("/api/v1/system/mini-program-review?version=1.0.0")
+                .body(Body::empty())
+                .unwrap()
+        };
+
+        let public_first = app.clone().oneshot(public_request()).await.unwrap();
+        let public_second = app.clone().oneshot(public_request()).await.unwrap();
+        let review_first = app.clone().oneshot(review_request()).await.unwrap();
+        let review_second = app.oneshot(review_request()).await.unwrap();
+
+        assert_eq!(public_first.headers().get("x-cache").unwrap(), "MISS");
+        assert_eq!(public_second.headers().get("x-cache").unwrap(), "HIT");
+        assert_eq!(public_hits.load(Ordering::SeqCst), 1);
+
+        let review_first_body = to_bytes(review_first.into_body(), MAX_CACHEABLE_BODY_SIZE)
+            .await
+            .unwrap();
+        let review_second_body = to_bytes(review_second.into_body(), MAX_CACHEABLE_BODY_SIZE)
+            .await
+            .unwrap();
+        assert_ne!(review_first_body, review_second_body);
+        assert_eq!(review_hits.load(Ordering::SeqCst), 2);
     }
 
     #[tokio::test]

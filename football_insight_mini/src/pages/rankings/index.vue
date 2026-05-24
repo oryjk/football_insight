@@ -1,6 +1,6 @@
 <template>
   <view class="page-root">
-    <FiBrandNav />
+    <FiBrandNav open-on-current-page @open-ai="openAiFromBrandNav" />
     <view class="mode-shell">
       <view class="mode-toggle">
         <button
@@ -26,6 +26,13 @@
     <view :class="{ 'mode-content--hidden': activeMode !== 'matches' }">
       <MatchesContent />
     </view>
+
+    <FiAiChatSheet
+      :visible="aiChatVisible"
+      :current-user="currentAiUser"
+      :ai-chat-mode="aiPublicConfig?.ai_chat_mode"
+      @close="closeAiChat"
+    />
   </view>
 </template>
 
@@ -33,12 +40,21 @@
 import { nextTick, ref } from 'vue'
 import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
+import FiAiChatSheet from '../../components/FiAiChatSheet.vue'
 import RankingsContent from './RankingsContent.vue'
 import MatchesContent from '../matches/MatchesContent.vue'
+import { useAiChatSheet } from '../../composables/useAiChatSheet'
 
 const activeMode = ref<'rankings' | 'matches'>('rankings')
 const rankingsContentRef = ref<InstanceType<typeof RankingsContent> | null>(null)
 const pendingSharedPosterSlug = ref<string | null>(null)
+const {
+  aiChatVisible,
+  currentAiUser,
+  aiPublicConfig,
+  openAiChat,
+  closeAiChat,
+} = useAiChatSheet()
 
 function normalizeRankingsMode(value: unknown): 'rankings' | 'matches' {
   return value === 'matches' ? 'matches' : 'rankings'
@@ -51,6 +67,10 @@ async function openPendingSharedPoster(): Promise<void> {
 
   await nextTick()
   await rankingsContentRef.value?.openSharedStandingsPoster(pendingSharedPosterSlug.value)
+}
+
+function openAiFromBrandNav(): void {
+  void openAiChat()
 }
 
 onLoad((query) => {

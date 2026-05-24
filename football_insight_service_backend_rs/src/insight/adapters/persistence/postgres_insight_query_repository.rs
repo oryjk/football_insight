@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
 use sqlx::{PgPool, types::Json};
+use std::time::Instant;
 
 use crate::insight::{
     domain::{
@@ -93,33 +94,21 @@ impl PostgresInsightQueryRepository {
         ranking_min_snapshot_at: Option<DateTime<Utc>>,
         matches_round_number: Option<i32>,
     ) -> anyhow::Result<InsightOverview> {
-        let total_matches =
-            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM f_i_matches WHERE season = $1")
-                .bind(season)
-                .fetch_one(&self.pool)
-                .await?;
-
-        let total_teams = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM f_i_teams")
-            .fetch_one(&self.pool)
-            .await?;
-
-        let total_players = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM f_i_players")
-            .fetch_one(&self.pool)
-            .await?;
-
-        let player_ranking_categories = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM f_i_ranking_categories WHERE scope = 'player'",
+        let started_at = Instant::now();
+        let stats_query = sqlx::query_as::<_, OverviewStatsRow>(
+            r#"
+            SELECT
+                (SELECT COUNT(*) FROM f_i_matches WHERE season = $1) AS total_matches,
+                (SELECT COUNT(*) FROM f_i_teams) AS total_teams,
+                (SELECT COUNT(*) FROM f_i_players) AS total_players,
+                (SELECT COUNT(*) FROM f_i_ranking_categories WHERE scope = 'player') AS player_ranking_categories,
+                (SELECT COUNT(*) FROM f_i_ranking_categories WHERE scope = 'team') AS team_ranking_categories
+            "#,
         )
-        .fetch_one(&self.pool)
-        .await?;
+        .bind(season)
+        .fetch_one(&self.pool);
 
-        let team_ranking_categories = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM f_i_ranking_categories WHERE scope = 'team'",
-        )
-        .fetch_one(&self.pool)
-        .await?;
-
-        let standings_top = sqlx::query_as::<_, OverviewStandingRow>(
+        let standings_top_query = sqlx::query_as::<_, OverviewStandingRow>(
             r#"
             WITH target_snapshot AS (
                 SELECT MAX(snapshot_at) AS snapshot_at
@@ -144,19 +133,9 @@ impl PostgresInsightQueryRepository {
         .bind(standings_snapshot_kind)
         .bind(standings_round_number)
         .bind(standings_min_snapshot_at)
-        .fetch_all(&self.pool)
-        .await?
-        .into_iter()
-        .map(|row| OverviewStanding {
-            rank_no: row.rank_no,
-            team_id: row.team_id,
-            team_name: row.team_name,
-            points: row.points,
-            avatar_storage_url: row.avatar_storage_url,
-        })
-        .collect();
+        .fetch_all(&self.pool);
 
-        let recent_matches = sqlx::query_as::<_, OverviewMatchRow>(
+        let recent_matches_query = sqlx::query_as::<_, OverviewMatchRow>(
             r#"
             SELECT
                 match_id,
@@ -180,25 +159,9 @@ impl PostgresInsightQueryRepository {
         )
         .bind(season)
         .bind(matches_round_number)
-        .fetch_all(&self.pool)
-        .await?
-        .into_iter()
-        .map(|row| OverviewMatch {
-            match_id: row.match_id,
-            round_number: row.round_number,
-            match_date: row.match_date,
-            match_time: row.match_time,
-            home_team_name: row.home_team_name,
-            away_team_name: row.away_team_name,
-            home_score: row.home_score,
-            away_score: row.away_score,
-            technical_stats: row.technical_stats.0,
-            home_corners: row.home_corners,
-            away_corners: row.away_corners,
-        })
-        .collect();
+        .fetch_all(&self.pool);
 
-        let top_scorer_rows = sqlx::query_as::<_, OverviewPlayerRow>(
+        let top_scorers_query = sqlx::query_as::<_, OverviewPlayerRow>(
             r#"
             WITH latest_goal_snapshot AS (
                 SELECT s.id
@@ -230,8 +193,50 @@ impl PostgresInsightQueryRepository {
         .bind(ranking_snapshot_kind)
         .bind(ranking_round_number)
         .bind(ranking_min_snapshot_at)
-        .fetch_all(&self.pool)
-        .await?;
+        .fetch_all(&self.pool);
+
+        let (stats, standings_top_rows, recent_match_rows, top_scorer_rows) = tokio::try_join!(
+            stats_query,
+            standings_top_query,
+            recent_matches_query,
+            top_scorers_query,
+        )?;
+
+        tracing::info!(
+            season,
+            view_kind,
+            round_number,
+            elapsed_ms = started_at.elapsed().as_millis() as u64,
+            "overview base queries completed"
+        );
+
+        let standings_top = standings_top_rows
+            .into_iter()
+            .map(|row| OverviewStanding {
+                rank_no: row.rank_no,
+                team_id: row.team_id,
+                team_name: row.team_name,
+                points: row.points,
+                avatar_storage_url: row.avatar_storage_url,
+            })
+            .collect();
+
+        let recent_matches = recent_match_rows
+            .into_iter()
+            .map(|row| OverviewMatch {
+                match_id: row.match_id,
+                round_number: row.round_number,
+                match_date: row.match_date,
+                match_time: row.match_time,
+                home_team_name: row.home_team_name,
+                away_team_name: row.away_team_name,
+                home_score: row.home_score,
+                away_score: row.away_score,
+                technical_stats: row.technical_stats.0,
+                home_corners: row.home_corners,
+                away_corners: row.away_corners,
+            })
+            .collect();
 
         let top_scorers = Self::keep_scorers_with_boundary_ties(top_scorer_rows, 5)
             .into_iter()
@@ -250,11 +255,11 @@ impl PostgresInsightQueryRepository {
             round_number,
             current_season: season,
             latest_scrape_finished_at,
-            total_matches,
-            total_teams,
-            total_players,
-            player_ranking_categories,
-            team_ranking_categories,
+            total_matches: stats.total_matches,
+            total_teams: stats.total_teams,
+            total_players: stats.total_players,
+            player_ranking_categories: stats.player_ranking_categories,
+            team_ranking_categories: stats.team_ranking_categories,
             standings_top,
             recent_matches,
             top_scorers,
@@ -1319,6 +1324,15 @@ struct LatestRunRow {
 }
 
 #[derive(sqlx::FromRow)]
+struct OverviewStatsRow {
+    total_matches: i64,
+    total_teams: i64,
+    total_players: i64,
+    player_ranking_categories: i64,
+    team_ranking_categories: i64,
+}
+
+#[derive(sqlx::FromRow)]
 struct OverviewStandingRow {
     rank_no: i32,
     team_id: i64,
@@ -1413,8 +1427,8 @@ struct TeamInsightRow {
 #[cfg(test)]
 mod tests {
     use super::{
-        OverviewPlayerRow, OverviewStandingRow, PostgresInsightQueryRepository, RoundProgressRow,
-        StandingsTableRow,
+        OverviewPlayerRow, OverviewStandingRow, OverviewStatsRow, PostgresInsightQueryRepository,
+        RoundProgressRow, StandingsTableRow,
     };
     use crate::insight::domain::{rankings::TeamRankingCategory, round_reference::RoundReference};
     use chrono::{NaiveDateTime, TimeZone, Utc};
@@ -1438,6 +1452,23 @@ mod tests {
             points,
             avatar_storage_url: Some(format!("team-{team_id}.png")),
         }
+    }
+
+    #[test]
+    fn overview_stats_row_exposes_all_count_fields() {
+        let stats = OverviewStatsRow {
+            total_matches: 240,
+            total_teams: 16,
+            total_players: 512,
+            player_ranking_categories: 12,
+            team_ranking_categories: 10,
+        };
+
+        assert_eq!(stats.total_matches, 240);
+        assert_eq!(stats.total_teams, 16);
+        assert_eq!(stats.total_players, 512);
+        assert_eq!(stats.player_ranking_categories, 12);
+        assert_eq!(stats.team_ranking_categories, 10);
     }
 
     fn standings_table_row(
@@ -1752,6 +1783,7 @@ fn select_best_riser(
 #[async_trait]
 impl InsightQueryRepository for PostgresInsightQueryRepository {
     async fn get_live_overview(&self) -> anyhow::Result<InsightOverview> {
+        let started_at = Instant::now();
         let latest_run = sqlx::query_as::<_, LatestRunRow>(
             r#"
             SELECT season, finished_at
@@ -1784,17 +1816,27 @@ impl InsightQueryRepository for PostgresInsightQueryRepository {
             )
             .await?;
 
-        let standings_movement = self
-            .fetch_standings_movement(latest_run.season, "live", None)
-            .await?;
-        let scorer_movement = self
-            .fetch_scorer_movement(latest_run.season, "live", None)
-            .await?;
+        let movement_started_at = Instant::now();
+        let (standings_movement, scorer_movement) = tokio::try_join!(
+            self.fetch_standings_movement(latest_run.season, "live", None),
+            self.fetch_scorer_movement(latest_run.season, "live", None),
+        )?;
+        tracing::info!(
+            season = latest_run.season,
+            elapsed_ms = movement_started_at.elapsed().as_millis() as u64,
+            "live overview movement queries completed"
+        );
         overview.insight_summary = Some(generate_insight_summary(
             &overview,
             standings_movement,
             scorer_movement,
         ));
+
+        tracing::info!(
+            season = latest_run.season,
+            elapsed_ms = started_at.elapsed().as_millis() as u64,
+            "live overview query completed"
+        );
 
         Ok(overview)
     }

@@ -1,6 +1,6 @@
 <template>
   <view class="page-root">
-    <FiBrandNav />
+    <FiBrandNav open-on-current-page @open-ai="openAiFromBrandNav" />
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" />
     <view class="page-bg-fade"></view>
     <view class="page-scroll">
@@ -373,6 +373,13 @@
       </template>
     </view>
     </view>
+
+    <FiAiChatSheet
+      :visible="aiChatVisible"
+      :current-user="currentAiUser"
+      :ai-chat-mode="aiPublicConfig?.ai_chat_mode"
+      @close="closeAiChat"
+    />
   </view>
 </template>
 
@@ -380,6 +387,7 @@
 import { computed, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
+import FiAiChatSheet from '../../components/FiAiChatSheet.vue'
 import diamondIcon from '../../static/user/diamond.svg'
 import bgImage from '../../static/user/bg.webp'
 import {
@@ -415,6 +423,7 @@ import {
   type MembershipTierGuide,
 } from '../../utils/membershipRules'
 import { consumePostLoginRedirect, navigateToPostLoginTarget } from '../../utils/postLoginRedirect'
+import { useAiChatSheet } from '../../composables/useAiChatSheet'
 
 const loading = ref(true)
 const currentUser = ref<CurrentUser | null>(null)
@@ -424,6 +433,13 @@ const notificationEmail = ref('')
 const notificationEmailForm = ref('')
 const notificationEmailSheetVisible = ref(false)
 const notificationEmailSaving = ref(false)
+const {
+  aiChatVisible,
+  currentAiUser,
+  aiPublicConfig,
+  openAiChat,
+  closeAiChat,
+} = useAiChatSheet()
 
 const miniWechatBindState = ref<MiniWechatBindingRequiredResponse | null>(null)
 const miniWechatBindForm = reactive({
@@ -723,6 +739,10 @@ function navigateToPurchase(): void {
   uni.navigateTo({
     url: '/pages/membership-purchase/index',
   })
+}
+
+function openAiFromBrandNav(): void {
+  void openAiChat()
 }
 
 async function handleMiniWechatLogin(): Promise<void> {

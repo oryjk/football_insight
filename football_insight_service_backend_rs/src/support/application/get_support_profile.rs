@@ -38,10 +38,8 @@ impl GetSupportProfileUseCase {
 
         let mut next_match = self
             .repository
-            .find_matches_for_team(favorite_team.team_id, Some(user_id), now)
-            .await?
-            .into_iter()
-            .find(|item| item.kickoff_at > now);
+            .find_next_match_for_team(favorite_team.team_id, Some(user_id), now)
+            .await?;
 
         if let Some(match_detail) = next_match.as_mut() {
             refresh_match_detail(match_detail, now);
@@ -56,7 +54,10 @@ impl GetSupportProfileUseCase {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
 
     use async_trait::async_trait;
     use chrono::{TimeZone, Utc};
@@ -73,7 +74,9 @@ mod tests {
 
     struct FakeRepository {
         favorite_team: Option<SupportTeamSummary>,
-        matches: Vec<SupportMatchDetail>,
+        next_match: Option<SupportMatchDetail>,
+        find_matches_calls: AtomicUsize,
+        find_next_match_calls: AtomicUsize,
     }
 
     #[async_trait]
@@ -103,7 +106,18 @@ mod tests {
             _viewer_user_id: Option<Uuid>,
             _now: chrono::DateTime<Utc>,
         ) -> anyhow::Result<Vec<SupportMatchDetail>> {
-            Ok(self.matches.clone())
+            self.find_matches_calls.fetch_add(1, Ordering::SeqCst);
+            Ok(Vec::new())
+        }
+
+        async fn find_next_match_for_team(
+            &self,
+            _team_id: i64,
+            _viewer_user_id: Option<Uuid>,
+            _now: chrono::DateTime<Utc>,
+        ) -> anyhow::Result<Option<SupportMatchDetail>> {
+            self.find_next_match_calls.fetch_add(1, Ordering::SeqCst);
+            Ok(self.next_match.clone())
         }
 
         async fn find_match_detail(
@@ -138,7 +152,9 @@ mod tests {
                 avatar_storage_url: Some("chengdu.png".to_string()),
                 rank_no: Some(2),
             }),
-            matches: vec![build_match("2026-04-12T11:35:00+00:00")],
+            next_match: Some(build_match("2026-04-12T11:35:00+00:00")),
+            find_matches_calls: AtomicUsize::new(0),
+            find_next_match_calls: AtomicUsize::new(0),
         }));
 
         let result = use_case.execute_at(user_id, now).await.expect("profile");
@@ -161,6 +177,36 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn execute_uses_repository_next_match_lookup() {
+        let user_id = Uuid::new_v4();
+        let now = Utc
+            .with_ymd_and_hms(2026, 4, 10, 10, 0, 0)
+            .single()
+            .expect("valid now");
+        let repository = Arc::new(FakeRepository {
+            favorite_team: Some(SupportTeamSummary {
+                team_id: 77680,
+                team_name: "成都蓉城".to_string(),
+                avatar_storage_url: Some("chengdu.png".to_string()),
+                rank_no: Some(2),
+            }),
+            next_match: Some(build_match("2026-04-12T11:35:00+00:00")),
+            find_matches_calls: AtomicUsize::new(0),
+            find_next_match_calls: AtomicUsize::new(0),
+        });
+        let use_case = GetSupportProfileUseCase::new(repository.clone());
+
+        let result = use_case.execute_at(user_id, now).await.expect("profile");
+
+        assert_eq!(
+            result.next_match.as_ref().map(|item| item.match_id),
+            Some(1)
+        );
+        assert_eq!(repository.find_next_match_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(repository.find_matches_calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
     async fn execute_returns_empty_state_without_favorite_team() {
         let user_id = Uuid::new_v4();
         let now = Utc
@@ -169,7 +215,9 @@ mod tests {
             .expect("valid now");
         let use_case = GetSupportProfileUseCase::new(Arc::new(FakeRepository {
             favorite_team: None,
-            matches: vec![build_match("2026-04-12T11:35:00+00:00")],
+            next_match: Some(build_match("2026-04-12T11:35:00+00:00")),
+            find_matches_calls: AtomicUsize::new(0),
+            find_next_match_calls: AtomicUsize::new(0),
         }));
 
         let result = use_case.execute_at(user_id, now).await.expect("profile");

@@ -155,13 +155,6 @@ impl SupportRepository for PostgresSupportRepository {
     async fn get_user_context(&self, user_id: Uuid) -> anyhow::Result<SupportUserContext> {
         let row = sqlx::query_as::<_, SupportUserContextRow>(
             r#"
-            WITH latest_standings AS (
-                SELECT DISTINCT ON (team_id)
-                       team_id,
-                       rank_no
-                  FROM f_i_standings
-                 ORDER BY team_id, snapshot_at DESC
-            )
             SELECT u.id AS user_id,
                    t.team_id AS favorite_team_id,
                    t.team_name AS favorite_team_name,
@@ -169,7 +162,13 @@ impl SupportRepository for PostgresSupportRepository {
                    ls.rank_no AS favorite_team_rank_no
               FROM f_i_users u
               LEFT JOIN f_i_teams t ON t.team_id = u.favorite_team_id
-              LEFT JOIN latest_standings ls ON ls.team_id = t.team_id
+              LEFT JOIN LATERAL (
+                  SELECT s.rank_no
+                    FROM f_i_standings s
+                   WHERE s.team_id = t.team_id
+                   ORDER BY s.snapshot_at DESC
+                   LIMIT 1
+              ) ls ON TRUE
              WHERE u.id = $1
              LIMIT 1
             "#,
@@ -197,20 +196,19 @@ impl SupportRepository for PostgresSupportRepository {
     ) -> anyhow::Result<SupportTeamSummary> {
         let row = sqlx::query_as::<_, SupportTeamRow>(
             r#"
-            WITH latest_standings AS (
-                SELECT DISTINCT ON (team_id)
-                       team_id,
-                       rank_no
-                  FROM f_i_standings
-                 ORDER BY team_id, snapshot_at DESC
-            ),
-            candidate AS (
+            WITH candidate AS (
                 SELECT t.team_id,
                        t.team_name,
                        t.avatar_storage_url,
                        ls.rank_no
                   FROM f_i_teams t
-                  LEFT JOIN latest_standings ls ON ls.team_id = t.team_id
+                  LEFT JOIN LATERAL (
+                      SELECT s.rank_no
+                        FROM f_i_standings s
+                       WHERE s.team_id = t.team_id
+                       ORDER BY s.snapshot_at DESC
+                       LIMIT 1
+                  ) ls ON TRUE
                  WHERE t.team_id = $2
             )
             UPDATE f_i_users u
@@ -262,6 +260,35 @@ impl SupportRepository for PostgresSupportRepository {
         }
 
         Ok(items)
+    }
+
+    async fn find_next_match_for_team(
+        &self,
+        team_id: i64,
+        viewer_user_id: Option<Uuid>,
+        now: DateTime<Utc>,
+    ) -> anyhow::Result<Option<SupportMatchDetail>> {
+        let match_id = sqlx::query_as::<_, MatchIdRow>(
+            r#"
+            SELECT m.match_id
+              FROM f_i_matches m
+             WHERE (m.home_team_id = $1 OR m.away_team_id = $1)
+               AND ((m.match_date::timestamp + m.match_time::time) AT TIME ZONE 'Asia/Shanghai') > $2
+             ORDER BY m.match_date ASC, m.match_time ASC, m.match_id ASC
+             LIMIT 1
+            "#,
+        )
+        .bind(team_id)
+        .bind(now)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        let Some(match_id) = match_id else {
+            return Ok(None);
+        };
+
+        self.find_match_detail(match_id.match_id, viewer_user_id)
+            .await
     }
 
     async fn find_match_detail(

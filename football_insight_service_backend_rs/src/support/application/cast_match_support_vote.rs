@@ -124,6 +124,15 @@ mod tests {
             unreachable!()
         }
 
+        async fn find_next_match_for_team(
+            &self,
+            _team_id: i64,
+            _viewer_user_id: Option<Uuid>,
+            _now: chrono::DateTime<Utc>,
+        ) -> anyhow::Result<Option<SupportMatchDetail>> {
+            unreachable!()
+        }
+
         async fn find_match_detail(
             &self,
             _match_id: i64,

@@ -3,16 +3,13 @@ import type { AiChatMode } from '../types/system'
 
 export const DEFAULT_AI_CHAT_MODE: AiChatMode = 'backend_proxy'
 export const WECHAT_CLOUD_ENV_ID = 'football-insight-3fknj64915d5867'
-export const WECHAT_CLOUD_AI_PROVIDER = 'hunyuan-exp'
-export const WECHAT_CLOUD_AI_MODEL = 'hunyuan-turbos-latest'
-export const WECHAT_CLOUD_IMAGE_FUNCTION_NAME = 'generateImage-pa1pub'
+export const WECHAT_CLOUD_AI_PROVIDER = 'hunyuan-v3'
+export const WECHAT_CLOUD_AI_MODEL = 'hy3-preview'
 
 export interface AiChatCapabilityNotice {
   title: string
   content: string
 }
-
-export type AiInteractionMode = 'text' | 'image'
 
 export interface AiInteractionMeta {
   emptyCopy: string
@@ -38,16 +35,7 @@ export function getAiChatCapabilityNotice(
   }
 }
 
-export function getAiInteractionMeta(mode: AiInteractionMode): AiInteractionMeta {
-  if (mode === 'image') {
-    return {
-      emptyCopy: '你可以描述想要的足球主题画面，比如吉祥物、球员海报、训练场景或比赛氛围图。',
-      emptyTitle: '试试生成一张足球主题图片',
-      placeholder: '描述你想生成的图片，例如：一只穿着红色球衣的小蜜蜂在足球场上带球',
-      submitLabel: '生成图片',
-    }
-  }
-
+export function getAiInteractionMeta(): AiInteractionMeta {
   return {
     emptyCopy: '你可以直接问榜首走势，也可以问某支球队、某位球员，或者欧冠、世界杯这些更泛的足球问题。',
     emptyTitle: '和小罗聊聊今天想看的足球话题',

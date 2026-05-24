@@ -6,6 +6,7 @@ import {
   getAiInteractionMeta,
   resolveAiChatMode,
 } from './aiChat'
+import * as aiChatConfig from './aiChat'
 
 describe('resolveAiChatMode', () => {
   test('falls back to backend_proxy for unknown values', () => {
@@ -56,12 +57,16 @@ describe('getAiChatCapabilityNotice', () => {
 })
 
 describe('getAiInteractionMeta', () => {
-  test('returns image mode copy for generate image flow', () => {
-    expect(getAiInteractionMeta('image')).toEqual({
-      emptyCopy: '你可以描述想要的足球主题画面，比如吉祥物、球员海报、训练场景或比赛氛围图。',
-      emptyTitle: '试试生成一张足球主题图片',
-      placeholder: '描述你想生成的图片，例如：一只穿着红色球衣的小蜜蜂在足球场上带球',
-      submitLabel: '生成图片',
+  test('returns text chat copy only', () => {
+    expect(getAiInteractionMeta()).toEqual({
+      emptyCopy: '你可以直接问榜首走势，也可以问某支球队、某位球员，或者欧冠、世界杯这些更泛的足球问题。',
+      emptyTitle: '和小罗聊聊今天想看的足球话题',
+      placeholder: '问问今天的榜首走势，或者任何足球相关的问题',
+      submitLabel: '发送',
     })
+  })
+
+  test('does not expose image generation configuration', () => {
+    expect((aiChatConfig as Record<string, unknown>).WECHAT_CLOUD_IMAGE_FUNCTION_NAME).toBe(undefined)
   })
 })

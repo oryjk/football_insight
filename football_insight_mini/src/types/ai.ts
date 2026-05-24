@@ -1,13 +1,10 @@
 export type AiChatRole = 'user' | 'assistant'
-export type AiChatMessageKind = 'text' | 'image'
 
 export interface AiChatMessage {
   id: string
   role: AiChatRole
   content: string
   createdAt: string
-  kind?: AiChatMessageKind
-  imageUrl?: string
 }
 
 export interface AiChatHistoryMessagePayload {

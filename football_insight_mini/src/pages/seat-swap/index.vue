@@ -1,6 +1,6 @@
 <template>
   <view class="page-root">
-    <FiBrandNav />
+    <FiBrandNav open-on-current-page @open-ai="openAiFromBrandNav" />
     <view class="page">
       <view v-if="loading" class="state-card">
         <text>正在加载换座池...</text>
@@ -289,6 +289,13 @@
       @choose-evidence="chooseEvidence"
       @submit-matched-cancel="submitMatchedCancel"
     />
+
+    <FiAiChatSheet
+      :visible="aiChatVisible"
+      :current-user="currentAiUser"
+      :ai-chat-mode="aiPublicConfig?.ai_chat_mode"
+      @close="closeAiChat"
+    />
   </view>
 </template>
 
@@ -296,6 +303,7 @@
 import { computed, nextTick, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
+import FiAiChatSheet from '../../components/FiAiChatSheet.vue'
 import FiBottomSheet from '../../components/FiBottomSheet.vue'
 import SeatSwapCandidateCard from '../../components/SeatSwapCandidateCard.vue'
 import SeatSwapManageSheet from '../../components/SeatSwapManageSheet.vue'
@@ -315,6 +323,7 @@ import type { TicketWatchRegion } from '../../types/ticketWatch'
 import { getAccessToken } from '../../utils/authStorage'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { formatDatetime } from '../../utils/format'
+import { useAiChatSheet } from '../../composables/useAiChatSheet'
 import {
   buildSeatSwapRegionAnchorId,
   buildSeatSwapMockCurrentResponse,
@@ -359,6 +368,13 @@ const stagedDesiredSeats = ref<SeatSwapFormState['desired_seats']>([])
 const expandedRegionKeys = ref<string[]>([])
 const pendingConfirmTarget = ref<SeatSwapCandidate | null>(null)
 const miniProgramNoticeEnabled = ref(false)
+const {
+  aiChatVisible,
+  currentAiUser,
+  aiPublicConfig,
+  openAiChat,
+  closeAiChat,
+} = useAiChatSheet()
 
 const cancelReason = ref('')
 const evidenceFileName = ref('')
@@ -909,6 +925,10 @@ async function submitMatchedCancel(): Promise<void> {
 
 function goToUserPage(): void {
   uni.switchTab({ url: '/pages/user/index' })
+}
+
+function openAiFromBrandNav(): void {
+  void openAiChat()
 }
 
 onShow(() => {

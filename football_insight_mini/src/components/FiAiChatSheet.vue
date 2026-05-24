@@ -1,6 +1,6 @@
 <template>
-  <view v-if="visible" class="ai-chat-mask" @tap="handleMaskTap">
-    <view class="ai-chat-sheet" @tap.stop>
+  <view v-if="visible" class="ai-chat-mask" @tap="handleMaskTap" @touchmove.stop.prevent>
+    <view class="ai-chat-sheet" @tap.stop @touchmove.stop.prevent>
       <view class="ai-chat-sheet__header">
         <view class="ai-chat-sheet__identity">
           <view class="ai-chat-sheet__avatar-shell">
@@ -25,23 +25,6 @@
         <button class="ai-chat-sheet__close" @click="handleClose">关闭</button>
       </view>
 
-      <view class="ai-chat-sheet__mode-switch">
-        <button
-          class="ai-chat-sheet__mode-pill"
-          :class="{ 'ai-chat-sheet__mode-pill--active': interactionMode === 'text' }"
-          @click="handleSwitchInteractionMode('text')"
-        >
-          文字聊天
-        </button>
-        <button
-          class="ai-chat-sheet__mode-pill"
-          :class="{ 'ai-chat-sheet__mode-pill--active': interactionMode === 'image' }"
-          @click="handleSwitchInteractionMode('image')"
-        >
-          生成图片
-        </button>
-      </view>
-
       <view v-if="messages.length" class="ai-chat-sheet__meta">
         <button v-if="messages.length" class="ai-chat-sheet__clear" @click="handleClearHistory">清空历史</button>
       </view>
@@ -51,12 +34,13 @@
         class="ai-chat-sheet__messages"
         :scroll-into-view="scrollIntoView"
         scroll-with-animation
+        @touchmove.stop
       >
         <view v-if="!messages.length" class="ai-chat-sheet__empty">
           <text class="ai-chat-sheet__empty-title">{{ interactionMeta.emptyTitle }}</text>
           <text class="ai-chat-sheet__empty-copy">{{ interactionMeta.emptyCopy }}</text>
 
-          <view v-if="interactionMode === 'text'" class="ai-chat-sheet__suggestions">
+          <view class="ai-chat-sheet__suggestions">
             <view
               v-for="suggestion in suggestionPrompts"
               :key="suggestion"
@@ -89,14 +73,13 @@
                 </view>
               </view>
               <view v-else class="ai-chat-message__text-wrap">
-                <image
-                  v-if="message.imageUrl"
-                  :src="message.imageUrl"
-                  mode="widthFix"
-                  class="ai-chat-message__image"
-                />
                 <text class="ai-chat-message__text">{{ message.content }}</text>
-                <text v-if="showsTypingCursor(message)" class="ai-chat-message__cursor">|</text>
+                <view v-if="showsGeneratingStatus(message)" class="ai-chat-message__generating">
+                  <text class="ai-chat-message__generating-label">继续生成中</text>
+                  <view class="ai-chat-message__thinking-dots">
+                    <text v-for="dot in 3" :key="dot" class="ai-chat-message__thinking-dot">•</text>
+                  </view>
+                </view>
               </view>
             </view>
           </view>
@@ -132,12 +115,10 @@ import type { AiChatMode } from '../types/system'
 import {
   getAiChatCapabilityNotice,
   getAiInteractionMeta,
-  type AiInteractionMode,
 } from '../config/aiChat'
-import { generateAiImage, streamAiChat, type AiChatStreamHandle } from '../api/ai'
+import { streamAiChat, type AiChatStreamHandle } from '../api/ai'
 import { clearAiChatHistory, getAiChatHistory, setAiChatHistory } from '../utils/aiChatStorage'
 import aiRonaldinhoAvatar from '../static/ai/ronaldinho-avatar.png'
-import generateImageAvatar from '../static/ai/generate-image-avatar.png'
 
 const props = defineProps<{
   visible: boolean
@@ -155,7 +136,6 @@ const messages = ref<AiChatMessage[]>([])
 const scrollIntoView = ref('')
 const activeStream = ref<AiChatStreamHandle | null>(null)
 const hasShownOpenNotice = ref(false)
-const interactionMode = ref<AiInteractionMode>('text')
 
 const suggestionPrompts = [
   '中超榜首最近为什么这么胶着？',
@@ -165,16 +145,10 @@ const suggestionPrompts = [
 
 const canChat = computed(() => !!props.currentUser?.id)
 const aiCapabilityNotice = computed(() => getAiChatCapabilityNotice(props.aiChatMode))
-const interactionMeta = computed(() => getAiInteractionMeta(interactionMode.value))
-const activeAvatar = computed(() =>
-  interactionMode.value === 'image' ? generateImageAvatar : aiRonaldinhoAvatar,
-)
-const assistantAvatar = computed(() =>
-  interactionMode.value === 'image' ? generateImageAvatar : aiRonaldinhoAvatar,
-)
-const loadingLabel = computed(() =>
-  interactionMode.value === 'image' ? '生成中...' : '回答中...',
-)
+const interactionMeta = computed(() => getAiInteractionMeta())
+const activeAvatar = computed(() => aiRonaldinhoAvatar)
+const assistantAvatar = computed(() => aiRonaldinhoAvatar)
+const loadingLabel = computed(() => '回答中...')
 const activeAssistantMessageId = computed(() => {
   const lastMessage = messages.value[messages.value.length - 1]
   if (!lastMessage || lastMessage.role !== 'assistant') {
@@ -230,7 +204,6 @@ function handleMaskTap() {
 
 function handleClose() {
   stopStreaming()
-  interactionMode.value = 'text'
   emit('close')
 }
 
@@ -277,6 +250,10 @@ function showsTypingCursor(message: AiChatMessage): boolean {
   return isActiveAssistantMessage(message) && !!message.content.trim()
 }
 
+function showsGeneratingStatus(message: AiChatMessage): boolean {
+  return showsTypingCursor(message)
+}
+
 function handleSuggestionTap(suggestion: string) {
   if (sending.value) {
     return
@@ -284,14 +261,6 @@ function handleSuggestionTap(suggestion: string) {
 
   draft.value = suggestion
   handleSubmit(suggestion)
-}
-
-function handleSwitchInteractionMode(mode: AiInteractionMode) {
-  if (sending.value || interactionMode.value === mode) {
-    return
-  }
-
-  interactionMode.value = mode
 }
 
 async function handleSubmit(overrideMessage?: string) {
@@ -316,39 +285,6 @@ async function handleSubmit(overrideMessage?: string) {
   sending.value = true
   syncScrollToBottom()
   persistHistory()
-
-  if (interactionMode.value === 'image') {
-    try {
-      const result = await generateAiImage(content)
-      messages.value = messages.value.map((message) =>
-        message.id === assistantMessage.id
-          ? {
-              ...message,
-              kind: 'image',
-              imageUrl: result.imageUrl,
-              content: result.revisedPrompt ? `已根据你的描述生成图片：${result.revisedPrompt}` : '图片生成完成',
-            }
-          : message,
-      )
-      sending.value = false
-      persistHistory()
-      syncScrollToBottom()
-    } catch (error) {
-      const assistantIndex = messages.value.findIndex((item) => item.id === assistantMessage.id)
-      if (assistantIndex >= 0 && !messages.value[assistantIndex].content.trim()) {
-        messages.value.splice(assistantIndex, 1)
-      }
-
-      sending.value = false
-      persistHistory()
-      uni.showToast({
-        title: error instanceof Error ? error.message : '图片生成失败',
-        icon: 'none',
-        duration: 2400,
-      })
-    }
-    return
-  }
 
   activeStream.value = streamAiChat(
     {
@@ -404,7 +340,6 @@ watch(
   ([visible]) => {
     if (!visible) {
       hasShownOpenNotice.value = false
-      interactionMode.value = 'text'
       return
     }
 
@@ -453,32 +388,6 @@ watch(
   justify-content: space-between;
   gap: 24rpx;
   padding: 30rpx 30rpx 16rpx;
-}
-
-.ai-chat-sheet__mode-switch {
-  display: flex;
-  gap: 14rpx;
-  padding: 0 30rpx 18rpx;
-}
-
-.ai-chat-sheet__mode-pill {
-  flex: 1 1 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 66rpx;
-  border-radius: 999rpx;
-  border: 2rpx solid rgba(228, 229, 236, 0.96);
-  background: rgba(255, 255, 255, 0.86);
-  color: #666b77;
-  font-size: 24rpx;
-  font-weight: 700;
-}
-
-.ai-chat-sheet__mode-pill--active {
-  background: linear-gradient(135deg, rgba(34, 38, 49, 0.98), rgba(61, 67, 84, 0.98));
-  border-color: rgba(34, 38, 49, 0.98);
-  color: #fff7e3;
 }
 
 .ai-chat-sheet__identity {
@@ -701,12 +610,6 @@ watch(
   gap: 12rpx;
 }
 
-.ai-chat-message__image {
-  width: 100%;
-  border-radius: 22rpx;
-  background: rgba(245, 246, 250, 0.9);
-}
-
 .ai-chat-message--assistant .ai-chat-message__text {
   color: #1c1f26;
 }
@@ -754,6 +657,20 @@ watch(
   font-weight: 700;
   line-height: 1;
   animation: ai-cursor-blink 1s steps(2, start) infinite;
+}
+
+.ai-chat-message__generating {
+  display: inline-flex;
+  align-items: center;
+  gap: 10rpx;
+  padding-top: 2rpx;
+}
+
+.ai-chat-message__generating-label {
+  color: #8d7434;
+  font-size: 22rpx;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .ai-chat-sheet__anchor {

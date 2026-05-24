@@ -7,14 +7,13 @@ import type {
 import type { AiChatMode } from '../types/system'
 import { API_BASE_URL } from '../config/apiBase'
 import {
-  WECHAT_CLOUD_IMAGE_FUNCTION_NAME,
   WECHAT_CLOUD_AI_MODEL,
   WECHAT_CLOUD_AI_PROVIDER,
   buildWechatCloudMessages,
   resolveAiChatMode,
 } from '../config/aiChat'
 import { getAccessToken } from '../utils/authStorage'
-import { callWechatCloudFunction, getWechatCloudAiExtension } from '../utils/wechatCloud'
+import { getWechatCloudAiExtension } from '../utils/wechatCloud'
 const STREAM_TIMEOUT_MS = 120000
 
 interface StreamAiChatPayload {
@@ -33,11 +32,6 @@ export interface AiChatStreamHandle {
   abort: () => void
 }
 
-export interface GenerateAiImageResult {
-  imageUrl: string
-  revisedPrompt: string
-}
-
 interface StreamAiChatOptions {
   mode?: AiChatMode
 }
@@ -45,6 +39,11 @@ interface StreamAiChatOptions {
 interface ChunkedRequestTask {
   abort: () => void
   onChunkReceived?: (callback: (chunk: { data: ArrayBuffer }) => void) => void
+}
+
+interface WechatCloudStreamTextResponse {
+  textStream?: AsyncIterable<unknown>
+  eventStream?: AsyncIterable<{ data?: string }>
 }
 
 function decodeChunk(data: ArrayBuffer): string {
@@ -243,6 +242,20 @@ function streamWechatCloudAiChat(
   }
 
   let isAborted = false
+  let hasCompleted = false
+  let accumulatedReply = ''
+
+  const completeOnce = (reply: string) => {
+    if (isAborted || hasCompleted) {
+      return
+    }
+
+    hasCompleted = true
+    callbacks.onDone({
+      model: WECHAT_CLOUD_AI_MODEL,
+      reply,
+    })
+  }
 
   void (async () => {
     try {
@@ -255,40 +268,25 @@ function streamWechatCloudAiChat(
             model: WECHAT_CLOUD_AI_MODEL,
             messages: buildWechatCloudMessages(payload.message, payload.history),
           },
+        }) as WechatCloudStreamTextResponse
+
+      const emitText = async (content: string) => {
+        accumulatedReply += content
+        await emitWechatCloudTextDelta(content, () => isAborted, (delta) => {
+          callbacks.onDelta({ content: delta })
         })
-
-      let reply = ''
-
-      for await (const event of response.eventStream as AsyncIterable<{ data?: string }>) {
-        if (isAborted) {
-          return
-        }
-
-        if (event.data === '[DONE]') {
-          break
-        }
-
-        const parsed = parseWechatCloudEventData(event.data)
-        if (!parsed) {
-          continue
-        }
-
-        if (parsed.content) {
-          reply += parsed.content
-          callbacks.onDelta({ content: parsed.content })
-        }
       }
+      const reply = response.textStream
+        ? await consumeWechatCloudTextStream(response.textStream, () => isAborted, emitText)
+        : await consumeWechatCloudEventStream(response.eventStream, () => isAborted, emitText)
 
       if (isAborted) {
         return
       }
 
-      callbacks.onDone({
-        model: WECHAT_CLOUD_AI_MODEL,
-        reply,
-      })
+      completeOnce(reply || accumulatedReply)
     } catch (error) {
-      if (isAborted) {
+      if (isAborted || hasCompleted) {
         return
       }
 
@@ -301,6 +299,97 @@ function streamWechatCloudAiChat(
       isAborted = true
     },
   }
+}
+
+async function consumeWechatCloudTextStream(
+  textStream: AsyncIterable<unknown>,
+  shouldAbort: () => boolean,
+  onText: (content: string) => Promise<void>,
+): Promise<string> {
+  let reply = ''
+
+  for await (const chunk of textStream) {
+    if (shouldAbort()) {
+      return reply
+    }
+
+    const content = normalizeWechatCloudTextChunk(chunk)
+    if (!content) {
+      continue
+    }
+
+    reply += content
+    await onText(content)
+  }
+
+  return reply
+}
+
+async function consumeWechatCloudEventStream(
+  eventStream: AsyncIterable<{ data?: string }> | undefined,
+  shouldAbort: () => boolean,
+  onText: (content: string) => Promise<void>,
+): Promise<string> {
+  if (!eventStream) {
+    throw new Error('微信云开发 AI 未返回可读取的文本流')
+  }
+
+  let reply = ''
+
+  for await (const event of eventStream) {
+    if (shouldAbort()) {
+      return reply
+    }
+
+    if (event.data === '[DONE]') {
+      break
+    }
+
+    const parsed = parseWechatCloudEventData(event.data)
+    if (!parsed?.content) {
+      continue
+    }
+
+    reply += parsed.content
+    await onText(parsed.content)
+  }
+
+  return reply
+}
+
+async function emitWechatCloudTextDelta(
+  content: string,
+  shouldAbort: () => boolean,
+  onDelta: (content: string) => void,
+): Promise<void> {
+  const segments = splitWechatCloudTextDelta(content)
+
+  for (const segment of segments) {
+    if (shouldAbort()) {
+      return
+    }
+
+    onDelta(segment)
+
+    if (segments.length > 1) {
+      await delay(18)
+    }
+  }
+}
+
+function splitWechatCloudTextDelta(content: string): string[] {
+  if (content.length <= 12) {
+    return [content]
+  }
+
+  const segments = content.match(/.{1,6}/gu)
+  return segments?.length ? segments : [content]
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
 }
 
 function parseWechatCloudEventData(
@@ -323,6 +412,24 @@ function parseWechatCloudEventData(
   }
 }
 
+function normalizeWechatCloudTextChunk(chunk: unknown): string {
+  if (typeof chunk === 'string') {
+    return chunk
+  }
+
+  if (chunk && typeof chunk === 'object') {
+    const record = chunk as Record<string, unknown>
+    for (const key of ['text', 'content', 'data']) {
+      const value = record[key]
+      if (typeof value === 'string') {
+        return value
+      }
+    }
+  }
+
+  return ''
+}
+
 function normalizeWechatCloudErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
     return error.message
@@ -339,34 +446,4 @@ function normalizeWechatCloudErrorMessage(error: unknown): string {
   }
 
   return '微信云开发 AI 调用失败'
-}
-
-export async function generateAiImage(prompt: string): Promise<GenerateAiImageResult> {
-  const normalizedPrompt = prompt.trim()
-  if (!normalizedPrompt) {
-    throw new Error('请输入图片描述')
-  }
-
-  if (!WECHAT_CLOUD_IMAGE_FUNCTION_NAME.trim()) {
-    throw new Error('还未配置生图云函数名称')
-  }
-
-  const result = await callWechatCloudFunction<{
-    success?: boolean
-    imageUrl?: string
-    revised_prompt?: string
-    code?: string
-    message?: string
-  }>(WECHAT_CLOUD_IMAGE_FUNCTION_NAME, {
-    prompt: normalizedPrompt,
-  })
-
-  if (!result?.success || !result.imageUrl) {
-    throw new Error(result?.message?.trim() || '图片生成失败')
-  }
-
-  return {
-    imageUrl: result.imageUrl,
-    revisedPrompt: result.revised_prompt?.trim() || normalizedPrompt,
-  }
 }

@@ -69,6 +69,10 @@ async fn main() -> anyhow::Result<()> {
                         "/api/v1/rounds/".to_string(),
                         std::time::Duration::from_secs(30),
                     ),
+                    (
+                        "/api/v1/system/public-config".to_string(),
+                        std::time::Duration::from_secs(60),
+                    ),
                 ],
             ),
             cache_get_responses,

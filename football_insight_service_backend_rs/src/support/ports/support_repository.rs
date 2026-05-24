@@ -19,6 +19,12 @@ pub trait SupportRepository: Send + Sync {
         viewer_user_id: Option<Uuid>,
         now: DateTime<Utc>,
     ) -> anyhow::Result<Vec<SupportMatchDetail>>;
+    async fn find_next_match_for_team(
+        &self,
+        team_id: i64,
+        viewer_user_id: Option<Uuid>,
+        now: DateTime<Utc>,
+    ) -> anyhow::Result<Option<SupportMatchDetail>>;
     async fn find_match_detail(
         &self,
         match_id: i64,

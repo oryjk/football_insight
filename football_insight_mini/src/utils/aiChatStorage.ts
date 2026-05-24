@@ -25,8 +25,6 @@ export function getAiChatHistory(userId: string): AiChatMessage[] {
         && (record.role === 'user' || record.role === 'assistant')
         && typeof record.content === 'string'
         && typeof record.createdAt === 'string'
-        && (record.kind === undefined || record.kind === 'text' || record.kind === 'image')
-        && (record.imageUrl === undefined || typeof record.imageUrl === 'string')
       )
     })
     .slice(-MAX_STORED_MESSAGES)
