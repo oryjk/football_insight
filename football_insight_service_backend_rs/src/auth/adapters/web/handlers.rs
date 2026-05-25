@@ -36,7 +36,7 @@ pub struct AuthWebConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct RegisterRequest {
-    pub invite_code: String,
+    pub invite_code: Option<String>,
     pub referral_code: Option<String>,
     #[serde(alias = "phone_number")]
     pub account_identifier: String,
@@ -75,7 +75,7 @@ pub struct MiniWechatLoginRequest {
 #[derive(Debug, Deserialize)]
 pub struct MiniWechatBindRequest {
     pub bind_token: String,
-    pub invite_code: String,
+    pub invite_code: Option<String>,
     pub referral_code: Option<String>,
     pub display_name: String,
     pub avatar_data_url: String,
@@ -93,7 +93,7 @@ pub async fn register_handler(
 ) -> Result<(StatusCode, Json<AuthResponseDto>), (StatusCode, String)> {
     let result = use_case
         .execute(RegisterInput {
-            invite_code: request.invite_code,
+            invite_code: request.invite_code.unwrap_or_default(),
             referral_code: request.referral_code,
             account_identifier: request.account_identifier,
             password: request.password,
@@ -266,7 +266,7 @@ pub async fn mini_wechat_bind_handler(
     let result = use_case
         .execute(BindWechatMiniProgramAccountInput {
             bind_token: request.bind_token,
-            invite_code: request.invite_code,
+            invite_code: request.invite_code.unwrap_or_default(),
             referral_code: request.referral_code,
             display_name: request.display_name,
             avatar_data_url: request.avatar_data_url,

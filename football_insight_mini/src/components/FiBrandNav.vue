@@ -1,5 +1,5 @@
 <template>
-    <view class="fi-brand-nav">
+    <view class="fi-brand-nav" :class="{ 'fi-brand-nav--transparent': transparent }">
         <view class="fi-brand-nav__status-spacer"></view>
         <view class="fi-brand-nav__bar">
             <view class="fi-brand-nav__brand" :style="brandStyle">
@@ -33,9 +33,11 @@ import { requestOpenAiChat } from "../utils/aiEntryIntent";
 const props = withDefaults(
     defineProps<{
         openOnCurrentPage?: boolean;
+        transparent?: boolean;
     }>(),
     {
         openOnCurrentPage: false,
+        transparent: false,
     },
 );
 
@@ -130,6 +132,37 @@ onMounted(() => {
     border-bottom: 1rpx solid rgba(232, 233, 238, 0.72);
     backdrop-filter: blur(18rpx);
     -webkit-backdrop-filter: blur(18rpx);
+}
+
+.fi-brand-nav--transparent {
+    background: transparent;
+    border-bottom-color: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.fi-brand-nav--transparent .fi-brand-nav__name {
+    color: #ffffff;
+    text-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.36);
+}
+
+.fi-brand-nav--transparent .fi-brand-nav__tagline {
+    color: rgba(255, 255, 255, 0.82);
+    text-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.34);
+}
+
+.fi-brand-nav--transparent .fi-brand-nav__logo {
+    border-color: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 10rpx 24rpx rgba(0, 0, 0, 0.22);
+}
+
+.fi-brand-nav--transparent .fi-brand-nav__ai {
+    background: rgba(255, 255, 255, 0.22);
+    border-color: rgba(255, 255, 255, 0.42);
+    color: #ffffff;
+    box-shadow: 0 10rpx 24rpx rgba(0, 0, 0, 0.16);
+    backdrop-filter: blur(14rpx);
+    -webkit-backdrop-filter: blur(14rpx);
 }
 
 .fi-brand-nav__status-spacer {

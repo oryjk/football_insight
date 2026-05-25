@@ -4,14 +4,14 @@ export function resolveCurrentUserInviteCode(inviteCode: string | null | undefin
 
 export interface UserAccountInfoItem {
   key: string
-  iconLabel: string
+  iconName: 'badge-check' | 'calendar-days' | 'calendar-check' | 'log-in'
   label: string
   value: string
 }
 
 export interface UserBenefitItem {
   key: string
-  iconLabel: string
+  iconName: 'ticket' | 'activity' | 'radar' | 'history'
   title: string
   caption: string
 }
@@ -27,7 +27,6 @@ export interface UserUpgradeStep {
 }
 
 interface BuildUserAccountInfoOptions {
-  membershipCode: string
   hasWechatBinding: boolean
   joinedAtLabel: string
   membershipExpiresAtLabel: string
@@ -51,32 +50,26 @@ export function buildUserAccountInfoItems(
 ): UserAccountInfoItem[] {
   return [
     {
-      key: 'membership',
-      iconLabel: '级',
-      label: '当前等级',
-      value: options.membershipCode,
-    },
-    {
       key: 'identity',
-      iconLabel: '身',
+      iconName: 'badge-check',
       label: '身份状态',
       value: options.hasWechatBinding ? '微信会员' : '标准会员',
     },
     {
       key: 'joined-at',
-      iconLabel: '时',
+      iconName: 'calendar-days',
       label: '加入时间',
       value: options.joinedAtLabel,
     },
     {
       key: 'membership-expiry',
-      iconLabel: '期',
+      iconName: 'calendar-check',
       label: '会员有效期',
       value: options.membershipExpiresAtLabel,
     },
     {
       key: 'login',
-      iconLabel: '微',
+      iconName: 'log-in',
       label: '登录状态',
       value: options.hasWechatBinding ? '已绑定微信' : '未绑定微信',
     },
@@ -91,25 +84,25 @@ export function buildUserBenefitItems(
   return [
     {
       key: 'watch',
-      iconLabel: '票',
+      iconName: 'ticket',
       title: '余票监控',
       caption: options.refreshLabel,
     },
     {
       key: 'recent-reflux',
-      iconLabel: '回',
+      iconName: 'activity',
       title: '最近回流速览',
       caption: resolveRecentRefluxBenefitCaption(tierNumber),
     },
     {
       key: 'tracking',
-      iconLabel: '盯',
+      iconName: 'radar',
       title: '更多钓区跟踪',
       caption: tierNumber >= 4 ? '跟踪上限更高' : '常用钓区可跟踪',
     },
     {
       key: 'history',
-      iconLabel: '盘',
+      iconName: 'history',
       title: '历史回流复盘',
       caption: tierNumber >= 5 ? '更全面复盘' : '回看近期变化',
     },

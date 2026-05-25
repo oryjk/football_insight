@@ -98,6 +98,41 @@ mod tests {
             })
         }
 
+        async fn create_user_with_mini_program_wechat_without_invite(
+            &self,
+            profile: &WechatOauthProfile,
+        ) -> anyhow::Result<AuthUser> {
+            self.create_user_with_mini_program_wechat_without_invite_with_referral(None, profile)
+                .await
+        }
+
+        async fn create_user_with_mini_program_wechat_without_invite_with_referral(
+            &self,
+            referral_code: Option<&str>,
+            profile: &WechatOauthProfile,
+        ) -> anyhow::Result<AuthUser> {
+            self.events.lock().unwrap().push(format!(
+                "mini-bind-without-invite:{}:{}",
+                referral_code.unwrap_or(""),
+                profile.display_name.as_deref().unwrap_or("")
+            ));
+
+            Ok(AuthUser {
+                id: Uuid::parse_str("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb").unwrap(),
+                account_identifier: "wx_test_open_id".to_string(),
+                display_name: profile.display_name.clone(),
+                invite_code: None,
+                avatar_url: profile.avatar_url.clone(),
+                has_wechat_binding: true,
+                membership_tier: "V1".to_string(),
+                membership_expires_at: None,
+                membership_benefits_enabled: true,
+                ticket_watch_poll_interval_seconds: 600,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            })
+        }
+
         async fn find_user_by_account_identifier(
             &self,
             _account_identifier: &str,
@@ -216,6 +251,34 @@ mod tests {
             vec!["mini-bind:INVITE-001:REF-CODE-001:小罗".to_string()]
         );
     }
+
+    #[tokio::test]
+    async fn execute_creates_v1_user_when_invite_code_is_blank() {
+        let repository = Arc::new(FakeRepository::default());
+        let use_case = BindWechatMiniProgramAccountUseCase::new(
+            repository.clone(),
+            Arc::new(FakeTokenPort),
+            Duration::days(30),
+        );
+
+        let result = use_case
+            .execute(BindWechatMiniProgramAccountInput {
+                bind_token: "bind-token".to_string(),
+                invite_code: "   ".to_string(),
+                referral_code: Some("  REF-CODE-001 ".to_string()),
+                display_name: "小罗".to_string(),
+                avatar_data_url: "data:image/png;base64,abcd".to_string(),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(result.access_token, "jwt::wx_test_open_id");
+        assert_eq!(result.user.membership_tier, "V1");
+        assert_eq!(
+            repository.events.lock().unwrap().clone(),
+            vec!["mini-bind-without-invite:REF-CODE-001:小罗".to_string()]
+        );
+    }
 }
 
 impl BindWechatMiniProgramAccountUseCase {
@@ -240,9 +303,6 @@ impl BindWechatMiniProgramAccountUseCase {
         }
 
         let invite_code = input.invite_code.trim();
-        if invite_code.is_empty() {
-            anyhow::bail!("invite code is required");
-        }
         let referral_code = input
             .referral_code
             .as_deref()
@@ -273,14 +333,22 @@ impl BindWechatMiniProgramAccountUseCase {
             avatar_url: Some(avatar_data_url.to_string()),
         };
 
-        let user = self
-            .repository
-            .create_user_with_invite_and_mini_program_wechat_with_referral(
-                invite_code,
-                referral_code.as_deref(),
-                &profile,
-            )
-            .await?;
+        let user = if invite_code.is_empty() {
+            self.repository
+                .create_user_with_mini_program_wechat_without_invite_with_referral(
+                    referral_code.as_deref(),
+                    &profile,
+                )
+                .await?
+        } else {
+            self.repository
+                .create_user_with_invite_and_mini_program_wechat_with_referral(
+                    invite_code,
+                    referral_code.as_deref(),
+                    &profile,
+                )
+                .await?
+        };
 
         self.repository.record_user_login(user.id).await?;
 

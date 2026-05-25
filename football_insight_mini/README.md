@@ -23,7 +23,7 @@ Football Insight 的微信小程序前端，采用 `uni-app + Vue 3 + TypeScript
    - 直接登录成功
 5. 如果当前微信尚未绑定账号：
    - 弹出补全层
-   - 填写邀请码
+   - 可选填写邀请码
    - 选择头像
    - 输入昵称
 6. 请求后端 `POST /api/v1/auth/mini-wechat/bind`

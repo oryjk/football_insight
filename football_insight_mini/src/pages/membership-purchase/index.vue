@@ -1,6 +1,8 @@
 <template>
   <view v-if="systemConfigUnderReview" class="page-root" />
   <view v-else class="page-root">
+    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" />
+    <view class="page-bg-fade"></view>
     <view class="page">
       <view class="purchase-hero">
         <text class="purchase-hero__eyebrow">会员充值</text>
@@ -120,6 +122,7 @@ import { getPublicSystemConfig } from '../../api/system'
 import type { PublicSystemConfig } from '../../types/system'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
+import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.webp'
 import { reportPageActivity } from '../../utils/userActivity'
 import {
   buildMembershipTierGuides,
@@ -283,12 +286,36 @@ async function handlePurchase() {
 
 <style scoped>
 .page-root {
+  position: relative;
   min-height: 100vh;
-  background-color: #f6f5f2;
+  background: #f7f8fa;
   box-sizing: border-box;
 }
 
+.page-bg-img {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.page-bg-fade {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background: linear-gradient(180deg, rgba(246, 247, 244, 0.24) 0%, rgba(247, 248, 250, 0.74) 32%, #f7f8fa 58%, #f7f8fa 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
 .page {
+  position: relative;
+  z-index: 1;
   padding: 32rpx;
   box-sizing: border-box;
 }
@@ -305,7 +332,7 @@ async function handlePurchase() {
   display: block;
   font-size: 22rpx;
   font-weight: 700;
-  color: #a87420;
+  color: #b91c1c;
   margin-bottom: 12rpx;
 }
 
@@ -334,15 +361,15 @@ async function handlePurchase() {
   min-width: 0;
   border-radius: 22rpx;
   padding: 26rpx 24rpx;
-  background: linear-gradient(180deg, #ffffff, #fbfaf7);
+  background: linear-gradient(180deg, #ffffff, #fff7f7);
   border: 2rpx solid rgba(226, 220, 207, 0.9);
   box-shadow: 0 10rpx 26rpx rgba(43, 37, 26, 0.04);
 }
 
 .product-card--active {
-  border-color: rgba(184, 132, 43, 0.88);
-  background: linear-gradient(180deg, #fff9eb, #ffffff);
-  box-shadow: 0 16rpx 34rpx rgba(184, 132, 43, 0.16);
+  border-color: rgba(220, 38, 38, 0.42);
+  background: linear-gradient(180deg, #fff5f5, #ffffff);
+  box-shadow: 0 16rpx 34rpx rgba(220, 38, 38, 0.12);
 }
 
 .product-card__top {
@@ -361,7 +388,7 @@ async function handlePurchase() {
 
 .product-card__tag {
   max-width: 150rpx;
-  color: #9a6b1c;
+  color: #991b1b;
   font-size: 20rpx;
   line-height: 1.25;
   text-align: right;
@@ -460,8 +487,8 @@ async function handlePurchase() {
   height: 32rpx;
   line-height: 32rpx;
   border-radius: 50%;
-  border: 2rpx solid rgba(184, 132, 43, 0.38);
-  color: #a87420;
+  border: 2rpx solid rgba(220, 38, 38, 0.28);
+  color: #b91c1c;
   font-size: 22rpx;
   font-weight: 800;
   text-align: center;
@@ -515,9 +542,9 @@ async function handlePurchase() {
 
 .membership-guide-item.tier-tone--v3,
 .membership-guide-item.tier-tone--v9 {
-  --guide-accent: #a87420;
-  --guide-bg: rgba(255, 249, 234, 0.96);
-  --guide-border: rgba(236, 212, 167, 0.95);
+  --guide-accent: #b91c1c;
+  --guide-bg: rgba(255, 241, 242, 0.96);
+  --guide-border: rgba(254, 205, 211, 0.95);
 }
 
 .membership-guide-item.tier-tone--v4,
@@ -540,7 +567,7 @@ async function handlePurchase() {
 }
 
 .membership-guide-item--selected {
-  box-shadow: 0 12rpx 24rpx rgba(160, 116, 35, 0.12);
+  box-shadow: 0 12rpx 24rpx rgba(220, 38, 38, 0.12);
 }
 
 .membership-guide-item__main {
@@ -629,8 +656,8 @@ async function handlePurchase() {
 .agreement-card__badge {
   padding: 8rpx 16rpx;
   border-radius: 999rpx;
-  background: rgba(184, 132, 43, 0.12);
-  color: #9a6b1c;
+  background: rgba(220, 38, 38, 0.1);
+  color: #991b1b;
   font-size: 22rpx;
   font-weight: 700;
 }
@@ -651,8 +678,8 @@ async function handlePurchase() {
   height: 34rpx;
   line-height: 34rpx;
   border-radius: 50%;
-  background: #f5efe2;
-  color: #9a6b1c;
+  background: #fee2e2;
+  color: #991b1b;
   font-size: 20rpx;
   font-weight: 800;
   text-align: center;
@@ -687,8 +714,8 @@ async function handlePurchase() {
 }
 
 .agreement-check__box--checked {
-  background: #b8842b;
-  border-color: #b8842b;
+  background: #dc2626;
+  border-color: #dc2626;
 }
 
 .agreement-check__text {
@@ -726,7 +753,7 @@ async function handlePurchase() {
 .purchase-actions__note {
   display: block;
   margin-top: 4rpx;
-  color: #9a6b1c;
+  color: #991b1b;
   font-size: 18rpx;
   font-weight: 700;
   line-height: 1.15;

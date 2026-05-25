@@ -39,9 +39,6 @@ impl RegisterWithInviteUseCase {
 
     pub async fn execute(&self, input: RegisterInput) -> anyhow::Result<AuthTokenBundle> {
         let invite_code = input.invite_code.trim().to_string();
-        if invite_code.is_empty() {
-            anyhow::bail!("invite code is required");
-        }
         let referral_code = input
             .referral_code
             .as_deref()
@@ -56,15 +53,24 @@ impl RegisterWithInviteUseCase {
         }
 
         let password_hash = self.password_port.hash_password(&password)?;
-        let user = self
-            .repository
-            .create_user_with_invite_with_referral(
-                &invite_code,
-                referral_code.as_deref(),
-                &account_identifier,
-                &password_hash,
-            )
-            .await?;
+        let user = if invite_code.is_empty() {
+            self.repository
+                .create_user_without_invite_with_referral(
+                    referral_code.as_deref(),
+                    &account_identifier,
+                    &password_hash,
+                )
+                .await?
+        } else {
+            self.repository
+                .create_user_with_invite_with_referral(
+                    &invite_code,
+                    referral_code.as_deref(),
+                    &account_identifier,
+                    &password_hash,
+                )
+                .await?
+        };
 
         self.repository.record_user_login(user.id).await?;
 
@@ -159,6 +165,42 @@ mod tests {
                 membership_expires_at: None,
                 membership_benefits_enabled: true,
                 ticket_watch_poll_interval_seconds: 300,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            })
+        }
+
+        async fn create_user_without_invite(
+            &self,
+            account_identifier: &str,
+            password_hash: &str,
+        ) -> anyhow::Result<AuthUser> {
+            self.create_user_without_invite_with_referral(None, account_identifier, password_hash)
+                .await
+        }
+
+        async fn create_user_without_invite_with_referral(
+            &self,
+            referral_code: Option<&str>,
+            account_identifier: &str,
+            password_hash: &str,
+        ) -> anyhow::Result<AuthUser> {
+            self.events.lock().unwrap().push(format!(
+                "register-without-invite:{}:{account_identifier}:{password_hash}",
+                referral_code.unwrap_or("")
+            ));
+
+            Ok(AuthUser {
+                id: Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap(),
+                account_identifier: account_identifier.to_string(),
+                display_name: Some(account_identifier.to_string()),
+                invite_code: None,
+                avatar_url: None,
+                has_wechat_binding: false,
+                membership_tier: "V1".to_string(),
+                membership_expires_at: None,
+                membership_benefits_enabled: true,
+                ticket_watch_poll_interval_seconds: 600,
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
             })
@@ -386,6 +428,37 @@ mod tests {
         assert_eq!(
             events[0],
             "register:INVITE-001:REF-CODE-001:13800138000:hashed::secret123"
+        );
+    }
+
+    #[tokio::test]
+    async fn execute_registers_v1_user_when_invite_code_is_blank() {
+        let repository = Arc::new(FakeRepository::default());
+        let use_case = RegisterWithInviteUseCase::new(
+            repository.clone(),
+            Arc::new(FakePasswordPort),
+            Arc::new(FakeTokenPort),
+            Duration::days(30),
+        );
+
+        let result = use_case
+            .execute(RegisterInput {
+                invite_code: "   ".to_string(),
+                referral_code: Some("  REF-CODE-001  ".to_string()),
+                account_identifier: "footballfan".to_string(),
+                password: "secret123".to_string(),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(result.user.account_identifier, "footballfan");
+        assert_eq!(result.user.membership_tier, "V1");
+        assert_eq!(result.access_token, "jwt::footballfan");
+
+        let events = repository.events.lock().unwrap().clone();
+        assert_eq!(
+            events,
+            vec!["register-without-invite:REF-CODE-001:footballfan:hashed::secret123".to_string()]
         );
     }
 }

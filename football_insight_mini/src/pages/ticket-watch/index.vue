@@ -1,5 +1,8 @@
 <template>
-  <view v-if="pageEntered" class="page">
+  <view v-if="pageEntered" class="page-root">
+    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" />
+    <view class="page-bg-fade"></view>
+    <view class="page">
       <view class="hero-card">
         <view class="hero-card__icon">
           <view class="hero-card__icon-box">
@@ -279,7 +282,7 @@
             <view v-else class="recent-reflux-lock">
               <view class="recent-reflux-lock__preview">
                 <view class="recent-reflux-lock__bar recent-reflux-lock__bar--red" />
-                <view class="recent-reflux-lock__bar recent-reflux-lock__bar--yellow" />
+                <view class="recent-reflux-lock__bar recent-reflux-lock__bar--middle" />
                 <view class="recent-reflux-lock__bar recent-reflux-lock__bar--green" />
               </view>
               <view class="recent-reflux-lock__body">
@@ -966,6 +969,7 @@
         {{ refluxSubscriptionSubmitting ? '处理中...' : '微信支付并开通' }}
       </button>
     </view>
+    </view>
   </view>
   <view v-else-if="!pageEntered" class="page page--entry-mask" />
 </template>
@@ -1020,6 +1024,7 @@ import soccerBallIcon from '../../static/ticket-watch/soccer-ball.svg'
 import swapArrowsIcon from '../../static/ticket-watch/swap-arrows.svg'
 import targetIcon from '../../static/ticket-watch/target.svg'
 import trendIcon from '../../static/ticket-watch/trend.svg'
+import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.webp'
 import {
   applyBlockInterestToSections,
   applyBlockInterestsToSections,
@@ -2247,13 +2252,38 @@ onUnload(() => {
 </script>
 
 <style scoped lang="css">
+.page-root {
+  position: relative;
+  min-height: 100vh;
+  background: #f7f8fa;
+}
+.page-bg-img {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 0;
+}
+.page-bg-fade {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background: linear-gradient(180deg, rgba(246, 247, 244, 0.24) 0%, rgba(247, 248, 250, 0.74) 32%, #f7f8fa 58%, #f7f8fa 100%);
+  pointer-events: none;
+  z-index: 0;
+}
 .page {
+  position: relative;
+  z-index: 1;
   min-height: 100vh;
   padding: 20rpx 20rpx 36rpx;
   display: flex;
   flex-direction: column;
   gap: 18rpx;
-  background: #f8f5ef;
 }
 
 .page--entry-mask {
@@ -2788,8 +2818,8 @@ onUnload(() => {
   padding: 0 20rpx;
   border-radius: 999rpx;
   border: 2rpx solid rgba(232, 226, 214, 0.96);
-  background: #fffdfa;
-  color: #8f836c;
+  background: #fff7f7;
+  color: #7f1d1d;
   font-size: 22rpx;
   font-weight: 700;
   line-height: 1;
@@ -2914,9 +2944,9 @@ onUnload(() => {
   min-height: 40rpx;
   padding: 0 14rpx 0 12rpx;
   border-radius: 999rpx;
-  border: 2rpx solid rgba(236, 222, 191, 1);
-  background: linear-gradient(180deg, #fff8ea, #f8edd7);
-  color: #9d7932;
+  border: 2rpx solid rgba(254, 205, 211, 1);
+  background: linear-gradient(180deg, #fff1f2, #fee2e2);
+  color: #991b1b;
   font-size: 18rpx;
   font-weight: 400;
   line-height: 1;
@@ -3183,7 +3213,7 @@ onUnload(() => {
   border-radius: 20rpx;
   background:
     linear-gradient(135deg, rgba(255,255,255,0.84), rgba(255,255,255,0.36)),
-    linear-gradient(180deg, rgba(255, 250, 235, 0.96), rgba(242, 251, 246, 0.94));
+    linear-gradient(180deg, rgba(255, 241, 242, 0.96), rgba(242, 251, 246, 0.94));
   border: 2rpx solid rgba(214, 225, 203, 0.94);
 }
 .recent-reflux-lock::after {
@@ -3194,7 +3224,7 @@ onUnload(() => {
   width: 190rpx;
   height: 190rpx;
   border-radius: 999rpx;
-  background: radial-gradient(circle, rgba(239, 207, 123, 0.28), rgba(255,255,255,0) 68%);
+  background: radial-gradient(circle, rgba(220, 38, 38, 0.18), rgba(255,255,255,0) 68%);
   pointer-events: none;
 }
 .recent-reflux-lock__preview {
@@ -3219,10 +3249,10 @@ onUnload(() => {
   color: rgba(224, 65, 55, 0.54);
   background: rgba(224, 65, 55, 0.78);
 }
-.recent-reflux-lock__bar--yellow {
+.recent-reflux-lock__bar--middle {
   height: 56rpx;
-  color: rgba(226, 168, 35, 0.5);
-  background: rgba(226, 168, 35, 0.76);
+  color: rgba(220, 38, 38, 0.46);
+  background: rgba(220, 38, 38, 0.68);
 }
 .recent-reflux-lock__bar--green {
   height: 42rpx;
@@ -3418,8 +3448,8 @@ onUnload(() => {
   border-color: rgba(224, 65, 55, 0.36);
 }
 .recent-reflux-item--within10 {
-  --recent-reflux-beam-rgb: 226, 168, 35;
-  border-color: rgba(226, 168, 35, 0.36);
+  --recent-reflux-beam-rgb: 220, 38, 38;
+  border-color: rgba(220, 38, 38, 0.28);
 }
 .recent-reflux-item--within30 {
   --recent-reflux-beam-rgb: 40, 168, 109;
@@ -4028,7 +4058,7 @@ onUnload(() => {
   background: rgba(255, 255, 255, 0.18);
 }
 .history-trend-row--selected .history-trend-row__bar {
-  background: linear-gradient(90deg, #f5d67a, #ffffff);
+  background: linear-gradient(90deg, #ef4444, #ffffff);
 }
 .history-trend-row__value {
   color: #17191f;

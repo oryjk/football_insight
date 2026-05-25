@@ -27,16 +27,14 @@ describe('resolveCurrentUserInviteCode', () => {
 describe('buildUserAccountInfoItems', () => {
   test('builds the account summary items for a bound wechat member', () => {
     expect(buildUserAccountInfoItems({
-      membershipCode: 'V9',
       hasWechatBinding: true,
       joinedAtLabel: '2026-4-8',
       membershipExpiresAtLabel: '有效至 2027-4-24',
     })).toEqual([
-      { key: 'membership', iconLabel: '级', label: '当前等级', value: 'V9' },
-      { key: 'identity', iconLabel: '身', label: '身份状态', value: '微信会员' },
-      { key: 'joined-at', iconLabel: '时', label: '加入时间', value: '2026-4-8' },
-      { key: 'membership-expiry', iconLabel: '期', label: '会员有效期', value: '有效至 2027-4-24' },
-      { key: 'login', iconLabel: '微', label: '登录状态', value: '已绑定微信' },
+      { key: 'identity', iconName: 'badge-check', label: '身份状态', value: '微信会员' },
+      { key: 'joined-at', iconName: 'calendar-days', label: '加入时间', value: '2026-4-8' },
+      { key: 'membership-expiry', iconName: 'calendar-check', label: '会员有效期', value: '有效至 2027-4-24' },
+      { key: 'login', iconName: 'log-in', label: '登录状态', value: '已绑定微信' },
     ])
   })
 })
@@ -98,10 +96,10 @@ describe('buildUserBenefitItems', () => {
       membershipCode: 'V9',
       refreshLabel: '1 秒刷新',
     })).toEqual([
-      { key: 'watch', iconLabel: '票', title: '余票监控', caption: '1 秒刷新' },
-      { key: 'recent-reflux', iconLabel: '回', title: '最近回流速览', caption: '3 分钟内' },
-      { key: 'tracking', iconLabel: '盯', title: '更多钓区跟踪', caption: '跟踪上限更高' },
-      { key: 'history', iconLabel: '盘', title: '历史回流复盘', caption: '更全面复盘' },
+      { key: 'watch', iconName: 'ticket', title: '余票监控', caption: '1 秒刷新' },
+      { key: 'recent-reflux', iconName: 'activity', title: '最近回流速览', caption: '3 分钟内' },
+      { key: 'tracking', iconName: 'radar', title: '更多钓区跟踪', caption: '跟踪上限更高' },
+      { key: 'history', iconName: 'history', title: '历史回流复盘', caption: '更全面复盘' },
     ])
   })
 
@@ -109,7 +107,7 @@ describe('buildUserBenefitItems', () => {
     expect(buildUserBenefitItems({
       membershipCode: 'V6',
       refreshLabel: '15 秒刷新',
-    })[1]).toEqual({ key: 'recent-reflux', iconLabel: '回', title: '最近回流速览', caption: '30 分钟内' })
+    })[1]).toEqual({ key: 'recent-reflux', iconName: 'activity', title: '最近回流速览', caption: '30 分钟内' })
 
     expect(buildUserBenefitItems({
       membershipCode: 'V7',

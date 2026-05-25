@@ -6,6 +6,8 @@
     <view class="page-scroll">
       <view class="page">
         <view class="hero-card">
+        <image class="page-hero-dots page-hero-dots--top" :src="memberCardDotsImage" mode="aspectFill" />
+        <image class="page-hero-dots page-hero-dots--bottom" :src="memberCardDotsImage" mode="aspectFill" />
         <view class="hero-card__top">
           <view>
             <text class="eyebrow">Insights</text>
@@ -299,7 +301,7 @@
                 <text class="contribution-row__share">{{ formatShare(item.share) }}</text>
               </view>
               <view class="contribution-row__bar">
-                <view class="contribution-row__fill contribution-row__fill--orange" :style="{ width: barWidth(item.share) }" />
+                <view class="contribution-row__fill contribution-row__fill--red" :style="{ width: barWidth(item.share) }" />
               </view>
             </view>
           </view>
@@ -424,7 +426,8 @@ import type {
 } from '../../types/insight'
 import type { CurrentUser } from '../../types/auth'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import bgImage from '../../static/insights/bg.webp'
+import bgImage from '../../static/user/phoenix-stadium-bg.webp'
+import memberCardDotsImage from '../../static/user/member-card-dots.png'
 import { useAnimatedInteger } from '../../composables/useAnimatedInteger'
 import { resolveMembershipBenefitsLocked } from '../../utils/membershipBenefits'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
@@ -744,11 +747,37 @@ onShow(async () => {
 .hero-card,
 .panel,
 .state-card {
+  position: relative;
   background: rgba(255, 255, 255, 0.94);
   border-radius: 36rpx;
   border: 2rpx solid rgba(236, 236, 241, 0.95);
   box-shadow: 0 20rpx 48rpx rgba(26, 28, 36, 0.06);
   padding: 20rpx;
+}
+
+.hero-card {
+  overflow: hidden;
+}
+
+.page-hero-dots {
+  position: absolute;
+  z-index: 0;
+  width: 292rpx;
+  height: 180rpx;
+  opacity: 0.34;
+  pointer-events: none;
+}
+
+.page-hero-dots--top {
+  top: -52rpx;
+  right: -54rpx;
+}
+
+.page-hero-dots--bottom {
+  left: -84rpx;
+  bottom: -42rpx;
+  opacity: 0.16;
+  transform: scaleX(-1);
 }
 
 .hero-card__top,
@@ -763,6 +792,8 @@ onShow(async () => {
 .section-heading {
   align-items: flex-start;
   gap: 12rpx;
+  position: relative;
+  z-index: 1;
 }
 
 .eyebrow,
@@ -848,6 +879,8 @@ onShow(async () => {
 .insights-lock-overlay__copy,
 .insights-board-entry__copy,
 .insights-ticket-watch-entry__copy {
+  position: relative;
+  z-index: 1;
   display: block;
   margin-top: 18rpx;
   color: #6b707b;
@@ -894,7 +927,7 @@ onShow(async () => {
   gap: 10rpx;
   padding: 22rpx;
   border-radius: 24rpx;
-  background: linear-gradient(180deg, rgba(255, 247, 234, 0.95), rgba(255, 255, 255, 0.94));
+  background: linear-gradient(180deg, rgba(255, 241, 242, 0.95), rgba(255, 255, 255, 0.94));
   color: #7c8089;
   font-size: 22rpx;
 }
@@ -1034,7 +1067,7 @@ onShow(async () => {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: linear-gradient(135deg, #f97316, #ea580c);
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
   color: #ffffff;
   font-size: 22rpx;
   font-weight: 700;
@@ -1143,8 +1176,8 @@ onShow(async () => {
   transition: width 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.contribution-row__fill--orange {
-  background: linear-gradient(90deg, #ff6a00, #ffb347);
+.contribution-row__fill--red {
+  background: linear-gradient(90deg, #b91c1c, #ef4444);
 }
 
 .contribution-row__fill--green {
@@ -1163,8 +1196,8 @@ onShow(async () => {
   align-self: flex-start;
   padding: 12rpx 22rpx;
   border-radius: 999rpx;
-  background: rgba(255, 106, 0, 0.12);
-  color: #ff6a00;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
   font-size: 24rpx;
   white-space: nowrap;
   line-height: 1;

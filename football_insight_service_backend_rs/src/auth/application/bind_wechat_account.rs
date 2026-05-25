@@ -83,8 +83,7 @@ impl BindWechatAccountUseCase {
                 .invite_code
                 .as_deref()
                 .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .ok_or_else(|| anyhow::anyhow!("invite code is required"))?;
+                .filter(|value| !value.is_empty());
             let referral_code = input
                 .referral_code
                 .as_deref()
@@ -92,15 +91,26 @@ impl BindWechatAccountUseCase {
                 .filter(|value| !value.is_empty());
             let password_hash = self.password_port.hash_password(&password)?;
 
-            self.repository
-                .create_user_with_invite_and_wechat_with_referral(
-                    invite_code,
-                    referral_code,
-                    &phone_number,
-                    &password_hash,
-                    &profile,
-                )
-                .await?
+            if let Some(invite_code) = invite_code {
+                self.repository
+                    .create_user_with_invite_and_wechat_with_referral(
+                        invite_code,
+                        referral_code,
+                        &phone_number,
+                        &password_hash,
+                        &profile,
+                    )
+                    .await?
+            } else {
+                self.repository
+                    .create_user_with_wechat_without_invite_with_referral(
+                        referral_code,
+                        &phone_number,
+                        &password_hash,
+                        &profile,
+                    )
+                    .await?
+            }
         };
 
         self.repository.record_user_login(user.id).await?;
@@ -141,7 +151,23 @@ mod tests {
         },
     };
 
-    struct FakeRepository;
+    struct FakeRepository {
+        existing_user: bool,
+    }
+
+    impl FakeRepository {
+        fn with_existing_user() -> Self {
+            Self {
+                existing_user: true,
+            }
+        }
+
+        fn without_existing_user() -> Self {
+            Self {
+                existing_user: false,
+            }
+        }
+    }
 
     #[async_trait]
     impl AuthRepository for FakeRepository {
@@ -158,6 +184,10 @@ mod tests {
             &self,
             account_identifier: &str,
         ) -> anyhow::Result<Option<StoredAuthUser>> {
+            if !self.existing_user {
+                return Ok(None);
+            }
+
             Ok(Some(StoredAuthUser {
                 user: AuthUser {
                     id: Uuid::parse_str("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb").unwrap(),
@@ -219,6 +249,32 @@ mod tests {
             unreachable!()
         }
 
+        async fn create_user_with_wechat_without_invite_with_referral(
+            &self,
+            referral_code: Option<&str>,
+            phone_number: &str,
+            password_hash: &str,
+            _profile: &WechatOauthProfile,
+        ) -> anyhow::Result<AuthUser> {
+            assert_eq!(referral_code, Some("REF-CODE-001"));
+            assert_eq!(password_hash, "hashed::secret123");
+
+            Ok(AuthUser {
+                id: Uuid::parse_str("cccccccc-cccc-cccc-cccc-cccccccccccc").unwrap(),
+                account_identifier: phone_number.to_string(),
+                display_name: Some("tester".to_string()),
+                invite_code: None,
+                avatar_url: None,
+                has_wechat_binding: true,
+                membership_tier: "V1".to_string(),
+                membership_expires_at: None,
+                membership_benefits_enabled: true,
+                ticket_watch_poll_interval_seconds: 600,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            })
+        }
+
         async fn create_user_with_invite_and_mini_program_wechat(
             &self,
             _invite_code: &str,
@@ -251,8 +307,8 @@ mod tests {
     struct FakePasswordPort;
 
     impl PasswordPort for FakePasswordPort {
-        fn hash_password(&self, _password: &str) -> anyhow::Result<String> {
-            unreachable!()
+        fn hash_password(&self, password: &str) -> anyhow::Result<String> {
+            Ok(format!("hashed::{password}"))
         }
 
         fn verify_password(&self, password: &str, password_hash: &str) -> anyhow::Result<bool> {
@@ -298,7 +354,7 @@ mod tests {
     #[tokio::test]
     async fn execute_trims_password_before_verifying_existing_user() {
         let use_case = BindWechatAccountUseCase::new(
-            Arc::new(FakeRepository),
+            Arc::new(FakeRepository::with_existing_user()),
             Arc::new(FakePasswordPort),
             Arc::new(FakeTokenPort),
             Duration::days(30),
@@ -316,6 +372,31 @@ mod tests {
             .unwrap();
 
         assert_eq!(result.user.account_identifier, "18602812970");
+        assert!(result.user.has_wechat_binding);
+    }
+
+    #[tokio::test]
+    async fn execute_creates_v1_user_without_invite_when_phone_not_found() {
+        let use_case = BindWechatAccountUseCase::new(
+            Arc::new(FakeRepository::without_existing_user()),
+            Arc::new(FakePasswordPort),
+            Arc::new(FakeTokenPort),
+            Duration::days(30),
+        );
+
+        let result = use_case
+            .execute(BindWechatAccountInput {
+                bind_token: "bind-token".to_string(),
+                invite_code: None,
+                referral_code: Some("  REF-CODE-001 ".to_string()),
+                phone_number: "18602812970".to_string(),
+                password: "  secret123  ".to_string(),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(result.user.account_identifier, "18602812970");
+        assert_eq!(result.user.membership_tier, "V1");
         assert!(result.user.has_wechat_binding);
     }
 }

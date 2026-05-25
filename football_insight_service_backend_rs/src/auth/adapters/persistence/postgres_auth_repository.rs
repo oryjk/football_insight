@@ -335,6 +335,79 @@ impl PostgresAuthRepository {
         Ok(user.into_auth_user(&membership_tier_rules))
     }
 
+    async fn create_standard_user(
+        &self,
+        referral_code: Option<&str>,
+        account_identifier: &str,
+        password_hash: &str,
+    ) -> anyhow::Result<AuthUser> {
+        let mut tx = self.pool.begin().await?;
+        let referrer_user_id = Self::resolve_referrer_user_id(&mut tx, referral_code).await?;
+        let membership_tier_rules = Self::load_membership_tier_rules_in_tx(&mut tx).await?;
+
+        let account_identifier_exists = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM f_i_users WHERE account_identifier = $1",
+        )
+        .bind(account_identifier)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        if account_identifier_exists > 0 {
+            anyhow::bail!("phone number is already registered");
+        }
+
+        let user = sqlx::query_as::<_, AuthUserRow>(
+            r#"
+            INSERT INTO f_i_users (
+                id,
+                account_identifier,
+                display_name,
+                password_hash,
+                membership_tier
+            ) VALUES ($1, $2, $3, $4, $5)
+            RETURNING id,
+                      account_identifier,
+                      display_name,
+                      NULL::VARCHAR AS invite_code,
+                      avatar_url,
+                      (wx_open_id IS NOT NULL) AS has_wechat_binding,
+                      membership_tier,
+                      membership_expires_at,
+                      CASE
+                          WHEN official_wechat_open_id IS NULL THEN TRUE
+                          ELSE EXISTS (
+                              SELECT 1
+                                FROM f_i_wechat_followers AS followers
+                               WHERE followers.open_id = f_i_users.official_wechat_open_id
+                                 AND followers.unsubscribed_at IS NULL
+                          )
+                      END AS membership_benefits_enabled,
+                      created_at,
+                      updated_at
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(account_identifier)
+        .bind(account_identifier)
+        .bind(password_hash)
+        .bind("V1")
+        .fetch_one(&mut *tx)
+        .await?;
+
+        if let (Some(referrer_user_id), Some(referral_code)) = (referrer_user_id, referral_code) {
+            Self::record_referral_and_upgrade_referrer(
+                &mut tx,
+                referrer_user_id,
+                user.id,
+                referral_code.trim(),
+            )
+            .await?;
+        }
+
+        tx.commit().await?;
+        Ok(user.into_auth_user(&membership_tier_rules))
+    }
+
     async fn create_invited_wechat_user(
         &self,
         invite_code: &str,
@@ -444,6 +517,91 @@ impl PostgresAuthRepository {
         Ok(user.into_auth_user(&membership_tier_rules))
     }
 
+    async fn create_standard_wechat_user(
+        &self,
+        referral_code: Option<&str>,
+        phone_number: &str,
+        password_hash: &str,
+        profile: &WechatOauthProfile,
+    ) -> anyhow::Result<AuthUser> {
+        let mut tx = self.pool.begin().await?;
+        let referrer_user_id = Self::resolve_referrer_user_id(&mut tx, referral_code).await?;
+        let membership_tier_rules = Self::load_membership_tier_rules_in_tx(&mut tx).await?;
+
+        let phone_exists = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM f_i_users WHERE account_identifier = $1",
+        )
+        .bind(phone_number)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        if phone_exists > 0 {
+            anyhow::bail!("phone number is already registered");
+        }
+
+        let user = sqlx::query_as::<_, AuthUserRow>(
+            r#"
+            INSERT INTO f_i_users (
+                id,
+                wx_open_id,
+                union_id,
+                account_identifier,
+                display_name,
+                avatar_url,
+                password_hash,
+                membership_tier
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id,
+                      account_identifier,
+                      display_name,
+                      NULL::VARCHAR AS invite_code,
+                      avatar_url,
+                      (wx_open_id IS NOT NULL) AS has_wechat_binding,
+                      membership_tier,
+                      membership_expires_at,
+                      CASE
+                          WHEN official_wechat_open_id IS NULL THEN TRUE
+                          ELSE EXISTS (
+                              SELECT 1
+                                FROM f_i_wechat_followers AS followers
+                               WHERE followers.open_id = f_i_users.official_wechat_open_id
+                                 AND followers.unsubscribed_at IS NULL
+                          )
+                      END AS membership_benefits_enabled,
+                      created_at,
+                      updated_at
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(&profile.open_id)
+        .bind(&profile.union_id)
+        .bind(phone_number)
+        .bind(
+            profile
+                .display_name
+                .clone()
+                .unwrap_or_else(|| phone_number.to_string()),
+        )
+        .bind(&profile.avatar_url)
+        .bind(password_hash)
+        .bind("V1")
+        .fetch_one(&mut *tx)
+        .await?;
+
+        if let (Some(referrer_user_id), Some(referral_code)) = (referrer_user_id, referral_code) {
+            Self::record_referral_and_upgrade_referrer(
+                &mut tx,
+                referrer_user_id,
+                user.id,
+                referral_code.trim(),
+            )
+            .await?;
+        }
+
+        tx.commit().await?;
+        Ok(user.into_auth_user(&membership_tier_rules))
+    }
+
     async fn create_invited_mini_wechat_user(
         &self,
         invite_code: &str,
@@ -535,6 +693,89 @@ impl PostgresAuthRepository {
         .bind(invite_code)
         .bind(user.id)
         .execute(&mut *tx)
+        .await?;
+
+        if let (Some(referrer_user_id), Some(referral_code)) = (referrer_user_id, referral_code) {
+            Self::record_referral_and_upgrade_referrer(
+                &mut tx,
+                referrer_user_id,
+                user.id,
+                referral_code.trim(),
+            )
+            .await?;
+        }
+
+        tx.commit().await?;
+        Ok(user.into_auth_user(&membership_tier_rules))
+    }
+
+    async fn create_standard_mini_wechat_user(
+        &self,
+        referral_code: Option<&str>,
+        profile: &WechatOauthProfile,
+    ) -> anyhow::Result<AuthUser> {
+        let mut tx = self.pool.begin().await?;
+        let referrer_user_id = Self::resolve_referrer_user_id(&mut tx, referral_code).await?;
+        let membership_tier_rules = Self::load_membership_tier_rules_in_tx(&mut tx).await?;
+
+        let account_identifier = Self::generate_wechat_account_identifier(&profile.open_id);
+
+        let account_identifier_exists = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM f_i_users WHERE account_identifier = $1",
+        )
+        .bind(&account_identifier)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        if account_identifier_exists > 0 {
+            anyhow::bail!("wechat account is already registered");
+        }
+
+        let user = sqlx::query_as::<_, AuthUserRow>(
+            r#"
+            INSERT INTO f_i_users (
+                id,
+                wx_open_id,
+                union_id,
+                account_identifier,
+                display_name,
+                avatar_url,
+                membership_tier
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING id,
+                      account_identifier,
+                      display_name,
+                      NULL::VARCHAR AS invite_code,
+                      avatar_url,
+                      (wx_open_id IS NOT NULL) AS has_wechat_binding,
+                      membership_tier,
+                      membership_expires_at,
+                      CASE
+                          WHEN official_wechat_open_id IS NULL THEN TRUE
+                          ELSE EXISTS (
+                              SELECT 1
+                                FROM f_i_wechat_followers AS followers
+                               WHERE followers.open_id = f_i_users.official_wechat_open_id
+                                 AND followers.unsubscribed_at IS NULL
+                          )
+                      END AS membership_benefits_enabled,
+                      created_at,
+                      updated_at
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(&profile.open_id)
+        .bind(&profile.union_id)
+        .bind(&account_identifier)
+        .bind(
+            profile
+                .display_name
+                .clone()
+                .unwrap_or_else(|| "微信用户".to_string()),
+        )
+        .bind(&profile.avatar_url)
+        .bind("V1")
+        .fetch_one(&mut *tx)
         .await?;
 
         if let (Some(referrer_user_id), Some(referral_code)) = (referrer_user_id, referral_code) {
@@ -754,6 +995,25 @@ impl AuthRepository for PostgresAuthRepository {
         .await
     }
 
+    async fn create_user_without_invite(
+        &self,
+        account_identifier: &str,
+        password_hash: &str,
+    ) -> anyhow::Result<AuthUser> {
+        self.create_standard_user(None, account_identifier, password_hash)
+            .await
+    }
+
+    async fn create_user_without_invite_with_referral(
+        &self,
+        referral_code: Option<&str>,
+        account_identifier: &str,
+        password_hash: &str,
+    ) -> anyhow::Result<AuthUser> {
+        self.create_standard_user(referral_code, account_identifier, password_hash)
+            .await
+    }
+
     async fn find_user_by_account_identifier(
         &self,
         account_identifier: &str,
@@ -919,6 +1179,27 @@ impl AuthRepository for PostgresAuthRepository {
         .await
     }
 
+    async fn create_user_with_wechat_without_invite(
+        &self,
+        phone_number: &str,
+        password_hash: &str,
+        profile: &WechatOauthProfile,
+    ) -> anyhow::Result<AuthUser> {
+        self.create_standard_wechat_user(None, phone_number, password_hash, profile)
+            .await
+    }
+
+    async fn create_user_with_wechat_without_invite_with_referral(
+        &self,
+        referral_code: Option<&str>,
+        phone_number: &str,
+        password_hash: &str,
+        profile: &WechatOauthProfile,
+    ) -> anyhow::Result<AuthUser> {
+        self.create_standard_wechat_user(referral_code, phone_number, password_hash, profile)
+            .await
+    }
+
     async fn create_user_with_invite_and_mini_program_wechat(
         &self,
         invite_code: &str,
@@ -935,6 +1216,22 @@ impl AuthRepository for PostgresAuthRepository {
         profile: &WechatOauthProfile,
     ) -> anyhow::Result<AuthUser> {
         self.create_invited_mini_wechat_user(invite_code, referral_code, profile)
+            .await
+    }
+
+    async fn create_user_with_mini_program_wechat_without_invite(
+        &self,
+        profile: &WechatOauthProfile,
+    ) -> anyhow::Result<AuthUser> {
+        self.create_standard_mini_wechat_user(None, profile).await
+    }
+
+    async fn create_user_with_mini_program_wechat_without_invite_with_referral(
+        &self,
+        referral_code: Option<&str>,
+        profile: &WechatOauthProfile,
+    ) -> anyhow::Result<AuthUser> {
+        self.create_standard_mini_wechat_user(referral_code, profile)
             .await
     }
 

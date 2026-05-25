@@ -1,6 +1,9 @@
 <template>
-  <scroll-view scroll-y class="page-scroll">
-    <view class="page">
+  <view class="page-root">
+    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" />
+    <view class="page-bg-fade"></view>
+    <scroll-view scroll-y class="page-scroll">
+      <view class="page">
       <view class="hero-card support-hero">
         <view class="hero-card__top">
           <view>
@@ -117,14 +120,16 @@
       </template>
 
       <canvas canvas-id="supportPosterCanvas" class="support-poster-canvas" />
-    </view>
-  </scroll-view>
+      </view>
+    </scroll-view>
+  </view>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onHide, onLoad, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
+import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.webp'
 import { castSupportVote, getMatchSupportDetail } from '../../api/support'
 import type { SupportMatchDetail } from '../../types/support'
 import { extractApiErrorMessage } from '../../utils/apiError'
@@ -456,7 +461,7 @@ async function generatePoster(): Promise<void> {
     context.setFontSize(28)
     context.fillText(`${detail.value.match_date} ${detail.value.match_time} · 第 ${detail.value.round_number} 轮`, 96, 486)
 
-    context.setFillStyle('#f97316')
+    context.setFillStyle('#dc2626')
     context.fillRect(96, 560, Math.max(40, (width - 192) * (detail.value.home_team.support_share_pct / 100)), 28)
     context.setFillStyle('#2563eb')
     context.fillRect(96, 616, Math.max(40, (width - 192) * (detail.value.away_team.support_share_pct / 100)), 28)
@@ -547,8 +552,34 @@ function roundRect(
 </script>
 
 <style scoped lang="css">
+.page-root {
+  position: relative;
+  min-height: 100vh;
+  background: #f7f8fa;
+}
+.page-bg-img {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 0;
+}
+.page-bg-fade {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background: linear-gradient(180deg, rgba(246, 247, 244, 0.24) 0%, rgba(247, 248, 250, 0.74) 32%, #f7f8fa 58%, #f7f8fa 100%);
+  pointer-events: none;
+  z-index: 0;
+}
 .page-scroll { height: 100vh; }
 .page {
+  position: relative;
+  z-index: 1;
   padding: 28rpx 24rpx 40rpx;
   display: flex;
   flex-direction: column;

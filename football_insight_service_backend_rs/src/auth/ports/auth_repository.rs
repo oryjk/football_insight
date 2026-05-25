@@ -25,6 +25,25 @@ pub trait AuthRepository: Send + Sync {
         self.create_user_with_invite(invite_code, account_identifier, password_hash)
             .await
     }
+    async fn create_user_without_invite(
+        &self,
+        account_identifier: &str,
+        password_hash: &str,
+    ) -> anyhow::Result<AuthUser> {
+        self.create_user_without_invite_with_referral(None, account_identifier, password_hash)
+            .await
+    }
+    async fn create_user_without_invite_with_referral(
+        &self,
+        referral_code: Option<&str>,
+        account_identifier: &str,
+        password_hash: &str,
+    ) -> anyhow::Result<AuthUser> {
+        let _ = referral_code;
+        let _ = account_identifier;
+        let _ = password_hash;
+        anyhow::bail!("create user without invite is not supported")
+    }
     async fn find_user_by_account_identifier(
         &self,
         account_identifier: &str,
@@ -54,6 +73,33 @@ pub trait AuthRepository: Send + Sync {
         self.create_user_with_invite_and_wechat(invite_code, phone_number, password_hash, profile)
             .await
     }
+    async fn create_user_with_wechat_without_invite(
+        &self,
+        phone_number: &str,
+        password_hash: &str,
+        profile: &WechatOauthProfile,
+    ) -> anyhow::Result<AuthUser> {
+        self.create_user_with_wechat_without_invite_with_referral(
+            None,
+            phone_number,
+            password_hash,
+            profile,
+        )
+        .await
+    }
+    async fn create_user_with_wechat_without_invite_with_referral(
+        &self,
+        referral_code: Option<&str>,
+        phone_number: &str,
+        password_hash: &str,
+        profile: &WechatOauthProfile,
+    ) -> anyhow::Result<AuthUser> {
+        let _ = referral_code;
+        let _ = phone_number;
+        let _ = password_hash;
+        let _ = profile;
+        anyhow::bail!("create wechat user without invite is not supported")
+    }
     async fn create_user_with_invite_and_mini_program_wechat(
         &self,
         invite_code: &str,
@@ -68,6 +114,22 @@ pub trait AuthRepository: Send + Sync {
         let _ = referral_code;
         self.create_user_with_invite_and_mini_program_wechat(invite_code, profile)
             .await
+    }
+    async fn create_user_with_mini_program_wechat_without_invite(
+        &self,
+        profile: &WechatOauthProfile,
+    ) -> anyhow::Result<AuthUser> {
+        self.create_user_with_mini_program_wechat_without_invite_with_referral(None, profile)
+            .await
+    }
+    async fn create_user_with_mini_program_wechat_without_invite_with_referral(
+        &self,
+        referral_code: Option<&str>,
+        profile: &WechatOauthProfile,
+    ) -> anyhow::Result<AuthUser> {
+        let _ = referral_code;
+        let _ = profile;
+        anyhow::bail!("create mini program wechat user without invite is not supported")
     }
     async fn get_user_by_id(&self, user_id: Uuid) -> anyhow::Result<Option<AuthUser>>;
     async fn record_user_login(&self, user_id: Uuid) -> anyhow::Result<()> {

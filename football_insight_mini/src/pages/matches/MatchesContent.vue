@@ -1,7 +1,7 @@
 <template>
-  <view class="page-root">
-    <image class="page-bg-img" :src="bgImage" mode="aspectFill" />
-    <view class="page-bg-fade"></view>
+  <view class="page-root" :class="{ 'page-root--embedded': embedded }">
+    <image v-if="!embedded" class="page-bg-img" :src="bgImage" mode="aspectFill" />
+    <view v-if="!embedded" class="page-bg-fade"></view>
     <view class="page-scroll">
       <view class="page">
       <FiLoading
@@ -285,7 +285,7 @@
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
-import bgImage from '../../static/matches/bg.webp'
+import bgImage from '../../static/user/phoenix-stadium-bg.webp'
 import { getAvailableRounds, getMatches } from '../../api/insight'
 import type { MatchCard, RoundReference } from '../../types/insight'
 import { extractApiErrorMessage } from '../../utils/apiError'
@@ -297,6 +297,10 @@ import {
   resolveMatchDisplayStatus,
   shouldShowLiveStatusTag,
 } from './helpers'
+
+defineProps<{
+  embedded?: boolean
+}>()
 
 interface UpcomingSection {
   title: string
@@ -532,10 +536,16 @@ onShow(() => {
 
 <style scoped lang="css">
 .page-root { position: relative; }
+.page-root--embedded {
+  margin-top: -16rpx;
+}
 .page-scroll {
   padding-top: calc(var(--fi-brand-nav-height) + 96rpx);
   position: relative;
   z-index: 1;
+}
+.page-root--embedded .page-scroll {
+  padding-top: 0;
 }
 
 @keyframes dot-blink {
@@ -554,6 +564,9 @@ onShow(() => {
   display: flex;
   flex-direction: column;
   gap: 16rpx;
+}
+.page-root--embedded .page {
+  padding-top: 0;
 }
 .page-bg-img {
   position: absolute;
@@ -729,14 +742,14 @@ onShow(() => {
 }
 .season-progress__dot--current .season-progress__dot-inner {
   background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMTkiIGZpbGw9IiNjOTk2NDIiLz48cGF0aCBkPSJNMjAsMTEuNSBMMjguMSwxNy40IEwyNSwyNi45IEwxNSwyNi45IEwxMS45LDE3LjQgWiIgZmlsbD0iI2ZmZmZmZiIvPjxwYXRoIGQ9Ik0yMCwxMS41IEwyMCwxIE0yOC4xLDE3LjQgTDM4LjEsMTQuMSBNMjUsMjYuOSBMMzEuMiwzNS40IE0xNSwyNi45IEw4LjgsMzUuNCBNMTEuOSwxNy40IEwxLjksMTQuMSIgc3Ryb2tlPSIjZmZmZmZmIiBzdHJva2Utd2lkdGg9IjIuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+PHBhdGggZD0iTTIwLDEgUTMwLDAgMzguMSwxNC4xIE0zOC4xLDE0LjEgUTQwLDI1IDMxLjIsMzUuNCBNMzEuMiwzNS40IFEyMCw0MCA4LjgsMzUuNCBNOC44LDM1LjQgUTAsMjUgMS45LDE0LjEgTTEuOSwxNC4xIFExMCwwIDIwLDEiIHN0cm9rZT0iI2ZmZmZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIGZpbGw9Im5vbmUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgb3BhY2l0eT0iMC40NSIvPjwvc3ZnPgo=");
-  box-shadow: 0 2rpx 10rpx rgba(201, 150, 66, 0.35);
+  box-shadow: 0 2rpx 10rpx rgba(220, 38, 38, 0.28);
   animation: dot-blink 1.2s ease-in-out infinite;
 }
 .season-progress__dot--selected .season-progress__dot-inner {
   transform: scale(1.3);
 }
 .season-progress__dot--current.season-progress__dot--selected .season-progress__dot-inner {
-  box-shadow: 0 4rpx 18rpx rgba(201, 150, 66, 0.55);
+  box-shadow: 0 4rpx 18rpx rgba(220, 38, 38, 0.42);
   animation: dot-blink-strong 1.2s ease-in-out infinite;
 }
 .season-progress__dot-number {
@@ -750,7 +763,7 @@ onShow(() => {
   color: #15161b;
 }
 .season-progress__item--current .season-progress__dot-number {
-  color: #c99642;
+  color: #dc2626;
 }
 .season-progress__summary {
   display: block;
@@ -788,10 +801,10 @@ onShow(() => {
   background: linear-gradient(180deg, #3d9c72, #2d8c63);
 }
 .match-card--live::before {
-  background: linear-gradient(180deg, #ff9129, #ef7d16);
+  background: linear-gradient(180deg, #ef4444, #dc2626);
 }
 .match-card--live {
-  box-shadow: 0 16rpx 40rpx rgba(255, 145, 41, 0.12);
+  box-shadow: 0 16rpx 40rpx rgba(220, 38, 38, 0.12);
 }
 .match-card--scheduled::before {
   background: linear-gradient(180deg, #c4c8d0, #a8adb8);
@@ -846,8 +859,8 @@ onShow(() => {
   justify-content: center;
   padding: 8rpx 16rpx;
   border-radius: 999rpx;
-  background: rgba(255, 145, 41, 0.14);
-  color: #df7616;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
   font-size: 22rpx;
   line-height: 1;
 }
@@ -862,7 +875,7 @@ onShow(() => {
   padding: 0;
   border: none;
   background: transparent;
-  color: #ef7d16;
+  color: #dc2626;
   font-size: 24rpx;
   line-height: 1.2;
 }
@@ -1020,11 +1033,11 @@ onShow(() => {
   animation-delay: calc(var(--tech-stat-delay, 120ms) + 70ms);
 }
 .tech-stat-row__fill--home {
-  background: #f59e0b;
+  background: #dc2626;
   transform-origin: right center;
 }
 .tech-stat-row__fill--away {
-  background: #f59e0b;
+  background: #dc2626;
   transform-origin: left center;
 }
 .state-card--error text { font-size: 28rpx; color: #c03a2b; }

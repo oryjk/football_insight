@@ -1,6 +1,9 @@
 <template>
-  <scroll-view scroll-y class="page-scroll">
-    <view class="page">
+  <view class="page-root">
+    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" />
+    <view class="page-bg-fade"></view>
+    <scroll-view scroll-y class="page-scroll">
+      <view class="page">
       <FiLoading
         v-if="loading"
         title="战术板加载中"
@@ -227,14 +230,16 @@
           <button class="team-board-composer__submit" @click="publishPost">发布观点</button>
         </view>
       </view>
-    </view>
-  </scroll-view>
+      </view>
+    </scroll-view>
+  </view>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
+import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.webp'
 import {
   addTeamBoardComment,
   createTeamBoardPost,
@@ -442,8 +447,32 @@ onShow(() => {
 </script>
 
 <style scoped lang="css">
+.page-root {
+  position: relative;
+  min-height: 100vh;
+  background: #f7f8fa;
+}
+.page-bg-img {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 0;
+}
+.page-bg-fade {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background: linear-gradient(180deg, rgba(246, 247, 244, 0.24) 0%, rgba(247, 248, 250, 0.74) 32%, #f7f8fa 58%, #f7f8fa 100%);
+  pointer-events: none;
+  z-index: 0;
+}
 .page-scroll { height: 100vh; }
-.page { padding: 28rpx 24rpx 40rpx; display: flex; flex-direction: column; gap: 24rpx; }
+.page { position: relative; z-index: 1; padding: 28rpx 24rpx 40rpx; display: flex; flex-direction: column; gap: 24rpx; }
 .hero-card, .panel, .state-card, .team-board-composer__dialog {
   background: rgba(255,255,255,0.94);
   border-radius: 36rpx;
@@ -607,8 +636,8 @@ onShow(() => {
   font-size: 24rpx;
 }
 .team-board-post__action.active {
-  background: rgba(255, 106, 0, 0.12);
-  color: #ff6a00;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
 }
 .team-board-comments {
   margin-top: 18rpx;

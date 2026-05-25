@@ -18,4 +18,9 @@ describe('football mini ci wrapper', () => {
     expect(wrapperSource.includes('const uploadVersion = command === "upload" ? resolveUploadVersion() : null;')).toBe(true)
     expect(wrapperSource.includes('[...extraArgs, "--version", uploadVersion]')).toBe(true)
   })
+
+  test('syncs manifest version before running the shared ci command', () => {
+    expect(wrapperSource.includes('import { syncManifestVersion } from "./sync-manifest-version.mjs";')).toBe(true)
+    expect(wrapperSource.includes('syncManifestVersion();')).toBe(true)
+  })
 })

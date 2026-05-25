@@ -16,6 +16,7 @@
 
       <template v-else>
         <view v-if="previewStandingsTables.length" class="panel standings-launcher">
+          <image class="standings-launcher__dots" :src="memberCardDotsImage" mode="aspectFill" />
           <view class="standings-launcher__grid">
             <view
               v-for="table in previewStandingsTables"
@@ -41,49 +42,52 @@
           </view>
         </view>
 
-        <view class="rankings-controls">
-          <view class="scope-toggle">
-            <view
-              class="scope-toggle__button"
-              :class="{ active: scope === 'team' }"
-              @click="scope = 'team'"
-            >
-              <text class="scope-toggle__button-text">球队榜</text>
-            </view>
-            <view
-              class="scope-toggle__button"
-              :class="{ active: scope === 'player' }"
-              @click="scope = 'player'"
-            >
-              <text class="scope-toggle__button-text">球员榜</text>
-            </view>
-          </view>
-
-          <view class="category-tabs-wrap">
-            <scroll-view
-              scroll-x
-              class="pill-row"
-              :scroll-left="categoryScrollLeft"
-              scroll-with-animation
-            >
-              <view class="pill-row__list">
-                <view
-                  v-for="item in categoryOptions"
-                  :id="`ranking-category-${item.slug}`"
-                  :key="item.slug"
-                  class="pill-row__item"
-                  :class="{ active: item.slug === activeCategorySlug }"
-                  @click="activeCategorySlug = item.slug"
-                >
-                  <text class="pill-row__item-text">{{ item.label }}</text>
-                </view>
+        <view
+          v-if="(scope === 'team' && activeTeamCategory) || (scope === 'player' && activePlayerCategory)"
+          class="panel ranking-surface"
+        >
+          <view class="rankings-controls">
+            <view class="scope-toggle">
+              <view
+                class="scope-toggle__button"
+                :class="{ active: scope === 'team' }"
+                @click="scope = 'team'"
+              >
+                <text class="scope-toggle__button-text">球队榜</text>
               </view>
-            </scroll-view>
-          </view>
-        </view>
+              <view
+                class="scope-toggle__button"
+                :class="{ active: scope === 'player' }"
+                @click="scope = 'player'"
+              >
+                <text class="scope-toggle__button-text">球员榜</text>
+              </view>
+            </view>
 
-        <view v-if="scope === 'team' && activeTeamCategory" class="panel ranking-surface">
-          <view class="ranking-list">
+            <view class="category-tabs-wrap">
+              <scroll-view
+                scroll-x
+                class="pill-row"
+                :scroll-left="categoryScrollLeft"
+                scroll-with-animation
+              >
+                <view class="pill-row__list">
+                  <view
+                    v-for="item in categoryOptions"
+                    :id="`ranking-category-${item.slug}`"
+                    :key="item.slug"
+                    class="pill-row__item"
+                    :class="{ active: item.slug === activeCategorySlug }"
+                    @click="activeCategorySlug = item.slug"
+                  >
+                    <text class="pill-row__item-text">{{ item.label }}</text>
+                  </view>
+                </view>
+              </scroll-view>
+            </view>
+          </view>
+
+          <view v-if="scope === 'team' && activeTeamCategory" class="ranking-list">
             <view class="section-heading section-heading--compact">
               <view>
                 <text class="section-kicker">{{ activeTeamSectionKicker }}</text>
@@ -129,10 +133,8 @@
               </view>
             </view>
           </view>
-        </view>
 
-        <view v-if="scope === 'player' && activePlayerCategory" class="panel ranking-surface">
-          <view class="ranking-list">
+          <view v-if="scope === 'player' && activePlayerCategory" class="ranking-list">
             <view class="section-heading section-heading--compact">
               <view>
                 <text class="section-kicker">实时球员累计榜</text>
@@ -318,7 +320,8 @@ import { getAvailableRounds, getMatches, getRankings } from '../../api/insight'
 import type { MatchCard, PlayerRankingCategory, RankingsViewResponse, RoundReference, StandingsTable, StandingsTableEntry, TeamRankingCategory, TeamRankingEntry } from '../../types/insight'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { type TeamSeasonMatch, resolveTeamSeasonMatches } from '../../utils/teamSeasonMatches'
-import bgImage from '../../static/rankings/bg.webp'
+import bgImage from '../../static/user/phoenix-stadium-bg.webp'
+import memberCardDotsImage from '../../static/user/member-card-dots.png'
 import { buildStandingsFallbackMetrics, buildStandingsPosterColumns, buildStandingsPosterMetrics, buildStandingsPosterSharePath, buildStandingsPosterShareTitle, buildStandingsPosterTeamLayout, buildStandingsRankingEntries, type StandingsRankingMode } from './poster'
 import { reportPageActivity } from '../../utils/userActivity'
 
@@ -764,7 +767,7 @@ async function generatePoster(table: StandingsTable): Promise<void> {
     posterEntries.forEach((entry, index) => {
       const y = 324 + index * rowHeight
       const teamLayout = buildStandingsPosterTeamLayout(Boolean(posterLogoPaths.get(entry.team_id)))
-      context.setFillStyle(index < 3 ? '#f97316' : '#121212')
+      context.setFillStyle(index < 3 ? '#dc2626' : '#121212')
       context.fillText(String(entry.rank_no), 88, y)
       drawPosterTeamLogo(context, posterLogoPaths.get(entry.team_id) ?? null, teamLayout.logoX, y - 22, teamLayout.logoSize)
       context.setFillStyle('#121212')
@@ -988,9 +991,10 @@ defineExpose({
 <style scoped lang="css">
 .page-root { position: relative; }
 .page-scroll {
-  padding-top: calc(var(--fi-brand-nav-height) + 96rpx);
+  padding-top: var(--fi-brand-nav-height);
   position: relative;
   z-index: 1;
+  box-sizing: border-box;
 }
 .page { padding: 24rpx 16rpx 40rpx; display: flex; flex-direction: column; gap: 16rpx; }
 .panel, .state-card {
@@ -1045,12 +1049,26 @@ defineExpose({
   font-size: 24rpx;
 }
 .standings-launcher {
+  position: relative;
+  overflow: hidden;
   display: grid;
   gap: 0;
   padding-top: 4rpx;
   padding-bottom: 8rpx;
 }
+.standings-launcher__dots {
+  position: absolute;
+  z-index: 0;
+  top: -54rpx;
+  right: -54rpx;
+  width: 292rpx;
+  height: 180rpx;
+  opacity: 0.34;
+  pointer-events: none;
+}
 .standings-launcher__grid {
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: 0;
   border-top: 2rpx solid rgba(235, 236, 241, 0.86);
@@ -1094,18 +1112,20 @@ defineExpose({
 }
 .rankings-controls {
   display: grid;
-  gap: 18rpx;
+  gap: 14rpx;
   width: 100%;
-  padding: 2rpx 4rpx 8rpx;
+  padding: 0 0 10rpx;
   overflow: hidden;
 }
 .scope-toggle {
-  display: flex;
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
-  gap: 34rpx;
-  padding: 0 8rpx;
-  border-bottom: 2rpx solid rgba(231, 232, 238, 0.9);
+  gap: 6rpx;
+  padding: 6rpx;
+  border: 2rpx solid rgba(232, 233, 238, 0.9);
+  border-radius: 999rpx;
+  background: rgba(246, 247, 251, 0.92);
 }
 .standings-mode-toggle {
   display: inline-grid;
@@ -1139,14 +1159,15 @@ defineExpose({
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 auto;
+  width: 100%;
   min-width: 0;
-  min-height: 68rpx;
-  padding: 12rpx 0 20rpx;
+  min-height: 58rpx;
+  padding: 0 20rpx;
+  border-radius: 999rpx;
   text-align: center;
   background: transparent;
   color: #7f8490;
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: 700;
   white-space: nowrap;
   line-height: 1;
@@ -1154,16 +1175,7 @@ defineExpose({
   box-sizing: border-box;
 }
 .scope-toggle__button::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: -2rpx;
-  width: 0;
-  height: 4rpx;
-  border-radius: 999rpx;
-  background: #15161b;
-  transform: translateX(-50%);
-  transition: width 160ms ease;
+  border: 0;
 }
 .scope-toggle__button-text {
   display: block;
@@ -1190,11 +1202,10 @@ defineExpose({
   box-sizing: border-box;
 }
 .scope-toggle__button.active {
-  color: #121212;
+  color: #ffffff;
   font-weight: 900;
-}
-.scope-toggle__button.active::after {
-  width: 100%;
+  background: #15161b;
+  box-shadow: 0 8rpx 18rpx rgba(21, 22, 27, 0.12);
 }
 .pill-row__item.active {
   color: #ffffff;
@@ -1210,7 +1221,7 @@ defineExpose({
   display: inline-flex;
   gap: 10rpx;
   min-width: max-content;
-  padding: 0 8rpx 4rpx;
+  padding: 0 0 4rpx;
 }
 .pill-row__item {
   background: rgba(239, 240, 244, 0.92);
@@ -1376,9 +1387,9 @@ defineExpose({
   line-height: 1;
   padding: 10rpx 18rpx;
   border-radius: 999rpx;
-  background: rgba(255, 106, 0, 0.12);
+  background: rgba(220, 38, 38, 0.12);
   font-size: 24rpx;
-  color: #ff6a00;
+  color: #dc2626;
 }
 .standings-sheet__poster {
   margin-top: 18rpx;
@@ -1427,7 +1438,7 @@ defineExpose({
   min-width: 0;
 }
 .standings-sheet__metric-value { color: #121212; font-weight: 800; line-height: 1; }
-.standings-sheet__metric:first-child .standings-sheet__metric-value { color: #f97316; }
+.standings-sheet__metric:first-child .standings-sheet__metric-value { color: #dc2626; }
 .standings-sheet__metric-label {
   color: #8f9198;
   font-size: 20rpx;
@@ -1580,7 +1591,7 @@ defineExpose({
 
 .team-season-match-row__result--draw {
   background: rgba(234, 179, 8, 0.12);
-  color: #b45309;
+  color: #854d0e;
 }
 
 .team-season-match-row__result--loss {
@@ -1589,8 +1600,8 @@ defineExpose({
 }
 
 .team-season-match-row__result--live {
-  background: rgba(249, 115, 22, 0.12);
-  color: #d97706;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
 }
 
 .team-season-match-row__result--scheduled {

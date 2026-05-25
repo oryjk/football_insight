@@ -1,7 +1,14 @@
 <template>
-  <view class="page-root">
-    <FiBrandNav open-on-current-page @open-ai="openAiFromBrandNav" />
-    <image class="page-bg-img" :src="bgImage" mode="aspectFill" />
+  <view
+    class="page-root"
+    :class="{ 'page-root--guest': isGuestPage }"
+  >
+    <FiBrandNav
+      open-on-current-page
+      :transparent="isGuestPage"
+      @open-ai="openAiFromBrandNav"
+    />
+    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" />
     <view class="page-bg-fade"></view>
     <view class="page-scroll">
       <view class="page">
@@ -19,58 +26,54 @@
 
       <template v-else>
       <view
+        v-if="currentUser"
         class="hero-card account-hero"
-        :class="currentUser ? [currentMembershipMeta.heroClass, currentMembershipGuide.toneClass] : 'account-hero--guest'"
+        :class="[currentMembershipMeta.heroClass, currentMembershipGuide.toneClass]"
       >
-        <view class="hero-card__top" :class="{ 'hero-card__top--member': currentUser }">
-          <template v-if="currentUser">
-            <view class="account-hero__eyebrow">
-              <image class="account-hero__eyebrow-icon" :src="diamondIcon" mode="aspectFit" />
-              <text class="account-hero__eyebrow-text">会员中心</text>
-            </view>
-          </template>
-          <template v-else>
-            <view>
-              <text class="eyebrow">账号登录</text>
-              <text class="hero-card__title">{{ accountHeadline }}</text>
-            </view>
-            <text v-if="accountHeroBadge" class="meta-note meta-note--hero">{{ accountHeroBadge }}</text>
-          </template>
+        <image class="account-hero__dots account-hero__dots--top" :src="memberCardDotsImage" mode="aspectFill" />
+        <image class="account-hero__dots account-hero__dots--bottom" :src="memberCardDotsImage" mode="aspectFill" />
+
+        <view class="hero-card__top hero-card__top--member">
+          <view class="account-hero__eyebrow">
+            <image class="account-hero__eyebrow-icon" :src="diamondIcon" mode="aspectFit" />
+            <text class="account-hero__eyebrow-text">会员中心</text>
+          </view>
         </view>
 
-        <view v-if="currentUser" class="profile-banner profile-banner--hero">
-          <view class="profile-banner__main">
-            <view class="profile-banner__avatar-wrap">
-              <view class="profile-banner__avatar">
-                <image
-                  v-if="currentUser.avatar_url"
-                  :src="currentUser.avatar_url"
-                  mode="aspectFill"
-                  class="profile-banner__avatar-image"
-                />
-                <text v-else class="profile-banner__avatar-fallback">{{ avatarFallbackLabel }}</text>
-              </view>
-              <view class="profile-banner__avatar-badge" :class="currentMembershipGuide.toneClass">{{ currentMembershipMeta.code }}</view>
-            </view>
-
-            <view class="profile-banner__body">
-              <text class="profile-banner__name">{{ currentUser.display_name }}</text>
-              <text class="membership-badge" :class="currentMembershipMeta.badgeClass">
-                {{ currentMembershipMeta.badgeLabel }}
-              </text>
-            </view>
+        <view v-if="currentUser" class="member-identity">
+          <view class="member-identity__avatar">
+            <image
+              v-if="currentUser.avatar_url"
+              :src="currentUser.avatar_url"
+              mode="aspectFill"
+              class="member-identity__avatar-image"
+            />
+            <text v-else class="member-identity__avatar-fallback">{{ avatarFallbackLabel }}</text>
           </view>
 
-          <view class="account-hero__medal" :class="currentMembershipGuide.toneClass">
-            <view class="account-hero__medal-ring"></view>
-            <view class="account-hero__medal-orbit"></view>
-            <view class="account-hero__medal-star account-hero__medal-star--one"></view>
-            <view class="account-hero__medal-star account-hero__medal-star--two"></view>
-            <view class="account-hero__medal-shield">
-              <text class="account-hero__medal-crown">⌃</text>
-              <text class="account-hero__medal-code">{{ currentMembershipMeta.code }}</text>
+          <view class="member-identity__copy">
+            <text class="member-identity__hello">亲爱的会员，您好！</text>
+            <text class="member-identity__desc">{{ membershipHeroDescription }}</text>
+          </view>
+
+        </view>
+
+        <view
+          class="membership-card"
+          :class="{ 'membership-card--actionable': canPurchaseMembership }"
+          @click="handleMembershipCardAction"
+        >
+          <view class="membership-card__content">
+            <view class="membership-card__main">
+              <text class="membership-card__title">{{ membershipHeroTitle }}</text>
+              <text class="membership-card__expire">{{ membershipHeroExpiryLabel }}</text>
+            </view>
+            <view class="membership-card__action">
+              <text class="membership-card__action-text">{{ membershipHeroActionText }}</text>
+              <text v-if="canPurchaseMembership" class="membership-card__action-arrow">›</text>
             </view>
           </view>
+          <view class="membership-card__level">{{ currentMembershipMeta.code }}</view>
         </view>
 
         <view v-if="currentUserInviteCode" class="profile-banner__invite profile-banner__invite--hero">
@@ -81,22 +84,6 @@
           <button class="profile-banner__invite-copy" :class="currentMembershipGuide.toneClass" @click="handleCopyInviteCode">一键复制</button>
         </view>
 
-        <text v-else class="hero-card__summary">{{ accountSummary }}</text>
-
-        <view v-if="canPurchaseMembership" class="purchase-entry" @click="navigateToPurchase">
-          <view class="purchase-entry__body">
-            <view class="purchase-entry__eyebrow">
-              <image class="purchase-entry__eyebrow-icon" :src="diamondIcon" mode="aspectFit" />
-              <text>{{ purchaseEntryEyebrow }}</text>
-            </view>
-            <text class="purchase-entry__label">{{ purchaseEntryLabel }}</text>
-            <text class="purchase-entry__hint">{{ purchaseEntryHint }}</text>
-          </view>
-          <view class="purchase-entry__aside">
-            <text class="purchase-entry__cta">{{ purchaseEntryCta }}</text>
-            <text class="purchase-entry__arrow">›</text>
-          </view>
-        </view>
       </view>
 
       <view v-if="loading" class="skeleton-stack">
@@ -181,7 +168,13 @@
               :key="item.key"
               class="account-info-item"
             >
-              <view class="account-info-item__icon">{{ item.iconLabel }}</view>
+              <view class="account-info-item__icon">
+                <image
+                  class="account-info-item__icon-image"
+                  :src="accountInfoIconMap[item.iconName]"
+                  mode="aspectFit"
+                />
+              </view>
               <view class="account-info-item__body">
                 <text class="account-info-item__label">{{ item.label }}</text>
                 <text class="account-info-item__value">{{ item.value }}</text>
@@ -203,10 +196,8 @@
         <view class="panel privilege-panel" :class="currentMembershipGuide.toneClass">
           <view class="privilege-panel__header">
             <view class="privilege-panel__title-row">
-              <text class="privilege-panel__crown">⌃</text>
               <text class="privilege-panel__title">{{ currentMembershipMeta.code }} 专属权益</text>
             </view>
-            <text class="privilege-panel__hint">尊享更多特权</text>
           </view>
 
           <view class="privilege-grid">
@@ -215,16 +206,24 @@
               :key="item.key"
               class="privilege-card"
             >
-              <view class="privilege-card__icon">{{ item.iconLabel }}</view>
-              <text class="privilege-card__title">{{ item.title }}</text>
-              <text class="privilege-card__caption">{{ item.caption }}</text>
+              <view class="privilege-card__icon">
+                <image
+                  class="privilege-card__icon-image"
+                  :src="benefitIconMap[item.iconName]"
+                  mode="aspectFit"
+                />
+              </view>
+              <view class="privilege-card__body">
+                <text class="privilege-card__title">{{ item.title }}</text>
+                <text class="privilege-card__caption">{{ item.caption }}</text>
+              </view>
             </view>
           </view>
         </view>
 
         <view class="panel upgrade-panel">
           <view class="upgrade-panel__title-row">
-            <view class="upgrade-panel__info-icon">i</view>
+            <image class="upgrade-panel__info-icon" :src="infoIcon" mode="aspectFit" />
             <text class="upgrade-panel__title">升级说明</text>
           </view>
           <text class="upgrade-panel__body">
@@ -264,45 +263,18 @@
         </view>
       </template>
 
-      <view v-else class="panel account-form-panel">
-        <view class="section-heading section-heading--compact account-form-panel__heading">
-          <view>
-            <text class="section-kicker">登录方式</text>
-            <text class="section-title">使用微信快速登录</text>
-          </view>
-          <text class="meta-note">微信登录</text>
-        </view>
-
-        <text class="account-form-panel__summary">
-          登录后可以保存你的主队、邮箱提醒和个人设置。首次登录时按提示补充头像和昵称即可。
-        </text>
-
-        <view v-if="isH5" class="mini-wechat-entry mini-wechat-entry--disabled">
-          <view class="mini-wechat-entry__notice">
-            <text class="mini-wechat-entry__tag">H5 暂不支持登录</text>
-            <text class="mini-wechat-entry__title">请在微信小程序中完成登录</text>
-            <text class="mini-wechat-entry__desc">
-              当前网页端仅支持浏览基础内容，登录和账号设置请前往微信小程序处理。
-            </text>
-          </view>
-        </view>
-        <view v-else class="mini-wechat-entry">
-          <button class="primary-action mini-wechat-entry__button" @click="handleMiniWechatLogin">微信一键登录</button>
-        </view>
-      </view>
-
       <view v-if="miniWechatBindState" class="sheet-mask" @tap="handleSheetMaskTap">
         <view class="sheet-card" @tap.stop="consumeSheetTap">
           <view class="section-heading section-heading--compact">
             <view>
               <text class="section-kicker">首次微信登录</text>
-              <text class="section-title">补充邀请码、头像和昵称</text>
+              <text class="section-title">补充头像和昵称</text>
             </view>
             <text class="meta-note">完成后直接登录</text>
           </view>
 
           <text class="account-form-panel__summary">
-            完成一次绑定后，后续就能直接用微信进入。推荐码选填，填写推荐人的邀请码即可。
+            完成一次绑定后，后续就能直接用微信进入。邀请码和推荐码都可选。
           </text>
 
           <view class="mini-wechat-bind-form">
@@ -330,7 +302,7 @@
             <input
               v-model="miniWechatBindForm.inviteCode"
               class="auth-input"
-              placeholder="请输入邀请码"
+              placeholder="请输入邀请码（可选）"
             />
             <input
               v-model="miniWechatBindForm.referralCode"
@@ -380,6 +352,44 @@
       :ai-chat-mode="aiPublicConfig?.ai_chat_mode"
       @close="closeAiChat"
     />
+
+    <view v-if="isGuestPage" class="guest-chant-wall">
+      <view class="guest-chant-wall__meta">
+        <text class="guest-chant-wall__kicker">MATCHDAY AT PHOENIX HILL</text>
+        <text class="guest-chant-wall__title">成都主场的歌声</text>
+      </view>
+
+      <view class="guest-chant-wall__lyrics">
+        <view class="guest-chant-wall__fade guest-chant-wall__fade--top"></view>
+        <view class="guest-chant-wall__fade guest-chant-wall__fade--bottom"></view>
+        <view class="guest-chant-wall__track">
+          <text
+            v-for="(line, index) in guestChantLoopLines"
+            :key="`guest-chant-${index}`"
+            class="guest-chant-wall__line"
+            :class="{ 'guest-chant-wall__line--focus': index % guestChantLines.length === 2 }"
+          >
+            {{ line }}
+          </text>
+        </view>
+      </view>
+
+      <view class="guest-chant-wall__meter">
+        <view
+          v-for="(height, index) in guestChantMeterBars"
+          :key="`guest-chant-meter-${index}`"
+          class="guest-chant-wall__bar"
+          :style="{ height: `${height}rpx`, animationDelay: `${index * -0.13}s` }"
+        ></view>
+      </view>
+    </view>
+
+    <FiLoginFloat
+      v-if="isGuestPage"
+      :disabled="isH5"
+      :action-text="isH5 ? '小程序登录' : '去登录'"
+      @action="handleMiniWechatLogin"
+    />
   </view>
 </template>
 
@@ -388,8 +398,19 @@ import { computed, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiAiChatSheet from '../../components/FiAiChatSheet.vue'
+import FiLoginFloat from '../../components/FiLoginFloat.vue'
+import activityIcon from '../../static/user/activity.svg'
+import badgeCheckIcon from '../../static/user/badge-check.svg'
+import calendarCheckIcon from '../../static/user/calendar-check.svg'
+import calendarDaysIcon from '../../static/user/calendar-days.svg'
 import diamondIcon from '../../static/user/diamond.svg'
-import bgImage from '../../static/user/bg.webp'
+import historyIcon from '../../static/user/history.svg'
+import infoIcon from '../../static/user/info.svg'
+import logInIcon from '../../static/user/log-in.svg'
+import memberCardDotsImage from '../../static/user/member-card-dots.png'
+import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.webp'
+import radarIcon from '../../static/user/radar.svg'
+import ticketIcon from '../../static/user/ticket.svg'
 import {
   bindMiniWechatAccount,
   getCurrentUser,
@@ -402,6 +423,7 @@ import { getPublicSystemConfig } from '../../api/system'
 import type { CurrentUser, MiniWechatBindingRequiredResponse } from '../../types/auth'
 import type { PublicSystemConfig } from '../../types/system'
 import { extractApiErrorMessage } from '../../utils/apiError'
+import { getAccessToken } from '../../utils/authStorage'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
 import { reportPageActivity } from '../../utils/userActivity'
 import {
@@ -425,7 +447,8 @@ import {
 import { consumePostLoginRedirect, navigateToPostLoginTarget } from '../../utils/postLoginRedirect'
 import { useAiChatSheet } from '../../composables/useAiChatSheet'
 
-const loading = ref(true)
+const hasLocalAccessToken = ref(Boolean(getAccessToken()))
+const loading = ref(hasLocalAccessToken.value)
 const currentUser = ref<CurrentUser | null>(null)
 const publicConfig = ref<PublicSystemConfig | null>(null)
 const systemConfigUnderReview = ref(false)
@@ -457,6 +480,31 @@ const isH5 =
   false
   // #endif
 
+const accountInfoIconMap: Record<UserAccountInfoItem['iconName'], string> = {
+  'badge-check': badgeCheckIcon,
+  'calendar-days': calendarDaysIcon,
+  'calendar-check': calendarCheckIcon,
+  'log-in': logInIcon,
+}
+const benefitIconMap: Record<UserBenefitItem['iconName'], string> = {
+  ticket: ticketIcon,
+  activity: activityIcon,
+  radar: radarIcon,
+  history: historyIcon,
+}
+
+const isGuestPage = computed(() => !systemConfigUnderReview.value && (!hasLocalAccessToken.value || (!loading.value && !currentUser.value)))
+const guestChantLines = [
+  '凤凰山的灯光亮起',
+  '红色看台一起呼吸',
+  '为成都喊到终场',
+  '每一次进攻都有人相信',
+  '主场的风吹过球衣',
+  '今晚继续并肩向前',
+]
+const guestChantLoopLines = [...guestChantLines, ...guestChantLines]
+const guestChantMeterBars = [18, 34, 24, 48, 30, 62, 38, 74, 44, 58, 32, 46, 26, 36]
+
 const joinedAtLabel = computed(() => {
   if (!currentUser.value?.created_at) {
     return ''
@@ -477,8 +525,6 @@ interface MembershipMeta {
   code: string
   badgeLabel: string
   heroClass: string
-  badgeClass: string
-  surfaceClass: string
   levelHint: string
   levelDescription: string
 }
@@ -492,8 +538,6 @@ function resolveMembershipMeta(tier: string | undefined): MembershipMeta {
       code: 'V3',
       badgeLabel: 'V3 邀请会员',
       heroClass: 'account-hero--v3',
-      badgeClass: 'membership-badge--v3',
-      surfaceClass: 'member-card--v3',
       levelHint: '邀请码会员',
       levelDescription: '通过邀请码完成首次绑定，当前按 V3 等级展示。',
     }
@@ -504,8 +548,6 @@ function resolveMembershipMeta(tier: string | undefined): MembershipMeta {
       code: 'V2',
       badgeLabel: 'V2 进阶会员',
       heroClass: 'account-hero--v2',
-      badgeClass: 'membership-badge--v2',
-      surfaceClass: 'member-card--v2',
       levelHint: '进阶会员',
       levelDescription: '通过推荐好友注册已升级到 V2，回流频率按进阶档位开放。',
     }
@@ -516,8 +558,6 @@ function resolveMembershipMeta(tier: string | undefined): MembershipMeta {
       code: normalizedTier,
       badgeLabel: `${normalizedTier} 推荐会员`,
       heroClass: 'account-hero--v3',
-      badgeClass: 'membership-badge--v3',
-      surfaceClass: 'member-card--v3',
       levelHint: '推荐升级会员',
       levelDescription: `当前已经通过推荐升级到 ${normalizedTier}，回流频率和后续会员权益会按更高档位开放。`,
     }
@@ -527,8 +567,6 @@ function resolveMembershipMeta(tier: string | undefined): MembershipMeta {
     code: normalizedTier,
     badgeLabel: `${normalizedTier} 标准会员`,
     heroClass: 'account-hero--v1',
-    badgeClass: 'membership-badge--v1',
-    surfaceClass: 'member-card--v1',
     levelHint: '标准会员',
     levelDescription: '当前是 V1 基础会员身份。',
   }
@@ -547,20 +585,32 @@ const canRenewCurrentV9Membership = computed(() =>
   currentMembershipMeta.value.code === 'V9'
   && Boolean(currentUser.value?.membership_expires_at?.trim()),
 )
-const purchaseEntryEyebrow = computed(() =>
-  canRenewCurrentV9Membership.value ? '会员续费通道' : '会员升级通道',
+const membershipHeroTitle = computed(() =>
+  currentMembershipMeta.value.code === 'V9' ? '至尊会员' : `${currentMembershipMeta.value.code} 会员`,
 )
-const purchaseEntryLabel = computed(() =>
-  canRenewCurrentV9Membership.value ? 'V9 会员续费' : 'V6-V9 会员充值',
-)
-const purchaseEntryHint = computed(() =>
-  canRenewCurrentV9Membership.value
-    ? '当前 V9 有效期可续费，支付成功后延长一年。'
-    : 'V6 起解锁最近回流速览，购买后立即生效。',
-)
-const purchaseEntryCta = computed(() =>
-  canRenewCurrentV9Membership.value ? '立即续费' : '立即开通',
-)
+const membershipHeroDescription = computed(() => {
+  if (currentMembershipMeta.value.code === 'V9') {
+    return '恭喜您，您已经是我们的至尊会员'
+  }
+
+  return `恭喜您，您已经是${currentMembershipMeta.value.badgeLabel}`
+})
+const membershipHeroExpiryLabel = computed(() => {
+  const label = membershipExpiresAtLabel.value
+
+  if (label === '长期有效' || label === '已过期') {
+    return label
+  }
+
+  return `${label.replace(/^有效至\s*/, '')} 到期`
+})
+const membershipHeroActionText = computed(() => {
+  if (!canPurchaseMembership.value) {
+    return '已开通'
+  }
+
+  return canRenewCurrentV9Membership.value ? '续费' : '升级'
+})
 const membershipTierGuides = computed<MembershipTierGuide[]>(() =>
   buildMembershipTierGuides(publicConfig.value?.membership_tier_rules),
 )
@@ -599,7 +649,6 @@ const accountInfoItems = computed<UserAccountInfoItem[]>(() => {
   }
 
   return buildUserAccountInfoItems({
-    membershipCode: currentMembershipMeta.value.code,
     hasWechatBinding: currentUser.value.has_wechat_binding,
     joinedAtLabel: joinedAtLabel.value,
     membershipExpiresAtLabel: membershipExpiresAtLabel.value,
@@ -615,41 +664,23 @@ const upgradeSteps = computed<UserUpgradeStep[]>(() =>
   buildUserUpgradeSteps(membershipTierGuides.value, currentMembershipMeta.value.code),
 )
 
-const accountHeadline = computed(() => {
-  if (!currentUser.value) {
-    return '登录后继续使用你的账号'
-  }
-
-  return '当前会员身份'
-})
-
-const accountHeroBadge = computed(() => {
-  if (!currentUser.value) {
-    return isH5 ? '小程序登录' : '微信登录'
-  }
-
-  return ''
-})
-
-const accountSummary = computed(() => {
-  if (!currentUser.value) {
-    return isH5
-      ? 'H5 端暂不支持登录，请前往微信小程序使用账号功能。'
-      : '登录后可以保存你的主队、提醒和个人设置。'
-  }
-
-  return currentUser.value.has_wechat_binding
-    ? `${currentMembershipMeta.value.code} 会员`
-    : '会员身份待完善'
-})
-
 async function loadUser(): Promise<void> {
-  loading.value = true
+  hasLocalAccessToken.value = Boolean(getAccessToken())
+  loading.value = hasLocalAccessToken.value
   systemConfigUnderReview.value = await loadSystemConfigUnderReview()
 
   if (systemConfigUnderReview.value) {
     currentUser.value = null
     publicConfig.value = null
+    miniWechatBindState.value = null
+    loading.value = false
+    return
+  }
+
+  if (!hasLocalAccessToken.value) {
+    currentUser.value = null
+    publicConfig.value = null
+    notificationEmail.value = ''
     miniWechatBindState.value = null
     loading.value = false
     return
@@ -741,6 +772,12 @@ function navigateToPurchase(): void {
   })
 }
 
+function handleMembershipCardAction(): void {
+  if (canPurchaseMembership.value) {
+    navigateToPurchase()
+  }
+}
+
 function openAiFromBrandNav(): void {
   void openAiChat()
 }
@@ -808,7 +845,7 @@ async function handleMiniWechatBind(): Promise<void> {
     const avatarDataUrl = await readAvatarAsDataUrl(miniWechatBindForm.avatarPreviewUrl)
     const result = await bindMiniWechatAccount({
       bind_token: miniWechatBindState.value.bind_token,
-      invite_code: miniWechatBindForm.inviteCode.trim(),
+      invite_code: miniWechatBindForm.inviteCode.trim() || undefined,
       referral_code: miniWechatBindForm.referralCode.trim() || undefined,
       display_name: miniWechatBindForm.displayName.trim(),
       avatar_data_url: avatarDataUrl,
@@ -902,16 +939,45 @@ onShow(() => {
 </script>
 
 <style scoped lang="css">
-.page-root { position: relative; }
+.page-root {
+  position: relative;
+  min-height: 100vh;
+  background: #f7f8fa;
+}
+.page-root--guest {
+  background: #11170f;
+}
 .page-scroll {
   padding-top: var(--fi-brand-nav-height);
   position: relative;
   z-index: 1;
+  min-height: calc(100vh - var(--fi-brand-nav-height));
+  box-sizing: border-box;
 }
 
 @keyframes fi-fade-in-up {
   from { opacity: 0; transform: translateY(30rpx); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes guest-chant-scroll {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+
+@keyframes guest-chant-pulse {
+  0%, 100% {
+    opacity: 0.38;
+    transform: scaleY(0.56);
+  }
+  45% {
+    opacity: 0.92;
+    transform: scaleY(1);
+  }
+  72% {
+    opacity: 0.56;
+    transform: scaleY(0.74);
+  }
 }
 
 .page {
@@ -923,25 +989,129 @@ onShow(() => {
   display: flex;
   flex-direction: column;
   gap: 16rpx;
+  min-height: calc(100vh - var(--fi-brand-nav-height));
+  box-sizing: border-box;
 }
 .page-bg-img {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
-  height: 600rpx;
+  height: 100vh;
   pointer-events: none;
   z-index: 0;
 }
 .page-bg-fade {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
-  height: 600rpx;
-  background: linear-gradient(180deg, transparent 45%, rgba(247,248,250,0.55) 78%, #f7f8fa 100%);
+  height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(246, 247, 244, 0.24) 0%, rgba(247, 248, 250, 0.74) 32%, #f7f8fa 58%, #f7f8fa 100%);
   pointer-events: none;
   z-index: 0;
+}
+.page-root--guest .page-bg-fade {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.18) 0%, rgba(247, 248, 250, 0.58) 22%, rgba(20, 20, 18, 0.12) 48%, rgba(0, 0, 0, 0.34) 100%),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.04));
+}
+.page-root--guest .page {
+  justify-content: flex-end;
+  padding: 24rpx 28rpx calc(12rpx + env(safe-area-inset-bottom));
+}
+.guest-chant-wall {
+  position: fixed;
+  left: 44rpx;
+  right: 44rpx;
+  bottom: calc(178rpx + env(safe-area-inset-bottom));
+  height: 520rpx;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+.guest-chant-wall__meta {
+  margin-bottom: 28rpx;
+  text-align: center;
+  text-shadow: 0 10rpx 26rpx rgba(0, 0, 0, 0.45);
+}
+.guest-chant-wall__kicker {
+  display: block;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 20rpx;
+  font-weight: 800;
+  letter-spacing: 4rpx;
+}
+.guest-chant-wall__title {
+  display: block;
+  margin-top: 10rpx;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 42rpx;
+  font-weight: 900;
+  line-height: 1.15;
+}
+.guest-chant-wall__lyrics {
+  position: relative;
+  height: 338rpx;
+  overflow: hidden;
+}
+.guest-chant-wall__track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: guest-chant-scroll 20s linear infinite;
+}
+.guest-chant-wall__line {
+  display: block;
+  width: 100%;
+  height: 68rpx;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 31rpx;
+  font-weight: 700;
+  line-height: 68rpx;
+  text-align: center;
+  text-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.42);
+}
+.guest-chant-wall__line--focus {
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 39rpx;
+  font-weight: 900;
+}
+.guest-chant-wall__fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 92rpx;
+  z-index: 1;
+  pointer-events: none;
+}
+.guest-chant-wall__fade--top {
+  top: 0;
+  background: linear-gradient(180deg, rgba(17, 23, 15, 0.84), rgba(17, 23, 15, 0));
+}
+.guest-chant-wall__fade--bottom {
+  bottom: 0;
+  background: linear-gradient(0deg, rgba(17, 23, 15, 0.72), rgba(17, 23, 15, 0));
+}
+.guest-chant-wall__meter {
+  height: 88rpx;
+  margin: 18rpx auto 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10rpx;
+  opacity: 0.52;
+}
+.guest-chant-wall__bar {
+  width: 8rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.64);
+  box-shadow: 0 0 18rpx rgba(255, 255, 255, 0.18);
+  transform-origin: bottom center;
+  animation: guest-chant-pulse 1.45s ease-in-out infinite;
 }
 .hero-card, .panel {
   position: relative;
@@ -1193,6 +1363,19 @@ onShow(() => {
     linear-gradient(180deg, rgba(250, 251, 255, 0.78), rgba(242, 245, 252, 0.48));
   border-color: rgba(189, 198, 216, 0.32);
 }
+.account-hero--guest {
+  margin-top: 0;
+  padding: 22rpx 24rpx;
+  border-radius: 28rpx;
+  background: rgba(21, 23, 29, 0.96);
+  border: 0;
+  box-shadow: 0 20rpx 46rpx rgba(16, 18, 24, 0.24);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.page-root--guest .account-hero {
+  animation-delay: 90ms;
+}
 .hero-card__top, .section-heading {
   display: flex;
   align-items: center;
@@ -1249,22 +1432,6 @@ onShow(() => {
   font-size: 44rpx;
   font-weight: 800;
 }
-.profile-banner__body {
-  min-width: 0;
-  flex: 1;
-}
-.profile-banner__identity {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  flex-wrap: wrap;
-}
-.profile-banner__name {
-  color: #121212;
-  font-size: 42rpx;
-  font-weight: 800;
-  line-height: 1.15;
-}
 .profile-banner__invite {
   margin-top: 16rpx;
   display: flex;
@@ -1301,141 +1468,12 @@ onShow(() => {
   height: 64rpx;
   line-height: 64rpx;
   border-radius: 999rpx;
-  border: 2rpx solid rgba(229, 210, 170, 0.96);
-  background: linear-gradient(180deg, rgba(255, 247, 226, 0.98), rgba(245, 229, 191, 0.98));
-  color: #7c5a1e;
+  border: 2rpx solid rgba(254, 205, 211, 0.96);
+  background: linear-gradient(180deg, rgba(255, 241, 242, 0.98), rgba(254, 226, 226, 0.98));
+  color: #991b1b;
   font-size: 24rpx;
   font-weight: 700;
   box-sizing: border-box;
-}
-.profile-banner__meta,
-.profile-banner__summary {
-  display: block;
-  margin-top: 10rpx;
-  color: #737987;
-  font-size: 24rpx;
-  line-height: 1.65;
-}
-.membership-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12rpx 18rpx;
-  border-radius: 999rpx;
-  font-size: 22rpx;
-  font-weight: 700;
-  line-height: 1;
-  white-space: nowrap;
-}
-.membership-badge--v3 {
-  color: #7a5318;
-  background: linear-gradient(135deg, rgba(255, 237, 199, 0.98), rgba(238, 212, 154, 0.98));
-  border: 2rpx solid rgba(225, 189, 120, 0.95);
-}
-.membership-badge--v2 {
-  color: #3a6b5c;
-  background: linear-gradient(135deg, rgba(210, 238, 228, 0.98), rgba(185, 220, 205, 0.98));
-  border: 2rpx solid rgba(142, 190, 174, 0.95);
-}
-.membership-badge--v1 {
-  color: #556176;
-  background: linear-gradient(135deg, rgba(241, 245, 252, 0.98), rgba(225, 232, 244, 0.98));
-  border: 2rpx solid rgba(195, 205, 223, 0.95);
-}
-.tier-emblem {
-  --tier-accent: #9aa6bb;
-  --tier-accent-soft: rgba(217, 225, 240, 0.95);
-  --tier-ink: #445065;
-  position: relative;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8rpx;
-}
-.tier-emblem--compact {
-  transform: translateY(4rpx);
-}
-.tier-emblem--featured {
-  width: 156rpx;
-}
-.tier-emblem--list {
-  width: 98rpx;
-}
-.tier-emblem__crest {
-  width: 92rpx;
-  height: 92rpx;
-  padding: 10rpx;
-  border-radius: 28rpx;
-  box-sizing: border-box;
-  background:
-    linear-gradient(135deg, rgba(255,255,255,0.94), rgba(255,255,255,0.22)),
-    linear-gradient(180deg, var(--tier-accent-soft), rgba(255,255,255,0.82));
-  border: 2rpx solid rgba(255,255,255,0.78);
-  box-shadow:
-    0 16rpx 36rpx var(--tier-shadow),
-    inset 0 -8rpx 14rpx rgba(255,255,255,0.48);
-  position: relative;
-  overflow: hidden;
-}
-.tier-emblem__crest::before,
-.tier-emblem__crest::after {
-  content: '';
-  position: absolute;
-  top: 24rpx;
-  width: 22rpx;
-  height: 16rpx;
-  border-radius: 999rpx 999rpx 12rpx 12rpx;
-  background: var(--tier-accent);
-  opacity: 0.92;
-}
-.tier-emblem__crest::before {
-  left: -4rpx;
-  transform: rotate(-26deg);
-}
-.tier-emblem__crest::after {
-  right: -4rpx;
-  transform: rotate(26deg);
-}
-.tier-emblem__core {
-  width: 100%;
-  height: 100%;
-  border-radius: 22rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--tier-ink);
-  font-size: 26rpx;
-  font-weight: 900;
-  letter-spacing: 1rpx;
-  background:
-    radial-gradient(circle at 50% 25%, rgba(255,255,255,0.86), transparent 42%),
-    linear-gradient(180deg, rgba(255,255,255,0.94), var(--tier-accent-soft));
-  border: 2rpx solid rgba(255,255,255,0.76);
-  box-shadow: inset 0 -8rpx 12rpx rgba(255,255,255,0.34);
-}
-.tier-emblem--featured .tier-emblem__crest {
-  width: 124rpx;
-  height: 124rpx;
-  border-radius: 34rpx;
-}
-.tier-emblem--featured .tier-emblem__core {
-  border-radius: 26rpx;
-  font-size: 34rpx;
-}
-.tier-emblem__pips {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8rpx;
-  min-height: 14rpx;
-}
-.tier-emblem__pip {
-  width: 10rpx;
-  height: 10rpx;
-  border-radius: 999rpx;
-  background: var(--tier-accent);
-  box-shadow: 0 4rpx 10rpx var(--tier-shadow);
 }
 .tier-tone--v1 {
   --tier-accent: #7f90aa;
@@ -1450,10 +1488,10 @@ onShow(() => {
   --tier-shadow: rgba(106, 158, 142, 0.28);
 }
 .tier-tone--v3 {
-  --tier-accent: #c99642;
-  --tier-accent-soft: rgba(244, 223, 176, 0.98);
-  --tier-ink: #7a5318;
-  --tier-shadow: rgba(201, 150, 66, 0.28);
+  --tier-accent: #dc2626;
+  --tier-accent-soft: rgba(254, 226, 226, 0.98);
+  --tier-ink: #991b1b;
+  --tier-shadow: rgba(220, 38, 38, 0.24);
 }
 .tier-tone--v4 {
   --tier-accent: #cf694e;
@@ -1531,119 +1569,6 @@ onShow(() => {
   box-shadow: 0 0 0 6rpx rgba(154, 160, 170, 0.12);
 }
 .meta-note--hero { padding-top: 14rpx; }
-.account-summary-grid {
-  margin-top: 18rpx;
-  display: grid;
-  gap: 12rpx;
-}
-.briefing-card {
-  border-radius: 28rpx;
-  border: 2rpx solid var(--page-border);
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,253,0.98));
-  padding: 18rpx 20rpx;
-}
-.briefing-card__label { color: #8f9198; font-size: 24rpx; }
-.briefing-card__value {
-  display: block;
-  margin-top: 10rpx;
-  color: #121212;
-  font-size: 34rpx;
-  font-weight: 800;
-}
-.briefing-card__subvalue {
-  display: block;
-  margin-top: 8rpx;
-  color: #8f9198;
-  font-size: 22rpx;
-  line-height: 1.45;
-}
-.watch-list {
-  margin-top: 18rpx;
-  display: grid;
-  gap: 12rpx;
-}
-.account-form-panel {
-  padding: 28rpx 24rpx 26rpx;
-  background: #ffffff;
-  border-color: rgba(229, 232, 238, 0.98);
-  box-shadow: 0 18rpx 42rpx rgba(25, 28, 36, 0.06);
-}
-.account-form-panel__heading {
-  padding-bottom: 18rpx;
-  border-bottom: 2rpx solid rgba(235, 237, 242, 0.98);
-}
-.mini-wechat-entry {
-  margin-top: 26rpx;
-  display: flex;
-  flex-direction: column;
-  gap: 14rpx;
-}
-
-.mini-wechat-entry--disabled {
-  gap: 0;
-}
-
-.mini-wechat-entry__notice {
-  padding: 24rpx 22rpx;
-  border-radius: 28rpx;
-  border: 2rpx solid rgba(229, 232, 238, 0.98);
-  background: #ffffff;
-  display: grid;
-  gap: 12rpx;
-}
-
-.mini-wechat-entry__tag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: fit-content;
-  padding: 10rpx 16rpx;
-  border-radius: 999rpx;
-  background: rgba(155, 124, 64, 0.1);
-  color: #8d6a2b;
-  font-size: 21rpx;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.mini-wechat-entry__title {
-  color: #16181d;
-  font-size: 30rpx;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.mini-wechat-entry__desc {
-  color: #716b5e;
-  font-size: 23rpx;
-  line-height: 1.65;
-}
-
-.mini-wechat-entry__button {
-  align-self: stretch;
-  min-height: 88rpx;
-  background: #15161b;
-  font-weight: 900;
-}
-.watch-list__item {
-  position: relative;
-  padding-left: 24rpx;
-}
-.watch-list__item::before {
-  content: '';
-  position: absolute;
-  top: 14rpx;
-  left: 0;
-  width: 10rpx;
-  height: 10rpx;
-  border-radius: 999rpx;
-  background: #131313;
-}
-.watch-list__item text {
-  color: #151515;
-  font-size: 24rpx;
-  line-height: 1.6;
-}
 .auth-form {
   margin-top: 22rpx;
   display: flex;
@@ -1685,8 +1610,8 @@ onShow(() => {
   margin-top: 24rpx;
   border-radius: 28rpx;
   padding: 22rpx 24rpx;
-  border: 2rpx solid var(--page-border-warm);
-  background: linear-gradient(180deg, rgba(252, 252, 253, 0.98), rgba(245, 247, 250, 0.98));
+  border: 1rpx solid rgba(229, 232, 238, 0.96);
+  background: rgba(255, 255, 255, 0.94);
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1713,6 +1638,8 @@ onShow(() => {
   align-items: center;
   justify-content: space-between;
   gap: 18rpx;
+  border-color: rgba(229, 232, 238, 0.96);
+  background: rgba(255, 255, 255, 0.94);
 }
 .notification-email-panel__body {
   min-width: 0;
@@ -1721,7 +1648,7 @@ onShow(() => {
 }
 .notification-email-panel__title {
   color: #15161b;
-  font-size: 28rpx;
+  font-size: 30rpx;
   font-weight: 800;
 }
 .notification-email-panel__value {
@@ -1741,6 +1668,7 @@ onShow(() => {
   font-size: 26rpx;
   font-weight: 800;
   line-height: 68rpx;
+  box-shadow: none;
 }
 .notification-email-panel__action::after {
   border: none;
@@ -1750,14 +1678,18 @@ onShow(() => {
   height: 78rpx;
   padding: 0 26rpx;
   border-radius: 999rpx;
-  border: 2rpx solid var(--page-border-warm);
-  background: linear-gradient(180deg, rgba(255, 249, 249, 0.98), rgba(250, 240, 240, 0.98));
-  color: #8d5b5b;
+  border: 0;
+  background: #15161b;
+  color: #ffffff;
   font-size: 26rpx;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 78rpx;
   text-align: center;
   box-sizing: border-box;
+  box-shadow: none;
+}
+.logout-action::after {
+  border: none;
 }
 .sheet-mask {
   position: fixed;
@@ -1808,70 +1740,6 @@ onShow(() => {
   display: flex;
   gap: 16rpx;
 }
-.member-card {
-  margin-top: 22rpx;
-  border-radius: 30rpx;
-  padding: 24rpx;
-  border: 2rpx solid var(--page-border);
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,249,252,0.98));
-}
-.member-card--v3 {
-  background: linear-gradient(180deg, rgba(255, 251, 242, 0.98), rgba(248, 239, 218, 0.98));
-  border-color: var(--page-border-warm);
-}
-.member-card--v2 {
-  background: linear-gradient(180deg, rgba(244, 252, 248, 0.98), rgba(232, 244, 238, 0.98));
-  border-color: rgba(170, 205, 190, 0.85);
-}
-.member-card--v1 {
-  background: linear-gradient(180deg, rgba(249, 251, 255, 0.98), rgba(239, 243, 250, 0.98));
-  border-color: var(--page-border);
-}
-.member-card__title {
-  display: block;
-  margin-top: 12rpx;
-  color: #15161b;
-  font-size: 38rpx;
-  font-weight: 800;
-  line-height: 1.18;
-}
-.member-card__body {
-  display: block;
-  margin-top: 12rpx;
-  color: #666d7b;
-  font-size: 26rpx;
-  line-height: 1.7;
-}
-.member-card__hero {
-  display: flex;
-  align-items: center;
-  gap: 22rpx;
-}
-.member-card__content {
-  min-width: 0;
-  flex: 1;
-}
-.member-benefit-pill {
-  margin-top: 18rpx;
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10rpx;
-  padding: 12rpx 16rpx;
-  border-radius: 20rpx;
-  background: rgba(255, 255, 255, 0.78);
-  border: 2rpx solid var(--page-border-warm);
-}
-.member-benefit-pill__label {
-  color: #8e845f;
-  font-size: 22rpx;
-  font-weight: 700;
-}
-.member-benefit-pill__value {
-  color: #191919;
-  font-size: 24rpx;
-  font-weight: 700;
-}
 .tier-ladder-panel {
   margin-top: 24rpx;
 }
@@ -1897,9 +1765,9 @@ onShow(() => {
   background: linear-gradient(180deg, rgba(244, 252, 248, 0.98), rgba(232, 244, 238, 0.98));
 }
 .tier-ladder-card.tier-tone--v3 {
-  --tier-pulse: rgba(201, 150, 66, 0.16);
-  border-color: rgba(230, 204, 152, 0.95);
-  background: linear-gradient(180deg, rgba(255, 252, 245, 0.98), rgba(249, 239, 217, 0.98));
+  --tier-pulse: rgba(220, 38, 38, 0.14);
+  border-color: rgba(254, 205, 211, 0.95);
+  background: linear-gradient(180deg, rgba(255, 241, 242, 0.98), rgba(254, 226, 226, 0.98));
 }
 .tier-ladder-card.tier-tone--v4 {
   --tier-pulse: rgba(207, 105, 78, 0.16);
@@ -1927,12 +1795,12 @@ onShow(() => {
   background: linear-gradient(180deg, rgba(255, 249, 249, 0.98), rgba(250, 235, 235, 0.98));
 }
 .tier-ladder-card.tier-tone--v9 {
-  --tier-pulse: rgba(214, 159, 47, 0.16);
-  border-color: rgba(221, 200, 148, 0.95);
-  background: linear-gradient(180deg, rgba(255, 252, 244, 0.98), rgba(246, 236, 208, 0.98));
+  --tier-pulse: rgba(185, 28, 28, 0.16);
+  border-color: rgba(252, 165, 165, 0.95);
+  background: linear-gradient(180deg, rgba(255, 241, 242, 0.98), rgba(254, 202, 202, 0.72));
 }
 .tier-ladder-card.tier-ladder-card--active {
-  box-shadow: 0 16rpx 44rpx rgba(201, 150, 66, 0.22);
+  box-shadow: 0 16rpx 44rpx rgba(220, 38, 38, 0.18);
   transform: translateY(-2rpx);
 }
 .tier-ladder-card.tier-tone--v1.tier-ladder-card--active {
@@ -1942,7 +1810,7 @@ onShow(() => {
   box-shadow: 0 16rpx 44rpx rgba(106, 158, 142, 0.22);
 }
 .tier-ladder-card.tier-tone--v3.tier-ladder-card--active {
-  box-shadow: 0 16rpx 44rpx rgba(201, 150, 66, 0.22);
+  box-shadow: 0 16rpx 44rpx rgba(220, 38, 38, 0.18);
 }
 .tier-ladder-card.tier-tone--v4.tier-ladder-card--active {
   box-shadow: 0 16rpx 44rpx rgba(207, 105, 78, 0.22);
@@ -2021,44 +1889,65 @@ onShow(() => {
   --member-highlight: rgba(255, 232, 179, 0.92);
   --member-wash: rgba(255, 243, 214, 0.68);
   --member-border: rgba(235, 211, 155, 0.92);
-  --member-eyebrow: #a87420;
-  --member-accent: #b8842b;
-  --member-accent-strong: #9f6c18;
-  --member-badge-from: #d8ac54;
-  --member-badge-to: #ad7421;
-  --member-soft-surface: rgba(255, 247, 229, 0.72);
-  --member-soft-border: rgba(236, 212, 167, 0.94);
-  --member-medal-ink: #c08b2d;
-  --member-medal-crown: rgba(201, 150, 66, 0.72);
-  --member-glow: rgba(207, 162, 71, 0.22);
-  --member-privilege-border: rgba(235, 220, 191, 0.76);
-  --member-privilege-bg: rgba(250, 244, 232, 0.96);
-  --member-privilege-icon-bg: rgba(191, 141, 53, 0.12);
-  --member-privilege-icon-color: #b07b29;
+  --member-eyebrow: #b91c1c;
+  --member-accent: #dc2626;
+  --member-accent-strong: #991b1b;
+  --member-badge-from: #ef4444;
+  --member-badge-to: #b91c1c;
+  --member-soft-surface: rgba(255, 241, 242, 0.72);
+  --member-soft-border: rgba(254, 205, 211, 0.94);
+  --member-medal-ink: #b91c1c;
+  --member-medal-crown: rgba(220, 38, 38, 0.62);
+  --member-glow: rgba(220, 38, 38, 0.18);
+  --member-privilege-border: rgba(254, 205, 211, 0.76);
+  --member-privilege-bg: rgba(255, 241, 242, 0.88);
+  --member-privilege-icon-bg: rgba(220, 38, 38, 0.1);
+  --member-privilege-icon-color: #b91c1c;
   position: relative;
   overflow: hidden;
-  padding: 24rpx 24rpx 28rpx;
-  border-color: var(--member-border);
-  box-shadow: 0 18rpx 40rpx rgba(184, 143, 52, 0.1);
+  padding: 24rpx;
+  border-color: rgba(232, 234, 239, 0.92);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 16rpx 40rpx rgba(20, 23, 31, 0.06);
 }
 
 .account-hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at 82% 18%, var(--member-highlight), transparent 34%),
-    radial-gradient(circle at 78% 52%, var(--member-wash), transparent 40%);
-  pointer-events: none;
+  display: none;
 }
 
-.account-hero--guest {
+.page-root--guest .account-hero::before,
+.page-root--guest .account-hero--guest::before {
+  display: none;
+}
+
+.page-root:not(.page-root--guest) .account-hero--guest {
   border-color: rgba(229, 232, 238, 0.96);
   box-shadow: 0 18rpx 40rpx rgba(25, 28, 36, 0.06);
 }
 
-.account-hero--guest::before {
+.page-root:not(.page-root--guest) .account-hero--guest::before {
   display: none;
+}
+
+.account-hero__dots {
+  position: absolute;
+  z-index: 0;
+  width: 300rpx;
+  height: 184rpx;
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.account-hero__dots--top {
+  top: -44rpx;
+  right: -48rpx;
+}
+
+.account-hero__dots--bottom {
+  left: -78rpx;
+  bottom: 82rpx;
+  opacity: 0.22;
+  transform: scaleX(-1);
 }
 
 .hero-card__top--member {
@@ -2071,7 +1960,7 @@ onShow(() => {
   display: inline-flex;
   align-items: center;
   gap: 10rpx;
-  color: var(--member-eyebrow);
+  color: #8b92a0;
 }
 
 .account-hero__eyebrow-icon {
@@ -2086,170 +1975,165 @@ onShow(() => {
   line-height: 1;
 }
 
-.profile-banner--hero {
+.member-identity {
   position: relative;
   z-index: 1;
-  margin-top: 18rpx;
+  margin-top: 22rpx;
+  display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 18rpx;
 }
 
-.profile-banner__main {
+.member-identity__avatar {
+  width: 104rpx;
+  height: 104rpx;
+  flex-shrink: 0;
+  border-radius: 999rpx;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef1f5;
+  border: 5rpx solid rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12rpx 26rpx rgba(18, 22, 30, 0.1);
+}
+
+.member-identity__avatar-image {
+  width: 100%;
+  height: 100%;
+}
+
+.member-identity__avatar-fallback {
+  color: #2c3139;
+  font-size: 38rpx;
+  font-weight: 900;
+}
+
+.member-identity__copy {
   min-width: 0;
   flex: 1;
   display: flex;
-  align-items: center;
-  gap: 18rpx;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10rpx;
 }
 
-.profile-banner__avatar-wrap {
+.member-identity__hello {
+  color: #171a20;
+  font-size: 34rpx;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.member-identity__desc {
+  color: #7b828e;
+  font-size: 23rpx;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.membership-card {
   position: relative;
-  flex-shrink: 0;
-}
-
-.profile-banner__avatar {
-  width: 124rpx;
-  height: 124rpx;
-  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(247, 241, 228, 0.94));
-  border: 4rpx solid rgba(255, 255, 255, 0.92);
-  box-shadow: 0 12rpx 26rpx rgba(142, 108, 31, 0.14);
-}
-
-.profile-banner__avatar-badge {
-  position: absolute;
-  right: -2rpx;
-  bottom: -2rpx;
-  min-width: 44rpx;
-  height: 44rpx;
-  padding: 0 12rpx;
-  border-radius: 999rpx;
-  border: 3rpx solid rgba(255, 255, 255, 0.94);
-  background: linear-gradient(180deg, var(--member-accent), var(--member-accent-strong));
-  color: #ffffff;
-  font-size: 20rpx;
-  font-weight: 800;
-  line-height: 38rpx;
-  text-align: center;
+  z-index: 1;
+  margin-top: 24rpx;
+  min-height: 154rpx;
+  padding: 28rpx 30rpx;
+  border-radius: 30rpx;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 88% 18%, rgba(232, 196, 119, 0.12), transparent 34%),
+    #34313b;
+  box-shadow: 0 18rpx 36rpx rgba(22, 24, 31, 0.18);
   box-sizing: border-box;
 }
 
-.profile-banner__body {
+.membership-card::before {
+  content: '';
+  position: absolute;
+  right: -26rpx;
+  top: -46rpx;
+  width: 230rpx;
+  height: 230rpx;
+  border-radius: 999rpx;
+  border: 2rpx solid rgba(221, 186, 111, 0.28);
+}
+
+.membership-card--actionable {
+  cursor: pointer;
+}
+
+.membership-card__content {
+  position: relative;
+  z-index: 1;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+}
+
+.membership-card__main {
+  min-width: 0;
+  flex: 1;
+  display: grid;
   gap: 14rpx;
 }
 
-.profile-banner__name {
-  font-size: 36rpx;
-  line-height: 1.06;
-}
-
-.membership-badge {
-  padding: 14rpx 22rpx;
-  font-size: 24rpx;
-}
-
-.account-hero__medal {
-  position: relative;
-  width: 214rpx;
-  height: 194rpx;
-  flex-shrink: 0;
-}
-
-.account-hero__medal-ring {
-  position: absolute;
-  top: 10rpx;
-  right: 0;
-  width: 194rpx;
-  height: 194rpx;
-  border-radius: 999rpx;
-  background:
-    repeating-radial-gradient(circle, rgba(255,255,255,0) 0 9rpx, rgba(255,255,255,0.38) 9rpx 12rpx),
-    radial-gradient(circle, rgba(255, 241, 209, 0.56), rgba(255,255,255,0) 72%);
-  opacity: 0.9;
-}
-
-.account-hero__medal-orbit {
-  position: absolute;
-  top: 92rpx;
-  left: 12rpx;
-  width: 186rpx;
-  height: 46rpx;
-  border-radius: 999rpx;
-  border: 4rpx solid rgba(255, 255, 255, 0.76);
-  border-left-color: transparent;
-  border-right-color: transparent;
-  transform: rotate(-8deg);
-  opacity: 0.88;
-}
-
-.account-hero__medal-shield {
-  position: absolute;
-  top: 22rpx;
-  right: 16rpx;
-  width: 136rpx;
-  height: 156rpx;
-  clip-path: polygon(50% 0%, 88% 16%, 88% 62%, 50% 100%, 12% 62%, 12% 16%);
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247, 234, 199, 0.98));
-  border: 2rpx solid rgba(242, 221, 171, 0.96);
-  box-shadow:
-    0 18rpx 34rpx var(--member-glow),
-    inset 0 -16rpx 22rpx rgba(218, 175, 78, 0.16);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.account-hero__medal-crown {
-  color: var(--member-medal-crown);
-  font-size: 24rpx;
+.membership-card__title {
+  color: #e9c477;
+  font-size: 42rpx;
+  font-weight: 900;
   line-height: 1;
 }
 
-.account-hero__medal-code {
-  margin-top: 4rpx;
-  color: var(--member-medal-ink);
-  font-size: 66rpx;
-  font-weight: 900;
-  line-height: 0.92;
-  letter-spacing: -2rpx;
+.membership-card__expire {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 23rpx;
+  font-weight: 600;
+  line-height: 1;
 }
 
-.account-hero__medal-star {
+.membership-card__action {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4rpx;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 25rpx;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.membership-card__action-arrow {
+  font-size: 34rpx;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.membership-card__level {
   position: absolute;
-  width: 10rpx;
-  height: 10rpx;
-  border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 0 0 6rpx rgba(255,255,255,0.18);
-}
-
-.account-hero__medal-star--one {
-  top: 34rpx;
-  right: 174rpx;
-}
-
-.account-hero__medal-star--two {
-  right: 8rpx;
-  top: 100rpx;
+  right: 30rpx;
+  bottom: 16rpx;
+  z-index: 1;
+  color: rgba(232, 196, 119, 0.12);
+  font-size: 64rpx;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .profile-banner__invite--hero {
   position: relative;
   z-index: 1;
-  margin-top: 18rpx;
-  padding: 18rpx 20rpx;
-  border-radius: 28rpx;
-  border: 1rpx solid var(--member-soft-border);
-  background: linear-gradient(180deg, rgba(255,255,255,0.78), var(--member-soft-surface));
-  backdrop-filter: blur(8rpx);
+  margin-top: 20rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 24rpx;
+  border: 0;
+  background: rgba(246, 247, 249, 0.92);
+  backdrop-filter: none;
 }
 
 .profile-banner__invite-label {
-  color: var(--member-accent-strong);
+  color: #8b92a0;
   font-size: 22rpx;
 }
 
@@ -2258,24 +2142,25 @@ onShow(() => {
 }
 
 .profile-banner__invite-copy {
-  min-width: 164rpx;
-  height: 68rpx;
-  line-height: 68rpx;
+  min-width: 148rpx;
+  height: 62rpx;
+  line-height: 62rpx;
   border: none;
-  background: linear-gradient(135deg, var(--member-badge-from), var(--member-badge-to));
+  background: #15171d;
   color: #ffffff;
-  box-shadow: 0 12rpx 22rpx rgba(170, 117, 32, 0.2);
+  box-shadow: none;
 }
 
 .info-panel,
 .privilege-panel,
 .upgrade-panel {
-  padding: 20rpx;
-  border-radius: 32rpx;
+  padding: 22rpx;
+  border-radius: 28rpx;
 }
 .info-panel,
 .privilege-panel {
-  border-color: var(--page-border-warm);
+  border-color: rgba(229, 232, 238, 0.96);
+  background: rgba(255, 255, 255, 0.94);
 }
 .info-panel {
   animation: fi-fade-in-up 520ms cubic-bezier(0.22, 1, 0.36, 1) 80ms both;
@@ -2291,7 +2176,7 @@ onShow(() => {
 .privilege-panel__title,
 .upgrade-panel__title {
   color: #1b1c20;
-  font-size: 28rpx;
+  font-size: 30rpx;
   font-weight: 800;
   line-height: 1;
 }
@@ -2300,43 +2185,33 @@ onShow(() => {
   margin-top: 22rpx;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-radius: 28rpx;
-  overflow: hidden;
-  border: 2rpx solid var(--page-border-warm);
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(249,250,253,0.98));
+  gap: 12rpx;
 }
 
 .account-info-item {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 16rpx;
-  padding: 22rpx 18rpx;
+  gap: 14rpx;
+  padding: 18rpx;
   box-sizing: border-box;
-  border-top: 2rpx solid var(--page-border-warm);
-}
-
-.account-info-item:nth-child(-n + 2) {
-  border-top: none;
-}
-
-.account-info-item:nth-child(even) {
-  border-left: 2rpx solid var(--page-border-warm);
+  border-radius: 22rpx;
+  border: 1rpx solid rgba(232, 235, 241, 0.98);
+  background: rgba(248, 249, 251, 0.78);
 }
 
 .account-info-item__icon {
-  width: 66rpx;
-  height: 66rpx;
-  border-radius: 999rpx;
+  width: 38rpx;
+  height: 38rpx;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, rgba(251, 244, 230, 0.98), rgba(244, 231, 203, 0.98));
-  color: #b18135;
-  font-size: 26rpx;
-  font-weight: 800;
-  box-shadow: inset 0 0 0 2rpx rgba(236, 217, 179, 0.72);
+}
+
+.account-info-item__icon-image {
+  width: 36rpx;
+  height: 36rpx;
 }
 
 .account-info-item__body {
@@ -2347,14 +2222,14 @@ onShow(() => {
 }
 
 .account-info-item__label {
-  color: #989ca7;
+  color: #969ca8;
   font-size: 22rpx;
   line-height: 1;
 }
 
 .account-info-item__value {
   color: #17181c;
-  font-size: 26rpx;
+  font-size: 25rpx;
   font-weight: 800;
   line-height: 1.15;
   word-break: break-word;
@@ -2373,67 +2248,64 @@ onShow(() => {
   gap: 10rpx;
 }
 
-.privilege-panel__crown {
-  color: #af7c2b;
-  font-size: 24rpx;
-  line-height: 1;
-}
-
-.privilege-panel__hint {
-  color: #ac9875;
-  font-size: 22rpx;
-  line-height: 1;
-}
-
 .privilege-grid {
   margin-top: 22rpx;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12rpx;
 }
 
 .privilege-card {
   min-width: 0;
-  padding: 18rpx 12rpx;
-  border-radius: 24rpx;
-  border: 2rpx solid var(--member-privilege-border);
-  background: linear-gradient(180deg, rgba(255,255,255,0.96), var(--member-privilege-bg));
-  display: grid;
-  justify-items: center;
-  align-content: start;
-  gap: 10rpx;
-  text-align: center;
+  padding: 18rpx;
+  border-radius: 22rpx;
+  border: 1rpx solid rgba(232, 235, 241, 0.98);
+  background: rgba(248, 249, 251, 0.78);
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  text-align: left;
 }
 
 .privilege-card__icon {
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 999rpx;
+  grid-area: icon;
+  width: 38rpx;
+  height: 38rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--member-privilege-icon-bg);
-  color: var(--member-privilege-icon-color);
-  font-size: 24rpx;
-  font-weight: 800;
+}
+
+.privilege-card__icon-image {
+  width: 36rpx;
+  height: 36rpx;
+}
+
+.privilege-card__body {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 10rpx;
 }
 
 .privilege-card__title {
+  display: block;
   color: #1e2025;
-  font-size: 22rpx;
+  font-size: 25rpx;
   font-weight: 800;
-  line-height: 1.3;
+  line-height: 1.15;
 }
 
 .privilege-card__caption {
+  display: block;
   color: #8a8f9b;
-  font-size: 20rpx;
-  line-height: 1.35;
+  font-size: 22rpx;
+  line-height: 1;
 }
 
 .upgrade-panel {
-  border-color: var(--page-border-warm);
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(251, 247, 239, 0.98));
+  border-color: rgba(229, 232, 238, 0.96);
+  background: rgba(255, 255, 255, 0.94);
 }
 
 .upgrade-panel__title-row {
@@ -2443,22 +2315,15 @@ onShow(() => {
 }
 
 .upgrade-panel__info-icon {
-  width: 34rpx;
-  height: 34rpx;
-  border-radius: 999rpx;
-  border: 2rpx solid rgba(178, 130, 42, 0.58);
-  color: #a27324;
-  font-size: 22rpx;
-  font-weight: 700;
-  line-height: 30rpx;
-  text-align: center;
-  box-sizing: border-box;
+  width: 36rpx;
+  height: 36rpx;
+  flex-shrink: 0;
 }
 
 .upgrade-panel__body {
   display: block;
   margin-top: 16rpx;
-  color: #7a735f;
+  color: #737986;
   font-size: 24rpx;
   line-height: 1.7;
 }
@@ -2472,38 +2337,93 @@ onShow(() => {
 .tier-ladder-card--compact {
   padding: 20rpx 22rpx;
   border-radius: 24rpx;
+  border: 0 !important;
   box-shadow: none;
   transform: none;
 }
 .tier-ladder-card.tier-ladder-card--compact.tier-ladder-card--active {
-  box-shadow: 0 8rpx 28rpx rgba(201, 150, 66, 0.18);
+  box-shadow: none;
+}
+.tier-ladder-card.tier-tone--v1.tier-ladder-card--compact {
+  background: #f3f5f8 !important;
+}
+.tier-ladder-card.tier-tone--v2.tier-ladder-card--compact {
+  background: #edf2f3 !important;
+}
+.tier-ladder-card.tier-tone--v3.tier-ladder-card--compact {
+  background: #f1eadc !important;
+}
+.tier-ladder-card.tier-tone--v4.tier-ladder-card--compact {
+  background: #eadfd9 !important;
+}
+.tier-ladder-card.tier-tone--v5.tier-ladder-card--compact {
+  background: #ded8e8 !important;
+}
+.tier-ladder-card.tier-tone--v6.tier-ladder-card--compact {
+  background: #d5e2da !important;
+}
+.tier-ladder-card.tier-tone--v7.tier-ladder-card--compact {
+  background: #cad8e9 !important;
+}
+.tier-ladder-card.tier-tone--v8.tier-ladder-card--compact {
+  background: #c95656 !important;
+}
+.tier-ladder-card.tier-tone--v9.tier-ladder-card--compact {
+  background: #9e2f2f !important;
 }
 .tier-ladder-card.tier-tone--v1.tier-ladder-card--compact.tier-ladder-card--active {
-  box-shadow: 0 8rpx 28rpx rgba(127, 144, 170, 0.18);
+  background: #e6ebf1 !important;
+  box-shadow: none;
 }
 .tier-ladder-card.tier-tone--v2.tier-ladder-card--compact.tier-ladder-card--active {
-  box-shadow: 0 8rpx 28rpx rgba(106, 158, 142, 0.18);
+  background: #dde8e6 !important;
+  box-shadow: none;
 }
 .tier-ladder-card.tier-tone--v3.tier-ladder-card--compact.tier-ladder-card--active {
-  box-shadow: 0 8rpx 28rpx rgba(201, 150, 66, 0.18);
+  background: #e6dcc7 !important;
+  box-shadow: none;
 }
 .tier-ladder-card.tier-tone--v4.tier-ladder-card--compact.tier-ladder-card--active {
-  box-shadow: 0 8rpx 28rpx rgba(207, 105, 78, 0.18);
+  background: #dfcfc7 !important;
+  box-shadow: none;
 }
 .tier-ladder-card.tier-tone--v5.tier-ladder-card--compact.tier-ladder-card--active {
-  box-shadow: 0 8rpx 28rpx rgba(142, 91, 199, 0.18);
+  background: #d0c8df !important;
+  box-shadow: none;
 }
 .tier-ladder-card.tier-tone--v6.tier-ladder-card--compact.tier-ladder-card--active {
-  box-shadow: 0 8rpx 28rpx rgba(61, 156, 114, 0.18);
+  background: #c6d8cc !important;
+  box-shadow: none;
 }
 .tier-ladder-card.tier-tone--v7.tier-ladder-card--compact.tier-ladder-card--active {
-  box-shadow: 0 8rpx 28rpx rgba(59, 120, 196, 0.18);
+  background: #b8cae1 !important;
+  box-shadow: none;
 }
 .tier-ladder-card.tier-tone--v8.tier-ladder-card--compact.tier-ladder-card--active {
-  box-shadow: 0 8rpx 28rpx rgba(203, 84, 77, 0.18);
+  background: #b94141 !important;
+  box-shadow: none;
 }
 .tier-ladder-card.tier-tone--v9.tier-ladder-card--compact.tier-ladder-card--active {
-  box-shadow: 0 16rpx 56rpx rgba(190, 130, 0, 0.65) !important;
+  background: #842525 !important;
+  box-shadow: none !important;
+}
+
+.tier-ladder-card.tier-tone--v8.tier-ladder-card--compact .tier-ladder-card__code,
+.tier-ladder-card.tier-tone--v8.tier-ladder-card--compact .tier-ladder-card__name,
+.tier-ladder-card.tier-tone--v8.tier-ladder-card--compact .tier-ladder-card__condition,
+.tier-ladder-card.tier-tone--v8.tier-ladder-card--compact .tier-ladder-card__refresh,
+.tier-ladder-card.tier-tone--v9.tier-ladder-card--compact .tier-ladder-card__code,
+.tier-ladder-card.tier-tone--v9.tier-ladder-card--compact .tier-ladder-card__name,
+.tier-ladder-card.tier-tone--v9.tier-ladder-card--compact .tier-ladder-card__condition,
+.tier-ladder-card.tier-tone--v9.tier-ladder-card--compact .tier-ladder-card__refresh {
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.tier-ladder-card.tier-tone--v8.tier-ladder-card--compact .tier-ladder-card__refresh,
+.tier-ladder-card.tier-tone--v9.tier-ladder-card--compact .tier-ladder-card__refresh {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: transparent;
+  color: #8f2525;
 }
 
 .tier-ladder-card--compact .tier-ladder-card__top {
@@ -2535,9 +2455,9 @@ onShow(() => {
   justify-content: center;
   padding: 8rpx 14rpx;
   border-radius: 999rpx;
-  background: rgba(255,255,255,0.78);
-  border: 2rpx solid rgba(237, 230, 214, 0.94);
-  color: #76684b;
+  background: #15171d;
+  border: 0;
+  color: #ffffff;
   font-size: 20rpx;
   font-weight: 700;
   line-height: 1;
@@ -2577,25 +2497,25 @@ onShow(() => {
   --member-highlight: rgba(255, 232, 179, 0.92);
   --member-wash: rgba(255, 243, 214, 0.68);
   --member-border: rgba(235, 211, 155, 0.92);
-  --member-eyebrow: #a87420;
-  --member-accent: #c79035;
-  --member-accent-strong: #9f6c18;
-  --member-badge-from: #ddb359;
-  --member-badge-to: #b17a22;
-  --member-soft-surface: rgba(255, 247, 229, 0.72);
-  --member-soft-border: rgba(236, 212, 167, 0.94);
-  --member-medal-ink: #c08b2d;
-  --member-medal-crown: rgba(201, 150, 66, 0.72);
-  --member-glow: rgba(207, 162, 71, 0.22);
-  --member-privilege-border: rgba(235, 220, 191, 0.76);
-  --member-privilege-bg: rgba(250, 244, 232, 0.96);
-  --member-privilege-icon-bg: rgba(191, 141, 53, 0.12);
-  --member-privilege-icon-color: #b07b29;
+  --member-eyebrow: #b91c1c;
+  --member-accent: #dc2626;
+  --member-accent-strong: #991b1b;
+  --member-badge-from: #ef4444;
+  --member-badge-to: #b91c1c;
+  --member-soft-surface: rgba(255, 241, 242, 0.72);
+  --member-soft-border: rgba(254, 205, 211, 0.94);
+  --member-medal-ink: #b91c1c;
+  --member-medal-crown: rgba(220, 38, 38, 0.62);
+  --member-glow: rgba(220, 38, 38, 0.18);
+  --member-privilege-border: rgba(254, 205, 211, 0.76);
+  --member-privilege-bg: rgba(255, 241, 242, 0.88);
+  --member-privilege-icon-bg: rgba(220, 38, 38, 0.1);
+  --member-privilege-icon-color: #b91c1c;
 }
 
 .account-hero.tier-tone--v4,
 .privilege-panel.tier-tone--v4 {
-  --member-highlight: rgba(255, 214, 198, 0.92);
+  --member-highlight: rgba(254, 202, 202, 0.92);
   --member-wash: rgba(255, 235, 229, 0.74);
   --member-border: rgba(236, 188, 173, 0.92);
   --member-eyebrow: #ab5a4d;
@@ -2700,147 +2620,23 @@ onShow(() => {
 
 .account-hero.tier-tone--v9,
 .privilege-panel.tier-tone--v9 {
-  --member-highlight: rgba(255, 226, 156, 0.94);
-  --member-wash: rgba(255, 241, 205, 0.78);
-  --member-border: rgba(227, 194, 121, 0.94);
-  --member-eyebrow: #9d6a16;
-  --member-accent: #d8a63f;
-  --member-accent-strong: #a96e14;
-  --member-badge-from: #e0b04d;
-  --member-badge-to: #b37215;
-  --member-soft-surface: rgba(255, 246, 220, 0.84);
-  --member-soft-border: rgba(237, 210, 149, 0.96);
-  --member-medal-ink: #cb9225;
-  --member-medal-crown: rgba(214, 159, 47, 0.76);
-  --member-glow: rgba(221, 168, 58, 0.24);
-  --member-privilege-border: rgba(237, 217, 172, 0.84);
-  --member-privilege-bg: rgba(255, 247, 226, 0.97);
-  --member-privilege-icon-bg: rgba(216, 166, 63, 0.14);
-  --member-privilege-icon-color: #bb8420;
+  --member-highlight: rgba(254, 202, 202, 0.94);
+  --member-wash: rgba(254, 226, 226, 0.78);
+  --member-border: rgba(254, 205, 211, 0.94);
+  --member-eyebrow: #b91c1c;
+  --member-accent: #dc2626;
+  --member-accent-strong: #991b1b;
+  --member-badge-from: #ef4444;
+  --member-badge-to: #b91c1c;
+  --member-soft-surface: rgba(255, 241, 242, 0.84);
+  --member-soft-border: rgba(254, 205, 211, 0.96);
+  --member-medal-ink: #b91c1c;
+  --member-medal-crown: rgba(220, 38, 38, 0.62);
+  --member-glow: rgba(220, 38, 38, 0.18);
+  --member-privilege-border: rgba(254, 205, 211, 0.84);
+  --member-privilege-bg: rgba(255, 241, 242, 0.92);
+  --member-privilege-icon-bg: rgba(220, 38, 38, 0.1);
+  --member-privilege-icon-color: #b91c1c;
 }
 
-.purchase-entry {
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
-  margin-top: 22rpx;
-  padding: 24rpx 24rpx 24rpx 26rpx;
-  border-radius: 28rpx;
-  border: 2rpx solid var(--member-soft-border);
-  background:
-    linear-gradient(135deg, rgba(255,255,255,0.72), rgba(255,255,255,0)),
-    linear-gradient(180deg, rgba(255, 250, 238, 0.96), rgba(248, 236, 204, 0.92));
-  box-shadow:
-    inset 0 1rpx 0 rgba(255,255,255,0.72),
-    0 14rpx 28rpx rgba(170, 126, 33, 0.12);
-  backdrop-filter: blur(8rpx);
-}
-
-.purchase-entry::before,
-.purchase-entry::after {
-  content: '';
-  position: absolute;
-  border-radius: 999rpx;
-  pointer-events: none;
-}
-
-.purchase-entry::before {
-  top: -26rpx;
-  right: -18rpx;
-  width: 180rpx;
-  height: 180rpx;
-  background: radial-gradient(circle, rgba(255, 238, 191, 0.7), rgba(255,255,255,0) 68%);
-}
-
-.purchase-entry::after {
-  left: 28rpx;
-  bottom: -44rpx;
-  width: 220rpx;
-  height: 120rpx;
-  background: radial-gradient(circle, rgba(232, 195, 111, 0.18), rgba(255,255,255,0) 72%);
-}
-
-.purchase-entry__body {
-  position: relative;
-  z-index: 1;
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 10rpx;
-}
-
-.purchase-entry__eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8rpx;
-  color: var(--member-eyebrow);
-  font-size: 22rpx;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.purchase-entry__eyebrow-icon {
-  width: 24rpx;
-  height: 24rpx;
-  flex-shrink: 0;
-}
-
-.purchase-entry__label {
-  color: #493413;
-  font-size: 34rpx;
-  font-weight: 800;
-  line-height: 1.08;
-}
-
-.purchase-entry__hint {
-  color: rgba(104, 80, 36, 0.82);
-  font-size: 23rpx;
-  line-height: 1.55;
-}
-
-.purchase-entry__aside {
-  position: relative;
-  z-index: 1;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 12rpx;
-}
-
-.purchase-entry__cta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 132rpx;
-  height: 52rpx;
-  padding: 0 18rpx;
-  border-radius: 999rpx;
-  background: linear-gradient(135deg, var(--member-badge-from), var(--member-badge-to));
-  color: #ffffff;
-  font-size: 22rpx;
-  font-weight: 700;
-  line-height: 1;
-  box-shadow: 0 10rpx 20rpx rgba(176, 122, 35, 0.24);
-}
-
-.purchase-entry__arrow {
-  width: 54rpx;
-  height: 54rpx;
-  border-radius: 999rpx;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.68);
-  border: 2rpx solid rgba(234, 212, 162, 0.92);
-  color: var(--member-accent-strong);
-  font-size: 34rpx;
-  font-weight: 700;
-  line-height: 1;
-}
 </style>

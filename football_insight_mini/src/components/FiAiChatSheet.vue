@@ -372,7 +372,7 @@ watch(
   height: 78vh;
   max-height: 1080rpx;
   background:
-    radial-gradient(circle at top right, rgba(255, 220, 109, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(220, 38, 38, 0.12), transparent 28%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(246, 248, 252, 0.98));
   border-radius: 36rpx;
   border: 2rpx solid rgba(233, 235, 241, 0.96);
@@ -413,7 +413,7 @@ watch(
   position: absolute;
   inset: -10rpx;
   border-radius: 999rpx;
-  background: radial-gradient(circle, rgba(255, 214, 102, 0.58), rgba(255, 214, 102, 0));
+  background: radial-gradient(circle, rgba(220, 38, 38, 0.38), rgba(220, 38, 38, 0));
   animation: ai-avatar-glow 2.2s ease-in-out infinite;
 }
 
@@ -442,7 +442,7 @@ watch(
 }
 
 .ai-chat-sheet__eyebrow {
-  color: #7f7157;
+  color: #7f1d1d;
   font-size: 22rpx;
   font-weight: 700;
   letter-spacing: 2rpx;
@@ -461,9 +461,9 @@ watch(
   width: 40rpx;
   height: 40rpx;
   border-radius: 999rpx;
-  background: rgba(255, 214, 102, 0.2);
-  border: 2rpx solid rgba(226, 182, 64, 0.55);
-  color: #8b6400;
+  background: rgba(220, 38, 38, 0.1);
+  border: 2rpx solid rgba(220, 38, 38, 0.24);
+  color: #b91c1c;
   font-size: 24rpx;
   font-weight: 800;
   line-height: 1;
@@ -635,7 +635,7 @@ watch(
 }
 
 .ai-chat-message__thinking-dot {
-  color: #d4a53a;
+  color: #dc2626;
   font-size: 28rpx;
   line-height: 1;
   animation: ai-thinking-bounce 1s ease-in-out infinite;
@@ -652,7 +652,7 @@ watch(
 .ai-chat-message__cursor {
   display: inline-block;
   margin-left: 6rpx;
-  color: #d4a53a;
+  color: #dc2626;
   font-size: 30rpx;
   font-weight: 700;
   line-height: 1;
@@ -667,7 +667,7 @@ watch(
 }
 
 .ai-chat-message__generating-label {
-  color: #8d7434;
+  color: #991b1b;
   font-size: 22rpx;
   font-weight: 700;
   line-height: 1;

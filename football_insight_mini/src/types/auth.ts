@@ -35,7 +35,7 @@ export type MiniWechatLoginResponse =
   | MiniWechatBindingRequiredResponse
 
 export interface RegisterPayload {
-  invite_code: string
+  invite_code?: string | null
   referral_code?: string | null
   account_identifier: string
   password: string
@@ -54,7 +54,7 @@ export interface ResetPasswordPayload {
 
 export interface MiniWechatBindPayload {
   bind_token: string
-  invite_code: string
+  invite_code?: string | null
   referral_code?: string | null
   display_name: string
   avatar_data_url: string

@@ -6,6 +6,8 @@
     <view class="page-scroll">
       <view class="page">
         <view class="hero-card hero-card--home">
+        <image class="page-hero-dots page-hero-dots--top" :src="memberCardDotsImage" mode="aspectFill" />
+        <image class="page-hero-dots page-hero-dots--bottom" :src="memberCardDotsImage" mode="aspectFill" />
         <view class="hero-card__top">
           <view class="hero-card__heading">
             <text class="eyebrow">Football Insight</text>
@@ -67,7 +69,7 @@
                   />
                 </view>
 
-                <view v-else-if="item.avatars.length" class="briefing-card__entity-group">
+                <view v-else-if="item.accent === 'leader' && item.avatars.length" class="briefing-card__entity-group">
                   <image
                     v-for="avatar in item.avatars.slice(0, 3)"
                     :key="`${item.label}-${avatar.name}`"
@@ -78,7 +80,26 @@
                   />
                 </view>
 
-                <view class="briefing-card__title-block">
+                <view v-if="item.entities.length" class="briefing-card__entity-list">
+                  <view
+                    v-for="entity in item.entities"
+                    :key="`${item.label}-${entity.name}-${entity.caption}`"
+                    class="briefing-card__entity-row"
+                  >
+                    <image
+                      :src="entity.avatar || ''"
+                      :alt="entity.name"
+                      mode="aspectFill"
+                      class="briefing-card__entity-row-avatar"
+                    />
+                    <view class="briefing-card__entity-row-body">
+                      <text class="briefing-card__entity-row-name">{{ entity.name }}</text>
+                      <text class="briefing-card__entity-row-team">{{ entity.caption }}</text>
+                    </view>
+                  </view>
+                </view>
+
+                <view v-else class="briefing-card__title-block">
                   <text class="briefing-card__value">{{ item.value }}</text>
                   <text v-if="item.subValue" class="briefing-card__subvalue">{{ item.subValue }}</text>
                 </view>
@@ -353,6 +374,11 @@
               hover-stay-time="100"
               @click="openPulseMatchTechStats(match)"
             >
+              <image
+                class="score-strip__corner"
+                :src="pulseMatchCornerImage"
+                mode="aspectFill"
+              />
               <view class="score-strip__meta">
                 <text>第 {{ match.round_number }} 轮</text>
                 <view class="score-strip__meta-trailing">
@@ -620,13 +646,7 @@
       </view>
     </view>
 
-    <view v-if="loginPromptVisible" class="login-float">
-      <view class="login-float__copy">
-        <text class="login-float__title">请先登录</text>
-        <text class="login-float__desc">重新登录后，可以继续关注主队和使用会员功能。</text>
-      </view>
-      <button class="login-float__action" @click="handleSupportLogin">去登录</button>
-    </view>
+    <FiLoginFloat v-if="loginPromptVisible" @action="handleSupportLogin" />
   </view>
 </template>
 
@@ -634,6 +654,7 @@
 import { computed, ref } from 'vue'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiAiChatSheet from '../../components/FiAiChatSheet.vue'
+import FiLoginFloat from '../../components/FiLoginFloat.vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
 import { getCurrentUser } from '../../api/auth'
@@ -655,7 +676,9 @@ import type { SupportMatchDetail, SupportProfile, SupportTeam } from '../../type
 import type { PublicSystemConfig } from '../../types/system'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { getAccessToken, setAccessToken } from '../../utils/authStorage'
-import bgImage from '../../static/home/bg.webp'
+import bgImage from '../../static/user/phoenix-stadium-bg.webp'
+import memberCardDotsImage from '../../static/user/member-card-dots.png'
+import pulseMatchCornerImage from '../../static/home/pulse-match-corner.png'
 import { buildHomeBriefingMarqueeMap, splitBriefingMarqueeRows, type HomeBriefingMarqueeAccent } from '../../utils/homeBriefingMarquees'
 import { buildHeadlineTitleParts } from '../../utils/homeViewText'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
@@ -692,6 +715,7 @@ interface BriefingItem {
   label: string
   value: string
   subValue: string | null
+  entities: Array<{ name: string; caption: string; avatar: string | null }>
   metricValue: string
   metricLabel: string
   avatars: Array<{ name: string; src: string | null }>
@@ -946,6 +970,7 @@ const briefingItems = computed<BriefingItem[]>(() => {
           label: '榜首风向',
           value: formatEntityNames(leadingTeams.value.map((team) => team.team_name)),
           subValue: null,
+          entities: [],
           metricValue: String(topTeam.value.points),
           metricLabel: leadingTeams.value.length > 1 ? '分并列榜首' : '分领跑',
           avatars: leadingTeams.value.map((team) => ({
@@ -960,6 +985,11 @@ const briefingItems = computed<BriefingItem[]>(() => {
           label: '射手头条',
           value: formatEntityNames(leadingScorers.value.map((player) => player.player_name)),
           subValue: formatEntityNames(leadingScorers.value.map((player) => player.team_name)),
+          entities: leadingScorers.value.map((player) => ({
+            name: player.player_name,
+            caption: player.team_name,
+            avatar: player.avatar_storage_url,
+          })),
           metricValue: String(topScorer.value.score_value),
           metricLabel: leadingScorers.value.length > 1 ? '球并列头名' : '球',
           avatars: leadingScorers.value.map((player) => ({
@@ -974,6 +1004,11 @@ const briefingItems = computed<BriefingItem[]>(() => {
           label: '助攻头条',
           value: formatEntityNames(leadingAssists.value.map((player) => player.player_name)),
           subValue: formatEntityNames(leadingAssists.value.map((player) => player.team_name)),
+          entities: leadingAssists.value.map((player) => ({
+            name: player.player_name,
+            caption: player.team_name,
+            avatar: player.avatar_storage_url,
+          })),
           metricValue: String(topAssist.value.score_value),
           metricLabel: leadingAssists.value.length > 1 ? '次并列头名' : '次助攻',
           avatars: leadingAssists.value.map((player) => ({
@@ -1330,56 +1365,6 @@ onShow(() => {
   display: grid;
   gap: 24rpx;
 }
-.login-float {
-  position: fixed;
-  left: 28rpx;
-  right: 28rpx;
-  bottom: 12rpx;
-  z-index: 40;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 20rpx;
-  padding: 22rpx 24rpx;
-  border-radius: 28rpx;
-  background: rgba(21, 23, 29, 0.96);
-  box-shadow: 0 20rpx 46rpx rgba(16, 18, 24, 0.24);
-}
-.login-float__copy {
-  min-width: 0;
-  display: grid;
-  gap: 6rpx;
-}
-.login-float__title,
-.login-float__desc {
-  display: block;
-}
-.login-float__title {
-  color: #ffffff;
-  font-size: 28rpx;
-  font-weight: 800;
-}
-.login-float__desc {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 22rpx;
-  line-height: 1.35;
-}
-.login-float__action {
-  min-width: 148rpx;
-  height: 64rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999rpx;
-  background: #ffffff;
-  color: #15171d;
-  font-size: 26rpx;
-  font-weight: 800;
-  line-height: 1;
-}
-.login-float__action::after {
-  border: none;
-}
 .skeleton-panel {
   position: relative;
   overflow: hidden;
@@ -1598,11 +1583,34 @@ onShow(() => {
 }
 
 .hero-card--home {
+  position: relative;
+  overflow: hidden;
   padding: 26rpx 24rpx 20rpx;
   border-radius: 36rpx;
   background: rgba(255, 255, 255, 0.96);
   border-color: rgba(229, 231, 236, 0.98);
   box-shadow: 0 18rpx 46rpx rgba(26, 28, 36, 0.07);
+}
+
+.page-hero-dots {
+  position: absolute;
+  z-index: 0;
+  width: 292rpx;
+  height: 180rpx;
+  opacity: 0.34;
+  pointer-events: none;
+}
+
+.page-hero-dots--top {
+  top: -54rpx;
+  right: -54rpx;
+}
+
+.page-hero-dots--bottom {
+  left: -86rpx;
+  bottom: 136rpx;
+  opacity: 0.18;
+  transform: scaleX(-1);
 }
 
 .hero-card__top,
@@ -1617,6 +1625,8 @@ onShow(() => {
 .hero-card__top {
   align-items: flex-start;
   gap: 16rpx;
+  position: relative;
+  z-index: 1;
 }
 
 .hero-card__heading {
@@ -1697,6 +1707,8 @@ onShow(() => {
 }
 
 .hero-card__guide {
+  position: relative;
+  z-index: 1;
   margin-top: 24rpx;
   padding: 22rpx 0 0;
   border-top: 2rpx solid rgba(231, 232, 238, 0.94);
@@ -1715,9 +1727,9 @@ onShow(() => {
   content: '';
   width: 8rpx;
   height: 8rpx;
-  background: #f97316;
+  background: #dc2626;
   border-radius: 999rpx;
-  box-shadow: 0 0 0 8rpx rgba(249, 115, 22, 0.12);
+  box-shadow: 0 0 0 8rpx rgba(220, 38, 38, 0.12);
 }
 
 .hero-card__guide-copy {
@@ -1739,13 +1751,15 @@ onShow(() => {
   color: #17181d;
   font-weight: 700;
   padding: 0 0.08em;
-  background-image: linear-gradient(90deg, rgba(249, 115, 22, 0.28), rgba(249, 115, 22, 0.28));
+  background-image: linear-gradient(90deg, rgba(220, 38, 38, 0.22), rgba(220, 38, 38, 0.22));
   background-repeat: no-repeat;
   background-size: 100% 0.36em;
   background-position: left bottom;
 }
 
 .briefing-grid {
+  position: relative;
+  z-index: 1;
   margin-top: 22rpx;
   display: grid;
   gap: 0;
@@ -1774,15 +1788,15 @@ onShow(() => {
 }
 
 .briefing-card--leader::before {
-  background: #ea580c;
+  background: #b91c1c;
 }
 
 .briefing-card--scorer::before {
-  background: #f97316;
+  background: #dc2626;
 }
 
 .briefing-card--assist::before {
-  background: #f59e0b;
+  background: #ef4444;
 }
 
 .briefing-card__label {
@@ -1854,6 +1868,53 @@ onShow(() => {
   min-width: 0;
 }
 
+.briefing-card__entity-list {
+  display: grid;
+  gap: 12rpx;
+  min-width: 0;
+  width: 100%;
+}
+
+.briefing-card__entity-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 12rpx;
+}
+
+.briefing-card__entity-row-avatar {
+  flex: 0 0 auto;
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 999rpx;
+  background: #f7f8fa;
+}
+
+.briefing-card__entity-row-body {
+  display: grid;
+  gap: 4rpx;
+  min-width: 0;
+}
+
+.briefing-card__entity-row-name {
+  color: #17181d;
+  font-size: 28rpx;
+  line-height: 1.12;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.briefing-card__entity-row-team {
+  color: #8a8f9a;
+  font-size: 20rpx;
+  line-height: 1.16;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .briefing-card__value {
   color: #17181d;
   font-size: 30rpx;
@@ -1904,7 +1965,7 @@ onShow(() => {
   content: '•';
   position: absolute;
   left: 0;
-  color: rgba(255, 138, 24, 0.92);
+  color: rgba(220, 38, 38, 0.9);
   font-size: 24rpx;
 }
 
@@ -1920,7 +1981,7 @@ onShow(() => {
 }
 
 .briefing-card__metric-value {
-  color: #f97316;
+  color: #dc2626;
   font-size: 50rpx;
   line-height: 0.95;
   font-weight: 800;
@@ -1976,19 +2037,36 @@ onShow(() => {
 }
 
 .score-strip {
+  position: relative;
+  overflow: hidden;
   padding: 18rpx 16rpx;
   display: grid;
   gap: 10rpx;
   border-radius: 28rpx;
   border: 2rpx solid #ececf1;
-  background: linear-gradient(180deg, rgba(249, 249, 252, 0.9), rgba(255, 255, 255, 1));
+  background-color: #ffffff;
 }
 
 .score-strip--interactive {
-  background:
-    radial-gradient(circle at top right, rgba(255, 145, 41, 0.12), transparent 32%),
-    linear-gradient(180deg, rgba(249, 249, 252, 0.92), rgba(255, 255, 255, 1));
-  border-color: rgba(255, 145, 41, 0.2);
+  border-color: rgba(220, 38, 38, 0.18);
+}
+
+.score-strip__corner {
+  position: absolute;
+  z-index: 0;
+  top: -58rpx;
+  left: -74rpx;
+  width: 214rpx;
+  height: 132rpx;
+  opacity: 0.52;
+  pointer-events: none;
+  transform: scaleX(-1);
+}
+
+.score-strip > view,
+.score-strip > text {
+  position: relative;
+  z-index: 1;
 }
 
 .score-strip--pressed {
@@ -2018,8 +2096,8 @@ onShow(() => {
 .score-strip__meta-pill {
   padding: 10rpx 16rpx;
   border-radius: 999rpx;
-  background: rgba(255, 145, 41, 0.12);
-  color: #d66b10 !important;
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626 !important;
   font-weight: 700;
 }
 
@@ -2060,7 +2138,7 @@ onShow(() => {
 }
 
 .score-strip__hint-text {
-  color: #d66b10;
+  color: #dc2626;
   font-size: 22rpx;
   line-height: 1.2;
   font-weight: 700;
@@ -2186,12 +2264,12 @@ onShow(() => {
 }
 
 .tech-stat-row__fill--home {
-  background: #f59e0b;
+  background: #dc2626;
   transform-origin: right center;
 }
 
 .tech-stat-row__fill--away {
-  background: #f59e0b;
+  background: #dc2626;
   transform-origin: left center;
 }
 
@@ -2353,7 +2431,7 @@ onShow(() => {
 
 .team-season-match-row__result--draw {
   background: rgba(234, 179, 8, 0.12);
-  color: #b45309;
+  color: #854d0e;
 }
 
 .team-season-match-row__result--loss {
@@ -2362,8 +2440,8 @@ onShow(() => {
 }
 
 .team-season-match-row__result--live {
-  background: rgba(249, 115, 22, 0.12);
-  color: #d97706;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
 }
 
 .team-season-match-row__result--scheduled {
@@ -2461,7 +2539,7 @@ onShow(() => {
 
 .ranking-row--pressed {
   transform: scale(0.992);
-  background: rgba(255, 145, 41, 0.08);
+  background: rgba(220, 38, 38, 0.08);
 }
 
 .ranking-row__rank {
@@ -2810,13 +2888,13 @@ onShow(() => {
   justify-self: end;
 }
 .support-home-match-card__vs {
-  color: #f97316;
+  color: #dc2626;
   font-size: 24rpx;
   font-weight: 900;
   line-height: 1;
   padding: 8rpx 14rpx;
   border-radius: 999rpx;
-  background: rgba(249, 115, 22, 0.08);
+  background: rgba(220, 38, 38, 0.08);
 }
 .support-home-match-card__bar {
   margin-top: 18rpx;
@@ -2835,7 +2913,7 @@ onShow(() => {
   background: #a7adb8;
 }
 .support-home-match-card__action {
-  color: #f97316;
+  color: #dc2626;
   font-weight: 800;
 }
 .sheet-mask {
@@ -2871,7 +2949,7 @@ onShow(() => {
   border-bottom: 2rpx solid #f0f1f5;
 }
 .favorite-team-sheet__row--active {
-  background: rgba(255, 145, 41, 0.08);
+  background: rgba(220, 38, 38, 0.08);
 }
 .sheet-actions {
   margin-top: 24rpx;

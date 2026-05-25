@@ -1,6 +1,8 @@
 <template>
   <view class="page-root">
     <FiBrandNav open-on-current-page @open-ai="openAiFromBrandNav" />
+    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" />
+    <view class="page-bg-fade"></view>
     <view class="page">
       <view v-if="loading" class="state-card">
         <text>正在加载换座池...</text>
@@ -305,6 +307,7 @@ import { onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiAiChatSheet from '../../components/FiAiChatSheet.vue'
 import FiBottomSheet from '../../components/FiBottomSheet.vue'
+import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.webp'
 import SeatSwapCandidateCard from '../../components/SeatSwapCandidateCard.vue'
 import SeatSwapManageSheet from '../../components/SeatSwapManageSheet.vue'
 import StadiumMap from '../../components/StadiumMap.vue'
@@ -940,6 +943,29 @@ onShow(() => {
 .page-root {
   position: relative;
   min-height: 100vh;
+  background: #f7f8fa;
+}
+
+.page-bg-img {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.page-bg-fade {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(246, 247, 244, 0.24) 0%, rgba(247, 248, 250, 0.74) 32%, #f7f8fa 58%, #f7f8fa 100%);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .page {

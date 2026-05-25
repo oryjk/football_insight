@@ -48,6 +48,8 @@ async fn wechat_webhook_verification_returns_plaintext_echo() {
             wechat_mini_app_secret: "wx_test_mini_secret".to_string(),
             wechat_webhook_token: token.to_string(),
             wechat_encoding_aes_key: aes_key.to_string(),
+            seat_swap_mini_subscribe_template_id: String::new(),
+            seat_swap_mini_subscribe_page: String::new(),
             ticket_monitor_base_url: None,
             redis_url: "redis://127.0.0.1:6379".to_string(),
             wechat_pay_mch_id: String::new(),
