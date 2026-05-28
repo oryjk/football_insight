@@ -129,6 +129,15 @@ pub trait SeatSwapRepository: Send + Sync {
         anyhow::bail!("seat swap repository match update is not implemented")
     }
 
+    async fn cancel_matched_pair(
+        &self,
+        request_id: Uuid,
+        target_request_id: Uuid,
+    ) -> anyhow::Result<()> {
+        let _ = (request_id, target_request_id);
+        anyhow::bail!("seat swap repository matched cancellation is not implemented")
+    }
+
     async fn update_status(
         &self,
         request_id: Uuid,

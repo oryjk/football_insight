@@ -554,6 +554,49 @@ impl SeatSwapRepository for PostgresSeatSwapRepository {
         Ok(())
     }
 
+    async fn cancel_matched_pair(
+        &self,
+        request_id: Uuid,
+        target_request_id: Uuid,
+    ) -> anyhow::Result<()> {
+        let mut tx = self.pool.begin().await?;
+
+        sqlx::query(
+            r#"
+            UPDATE f_i_seat_swap_requests
+            SET status = 'active',
+                matched_request_id = NULL,
+                updated_at = NOW()
+            WHERE id IN ($1, $2)
+            "#,
+        )
+        .bind(request_id)
+        .bind(target_request_id)
+        .execute(&mut *tx)
+        .await?;
+
+        sqlx::query(
+            r#"
+            DELETE FROM f_i_seat_swap_confirmations
+            WHERE (
+                request_id = $1
+                AND target_request_id = $2
+            )
+               OR (
+                request_id = $2
+                AND target_request_id = $1
+            )
+            "#,
+        )
+        .bind(request_id)
+        .bind(target_request_id)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(())
+    }
+
     async fn insert_matched_cancellation(
         &self,
         input: MatchedCancellationInput,
