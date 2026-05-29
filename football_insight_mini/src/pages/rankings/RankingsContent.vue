@@ -1,6 +1,6 @@
 <template>
   <view class="page-root">
-    <image class="page-bg-img" :src="bgImage" mode="aspectFill" />
+    <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
     <view class="page-scroll" :class="{ 'page-scroll--locked': selectedRankingTeam || selectedStandingsTable }">
       <view class="page">
@@ -346,7 +346,7 @@ import { getAvailableRounds, getMatches, getRankings } from '../../api/insight'
 import type { MatchCard, PlayerRankingCategory, RankingsViewResponse, RoundReference, StandingsTable, StandingsTableEntry, TeamRankingCategory, TeamRankingEntry } from '../../types/insight'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { buildTeamSeasonMatchRowId, type TeamSeasonMatch, resolveTeamSeasonMatches } from '../../utils/teamSeasonMatches'
-import bgImage from '../../static/user/phoenix-stadium-bg.jpg'
+import bgImage from '../../static/user/phoenix-stadium-bg.webp'
 import memberCardDotsImage from '../../static/user/member-card-dots.png'
 import { buildStandingsFallbackMetrics, buildStandingsPosterColumns, buildStandingsPosterMetrics, buildStandingsPosterSharePath, buildStandingsPosterShareTitle, buildStandingsPosterTeamLayout, buildStandingsRankingEntries, type StandingsRankingMode } from './poster'
 import { reportPageActivity } from '../../utils/userActivity'

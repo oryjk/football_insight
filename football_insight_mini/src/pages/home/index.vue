@@ -1,7 +1,7 @@
 <template>
   <view class="home-page-shell">
     <FiBrandNav open-on-current-page @open-ai="openAiFromBrandNav" />
-    <image class="page-bg-img" :src="bgImage" mode="aspectFill" />
+    <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
     <view class="page-scroll">
       <view class="page">
@@ -676,7 +676,7 @@ import type { SupportMatchDetail, SupportProfile, SupportTeam } from '../../type
 import type { PublicSystemConfig } from '../../types/system'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { getAccessToken, setAccessToken } from '../../utils/authStorage'
-import bgImage from '../../static/user/phoenix-stadium-bg.jpg'
+import bgImage from '../../static/user/phoenix-stadium-bg.webp'
 import memberCardDotsImage from '../../static/user/member-card-dots.png'
 import pulseMatchCornerImage from '../../static/home/pulse-match-corner.png'
 import { buildHomeBriefingMarqueeMap, splitBriefingMarqueeRows, type HomeBriefingMarqueeAccent } from '../../utils/homeBriefingMarquees'

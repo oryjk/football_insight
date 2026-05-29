@@ -1,7 +1,7 @@
 <template>
   <view class="page-root">
     <FiBrandNav open-on-current-page @open-ai="openAiFromBrandNav" />
-    <image class="page-bg-img" :src="bgImage" mode="aspectFill" />
+    <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
     <view class="page-scroll">
       <view class="page">
@@ -426,7 +426,7 @@ import type {
 } from '../../types/insight'
 import type { CurrentUser } from '../../types/auth'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import bgImage from '../../static/user/phoenix-stadium-bg.jpg'
+import bgImage from '../../static/user/phoenix-stadium-bg.webp'
 import memberCardDotsImage from '../../static/user/member-card-dots.png'
 import { useAnimatedInteger } from '../../composables/useAnimatedInteger'
 import { resolveMembershipBenefitsLocked } from '../../utils/membershipBenefits'

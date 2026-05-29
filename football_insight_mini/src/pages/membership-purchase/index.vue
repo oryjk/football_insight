@@ -1,7 +1,7 @@
 <template>
   <view v-if="systemConfigUnderReview" class="page-root" />
   <view v-else class="page-root">
-    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" />
+    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
     <view class="page">
       <view class="purchase-hero">
@@ -122,7 +122,7 @@ import { getPublicSystemConfig } from '../../api/system'
 import type { PublicSystemConfig } from '../../types/system'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
-import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.jpg'
+import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.webp'
 import { reportPageActivity } from '../../utils/userActivity'
 import {
   buildMembershipTierGuides,

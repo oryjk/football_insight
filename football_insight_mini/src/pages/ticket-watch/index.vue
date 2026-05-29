@@ -1,6 +1,6 @@
 <template>
   <view v-if="pageEntered" class="page-root">
-    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" />
+    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
     <view class="page">
       <view class="hero-card">
@@ -1024,7 +1024,7 @@ import soccerBallIcon from '../../static/ticket-watch/soccer-ball.svg'
 import swapArrowsIcon from '../../static/ticket-watch/swap-arrows.svg'
 import targetIcon from '../../static/ticket-watch/target.svg'
 import trendIcon from '../../static/ticket-watch/trend.svg'
-import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.jpg'
+import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.webp'
 import {
   applyBlockInterestToSections,
   applyBlockInterestsToSections,

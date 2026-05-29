@@ -1,6 +1,6 @@
 <template>
   <view class="page-root" :class="{ 'page-root--embedded': embedded }">
-    <image v-if="!embedded" class="page-bg-img" :src="bgImage" mode="aspectFill" />
+    <image v-if="!embedded" class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
     <view v-if="!embedded" class="page-bg-fade"></view>
     <view class="page-scroll">
       <view class="page">
@@ -285,7 +285,7 @@
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
-import bgImage from '../../static/user/phoenix-stadium-bg.jpg'
+import bgImage from '../../static/user/phoenix-stadium-bg.webp'
 import { getAvailableRounds, getMatches } from '../../api/insight'
 import type { MatchCard, RoundReference } from '../../types/insight'
 import { extractApiErrorMessage } from '../../utils/apiError'

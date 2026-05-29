@@ -1,6 +1,6 @@
 <template>
   <view class="page-root">
-    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" />
+    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
     <scroll-view scroll-y class="page-scroll">
       <view class="page">
@@ -129,7 +129,7 @@
 import { computed, ref } from 'vue'
 import { onHide, onLoad, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
-import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.jpg'
+import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.webp'
 import { castSupportVote, getMatchSupportDetail } from '../../api/support'
 import type { SupportMatchDetail } from '../../types/support'
 import { extractApiErrorMessage } from '../../utils/apiError'

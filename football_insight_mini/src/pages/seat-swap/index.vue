@@ -2,7 +2,7 @@
   <page-meta :page-style="pageLockStyle" />
   <view class="page-root">
     <FiBrandNav open-on-current-page @open-ai="openAiFromBrandNav" />
-    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" />
+    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
     <view class="page">
       <view v-if="loading" class="state-card">
@@ -331,7 +331,7 @@ import { onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiAiChatSheet from '../../components/FiAiChatSheet.vue'
 import FiBottomSheet from '../../components/FiBottomSheet.vue'
-import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.jpg'
+import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.webp'
 import SeatSwapCandidateCard from '../../components/SeatSwapCandidateCard.vue'
 import SeatSwapManageSheet from '../../components/SeatSwapManageSheet.vue'
 import StadiumMap from '../../components/StadiumMap.vue'
