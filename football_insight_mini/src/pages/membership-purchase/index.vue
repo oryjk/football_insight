@@ -122,7 +122,7 @@ import { getPublicSystemConfig } from '../../api/system'
 import type { PublicSystemConfig } from '../../types/system'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
-import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.webp'
+import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { reportPageActivity } from '../../utils/userActivity'
 import {
   buildMembershipTierGuides,
