@@ -52,7 +52,7 @@
           </view>
 
           <view class="member-identity__copy">
-            <text class="member-identity__hello">亲爱的会员，您好！</text>
+            <text class="member-identity__hello">{{ memberGreetingText }}</text>
             <text class="member-identity__desc">{{ membershipHeroDescription }}</text>
           </view>
 
@@ -594,6 +594,15 @@ const membershipHeroDescription = computed(() => {
   }
 
   return `恭喜您，您已经是${currentMembershipMeta.value.badgeLabel}`
+})
+const memberGreetingText = computed(() => {
+  const displayName = currentUser.value?.display_name?.trim()
+
+  if (!displayName) {
+    return '亲爱的会员，您好！'
+  }
+
+  return `${displayName}，您好！`
 })
 const membershipHeroExpiryLabel = computed(() => {
   const label = membershipExpiresAtLabel.value
@@ -2019,10 +2028,12 @@ onShow(() => {
 }
 
 .member-identity__hello {
+  max-width: 100%;
   color: #171a20;
   font-size: 34rpx;
   font-weight: 900;
   line-height: 1.1;
+  word-break: break-all;
 }
 
 .member-identity__desc {

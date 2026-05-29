@@ -65,6 +65,7 @@ async fn wechat_webhook_verification_returns_plaintext_echo() {
                 app_key: String::new(),
                 master_secret: String::new(),
             }),
+            admin_api_token: None,
         },
     );
 

@@ -1,9 +1,13 @@
 <template>
-  <view class="page-root">
+  <page-meta :page-style="pageLockStyle" />
+  <view class="page-root" :class="{ 'page-root--locked': pageScrollLocked }">
     <FiBrandNav open-on-current-page @open-ai="openAiFromBrandNav" />
 
     <view>
-      <RankingsContent ref="rankingsContentRef" />
+      <RankingsContent
+        ref="rankingsContentRef"
+        @page-scroll-lock-change="handlePageScrollLockChange"
+      />
     </view>
     <view>
       <MatchesContent embedded />
@@ -19,7 +23,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiAiChatSheet from '../../components/FiAiChatSheet.vue'
@@ -29,6 +33,8 @@ import { useAiChatSheet } from '../../composables/useAiChatSheet'
 
 const rankingsContentRef = ref<InstanceType<typeof RankingsContent> | null>(null)
 const pendingSharedPosterSlug = ref<string | null>(null)
+const pageScrollLocked = ref(false)
+const pageLockStyle = computed(() => pageScrollLocked.value ? 'overflow: hidden;' : '')
 const {
   aiChatVisible,
   currentAiUser,
@@ -48,6 +54,10 @@ async function openPendingSharedPoster(): Promise<void> {
 
 function openAiFromBrandNav(): void {
   void openAiChat()
+}
+
+function handlePageScrollLockChange(locked: boolean): void {
+  pageScrollLocked.value = locked
 }
 
 onLoad((query) => {
@@ -76,5 +86,9 @@ onShareAppMessage(() => {
   position: relative;
   min-height: 100vh;
   background: #f7f8fa;
+}
+.page-root--locked {
+  height: 100vh;
+  overflow: hidden;
 }
 </style>

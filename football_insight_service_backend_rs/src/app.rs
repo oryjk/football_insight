@@ -4,9 +4,10 @@ use axum::{Router, routing::get};
 use sqlx::PgPool;
 
 use crate::{
-    activity::bootstrap::build_activity_routes, ai::bootstrap::build_ai_routes,
-    auth::bootstrap::build_auth, auth_license::bootstrap::build_auth_license_routes,
-    config::AppConfig, health::bootstrap::build_health_routes, insight::bootstrap::build_insight,
+    activity::bootstrap::build_activity_routes, admin::bootstrap::build_admin_routes,
+    ai::bootstrap::build_ai_routes, auth::bootstrap::build_auth,
+    auth_license::bootstrap::build_auth_license_routes, config::AppConfig,
+    health::bootstrap::build_health_routes, insight::bootstrap::build_insight,
     payment::bootstrap::build_payment,
     push_notification::bootstrap::build_push_notification_routes,
     reflux_subscription::bootstrap::build_reflux_subscription_routes,
@@ -17,6 +18,7 @@ use crate::{
 
 pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
     let insight = build_insight(pool.clone());
+    let admin_routes = build_admin_routes(pool.clone(), config.admin_api_token.clone());
     let health_routes = build_health_routes(pool.clone());
     let system_config = build_system_config_routes(pool.clone(), insight.repository.clone());
 
@@ -70,6 +72,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
     Router::new()
         .route("/", get(|| async { "football insight service" }))
         .merge(health_routes)
+        .merge(admin_routes)
         .merge(system_config.routes)
         .merge(auth.routes)
         .merge(activity_routes)

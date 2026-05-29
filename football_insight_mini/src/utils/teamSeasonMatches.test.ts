@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 import type { MatchCard } from '../types/insight'
-import { resolveTeamSeasonMatches } from './teamSeasonMatches'
+import { buildTeamSeasonMatchRowId, resolveTeamSeasonMatches } from './teamSeasonMatches'
 
 function createMatch(overrides: Partial<MatchCard> = {}): MatchCard {
   return {
@@ -129,5 +129,59 @@ describe('resolveTeamSeasonMatches', () => {
     expect(matches.map((match) => match.matchId)).toEqual([72, 71])
     expect(matches.map((match) => match.resultLabel)).toEqual(['负', '平'])
     expect(matches.map((match) => match.resultTone)).toEqual(['loss', 'draw'])
+  })
+
+  test('marks the latest completed match and next scheduled match as focused', () => {
+    const matches = resolveTeamSeasonMatches(
+      { team_id: 9, team_name: '成都蓉城' },
+      [
+        createMatch({
+          match_id: 81,
+          round_number: 1,
+          match_date: '2026-04-02',
+          match_time: '19:35',
+          status: 'finished',
+          home_score: '1',
+          away_score: '0',
+        }),
+        createMatch({
+          match_id: 82,
+          round_number: 2,
+          match_date: '2026-04-09',
+          match_time: '20:00',
+          status: 'finished',
+          home_score: '2',
+          away_score: '1',
+        }),
+        createMatch({
+          match_id: 83,
+          round_number: 3,
+          match_date: '2026-04-18',
+          match_time: '19:35',
+          status: 'scheduled',
+        }),
+        createMatch({
+          match_id: 84,
+          round_number: 4,
+          match_date: '2026-04-25',
+          match_time: '19:35',
+          status: 'scheduled',
+        }),
+      ],
+      '2026-04-12T12:00:00+08:00',
+    )
+
+    expect(matches.map((match) => [match.matchId, match.focusKind])).toEqual([
+      [81, null],
+      [82, 'latest-finished'],
+      [83, 'next-scheduled'],
+      [84, null],
+    ])
+  })
+})
+
+describe('buildTeamSeasonMatchRowId', () => {
+  test('builds a stable scroll target id from match id', () => {
+    expect(buildTeamSeasonMatchRowId(83)).toBe('team-season-match-83')
   })
 })

@@ -172,10 +172,7 @@ fn should_show_contact(viewer_user_id: Option<Uuid>, status: &SeatSwapCandidateS
     viewer_user_id.is_some()
         && matches!(
             status,
-            SeatSwapCandidateStatus::Communicable
-                | SeatSwapCandidateStatus::WaitingPeerConfirmation
-                | SeatSwapCandidateStatus::PeerConfirmedMe
-                | SeatSwapCandidateStatus::Matched
+            SeatSwapCandidateStatus::PeerConfirmedMe | SeatSwapCandidateStatus::Matched
         )
 }
 
@@ -390,7 +387,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn exposes_contacts_for_any_candidate_when_i_have_published() {
+    async fn hides_contacts_before_peer_has_confirmed_me() {
         let use_case = build_use_case_with_pool(vec![
             request_fixture(1, USER_A, "A", vec!["B"]),
             request_fixture(2, USER_B, "C", vec!["A"]),
@@ -402,7 +399,7 @@ mod tests {
             view.candidates[0].status,
             SeatSwapCandidateStatus::Communicable
         );
-        assert!(view.candidates[0].contact.is_some());
+        assert!(view.candidates[0].contact.is_none());
     }
 
     #[tokio::test]
@@ -422,17 +419,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn exposes_contacts_for_bidirectional_candidates() {
-        let use_case = build_use_case_with_pool(vec![
-            request_fixture(1, USER_A, "A", vec!["B"]),
-            request_fixture(2, USER_B, "B", vec!["A"]),
-        ]);
+    async fn exposes_contacts_after_peer_has_confirmed_me() {
+        let use_case = build_use_case_with_confirmations(
+            vec![
+                request_fixture(1, USER_A, "A", vec!["B"]),
+                request_fixture(2, USER_B, "B", vec!["A"]),
+            ],
+            vec![SeatSwapConfirmation {
+                request_id: Uuid::from_u128(2),
+                target_request_id: Uuid::from_u128(1),
+                confirmed_by_user_id: USER_B,
+            }],
+        );
 
         let view = use_case.execute(Some(USER_A)).await.expect("view");
 
         assert_eq!(
             view.candidates[0].status,
-            SeatSwapCandidateStatus::Communicable
+            SeatSwapCandidateStatus::PeerConfirmedMe
         );
         assert!(view.candidates[0].contact.is_some());
     }

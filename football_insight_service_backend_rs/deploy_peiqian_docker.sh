@@ -211,24 +211,52 @@ export DOCKER_CONFIG
 git_sync_branch() {
     local branch="$1"
 
-    if git -c http.version=HTTP/1.1 fetch origin "${branch}"; then
+    ensure_origin_remote
+
+    if git_with_proxy fetch origin "${branch}"; then
         git checkout "${branch}"
-        git -c http.version=HTTP/1.1 pull --ff-only origin "${branch}"
+        git_with_proxy pull --ff-only origin "${branch}"
         return 0
     fi
 
     echo "⚠️ git 同步首次失败，5 秒后重试一次..."
     sleep 5
-    git -c http.version=HTTP/1.1 fetch origin "${branch}"
+    ensure_origin_remote
+    git_with_proxy fetch origin "${branch}"
     git checkout "${branch}"
-    git -c http.version=HTTP/1.1 pull --ff-only origin "${branch}"
+    git_with_proxy pull --ff-only origin "${branch}"
+}
+
+git_with_proxy() {
+    if command -v zsh >/dev/null 2>&1; then
+        zsh -ic 'proxyOn >/dev/null 2>&1 || true; cd -- "$1"; shift; git -c http.version=HTTP/1.1 "$@"' \
+            git-with-proxy "${DEPLOY_MONOREPO_DIR}" "$@"
+    else
+        git -c http.version=HTTP/1.1 "$@"
+    fi
+}
+
+ensure_origin_remote() {
+    local current_url
+
+    current_url="$(git remote get-url origin 2>/dev/null || true)"
+    if [ "${current_url}" = "${DEPLOY_REPO_URL}" ]; then
+        return 0
+    fi
+
+    echo "🔧 修正生产机 Git origin: ${current_url:-<missing>} -> ${DEPLOY_REPO_URL}"
+    if git remote get-url origin >/dev/null 2>&1; then
+        git remote set-url origin "${DEPLOY_REPO_URL}"
+    else
+        git remote add origin "${DEPLOY_REPO_URL}"
+    fi
 }
 
 if [ ! -d "${DEPLOY_MONOREPO_DIR}/.git" ]; then
     echo "📥 首次初始化 ${DEPLOY_MONOREPO_DIR}..."
     mkdir -p "${DEPLOY_MONOREPO_DIR}"
     TEMP_CLONE_DIR="$(mktemp -d /tmp/football-insight-monorepo-XXXXXX)"
-    git clone --branch "${BRANCH}" "${DEPLOY_REPO_URL}" "${TEMP_CLONE_DIR}"
+    git_with_proxy clone --branch "${BRANCH}" "${DEPLOY_REPO_URL}" "${TEMP_CLONE_DIR}"
     shopt -s dotglob nullglob
     mv "${TEMP_CLONE_DIR}"/* "${DEPLOY_MONOREPO_DIR}/"
     rmdir "${TEMP_CLONE_DIR}"

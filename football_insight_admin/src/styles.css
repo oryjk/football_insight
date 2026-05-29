@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 48 28% 97%;
+  --foreground: 220 18% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 18% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 18% 12%;
+  --primary: 166 76% 24%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 46 23% 91%;
+  --secondary-foreground: 220 18% 15%;
+  --accent: 46 23% 91%;
+  --accent-foreground: 220 18% 12%;
+  --muted: 45 18% 92%;
+  --muted-foreground: 220 8% 43%;
+  --destructive: 0 72% 45%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 42 16% 83%;
+  --input: 42 16% 83%;
+  --ring: 166 76% 24%;
+  --radius: 0.5rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    linear-gradient(180deg, hsl(48 28% 97%) 0%, hsl(44 26% 94%) 100%);
+  font-family:
+    ui-sans-serif,
+    "PingFang SC",
+    "Microsoft YaHei",
+    "Noto Sans CJK SC",
+    sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}

@@ -130,9 +130,17 @@ bun run build:mp-weixin
 
 - `VITE_API_BASE_URL`
 - `VITE_MINI_PROGRAM_VERSION`
-- `VITE_MINI_PROGRAM_APP_ID`（可选）
 
-小程序启动页面会用 `VITE_MINI_PROGRAM_VERSION` 请求后端 `GET /api/v1/system_config?version={version}`。如果后端返回 `is_under_review=true` 且 `matched=true`，小程序会进入审核模式：不加载会员、支付、用户会员等级、回流看板会员权益等相关信息。
+小程序审核态判断当前对齐 `registration_system_mini` 的实现，不再走业务后端 `system_config`，而是直接请求：
+
+- `GET https://match.oryjk.cn/mini-review/api/public/review-status?project_code=football_insight_mini&version={version}`
+
+其中：
+
+- `project_code` 固定为 `football_insight_mini`
+- `version` 使用当前小程序版本号 `VITE_MINI_PROGRAM_VERSION`
+
+如果接口返回 `is_reviewing=true`，小程序会进入审核模式：不加载会员、支付、用户会员等级、回流看板会员权益等相关信息。
 
 当前项目已经内置：
 

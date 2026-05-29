@@ -15,6 +15,7 @@ import {
   countSeatSwapDesiredRegions,
   previousSeatSwapStep,
   resolveSeatSwapBrowseFilterKey,
+  resolveDefaultExpandedSeatSwapRegionKeys,
   resolveSeatSwapStickyMapThreshold,
   readSeatSwapViewportScrollTop,
   shouldDimSeatSwapRegion,
@@ -202,6 +203,14 @@ describe('seat swap request grouping', () => {
 })
 
 describe('seat swap candidate actions', () => {
+  test('lets a logged-in viewer start publishing against a display-only candidate before they have their own request', () => {
+    expect(resolveSeatSwapCandidateAction({
+      candidateStatus: 'display_only',
+      candidateRequestId: 'target-request',
+      isLoggedIn: true,
+    })).toBe('confirm')
+  })
+
   test('lets the viewer cancel their pending confirmation instead of confirming again', () => {
     expect(resolveSeatSwapCandidateAction({
       candidateStatus: 'waiting_peer_confirmation',
@@ -217,7 +226,7 @@ describe('seat swap candidate actions', () => {
       candidateRequestId: 'target-request',
       myRequestId: 'my-request',
       isLoggedIn: true,
-    })).toBe('none')
+    })).toBe('matched_cancel')
   })
 })
 
@@ -260,6 +269,10 @@ describe('seat swap map interaction', () => {
   test('builds stable anchor ids for region groups', () => {
     expect(buildSeatSwapRegionAnchorId('531')).toBe('seat-swap-group-531')
     expect(buildSeatSwapRegionAnchorId('VIP2')).toBe('seat-swap-group-VIP2')
+  })
+
+  test('expands every available region group by default', () => {
+    expect(resolveDefaultExpandedSeatSwapRegionKeys(['508', '522', '531'])).toEqual(['508', '522', '531'])
   })
 
   test('toggles the selected browse region off when tapped again', () => {

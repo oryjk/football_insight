@@ -31,6 +31,24 @@ impl PostgresAuthRepository {
         Self { pool }
     }
 
+    async fn find_user_status_by_account_identifier(
+        tx: &mut Transaction<'_, Postgres>,
+        account_identifier: &str,
+    ) -> anyhow::Result<Option<(Uuid, String)>> {
+        sqlx::query_as::<_, (Uuid, String)>(
+            r#"
+            SELECT id, status
+              FROM f_i_users
+             WHERE account_identifier = $1
+             LIMIT 1
+            "#,
+        )
+        .bind(account_identifier)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(Into::into)
+    }
+
     fn generate_invite_code() -> String {
         let raw = Uuid::new_v4().simple().to_string().to_uppercase();
         format!("FI-{}-{}", &raw[..6], &raw[6..12])
@@ -172,7 +190,7 @@ impl PostgresAuthRepository {
         referred_user_id: Uuid,
         referral_code: &str,
     ) -> anyhow::Result<()> {
-        sqlx::query(
+        let result = sqlx::query(
             r#"
             INSERT INTO f_i_user_referrals (
                 id,
@@ -180,6 +198,7 @@ impl PostgresAuthRepository {
                 referred_user_id,
                 referral_invite_code
             ) VALUES ($1, $2, $3, $4)
+            ON CONFLICT (referred_user_id) DO NOTHING
             "#,
         )
         .bind(Uuid::new_v4())
@@ -188,6 +207,10 @@ impl PostgresAuthRepository {
         .bind(referral_code)
         .execute(&mut **tx)
         .await?;
+
+        if result.rows_affected() == 0 {
+            return Ok(());
+        }
 
         let referral_count = sqlx::query_scalar::<_, i64>(
             r#"
@@ -252,15 +275,82 @@ impl PostgresAuthRepository {
             Self::resolve_invite_code_official_wechat_open_id(&mut tx, invite_code).await?;
         let membership_tier_rules = Self::load_membership_tier_rules_in_tx(&mut tx).await?;
 
-        let account_identifier_exists = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM f_i_users WHERE account_identifier = $1",
-        )
-        .bind(account_identifier)
-        .fetch_one(&mut *tx)
-        .await?;
+        if let Some((user_id, status)) =
+            Self::find_user_status_by_account_identifier(&mut tx, account_identifier).await?
+        {
+            if status == "active" {
+                anyhow::bail!("phone number is already registered");
+            }
 
-        if account_identifier_exists > 0 {
-            anyhow::bail!("phone number is already registered");
+            let user = sqlx::query_as::<_, AuthUserRow>(
+                r#"
+                UPDATE f_i_users
+                   SET display_name = $2,
+                       password_hash = $3,
+                       membership_tier = 'V3',
+                       official_wechat_open_id = $4,
+                       status = 'active',
+                       updated_at = NOW()
+                 WHERE id = $1
+                RETURNING id,
+                          account_identifier,
+                          display_name,
+                          (
+                              SELECT code
+                                FROM f_i_invite_codes AS invite_codes
+                               WHERE invite_codes.used_by_user_id = f_i_users.id
+                               LIMIT 1
+                          ) AS invite_code,
+                          avatar_url,
+                          (wx_open_id IS NOT NULL) AS has_wechat_binding,
+                          membership_tier,
+                          membership_expires_at,
+                          CASE
+                              WHEN official_wechat_open_id IS NULL THEN TRUE
+                              ELSE EXISTS (
+                                  SELECT 1
+                                    FROM f_i_wechat_followers AS followers
+                                   WHERE followers.open_id = f_i_users.official_wechat_open_id
+                                     AND followers.unsubscribed_at IS NULL
+                              )
+                          END AS membership_benefits_enabled,
+                          created_at,
+                          updated_at
+                "#,
+            )
+            .bind(user_id)
+            .bind(account_identifier)
+            .bind(password_hash)
+            .bind(&official_wechat_open_id)
+            .fetch_one(&mut *tx)
+            .await?;
+
+            sqlx::query(
+                r#"
+                UPDATE f_i_invite_codes
+                   SET used_by_user_id = $2,
+                       used_at = NOW()
+                 WHERE code = $1
+                "#,
+            )
+            .bind(invite_code)
+            .bind(user.id)
+            .execute(&mut *tx)
+            .await?;
+
+            if let (Some(referrer_user_id), Some(referral_code)) = (referrer_user_id, referral_code)
+            {
+                Self::record_referral_and_upgrade_referrer(
+                    &mut tx,
+                    referrer_user_id,
+                    user.id,
+                    referral_code.trim(),
+                )
+                .await?;
+            }
+
+            tx.commit().await?;
+            return Ok(user.into_auth_user(&membership_tier_rules));
         }
 
         let user = sqlx::query_as::<_, AuthUserRow>(
@@ -345,15 +435,67 @@ impl PostgresAuthRepository {
         let referrer_user_id = Self::resolve_referrer_user_id(&mut tx, referral_code).await?;
         let membership_tier_rules = Self::load_membership_tier_rules_in_tx(&mut tx).await?;
 
-        let account_identifier_exists = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM f_i_users WHERE account_identifier = $1",
-        )
-        .bind(account_identifier)
-        .fetch_one(&mut *tx)
-        .await?;
+        if let Some((user_id, status)) =
+            Self::find_user_status_by_account_identifier(&mut tx, account_identifier).await?
+        {
+            if status == "active" {
+                anyhow::bail!("phone number is already registered");
+            }
 
-        if account_identifier_exists > 0 {
-            anyhow::bail!("phone number is already registered");
+            let user = sqlx::query_as::<_, AuthUserRow>(
+                r#"
+                UPDATE f_i_users
+                   SET display_name = $2,
+                       password_hash = $3,
+                       membership_tier = 'V1',
+                       status = 'active',
+                       updated_at = NOW()
+                 WHERE id = $1
+                RETURNING id,
+                          account_identifier,
+                          display_name,
+                          (
+                              SELECT code
+                                FROM f_i_invite_codes AS invite_codes
+                               WHERE invite_codes.used_by_user_id = f_i_users.id
+                               LIMIT 1
+                          ) AS invite_code,
+                          avatar_url,
+                          (wx_open_id IS NOT NULL) AS has_wechat_binding,
+                          membership_tier,
+                          membership_expires_at,
+                          CASE
+                              WHEN official_wechat_open_id IS NULL THEN TRUE
+                              ELSE EXISTS (
+                                  SELECT 1
+                                    FROM f_i_wechat_followers AS followers
+                                   WHERE followers.open_id = f_i_users.official_wechat_open_id
+                                     AND followers.unsubscribed_at IS NULL
+                              )
+                          END AS membership_benefits_enabled,
+                          created_at,
+                          updated_at
+                "#,
+            )
+            .bind(user_id)
+            .bind(account_identifier)
+            .bind(password_hash)
+            .fetch_one(&mut *tx)
+            .await?;
+
+            if let (Some(referrer_user_id), Some(referral_code)) = (referrer_user_id, referral_code)
+            {
+                Self::record_referral_and_upgrade_referrer(
+                    &mut tx,
+                    referrer_user_id,
+                    user.id,
+                    referral_code.trim(),
+                )
+                .await?;
+            }
+
+            tx.commit().await?;
+            return Ok(user.into_auth_user(&membership_tier_rules));
         }
 
         let user = sqlx::query_as::<_, AuthUserRow>(
@@ -423,15 +565,93 @@ impl PostgresAuthRepository {
             Self::resolve_invite_code_official_wechat_open_id(&mut tx, invite_code).await?;
         let membership_tier_rules = Self::load_membership_tier_rules_in_tx(&mut tx).await?;
 
-        let phone_exists = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM f_i_users WHERE account_identifier = $1",
-        )
-        .bind(phone_number)
-        .fetch_one(&mut *tx)
-        .await?;
+        if let Some((user_id, status)) =
+            Self::find_user_status_by_account_identifier(&mut tx, phone_number).await?
+        {
+            if status == "active" {
+                anyhow::bail!("phone number is already registered");
+            }
 
-        if phone_exists > 0 {
-            anyhow::bail!("phone number is already registered");
+            let user = sqlx::query_as::<_, AuthUserRow>(
+                r#"
+                UPDATE f_i_users
+                   SET wx_open_id = $2,
+                       union_id = $3,
+                       display_name = $4,
+                       avatar_url = $5,
+                       password_hash = $6,
+                       membership_tier = 'V3',
+                       official_wechat_open_id = $7,
+                       status = 'active',
+                       updated_at = NOW()
+                 WHERE id = $1
+                RETURNING id,
+                          account_identifier,
+                          display_name,
+                          (
+                              SELECT code
+                                FROM f_i_invite_codes AS invite_codes
+                               WHERE invite_codes.used_by_user_id = f_i_users.id
+                               LIMIT 1
+                          ) AS invite_code,
+                          avatar_url,
+                          (wx_open_id IS NOT NULL) AS has_wechat_binding,
+                          membership_tier,
+                          membership_expires_at,
+                          CASE
+                              WHEN official_wechat_open_id IS NULL THEN TRUE
+                              ELSE EXISTS (
+                                  SELECT 1
+                                    FROM f_i_wechat_followers AS followers
+                                   WHERE followers.open_id = f_i_users.official_wechat_open_id
+                                     AND followers.unsubscribed_at IS NULL
+                              )
+                          END AS membership_benefits_enabled,
+                          created_at,
+                          updated_at
+                "#,
+            )
+            .bind(user_id)
+            .bind(&profile.open_id)
+            .bind(&profile.union_id)
+            .bind(
+                profile
+                    .display_name
+                    .clone()
+                    .unwrap_or_else(|| phone_number.to_string()),
+            )
+            .bind(&profile.avatar_url)
+            .bind(password_hash)
+            .bind(&official_wechat_open_id)
+            .fetch_one(&mut *tx)
+            .await?;
+
+            sqlx::query(
+                r#"
+                UPDATE f_i_invite_codes
+                   SET used_by_user_id = $2,
+                       used_at = NOW()
+                 WHERE code = $1
+                "#,
+            )
+            .bind(invite_code)
+            .bind(user.id)
+            .execute(&mut *tx)
+            .await?;
+
+            if let (Some(referrer_user_id), Some(referral_code)) = (referrer_user_id, referral_code)
+            {
+                Self::record_referral_and_upgrade_referrer(
+                    &mut tx,
+                    referrer_user_id,
+                    user.id,
+                    referral_code.trim(),
+                )
+                .await?;
+            }
+
+            tx.commit().await?;
+            return Ok(user.into_auth_user(&membership_tier_rules));
         }
 
         let user = sqlx::query_as::<_, AuthUserRow>(
@@ -528,15 +748,78 @@ impl PostgresAuthRepository {
         let referrer_user_id = Self::resolve_referrer_user_id(&mut tx, referral_code).await?;
         let membership_tier_rules = Self::load_membership_tier_rules_in_tx(&mut tx).await?;
 
-        let phone_exists = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM f_i_users WHERE account_identifier = $1",
-        )
-        .bind(phone_number)
-        .fetch_one(&mut *tx)
-        .await?;
+        if let Some((user_id, status)) =
+            Self::find_user_status_by_account_identifier(&mut tx, phone_number).await?
+        {
+            if status == "active" {
+                anyhow::bail!("phone number is already registered");
+            }
 
-        if phone_exists > 0 {
-            anyhow::bail!("phone number is already registered");
+            let user = sqlx::query_as::<_, AuthUserRow>(
+                r#"
+                UPDATE f_i_users
+                   SET wx_open_id = $2,
+                       union_id = $3,
+                       display_name = $4,
+                       avatar_url = $5,
+                       password_hash = $6,
+                       membership_tier = 'V1',
+                       status = 'active',
+                       updated_at = NOW()
+                 WHERE id = $1
+                RETURNING id,
+                          account_identifier,
+                          display_name,
+                          (
+                              SELECT code
+                                FROM f_i_invite_codes AS invite_codes
+                               WHERE invite_codes.used_by_user_id = f_i_users.id
+                               LIMIT 1
+                          ) AS invite_code,
+                          avatar_url,
+                          (wx_open_id IS NOT NULL) AS has_wechat_binding,
+                          membership_tier,
+                          membership_expires_at,
+                          CASE
+                              WHEN official_wechat_open_id IS NULL THEN TRUE
+                              ELSE EXISTS (
+                                  SELECT 1
+                                    FROM f_i_wechat_followers AS followers
+                                   WHERE followers.open_id = f_i_users.official_wechat_open_id
+                                     AND followers.unsubscribed_at IS NULL
+                              )
+                          END AS membership_benefits_enabled,
+                          created_at,
+                          updated_at
+                "#,
+            )
+            .bind(user_id)
+            .bind(&profile.open_id)
+            .bind(&profile.union_id)
+            .bind(
+                profile
+                    .display_name
+                    .clone()
+                    .unwrap_or_else(|| phone_number.to_string()),
+            )
+            .bind(&profile.avatar_url)
+            .bind(password_hash)
+            .fetch_one(&mut *tx)
+            .await?;
+
+            if let (Some(referrer_user_id), Some(referral_code)) = (referrer_user_id, referral_code)
+            {
+                Self::record_referral_and_upgrade_referrer(
+                    &mut tx,
+                    referrer_user_id,
+                    user.id,
+                    referral_code.trim(),
+                )
+                .await?;
+            }
+
+            tx.commit().await?;
+            return Ok(user.into_auth_user(&membership_tier_rules));
         }
 
         let user = sqlx::query_as::<_, AuthUserRow>(
@@ -617,15 +900,91 @@ impl PostgresAuthRepository {
 
         let account_identifier = Self::generate_wechat_account_identifier(&profile.open_id);
 
-        let account_identifier_exists = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM f_i_users WHERE account_identifier = $1",
-        )
-        .bind(&account_identifier)
-        .fetch_one(&mut *tx)
-        .await?;
+        if let Some((user_id, status)) =
+            Self::find_user_status_by_account_identifier(&mut tx, &account_identifier).await?
+        {
+            if status == "active" {
+                anyhow::bail!("wechat account is already registered");
+            }
 
-        if account_identifier_exists > 0 {
-            anyhow::bail!("wechat account is already registered");
+            let user = sqlx::query_as::<_, AuthUserRow>(
+                r#"
+                UPDATE f_i_users
+                   SET wx_open_id = $2,
+                       union_id = $3,
+                       display_name = $4,
+                       avatar_url = $5,
+                       membership_tier = 'V3',
+                       official_wechat_open_id = $6,
+                       status = 'active',
+                       updated_at = NOW()
+                 WHERE id = $1
+                RETURNING id,
+                          account_identifier,
+                          display_name,
+                          (
+                              SELECT code
+                                FROM f_i_invite_codes AS invite_codes
+                               WHERE invite_codes.used_by_user_id = f_i_users.id
+                               LIMIT 1
+                          ) AS invite_code,
+                          avatar_url,
+                          (wx_open_id IS NOT NULL) AS has_wechat_binding,
+                          membership_tier,
+                          membership_expires_at,
+                          CASE
+                              WHEN official_wechat_open_id IS NULL THEN TRUE
+                              ELSE EXISTS (
+                                  SELECT 1
+                                    FROM f_i_wechat_followers AS followers
+                                   WHERE followers.open_id = f_i_users.official_wechat_open_id
+                                     AND followers.unsubscribed_at IS NULL
+                              )
+                          END AS membership_benefits_enabled,
+                          created_at,
+                          updated_at
+                "#,
+            )
+            .bind(user_id)
+            .bind(&profile.open_id)
+            .bind(&profile.union_id)
+            .bind(
+                profile
+                    .display_name
+                    .clone()
+                    .unwrap_or_else(|| "微信用户".to_string()),
+            )
+            .bind(&profile.avatar_url)
+            .bind(&official_wechat_open_id)
+            .fetch_one(&mut *tx)
+            .await?;
+
+            sqlx::query(
+                r#"
+                UPDATE f_i_invite_codes
+                   SET used_by_user_id = $2,
+                       used_at = NOW()
+                 WHERE code = $1
+                "#,
+            )
+            .bind(invite_code)
+            .bind(user.id)
+            .execute(&mut *tx)
+            .await?;
+
+            if let (Some(referrer_user_id), Some(referral_code)) = (referrer_user_id, referral_code)
+            {
+                Self::record_referral_and_upgrade_referrer(
+                    &mut tx,
+                    referrer_user_id,
+                    user.id,
+                    referral_code.trim(),
+                )
+                .await?;
+            }
+
+            tx.commit().await?;
+            return Ok(user.into_auth_user(&membership_tier_rules));
         }
 
         let user = sqlx::query_as::<_, AuthUserRow>(
@@ -720,15 +1079,76 @@ impl PostgresAuthRepository {
 
         let account_identifier = Self::generate_wechat_account_identifier(&profile.open_id);
 
-        let account_identifier_exists = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM f_i_users WHERE account_identifier = $1",
-        )
-        .bind(&account_identifier)
-        .fetch_one(&mut *tx)
-        .await?;
+        if let Some((user_id, status)) =
+            Self::find_user_status_by_account_identifier(&mut tx, &account_identifier).await?
+        {
+            if status == "active" {
+                anyhow::bail!("wechat account is already registered");
+            }
 
-        if account_identifier_exists > 0 {
-            anyhow::bail!("wechat account is already registered");
+            let user = sqlx::query_as::<_, AuthUserRow>(
+                r#"
+                UPDATE f_i_users
+                   SET wx_open_id = $2,
+                       union_id = $3,
+                       display_name = $4,
+                       avatar_url = $5,
+                       membership_tier = 'V1',
+                       status = 'active',
+                       updated_at = NOW()
+                 WHERE id = $1
+                RETURNING id,
+                          account_identifier,
+                          display_name,
+                          (
+                              SELECT code
+                                FROM f_i_invite_codes AS invite_codes
+                               WHERE invite_codes.used_by_user_id = f_i_users.id
+                               LIMIT 1
+                          ) AS invite_code,
+                          avatar_url,
+                          (wx_open_id IS NOT NULL) AS has_wechat_binding,
+                          membership_tier,
+                          membership_expires_at,
+                          CASE
+                              WHEN official_wechat_open_id IS NULL THEN TRUE
+                              ELSE EXISTS (
+                                  SELECT 1
+                                    FROM f_i_wechat_followers AS followers
+                                   WHERE followers.open_id = f_i_users.official_wechat_open_id
+                                     AND followers.unsubscribed_at IS NULL
+                              )
+                          END AS membership_benefits_enabled,
+                          created_at,
+                          updated_at
+                "#,
+            )
+            .bind(user_id)
+            .bind(&profile.open_id)
+            .bind(&profile.union_id)
+            .bind(
+                profile
+                    .display_name
+                    .clone()
+                    .unwrap_or_else(|| "微信用户".to_string()),
+            )
+            .bind(&profile.avatar_url)
+            .fetch_one(&mut *tx)
+            .await?;
+
+            if let (Some(referrer_user_id), Some(referral_code)) = (referrer_user_id, referral_code)
+            {
+                Self::record_referral_and_upgrade_referrer(
+                    &mut tx,
+                    referrer_user_id,
+                    user.id,
+                    referral_code.trim(),
+                )
+                .await?;
+            }
+
+            tx.commit().await?;
+            return Ok(user.into_auth_user(&membership_tier_rules));
         }
 
         let user = sqlx::query_as::<_, AuthUserRow>(
@@ -1048,6 +1468,7 @@ impl AuthRepository for PostgresAuthRepository {
                    password_hash
               FROM f_i_users
              WHERE account_identifier = $1
+               AND status = 'active'
              LIMIT 1
             "#,
         )
@@ -1088,6 +1509,7 @@ impl AuthRepository for PostgresAuthRepository {
                    updated_at
               FROM f_i_users
              WHERE wx_open_id = $1
+               AND status = 'active'
              LIMIT 1
             "#,
         )
@@ -1113,6 +1535,7 @@ impl AuthRepository for PostgresAuthRepository {
                    avatar_url = COALESCE(avatar_url, $5),
                    updated_at = NOW()
              WHERE id = $1
+               AND status = 'active'
             RETURNING id,
                       account_identifier,
                       display_name,
@@ -1265,6 +1688,7 @@ impl AuthRepository for PostgresAuthRepository {
                    updated_at
               FROM f_i_users
              WHERE id = $1
+               AND status = 'active'
              LIMIT 1
             "#,
         )
@@ -1431,6 +1855,7 @@ impl AuthRepository for PostgresAuthRepository {
                    updated_at = NOW()
               FROM f_i_invite_codes AS invite_codes
              WHERE users.account_identifier = $2
+               AND users.status = 'active'
                AND invite_codes.code = $1
                AND invite_codes.used_by_user_id = users.id
             "#,
@@ -1452,18 +1877,19 @@ impl AuthRepository for PostgresAuthRepository {
 #[async_trait::async_trait]
 impl crate::auth::ports::user_membership_port::UserMembershipPort for PostgresAuthRepository {
     async fn get_user_open_id(&self, user_id: Uuid) -> anyhow::Result<Option<String>> {
-        let open_id: Option<String> =
-            sqlx::query_scalar("SELECT wx_open_id FROM f_i_users WHERE id = $1 LIMIT 1")
-                .bind(user_id)
-                .fetch_optional(&self.pool)
-                .await?;
+        let open_id: Option<String> = sqlx::query_scalar(
+            "SELECT wx_open_id FROM f_i_users WHERE id = $1 AND status = 'active' LIMIT 1",
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
 
         Ok(open_id)
     }
 
     async fn get_user_membership_tier(&self, user_id: Uuid) -> anyhow::Result<Option<String>> {
         let row = sqlx::query(
-            "SELECT membership_tier, membership_expires_at FROM f_i_users WHERE id = $1 LIMIT 1",
+            "SELECT membership_tier, membership_expires_at FROM f_i_users WHERE id = $1 AND status = 'active' LIMIT 1",
         )
         .bind(user_id)
         .fetch_optional(&self.pool)
@@ -1483,6 +1909,7 @@ impl crate::auth::ports::user_membership_port::UserMembershipPort for PostgresAu
             UPDATE f_i_users
             SET membership_tier = $2, updated_at = NOW()
             WHERE id = $1
+              AND status = 'active'
             "#,
         )
         .bind(user_id)
@@ -1495,7 +1922,7 @@ impl crate::auth::ports::user_membership_port::UserMembershipPort for PostgresAu
 
     async fn is_seat_swap_notice_enabled(&self, user_id: Uuid) -> anyhow::Result<Option<bool>> {
         let value = sqlx::query_scalar::<_, bool>(
-            "SELECT seat_swap_notice_enabled FROM f_i_users WHERE id = $1 LIMIT 1",
+            "SELECT seat_swap_notice_enabled FROM f_i_users WHERE id = $1 AND status = 'active' LIMIT 1",
         )
         .bind(user_id)
         .fetch_optional(&self.pool)

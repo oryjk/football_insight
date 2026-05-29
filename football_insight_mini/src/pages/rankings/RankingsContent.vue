@@ -2,7 +2,7 @@
   <view class="page-root">
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" />
     <view class="page-bg-fade"></view>
-    <view class="page-scroll">
+    <view class="page-scroll" :class="{ 'page-scroll--locked': selectedRankingTeam || selectedStandingsTable }">
       <view class="page">
       <FiLoading
         v-if="loading"
@@ -162,8 +162,17 @@
         </view>
       </template>
 
-      <view v-if="selectedRankingTeam" class="standings-sheet-mask" @click.self="closeRankingTeamSheet">
-        <view class="standings-sheet standings-sheet--team-season" @click.stop="consumeSheetTap">
+      <view
+        v-if="selectedRankingTeam"
+        class="standings-sheet-mask"
+        @click.self="closeRankingTeamSheet"
+        @touchmove.stop.prevent
+      >
+        <view
+          class="standings-sheet standings-sheet--team-season"
+          @click.stop="consumeSheetTap"
+          @touchmove.stop
+        >
           <view class="section-heading section-heading--compact">
             <view>
               <text class="section-kicker">球队赛季战绩</text>
@@ -208,22 +217,34 @@
             <text>{{ teamSeasonMatchesErrorMessage }}</text>
           </view>
 
-          <scroll-view v-else-if="selectedRankingTeamMatches.length" scroll-y class="team-season-sheet__list">
+          <scroll-view
+            v-else-if="selectedRankingTeamMatches.length"
+            scroll-y
+            class="team-season-sheet__list"
+            :scroll-top="teamSeasonScrollTop"
+            scroll-with-animation
+          >
             <view
               v-for="(match, index) in selectedRankingTeamMatches"
               :key="match.matchId"
+              :id="buildTeamSeasonMatchRowId(match.matchId)"
               class="team-season-match-row"
+              :class="[
+                match.isHomeTeam ? 'team-season-match-row--home' : 'team-season-match-row--away',
+                match.focusKind ? `team-season-match-row--${match.focusKind}` : '',
+              ]"
               :style="getTeamMatchRowStyle(index)"
             >
+              <text
+                v-if="match.focusKind"
+                class="team-season-match-row__focus"
+                :class="`team-season-match-row__focus--${match.focusKind}`"
+              >
+                {{ match.focusKind === 'latest-finished' ? '刚赛完' : '下一场' }}
+              </text>
               <view class="team-season-match-row__meta">
-                <text>第 {{ match.roundNumber }} 轮 · {{ match.matchDate }} {{ match.matchTime }}</text>
-                <view class="team-season-match-row__meta-right">
-                  <text class="team-season-match-row__venue" :class="match.isHomeTeam ? 'team-season-match-row__venue--home' : 'team-season-match-row__venue--away'">
-                    {{ match.venueLabel }}
-                  </text>
-                  <text class="team-season-match-row__result" :class="`team-season-match-row__result--${match.resultTone}`">
-                    {{ match.resultLabel }}
-                  </text>
+                <view class="team-season-match-row__meta-left">
+                  <text>第 {{ match.roundNumber }} 轮 · {{ match.matchDate }} {{ match.matchTime }}</text>
                 </view>
               </view>
               <view class="team-season-match-row__body">
@@ -246,8 +267,13 @@
         </view>
       </view>
 
-      <view v-if="selectedStandingsTable" class="standings-sheet-mask" @click.self="closeStandingsSheet">
-        <view class="standings-sheet">
+      <view
+        v-if="selectedStandingsTable"
+        class="standings-sheet-mask"
+        @click.self="closeStandingsSheet"
+        @touchmove.stop.prevent
+      >
+        <view class="standings-sheet" @touchmove.stop>
           <view class="section-heading section-heading--compact">
             <view>
               <text class="section-kicker">完整积分榜</text>
@@ -319,7 +345,7 @@ import FiLoading from '../../components/FiLoading.vue'
 import { getAvailableRounds, getMatches, getRankings } from '../../api/insight'
 import type { MatchCard, PlayerRankingCategory, RankingsViewResponse, RoundReference, StandingsTable, StandingsTableEntry, TeamRankingCategory, TeamRankingEntry } from '../../types/insight'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { type TeamSeasonMatch, resolveTeamSeasonMatches } from '../../utils/teamSeasonMatches'
+import { buildTeamSeasonMatchRowId, type TeamSeasonMatch, resolveTeamSeasonMatches } from '../../utils/teamSeasonMatches'
 import bgImage from '../../static/user/phoenix-stadium-bg.webp'
 import memberCardDotsImage from '../../static/user/member-card-dots.png'
 import { buildStandingsFallbackMetrics, buildStandingsPosterColumns, buildStandingsPosterMetrics, buildStandingsPosterSharePath, buildStandingsPosterShareTitle, buildStandingsPosterTeamLayout, buildStandingsRankingEntries, type StandingsRankingMode } from './poster'
@@ -366,6 +392,9 @@ const standingsPosterQrModules = [
   '111111101010110101101111111011101',
 ]
 const instance = getCurrentInstance()
+const emit = defineEmits<{
+  (event: 'page-scroll-lock-change', locked: boolean): void
+}>()
 const scope = ref<'team' | 'player'>('team')
 const standingsRankingMode = ref<StandingsRankingMode>('with_penalty')
 const loading = ref(true)
@@ -383,6 +412,7 @@ const rounds = ref<RoundReference[]>([])
 const allSeasonMatches = ref<MatchCard[] | null>(null)
 const teamSeasonMatchesLoading = ref(false)
 const teamSeasonMatchesErrorMessage = ref('')
+const teamSeasonScrollTop = ref(0)
 const pendingAutoOpenStandingsSlug = ref<string | null>(null)
 
 interface StandingsPosterSharePayload {
@@ -518,6 +548,9 @@ const selectedRankingTeamRecordText = computed(() => {
   const record = selectedRankingTeamRecordParts.value
   return `${record.wins}胜 ${record.draws}平 ${record.losses}负`
 })
+const nextScheduledTeamSeasonMatch = computed(() =>
+  selectedRankingTeamMatches.value.find((match) => match.focusKind === 'next-scheduled') ?? null,
+)
 
 watch(
   categoryOptions,
@@ -537,6 +570,26 @@ watch(
 watch(activeCategorySlug, () => {
   void centerActiveCategory()
 })
+
+watch(
+  nextScheduledTeamSeasonMatch,
+  async (match) => {
+    if (!selectedRankingTeam.value || !match) {
+      return
+    }
+
+    await nextTick()
+    centerTeamSeasonMatch(match.matchId)
+  },
+  { flush: 'post' },
+)
+
+watch(
+  () => Boolean(selectedRankingTeam.value || selectedStandingsTable.value),
+  (locked) => {
+    emit('page-scroll-lock-change', locked)
+  },
+)
 
 function priority(slug: string): number {
   if (slug === 'standings_with_penalty') {
@@ -587,9 +640,20 @@ function hasRectShape(value: unknown): value is { left: number; width: number } 
     && typeof (value as { width?: unknown }).width === 'number'
 }
 
+function hasVerticalRectShape(value: unknown): value is { top: number; height: number } {
+  return !!value && typeof value === 'object'
+    && typeof (value as { top?: unknown }).top === 'number'
+    && typeof (value as { height?: unknown }).height === 'number'
+}
+
 function hasScrollLeft(value: unknown): value is { scrollLeft: number } {
   return !!value && typeof value === 'object'
     && typeof (value as { scrollLeft?: unknown }).scrollLeft === 'number'
+}
+
+function hasScrollTop(value: unknown): value is { scrollTop: number } {
+  return !!value && typeof value === 'object'
+    && typeof (value as { scrollTop?: unknown }).scrollTop === 'number'
 }
 
 async function centerActiveCategory(): Promise<void> {
@@ -618,6 +682,34 @@ async function centerActiveCategory(): Promise<void> {
 
     if (nextScrollLeft !== categoryScrollLeft.value) {
       categoryScrollLeft.value = nextScrollLeft
+    }
+  })
+}
+
+async function centerTeamSeasonMatch(matchId: number): Promise<void> {
+  if (!instance) {
+    return
+  }
+
+  await nextTick()
+
+  const query = uni.createSelectorQuery().in(instance)
+  query.select('.team-season-sheet__list').boundingClientRect()
+  query.select('.team-season-sheet__list').scrollOffset(() => {})
+  query.select(`#${buildTeamSeasonMatchRowId(matchId)}`).boundingClientRect()
+  query.exec((result) => {
+    const [rawScrollRect, rawScrollOffset, rawMatchRect] = (result ?? []) as unknown[]
+
+    if (!hasVerticalRectShape(rawScrollRect) || !hasScrollTop(rawScrollOffset) || !hasVerticalRectShape(rawMatchRect)) {
+      return
+    }
+
+    const verticalDelta = (rawMatchRect.top + rawMatchRect.height / 2)
+      - (rawScrollRect.top + rawScrollRect.height / 2)
+    const nextScrollTop = Math.max(0, Math.round(rawScrollOffset.scrollTop + verticalDelta))
+
+    if (nextScrollTop !== teamSeasonScrollTop.value) {
+      teamSeasonScrollTop.value = nextScrollTop
     }
   })
 }
@@ -714,6 +806,7 @@ async function openRankingTeamSheet(team: TeamRankingEntry): Promise<void> {
 function closeRankingTeamSheet(): void {
   selectedRankingTeam.value = null
   teamSeasonMatchesErrorMessage.value = ''
+  teamSeasonScrollTop.value = 0
 }
 
 async function generatePoster(table: StandingsTable): Promise<void> {
@@ -995,6 +1088,10 @@ defineExpose({
   position: relative;
   z-index: 1;
   box-sizing: border-box;
+}
+.page-scroll--locked {
+  height: 100vh;
+  overflow: hidden;
 }
 .page { padding: 24rpx 16rpx 40rpx; display: flex; flex-direction: column; gap: 16rpx; }
 .panel, .state-card {
@@ -1529,8 +1626,11 @@ defineExpose({
   text-align: center;
 }
 .team-season-match-row {
-  padding: 20rpx 0;
-  border-top: 2rpx solid #f0f1f5;
+  position: relative;
+  margin-top: 10rpx;
+  padding: 20rpx 18rpx;
+  border-top: 2rpx solid transparent;
+  border-radius: 18rpx;
   display: grid;
   gap: 14rpx;
   opacity: 0;
@@ -1541,74 +1641,57 @@ defineExpose({
 .team-season-match-row:first-child {
   border-top: none;
 }
+.team-season-match-row--home {
+  background: linear-gradient(135deg, #7f1d1d, #b91c1c);
+  box-shadow: 0 12rpx 26rpx rgba(127, 29, 29, 0.18);
+}
+.team-season-match-row--away {
+  background: linear-gradient(135deg, #14532d, #16a34a);
+  box-shadow: 0 12rpx 26rpx rgba(20, 83, 45, 0.18);
+}
+.team-season-match-row--latest-finished,
+.team-season-match-row--next-scheduled {
+  box-shadow: 0 14rpx 30rpx rgba(17, 24, 39, 0.22), inset 0 0 0 3rpx rgba(255, 255, 255, 0.28);
+}
 .team-season-match-row__meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16rpx;
-  color: #8f9198;
+  color: #fff;
   font-size: 22rpx;
 }
-.team-season-match-row__meta-right {
-  display: inline-flex;
+.team-season-match-row__meta-left {
+  min-width: 0;
+  display: flex;
   align-items: center;
-  gap: 8rpx;
+  gap: 10rpx;
+  padding-right: 128rpx;
+  overflow: hidden;
+  white-space: nowrap;
 }
-.team-season-match-row__venue {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 56rpx;
-  padding: 4rpx 12rpx;
-  border-radius: 999rpx;
+.team-season-match-row__focus {
+  position: absolute;
+  right: 18rpx;
+  top: -2rpx;
+  z-index: 1;
+  min-width: 108rpx;
+  padding: 8rpx 18rpx 8rpx 16rpx;
+  border-radius: 0 0 16rpx 16rpx;
   font-size: 20rpx;
-  font-weight: 800;
+  line-height: 1.1;
+  font-weight: 900;
+  text-align: center;
+  box-shadow: 0 8rpx 18rpx rgba(17, 24, 39, 0.2);
 }
-.team-season-match-row__venue--home {
-  background: rgba(220, 38, 38, 0.12);
-  color: #dc2626;
+.team-season-match-row__focus--latest-finished {
+  background: #2563eb;
+  color: #fff;
 }
-.team-season-match-row__venue--away {
-  background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
+.team-season-match-row__focus--next-scheduled {
+  background: #fff;
+  color: #14532d;
 }
-
-.team-season-match-row__result {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 56rpx;
-  padding: 4rpx 12rpx;
-  border-radius: 999rpx;
-  font-size: 20rpx;
-  font-weight: 800;
-}
-
-.team-season-match-row__result--win {
-  background: rgba(220, 38, 38, 0.12);
-  color: #dc2626;
-}
-
-.team-season-match-row__result--draw {
-  background: rgba(234, 179, 8, 0.12);
-  color: #854d0e;
-}
-
-.team-season-match-row__result--loss {
-  background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
-}
-
-.team-season-match-row__result--live {
-  background: rgba(220, 38, 38, 0.12);
-  color: #dc2626;
-}
-
-.team-season-match-row__result--scheduled {
-  background: rgba(59, 130, 246, 0.12);
-  color: #2563eb;
-}
-
 .team-season-match-row__body {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -1635,7 +1718,7 @@ defineExpose({
 }
 
 .team-season-match-row__team {
-  color: #7b818d;
+  color: #fff;
   font-size: 28rpx;
   font-weight: 700;
   white-space: nowrap;
@@ -1644,11 +1727,11 @@ defineExpose({
 }
 
 .team-season-match-row__team--active {
-  color: #121212;
+  color: #fff;
 }
 
 .team-season-match-row__score {
-  color: #121212;
+  color: #fff;
   font-size: 40rpx;
   line-height: 1;
   font-weight: 800;

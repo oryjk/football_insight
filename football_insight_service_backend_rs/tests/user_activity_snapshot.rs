@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use football_insight_service_backend_rs::activity::{
     application::record_page_activity::{RecordPageActivityInput, RecordPageActivityUseCase},
+    domain::page_key::ActivityError,
     ports::user_activity_repository::UserActivityRepository,
 };
 use uuid::Uuid;
@@ -56,6 +57,9 @@ async fn rejects_unknown_page_key() {
         .await
         .unwrap_err();
 
-    assert!(error.to_string().contains("unsupported activity page key"));
+    assert!(matches!(
+        error.downcast_ref::<ActivityError>(),
+        Some(ActivityError::UnsupportedPageKey)
+    ));
     assert!(repository.calls.lock().unwrap().is_empty());
 }

@@ -20,6 +20,13 @@ export interface PublicSystemConfig {
   membership_tier_rules?: MembershipTierRule[]
 }
 
+export interface MiniReviewStatus {
+  project_code: string
+  version: string
+  is_reviewing: boolean
+  status_text: string
+}
+
 export interface SystemConfig {
   mini_program_app_id: string
   mini_program_version: string

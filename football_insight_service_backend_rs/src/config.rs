@@ -95,6 +95,7 @@ pub struct AppConfig {
     pub jpush: Option<JPushConfig>,
     pub seat_swap_mini_subscribe_template_id: String,
     pub seat_swap_mini_subscribe_page: String,
+    pub admin_api_token: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -179,6 +180,10 @@ impl AppConfig {
             std::env::var("WECHAT_MINI_SEAT_SWAP_SUBSCRIBE_TEMPLATE_ID").unwrap_or_default();
         let seat_swap_mini_subscribe_page = std::env::var("WECHAT_MINI_SEAT_SWAP_SUBSCRIBE_PAGE")
             .unwrap_or_else(|_| "pages/seat-swap/index".to_string());
+        let admin_api_token = std::env::var("ADMIN_API_TOKEN")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
 
         Ok(Self {
             port,
@@ -205,6 +210,7 @@ impl AppConfig {
             jpush,
             seat_swap_mini_subscribe_template_id,
             seat_swap_mini_subscribe_page,
+            admin_api_token,
         })
     }
 }

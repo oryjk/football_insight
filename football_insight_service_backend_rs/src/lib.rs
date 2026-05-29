@@ -1,4 +1,5 @@
 pub mod activity;
+pub mod admin;
 pub mod ai;
 pub mod app;
 pub mod auth;

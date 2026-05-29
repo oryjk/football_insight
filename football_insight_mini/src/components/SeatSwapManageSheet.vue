@@ -22,7 +22,7 @@
         <text class="seat-swap-manage__note">你可以编辑或撤销当前发布。撤销后已发出的"确认换座"会一并失效。</text>
       </template>
       <template v-else>
-        <text class="seat-swap-manage__note">已匹配成功。如线下协商取消,请填写说明并上传双方达成一致的截图。</text>
+        <text class="seat-swap-manage__note">已匹配成功。如双方协商取消，填写原因后即可取消当前匹配。</text>
         <view class="seat-swap-manage__field seat-swap-manage__field--full">
           <text class="seat-swap-manage__field-label">撤销说明</text>
           <textarea
@@ -31,12 +31,6 @@
             placeholder="撤销说明"
             @input="emit('update:cancelReason', normalizeInputValue($event))"
           />
-        </view>
-        <view class="seat-swap-manage__evidence">
-          <button class="seat-swap-manage__ghost seat-swap-manage__evidence-pick" @tap="emit('choose-evidence')">
-            {{ evidenceFileName ? '重新选择截图' : '选择截图' }}
-          </button>
-          <text v-if="evidenceFileName" class="seat-swap-manage__evidence-name">{{ evidenceFileName }}</text>
         </view>
       </template>
     </view>
@@ -69,7 +63,6 @@ defineProps<{
   statusLabel: string
   desiredSummary: string
   cancelReason: string
-  evidenceFileName: string
 }>()
 
 const emit = defineEmits<{
@@ -78,7 +71,6 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'edit'): void
   (e: 'delete'): void
-  (e: 'choose-evidence'): void
   (e: 'submit-matched-cancel'): void
 }>()
 
@@ -158,25 +150,6 @@ function normalizeInputValue(event: Event): string {
   font-size: 26rpx;
   color: #121212;
   box-sizing: border-box;
-}
-
-.seat-swap-manage__evidence {
-  margin-top: 14rpx;
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-  flex-wrap: wrap;
-}
-
-.seat-swap-manage__evidence-pick {
-  flex-shrink: 0;
-}
-
-.seat-swap-manage__evidence-name {
-  flex: 1;
-  color: #988f84;
-  font-size: 22rpx;
-  word-break: break-all;
 }
 
 .seat-swap-manage__actions {

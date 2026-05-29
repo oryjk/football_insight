@@ -37,7 +37,7 @@ export interface SeatSwapFormErrors {
 }
 
 export type SeatSwapSelectionStep = 'select_current' | 'select_desired' | 'ready_to_publish'
-export type SeatSwapCandidateAction = 'confirm' | 'cancel_confirmation' | 'none'
+export type SeatSwapCandidateAction = 'confirm' | 'cancel_confirmation' | 'matched_cancel' | 'none'
 
 export interface SeatSwapRegionGroup<TRequest extends SeatSwapRegionGroupItem> {
   region_key: string
@@ -229,6 +229,10 @@ export function resolveSeatSwapBrowseFilterKey(currentKey: string, tappedKey: st
   return currentKey === tappedKey ? '' : tappedKey
 }
 
+export function resolveDefaultExpandedSeatSwapRegionKeys(availableKeys: string[]): string[] {
+  return [...availableKeys]
+}
+
 export function shouldDimSeatSwapRegion(input: {
   mode: 'browse' | 'filter' | 'published' | 'select-current' | 'select-desired' | 'review'
   hasFilterKey: boolean
@@ -294,8 +298,8 @@ export function resolveSeatSwapCandidateAction(input: {
     return 'cancel_confirmation'
   }
 
-  if (input.candidateStatus === 'matched' || input.candidateStatus === 'display_only') {
-    return 'none'
+  if (input.candidateStatus === 'matched') {
+    return 'matched_cancel'
   }
 
   return 'confirm'

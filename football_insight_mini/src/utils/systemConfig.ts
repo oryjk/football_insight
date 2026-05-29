@@ -1,13 +1,13 @@
-import { getSystemConfig } from '../api/system'
-import type { SystemConfig } from '../types/system'
+import { getMiniReviewStatus } from '../api/miniReview'
+import type { MiniReviewStatus } from '../types/system'
 
-export function resolveSystemConfigUnderReview(config: Pick<SystemConfig, 'is_under_review' | 'matched'> | null): boolean {
-  return Boolean(config?.matched && config.is_under_review)
+export function resolveSystemConfigUnderReview(config: Pick<MiniReviewStatus, 'is_reviewing'> | null): boolean {
+  return Boolean(config?.is_reviewing)
 }
 
-export async function loadSystemConfig(): Promise<SystemConfig | null> {
-  return getSystemConfig().catch((error) => {
-    console.warn('[system_config] load failed', error)
+export async function loadSystemConfig(): Promise<MiniReviewStatus | null> {
+  return getMiniReviewStatus().catch((error) => {
+    console.warn('[mini-review] load failed', error)
     return null
   })
 }

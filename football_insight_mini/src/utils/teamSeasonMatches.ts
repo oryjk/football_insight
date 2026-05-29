@@ -20,6 +20,7 @@ export interface TeamSeasonMatch {
   resultTone: 'win' | 'draw' | 'loss' | 'live' | 'scheduled'
   scoreText: string
   venueLabel: '主' | '客'
+  focusKind: 'latest-finished' | 'next-scheduled' | null
 }
 
 function resolveKickoffSortValue(matchDate: string, matchTime: string): number {
@@ -29,18 +30,38 @@ function resolveKickoffSortValue(matchDate: string, matchTime: string): number {
   return Number.isNaN(timestamp) ? 0 : timestamp
 }
 
+export function buildTeamSeasonMatchRowId(matchId: number): string {
+  return `team-season-match-${matchId}`
+}
+
 export function resolveTeamSeasonMatches(
   team: { team_id: number; team_name: string },
   matches: MatchCard[],
   nowIso = new Date().toISOString(),
 ): TeamSeasonMatch[] {
-  return matches
+  const teamMatches = matches
     .filter((match) =>
       match.home_team_id === team.team_id
       || match.away_team_id === team.team_id
       || match.home_team_name === team.team_name
       || match.away_team_name === team.team_name,
     )
+
+  const latestFinishedMatchId = teamMatches
+    .filter((match) => resolveMatchDisplayStatus(match, nowIso) === 'finished')
+    .sort((left, right) =>
+      resolveKickoffSortValue(right.match_date, right.match_time)
+      - resolveKickoffSortValue(left.match_date, left.match_time),
+    )[0]?.match_id ?? null
+
+  const nextScheduledMatchId = teamMatches
+    .filter((match) => resolveMatchDisplayStatus(match, nowIso) === 'scheduled')
+    .sort((left, right) =>
+      resolveKickoffSortValue(left.match_date, left.match_time)
+      - resolveKickoffSortValue(right.match_date, right.match_time),
+    )[0]?.match_id ?? null
+
+  return teamMatches
     .sort((left, right) => {
       const leftStatus = resolveMatchDisplayStatus(left, nowIso)
       const rightStatus = resolveMatchDisplayStatus(right, nowIso)
@@ -72,6 +93,9 @@ export function resolveTeamSeasonMatches(
 
       const opponentName = isHomeTeam ? match.away_team_name : match.home_team_name
       const venueLabel = isHomeTeam ? '主' : '客'
+      const focusKind = match.match_id === latestFinishedMatchId
+        ? 'latest-finished'
+        : match.match_id === nextScheduledMatchId ? 'next-scheduled' : null
 
       if (displayStatus === 'live') {
         return {
@@ -93,6 +117,7 @@ export function resolveTeamSeasonMatches(
           resultTone: 'live',
           scoreText,
           venueLabel,
+          focusKind,
         }
       }
 
@@ -116,6 +141,7 @@ export function resolveTeamSeasonMatches(
           resultTone: 'scheduled',
           scoreText,
           venueLabel,
+          focusKind,
         }
       }
 
@@ -140,6 +166,7 @@ export function resolveTeamSeasonMatches(
         resultTone,
         scoreText,
         venueLabel,
+        focusKind,
       }
     })
 }
