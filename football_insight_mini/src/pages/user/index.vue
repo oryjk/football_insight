@@ -408,7 +408,7 @@ import historyIcon from '../../static/user/history.svg'
 import infoIcon from '../../static/user/info.svg'
 import logInIcon from '../../static/user/log-in.svg'
 import memberCardDotsImage from '../../static/user/member-card-dots.png'
-import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.webp'
+import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.jpg'
 import radarIcon from '../../static/user/radar.svg'
 import ticketIcon from '../../static/user/ticket.svg'
 import {

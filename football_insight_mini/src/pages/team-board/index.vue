@@ -239,7 +239,7 @@
 import { computed, reactive, ref } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
-import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.webp'
+import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.jpg'
 import {
   addTeamBoardComment,
   createTeamBoardPost,

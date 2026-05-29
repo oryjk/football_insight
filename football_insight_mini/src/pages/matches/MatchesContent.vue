@@ -285,7 +285,7 @@
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
-import bgImage from '../../static/user/phoenix-stadium-bg.webp'
+import bgImage from '../../static/user/phoenix-stadium-bg.jpg'
 import { getAvailableRounds, getMatches } from '../../api/insight'
 import type { MatchCard, RoundReference } from '../../types/insight'
 import { extractApiErrorMessage } from '../../utils/apiError'

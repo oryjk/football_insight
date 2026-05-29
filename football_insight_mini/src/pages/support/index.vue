@@ -129,7 +129,7 @@
 import { computed, ref } from 'vue'
 import { onHide, onLoad, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
-import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.webp'
+import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.jpg'
 import { castSupportVote, getMatchSupportDetail } from '../../api/support'
 import type { SupportMatchDetail } from '../../types/support'
 import { extractApiErrorMessage } from '../../utils/apiError'

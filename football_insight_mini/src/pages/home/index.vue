@@ -676,7 +676,7 @@ import type { SupportMatchDetail, SupportProfile, SupportTeam } from '../../type
 import type { PublicSystemConfig } from '../../types/system'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { getAccessToken, setAccessToken } from '../../utils/authStorage'
-import bgImage from '../../static/user/phoenix-stadium-bg.webp'
+import bgImage from '../../static/user/phoenix-stadium-bg.jpg'
 import memberCardDotsImage from '../../static/user/member-card-dots.png'
 import pulseMatchCornerImage from '../../static/home/pulse-match-corner.png'
 import { buildHomeBriefingMarqueeMap, splitBriefingMarqueeRows, type HomeBriefingMarqueeAccent } from '../../utils/homeBriefingMarquees'

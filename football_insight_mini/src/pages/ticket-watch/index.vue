@@ -1024,7 +1024,7 @@ import soccerBallIcon from '../../static/ticket-watch/soccer-ball.svg'
 import swapArrowsIcon from '../../static/ticket-watch/swap-arrows.svg'
 import targetIcon from '../../static/ticket-watch/target.svg'
 import trendIcon from '../../static/ticket-watch/trend.svg'
-import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.webp'
+import phoenixStadiumBgImage from '../../static/user/phoenix-stadium-bg.jpg'
 import {
   applyBlockInterestToSections,
   applyBlockInterestsToSections,

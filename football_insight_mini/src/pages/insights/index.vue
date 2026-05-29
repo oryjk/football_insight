@@ -426,7 +426,7 @@ import type {
 } from '../../types/insight'
 import type { CurrentUser } from '../../types/auth'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import bgImage from '../../static/user/phoenix-stadium-bg.webp'
+import bgImage from '../../static/user/phoenix-stadium-bg.jpg'
 import memberCardDotsImage from '../../static/user/member-card-dots.png'
 import { useAnimatedInteger } from '../../composables/useAnimatedInteger'
 import { resolveMembershipBenefitsLocked } from '../../utils/membershipBenefits'
