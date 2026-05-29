@@ -1,4 +1,5 @@
 <template>
+  <page-meta :page-style="pageLockStyle" />
   <view class="page-root">
     <FiBrandNav open-on-current-page @open-ai="openAiFromBrandNav" />
     <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" />
@@ -111,6 +112,7 @@
                 :action="candidateAction(candidate)"
                 @confirm="confirmCandidate"
                 @cancel-confirmation="cancelCandidateConfirmation"
+                @matched-cancel="openMatchedCancelForCandidate"
               />
             </template>
           </template>
@@ -127,6 +129,7 @@
             :action="candidateAction(candidate)"
             @confirm="confirmCandidate"
             @cancel-confirmation="cancelCandidateConfirmation"
+            @matched-cancel="openMatchedCancelForCandidate"
           />
         </template>
       </template>
@@ -156,6 +159,8 @@
       v-model:visible="publishSheetVisible"
       :eyebrow="publishSheetEyebrow"
       :title="publishSheetTitle"
+      height="76vh"
+      compact-footer
     >
       <view class="steps">
         <view
@@ -184,8 +189,14 @@
 
       <template v-if="selectionStep === 'select_current'">
         <view class="selected-tags">
-          <text v-if="stagedCurrentRegionName" class="tag tag--current">已选 · {{ stagedCurrentRegionName }}</text>
-          <text v-else class="tag tag--empty">点选你现在的分区</text>
+          <text
+            v-if="stagedCurrentRegionName"
+            class="tag tag--region"
+            :class="regionTagClass(stagedCurrentRegionName)"
+          >
+            已选 · {{ stagedCurrentRegionName }}
+          </text>
+          <text v-else class="tag tag--empty">先点球场中的当前分区</text>
         </view>
         <view class="row-input">
           <view class="row-input__field">
@@ -203,43 +214,58 @@
       </template>
 
       <template v-else-if="selectionStep === 'select_desired'">
-        <view class="selected-tags">
-          <text class="tag tag--current">当前座位 · {{ form.current_region_name }}</text>
-          <text
-            v-for="seat in stagedDesiredSeats"
-            :key="`tag-${seat.region_key}`"
-            class="tag tag--desired"
+        <view class="seat-selection-group">
+          <text class="seat-selection-group__title">当前座位</text>
+          <view
+            class="current-seat-card tag--region"
+            :class="regionTagClass(form.current_region_name)"
           >
-            {{ seat.region_name }}
-          </text>
-          <text v-if="!stagedDesiredSeats.length" class="tag tag--empty">点选目标座位分区(可多选)</text>
+            <text class="current-seat-card__region">{{ form.current_region_name }}</text>
+            <text class="current-seat-card__meta">{{ form.current_row }}排</text>
+            <text class="current-seat-card__meta">{{ form.current_seat_no }}号</text>
+          </view>
+        </view>
+        <view class="selected-tags">
+          <text v-if="!stagedDesiredSeats.length" class="tag tag--empty">先点球场中的目标分区(可多选)</text>
         </view>
         <view v-if="stagedDesiredSeats.length" class="desired-rows">
+          <text class="seat-selection-group__title seat-selection-group__title--full">目标座位</text>
           <view
             v-for="seat in stagedDesiredSeats"
             :key="`desired-${seat.region_key}`"
-            class="desired-rows__item"
+            class="desired-rows__item tag--region"
+            :class="regionTagClass(seat.region_name)"
           >
             <text class="desired-rows__name">{{ seat.region_name }}</text>
-            <input v-model="seat.desired_row" class="input-box input-box--short" placeholder="排" />
-            <input v-model="seat.desired_seat_no" class="input-box input-box--short" placeholder="号" />
           </view>
         </view>
         <text v-if="formErrors.desired_seats" class="field-error">{{ formErrors.desired_seats }}</text>
       </template>
 
       <template v-else>
-        <view class="summary-card">
-          <view class="summary-card__row">
-            <text class="summary-card__label">当前</text>
-            <text class="summary-card__value">{{ formatSeatLabel(form) }}</text>
-          </view>
-          <view class="summary-card__row">
-            <text class="summary-card__label">目标</text>
-            <text class="summary-card__value">{{ confirmedDesiredSummary }}</text>
+        <view class="seat-selection-group">
+          <text class="seat-selection-group__title">当前座位</text>
+          <view
+            class="current-seat-card tag--region"
+            :class="regionTagClass(form.current_region_name)"
+          >
+            <text class="current-seat-card__region">{{ form.current_region_name }}</text>
+            <text class="current-seat-card__meta">{{ form.current_row }}排</text>
+            <text class="current-seat-card__meta">{{ form.current_seat_no }}号</text>
           </view>
         </view>
-        <view class="row-input">
+        <view class="desired-rows desired-rows--summary">
+          <text class="seat-selection-group__title seat-selection-group__title--full">目标座位</text>
+          <view
+            v-for="seat in form.desired_seats"
+            :key="`summary-desired-${seat.region_key}`"
+            class="desired-rows__item tag--region"
+            :class="regionTagClass(seat.region_name)"
+          >
+            <text class="desired-rows__name">{{ seat.region_name }}</text>
+          </view>
+        </view>
+        <view class="row-input row-input--contact">
           <view class="row-input__field">
             <text class="row-input__label">微信号</text>
             <input v-model="form.wechat_id" class="input-box" placeholder="至少填一项" />
@@ -284,11 +310,9 @@
       :request="currentView?.my_request"
       :status-label="myRequestStatusLabel"
       :desired-summary="myDesiredSummary"
-      :evidence-file-name="evidenceFileName"
       @close="closeManageSheet"
       @edit="openEditFromManage"
       @delete="deleteRequest"
-      @choose-evidence="chooseEvidence"
       @submit-matched-cancel="submitMatchedCancel"
     />
 
@@ -326,6 +350,7 @@ import type { TicketWatchRegion } from '../../types/ticketWatch'
 import { getAccessToken } from '../../utils/authStorage'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { formatDatetime } from '../../utils/format'
+import { resolveSeatSwapRegionColorGroup } from '../../utils/stadiumRegions'
 import { useAiChatSheet } from '../../composables/useAiChatSheet'
 import {
   buildSeatSwapRegionAnchorId,
@@ -342,6 +367,7 @@ import {
   previousSeatSwapStep,
   resolveSeatSwapBrowseFilterKey,
   resolveSeatSwapCandidateAction,
+  resolveDefaultExpandedSeatSwapRegionKeys,
   statusLabel,
   toggleDesiredSeatRegion,
   validateSeatSwapForm,
@@ -365,11 +391,15 @@ const publishSheetVisible = ref(false)
 const manageSheetVisible = ref(false)
 const browsingFilterKey = ref('')
 
+const pageScrollLocked = computed(() => publishSheetVisible.value || manageSheetVisible.value)
+const pageLockStyle = computed(() => pageScrollLocked.value ? 'overflow: hidden;' : '')
+
 const selectionStep = ref<SeatSwapSelectionStep>('select_current')
 const stagedCurrentRegionKey = ref('')
 const stagedDesiredSeats = ref<SeatSwapFormState['desired_seats']>([])
 const expandedRegionKeys = ref<string[]>([])
 const pendingConfirmTarget = ref<SeatSwapCandidate | null>(null)
+const pendingMatchedCancelTargetId = ref('')
 const miniProgramNoticeEnabled = ref(false)
 const {
   aiChatVisible,
@@ -380,9 +410,6 @@ const {
 } = useAiChatSheet()
 
 const cancelReason = ref('')
-const evidenceFileName = ref('')
-const evidenceBase64 = ref('')
-const evidenceContentType = ref('image/jpeg')
 
 const form = reactive<SeatSwapFormState>({
   current_region_key: '',
@@ -498,6 +525,10 @@ function findRegion(key: string): TicketWatchRegion | undefined {
   return regions.value.find((r) => regionKey(r) === key)
 }
 
+function regionTagClass(regionName: string): string {
+  return `tag--region-${resolveSeatSwapRegionColorGroup(regionName)}`
+}
+
 function groupHasMyDesired(group: { region_key: string }): boolean {
   return myDesiredKeys.value.includes(group.region_key)
 }
@@ -516,8 +547,7 @@ function syncExpandedRegionKeys(): void {
   const available = seatSwapRegionGroups.value.map((g) => g.region_key)
   expandedRegionKeys.value = expandedRegionKeys.value.filter((k) => available.includes(k))
   if (!expandedRegionKeys.value.length && available.length) {
-    const hit = available.find((k) => myDesiredKeys.value.includes(k))
-    expandedRegionKeys.value = [hit || available[0]]
+    expandedRegionKeys.value = resolveDefaultExpandedSeatSwapRegionKeys(available)
   }
 }
 
@@ -737,13 +767,13 @@ function openPublishSheetForCandidate(candidate: SeatSwapCandidate): void {
 
 function openManageSheet(): void {
   cancelReason.value = ''
-  evidenceFileName.value = ''
-  evidenceBase64.value = ''
+  pendingMatchedCancelTargetId.value = ''
   manageSheetVisible.value = true
 }
 
 function closeManageSheet(): void {
   manageSheetVisible.value = false
+  pendingMatchedCancelTargetId.value = ''
 }
 
 function openEditFromManage(): void {
@@ -842,7 +872,25 @@ async function confirmCandidate(requestId: string): Promise<void> {
   }
 }
 
+async function confirmSeatSwapCancellation(): Promise<boolean> {
+  return await new Promise<boolean>((resolve) => {
+    uni.showModal({
+      title: '确认取消匹配',
+      content: '取消后需要重新发起确认，确定继续吗？',
+      confirmText: '确定取消',
+      cancelText: '先保留',
+      success: (result) => resolve(Boolean(result.confirm)),
+      fail: () => resolve(false),
+    })
+  })
+}
+
 async function cancelCandidateConfirmation(requestId: string): Promise<void> {
+  const confirmed = await confirmSeatSwapCancellation()
+  if (!confirmed) {
+    return
+  }
+
   try {
     await cancelSeatSwapCandidateConfirmation(requestId)
     uni.showToast({ title: '已取消匹配', icon: 'success' })
@@ -850,6 +898,12 @@ async function cancelCandidateConfirmation(requestId: string): Promise<void> {
   } catch (err) {
     uni.showToast({ title: extractApiErrorMessage(err, '取消失败'), icon: 'none' })
   }
+}
+
+function openMatchedCancelForCandidate(requestId: string): void {
+  pendingMatchedCancelTargetId.value = requestId
+  cancelReason.value = ''
+  manageSheetVisible.value = true
 }
 
 async function requestSeatSwapSubscribeMessage(): Promise<boolean> {
@@ -877,49 +931,32 @@ async function requestSeatSwapSubscribeMessage(): Promise<boolean> {
   return miniProgramNoticeEnabled.value
 }
 
-function chooseEvidence(): void {
-  uni.chooseImage({
-    count: 1,
-    success: (result) => {
-      const path = result.tempFilePaths[0]
-      evidenceFileName.value = path.split('/').pop() || 'seat-swap-cancel.jpg'
-      const fs = uni.getFileSystemManager()
-      fs.readFile({
-        filePath: path,
-        encoding: 'base64',
-        success: (readResult) => {
-          evidenceBase64.value = String(readResult.data)
-        },
-        fail: () => {
-          evidenceFileName.value = ''
-          evidenceBase64.value = ''
-          uni.showToast({ title: '截图读取失败', icon: 'none' })
-        },
-      })
-    },
-  })
-}
-
 async function submitMatchedCancel(): Promise<void> {
   const matchedId = currentView.value?.my_request?.request_id
-  const target = currentView.value?.candidates.find((c) => c.status === 'matched')
+  const target = currentView.value?.candidates.find((candidate) => {
+    if (pendingMatchedCancelTargetId.value) {
+      return candidate.request_id === pendingMatchedCancelTargetId.value
+    }
+    return candidate.status === 'matched'
+  })
   if (!matchedId || !target) {
     uni.showToast({ title: '暂无可撤销的匹配', icon: 'none' })
     return
   }
-  if (!cancelReason.value.trim() || !evidenceBase64.value) {
-    uni.showToast({ title: '请填写说明并上传截图', icon: 'none' })
+  if (!cancelReason.value.trim()) {
+    uni.showToast({ title: '请填写撤销说明', icon: 'none' })
     return
   }
   try {
     await cancelMatchedSeatSwap(target.request_id, {
       reason: cancelReason.value,
-      evidence_file_name: evidenceFileName.value || 'seat-swap-cancel.jpg',
-      evidence_content_type: evidenceContentType.value,
-      evidence_base64: evidenceBase64.value,
+      evidence_file_name: '',
+      evidence_content_type: '',
+      evidence_base64: '',
     })
     uni.showToast({ title: '已提交撤销', icon: 'success' })
     manageSheetVisible.value = false
+    pendingMatchedCancelTargetId.value = ''
     await loadPage()
   } catch (err) {
     uni.showToast({ title: extractApiErrorMessage(err, '提交撤销失败'), icon: 'none' })
@@ -1458,29 +1495,76 @@ onShow(() => {
   line-height: 1;
 }
 
-.tag--current {
-  background: #fff1f0;
-  color: #b42318;
-  border-color: rgba(226, 59, 46, 0.24);
+.tag--region {
+  border-radius: 12rpx;
+  border-color: transparent;
+  color: #fff;
+  font-weight: 900;
+  box-shadow: 0 8rpx 18rpx rgba(18, 25, 20, 0.18);
 }
 
-.tag--desired {
-  background: #eef8f2;
-  color: #167348;
-  border-color: rgba(29, 138, 85, 0.3);
-}
+.tag--region-blue { background: #336fbd; }
+.tag--region-green { background: #46ab59; }
+.tag--region-purple { background: #6c369b; }
+.tag--region-yellow { background: #f4c23a; color: #17191f; }
+.tag--region-navy { background: #0f215e; }
+.tag--region-red { background: #ec3b20; }
+.tag--region-vip { background: #b90000; }
+.tag--region-muted { background: #d9dee7; color: #17191f; }
 
 .tag--empty {
-  background: #ffffff;
-  color: #8f9198;
-  border-color: rgba(207, 211, 220, 0.95);
+  background: #fff1f0;
+  color: #c52018;
+  border-color: rgba(226, 59, 46, 0.42);
   border-style: dashed;
+}
+
+.seat-selection-group {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin: 18rpx 0 0;
+}
+
+.seat-selection-group__title {
+  color: #6d7280;
+  font-size: 22rpx;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.seat-selection-group__title--full {
+  width: 100%;
+}
+
+.current-seat-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 10rpx;
+  min-height: 54rpx;
+  padding: 0 16rpx;
+  border-radius: 14rpx;
+  box-sizing: border-box;
+}
+
+.current-seat-card__region {
+  font-size: 24rpx;
+  font-weight: 900;
+}
+
+.current-seat-card__meta {
+  font-size: 24rpx;
+  font-weight: 900;
 }
 
 .row-input {
   display: flex;
   gap: 16rpx;
   margin-top: 12rpx;
+}
+
+.row-input--contact {
+  margin-bottom: 22rpx;
 }
 
 .row-input--full {
@@ -1530,30 +1614,29 @@ onShow(() => {
 }
 
 .desired-rows {
-  margin-top: 16rpx;
+  margin-top: 12rpx;
   display: flex;
-  flex-direction: column;
-  gap: 12rpx;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.desired-rows--summary {
+  margin-top: 16rpx;
 }
 
 .desired-rows__item {
-  display: flex;
-  align-items: stretch;
-  gap: 12rpx;
+  display: inline-flex;
+  align-items: center;
+  min-height: 54rpx;
+  padding: 0 16rpx;
+  border-radius: 14rpx;
+  box-sizing: border-box;
+  box-shadow: 0 8rpx 18rpx rgba(18, 25, 20, 0.14);
 }
 
 .desired-rows__name {
-  flex: 1;
-  height: 72rpx;
-  padding: 0 18rpx;
-  border-radius: 16rpx;
-  background: #eef8f2;
-  color: #167348;
   font-size: 24rpx;
-  font-weight: 400;
-  display: flex;
-  align-items: center;
-  box-sizing: border-box;
+  font-weight: 900;
 }
 
 .field-error {
@@ -1561,35 +1644,6 @@ onShow(() => {
   margin-top: 12rpx;
   color: #b42318;
   font-size: 22rpx;
-}
-
-.summary-card {
-  padding: 18rpx 22rpx;
-  margin: 18rpx 0 0;
-  border-radius: 16rpx;
-  background: #ffffff;
-  border: 1rpx solid rgba(232, 233, 238, 0.95);
-}
-
-.summary-card__row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 16rpx;
-  padding: 6rpx 0;
-}
-
-.summary-card__label {
-  color: #8f9198;
-  font-size: 22rpx;
-}
-
-.summary-card__value {
-  color: #121212;
-  font-size: 24rpx;
-  font-weight: 400;
-  text-align: right;
-  flex: 1;
 }
 
 .btn-primary {

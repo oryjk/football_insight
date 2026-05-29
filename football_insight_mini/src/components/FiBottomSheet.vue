@@ -3,12 +3,14 @@
     v-if="rendered"
     class="fi-sheet-mask"
     :class="{ 'fi-sheet-mask--closing': closing }"
+    @touchmove.stop.prevent
     @tap="handleMaskTap"
   >
     <view
       class="fi-sheet-card"
       :class="{ 'fi-sheet-card--closing': closing }"
       :style="cardStyle"
+      @touchmove.stop
       @tap.stop
     >
       <view class="fi-sheet-card__handle"></view>
@@ -21,11 +23,15 @@
         <button class="fi-sheet-card__close" @tap="handleClose">✕</button>
       </view>
 
-      <scroll-view scroll-y class="fi-sheet-card__body">
+      <scroll-view scroll-y class="fi-sheet-card__body" @touchmove.stop>
         <slot></slot>
       </scroll-view>
 
-      <view v-if="hasFooter" class="fi-sheet-card__footer">
+      <view
+        v-if="hasFooter"
+        class="fi-sheet-card__footer"
+        :class="{ 'fi-sheet-card__footer--compact': compactFooter }"
+      >
         <slot name="footer"></slot>
       </view>
     </view>
@@ -41,6 +47,7 @@ interface Props {
   eyebrow?: string
   height?: string
   closeOnMask?: boolean
+  compactFooter?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -48,6 +55,7 @@ const props = withDefaults(defineProps<Props>(), {
   eyebrow: '',
   height: '88vh',
   closeOnMask: true,
+  compactFooter: false,
 })
 
 const emit = defineEmits<{
@@ -57,7 +65,11 @@ const emit = defineEmits<{
 
 const slots = useSlots()
 const hasFooter = computed(() => !!slots.footer)
-const cardStyle = computed(() => ({ maxHeight: props.height }))
+const cardStyle = computed(() => ({
+  '--fi-sheet-height': props.height,
+  height: props.height,
+  maxHeight: props.height,
+}))
 const rendered = ref(props.visible)
 const closing = ref(false)
 let closeTimer: ReturnType<typeof setTimeout> | null = null
@@ -117,6 +129,8 @@ function handleMaskTap() {
 .fi-sheet-card {
   position: relative;
   width: 100%;
+  height: var(--fi-sheet-height);
+  max-height: var(--fi-sheet-height);
   display: flex;
   flex-direction: column;
   border-radius: 36rpx 36rpx 0 0;
@@ -195,7 +209,7 @@ function handleMaskTap() {
 .fi-sheet-card__body {
   flex: 1;
   min-height: 0;
-  height: 0;
+  height: 100%;
   padding: 6rpx 30rpx 20rpx;
   box-sizing: border-box;
 }
@@ -207,6 +221,11 @@ function handleMaskTap() {
   background: #ffffff;
   display: flex;
   gap: 16rpx;
+}
+
+.fi-sheet-card__footer--compact {
+  padding-top: 14rpx;
+  padding-bottom: 18rpx;
 }
 
 @keyframes fi-overlay-fade-in {
