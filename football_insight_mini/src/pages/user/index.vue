@@ -385,7 +385,7 @@
     </view>
 
     <FiLoginFloat
-      v-if="isGuestPage"
+      v-if="showGuestLoginFloat"
       :disabled="isH5"
       :action-text="isH5 ? '小程序登录' : '去登录'"
       @action="handleMiniWechatLogin"
@@ -496,6 +496,7 @@ const benefitIconMap: Record<UserBenefitItem['iconName'], string> = {
 const isGuestPage = computed(() => !systemConfigUnderReview.value && (!hasLocalAccessToken.value || (!loading.value && !currentUser.value)))
 const hasOpenSheet = computed(() => Boolean(miniWechatBindState.value) || notificationEmailSheetVisible.value)
 const showGuestChantWall = computed(() => isGuestPage.value && !hasOpenSheet.value)
+const showGuestLoginFloat = computed(() => isGuestPage.value && !hasOpenSheet.value)
 const guestChantLines = [
   '凤凰山的灯光亮起',
   '红色看台一起呼吸',
