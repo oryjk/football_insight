@@ -353,7 +353,7 @@
       @close="closeAiChat"
     />
 
-    <view v-if="isGuestPage" class="guest-chant-wall">
+    <view v-if="showGuestChantWall" class="guest-chant-wall">
       <view class="guest-chant-wall__meta">
         <text class="guest-chant-wall__kicker">MATCHDAY AT PHOENIX HILL</text>
         <text class="guest-chant-wall__title">成都主场的歌声</text>
@@ -494,6 +494,8 @@ const benefitIconMap: Record<UserBenefitItem['iconName'], string> = {
 }
 
 const isGuestPage = computed(() => !systemConfigUnderReview.value && (!hasLocalAccessToken.value || (!loading.value && !currentUser.value)))
+const hasOpenSheet = computed(() => Boolean(miniWechatBindState.value) || notificationEmailSheetVisible.value)
+const showGuestChantWall = computed(() => isGuestPage.value && !hasOpenSheet.value)
 const guestChantLines = [
   '凤凰山的灯光亮起',
   '红色看台一起呼吸',
@@ -1703,7 +1705,7 @@ onShow(() => {
 .sheet-mask {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 80;
   background: rgba(18, 20, 28, 0.36);
   backdrop-filter: blur(8rpx);
   display: flex;
