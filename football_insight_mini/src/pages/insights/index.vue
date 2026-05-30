@@ -21,13 +21,18 @@
         </text>
       </view>
 
-      <view v-if="!systemConfigUnderReview" class="panel insights-ticket-watch-entry" @click="openTicketWatch">
+      <view
+        v-if="!systemConfigUnderReview"
+        class="panel insights-ticket-watch-entry"
+        :class="{ 'insights-ticket-watch-entry--locked': shouldLockTicketWatchEntry }"
+        @click="openTicketWatch"
+      >
         <view class="section-heading section-heading--compact">
           <view>
             <text class="section-kicker">Ticket Watch</text>
             <text class="section-title">回流看板</text>
           </view>
-          <text class="meta-pill">打开</text>
+          <text class="meta-pill">{{ shouldLockTicketWatchEntry ? '登录后' : '打开' }}</text>
         </view>
       </view>
 
@@ -87,16 +92,7 @@
           </view>
         </view>
 
-        <view class="insights-lock-overlay">
-          <view class="insights-lock-overlay__card">
-            <text class="section-kicker">登录后查看</text>
-            <text class="insights-lock-overlay__title">球队洞察需要先登录</text>
-            <text class="insights-lock-overlay__copy">
-              登录后可查看球队进球贡献、助攻贡献和失球贡献结构。如果你还没有完成首次微信登录，可以先关注公众号获取邀请码，再补齐微信绑定。
-            </text>
-            <button class="insights-lock-overlay__action" @click="goToLogin">去登录查看</button>
-          </view>
-        </view>
+        <view class="insights-lock-overlay" />
       </view>
 
       <view v-else-if="membershipBenefitsLocked" class="panel insights-locked">
@@ -406,6 +402,8 @@
       :ai-chat-mode="aiPublicConfig?.ai_chat_mode"
       @close="closeAiChat"
     />
+
+    <FiLoginFloat v-if="showLoginFloat" @action="goToLogin" />
   </view>
 </template>
 
@@ -414,6 +412,7 @@ import { computed, getCurrentInstance, nextTick, ref, watch } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiAiChatSheet from '../../components/FiAiChatSheet.vue'
+import FiLoginFloat from '../../components/FiLoginFloat.vue'
 import FiLoading from '../../components/FiLoading.vue'
 import { getCurrentUser } from '../../api/auth'
 import { getLiveTeamInsights } from '../../api/insight'
@@ -459,6 +458,10 @@ const {
 } = useAiChatSheet()
 const membershipBenefitsLocked = computed(() =>
   resolveMembershipBenefitsLocked(currentUser.value),
+)
+const showLoginFloat = computed(() => !systemConfigUnderReview.value && !userLoading.value && !currentUser.value)
+const shouldLockTicketWatchEntry = computed(() =>
+  !userLoading.value && (!currentUser.value || membershipBenefitsLocked.value),
 )
 
 const previewTeams = ['成都蓉城', '上海申花', '武汉三镇', '山东泰山']
@@ -552,6 +555,10 @@ function assistContributionInstanceKey(item: AssistContribution): string {
 
 function openTicketWatch(): void {
   if (systemConfigUnderReview.value) {
+    return
+  }
+
+  if (!currentUser.value) {
     return
   }
 
@@ -719,7 +726,7 @@ onShow(async () => {
 }
 
 .page {
-  padding: 24rpx 16rpx 40rpx;
+  padding: 24rpx 16rpx calc(152rpx + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 16rpx;
@@ -875,6 +882,28 @@ onShow(async () => {
   line-height: 1;
 }
 
+.insights-ticket-watch-entry {
+  overflow: hidden;
+}
+
+.insights-ticket-watch-entry--locked {
+  pointer-events: none;
+}
+
+.insights-ticket-watch-entry--locked .section-heading {
+  filter: blur(5rpx);
+  opacity: 0.56;
+}
+
+.insights-ticket-watch-entry--locked::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.26);
+  pointer-events: none;
+}
+
 .hero-card__summary,
 .insights-lock-overlay__copy,
 .insights-board-entry__copy,
@@ -891,7 +920,7 @@ onShow(async () => {
 .insights-locked {
   position: relative;
   overflow: hidden;
-  min-height: 1080rpx;
+  min-height: 820rpx;
   padding: 0;
 }
 
