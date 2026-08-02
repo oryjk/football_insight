@@ -15,8 +15,9 @@ REMOTE_REPO="$TEST_ROOT/remote-repo"
 FAKE_BIN="$TEST_ROOT/bin"
 COMMAND_LOG="$TEST_ROOT/commands.log"
 DEPLOY_MARKER="$TEST_ROOT/deployed"
+PULL_MARKER="$TEST_ROOT/pulled"
 
-mkdir -p "$FIXTURE_REPO" "$REMOTE_REPO/.git" "$REMOTE_REPO/deploy/local-test" "$FAKE_BIN"
+mkdir -p "$FIXTURE_REPO/.git" "$FIXTURE_REPO/deploy/local-test" "$REMOTE_REPO/.git" "$REMOTE_REPO/deploy/local-test" "$FAKE_BIN"
 cp "$DEPLOY_SCRIPT" "$FIXTURE_REPO/deploy_local233.sh"
 chmod +x "$FIXTURE_REPO/deploy_local233.sh"
 
@@ -46,13 +47,23 @@ case "${1:-} ${2:-}" in
         ;;
     "check-ref-format --branch")
         ;;
-    "rev-parse HEAD"|"rev-parse origin/feature/test")
+    "rev-parse HEAD")
+        if [[ "$git_dir" == "$FIXTURE_REPO" && "${FAKE_LOCAL_BEHIND:-0}" == "1" && ! -e "$PULL_MARKER" ]]; then
+            printf '0000000000000000000000000000000000000000\n'
+        else
+            printf '1111111111111111111111111111111111111111\n'
+        fi
+        ;;
+    "rev-parse origin/feature/test")
         printf '1111111111111111111111111111111111111111\n'
         ;;
     "show-ref --verify")
         exit 1
         ;;
-    "fetch origin"|"checkout -b"|"pull --ff-only")
+    "pull --ff-only")
+        touch "$PULL_MARKER"
+        ;;
+    "fetch origin"|"checkout -b")
         ;;
     *)
         printf 'unexpected git command: %s\n' "$*" >&2
@@ -106,9 +117,10 @@ EOF
 
 chmod +x "$FAKE_BIN/git" "$FAKE_BIN/ssh" "$FAKE_BIN/curl" "$FAKE_BIN/docker"
 chmod +x "$REMOTE_REPO/deploy/local-test/up.sh"
+cp "$REMOTE_REPO/deploy/local-test/up.sh" "$FIXTURE_REPO/deploy/local-test/up.sh"
 
 export PATH="$FAKE_BIN:/usr/bin:/bin"
-export COMMAND_LOG FIXTURE_REPO REMOTE_REPO DEPLOY_MARKER
+export COMMAND_LOG FIXTURE_REPO REMOTE_REPO DEPLOY_MARKER PULL_MARKER
 
 help_output=$(cd "$TEST_ROOT" && "$FIXTURE_REPO/deploy_local233.sh" --help)
 [[ "$help_output" == *"DEPLOY_HOST"* ]]
@@ -136,5 +148,14 @@ grep -q "git\[$REMOTE_REPO\] pull --ff-only origin feature/test" "$COMMAND_LOG"
 grep -q "curl -fsS http://127.0.0.1:18092/api/health" "$COMMAND_LOG"
 grep -q "curl -fsS http://127.0.0.1:18092/api/v1/ticket-watch/regions" "$COMMAND_LOG"
 grep -q "curl -fsS http://127.0.0.1:18092/api/v1/seat-swap/current" "$COMMAND_LOG"
+
+rm -f "$DEPLOY_MARKER" "$PULL_MARKER"
+ssh_count_before=$(grep -c '^ssh\[' "$COMMAND_LOG" || true)
+FAKE_LOCAL_BEHIND=1 DEPLOY_REPO_DIR="$FIXTURE_REPO" "$FIXTURE_REPO/deploy_local233.sh" >"$TEST_ROOT/local-target.out"
+ssh_count_after=$(grep -c '^ssh\[' "$COMMAND_LOG" || true)
+
+[[ -e "$DEPLOY_MARKER" ]]
+[[ -e "$PULL_MARKER" ]]
+[[ "$ssh_count_after" == "$ssh_count_before" ]]
 
 echo "deploy_local233.sh tests passed"
