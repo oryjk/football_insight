@@ -2,6 +2,8 @@
 
 足球洞察原生 Android 管理端，使用 Kotlin、Jetpack Compose、Material 3、Retrofit 和 Android Keystore。
 
+视觉主题评审稿见 [Android 管理端设计规范](../docs/android-admin-design-system.md)。确认后再统一落地颜色、字体、间距和组件 token。
+
 ## 功能
 
 - 独立管理员用户名/密码登录

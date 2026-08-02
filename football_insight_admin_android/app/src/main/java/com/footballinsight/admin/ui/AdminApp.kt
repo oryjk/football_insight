@@ -2,7 +2,7 @@
 
 package com.footballinsight.admin.ui
 
-import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -62,12 +63,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.footballinsight.admin.data.remote.AdminAuditLogDto
 import com.footballinsight.admin.data.remote.AdminReferredUserDto
 import com.footballinsight.admin.data.remote.AdminUserDto
@@ -94,14 +100,7 @@ fun AdminApp(viewModel: AdminViewModel, onBiometricUnlock: () -> Unit) {
                 viewModel::login,
                 viewModel::switchServer,
             )
-            state.selectedUser != null -> UserDetailScreen(
-                state.selectedUser!!,
-                state.loading,
-                viewModel::closeUser,
-                viewModel::changeStatus,
-                viewModel::adjustMembership,
-            )
-            else -> AdminHome(state, viewModel, snackbar)
+            else -> AuthenticatedAdmin(state, viewModel, snackbar)
         }
         if (state.loading && state.authenticated) {
             Surface(Modifier.align(Alignment.TopCenter).padding(top = 72.dp), tonalElevation = 4.dp) {
@@ -113,6 +112,37 @@ fun AdminApp(viewModel: AdminViewModel, onBiometricUnlock: () -> Unit) {
         }
         if (!state.authenticated) {
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun AuthenticatedAdmin(state: AdminUiState, viewModel: AdminViewModel, snackbar: SnackbarHostState) {
+    val navController = rememberNavController()
+    NavHost(navController = navController, startDestination = AdminHomeRoute) {
+        composable(AdminHomeRoute) {
+            AdminHome(state, viewModel, snackbar) { userId ->
+                navController.navigate(adminUserRoute(userId))
+            }
+        }
+        composable("$AdminUserRoute/{userId}") { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId").orEmpty()
+            LaunchedEffect(userId) {
+                if (userId.isNotBlank()) viewModel.openUser(userId)
+            }
+            val user = state.selectedUser?.takeIf { it.id == userId }
+            if (user == null) {
+                UserDetailLoading(state.loading) { navController.popBackStack() }
+            } else {
+                UserDetailScreen(
+                    user,
+                    state.loading,
+                    { navController.popBackStack() },
+                    { referralId -> navController.navigate(adminUserRoute(referralId)) },
+                    viewModel::changeStatus,
+                    viewModel::adjustMembership,
+                )
+            }
         }
     }
 }
@@ -176,7 +206,12 @@ private fun LoginScreen(
 }
 
 @Composable
-private fun AdminHome(state: AdminUiState, viewModel: AdminViewModel, snackbar: SnackbarHostState) {
+private fun AdminHome(
+    state: AdminUiState,
+    viewModel: AdminViewModel,
+    snackbar: SnackbarHostState,
+    onOpenUser: (String) -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -213,7 +248,7 @@ private fun AdminHome(state: AdminUiState, viewModel: AdminViewModel, snackbar: 
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         when (state.destination) {
-            AdminDestination.Users -> UsersScreen(state, viewModel, Modifier.padding(padding))
+            AdminDestination.Users -> UsersScreen(state, viewModel, onOpenUser, Modifier.padding(padding))
             AdminDestination.Audit -> AuditScreen(state.auditLogs, Modifier.padding(padding))
             AdminDestination.Settings -> SettingsScreen(state, viewModel, Modifier.padding(padding))
         }
@@ -221,7 +256,12 @@ private fun AdminHome(state: AdminUiState, viewModel: AdminViewModel, snackbar: 
 }
 
 @Composable
-private fun UsersScreen(state: AdminUiState, viewModel: AdminViewModel, modifier: Modifier = Modifier) {
+private fun UsersScreen(
+    state: AdminUiState,
+    viewModel: AdminViewModel,
+    onOpenUser: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier.fillMaxSize()) {
         OutlinedTextField(
             state.query,
@@ -271,7 +311,7 @@ private fun UsersScreen(state: AdminUiState, viewModel: AdminViewModel, modifier
                         trailingContent = { Text(if (user.status == "active") "正常" else "禁用", style = MaterialTheme.typography.labelMedium) },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    TextButton(onClick = { viewModel.openUser(user.id) }, modifier = Modifier.padding(start = 58.dp)) { Text("查看与管理") }
+                    TextButton(onClick = { onOpenUser(user.id) }, modifier = Modifier.padding(start = 58.dp)) { Text("查看与管理") }
                     HorizontalDivider()
                 }
             }
@@ -284,12 +324,12 @@ private fun UserDetailScreen(
     user: AdminUserDto,
     loading: Boolean,
     onBack: () -> Unit,
+    onReferralClick: (String) -> Unit,
     onStatus: (AdminUserDto, String) -> Unit,
     onMembership: (AdminUserDto, String, String, String?, String) -> Unit,
 ) {
     var statusDialog by remember { mutableStateOf(false) }
     var membershipDialog by remember { mutableStateOf(false) }
-    BackHandler(onBack = onBack)
     Scaffold(topBar = {
         TopAppBar(
             title = { Text(user.displayName) },
@@ -312,7 +352,7 @@ private fun UserDetailScreen(
                         ),
                     )
                 }
-                ReferralSection(user.referrals.orEmpty())
+                ReferralSection(user.referrals.orEmpty(), onReferralClick)
                 DetailSection("订单", listOf("最近记录" to user.orders.orEmpty().size.toString()))
                 user.orders.orEmpty().forEach { order ->
                     DetailSection(order.orderNo, listOf("产品" to order.productType, "金额" to "¥%.2f".format(order.amountCents / 100.0), "状态" to order.status, "创建" to compactTime(order.createdAt)))
@@ -365,7 +405,7 @@ private fun DetailSection(title: String, values: List<Pair<String, String>>) {
 }
 
 @Composable
-private fun ReferralSection(referrals: List<AdminReferredUserDto>) {
+private fun ReferralSection(referrals: List<AdminReferredUserDto>, onReferralClick: (String) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp)) {
         Text("邀请下级", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
         if (referrals.isEmpty()) {
@@ -373,7 +413,11 @@ private fun ReferralSection(referrals: List<AdminReferredUserDto>) {
         } else {
             referrals.forEach { referral ->
                 Row(
-                    Modifier.fillMaxWidth().padding(top = 10.dp),
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 2.dp)
+                        .clickable { onReferralClick(referral.id) }
+                        .padding(vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -383,10 +427,14 @@ private fun ReferralSection(referrals: List<AdminReferredUserDto>) {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                     Text(
                         compactTime(referral.createdAt),
+                        modifier = Modifier.width(132.dp),
                         maxLines = 1,
+                        textAlign = TextAlign.End,
+                        fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -394,6 +442,20 @@ private fun ReferralSection(referrals: List<AdminReferredUserDto>) {
         }
     }
     HorizontalDivider()
+}
+
+@Composable
+private fun UserDetailLoading(loading: Boolean, onBack: () -> Unit) {
+    Scaffold(topBar = {
+        TopAppBar(
+            title = { Text("用户详情") },
+            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") } },
+        )
+    }) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+            if (loading) CircularProgressIndicator() else Text("详情加载失败，请返回重试", color = MaterialTheme.colorScheme.error)
+        }
+    }
 }
 
 @Composable
@@ -535,3 +597,6 @@ private fun destinationIcon(value: AdminDestination) = when (value) {
 }
 
 private val MembershipTiersDescending = (9 downTo 1).map { "V$it" }
+private const val AdminHomeRoute = "admin-home"
+private const val AdminUserRoute = "admin-user"
+private fun adminUserRoute(userId: String) = "$AdminUserRoute/$userId"

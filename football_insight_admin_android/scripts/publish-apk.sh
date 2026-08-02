@@ -81,8 +81,7 @@ VERSION_NAME=$($APK_ANALYZER manifest version-name "$APK_PATH")
 VERSION_CODE=$($APK_ANALYZER manifest version-code "$APK_PATH")
 SAFE_VERSION=${VERSION_NAME//[^a-zA-Z0-9._-]/-}
 PUBLISHED_AT=$(TZ=Asia/Shanghai date --iso-8601=seconds)
-TIMESTAMP=$(TZ=Asia/Shanghai date +%Y%m%d-%H%M%S)
-RELEASE_FILE="football-insight-admin-${SAFE_VERSION}-build-${VERSION_CODE}-${TIMESTAMP}.apk"
+RELEASE_FILE="football-insight-admin-v${SAFE_VERSION}.apk"
 FILE_SIZE=$(stat -c '%s' "$APK_PATH")
 SHA256=$(sha256sum "$APK_PATH" | awk '{print $1}')
 
@@ -111,7 +110,7 @@ jq -n \
     --slurpfile current "$STAGING_DIR/metadata.json" \
     --slurpfile existing "$STAGING_DIR/existing.json" \
     --argjson keep "$RETAIN_RELEASES" \
-    '[$current[0]] + [$existing[0][] | select(.sha256 != $current[0].sha256)] | .[:$keep]' \
+    '[$current[0]] + [$existing[0][] | select(.sha256 != $current[0].sha256 and .releaseFile != $current[0].releaseFile)] | .[:$keep]' \
     > "$STAGING_DIR/releases.json"
 
 install -m 0644 "$APK_PATH" "$PUBLIC_DIR/releases/.${RELEASE_FILE}.tmp"
@@ -139,5 +138,5 @@ for old_release in "${OLD_RELEASES[@]}"; do
 done
 
 echo "Published: $PUBLIC_URL"
-echo "Version:   $VERSION_NAME · build $VERSION_CODE"
+echo "Version:   $VERSION_NAME"
 echo "SHA256:    $SHA256"

@@ -107,8 +107,6 @@ class AdminViewModel private constructor(context: Context) : ViewModel() {
         _state.update { it.copy(selectedUser = connectionManager.api().user(id)) }
     }
 
-    fun closeUser() = _state.update { it.copy(selectedUser = null) }
-
     fun changeStatus(user: AdminUserDto, reason: String) = launchRequest {
         val updated = if (user.status == "active") {
             connectionManager.api().disable(user.id, AdminReasonRequest(reason))
