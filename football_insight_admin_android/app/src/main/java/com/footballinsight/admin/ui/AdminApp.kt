@@ -2,6 +2,7 @@
 
 package com.footballinsight.admin.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -274,6 +275,7 @@ private fun UserDetailScreen(
 ) {
     var statusDialog by remember { mutableStateOf(false) }
     var membershipDialog by remember { mutableStateOf(false) }
+    BackHandler(onBack = onBack)
     Scaffold(topBar = {
         TopAppBar(
             title = { Text(user.displayName) },

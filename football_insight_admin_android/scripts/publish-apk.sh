@@ -82,7 +82,7 @@ VERSION_CODE=$($APK_ANALYZER manifest version-code "$APK_PATH")
 SAFE_VERSION=${VERSION_NAME//[^a-zA-Z0-9._-]/-}
 PUBLISHED_AT=$(TZ=Asia/Shanghai date --iso-8601=seconds)
 TIMESTAMP=$(TZ=Asia/Shanghai date +%Y%m%d-%H%M%S)
-RELEASE_FILE="football-insight-admin-${SAFE_VERSION}-${TIMESTAMP}.apk"
+RELEASE_FILE="football-insight-admin-${SAFE_VERSION}-build-${VERSION_CODE}-${TIMESTAMP}.apk"
 FILE_SIZE=$(stat -c '%s' "$APK_PATH")
 SHA256=$(sha256sum "$APK_PATH" | awk '{print $1}')
 
@@ -139,5 +139,5 @@ for old_release in "${OLD_RELEASES[@]}"; do
 done
 
 echo "Published: $PUBLIC_URL"
-echo "Version:   $VERSION_NAME ($VERSION_CODE)"
+echo "Version:   $VERSION_NAME · build $VERSION_CODE"
 echo "SHA256:    $SHA256"

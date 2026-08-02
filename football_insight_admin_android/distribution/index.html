@@ -46,7 +46,7 @@
   const fmtTime = value => value ? new Date(value).toLocaleString('zh-CN', { hour12:false }) : '-';
   async function load() {
     const metadata = await fetch('metadata.json', { cache:'no-store' }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
-    document.querySelector('#version').textContent = `版本 ${metadata.versionName} (${metadata.versionCode})`;
+    document.querySelector('#version').textContent = `版本 ${metadata.versionName} · build ${metadata.versionCode}`;
     document.querySelector('#published').textContent = fmtTime(metadata.publishedAt);
     document.querySelector('#size').textContent = fmtSize(metadata.fileSizeBytes);
     document.querySelector('#sha').textContent = metadata.sha256;
