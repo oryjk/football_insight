@@ -3,6 +3,7 @@
 package com.footballinsight.admin.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -237,6 +239,16 @@ private fun UsersScreen(state: AdminUiState, viewModel: AdminViewModel, modifier
             FilterChip(state.statusFilter == null, { viewModel.setFilters(null, state.tierFilter) }, { Text("全部") })
             FilterChip(state.statusFilter == "active", { viewModel.setFilters("active", state.tierFilter) }, { Text("正常") })
             FilterChip(state.statusFilter == "disabled", { viewModel.setFilters("disabled", state.tierFilter) }, { Text("已禁用") })
+        }
+        Text("会员等级", Modifier.padding(start = 18.dp, top = 2.dp, bottom = 4.dp), style = MaterialTheme.typography.labelMedium)
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilterChip(state.tierFilter == null, { viewModel.setFilters(state.statusFilter, null) }, { Text("全部") })
+            MembershipTiersDescending.forEach { tier ->
+                FilterChip(state.tierFilter == tier, { viewModel.setFilters(state.statusFilter, tier) }, { Text(tier) })
+            }
         }
         Text("${state.totalUsers} 位用户", Modifier.padding(horizontal = 18.dp, vertical = 4.dp), style = MaterialTheme.typography.labelMedium)
         if (state.users.isEmpty() && !state.loading) {
@@ -490,3 +502,5 @@ private fun destinationIcon(value: AdminDestination) = when (value) {
     AdminDestination.Audit -> Icons.Default.ManageAccounts
     AdminDestination.Settings -> Icons.Default.Settings
 }
+
+private val MembershipTiersDescending = (9 downTo 1).map { "V$it" }
