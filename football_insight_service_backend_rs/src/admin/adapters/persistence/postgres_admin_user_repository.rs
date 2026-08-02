@@ -249,7 +249,6 @@ impl AdminUserRepository for PostgresAdminUserRepository {
                SET status = 'disabled',
                    updated_at = NOW()
              WHERE id = $1
-               AND status = 'active'
             "#,
         )
         .bind(user_id)
@@ -308,9 +307,17 @@ mod tests {
             .split("#[cfg(test)]")
             .next()
             .expect("repository implementation exists");
+        let delete_implementation = implementation
+            .split("async fn delete_user")
+            .nth(1)
+            .expect("delete_user implementation exists")
+            .split("fn map_unique_user_error")
+            .next()
+            .expect("delete_user implementation ends before error mapper");
 
-        assert!(!implementation.contains("DELETE FROM f_i_users WHERE id = $1"));
-        assert!(implementation.contains("SET status = 'disabled'"));
-        assert!(implementation.contains("DELETE FROM f_i_user_sessions WHERE user_id = $1"));
+        assert!(!delete_implementation.contains("DELETE FROM f_i_users WHERE id = $1"));
+        assert!(delete_implementation.contains("SET status = 'disabled'"));
+        assert!(!delete_implementation.contains("AND status = 'active'"));
+        assert!(delete_implementation.contains("DELETE FROM f_i_user_sessions WHERE user_id = $1"));
     }
 }

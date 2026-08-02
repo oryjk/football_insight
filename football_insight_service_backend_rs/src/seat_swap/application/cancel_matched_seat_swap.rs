@@ -99,11 +99,18 @@ mod tests {
 
     use super::{CancelMatchedSeatSwapInput, CancelMatchedSeatSwapUseCase};
     use crate::seat_swap::{
-        domain::{SeatSwapContact, SeatSwapCurrentMatch, SeatSwapRequest, SeatSwapRequestStatus, SeatSwapUser},
+        domain::{
+            SeatSwapContact, SeatSwapCurrentMatch, SeatSwapRequest, SeatSwapRequestStatus,
+            SeatSwapUser,
+        },
         ports::{
             current_match_port::CurrentSeatSwapMatchPort,
-            evidence_storage_port::{SeatSwapEvidenceObject, SeatSwapEvidenceStoragePort, SeatSwapEvidenceUpload},
-            seat_swap_repository::{MatchedCancellationInput, SeatSwapConfirmation, SeatSwapRepository},
+            evidence_storage_port::{
+                SeatSwapEvidenceObject, SeatSwapEvidenceStoragePort, SeatSwapEvidenceUpload,
+            },
+            seat_swap_repository::{
+                MatchedCancellationInput, SeatSwapConfirmation, SeatSwapRepository,
+            },
         },
     };
 
@@ -118,7 +125,10 @@ mod tests {
 
     #[async_trait]
     impl SeatSwapRepository for StubRepository {
-        async fn list_active_requests(&self, _match_id: i64) -> anyhow::Result<Vec<SeatSwapRequest>> {
+        async fn list_active_requests(
+            &self,
+            _match_id: i64,
+        ) -> anyhow::Result<Vec<SeatSwapRequest>> {
             Ok(vec![])
         }
 
@@ -161,7 +171,10 @@ mod tests {
             &self,
             input: MatchedCancellationInput,
         ) -> anyhow::Result<()> {
-            self.cancellations.lock().expect("cancellations").push(input);
+            self.cancellations
+                .lock()
+                .expect("cancellations")
+                .push(input);
             Ok(())
         }
 
@@ -191,7 +204,9 @@ mod tests {
             }))
         }
 
-        async fn current_regions(&self) -> anyhow::Result<Vec<crate::seat_swap::domain::SeatSwapRegion>> {
+        async fn current_regions(
+            &self,
+        ) -> anyhow::Result<Vec<crate::seat_swap::domain::SeatSwapRegion>> {
             Ok(vec![])
         }
     }
@@ -247,10 +262,24 @@ mod tests {
             .await;
 
         assert!(result.is_ok());
-        assert_eq!(*evidence_storage.upload_calls.lock().expect("upload calls"), 0);
-        assert_eq!(repository.cancellations.lock().expect("cancellations").len(), 1);
         assert_eq!(
-            repository.cancelled_pairs.lock().expect("cancelled pairs").as_slice(),
+            *evidence_storage.upload_calls.lock().expect("upload calls"),
+            0
+        );
+        assert_eq!(
+            repository
+                .cancellations
+                .lock()
+                .expect("cancellations")
+                .len(),
+            1
+        );
+        assert_eq!(
+            repository
+                .cancelled_pairs
+                .lock()
+                .expect("cancelled pairs")
+                .as_slice(),
             &[(REQUEST_ID, TARGET_ID)],
         );
     }
