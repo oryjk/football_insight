@@ -65,9 +65,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.footballinsight.admin.data.remote.AdminAuditLogDto
+import com.footballinsight.admin.data.remote.AdminReferredUserDto
 import com.footballinsight.admin.data.remote.AdminUserDto
 
 @Composable
@@ -310,10 +312,7 @@ private fun UserDetailScreen(
                         ),
                     )
                 }
-                DetailSection("邀请下级", listOf("人数" to user.referrals.orEmpty().size.toString()))
-                user.referrals.orEmpty().forEach { referral ->
-                    DetailSection(referral.displayName, listOf("账号" to referral.accountIdentifier, "状态" to referral.status, "加入" to compactTime(referral.createdAt)))
-                }
+                ReferralSection(user.referrals.orEmpty())
                 DetailSection("订单", listOf("最近记录" to user.orders.orEmpty().size.toString()))
                 user.orders.orEmpty().forEach { order ->
                     DetailSection(order.orderNo, listOf("产品" to order.productType, "金额" to "¥%.2f".format(order.amountCents / 100.0), "状态" to order.status, "创建" to compactTime(order.createdAt)))
@@ -359,6 +358,38 @@ private fun DetailSection(title: String, values: List<Pair<String, String>>) {
             Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(value, modifier = Modifier.padding(start = 20.dp), fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+    HorizontalDivider()
+}
+
+@Composable
+private fun ReferralSection(referrals: List<AdminReferredUserDto>) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp)) {
+        Text("邀请下级", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+        if (referrals.isEmpty()) {
+            Text("暂无下级", Modifier.padding(top = 10.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            referrals.forEach { referral ->
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        referral.displayName,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(
+                        compactTime(referral.createdAt),
+                        maxLines = 1,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
