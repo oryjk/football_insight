@@ -150,7 +150,7 @@ cd football_insight_admin_android
 ANDROID_HOME=/home/betalpha/Android/Sdk ./gradlew testDebugUnitTest lintDebug assembleDebug
 ```
 
-管理端内网 Debug 包默认使用 local233 测试 API `http://172.16.60.233:18092/`，Release 构建默认使用生产 API `https://match.oryjk.cn/`。模拟器访问本机测试后端时使用 `http://10.0.2.2:18092/`；也可通过 Gradle 属性 `FOOTBALL_ADMIN_API_BASE_URL` 覆盖。App 会通过 `/api/v1/system/public-config` 的 JSON 响应识别正确后端，不会只凭 HTTP 200 接受错误页面。
+管理端内网 Debug 包默认使用 local233 管理 API `http://172.16.60.233:18092/`，Release 构建默认使用生产 API `https://match.oryjk.cn/`。模拟器访问本机后端时使用 `http://10.0.2.2:18092/`；也可通过 Gradle 属性 `FOOTBALL_ADMIN_API_BASE_URL` 覆盖。App 会通过 `/api/v1/system/public-config` 的 JSON 响应识别正确后端，不会只凭 HTTP 200 接受错误页面。
 
 本机测试环境启动：
 
@@ -158,7 +158,7 @@ ANDROID_HOME=/home/betalpha/Android/Sdk ./gradlew testDebugUnitTest lintDebug as
 ./deploy/local-test/up.sh
 ```
 
-它只使用 local233 的 `football_insight_test` 数据库和独立 Redis，并自动执行 migration 与测试数据初始化。测试 owner：`owner` / `FootballTest2026!`。
+后端和 Redis 运行在 local233，后端通过私有 SSH 隧道直接连接 `peiqian` 上的生产 `football_data`，并在启动时自动执行 migration。管理员：`admin` / `admin123`。会员调整、禁用/恢复等写操作会直接修改生产用户数据。
 
 ## 账号系统说明
 
