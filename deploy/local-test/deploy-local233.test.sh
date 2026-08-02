@@ -49,7 +49,10 @@ case "${1:-} ${2:-}" in
     "rev-parse HEAD"|"rev-parse origin/feature/test")
         printf '1111111111111111111111111111111111111111\n'
         ;;
-    "fetch origin"|"checkout feature/test"|"pull --ff-only")
+    "show-ref --verify")
+        exit 1
+        ;;
+    "fetch origin"|"checkout -b"|"pull --ff-only")
         ;;
     *)
         printf 'unexpected git command: %s\n' "$*" >&2
@@ -128,6 +131,7 @@ grep -q "remote working tree is not clean" "$TEST_ROOT/remote-dirty.out"
 DEPLOY_REPO_DIR="$REMOTE_REPO" "$FIXTURE_REPO/deploy_local233.sh" >"$TEST_ROOT/success.out"
 
 [[ -e "$DEPLOY_MARKER" ]]
+grep -q "git\[$REMOTE_REPO\] checkout -b feature/test origin/feature/test" "$COMMAND_LOG"
 grep -q "git\[$REMOTE_REPO\] pull --ff-only origin feature/test" "$COMMAND_LOG"
 grep -q "curl -fsS http://127.0.0.1:18092/api/health" "$COMMAND_LOG"
 grep -q "curl -fsS http://127.0.0.1:18092/api/v1/ticket-watch/regions" "$COMMAND_LOG"

@@ -83,7 +83,7 @@ if [[ ! "$SSH_CONNECT_TIMEOUT" =~ ^[0-9]+$ ]] || ((SSH_CONNECT_TIMEOUT < 1)); th
 fi
 
 echo "Fetching origin/$DEPLOY_BRANCH..."
-git -C "$REPO_ROOT" fetch origin "$DEPLOY_BRANCH"
+git -C "$REPO_ROOT" fetch origin "$DEPLOY_BRANCH:refs/remotes/origin/$DEPLOY_BRANCH"
 
 local_head=$(git -C "$REPO_ROOT" rev-parse HEAD)
 origin_head=$(git -C "$REPO_ROOT" rev-parse "origin/$DEPLOY_BRANCH")
@@ -134,8 +134,12 @@ if [[ -n "$remote_status" ]]; then
     exit 1
 fi
 
-git -C "$deploy_repo_dir" fetch origin "$deploy_branch"
-git -C "$deploy_repo_dir" checkout "$deploy_branch"
+git -C "$deploy_repo_dir" fetch origin "$deploy_branch:refs/remotes/origin/$deploy_branch"
+if git -C "$deploy_repo_dir" show-ref --verify --quiet "refs/heads/$deploy_branch"; then
+    git -C "$deploy_repo_dir" checkout "$deploy_branch"
+else
+    git -C "$deploy_repo_dir" checkout -b "$deploy_branch" "origin/$deploy_branch"
+fi
 git -C "$deploy_repo_dir" pull --ff-only origin "$deploy_branch"
 
 deployed_head=$(git -C "$deploy_repo_dir" rev-parse HEAD)
