@@ -22,8 +22,9 @@ Environment overrides:
                        (default: football-insight-local-test-backend)
   SSH_CONNECT_TIMEOUT  SSH connection timeout in seconds (default: 10)
 
-The local and remote working trees must be clean. The local HEAD must already
-be pushed to origin before deployment starts.
+The local and remote working trees must be clean. From a development machine,
+the local HEAD must already be pushed. When run from DEPLOY_REPO_DIR on the
+deployment host, the script pulls the current branch directly from origin.
 EOF
 }
 
@@ -38,18 +39,30 @@ if (($# > 0)); then
     exit 2
 fi
 
-for command_name in git ssh; do
-    if ! command -v "$command_name" >/dev/null 2>&1; then
-        echo "required command not found: $command_name" >&2
-        exit 1
-    fi
-done
-
 DEPLOY_HOST=${DEPLOY_HOST:-local233}
 DEPLOY_REPO_DIR=${DEPLOY_REPO_DIR:-/home/betalpha/projects/football_insight}
 DEPLOY_PORT=${DEPLOY_PORT:-18092}
 DEPLOY_CONTAINER=${DEPLOY_CONTAINER:-football-insight-local-test-backend}
 SSH_CONNECT_TIMEOUT=${SSH_CONNECT_TIMEOUT:-10}
+
+if ! command -v git >/dev/null 2>&1; then
+    echo "required command not found: git" >&2
+    exit 1
+fi
+
+run_on_deploy_host=false
+if [[ -d "$DEPLOY_REPO_DIR/.git" ]]; then
+    deploy_repo_physical=$(cd -- "$DEPLOY_REPO_DIR" && pwd -P)
+    repo_root_physical=$(cd -- "$REPO_ROOT" && pwd -P)
+    if [[ "$deploy_repo_physical" == "$repo_root_physical" ]]; then
+        run_on_deploy_host=true
+    fi
+fi
+
+if [[ "$run_on_deploy_host" == false ]] && ! command -v ssh >/dev/null 2>&1; then
+    echo "required command not found: ssh" >&2
+    exit 1
+fi
 
 local_status=$(git -C "$REPO_ROOT" status --porcelain)
 if [[ -n "$local_status" ]]; then
@@ -87,26 +100,47 @@ git -C "$REPO_ROOT" fetch origin "$DEPLOY_BRANCH:refs/remotes/origin/$DEPLOY_BRA
 
 local_head=$(git -C "$REPO_ROOT" rev-parse HEAD)
 origin_head=$(git -C "$REPO_ROOT" rev-parse "origin/$DEPLOY_BRANCH")
-if [[ "$local_head" != "$origin_head" ]]; then
+if [[ "$run_on_deploy_host" == false && "$local_head" != "$origin_head" ]]; then
     echo "local HEAD has not been pushed to origin/$DEPLOY_BRANCH" >&2
     echo "local:  $local_head" >&2
     echo "origin: $origin_head" >&2
     exit 1
 fi
 
+expected_head=$local_head
+if [[ "$run_on_deploy_host" == true ]]; then
+    expected_head=$origin_head
+fi
+
 printf -v remote_command 'bash -s -- %q %q %q %q %q' \
     "$DEPLOY_REPO_DIR" \
     "$DEPLOY_BRANCH" \
-    "$local_head" \
+    "$expected_head" \
     "$DEPLOY_PORT" \
     "$DEPLOY_CONTAINER"
 
-echo "Deploying $DEPLOY_BRANCH@$local_head to $DEPLOY_HOST:$DEPLOY_REPO_DIR..."
-ssh \
-    -o BatchMode=yes \
-    -o "ConnectTimeout=$SSH_CONNECT_TIMEOUT" \
-    "$DEPLOY_HOST" \
-    "$remote_command" <<'REMOTE_SCRIPT'
+if [[ "$run_on_deploy_host" == true ]]; then
+    echo "Deploying $DEPLOY_BRANCH@$expected_head directly in $DEPLOY_REPO_DIR..."
+    target_runner=(
+        bash -s --
+        "$DEPLOY_REPO_DIR"
+        "$DEPLOY_BRANCH"
+        "$expected_head"
+        "$DEPLOY_PORT"
+        "$DEPLOY_CONTAINER"
+    )
+else
+    echo "Deploying $DEPLOY_BRANCH@$expected_head to $DEPLOY_HOST:$DEPLOY_REPO_DIR..."
+    target_runner=(
+        ssh
+        -o BatchMode=yes
+        -o "ConnectTimeout=$SSH_CONNECT_TIMEOUT"
+        "$DEPLOY_HOST"
+        "$remote_command"
+    )
+fi
+
+"${target_runner[@]}" <<'REMOTE_SCRIPT'
 set -euo pipefail
 
 deploy_repo_dir=$1

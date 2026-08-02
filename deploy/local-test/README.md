@@ -33,6 +33,16 @@ DEPLOY_BRANCH=main \
 ./deploy_local233.sh
 ```
 
+也可以直接登录 local233，在部署工作区执行同一个命令：
+
+```bash
+cd /home/betalpha/projects/football_insight
+./deploy_local233.sh
+```
+
+脚本检测到自身位于 `DEPLOY_REPO_DIR` 后会进入本机模式：允许当前分支落后于 origin，
+直接拉取 `origin/<当前分支>` 并部署，不会再 SSH 回 local233。
+
 停止：
 
 ```bash
