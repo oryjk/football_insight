@@ -22,24 +22,28 @@ android {
         applicationId = "com.footballinsight.admin"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
-
-        val apiBaseUrl = configuredValue(
-            "FOOTBALL_ADMIN_API_BASE_URL",
-            "https://match.oryjk.cn/",
-        ).let { if (it.endsWith('/')) it else "$it/" }
-        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            val apiBaseUrl = configuredValue(
+                "FOOTBALL_ADMIN_API_BASE_URL",
+                "http://172.16.60.233:18092/",
+            ).let { if (it.endsWith('/')) it else "$it/" }
+            buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
         }
         release {
+            val apiBaseUrl = configuredValue(
+                "FOOTBALL_ADMIN_API_BASE_URL",
+                "https://match.oryjk.cn/",
+            ).let { if (it.endsWith('/')) it else "$it/" }
+            buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

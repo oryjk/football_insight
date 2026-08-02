@@ -83,7 +83,12 @@ fun AdminApp(viewModel: AdminViewModel, onBiometricUnlock: () -> Unit) {
         when {
             state.requiresBiometricUnlock -> LocalUnlockPane(onBiometricUnlock)
             state.checkingSession -> LoadingPane()
-            !state.authenticated -> LoginScreen(state.loading, state.serverUrl, viewModel::login)
+            !state.authenticated -> LoginScreen(
+                state.loading,
+                state.serverUrl,
+                viewModel::login,
+                viewModel::switchServer,
+            )
             state.selectedUser != null -> UserDetailScreen(
                 state.selectedUser!!,
                 state.loading,
@@ -101,13 +106,22 @@ fun AdminApp(viewModel: AdminViewModel, onBiometricUnlock: () -> Unit) {
                 }
             }
         }
+        if (!state.authenticated) {
+            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
+        }
     }
 }
 
 @Composable
-private fun LoginScreen(loading: Boolean, serverUrl: String, onLogin: (String, String) -> Unit) {
+private fun LoginScreen(
+    loading: Boolean,
+    serverUrl: String,
+    onLogin: (String, String) -> Unit,
+    onSwitchServer: (String) -> Unit,
+) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var serverDraft by remember(serverUrl) { mutableStateOf(serverUrl) }
     Column(
         Modifier.fillMaxSize().padding(horizontal = 28.dp),
         verticalArrangement = Arrangement.Center,
@@ -141,7 +155,18 @@ private fun LoginScreen(loading: Boolean, serverUrl: String, onLogin: (String, S
             enabled = !loading && username.isNotBlank() && password.length >= 8,
             modifier = Modifier.fillMaxWidth().height(48.dp),
         ) { Text(if (loading) "登录中" else "登录") }
-        Text(serverUrl, Modifier.padding(top = 18.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+        OutlinedTextField(
+            serverDraft,
+            { serverDraft = it },
+            Modifier.fillMaxWidth().padding(top = 16.dp),
+            label = { Text("服务器地址") },
+            singleLine = true,
+        )
+        OutlinedButton(
+            onClick = { onSwitchServer(serverDraft) },
+            enabled = !loading && serverDraft.isNotBlank(),
+            modifier = Modifier.padding(top = 8.dp),
+        ) { Text("验证服务器") }
     }
 }
 

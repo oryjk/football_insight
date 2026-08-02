@@ -1,5 +1,6 @@
 package com.footballinsight.admin.data.remote
 
+import com.footballinsight.admin.BuildConfig
 import com.footballinsight.admin.data.session.InMemoryAdminSessionStore
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
@@ -9,6 +10,11 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class NetworkConfigurationTest {
+    @Test
+    fun debug_build_defaults_to_local233_test_backend() {
+        assertEquals("http://172.16.60.233:18092/", BuildConfig.API_BASE_URL)
+    }
+
     @Test
     fun normalizes_server_urls_for_retrofit() {
         assertEquals("http://10.0.2.2:8080/", normalizeServerUrl("10.0.2.2:8080"))

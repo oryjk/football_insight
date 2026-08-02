@@ -1,0 +1,76 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: football-insight-local-test-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: football_insight_test
+      POSTGRES_USER: football_test
+      POSTGRES_PASSWORD: local_test_only
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - football_insight_test_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U football_test -d football_insight_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    container_name: football-insight-local-test-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:56379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  backend:
+    image: football-insight-local-test-backend:latest
+    build:
+      context: ../../football_insight_service_backend_rs
+      dockerfile: Dockerfile
+    container_name: football-insight-local-test-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      PORT: "8092"
+      DATABASE_URL: postgresql://football_test:local_test_only@postgres:5432/football_insight_test
+      DB_POOL_MAX_CONNECTIONS: "5"
+      DB_POOL_MIN_CONNECTIONS: "1"
+      DB_POOL_ACQUIRE_TIMEOUT_SECS: "5"
+      DB_POOL_IDLE_TIMEOUT_SECS: "90"
+      DB_POOL_MAX_LIFETIME_SECS: "600"
+      RUST_LOG: info,sqlx=warn
+      JWT_SECRET: local-c-end-jwt-secret-at-least-32-characters
+      ADMIN_JWT_SECRET: local-admin-jwt-secret-at-least-32-characters
+      ADMIN_OWNER_USERNAME: owner
+      ADMIN_OWNER_PASSWORD: FootballTest2026!
+      ADMIN_OWNER_DISPLAY_NAME: Local Test Owner
+      WECHAT_APP_ID: local-test-wechat-app
+      WECHAT_APP_SECRET: local-test-wechat-secret
+      WECHAT_MINI_APP_ID: local-test-mini-app
+      WECHAT_MINI_APP_SECRET: local-test-mini-secret
+      WECHAT_WEBHOOK_TOKEN: local-test-webhook-token
+      WECHAT_ENCODING_AES_KEY: abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG
+      REDIS_URL: redis://redis:6379
+      PUBLIC_BASE_URL: http://172.16.60.233:18092
+      FI_REFLUX_NOTIFICATION_WORKER_ENABLED: "false"
+    ports:
+      - "0.0.0.0:18092:8092"
+    volumes:
+      - football_insight_test_logs:/app/logs
+
+volumes:
+  football_insight_test_pgdata:
+    name: football-insight-local-test-pgdata
+  football_insight_test_logs:
+    name: football-insight-local-test-logs

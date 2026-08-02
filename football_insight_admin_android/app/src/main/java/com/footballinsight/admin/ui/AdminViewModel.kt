@@ -145,6 +145,7 @@ class AdminViewModel private constructor(context: Context) : ViewModel() {
             serverUrl = normalized,
             checkingSession = false,
             biometricEnabled = securityPreferences.getBoolean(KEY_BIOMETRIC, false),
+            message = "服务器已切换",
         )
     }
 
