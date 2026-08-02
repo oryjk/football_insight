@@ -16,6 +16,23 @@
 ./deploy/local-test/up.sh
 ```
 
+从其他可 SSH 访问 local233 的开发机发布已提交并 push 的代码：
+
+```bash
+./deploy_local233.sh
+```
+
+脚本根据自身位置定位本地 monorepo，不依赖开发机上的绝对路径。它会要求本地和
+local233 工作区均无未提交改动，确认当前分支 HEAD 已 push，然后在 local233 上执行
+`git pull --ff-only`、`deploy/local-test/up.sh` 以及接口验证。可按需覆盖：
+
+```bash
+DEPLOY_HOST=local233 \
+DEPLOY_REPO_DIR=/home/betalpha/projects/football_insight \
+DEPLOY_BRANCH=main \
+./deploy_local233.sh
+```
+
 停止：
 
 ```bash

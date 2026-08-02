@@ -47,17 +47,30 @@ describe('resolveMatchDisplayStatus', () => {
     expect(status).toBe('live')
   })
 
-  test('keeps a started non-finished match as live even after the default match window', () => {
+  test('stops inferring live after the three-hour match window', () => {
     const status = resolveMatchDisplayStatus(
       createMatch({
         match_date: '2026-04-10',
         match_time: '19:35',
         status: 'scheduled',
       }),
-      '2026-04-10T22:31:00+08:00',
+      '2026-04-10T22:36:00+08:00',
     )
 
-    expect(status).toBe('live')
+    expect(status).toBe('scheduled')
+  })
+
+  test('keeps an explicit postponed match postponed after kickoff', () => {
+    const status = resolveMatchDisplayStatus(
+      createMatch({
+        match_date: '2026-04-10',
+        match_time: '19:35',
+        status: 'postponed',
+      }),
+      '2026-04-10T20:10:00+08:00',
+    )
+
+    expect(status).toBe('postponed')
   })
 
   test('keeps future matches as scheduled', () => {
@@ -120,6 +133,19 @@ describe('formatMatchScoreboardText', () => {
 
     expect(text).toBe('未开赛')
   })
+
+  test('shows an explicit postponed label', () => {
+    const text = formatMatchScoreboardText(
+      createMatch({
+        status: 'postponed',
+        home_score: '',
+        away_score: '',
+      }),
+      '2026-04-10T20:10:00+08:00',
+    )
+
+    expect(text).toBe('延期')
+  })
 })
 
 describe('shouldShowLiveStatusTag', () => {
@@ -144,6 +170,15 @@ describe('shouldShowLiveStatusTag', () => {
         away_score: '1',
       }),
       '2026-04-10T22:10:00+08:00',
+    )
+
+    expect(visible).toBe(false)
+  })
+
+  test('hides live status tag for postponed matches', () => {
+    const visible = shouldShowLiveStatusTag(
+      createMatch({ status: 'postponed' }),
+      '2026-04-10T20:10:00+08:00',
     )
 
     expect(visible).toBe(false)

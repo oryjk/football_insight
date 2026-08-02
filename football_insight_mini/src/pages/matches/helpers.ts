@@ -1,6 +1,7 @@
 import type { MatchCard } from '../../types/insight'
 
 type MatchDisplayStatus = MatchCard['status']
+const LIVE_INFERENCE_WINDOW_MS = 3 * 60 * 60 * 1000
 
 export interface MatchTechStatRow {
   key: string
@@ -15,7 +16,7 @@ export function resolveMatchDisplayStatus(
   match: Pick<MatchCard, 'status' | 'match_date' | 'match_time'>,
   nowIso = new Date().toISOString(),
 ): MatchDisplayStatus {
-  if (match.status === 'finished' || match.status === 'live') {
+  if (match.status !== 'scheduled') {
     return match.status
   }
 
@@ -23,10 +24,10 @@ export function resolveMatchDisplayStatus(
   const nowAt = new Date(nowIso).getTime()
 
   if (!kickoffAt || Number.isNaN(nowAt)) {
-    return match.status
+    return 'scheduled'
   }
 
-  if (nowAt >= kickoffAt) {
+  if (nowAt >= kickoffAt && nowAt < kickoffAt + LIVE_INFERENCE_WINDOW_MS) {
     return 'live'
   }
 
@@ -44,6 +45,10 @@ export function formatMatchScoreboardText(
   nowIso = new Date().toISOString(),
 ): string {
   const displayStatus = resolveMatchDisplayStatus(match, nowIso)
+
+  if (displayStatus === 'postponed') {
+    return '延期'
+  }
 
   if ((displayStatus === 'live' || displayStatus === 'finished') && hasMatchScores(match)) {
     return `${match.home_score} : ${match.away_score}`

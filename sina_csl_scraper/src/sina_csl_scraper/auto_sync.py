@@ -68,6 +68,8 @@ def build_auto_sync_decision(
     active_matches: list[int] = []
 
     for match in matches:
+        if match.status == "4":
+            continue
         due_at = resolve_match_due_at(
             match,
             match_duration_minutes=match_duration_minutes,

@@ -16,11 +16,13 @@ from .auto_sync import (
 )
 from .assets import AssetUploader, HttpAssetFetcher, MinioAssetTarget
 from .catalog import build_player_profiles, build_team_profiles
+from .cfl_client import CflCslClient
 from .client import SinaCslClient, serialize_datasets
 from .constants import DEFAULT_LEAGUE_ID
 from .leisu import LeisuBrowserClient, LeisuCornerEnricher, load_leisu_match_map
 from .models import MatchResult
 from .postgres_repository import PostgresInsightSyncRepository
+from .schedule import fetch_reconciled_schedule
 from .sync import InsightSyncService, SyncPayload
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
@@ -69,16 +71,25 @@ def run_scrape(
     enrich_corners: bool = False,
     leisu_match_map: Path | None = Path(_env_default("FI_LEISU_MATCH_MAP")) if _env_default("FI_LEISU_MATCH_MAP") else None,
     client: SinaCslClient | None = None,
+    cfl_client: CflCslClient | None = None,
     corner_enricher: LeisuCornerEnricher | None = None,
     enrich_match_ids: set[int] | None = None,
+    expected_matches_per_round: int = 8,
 ) -> dict[str, Any]:
     client = client or SinaCslClient(league_id=league_id)
+    cfl_client = cfl_client or CflCslClient()
     league_info = client.fetch_league_info()
     target_season = season or league_info.current_season
     target_dir = output_dir / str(target_season)
 
     standings = client.fetch_standings(target_season)
-    matches = client.fetch_all_matches(target_season, max_round=league_info.max_round)
+    matches = fetch_reconciled_schedule(
+        sina_client=client,
+        cfl_client=cfl_client,
+        season=target_season,
+        max_round=league_info.max_round,
+        expected_matches_per_round=expected_matches_per_round,
+    )
     if enrich_corners:
         enrichment_targets = (
             [match for match in matches if match.match_id in enrich_match_ids]
@@ -139,6 +150,8 @@ def run_scrape(
                 SyncPayload(
                     season=target_season,
                     current_round=league_info.current_round,
+                    max_round=league_info.max_round,
+                    expected_matches_per_round=expected_matches_per_round,
                     teams=teams,
                     players=players,
                     matches=matches,
@@ -401,7 +414,12 @@ def auto_sync_due(
     client = SinaCslClient(league_id=league_id)
     league_info = client.fetch_league_info()
     target_season = season or league_info.current_season
-    matches = client.fetch_all_matches(target_season, max_round=league_info.max_round)
+    matches = fetch_reconciled_schedule(
+        sina_client=client,
+        cfl_client=CflCslClient(),
+        season=target_season,
+        max_round=league_info.max_round,
+    )
     state = load_auto_sync_state(state_file)
     now = datetime.now().astimezone()
     decision = build_auto_sync_decision(

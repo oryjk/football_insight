@@ -672,6 +672,7 @@ onShow(() => {
 .meta-note--hero { padding-top: 14rpx; }
 .meta-pill--button {
   display: inline-flex;
+  margin: 0 0 0 auto;
   align-items: center;
   justify-content: center;
   white-space: nowrap;
@@ -809,6 +810,9 @@ onShow(() => {
 .match-card--live {
   box-shadow: 0 16rpx 40rpx rgba(220, 38, 38, 0.12);
 }
+.match-card--postponed::before {
+  background: #d97706;
+}
 .match-card--scheduled::before {
   background: linear-gradient(180deg, #c4c8d0, #a8adb8);
 }
@@ -875,6 +879,7 @@ onShow(() => {
   gap: 16rpx;
 }
 .match-card__tech-link {
+  margin: 0 0 0 auto;
   padding: 0;
   border: none;
   background: transparent;
@@ -899,6 +904,7 @@ onShow(() => {
 }
 .schedule-dialog__close {
   display: inline-flex;
+  margin: 0 0 0 auto;
   align-items: center;
   justify-content: center;
   white-space: nowrap;
@@ -938,6 +944,7 @@ onShow(() => {
 }
 .tech-stats-sheet__close {
   display: inline-flex;
+  margin: 0 0 0 auto;
   align-items: center;
   justify-content: center;
   white-space: nowrap;

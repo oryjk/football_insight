@@ -16,8 +16,8 @@ export interface TeamSeasonMatch {
   opponentAvatar: string | null
   isHomeTeam: boolean
   displayStatus: MatchCard['status']
-  resultLabel: '胜' | '平' | '负' | '进' | '未'
-  resultTone: 'win' | 'draw' | 'loss' | 'live' | 'scheduled'
+  resultLabel: '胜' | '平' | '负' | '进' | '未' | '延'
+  resultTone: 'win' | 'draw' | 'loss' | 'live' | 'scheduled' | 'postponed'
   scoreText: string
   venueLabel: '主' | '客'
   focusKind: 'latest-finished' | 'next-scheduled' | null
@@ -65,7 +65,7 @@ export function resolveTeamSeasonMatches(
     .sort((left, right) => {
       const leftStatus = resolveMatchDisplayStatus(left, nowIso)
       const rightStatus = resolveMatchDisplayStatus(right, nowIso)
-      const order = { finished: 0, live: 1, scheduled: 2 } as const
+      const order = { finished: 0, live: 1, postponed: 2, scheduled: 3 } as const
       const leftPriority = order[leftStatus as keyof typeof order] ?? 3
       const rightPriority = order[rightStatus as keyof typeof order] ?? 3
 
@@ -86,7 +86,9 @@ export function resolveTeamSeasonMatches(
 
       const leftScore = isHomeTeam ? match.home_score : match.away_score
       const rightScore = isHomeTeam ? match.away_score : match.home_score
-      const scoreText = displayStatus === 'scheduled' || !hasScores ? 'VS' : `${leftScore} : ${rightScore}`
+      const scoreText = displayStatus === 'postponed'
+        ? '延期'
+        : displayStatus === 'scheduled' || !hasScores ? 'VS' : `${leftScore} : ${rightScore}`
 
       const teamScoreNum = isHomeTeam ? homeScoreNum : awayScoreNum
       const opponentScoreNum = isHomeTeam ? awayScoreNum : homeScoreNum
@@ -115,6 +117,30 @@ export function resolveTeamSeasonMatches(
           displayStatus,
           resultLabel: '进',
           resultTone: 'live',
+          scoreText,
+          venueLabel,
+          focusKind,
+        }
+      }
+
+      if (displayStatus === 'postponed') {
+        return {
+          matchId: match.match_id,
+          roundNumber: match.round_number,
+          matchDate: match.match_date,
+          matchTime: match.match_time,
+          homeTeamName: match.home_team_name,
+          awayTeamName: match.away_team_name,
+          homeScore: match.home_score,
+          awayScore: match.away_score,
+          teamName: team.team_name,
+          teamAvatar: isHomeTeam ? match.home_team_avatar : match.away_team_avatar,
+          opponentName,
+          opponentAvatar: isHomeTeam ? match.away_team_avatar : match.home_team_avatar,
+          isHomeTeam,
+          displayStatus,
+          resultLabel: '延',
+          resultTone: 'postponed',
           scoreText,
           venueLabel,
           focusKind,

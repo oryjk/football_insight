@@ -38,9 +38,13 @@ class MatchResult:
     away_corners: int | None = None
     corner_source: str | None = None
     technical_stats: list[Any] | None = None
+    schedule_source: str = "sina"
+    source_match_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
+        payload.pop("schedule_source", None)
+        payload.pop("source_match_id", None)
         if self.technical_stats is not None:
             payload["technical_stats"] = [
                 asdict(item) if is_dataclass(item) else item

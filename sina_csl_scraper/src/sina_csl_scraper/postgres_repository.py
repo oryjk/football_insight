@@ -170,7 +170,7 @@ class PostgresInsightSyncRepository:
             )
         return len(players)
 
-    def upsert_matches(self, matches: list[MatchResult]) -> int:
+    def upsert_matches(self, matches: list[MatchResult], *, run_id: str) -> int:
         if not matches:
             return 0
 
@@ -183,6 +183,7 @@ class PostgresInsightSyncRepository:
         rows = [
             self._match_record(
                 match,
+                run_id=run_id,
                 include_corner_columns=self._match_tech_columns["corner_columns_available"],
                 include_technical_stats=self._match_tech_columns["technical_stats_available"],
             )
@@ -192,6 +193,21 @@ class PostgresInsightSyncRepository:
         with self.data_connection.cursor() as cursor:
             cursor.executemany(sql, rows)
         return len(matches)
+
+    def deactivate_missing_matches(self, *, season: int, run_id: str) -> int:
+        with self.data_connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE f_i_matches
+                   SET source_active = FALSE,
+                       updated_at = NOW()
+                 WHERE season = %s
+                   AND source_active = TRUE
+                   AND last_seen_run_id IS DISTINCT FROM %s
+                """,
+                (season, run_id),
+            )
+            return cursor.rowcount
 
     def _detect_match_tech_columns(self) -> dict[str, bool]:
         required_columns = {
@@ -244,10 +260,14 @@ class PostgresInsightSyncRepository:
                 away_score,
                 home_logo,
                 away_logo,
+                schedule_source,
+                source_match_id,
+                source_active,
+                last_seen_run_id,
                 updated_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
-            ON CONFLICT (match_id) DO UPDATE
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (season, round_number, home_team_id, away_team_id) DO UPDATE
                 SET season = EXCLUDED.season,
                     round_number = EXCLUDED.round_number,
                     round_name = EXCLUDED.round_name,
@@ -262,6 +282,10 @@ class PostgresInsightSyncRepository:
                     away_score = EXCLUDED.away_score,
                     home_logo = EXCLUDED.home_logo,
                     away_logo = EXCLUDED.away_logo,
+                    schedule_source = EXCLUDED.schedule_source,
+                    source_match_id = EXCLUDED.source_match_id,
+                    source_active = TRUE,
+                    last_seen_run_id = EXCLUDED.last_seen_run_id,
                     updated_at = NOW()
         """
 
@@ -284,14 +308,18 @@ class PostgresInsightSyncRepository:
                 away_score,
                 home_logo,
                 away_logo,
+                schedule_source,
+                source_match_id,
+                source_active,
+                last_seen_run_id,
                 leisu_match_id,
                 home_corners,
                 away_corners,
                 corner_source,
                 updated_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
-            ON CONFLICT (match_id) DO UPDATE
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (season, round_number, home_team_id, away_team_id) DO UPDATE
                 SET season = EXCLUDED.season,
                     round_number = EXCLUDED.round_number,
                     round_name = EXCLUDED.round_name,
@@ -306,6 +334,10 @@ class PostgresInsightSyncRepository:
                     away_score = EXCLUDED.away_score,
                     home_logo = EXCLUDED.home_logo,
                     away_logo = EXCLUDED.away_logo,
+                    schedule_source = EXCLUDED.schedule_source,
+                    source_match_id = EXCLUDED.source_match_id,
+                    source_active = TRUE,
+                    last_seen_run_id = EXCLUDED.last_seen_run_id,
                     leisu_match_id = COALESCE(EXCLUDED.leisu_match_id, f_i_matches.leisu_match_id),
                     home_corners = COALESCE(EXCLUDED.home_corners, f_i_matches.home_corners),
                     away_corners = COALESCE(EXCLUDED.away_corners, f_i_matches.away_corners),
@@ -332,6 +364,10 @@ class PostgresInsightSyncRepository:
                 away_score,
                 home_logo,
                 away_logo,
+                schedule_source,
+                source_match_id,
+                source_active,
+                last_seen_run_id,
                 leisu_match_id,
                 home_corners,
                 away_corners,
@@ -339,8 +375,8 @@ class PostgresInsightSyncRepository:
                 technical_stats,
                 updated_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
-            ON CONFLICT (match_id) DO UPDATE
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (season, round_number, home_team_id, away_team_id) DO UPDATE
                 SET season = EXCLUDED.season,
                     round_number = EXCLUDED.round_number,
                     round_name = EXCLUDED.round_name,
@@ -355,6 +391,10 @@ class PostgresInsightSyncRepository:
                     away_score = EXCLUDED.away_score,
                     home_logo = EXCLUDED.home_logo,
                     away_logo = EXCLUDED.away_logo,
+                    schedule_source = EXCLUDED.schedule_source,
+                    source_match_id = EXCLUDED.source_match_id,
+                    source_active = TRUE,
+                    last_seen_run_id = EXCLUDED.last_seen_run_id,
                     leisu_match_id = COALESCE(EXCLUDED.leisu_match_id, f_i_matches.leisu_match_id),
                     home_corners = COALESCE(EXCLUDED.home_corners, f_i_matches.home_corners),
                     away_corners = COALESCE(EXCLUDED.away_corners, f_i_matches.away_corners),
@@ -367,6 +407,7 @@ class PostgresInsightSyncRepository:
     def _match_record(
         match: MatchResult,
         *,
+        run_id: str,
         include_corner_columns: bool,
         include_technical_stats: bool,
     ) -> tuple[Any, ...]:
@@ -386,6 +427,10 @@ class PostgresInsightSyncRepository:
             match.away_score,
             match.home_logo,
             match.away_logo,
+            match.schedule_source,
+            match.source_match_id or str(match.match_id),
+            True,
+            run_id,
         )
         if not include_corner_columns and not include_technical_stats:
             return base_record

@@ -129,12 +129,14 @@ export interface RankingsViewResponse {
   player_categories: PlayerRankingCategory[]
 }
 
+export type MatchStatus = 'scheduled' | 'live' | 'finished' | 'postponed'
+
 export interface MatchCard {
   match_id: number
   round_number: number
   match_date: string
   match_time: string
-  status: 'scheduled' | 'live' | 'finished' | string
+  status: MatchStatus
   home_team_id: number
   home_team_name: string
   home_score: string

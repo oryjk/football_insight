@@ -15,6 +15,7 @@ def build_match(
     match_id: int = 1,
     date: str = "2026-04-12",
     time: str = "19:35",
+    status: str = "1",
 ) -> MatchResult:
     return MatchResult(
         match_id=match_id,
@@ -23,7 +24,7 @@ def build_match(
         round_name="第6轮",
         date=date,
         time=time,
-        status="1",
+        status=status,
         home_team_id=1,
         home_team_name="成都蓉城",
         home_score="",
@@ -123,3 +124,15 @@ def test_build_auto_sync_decision_throttles_active_match_window_by_last_run_at()
     assert decision.newly_due_match_ids == ()
     assert decision.active_match_ids == (201,)
     assert decision.latest_due_at is None
+
+
+def test_postponed_match_does_not_trigger_active_or_completed_sync() -> None:
+    decision = build_auto_sync_decision(
+        [build_match(match_id=301, status="4")],
+        now=datetime.fromisoformat("2026-04-13T09:00:00+08:00"),
+        state=AutoSyncState(),
+    )
+
+    assert decision.should_run is False
+    assert decision.newly_due_match_ids == ()
+    assert decision.active_match_ids == ()

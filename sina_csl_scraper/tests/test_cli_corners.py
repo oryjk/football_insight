@@ -55,6 +55,9 @@ class FakeSinaClient:
             )
         ]
 
+    def fetch_round_matches(self, season: int, round_number: int) -> list[MatchResult]:
+        return self.fetch_all_matches(season, max_round=round_number)
+
     def fetch_all_team_rankings(self, season: int) -> list[RankingDataset]:
         return []
 
@@ -149,6 +152,16 @@ class FakeMultiMatchSinaClient(FakeSinaClient):
         ]
 
 
+class FakeCflClient:
+    def __init__(self, matches: list[MatchResult]) -> None:
+        self.matches = matches
+        self.calls: list[int] = []
+
+    def fetch_round_matches(self, season: int, round_number: int, team_index: object) -> list[MatchResult]:
+        self.calls.append(round_number)
+        return self.matches
+
+
 def test_run_scrape_writes_enriched_corner_fields_into_matches_json(tmp_path) -> None:
     run_scrape(
         season=2026,
@@ -156,6 +169,7 @@ def test_run_scrape_writes_enriched_corner_fields_into_matches_json(tmp_path) ->
         client=FakeSinaClient(),
         corner_enricher=FakeCornerEnricher(),
         enrich_corners=True,
+        expected_matches_per_round=1,
     )
 
     matches_payload = json.loads((tmp_path / "2026" / "matches.json").read_text(encoding="utf-8"))
@@ -211,6 +225,7 @@ def test_run_scrape_enriches_only_requested_matches_and_keeps_full_schedule(tmp_
         corner_enricher=enricher,
         enrich_corners=True,
         enrich_match_ids={288579},
+        expected_matches_per_round=2,
     )
 
     matches_payload = json.loads((tmp_path / "2026" / "matches.json").read_text(encoding="utf-8"))
@@ -219,3 +234,43 @@ def test_run_scrape_enriches_only_requested_matches_and_keeps_full_schedule(tmp_
     assert [match["match_id"] for match in matches_payload] == [288579, 288580]
     assert matches_payload[0]["home_corners"] == 4
     assert matches_payload[1]["home_corners"] is None
+
+
+def test_run_scrape_fills_an_incomplete_sina_round_from_cfl(tmp_path) -> None:
+    sina_client = FakeMultiMatchSinaClient()
+    fallback_matches = list(sina_client.fetch_round_matches(2026, 1))
+    for match_id in range(288581, 288587):
+        fallback_matches.append(
+            MatchResult(
+                match_id=-match_id,
+                season=2026,
+                round_number=1,
+                round_name="第1轮",
+                date="2026-03-09",
+                time="19:35",
+                status="4" if match_id == 288586 else "1",
+                home_team_id=match_id * 2,
+                home_team_name=f"主队{match_id}",
+                home_score="",
+                away_team_id=match_id * 2 + 1,
+                away_team_name=f"客队{match_id}",
+                away_score="",
+                home_logo="",
+                away_logo="",
+                schedule_source="cfl",
+                source_match_id=f"official-{match_id}",
+            )
+        )
+    cfl_client = FakeCflClient(fallback_matches)
+
+    result = run_scrape(
+        season=2026,
+        output_dir=tmp_path,
+        client=sina_client,
+        cfl_client=cfl_client,
+    )
+
+    payload = json.loads((tmp_path / "2026" / "matches.json").read_text(encoding="utf-8"))
+    assert result["matches"] == 8
+    assert cfl_client.calls == [1]
+    assert sum(match["status"] == "4" for match in payload) == 1

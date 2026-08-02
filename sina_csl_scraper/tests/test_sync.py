@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -41,9 +42,13 @@ class FakeRepository:
         self.calls.append(("upsert_players", players))
         return self._maybe_fail("upsert_players", len(players))
 
-    def upsert_matches(self, matches: list[MatchResult]) -> int:
-        self.calls.append(("upsert_matches", matches))
+    def upsert_matches(self, matches: list[MatchResult], *, run_id: str) -> int:
+        self.calls.append(("upsert_matches", {"matches": matches, "run_id": run_id}))
         return self._maybe_fail("upsert_matches", len(matches))
+
+    def deactivate_missing_matches(self, *, season: int, run_id: str) -> int:
+        self.calls.append(("deactivate_missing_matches", {"season": season, "run_id": run_id}))
+        return self._maybe_fail("deactivate_missing_matches", 0)
 
     def round_final_exists(self, *, season: int, round_number: int) -> bool:
         self.calls.append(("round_final_exists", {"season": season, "round_number": round_number}))
@@ -165,6 +170,8 @@ def _sample_payload() -> SyncPayload:
     return SyncPayload(
         season=2026,
         current_round=1,
+        max_round=2,
+        expected_matches_per_round=1,
         teams=[
             TeamProfile(team_id=136, team_name="北京国安", avatar_object_name="summary/teams/136.png"),
         ],
@@ -265,6 +272,8 @@ def _sample_payload_with_partial_next_round() -> SyncPayload:
     return SyncPayload(
         season=2026,
         current_round=2,
+        max_round=2,
+        expected_matches_per_round=2,
         teams=[
             TeamProfile(team_id=136, team_name="北京国安", avatar_object_name="summary/teams/136.png"),
         ],
@@ -286,6 +295,23 @@ def _sample_payload_with_partial_next_round() -> SyncPayload:
                 away_team_id=500,
                 away_team_name="云南玉昆",
                 away_score="0",
+                home_logo="home.png",
+                away_logo="away.png",
+            ),
+            MatchResult(
+                match_id=4,
+                season=2026,
+                round_number=1,
+                round_name="第1轮",
+                date="2026-03-01",
+                time="20:00",
+                status="3",
+                home_team_id=501,
+                home_team_name="大连英博",
+                home_score="1",
+                away_team_id=502,
+                away_team_name="重庆铜梁龙",
+                away_score="1",
                 home_logo="home.png",
                 away_logo="away.png",
             ),
@@ -416,6 +442,7 @@ def test_sync_service_persists_payload_and_completes_run() -> None:
         "upsert_teams",
         "upsert_players",
         "upsert_matches",
+        "deactivate_missing_matches",
         "insert_standings",
         "sync_team_rankings",
         "sync_player_rankings",
@@ -446,6 +473,7 @@ def test_sync_service_skips_round_final_when_round_already_finalized() -> None:
         "upsert_teams",
         "upsert_players",
         "upsert_matches",
+        "deactivate_missing_matches",
         "insert_standings",
         "sync_team_rankings",
         "sync_player_rankings",
@@ -472,6 +500,7 @@ def test_sync_service_skips_round_final_when_next_round_has_already_started() ->
         "upsert_teams",
         "upsert_players",
         "upsert_matches",
+        "deactivate_missing_matches",
         "insert_standings",
         "sync_team_rankings",
         "sync_player_rankings",
@@ -497,6 +526,25 @@ def test_sync_service_marks_run_failed_when_live_sync_errors() -> None:
         "upsert_teams",
         "upsert_players",
         "upsert_matches",
+        "rollback_sync",
+        "fail_scrape_run",
+    ]
+
+
+def test_sync_service_rejects_incomplete_snapshot_before_data_mutation() -> None:
+    repository = FakeRepository()
+    service = InsightSyncService(
+        repository=repository,
+        clock=lambda: datetime(2026, 4, 5, 8, 0, tzinfo=UTC),
+    )
+    payload = replace(_sample_payload(), matches=_sample_payload().matches[:1])
+
+    with pytest.raises(ValueError, match="round 2 expected 1 matches, got 0"):
+        service.sync(payload)
+
+    assert [name for name, _ in repository.calls] == [
+        "start_scrape_run",
+        "begin_sync",
         "rollback_sync",
         "fail_scrape_run",
     ]

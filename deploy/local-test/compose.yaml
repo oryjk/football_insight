@@ -41,6 +41,7 @@ services:
       WECHAT_MINI_APP_SECRET: local-test-mini-secret
       WECHAT_WEBHOOK_TOKEN: local-test-webhook-token
       WECHAT_ENCODING_AES_KEY: abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG
+      TICKET_MONITOR_BASE_URL: http://host.docker.internal:4000
       REDIS_URL: redis://redis:6379
       PUBLIC_BASE_URL: http://172.16.60.233:18092
       FI_REFLUX_NOTIFICATION_WORKER_ENABLED: "false"

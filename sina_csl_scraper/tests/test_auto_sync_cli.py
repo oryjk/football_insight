@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 
 from sina_csl_scraper.auto_sync import AutoSyncDecision, AutoSyncState
 from sina_csl_scraper.cli import app
-from sina_csl_scraper.models import LeagueInfo
+from sina_csl_scraper.models import LeagueInfo, MatchResult
 
 
 class FakeSinaClient:
@@ -25,6 +25,64 @@ class FakeSinaClient:
 
     def fetch_all_matches(self, season: int, max_round: int | None = None) -> list[object]:
         return []
+
+    def fetch_round_matches(self, season: int, round_number: int) -> list[MatchResult]:
+        return [
+            MatchResult(
+                match_id=round_number * 100 + item,
+                season=season,
+                round_number=round_number,
+                round_name=f"第{round_number}轮",
+                date="2026-03-01",
+                time="19:35",
+                status="1",
+                home_team_id=round_number * 1000 + item * 2,
+                home_team_name=f"主队{round_number}-{item}",
+                home_score="",
+                away_team_id=round_number * 1000 + item * 2 + 1,
+                away_team_name=f"客队{round_number}-{item}",
+                away_score="",
+                home_logo="",
+                away_logo="",
+            )
+            for item in range(1, 9)
+        ]
+
+
+def test_auto_sync_due_uses_reconciled_schedule(monkeypatch, tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+
+    class DirectFetchMustNotBeUsed(FakeSinaClient):
+        def fetch_all_matches(self, season: int, max_round: int | None = None) -> list[object]:
+            raise AssertionError("auto sync must use the reconciled schedule")
+
+    def fake_fetch_reconciled_schedule(**kwargs: object) -> list[object]:
+        captured.update(kwargs)
+        return []
+
+    monkeypatch.setattr("sina_csl_scraper.cli.SinaCslClient", DirectFetchMustNotBeUsed)
+    monkeypatch.setattr(
+        "sina_csl_scraper.cli.fetch_reconciled_schedule",
+        fake_fetch_reconciled_schedule,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "sina_csl_scraper.cli.build_auto_sync_decision",
+        lambda *args, **kwargs: AutoSyncDecision(
+            should_run=False,
+            latest_due_at=None,
+            newly_due_match_ids=(),
+        ),
+    )
+
+    result = CliRunner().invoke(
+        app,
+        ["auto-sync-due", "--state-file", str(tmp_path / ".auto_sync_state.json"), "--dry-run"],
+    )
+
+    assert result.exit_code == 0
+    assert captured["season"] == 2026
+    assert captured["max_round"] == 30
 
 
 def test_auto_sync_due_logs_completed_due_window_with_explicit_name(monkeypatch, tmp_path: Path) -> None:

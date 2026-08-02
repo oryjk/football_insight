@@ -681,6 +681,9 @@ onShow(() => {
   white-space: nowrap;
   line-height: 1;
 }
+.team-board-composer__close {
+  margin: 0 0 0 auto;
+}
 .team-board-composer {
   position: fixed;
   inset: 0;

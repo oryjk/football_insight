@@ -13,6 +13,8 @@ SnapshotKind = Literal["live", "round_final"]
 class SyncPayload:
     season: int
     current_round: int
+    max_round: int
+    expected_matches_per_round: int
     teams: list[TeamProfile]
     players: list[PlayerProfile]
     matches: list[MatchResult]
@@ -50,7 +52,9 @@ class InsightSyncRepository(Protocol):
 
     def upsert_players(self, players: list[PlayerProfile]) -> int: ...
 
-    def upsert_matches(self, matches: list[MatchResult]) -> int: ...
+    def upsert_matches(self, matches: list[MatchResult], *, run_id: str) -> int: ...
+
+    def deactivate_missing_matches(self, *, season: int, run_id: str) -> int: ...
 
     def round_final_exists(self, *, season: int, round_number: int) -> bool: ...
 
@@ -129,6 +133,41 @@ def has_started_matches_beyond_round(matches: list[MatchResult], round_number: i
     )
 
 
+def validate_complete_schedule(payload: SyncPayload) -> None:
+    if payload.max_round <= 0 or payload.expected_matches_per_round <= 0:
+        raise ValueError("schedule dimensions must be positive")
+
+    matches_by_round: dict[int, list[MatchResult]] = {}
+    fixture_keys: set[tuple[int, int, int, int]] = set()
+    for match in payload.matches:
+        if match.season != payload.season:
+            raise ValueError(
+                f"match {match.match_id} belongs to season {match.season}, expected {payload.season}"
+            )
+        if match.round_number < 1 or match.round_number > payload.max_round:
+            raise ValueError(
+                f"match {match.match_id} has round {match.round_number} outside 1..{payload.max_round}"
+            )
+        fixture_key = (
+            match.season,
+            match.round_number,
+            match.home_team_id,
+            match.away_team_id,
+        )
+        if fixture_key in fixture_keys:
+            raise ValueError(f"round {match.round_number} contains duplicate fixtures")
+        fixture_keys.add(fixture_key)
+        matches_by_round.setdefault(match.round_number, []).append(match)
+
+    for round_number in range(1, payload.max_round + 1):
+        actual_count = len(matches_by_round.get(round_number, []))
+        if actual_count != payload.expected_matches_per_round:
+            raise ValueError(
+                f"round {round_number} expected {payload.expected_matches_per_round} "
+                f"matches, got {actual_count}"
+            )
+
+
 class InsightSyncService:
     def __init__(
         self,
@@ -150,10 +189,15 @@ class InsightSyncService:
         self.repository.begin_sync()
 
         try:
+            validate_complete_schedule(payload)
             live_round_number = normalize_live_round_number(payload.current_round)
             teams_upserted = self.repository.upsert_teams(payload.teams)
             players_upserted = self.repository.upsert_players(payload.players)
-            matches_upserted = self.repository.upsert_matches(payload.matches)
+            matches_upserted = self.repository.upsert_matches(payload.matches, run_id=run_id)
+            self.repository.deactivate_missing_matches(
+                season=payload.season,
+                run_id=run_id,
+            )
             live_standings_inserted = self.repository.insert_standings(
                 run_id=run_id,
                 season=payload.season,

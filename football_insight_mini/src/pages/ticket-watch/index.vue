@@ -2546,6 +2546,7 @@ onUnload(() => {
   font-weight: 800;
 }
 .subscription-dialog__close {
+  margin: 0 0 0 auto;
   width: 56rpx;
   height: 56rpx;
   display: flex;

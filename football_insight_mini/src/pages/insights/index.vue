@@ -876,6 +876,7 @@ onShow(async () => {
 
 .meta-pill--button {
   display: inline-flex;
+  margin: 0 0 0 auto;
   align-items: center;
   justify-content: center;
   white-space: nowrap;

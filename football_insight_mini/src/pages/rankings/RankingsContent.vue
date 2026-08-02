@@ -1472,6 +1472,9 @@ defineExpose({
   font-size: 24rpx;
   color: #6d7280;
 }
+.standings-sheet__close {
+  margin: 0 0 0 auto;
+}
 .standings-sheet__share {
   background: rgba(21, 22, 27, 0.92);
   color: #ffffff;

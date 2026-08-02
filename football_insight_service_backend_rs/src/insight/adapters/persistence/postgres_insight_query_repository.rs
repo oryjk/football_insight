@@ -98,7 +98,7 @@ impl PostgresInsightQueryRepository {
         let stats_query = sqlx::query_as::<_, OverviewStatsRow>(
             r#"
             SELECT
-                (SELECT COUNT(*) FROM f_i_matches WHERE season = $1) AS total_matches,
+                (SELECT COUNT(*) FROM f_i_matches WHERE season = $1 AND source_active = TRUE) AS total_matches,
                 (SELECT COUNT(*) FROM f_i_teams) AS total_teams,
                 (SELECT COUNT(*) FROM f_i_players) AS total_players,
                 (SELECT COUNT(*) FROM f_i_ranking_categories WHERE scope = 'player') AS player_ranking_categories,
@@ -151,6 +151,7 @@ impl PostgresInsightQueryRepository {
                 away_corners
              FROM f_i_matches
              WHERE season = $1
+               AND source_active = TRUE
                AND status = '3'
                AND ($2::int IS NULL OR round_number = $2)
              ORDER BY round_number DESC, match_date DESC, match_time DESC
@@ -312,8 +313,10 @@ impl PostgresInsightQueryRepository {
     fn map_match_status(status: &str) -> &'static str {
         match status {
             "1" => "scheduled",
+            "2" => "live",
             "3" => "finished",
-            _ => "live",
+            "4" => "postponed",
+            _ => "scheduled",
         }
     }
 
@@ -328,7 +331,12 @@ impl PostgresInsightQueryRepository {
     fn summarize_rounds(season: i32, rows: Vec<RoundProgressRow>) -> Vec<RoundReference> {
         let current_round_number = rows
             .iter()
-            .find(|row| row.completed_matches < row.total_matches)
+            .rev()
+            .find(|row| row.completed_matches < row.total_matches && row.started_matches > 0)
+            .or_else(|| {
+                rows.iter()
+                    .find(|row| row.completed_matches < row.total_matches)
+            })
             .map(|row| row.round_number);
 
         rows.into_iter()
@@ -704,6 +712,7 @@ impl PostgresInsightQueryRepository {
                 LEFT JOIN f_i_teams at ON at.team_id = m.away_team_id
                 WHERE m.season = $1
                   AND m.round_number = $2
+                  AND m.source_active = TRUE
                   AND ($3::bool = false OR m.status = '3')
                 ORDER BY m.match_date ASC, m.match_time ASC, m.match_id ASC
                 LIMIT 32
@@ -740,6 +749,7 @@ impl PostgresInsightQueryRepository {
                 LEFT JOIN f_i_teams ht ON ht.team_id = m.home_team_id
                 LEFT JOIN f_i_teams at ON at.team_id = m.away_team_id
                 WHERE m.season = $1
+                  AND m.source_active = TRUE
                   AND ($2::bool = false OR m.status = '3')
                 ORDER BY m.round_number DESC, m.match_date DESC, m.match_time DESC, m.match_id DESC
                 LIMIT 20
@@ -854,9 +864,10 @@ impl PostgresInsightQueryRepository {
         let cutoff = sqlx::query_scalar::<_, Option<NaiveDateTime>>(
             r#"
             SELECT MAX((match_date::timestamp + match_time::time) + INTERVAL '120 minutes') AS cutoff
-              FROM f_i_matches
+             FROM f_i_matches
              WHERE season = $1
                AND round_number = $2
+               AND source_active = TRUE
              GROUP BY round_number
             HAVING BOOL_AND(status = '3')
             "#,
@@ -878,9 +889,10 @@ impl PostgresInsightQueryRepository {
         let kickoff = sqlx::query_scalar::<_, Option<NaiveDateTime>>(
             r#"
             SELECT MIN(match_date::timestamp + match_time::time)
-              FROM f_i_matches
+             FROM f_i_matches
              WHERE season = $1
                AND round_number > $2
+               AND source_active = TRUE
             "#,
         )
         .bind(season)
@@ -1507,6 +1519,7 @@ mod tests {
             round_number,
             total_matches,
             completed_matches,
+            started_matches: completed_matches,
             finalized_at: finalized_at.map(|item| item.parse().unwrap()),
         }
     }
@@ -1615,6 +1628,25 @@ mod tests {
     }
 
     #[test]
+    fn summarize_rounds_prefers_latest_started_incomplete_round() {
+        let rows = vec![
+            round_progress_row(18, 8, 4, None),
+            round_progress_row(19, 8, 8, Some("2026-07-19T12:00:00Z")),
+            round_progress_row(20, 8, 8, Some("2026-07-27T12:00:00Z")),
+            round_progress_row(21, 8, 5, None),
+            round_progress_row(22, 8, 0, None),
+        ];
+
+        let rounds = PostgresInsightQueryRepository::summarize_rounds(2026, rows);
+
+        assert_eq!(rounds[0].status, "upcoming");
+        assert_eq!(rounds[1].status, "completed");
+        assert_eq!(rounds[2].status, "completed");
+        assert_eq!(rounds[3].status, "current");
+        assert_eq!(rounds[4].status, "upcoming");
+    }
+
+    #[test]
     fn resolve_live_match_round_number_prefers_current_round() {
         let rounds = vec![
             RoundReference {
@@ -1691,8 +1723,12 @@ mod tests {
             "finished"
         );
         assert_eq!(
+            PostgresInsightQueryRepository::map_match_status("4"),
+            "postponed"
+        );
+        assert_eq!(
             PostgresInsightQueryRepository::map_match_status("99"),
-            "live"
+            "scheduled"
         );
     }
 
@@ -1738,6 +1774,7 @@ struct RoundProgressRow {
     round_number: i32,
     total_matches: i64,
     completed_matches: i64,
+    started_matches: i64,
     finalized_at: Option<DateTime<Utc>>,
 }
 
@@ -1895,6 +1932,13 @@ impl InsightQueryRepository for PostgresInsightQueryRepository {
                 round_number,
                 COUNT(*) AS total_matches,
                 COUNT(*) FILTER (WHERE status = '3') AS completed_matches,
+                COUNT(*) FILTER (
+                    WHERE status IN ('2', '3')
+                       OR (
+                           status = '1'
+                           AND ((match_date::timestamp + match_time::time) AT TIME ZONE 'Asia/Shanghai') <= NOW()
+                       )
+                ) AS started_matches,
                 CASE
                     WHEN BOOL_AND(status = '3')
                         THEN MAX((((match_date::timestamp + match_time::time) + INTERVAL '120 minutes') AT TIME ZONE 'UTC'))
@@ -1902,6 +1946,7 @@ impl InsightQueryRepository for PostgresInsightQueryRepository {
                 END AS finalized_at
             FROM f_i_matches
             WHERE season = $1
+              AND source_active = TRUE
               AND round_number IS NOT NULL
             GROUP BY round_number
             ORDER BY round_number ASC

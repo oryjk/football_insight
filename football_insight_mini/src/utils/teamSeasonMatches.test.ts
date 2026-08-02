@@ -178,6 +178,31 @@ describe('resolveTeamSeasonMatches', () => {
       [84, null],
     ])
   })
+
+  test('keeps postponed matches distinct from scheduled matches', () => {
+    const matches = resolveTeamSeasonMatches(
+      { team_id: 9, team_name: '成都蓉城' },
+      [
+        createMatch({
+          match_id: 91,
+          match_date: '2026-04-11',
+          status: 'postponed',
+        }),
+        createMatch({
+          match_id: 92,
+          match_date: '2026-04-25',
+          status: 'scheduled',
+        }),
+      ],
+      '2026-04-21T20:00:00+08:00',
+    )
+
+    expect(matches.map((match) => match.displayStatus)).toEqual(['postponed', 'scheduled'])
+    expect(matches.map((match) => match.resultLabel)).toEqual(['延', '未'])
+    expect(matches.map((match) => match.scoreText)).toEqual(['延期', 'VS'])
+    expect(matches[0].focusKind).toBeNull()
+    expect(matches[1].focusKind).toBe('next-scheduled')
+  })
 })
 
 describe('buildTeamSeasonMatchRowId', () => {

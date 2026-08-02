@@ -10,6 +10,11 @@ from sina_csl_scraper.postgres_repository import (
 class FakeCursor:
     def __init__(self) -> None:
         self.executemany_calls: list[tuple[str, list[tuple[object, ...]]]] = []
+        self.execute_calls: list[tuple[str, tuple[object, ...]]] = []
+        self.rowcount = 1
+
+    def execute(self, sql: str, params: tuple[object, ...]) -> None:
+        self.execute_calls.append((sql, params))
 
     def executemany(self, sql: str, params: list[tuple[object, ...]]) -> None:
         self.executemany_calls.append((sql, params))
@@ -121,7 +126,7 @@ def test_upsert_matches_preserves_existing_leisu_fields_when_new_values_are_null
             corner_source=None,
             technical_stats=None,
         ),
-    ])
+    ], run_id="run-1")
 
     sql, params = connection.cursor_instance.executemany_calls[0]
 
@@ -130,5 +135,24 @@ def test_upsert_matches_preserves_existing_leisu_fields_when_new_values_are_null
     assert "away_corners = COALESCE(EXCLUDED.away_corners, f_i_matches.away_corners)" in sql
     assert "corner_source = COALESCE(EXCLUDED.corner_source, f_i_matches.corner_source)" in sql
     assert "technical_stats = COALESCE(EXCLUDED.technical_stats, f_i_matches.technical_stats)" in sql
+    assert "ON CONFLICT (season, round_number, home_team_id, away_team_id)" in sql
+    assert "match_id = EXCLUDED.match_id" not in sql
+    assert "source_active = TRUE" in sql
+    assert "last_seen_run_id = EXCLUDED.last_seen_run_id" in sql
+    assert sql.split("ON CONFLICT", maxsplit=1)[0].count("%s") == len(params[0])
     assert params[0][0] == 288620
+    assert "run-1" in params[0]
     assert params[0][-1] is None
+
+
+def test_deactivate_missing_matches_only_marks_rows_not_seen_in_current_run() -> None:
+    repository, connection = build_repository()
+
+    count = repository.deactivate_missing_matches(season=2026, run_id="run-1")
+
+    sql, params = connection.cursor_instance.execute_calls[0]
+    assert "UPDATE f_i_matches" in sql
+    assert "source_active = FALSE" in sql
+    assert "last_seen_run_id IS DISTINCT FROM %s" in sql
+    assert params == (2026, "run-1")
+    assert count == 1

@@ -1,0 +1,121 @@
+{
+  "status": 200,
+  "msg": "success",
+  "data": {
+    "count": 8,
+    "dataList": [
+      {
+        "id": "7bd0tgocljrhe08rkr5c73ok4",
+        "week": 18,
+        "match_status": "Played",
+        "local_date_time": "2026-07-10 19:35:00",
+        "home_contestant_id": "7fqhid43axyzp47bihoqhqdbf",
+        "home_contestant_name": "山东泰山",
+        "home_contestant_icon": "//pic.cfl-china.cn/shandong.png",
+        "away_contestant_id": "3n4jrcw6w965v1qvp0azx5kwk",
+        "away_contestant_name": "云南玉昆",
+        "away_contestant_icon": "//pic.cfl-china.cn/yunnan.png",
+        "ft_home_score": 4,
+        "ft_away_score": 3
+      },
+      {
+        "id": "7bz86a4xl8hb0rm4fyrwu347o",
+        "week": 18,
+        "match_status": "Postponed",
+        "local_date_time": "2026-07-11 19:00:00",
+        "home_contestant_id": "6nbq8ek8wl4scwttlmgdyveqy",
+        "home_contestant_name": "武汉三镇",
+        "home_contestant_icon": "//pic.cfl-china.cn/wuhan.png",
+        "away_contestant_id": "1eaept8dld85s894brcrkrq5p",
+        "away_contestant_name": "河南俱乐部彩陶坊",
+        "away_contestant_icon": "//pic.cfl-china.cn/henan.png",
+        "ft_home_score": 0,
+        "ft_away_score": 0
+      },
+      {
+        "id": "7d0pav2lbsf28wpyhxvx19kpg",
+        "week": 18,
+        "match_status": "Postponed",
+        "local_date_time": "2026-07-11 19:35:00",
+        "home_contestant_id": "cvx4yvx5oby9dz7vm70mw04um",
+        "home_contestant_name": "上海申花",
+        "home_contestant_icon": "//pic.cfl-china.cn/shenhua.png",
+        "away_contestant_id": "exq7je02eprk5fcre1uo9zwbi",
+        "away_contestant_name": "北京国安",
+        "away_contestant_icon": "//pic.cfl-china.cn/guoan.png",
+        "ft_home_score": 0,
+        "ft_away_score": 0
+      },
+      {
+        "id": "7djttj5jbvsn1ztid1jilvqqc",
+        "week": 18,
+        "match_status": "Played",
+        "local_date_time": "2026-07-11 19:35:00",
+        "home_contestant_id": "a1a0zo3jliehxemg6qpa3lrva",
+        "home_contestant_name": "深圳新鹏城",
+        "home_contestant_icon": "//pic.cfl-china.cn/shenzhen.png",
+        "away_contestant_id": "2ff3aaqtf2g91wbcz4w80kkr8",
+        "away_contestant_name": "青岛西海岸",
+        "away_contestant_icon": "//pic.cfl-china.cn/west-coast.png",
+        "ft_home_score": 3,
+        "ft_away_score": 0
+      },
+      {
+        "id": "7e2x6mg6j6yvcv2p6n0cxq3o4",
+        "week": 18,
+        "match_status": "Played",
+        "local_date_time": "2026-07-11 20:00:00",
+        "home_contestant_id": "19g03gt1yj4oo8ak4vyf6sp9l",
+        "home_contestant_name": "成都蓉城",
+        "home_contestant_icon": "//pic.cfl-china.cn/chengdu.png",
+        "away_contestant_id": "cjnb1ayk5mruxqpud9qmy4t1w",
+        "away_contestant_name": "重庆铜梁龙",
+        "away_contestant_icon": "//pic.cfl-china.cn/chongqing.png",
+        "ft_home_score": 1,
+        "ft_away_score": 1
+      },
+      {
+        "id": "7elqren5n59mu0vl7uy1i4h78",
+        "week": 18,
+        "match_status": "Postponed",
+        "local_date_time": "2026-07-12 19:00:00",
+        "home_contestant_id": "di8wvsww8w86i7gr80pbbhsyi",
+        "home_contestant_name": "天津津门虎",
+        "home_contestant_icon": "//pic.cfl-china.cn/tianjin.png",
+        "away_contestant_id": "7u46yssnarhr1uyxsmv4q5x3q",
+        "away_contestant_name": "辽宁铁人楠波湾",
+        "away_contestant_icon": "//pic.cfl-china.cn/liaoning.png",
+        "ft_home_score": 0,
+        "ft_away_score": 0
+      },
+      {
+        "id": "7f5jiwzp5jzhfmr76hf5scbo4",
+        "week": 18,
+        "match_status": "Postponed",
+        "local_date_time": "2026-07-12 19:35:00",
+        "home_contestant_id": "5x5hvs5xtbbh8b0zg5ehyyudv",
+        "home_contestant_name": "上海海港",
+        "home_contestant_icon": "//pic.cfl-china.cn/port.png",
+        "away_contestant_id": "dicpumaiand6vk7vqbn4tqdxw",
+        "away_contestant_name": "大连英博海发",
+        "away_contestant_icon": "//pic.cfl-china.cn/dalian.png",
+        "ft_home_score": 0,
+        "ft_away_score": 0
+      },
+      {
+        "id": "7ci21e0q7l8tsmj2tzzrxjd3o",
+        "week": 18,
+        "match_status": "Played",
+        "local_date_time": "2026-07-14 19:35:00",
+        "home_contestant_id": "a3l87ozfq8bjwpy0nxvs5w28o",
+        "home_contestant_name": "浙江俱乐部绿城",
+        "home_contestant_icon": "//pic.cfl-china.cn/zhejiang.png",
+        "away_contestant_id": "a3rgv4o76uowd2gxzx9pgf02d",
+        "away_contestant_name": "青岛海牛",
+        "away_contestant_icon": "//pic.cfl-china.cn/hainiu.png",
+        "ft_home_score": 3,
+        "ft_away_score": 2
+      }
+    ]
+  }
+}

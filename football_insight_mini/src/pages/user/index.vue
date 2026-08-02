@@ -1671,6 +1671,7 @@ onShow(() => {
 }
 .notification-email-panel__action {
   flex-shrink: 0;
+  margin: 0 0 0 auto;
   min-width: 128rpx;
   height: 68rpx;
   padding: 0 26rpx;

@@ -493,6 +493,10 @@ watch(
   line-height: 1;
 }
 
+.ai-chat-sheet__close {
+  margin: 0 0 0 auto;
+}
+
 .ai-chat-sheet__meta {
   display: flex;
   align-items: center;

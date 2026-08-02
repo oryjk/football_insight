@@ -187,6 +187,7 @@ function handleMaskTap() {
 
 .fi-sheet-card__close {
   flex-shrink: 0;
+  margin: 0 0 0 auto;
   width: 52rpx;
   height: 52rpx;
   padding: 0;

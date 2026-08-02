@@ -240,8 +240,10 @@ impl SupportRepository for PostgresSupportRepository {
         let match_ids = sqlx::query_as::<_, MatchIdRow>(
             r#"
             SELECT m.match_id
-              FROM f_i_matches m
+             FROM f_i_matches m
              WHERE (m.home_team_id = $1 OR m.away_team_id = $1)
+               AND m.source_active = TRUE
+               AND m.status <> '4'
                AND ((m.match_date::timestamp + m.match_time::time) AT TIME ZONE 'Asia/Shanghai') > $2
              ORDER BY m.match_date ASC, m.match_time ASC, m.match_id ASC
              LIMIT 3
@@ -271,8 +273,10 @@ impl SupportRepository for PostgresSupportRepository {
         let match_id = sqlx::query_as::<_, MatchIdRow>(
             r#"
             SELECT m.match_id
-              FROM f_i_matches m
+             FROM f_i_matches m
              WHERE (m.home_team_id = $1 OR m.away_team_id = $1)
+               AND m.source_active = TRUE
+               AND m.status <> '4'
                AND ((m.match_date::timestamp + m.match_time::time) AT TIME ZONE 'Asia/Shanghai') > $2
              ORDER BY m.match_date ASC, m.match_time ASC, m.match_id ASC
              LIMIT 1
@@ -315,9 +319,10 @@ impl SupportRepository for PostgresSupportRepository {
                        at.avatar_storage_url AS away_team_avatar_storage_url,
                        m.away_score
                   FROM f_i_matches m
-                  LEFT JOIN f_i_teams ht ON ht.team_id = m.home_team_id
-                  LEFT JOIN f_i_teams at ON at.team_id = m.away_team_id
+                 LEFT JOIN f_i_teams ht ON ht.team_id = m.home_team_id
+                 LEFT JOIN f_i_teams at ON at.team_id = m.away_team_id
                  WHERE m.match_id = $1
+                   AND m.source_active = TRUE
             ),
             match_support_totals AS (
                 SELECT v.supported_team_id,
@@ -332,6 +337,7 @@ impl SupportRepository for PostgresSupportRepository {
                   FROM f_i_match_support_votes v
                   JOIN f_i_matches m ON m.match_id = v.match_id
                   JOIN selected_match sm ON sm.season = m.season
+                 WHERE m.source_active = TRUE
                  GROUP BY v.supported_team_id
             ),
             viewer_context AS (
