@@ -95,7 +95,10 @@ pub struct AppConfig {
     pub jpush: Option<JPushConfig>,
     pub seat_swap_mini_subscribe_template_id: String,
     pub seat_swap_mini_subscribe_page: String,
-    pub admin_api_token: Option<String>,
+    pub admin_jwt_secret: String,
+    pub admin_owner_username: String,
+    pub admin_owner_password: String,
+    pub admin_owner_display_name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -180,10 +183,17 @@ impl AppConfig {
             std::env::var("WECHAT_MINI_SEAT_SWAP_SUBSCRIBE_TEMPLATE_ID").unwrap_or_default();
         let seat_swap_mini_subscribe_page = std::env::var("WECHAT_MINI_SEAT_SWAP_SUBSCRIBE_PAGE")
             .unwrap_or_else(|_| "pages/seat-swap/index".to_string());
-        let admin_api_token = std::env::var("ADMIN_API_TOKEN")
-            .ok()
-            .map(|value| value.trim().to_string())
-            .filter(|value| !value.is_empty());
+        let admin_jwt_secret =
+            std::env::var("ADMIN_JWT_SECRET").context("ADMIN_JWT_SECRET is required")?;
+        if admin_jwt_secret.trim().len() < 32 {
+            anyhow::bail!("ADMIN_JWT_SECRET must be at least 32 characters");
+        }
+        let admin_owner_username =
+            std::env::var("ADMIN_OWNER_USERNAME").context("ADMIN_OWNER_USERNAME is required")?;
+        let admin_owner_password =
+            std::env::var("ADMIN_OWNER_PASSWORD").context("ADMIN_OWNER_PASSWORD is required")?;
+        let admin_owner_display_name = std::env::var("ADMIN_OWNER_DISPLAY_NAME")
+            .unwrap_or_else(|_| "Football Insight Owner".to_string());
 
         Ok(Self {
             port,
@@ -210,7 +220,10 @@ impl AppConfig {
             jpush,
             seat_swap_mini_subscribe_template_id,
             seat_swap_mini_subscribe_page,
-            admin_api_token,
+            admin_jwt_secret,
+            admin_owner_username,
+            admin_owner_password,
+            admin_owner_display_name,
         })
     }
 }

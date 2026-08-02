@@ -34,8 +34,68 @@ pub struct AdminUserList {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AdminUserSearch {
+pub struct AdminReferredUser {
+    pub id: Uuid,
+    pub account_identifier: String,
     pub display_name: Option<String>,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdminUserActivity {
+    pub last_login_at: Option<DateTime<Utc>>,
+    pub last_active_at: Option<DateTime<Utc>>,
+    pub last_active_page_key: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdminPaymentOrder {
+    pub order_no: String,
+    pub amount_cents: i32,
+    pub status: String,
+    pub product_type: String,
+    pub paid_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdminSubscription {
+    pub id: Uuid,
+    pub plan_code: String,
+    pub scope: String,
+    pub team_code: String,
+    pub season: Option<i32>,
+    pub match_id: Option<i64>,
+    pub status: String,
+    pub starts_at: DateTime<Utc>,
+    pub expires_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdminUserDevice {
+    pub id: i64,
+    pub platform: String,
+    pub masked_device_token: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdminUserDetail {
+    pub user: AdminUser,
+    pub referrals: Vec<AdminReferredUser>,
+    pub activity: Option<AdminUserActivity>,
+    pub orders: Vec<AdminPaymentOrder>,
+    pub subscriptions: Vec<AdminSubscription>,
+    pub devices: Vec<AdminUserDevice>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdminUserSearch {
+    pub query: Option<String>,
+    pub status: Option<String>,
+    pub membership_tier: Option<String>,
     pub page: i64,
     pub page_size: i64,
 }
@@ -58,6 +118,25 @@ pub struct AdminUpdateUserInput {
     pub membership_tier: Option<String>,
     pub membership_expires_at: Option<DateTime<Utc>>,
     pub membership_expires_at_set: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdminMembershipAdjustment {
+    pub membership_tier: String,
+    pub membership_expires_at: Option<DateTime<Utc>>,
+    pub membership_expires_at_set: bool,
+    pub reason: String,
+}
+
+pub fn validate_admin_reason(value: &str) -> anyhow::Result<String> {
+    let value = value.trim().to_string();
+    if value.is_empty() {
+        anyhow::bail!("reason is required");
+    }
+    if value.chars().count() > 500 {
+        anyhow::bail!("reason is too long");
+    }
+    Ok(value)
 }
 
 pub fn normalize_page(value: Option<i64>) -> i64 {

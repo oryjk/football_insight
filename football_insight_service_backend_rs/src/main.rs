@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use anyhow::Context;
 use axum::{extract::Request, middleware::from_fn_with_state};
 use football_insight_service_backend_rs::{
+    admin::bootstrap::bootstrap_admin_owner,
     app::build_router,
     config::AppConfig,
     http_cache::{HttpResponseCache, cache_get_responses},
@@ -52,6 +53,11 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("failed to connect to postgres")?;
     tracing::info!("postgres connection established");
+
+    bootstrap_admin_owner(pool.clone(), &config)
+        .await
+        .context("failed to bootstrap admin owner")?;
+    tracing::info!("admin owner bootstrap verified");
 
     spawn_reflux_notification_worker(pool.clone(), &config);
 

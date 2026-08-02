@@ -5,8 +5,9 @@ use uuid::Uuid;
 
 use crate::admin::{
     domain::admin_user::{
-        AdminCreateUserInput, AdminInviter, AdminUpdateUserInput, AdminUser, AdminUserList,
-        AdminUserSearch,
+        AdminCreateUserInput, AdminInviter, AdminMembershipAdjustment, AdminPaymentOrder,
+        AdminReferredUser, AdminSubscription, AdminUpdateUserInput, AdminUser, AdminUserActivity,
+        AdminUserDetail, AdminUserDevice, AdminUserList, AdminUserSearch,
     },
     ports::admin_user_repository::AdminUserRepository,
 };
@@ -37,6 +38,54 @@ struct AdminUserRow {
     referral_invite_code: Option<String>,
     membership_tier: String,
     membership_expires_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow)]
+struct AdminReferredUserRow {
+    id: Uuid,
+    account_identifier: String,
+    display_name: Option<String>,
+    status: String,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow)]
+struct AdminUserActivityRow {
+    last_login_at: Option<DateTime<Utc>>,
+    last_active_at: Option<DateTime<Utc>>,
+    last_active_page_key: Option<String>,
+}
+
+#[derive(Debug, FromRow)]
+struct AdminPaymentOrderRow {
+    order_no: String,
+    amount_cents: i32,
+    status: String,
+    product_type: String,
+    paid_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow)]
+struct AdminSubscriptionRow {
+    id: Uuid,
+    plan_code: String,
+    scope: String,
+    team_code: String,
+    season: Option<i32>,
+    match_id: Option<i64>,
+    status: String,
+    starts_at: DateTime<Utc>,
+    expires_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, FromRow)]
+struct AdminUserDeviceRow {
+    id: i64,
+    device_token: String,
+    platform: String,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -78,20 +127,20 @@ impl From<AdminUserRow> for AdminUser {
 impl AdminUserRepository for PostgresAdminUserRepository {
     async fn list_users(&self, search: AdminUserSearch) -> anyhow::Result<AdminUserList> {
         let offset = (search.page - 1) * search.page_size;
-        let display_name_pattern = search
-            .display_name
-            .as_ref()
-            .map(|value| format!("%{}%", value));
+        let query_pattern = search.query.as_ref().map(|value| format!("%{}%", value));
 
         let total = sqlx::query_scalar::<_, i64>(
             r#"
             SELECT COUNT(*)
               FROM f_i_users
-             WHERE status = 'active'
-               AND ($1::TEXT IS NULL OR display_name ILIKE $1)
+             WHERE ($1::TEXT IS NULL OR display_name ILIKE $1 OR account_identifier ILIKE $1)
+               AND ($2::TEXT IS NULL OR status = $2)
+               AND ($3::TEXT IS NULL OR membership_tier = $3)
             "#,
         )
-        .bind(display_name_pattern.as_deref())
+        .bind(query_pattern.as_deref())
+        .bind(search.status.as_deref())
+        .bind(search.membership_tier.as_deref())
         .fetch_one(&self.pool)
         .await?;
 
@@ -126,13 +175,16 @@ impl AdminUserRepository for PostgresAdminUserRepository {
                 ON referrals.referred_user_id = users.id
          LEFT JOIN f_i_users AS referrer
                 ON referrer.id = referrals.referrer_user_id
-             WHERE users.status = 'active'
-               AND ($1::TEXT IS NULL OR users.display_name ILIKE $1)
+             WHERE ($1::TEXT IS NULL OR users.display_name ILIKE $1 OR users.account_identifier ILIKE $1)
+               AND ($2::TEXT IS NULL OR users.status = $2)
+               AND ($3::TEXT IS NULL OR users.membership_tier = $3)
              ORDER BY users.created_at DESC, users.id DESC
-             LIMIT $2 OFFSET $3
+             LIMIT $4 OFFSET $5
             "#,
         )
-        .bind(display_name_pattern.as_deref())
+        .bind(query_pattern.as_deref())
+        .bind(search.status.as_deref())
+        .bind(search.membership_tier.as_deref())
         .bind(search.page_size)
         .bind(offset)
         .fetch_all(&self.pool)
@@ -144,6 +196,165 @@ impl AdminUserRepository for PostgresAdminUserRepository {
             page_size: search.page_size,
             items: rows.into_iter().map(Into::into).collect(),
         })
+    }
+
+    async fn get_user(&self, user_id: Uuid) -> anyhow::Result<Option<AdminUser>> {
+        let row = sqlx::query_as::<_, AdminUserRow>(
+            r#"
+            SELECT users.id,
+                   users.account_identifier,
+                   users.display_name,
+                   users.avatar_url,
+                   (users.wx_open_id IS NOT NULL) AS has_wechat_binding,
+                   users.status,
+                   own_invite.code AS invite_code,
+                   referrer.id AS invited_by_user_id,
+                   referrer.display_name AS invited_by_display_name,
+                   referrer.account_identifier AS invited_by_account_identifier,
+                   referrals.referral_invite_code,
+                   users.membership_tier,
+                   users.membership_expires_at,
+                   users.created_at,
+                   users.updated_at
+              FROM f_i_users AS users
+         LEFT JOIN LATERAL (
+                   SELECT invite_codes.code
+                     FROM f_i_invite_codes AS invite_codes
+                    WHERE invite_codes.used_by_user_id = users.id
+                    ORDER BY invite_codes.used_at DESC NULLS LAST,
+                             invite_codes.created_at DESC,
+                             invite_codes.id DESC
+                    LIMIT 1
+                   ) AS own_invite ON TRUE
+         LEFT JOIN f_i_user_referrals AS referrals
+                ON referrals.referred_user_id = users.id
+         LEFT JOIN f_i_users AS referrer
+                ON referrer.id = referrals.referrer_user_id
+             WHERE users.id = $1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(Into::into))
+    }
+
+    async fn get_user_detail(&self, user_id: Uuid) -> anyhow::Result<Option<AdminUserDetail>> {
+        let Some(user) = self.get_user(user_id).await? else {
+            return Ok(None);
+        };
+        let referrals = sqlx::query_as::<_, AdminReferredUserRow>(
+            r#"
+            SELECT users.id, users.account_identifier, users.display_name, users.status, users.created_at
+              FROM f_i_user_referrals AS referrals
+              JOIN f_i_users AS users ON users.id = referrals.referred_user_id
+             WHERE referrals.referrer_user_id = $1
+             ORDER BY users.created_at DESC
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?
+        .into_iter()
+        .map(|row| AdminReferredUser {
+            id: row.id,
+            account_identifier: row.account_identifier,
+            display_name: row.display_name,
+            status: row.status,
+            created_at: row.created_at,
+        })
+        .collect();
+        let activity = sqlx::query_as::<_, AdminUserActivityRow>(
+            r#"
+            SELECT last_login_at, last_active_at, last_active_page_key
+              FROM f_i_user_activity_snapshots
+             WHERE user_id = $1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?
+        .map(|row| AdminUserActivity {
+            last_login_at: row.last_login_at,
+            last_active_at: row.last_active_at,
+            last_active_page_key: row.last_active_page_key,
+        });
+        let orders = sqlx::query_as::<_, AdminPaymentOrderRow>(
+            r#"
+            SELECT order_no, amount_cents, status, product_type, paid_at, created_at
+              FROM f_i_payment_orders
+             WHERE user_id = $1
+             ORDER BY created_at DESC
+             LIMIT 50
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?
+        .into_iter()
+        .map(|row| AdminPaymentOrder {
+            order_no: row.order_no,
+            amount_cents: row.amount_cents,
+            status: row.status,
+            product_type: row.product_type,
+            paid_at: row.paid_at,
+            created_at: row.created_at,
+        })
+        .collect();
+        let subscriptions = sqlx::query_as::<_, AdminSubscriptionRow>(
+            r#"
+            SELECT id, plan_code, scope, team_code, season, match_id, status, starts_at, expires_at
+              FROM f_i_user_reflux_subscriptions
+             WHERE user_id = $1
+             ORDER BY created_at DESC
+             LIMIT 50
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?
+        .into_iter()
+        .map(|row| AdminSubscription {
+            id: row.id,
+            plan_code: row.plan_code,
+            scope: row.scope,
+            team_code: row.team_code,
+            season: row.season,
+            match_id: row.match_id,
+            status: row.status,
+            starts_at: row.starts_at,
+            expires_at: row.expires_at,
+        })
+        .collect();
+        let devices = sqlx::query_as::<_, AdminUserDeviceRow>(
+            r#"
+            SELECT id, device_token, platform, created_at, updated_at
+              FROM f_i_user_device_tokens
+             WHERE user_id = $1
+             ORDER BY updated_at DESC
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?
+        .into_iter()
+        .map(|row| AdminUserDevice {
+            id: row.id,
+            platform: row.platform,
+            masked_device_token: mask_device_token(&row.device_token),
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        })
+        .collect();
+
+        Ok(Some(AdminUserDetail {
+            user,
+            referrals,
+            activity,
+            orders,
+            subscriptions,
+            devices,
+        }))
     }
 
     async fn create_user(
@@ -265,6 +476,161 @@ impl AdminUserRepository for PostgresAdminUserRepository {
         tx.commit().await?;
         Ok(result.rows_affected() > 0)
     }
+
+    async fn set_user_status(
+        &self,
+        user_id: Uuid,
+        status: &str,
+        admin_id: Uuid,
+        reason: &str,
+    ) -> anyhow::Result<Option<AdminUser>> {
+        let mut tx = self.pool.begin().await?;
+        let before_status = sqlx::query_scalar::<_, String>(
+            "SELECT status FROM f_i_users WHERE id = $1 FOR UPDATE",
+        )
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let Some(before_status) = before_status else {
+            tx.rollback().await?;
+            return Ok(None);
+        };
+
+        let row = sqlx::query_as::<_, AdminUserRow>(
+            r#"
+            UPDATE f_i_users
+               SET status = $2, updated_at = NOW()
+             WHERE id = $1
+            RETURNING id,
+                      account_identifier,
+                      display_name,
+                      avatar_url,
+                      (wx_open_id IS NOT NULL) AS has_wechat_binding,
+                      status,
+                      NULL::TEXT AS invite_code,
+                      NULL::UUID AS invited_by_user_id,
+                      NULL::TEXT AS invited_by_display_name,
+                      NULL::TEXT AS invited_by_account_identifier,
+                      NULL::TEXT AS referral_invite_code,
+                      membership_tier,
+                      membership_expires_at,
+                      created_at,
+                      updated_at
+            "#,
+        )
+        .bind(user_id)
+        .bind(status)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        if status == "disabled" {
+            sqlx::query("DELETE FROM f_i_user_sessions WHERE user_id = $1")
+                .bind(user_id)
+                .execute(&mut *tx)
+                .await?;
+        }
+        sqlx::query(
+            r#"
+            INSERT INTO f_i_admin_audit_logs (
+                id, admin_user_id, action, target_type, target_id, reason, before_json, after_json
+            ) VALUES ($1, $2, $3, 'user', $4, $5, $6, $7)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(admin_id)
+        .bind(if status == "disabled" {
+            "user.disable"
+        } else {
+            "user.restore"
+        })
+        .bind(user_id.to_string())
+        .bind(reason)
+        .bind(serde_json::json!({"status": before_status}))
+        .bind(serde_json::json!({"status": status}))
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(Some(row.into()))
+    }
+
+    async fn adjust_membership(
+        &self,
+        user_id: Uuid,
+        adjustment: AdminMembershipAdjustment,
+        admin_id: Uuid,
+    ) -> anyhow::Result<Option<AdminUser>> {
+        let mut tx = self.pool.begin().await?;
+        let before = sqlx::query_as::<_, (String, Option<DateTime<Utc>>)>(
+            r#"
+            SELECT membership_tier, membership_expires_at
+              FROM f_i_users
+             WHERE id = $1
+             FOR UPDATE
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let Some((before_tier, before_expires_at)) = before else {
+            tx.rollback().await?;
+            return Ok(None);
+        };
+
+        let row = sqlx::query_as::<_, AdminUserRow>(
+            r#"
+            UPDATE f_i_users
+               SET membership_tier = $2,
+                   membership_expires_at = CASE WHEN $3 THEN $4 ELSE membership_expires_at END,
+                   updated_at = NOW()
+             WHERE id = $1
+            RETURNING id,
+                      account_identifier,
+                      display_name,
+                      avatar_url,
+                      (wx_open_id IS NOT NULL) AS has_wechat_binding,
+                      status,
+                      NULL::TEXT AS invite_code,
+                      NULL::UUID AS invited_by_user_id,
+                      NULL::TEXT AS invited_by_display_name,
+                      NULL::TEXT AS invited_by_account_identifier,
+                      NULL::TEXT AS referral_invite_code,
+                      membership_tier,
+                      membership_expires_at,
+                      created_at,
+                      updated_at
+            "#,
+        )
+        .bind(user_id)
+        .bind(&adjustment.membership_tier)
+        .bind(adjustment.membership_expires_at_set)
+        .bind(adjustment.membership_expires_at)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO f_i_admin_audit_logs (
+                id, admin_user_id, action, target_type, target_id, reason, before_json, after_json
+            ) VALUES ($1, $2, 'user.membership.adjust', 'user', $3, $4, $5, $6)
+            "#,
+        )
+        .bind(Uuid::new_v4())
+        .bind(admin_id)
+        .bind(user_id.to_string())
+        .bind(&adjustment.reason)
+        .bind(serde_json::json!({
+            "membership_tier": before_tier,
+            "membership_expires_at": before_expires_at,
+        }))
+        .bind(serde_json::json!({
+            "membership_tier": row.membership_tier,
+            "membership_expires_at": row.membership_expires_at,
+        }))
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(Some(row.into()))
+    }
 }
 
 fn map_unique_user_error(error: sqlx::Error) -> anyhow::Error {
@@ -275,6 +641,22 @@ fn map_unique_user_error(error: sqlx::Error) -> anyhow::Error {
     }
 
     error.into()
+}
+
+fn mask_device_token(token: &str) -> String {
+    if token.chars().count() <= 8 {
+        return "********".to_string();
+    }
+    let prefix: String = token.chars().take(4).collect();
+    let suffix: String = token
+        .chars()
+        .rev()
+        .take(4)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    format!("{prefix}...{suffix}")
 }
 
 #[cfg(test)]

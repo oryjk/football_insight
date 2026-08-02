@@ -25,6 +25,10 @@ DATABASE_URL='postgresql://football_app:***@117.72.164.211:5432/football_data?ss
 - `DATABASE_URL`
 - `RUST_LOG`
 - `JWT_SECRET`
+- `ADMIN_JWT_SECRET`
+- `ADMIN_OWNER_USERNAME`
+- `ADMIN_OWNER_PASSWORD`
+- `ADMIN_OWNER_DISPLAY_NAME`
 - `OPENAI_API_KEY`
 - `OPENAI_BASE_URL`
 - `AI_CHAT_MODEL`
@@ -45,6 +49,8 @@ DATABASE_URL='postgresql://football_app:***@117.72.164.211:5432/football_data?ss
 - `AI_CHAT_MODEL` 默认为 `glm-5.1`
 - 如果未单独配置小程序环境变量，后端会自动回退到 `WECHAT_APP_ID / WECHAT_APP_SECRET`
 - `TICKET_MONITOR_BASE_URL` 用于余票监控 / 下一场比赛等联动能力，本地默认会回落到 `http://127.0.0.1:4000`
+- `ADMIN_JWT_SECRET` 必须独立于 C 端 `JWT_SECRET`，且至少 32 个字符
+- `ADMIN_OWNER_*` 用于首次启动时创建独立 owner；同名账号已存在时不会覆盖密码
 
 ## 数据库
 
@@ -112,6 +118,16 @@ docker run -d \
   - `/api/v1/auth/me`
   - `/api/v1/auth/logout`
   - `/football/wechat/webhook`
+- 管理端认证（只供原生管理 App）
+  - `POST /api/v1/admin/auth/login`
+  - `GET /api/v1/admin/auth/me`
+  - `POST /api/v1/admin/auth/logout`
+  - `GET /api/v1/admin/users`
+  - `GET /api/v1/admin/users/{id}`
+  - `POST /api/v1/admin/users/{id}/disable`
+  - `POST /api/v1/admin/users/{id}/restore`
+  - `POST /api/v1/admin/users/{id}/membership`
+  - `GET /api/v1/admin/audit-logs`
 - AI
   - `/api/v1/ai/chat`
   - `/api/v1/ai/chat/stream`

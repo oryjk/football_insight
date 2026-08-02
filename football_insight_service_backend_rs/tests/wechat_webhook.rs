@@ -65,7 +65,10 @@ async fn wechat_webhook_verification_returns_plaintext_echo() {
                 app_key: String::new(),
                 master_secret: String::new(),
             }),
-            admin_api_token: None,
+            admin_jwt_secret: "test-admin-jwt-secret-at-least-32-characters".to_string(),
+            admin_owner_username: "owner".to_string(),
+            admin_owner_password: "test-owner-password".to_string(),
+            admin_owner_display_name: "Test Owner".to_string(),
         },
     );
 

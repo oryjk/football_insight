@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>足球洞察管理 App</title>
+  <style>
+    :root { color-scheme: light; --bg:#f3f5f2; --surface:#fff; --text:#18211d; --muted:#65716b; --line:#d8ded9; --green:#176b52; --green-soft:#d9efe7; --amber:#9b5c17; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+    main { width:min(760px,calc(100% - 32px)); margin:auto; padding:42px 0 56px; }
+    header { display:flex; align-items:center; gap:16px; padding-bottom:26px; border-bottom:1px solid var(--line); }
+    .mark { width:56px; height:56px; display:grid; place-items:center; border-radius:8px; background:var(--green); color:#fff; font-size:25px; font-weight:800; }
+    h1 { margin:0; font-size:clamp(26px,6vw,38px); letter-spacing:0; }
+    .sub { margin:5px 0 0; color:var(--muted); }
+    .release { margin-top:24px; padding:22px; background:var(--surface); border:1px solid var(--line); border-radius:8px; }
+    .version-line { display:flex; justify-content:space-between; gap:16px; align-items:baseline; }
+    h2 { margin:0; font-size:20px; }
+    .published { color:var(--muted); font-size:13px; }
+    .download { display:flex; justify-content:center; align-items:center; min-height:50px; margin-top:20px; border-radius:6px; background:var(--green); color:#fff; font-weight:700; text-decoration:none; }
+    dl { display:grid; grid-template-columns:90px minmax(0,1fr); gap:10px 16px; margin:22px 0 0; padding-top:18px; border-top:1px solid var(--line); }
+    dt { color:var(--muted); } dd { margin:0; overflow-wrap:anywhere; }
+    code { font-size:12px; }
+    h3 { margin:28px 0 12px; font-size:16px; }
+    ul { margin:0; padding-left:20px; line-height:1.8; }
+    .history { margin-top:24px; }
+    .history a { color:var(--green); }
+    .notice { margin-top:20px; padding:13px 15px; border-left:3px solid var(--amber); background:#fff7e8; color:#70410d; font-size:13px; line-height:1.6; }
+    @media (max-width:540px) { main{padding-top:24px}.release{padding:18px}.version-line{display:block}.published{margin-top:6px}dl{grid-template-columns:72px minmax(0,1fr)} }
+  </style>
+</head>
+<body>
+<main>
+  <header><div class="mark">足</div><div><h1>足球洞察管理</h1><p class="sub">Android 管理端内部下载</p></div></header>
+  <section class="release">
+    <div class="version-line"><h2 id="version">正在读取版本</h2><span class="published" id="published">-</span></div>
+    <a class="download" href="latest.apk" download>下载最新 APK</a>
+    <dl><dt>文件大小</dt><dd id="size">-</dd><dt>SHA256</dt><dd><code id="sha">-</code></dd><dt>提交</dt><dd><code id="commit">-</code></dd></dl>
+    <h3>本次更新</h3><ul id="notes"><li>正在读取发布说明</li></ul>
+    <p class="notice">这是内部 Debug 签名版本。Android 如提示禁止安装未知应用，请只为当前浏览器临时授权。</p>
+  </section>
+  <section class="history"><h3>历史版本</h3><ul id="history"><li>正在读取历史版本</li></ul></section>
+</main>
+<script>
+  const fmtSize = n => n ? `${(n / 1024 / 1024).toFixed(1)} MB` : '-';
+  const fmtTime = value => value ? new Date(value).toLocaleString('zh-CN', { hour12:false }) : '-';
+  async function load() {
+    const metadata = await fetch('metadata.json', { cache:'no-store' }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    document.querySelector('#version').textContent = `版本 ${metadata.versionName} (${metadata.versionCode})`;
+    document.querySelector('#published').textContent = fmtTime(metadata.publishedAt);
+    document.querySelector('#size').textContent = fmtSize(metadata.fileSizeBytes);
+    document.querySelector('#sha').textContent = metadata.sha256;
+    document.querySelector('#commit').textContent = metadata.gitCommit.slice(0, 12);
+    document.querySelector('#notes').innerHTML = metadata.releaseNotes.map(item => `<li>${escapeHtml(item)}</li>`).join('');
+    const history = await fetch('releases.json', { cache:'no-store' }).then(r => r.json());
+    document.querySelector('#history').innerHTML = history.map(item => `<li><a href="${encodeURI(item.releaseFile)}">${escapeHtml(item.versionName)}</a> · ${fmtTime(item.publishedAt)}</li>`).join('');
+  }
+  function escapeHtml(value) { const node=document.createElement('span'); node.textContent=String(value); return node.innerHTML; }
+  load().catch(() => { document.querySelector('#version').textContent='版本信息读取失败'; });
+</script>
+</body>
+</html>

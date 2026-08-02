@@ -1,1 +1,3 @@
+pub mod postgres_admin_audit_repository;
+pub mod postgres_admin_auth_repository;
 pub mod postgres_admin_user_repository;

@@ -5,8 +5,9 @@ use uuid::Uuid;
 use crate::{
     admin::{
         domain::admin_user::{
-            AdminCreateUserInput, AdminUpdateUserInput, AdminUser, AdminUserList, AdminUserSearch,
-            validate_admin_password, validate_display_name, validate_membership_tier,
+            AdminCreateUserInput, AdminMembershipAdjustment, AdminUpdateUserInput, AdminUser,
+            AdminUserDetail, AdminUserList, AdminUserSearch, validate_admin_password,
+            validate_admin_reason, validate_display_name, validate_membership_tier,
         },
         ports::admin_user_repository::AdminUserRepository,
     },
@@ -31,6 +32,14 @@ impl AdminUserService {
 
     pub async fn list_users(&self, search: AdminUserSearch) -> anyhow::Result<AdminUserList> {
         self.repository.list_users(search).await
+    }
+
+    pub async fn get_user(&self, user_id: Uuid) -> anyhow::Result<Option<AdminUser>> {
+        self.repository.get_user(user_id).await
+    }
+
+    pub async fn get_user_detail(&self, user_id: Uuid) -> anyhow::Result<Option<AdminUserDetail>> {
+        self.repository.get_user_detail(user_id).await
     }
 
     pub async fn create_user(&self, mut input: AdminCreateUserInput) -> anyhow::Result<AdminUser> {
@@ -59,5 +68,34 @@ impl AdminUserService {
 
     pub async fn delete_user(&self, user_id: Uuid) -> anyhow::Result<bool> {
         self.repository.delete_user(user_id).await
+    }
+
+    pub async fn set_user_status(
+        &self,
+        user_id: Uuid,
+        status: &str,
+        admin_id: Uuid,
+        reason: String,
+    ) -> anyhow::Result<Option<AdminUser>> {
+        if !matches!(status, "active" | "disabled") {
+            anyhow::bail!("invalid user status");
+        }
+        let reason = validate_admin_reason(&reason)?;
+        self.repository
+            .set_user_status(user_id, status, admin_id, &reason)
+            .await
+    }
+
+    pub async fn adjust_membership(
+        &self,
+        user_id: Uuid,
+        mut adjustment: AdminMembershipAdjustment,
+        admin_id: Uuid,
+    ) -> anyhow::Result<Option<AdminUser>> {
+        adjustment.membership_tier = validate_membership_tier(&adjustment.membership_tier)?;
+        adjustment.reason = validate_admin_reason(&adjustment.reason)?;
+        self.repository
+            .adjust_membership(user_id, adjustment, admin_id)
+            .await
     }
 }

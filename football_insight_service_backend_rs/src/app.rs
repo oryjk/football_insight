@@ -18,7 +18,7 @@ use crate::{
 
 pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
     let insight = build_insight(pool.clone());
-    let admin_routes = build_admin_routes(pool.clone(), config.admin_api_token.clone());
+    let admin_routes = build_admin_routes(pool.clone(), config);
     let health_routes = build_health_routes(pool.clone());
     let system_config = build_system_config_routes(pool.clone(), insight.repository.clone());
 

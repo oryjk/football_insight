@@ -43,6 +43,12 @@ coverage/
 target/
 .sqlx/
 
+# Android / Gradle
+.gradle/
+local.properties
+*.apk
+*.aab
+
 # Python
 .venv/
 venv/

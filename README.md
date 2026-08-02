@@ -2,7 +2,7 @@
 
 一个面向中国足球用户的“数据洞察”产品实验项目，当前一期 MVP 聚焦中超联赛。
 
-当前 monorepo 下包含 3 个子项目：
+当前 monorepo 下包含 4 个子项目：
 
 - `sina_csl_scraper`
   - Python + `uv`
@@ -13,6 +13,9 @@
 - `football_insight_mini`
   - uni-app + Vue 3 + TypeScript + Bun
   - 负责微信小程序，并支持编译为 H5
+- `football_insight_admin_android`
+  - Kotlin + Jetpack Compose + Material 3
+  - 原生 Android 管理端，只调用 `/api/v1/admin/**`
 
 ## 当前能力
 
@@ -34,7 +37,7 @@
   -> sina_csl_scraper
   -> PostgreSQL (football_data, f_i_* tables)
   -> football_insight_service_backend_rs
-  -> football_insight_mini
+  -> football_insight_mini / football_insight_admin_android
 ```
 
 当前职责边界：
@@ -59,6 +62,7 @@ football_insight/
 ├── DEPLOYMENT.md
 ├── README.md
 ├── football_insight_mini/
+├── football_insight_admin_android/
 ├── football_insight_service_backend_rs/
 └── sina_csl_scraper/
 ```
@@ -138,6 +142,15 @@ bun run dev:mp-weixin
 然后用微信开发者工具打开：
 
 - `football_insight_mini/dist/dev/mp-weixin`
+
+### 5. 构建 Android 管理端
+
+```bash
+cd football_insight_admin_android
+ANDROID_HOME=/home/betalpha/Android/Sdk ./gradlew testDebugUnitTest lintDebug assembleDebug
+```
+
+管理端生产 API 默认使用 `https://match.oryjk.cn/`。模拟器访问本机后端时，在 App 设置中切换为 `http://10.0.2.2:8080/`；也可通过 Gradle 属性 `FOOTBALL_ADMIN_API_BASE_URL` 覆盖构建默认值。App 会通过 `/api/v1/system/public-config` 的 JSON 响应识别正确后端，不会只凭 HTTP 200 接受 Nginx 回落页面。
 
 ## 账号系统说明
 

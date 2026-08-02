@@ -52,6 +52,7 @@ bun run build:h5
 
 ```bash
 rsync -av --delete \
+  --exclude 'admin-android/' \
   football_insight_mini/dist/build/h5/ \
   jd:/root/docker_data/nginx/html/football/
 ```
@@ -67,6 +68,8 @@ curl -I https://match.oryjk.cn/football/
 - 首页是否能打开
 - 榜单页是否能正常拉数据
 - 我的页面是否能正常读取系统配置
+
+`football/admin-android/` 是 Android 管理端下载目录，H5 同步必须保留上述 `--exclude`，不得被 `--delete` 清理。
 
 ## 后端部署
 
