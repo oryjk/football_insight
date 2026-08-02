@@ -53,4 +53,4 @@ ANDROID_HOME=/home/betalpha/Android/Sdk \
   ./scripts/publish-apk.sh --note "本次更新内容"
 ```
 
-下载页：`https://match.oryjk.cn/football/admin-android/`。发布脚本会运行测试、lint 和构建，验证 APK 签名，上传版本化 APK、`latest.apk`、SHA256 metadata 和最近 10 个历史版本。
+内网下载页：`http://172.16.60.233/football-admin-android/`。发布脚本会运行测试、lint 和构建，验证 APK 签名，并发布版本化 APK、`latest.apk`、SHA256 metadata 和历史版本。该入口由 local233 内部 gateway 托管，不发布到公网。

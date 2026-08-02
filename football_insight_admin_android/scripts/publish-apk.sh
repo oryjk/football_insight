@@ -4,9 +4,9 @@ set -euo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 ANDROID_DIR=$(cd -- "$SCRIPT_DIR/.." && pwd)
 REPO_ROOT=$(git -C "$ANDROID_DIR" rev-parse --show-toplevel)
-PUBLISH_HOST=${FOOTBALL_ADMIN_PUBLISH_HOST:-jd}
-PUBLIC_DIR=${FOOTBALL_ADMIN_PUBLIC_DIR:-/root/docker_data/nginx/html/football/admin-android}
-PUBLIC_URL=${FOOTBALL_ADMIN_PUBLIC_URL:-https://match.oryjk.cn/football/admin-android/}
+PUBLIC_ROOT=${FOOTBALL_ADMIN_PUBLIC_ROOT:-${GATEWAY_PUBLIC_ROOT:-"$HOME/.local/share/betalpha-admin-downloads"}}
+PUBLIC_DIR="$PUBLIC_ROOT/football-admin-android"
+PUBLIC_URL=${FOOTBALL_ADMIN_PUBLIC_URL:-http://172.16.60.233/football-admin-android/}
 RETAIN_RELEASES=${RETAIN_RELEASES:-10}
 SKIP_BUILD=false
 NOTES=()
@@ -16,9 +16,9 @@ usage() {
 Usage: publish-apk.sh [--skip-build] --note TEXT [--note TEXT ...]
 
 Environment:
-  FOOTBALL_ADMIN_PUBLISH_HOST  SSH host serving the download page. Defaults to jd.
-  FOOTBALL_ADMIN_PUBLIC_DIR    Remote static directory.
-  FOOTBALL_ADMIN_PUBLIC_URL    Public HTTPS download URL.
+  FOOTBALL_ADMIN_PUBLIC_ROOT   Static root mounted by the local233 internal gateway.
+  GATEWAY_PUBLIC_ROOT          Shared gateway root used as a fallback.
+  FOOTBALL_ADMIN_PUBLIC_URL    Internal download URL.
   ANDROID_HOME                 Android SDK path.
   RETAIN_RELEASES              Versioned APK files to retain. Defaults to 10.
 EOF
@@ -101,9 +101,9 @@ jq -n \
     '{versionName:$versionName,versionCode:$versionCode,buildType:"debug",publishedAt:$publishedAt,fileSizeBytes:$fileSizeBytes,sha256:$sha256,gitCommit:$gitCommit,releaseFile:$releaseFile,releaseNotes:$releaseNotes}' \
     > "$STAGING_DIR/metadata.json"
 
-ssh "$PUBLISH_HOST" "mkdir -p '$PUBLIC_DIR/releases'"
-if ssh "$PUBLISH_HOST" "test -f '$PUBLIC_DIR/releases.json'"; then
-    ssh "$PUBLISH_HOST" "cat '$PUBLIC_DIR/releases.json'" > "$STAGING_DIR/existing.json"
+mkdir -p "$PUBLIC_DIR/releases"
+if [[ -f "$PUBLIC_DIR/releases.json" ]] && jq -e 'type == "array"' "$PUBLIC_DIR/releases.json" >/dev/null 2>&1; then
+    install -m 0644 "$PUBLIC_DIR/releases.json" "$STAGING_DIR/existing.json"
 else
     echo '[]' > "$STAGING_DIR/existing.json"
 fi
@@ -114,16 +114,29 @@ jq -n \
     '[$current[0]] + [$existing[0][] | select(.sha256 != $current[0].sha256)] | .[:$keep]' \
     > "$STAGING_DIR/releases.json"
 
-rsync -a "$APK_PATH" "$PUBLISH_HOST:$PUBLIC_DIR/releases/$RELEASE_FILE"
-rsync -a "$APK_PATH" "$PUBLISH_HOST:$PUBLIC_DIR/.latest.apk.tmp"
-rsync -a "$ANDROID_DIR/distribution/index.html" "$PUBLISH_HOST:$PUBLIC_DIR/.index.html.tmp"
-rsync -a "$STAGING_DIR/metadata.json" "$PUBLISH_HOST:$PUBLIC_DIR/.metadata.json.tmp"
-rsync -a "$STAGING_DIR/releases.json" "$PUBLISH_HOST:$PUBLIC_DIR/.releases.json.tmp"
-ssh "$PUBLISH_HOST" "set -eu; mv '$PUBLIC_DIR/.latest.apk.tmp' '$PUBLIC_DIR/latest.apk'; mv '$PUBLIC_DIR/.index.html.tmp' '$PUBLIC_DIR/index.html'; mv '$PUBLIC_DIR/.metadata.json.tmp' '$PUBLIC_DIR/metadata.json'; mv '$PUBLIC_DIR/.releases.json.tmp' '$PUBLIC_DIR/releases.json'"
+install -m 0644 "$APK_PATH" "$PUBLIC_DIR/releases/.${RELEASE_FILE}.tmp"
+mv -f "$PUBLIC_DIR/releases/.${RELEASE_FILE}.tmp" "$PUBLIC_DIR/releases/$RELEASE_FILE"
+install -m 0644 "$APK_PATH" "$PUBLIC_DIR/.latest.apk.tmp"
+install -m 0644 "$ANDROID_DIR/distribution/index.html" "$PUBLIC_DIR/.index.html.tmp"
+install -m 0644 "$STAGING_DIR/metadata.json" "$PUBLIC_DIR/.metadata.json.tmp"
+install -m 0644 "$STAGING_DIR/releases.json" "$PUBLIC_DIR/.releases.json.tmp"
+mv -f "$PUBLIC_DIR/.latest.apk.tmp" "$PUBLIC_DIR/latest.apk"
+mv -f "$PUBLIC_DIR/.index.html.tmp" "$PUBLIC_DIR/index.html"
+mv -f "$PUBLIC_DIR/.metadata.json.tmp" "$PUBLIC_DIR/metadata.json"
+mv -f "$PUBLIC_DIR/.releases.json.tmp" "$PUBLIC_DIR/releases.json"
 
-REMOTE_SHA=$(ssh "$PUBLISH_HOST" "sha256sum '$PUBLIC_DIR/latest.apk' | cut -d ' ' -f 1")
-[[ "$REMOTE_SHA" == "$SHA256" ]] || { echo "Remote SHA256 mismatch" >&2; exit 1; }
+PUBLISHED_SHA=$(sha256sum "$PUBLIC_DIR/latest.apk" | cut -d ' ' -f 1)
+[[ "$PUBLISHED_SHA" == "$SHA256" ]] || { echo "Published SHA256 mismatch" >&2; exit 1; }
 curl --fail --silent --show-error --max-time 15 "$PUBLIC_URL/metadata.json" | jq -e --arg sha "$SHA256" '.sha256 == $sha' >/dev/null
+
+mapfile -t OLD_RELEASES < <(
+    find "$PUBLIC_DIR/releases" -maxdepth 1 -type f -name '*.apk' -printf '%T@ %p\n' \
+        | sort -nr \
+        | awk -v keep="$RETAIN_RELEASES" 'NR > keep { sub(/^[^ ]+ /, ""); print }'
+)
+for old_release in "${OLD_RELEASES[@]}"; do
+    rm -f -- "$old_release"
+done
 
 echo "Published: $PUBLIC_URL"
 echo "Version:   $VERSION_NAME ($VERSION_CODE)"
