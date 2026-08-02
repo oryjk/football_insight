@@ -257,11 +257,60 @@
         <view class="account-actions">
           <view class="account-actions__body">
             <text class="account-actions__label">账号管理</text>
-            <text class="account-actions__caption">如需切换账号，可退出后重新使用微信登录。</text>
+            <text class="account-actions__caption">{{ loginPresentation.switchAccountCaption }}</text>
           </view>
           <button class="logout-action" @click="handleLogout">退出登录</button>
         </view>
       </template>
+
+      <!-- #ifdef H5 -->
+      <view v-if="passwordLoginSheetVisible" class="sheet-mask" @tap="closePasswordLoginSheet">
+        <view class="sheet-card password-login-sheet" @tap.stop="consumeSheetTap">
+          <view class="section-heading section-heading--compact">
+            <view>
+              <text class="section-kicker">H5 登录</text>
+              <text class="section-title">账号密码登录</text>
+            </view>
+          </view>
+
+          <view class="password-login-form">
+            <input
+              v-model="passwordLoginForm.accountIdentifier"
+              class="auth-input"
+              type="text"
+              placeholder="请输入账号或手机号"
+              confirm-type="next"
+            />
+            <input
+              v-model="passwordLoginForm.password"
+              class="auth-input"
+              type="text"
+              password
+              placeholder="请输入密码"
+              confirm-type="done"
+              @confirm="handlePasswordLogin"
+            />
+          </view>
+
+          <view class="sheet-actions">
+            <button
+              class="primary-action primary-action--ghost"
+              :disabled="passwordLoginSubmitting"
+              @click="closePasswordLoginSheet"
+            >
+              取消
+            </button>
+            <button
+              class="primary-action"
+              :disabled="passwordLoginSubmitting"
+              @click="handlePasswordLogin"
+            >
+              {{ passwordLoginSubmitting ? '登录中...' : '登录' }}
+            </button>
+          </view>
+        </view>
+      </view>
+      <!-- #endif -->
 
       <view v-if="miniWechatBindState" class="sheet-mask" @tap="handleSheetMaskTap">
         <view class="sheet-card" @tap.stop="consumeSheetTap">
@@ -386,9 +435,8 @@
 
     <FiLoginFloat
       v-if="showGuestLoginFloat"
-      :disabled="isH5"
-      :action-text="isH5 ? '小程序登录' : '去登录'"
-      @action="handleMiniWechatLogin"
+      :action-text="loginPresentation.actionText"
+      @action="handleLoginAction"
     />
   </view>
 </template>
@@ -415,6 +463,7 @@ import {
   bindMiniWechatAccount,
   getCurrentUser,
   getNotificationEmail,
+  login,
   loginWithMiniWechat,
   logout,
   updateNotificationEmail,
@@ -446,6 +495,11 @@ import {
 } from '../../utils/membershipRules'
 import { consumePostLoginRedirect, navigateToPostLoginTarget } from '../../utils/postLoginRedirect'
 import { useAiChatSheet } from '../../composables/useAiChatSheet'
+import {
+  buildPasswordLoginPayload,
+  resolveUserLoginPresentation,
+  validatePasswordLoginForm,
+} from './loginHelpers'
 
 const hasLocalAccessToken = ref(Boolean(getAccessToken()))
 const loading = ref(hasLocalAccessToken.value)
@@ -471,6 +525,12 @@ const miniWechatBindForm = reactive({
   displayName: '',
   avatarPreviewUrl: '',
 })
+const passwordLoginSheetVisible = ref(false)
+const passwordLoginSubmitting = ref(false)
+const passwordLoginForm = reactive({
+  accountIdentifier: '',
+  password: '',
+})
 
 const isH5 =
   // #ifdef H5
@@ -479,6 +539,8 @@ const isH5 =
   // #ifndef H5
   false
   // #endif
+
+const loginPresentation = resolveUserLoginPresentation(isH5)
 
 const accountInfoIconMap: Record<UserAccountInfoItem['iconName'], string> = {
   'badge-check': badgeCheckIcon,
@@ -494,7 +556,11 @@ const benefitIconMap: Record<UserBenefitItem['iconName'], string> = {
 }
 
 const isGuestPage = computed(() => !systemConfigUnderReview.value && (!hasLocalAccessToken.value || (!loading.value && !currentUser.value)))
-const hasOpenSheet = computed(() => Boolean(miniWechatBindState.value) || notificationEmailSheetVisible.value)
+const hasOpenSheet = computed(() =>
+  passwordLoginSheetVisible.value
+  || Boolean(miniWechatBindState.value)
+  || notificationEmailSheetVisible.value,
+)
 const showGuestChantWall = computed(() => isGuestPage.value && !hasOpenSheet.value)
 const showGuestLoginFloat = computed(() => isGuestPage.value && !hasOpenSheet.value)
 const guestChantLines = [
@@ -792,6 +858,52 @@ function handleMembershipCardAction(): void {
 
 function openAiFromBrandNav(): void {
   void openAiChat()
+}
+
+function handleLoginAction(): void {
+  if (loginPresentation.method === 'password') {
+    passwordLoginSheetVisible.value = true
+    return
+  }
+
+  void handleMiniWechatLogin()
+}
+
+function closePasswordLoginSheet(): void {
+  if (passwordLoginSubmitting.value) {
+    return
+  }
+
+  passwordLoginSheetVisible.value = false
+  passwordLoginForm.password = ''
+}
+
+async function handlePasswordLogin(): Promise<void> {
+  if (passwordLoginSubmitting.value) {
+    return
+  }
+
+  const validationError = validatePasswordLoginForm(passwordLoginForm)
+  if (validationError) {
+    uni.showToast({ title: validationError, icon: 'none' })
+    return
+  }
+
+  passwordLoginSubmitting.value = true
+  try {
+    const result = await login(buildPasswordLoginPayload(passwordLoginForm))
+    hasLocalAccessToken.value = Boolean(getAccessToken())
+    currentUser.value = result.user
+    passwordLoginSheetVisible.value = false
+    passwordLoginForm.password = ''
+    await loadUser()
+    uni.showToast({ title: '登录成功', icon: 'success' })
+    await redirectAfterLogin()
+  } catch (error) {
+    uni.showToast({ title: extractApiErrorMessage(error, '登录失败'), icon: 'none' })
+  } finally {
+    passwordLoginSubmitting.value = false
+  }
 }
 
 async function handleMiniWechatLogin(): Promise<void> {
@@ -1618,6 +1730,9 @@ onShow(() => {
   background: #f6f7fb;
   color: #6d7280;
 }
+.primary-action[disabled] {
+  opacity: 0.5;
+}
 .account-actions {
   margin-top: 24rpx;
   border-radius: 28rpx;
@@ -1707,6 +1822,7 @@ onShow(() => {
 .sheet-mask {
   position: fixed;
   inset: 0;
+  bottom: var(--window-bottom, 0px);
   z-index: 80;
   background: rgba(18, 20, 28, 0.36);
   backdrop-filter: blur(8rpx);
@@ -1722,7 +1838,13 @@ onShow(() => {
   box-shadow: 0 -24rpx 56rpx rgba(12,14,20,0.12);
   animation: fi-sheet-up 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.mini-wechat-bind-form {
+.password-login-sheet {
+  max-width: 720rpx;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+.mini-wechat-bind-form,
+.password-login-form {
   margin-top: 22rpx;
   display: flex;
   flex-direction: column;

@@ -48,7 +48,7 @@ function handleAction(): void {
   position: fixed;
   left: 28rpx;
   right: 28rpx;
-  bottom: 12rpx;
+  bottom: calc(var(--window-bottom, 0px) + 12rpx);
   z-index: 40;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
