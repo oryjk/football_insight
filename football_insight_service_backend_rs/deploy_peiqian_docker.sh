@@ -11,6 +11,11 @@
 #
 # Required secret:
 #   Put HARBOR_PASSWORD in .env, or export it before running this script.
+#
+# Optional:
+#   BUILD_USE_PROXY=1 runs the out109 build inside `zsh -ic 'proxy_on'`.
+#   Default is a direct connection (the build proxy at 172.17.64.1:7890 is
+#   not always reachable, while git and the docker mirror work directly).
 
 set -euo pipefail
 
@@ -154,8 +159,13 @@ printf '%s' "${HARBOR_PASSWORD}" \
     | ssh "${BUILD_HOST}" "mkdir -p '${BUILD_DOCKER_CONFIG}' && DOCKER_CONFIG='${BUILD_DOCKER_CONFIG}' docker login ${HARBOR_REGISTRY} -u '${HARBOR_USERNAME}' --password-stdin"
 
 echo "📦 在 ${BUILD_HOST} 拉取代码、构建镜像并推送..."
+if [[ "${BUILD_USE_PROXY:-0}" == "1" ]]; then
+    BUILD_RUN_SHELL="zsh -ic 'proxy_on; bash -s'"
+else
+    BUILD_RUN_SHELL="bash -s"
+fi
 ssh "${BUILD_HOST}" \
-    "BUILD_REPO_DIR='${BUILD_REPO_DIR}' BUILD_DIR='${BUILD_DIR}' BRANCH='${BRANCH}' IMAGE_REF='${IMAGE_REF}' LATEST_REF='${LATEST_REF}' DOCKER_CONFIG='${BUILD_DOCKER_CONFIG}' BUILD_ENV_FILE='${BUILD_ENV_FILE}' zsh -ic 'proxy_on; bash -s'" << 'EOF'
+    "BUILD_REPO_DIR='${BUILD_REPO_DIR}' BUILD_DIR='${BUILD_DIR}' BRANCH='${BRANCH}' IMAGE_REF='${IMAGE_REF}' LATEST_REF='${LATEST_REF}' DOCKER_CONFIG='${BUILD_DOCKER_CONFIG}' BUILD_ENV_FILE='${BUILD_ENV_FILE}' ${BUILD_RUN_SHELL}" << 'EOF'
 set -euo pipefail
 export DOCKER_CONFIG
 
