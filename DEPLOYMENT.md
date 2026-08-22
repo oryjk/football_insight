@@ -4,13 +4,12 @@
 
 ## 生产环境
 
-- 默认生产服务器别名：`jd`
-- 默认生产服务器登录：`ssh jd`
-- 备用生产服务器别名：`peiqian`
-- 备用生产服务器登录：`ssh peiqian`
+- 线上域名入口机：`peiqian`（`match.oryjk.cn` 的 DNS 直接解析到 peiqian 公网 IP `117.72.164.211`）
+- peiqian 登录：`ssh peiqian`
+- 备用入口机：`jd`（`ssh jd`）；jd 上的 Nginx 同样把 `/api/v1/` 反代到 peiqian 的 `10.8.10.2:8092`（WireGuard）
 - 前端访问地址：`https://match.oryjk.cn/football/`
 - 后端接口前缀：`https://match.oryjk.cn/api/v1/`
-- `match.oryjk.cn` 当前对应 `jd`；`jd` 与 `peiqian` 之间通过 WireGuard 联通
+- 结论：后端发版必须 `jd` 和 `peiqian` 两台都执行；只发 `jd` 线上不会生效
 
 ## 生产目录
 
@@ -228,11 +227,11 @@ ssh jd 'journalctl -u football-insight.service -n 100 --no-pager'
 ### 纯后端改动
 
 1. push 代码
-2. 选择目标机：
+2. 两台都要发（线上入口是 `peiqian`，`jd` 是备用入口）：
    - `football_insight_service_backend_rs/deploy_jd_docker.sh`
    - `football_insight_service_backend_rs/deploy_peiqian_docker.sh`
 3. 如有 migration，在对应目标机执行 `cargo run --release --bin run_migrations`
-4. `curl` 验证接口
+4. 用 `https://match.oryjk.cn` 域名验证接口（目标机本机 8092 正常不代表线上生效）
 5. 优先看 `logs/app.log`，必要时再看 `docker logs`
 
 ### 同时改前后端
@@ -262,9 +261,18 @@ ssh jd 'journalctl -u football-insight.service -n 100 --no-pager'
 2. 用微信开发者工具打开 `dist/build/mp-weixin`
 3. 在微信开发者工具里上传新版本
 
+## local233 生产库 SSH 隧道
+
+local233 管理联调后端经 SSH 隧道连接 peiqian 上的生产 `football_data`：
+
+- 隧道由 systemd 用户服务 `football-insight-db-tunnel.service` 常驻托管（unit 位于 `~/.config/systemd/user/`，运行用户 `betalpha`，已 enable + linger）
+- `Restart=always` 自愈，机器重启后自动拉起，不再依赖 `up.sh` 手工建隧道
+- 服务保持 master-socket 形态（`/tmp/football-insight-admin-db-tunnel-1000.sock`），`deploy/local-test/up.sh` 的 `-O check` 探测可直接识别，仓库脚本无需改动
+- 排查命令：`systemctl --user status football-insight-db-tunnel`（在 local233 上以 betalpha 执行）
+
 ## 风险点
 
-- 不要把“后端已发布到 `peiqian`”和“线上域名入口已经切到 `peiqian`”混为一谈
+- 线上域名入口当前就是 `peiqian`（DNS 直解析）；只把镜像发到 `jd` 线上不会有任何变化，必须两台都发
 - 后端部署前如果忘了 push，服务器拉不到最新代码
 - 有 migration 时，如果只重启服务不跑迁移，接口可能变成 `500`
 - 如果后端代码改了，本地验证前必须先重启本地后端，不要在旧进程上验证新逻辑

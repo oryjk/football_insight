@@ -46,7 +46,8 @@
 
 ## 当前部署约定
 
-- 生产服务器：`jd`
+- 线上域名入口：`peiqian`（`match.oryjk.cn` DNS 直接解析到 peiqian）；`jd` 为备用入口，其 Nginx 把 `/api/v1/` 反代到 peiqian
+- 后端发版必须 `jd`、`peiqian` 两台都执行，只发 `jd` 线上不生效
 - 生产 monorepo 目录：`/root/projects/football_insight`
 - 后端项目目录：`/root/projects/football_insight/football_insight_service_backend_rs`
 - 前端静态目录：`/root/docker_data/nginx/html/football/`
