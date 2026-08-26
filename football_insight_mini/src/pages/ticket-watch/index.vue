@@ -1021,7 +1021,8 @@ import type {
   TicketWatchTrackedInterest,
   RefluxSubscriptionPlan,
 } from '../../types/ticketWatch'
-import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
+import { ApiRequestError, extractApiErrorMessage, isUnauthorizedError } from '../../utils/apiError'
+import { getAccessToken } from '../../utils/authStorage'
 import { resolveMembershipBenefitsLocked } from '../../utils/membershipBenefits'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
 import { reportPageActivity } from '../../utils/userActivity'
@@ -2051,9 +2052,36 @@ async function refreshMatchIdEntitlement(): Promise<void> {
   }
 }
 
+function promptMatchIdLogin(): void {
+  uni.showModal({
+    title: '先登录再查看',
+    content: '登录后才能查看比赛 ID，现在去“我的”页登录吗？',
+    confirmText: '去登录',
+    success: ({ confirm }) => {
+      if (!confirm) {
+        return
+      }
+
+      uni.switchTab({
+        url: '/pages/user/index',
+      })
+    },
+  })
+}
+
 async function openMatchIdSheet(): Promise<void> {
   const match = currentMatch.value
   if (!match || matchIdSheetState.value === 'paying') {
+    return
+  }
+
+  if (systemConfigUnderReview.value) {
+    uni.showToast({ title: '该功能审核期间暂不可用', icon: 'none' })
+    return
+  }
+
+  if (!getAccessToken()) {
+    promptMatchIdLogin()
     return
   }
 
@@ -2065,6 +2093,11 @@ async function openMatchIdSheet(): Promise<void> {
     matchIdSheetState.value = resolveMatchIdSheetState(entitlement)
   } catch (error) {
     matchIdSheetVisible.value = false
+    if (isUnauthorizedError(error)) {
+      // token 失效与未登录走同一个登录引导，避免弹窗闪开即关、体感"没反应"。
+      promptMatchIdLogin()
+      return
+    }
     uni.showToast({ title: extractApiErrorMessage(error, '获取解锁状态失败'), icon: 'none' })
   }
 }
