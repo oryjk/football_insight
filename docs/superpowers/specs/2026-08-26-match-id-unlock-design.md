@@ -15,7 +15,7 @@
 | 决策点 | 结论 | 备注 |
 | --- | --- | --- |
 | 付费范围 | 真接微信支付 | 复用现有 wxpay + 订单链路 |
-| id 含义 | 内部 `match_id`（数据库主键，数字） | 非 `external_match_id` |
+| id 含义 | 内部 `match_id`（`f_i_matches.match_id`，业务唯一键，数字） | 非 `external_match_id` |
 | 计费口径 | 按场次 | 5 元解锁一场，永久可见；换场次需重新付费；V6+ 全部免费 |
 | 门槛强度 | 软门槛 | 看板接口继续明文返回 `match_id`，老客户端零影响；详见"向后兼容" |
 
@@ -105,7 +105,7 @@ POST /api/v1/match-id/order
 - 比赛不存在 → 404
 - V6+ 会员 → 400 "V6 及以上会员可直接查看，无需购买"（正常前端流程不会到达，防御）
 - 本场已解锁 → 409 "本场比赛 ID 已解锁，无需重复购买"
-- 未绑定微信（`get_user_open_id` 为空）→ 403 "请先绑定微信后再支付"（reflux 下单同款前置校验）
+- 未绑定微信（`get_user_open_id` 为空）→ 403 "请先绑定微信后再支付"（校验点与 reflux 下单一致；注意 reflux 把该错误映射为 400，本端点定为 403，实现时不要对齐 reflux）
 
 通过后：`OrderRepository.create_order(NewPaymentOrder { amount_cents: 500, product_type: "match_id_unlock:{match_id}", ... })` → `WechatPayPort.unified_order(order_no, "解锁比赛ID", 500, openid)`，返回订单号与支付参数（与 reflux 订阅下单用例同构）。每次点击生成新订单；旧 pending 单自然遗留、不主动处置（与 reflux 实际行为一致，页面已有轮询 + entitlement 刷新兜底）。
 
@@ -113,7 +113,7 @@ POST /api/v1/match-id/order
 
 - `payment/domain/order.rs` 新增 `parse_match_id_unlock_product_type(&str) -> Option<i64>`（仿 reflux 解析器，解析 `match_id_unlock:{match_id}` 中的场次 id）。
 - `handle_wechat_notify.rs` 在现有 reflux 分支旁增加 match_id_unlock 分支。
-- `PaymentSettlementPort` trait 新增 `settle_match_id_unlock_order(order)`，Postgres 实现在事务内：订单置 paid（复用现有置 paid SQL 模式）+ `INSERT INTO f_i_user_match_id_unlocks ... ON CONFLICT (user_id, match_id) DO NOTHING`（重复回调幂等）。
+- `PaymentSettlementPort` trait 新增 `settle_match_id_unlock_order(order_no, transaction_id, user_id, match_id)`（与现有 settle 方法的参数风格一致），Postgres 实现在事务内：订单置 paid（复用现有置 paid SQL 模式）+ `INSERT INTO f_i_user_match_id_unlocks ... ON CONFLICT (user_id, match_id) DO NOTHING`（重复回调幂等）。
 
 ### 缓存
 
@@ -143,12 +143,14 @@ export function createMatchIdOrder(matchId: number): Promise<{ order_no: string;
 
 - props：`visible`、`matchId: number | null`、`matchLabel: string`（轮次 + 对阵 + 日期摘要）、`state: 'loading' | 'locked' | 'unlocked' | 'paying'`、`via`、`effectiveTier`
 - emits：`close`、`pay`、`copy`、`upgrade`（升级按钮由页面处理跳转，组件不跳页面）
-- 已解锁态：比赛摘要 + 大字号 match_id + "复制"按钮（组件内 `uni.setClipboardData`，平台能力不属于业务 API）+ 来源说明（"会员权益" / "已购解锁"）
+- 已解锁态：比赛摘要 + 大字号 match_id + "复制"按钮（组件内 `uni.setClipboardData`，平台能力不属于业务 API）+ 来源说明（"会员权益" / "单场解锁"）
 - 锁定态：说明文案"V6 及以上会员可免费查看，或支付 ¥5 解锁本场比赛 ID"；主按钮"¥5 解锁本场"（emits pay）、次按钮"升级到 V6"（emits upgrade）
 - paying 态：主按钮置 loading 并禁用
 - 视觉沿用页面现有 subscription-dialog / recent-reflux-lock 的卡片与按钮语言
 
 ### 页面编排（index.vue，约 100 行新增）
+
+ticket-watch 整体重构在 backlog 中，本次不动存量结构；页面新增代码保持薄编排（状态 + API 调用），展示逻辑一律下沉到组件与 helpers。
 
 按钮放在 `watch-monitor-actions` 区，与"停止监控 / 订阅提醒"并列，复用 `watch-monitor-actions__button` 样式。`openMatchIdSheet()` 流程：
 
