@@ -1,6 +1,6 @@
 # Football Insight Workspace Guide
 
-本目录下是一个独立于报名系统主业务的足球数据产品实验项目。当前是 monorepo，包含 3 个子项目：
+本目录下是一个独立于报名系统主业务的足球数据产品，已上线运行（线上入口 `match.oryjk.cn`，部署拓扑见下方「当前部署约定」）。当前是 monorepo，包含 3 个子项目：
 
 - `football_insight_service_backend_rs`
   - Rust + Axum + SQLx + PostgreSQL
