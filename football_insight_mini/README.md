@@ -185,6 +185,19 @@ bun run mp:preview -- --desc "预览说明"               # 只传预览版，�
 - 项目根 `private.<appid>.key`：微信公众平台「开发管理 → 开发设置 → 小程序代码上传」下载的私钥（已 git-ignore）；可用 `MINI_CI_PRIVATE_KEY_PATH` 覆盖路径。
 - `.env.ci.local` 配置 `MINI_REVIEW_API_KEY`（git-ignore；与后端环境变量 `MINI_REVIEW_API_KEY` 保持一致）。纯本地离线构建可设 `MINI_REVIEW_SKIP=1` 跳过登记。
 
+**在 peiqian 上构建发布（推荐）**：发版登记接口、上传私钥、`.env.ci.local` 都已配在 peiqian，编译链内存也更充裕；push 代码后在 peiqian 远程构建发布即可：
+
+```bash
+ssh peiqian "cd /root/projects/football_insight \
+  && zsh -ic 'proxyOn; git pull --ff-only' \
+  && cd football_insight_mini \
+  && export PATH=\$HOME/.bun/bin:\$PATH \
+  && bun install \
+  && bun run mp:release -- --desc '本次变更说明'"
+```
+
+（交互式登录 peiqian 时 PATH 已在 `.zshrc` 配好。`git pull` 需要先开代理。本地 Mac 上发版同样可用：私钥与 `.env.ci.local` 已就位，登记接口走 `match.oryjk.cn`。）
+
 上传后的收尾：
 
 - 上传产物是**开发版本**：验证用 `mp:preview` 的二维码或在公众平台设为体验版；对外正式发布需在微信公众平台提审通过后点发布，CLI 不做这一步。
