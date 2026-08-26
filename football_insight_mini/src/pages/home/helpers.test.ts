@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { ApiError } from '../../utils/apiError'
 import type {
   MatchCard,
   OverviewMatch,
@@ -26,6 +27,7 @@ import {
   resolveHomeSupportMatchWeekdayLabel,
   resolveHomeSupportWindowShortLabel,
   shouldShowHomeSupportLoading,
+  isHomeAuthExpiredError,
   isHomeAuthExpiredMessage,
   resolveHomeLoadPlan,
 } from './helpers'
@@ -780,5 +782,23 @@ describe('formatHomeTeamSeasonRecord', () => {
     ])
 
     expect(record).toBe('2胜 1平 1负')
+  })
+})
+
+
+describe('isHomeAuthExpiredError', () => {
+  test('uses statusCode from ApiError instead of message text', () => {
+    const error = new ApiError('Token expired', 401, { message: 'Token expired' })
+    expect(isHomeAuthExpiredError(error)).toBe(true)
+
+    const other = new ApiError('登录后才能查看', 403, null)
+    expect(isHomeAuthExpiredError(other)).toBe(false)
+  })
+
+  test('falls back to message matching for plain errors', () => {
+    expect(isHomeAuthExpiredError(new Error('please login first'))).toBe(false)
+    expect(isHomeAuthExpiredError(new Error('请先登录'))).toBe(true)
+    expect(isHomeAuthExpiredError('unauthorized')).toBe(false)
+    expect(isHomeAuthExpiredError(null)).toBe(false)
   })
 })

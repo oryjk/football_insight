@@ -133,7 +133,7 @@ import {
   buildHomeHeadlineBody,
   buildHomeHeroGuide,
   buildHomeWatchPoints,
-  isHomeAuthExpiredMessage,
+  isHomeAuthExpiredError,
   resolveHomeGuideLeaders,
   resolveHomeGuideNote,
   resolveHomeGuideReferenceRoundNumber,
@@ -471,7 +471,7 @@ async function loadSupportData() {
   } catch (error) {
     const message = extractApiErrorMessage(error, '助力入口加载失败，请稍后重试。')
 
-    if (isHomeAuthExpiredMessage(message)) {
+    if (isHomeAuthExpiredError(error)) {
       setAccessToken(null)
       hasAuthToken.value = false
       supportProfile.value = null

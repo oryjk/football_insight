@@ -10,6 +10,7 @@ import type {
   StandingsTable,
 } from '../../types/insight'
 import type { SupportMatchDetail } from '../../types/support'
+import { isApiError } from '../../utils/apiError'
 import { resolveMatchDisplayStatus } from '../matches/helpers'
 import type { HomeBriefingMarqueeAccent } from '../../utils/homeBriefingMarquees'
 
@@ -138,6 +139,19 @@ export function isHomeAuthExpiredMessage(message: string): boolean {
     || normalized.includes('not logged in')
     || normalized.includes('invalid token')
     || normalized.includes('token expired')
+}
+
+/** 认证过期判断优先依据 HTTP 状态码；文案匹配仅兜底非 ApiError 的错误。 */
+export function isHomeAuthExpiredError(error: unknown): boolean {
+  if (isApiError(error)) {
+    return error.isUnauthorized
+  }
+
+  if (error instanceof Error) {
+    return isHomeAuthExpiredMessage(error.message)
+  }
+
+  return false
 }
 
 export function resolveHomeLoadPlan(hasAuthToken: boolean): HomeLoadPlan {

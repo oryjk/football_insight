@@ -13,7 +13,8 @@
     "sync:mp-weixin:windows": "bash scripts/sync-mp-weixin-dist.sh",
     "type-check": "vue-tsc --noEmit",
     "mp:release": "bun run build:mp-weixin && node scripts/mini-ci.mjs upload",
-    "mp:preview": "node scripts/mini-ci.mjs preview"
+    "mp:preview": "node scripts/mini-ci.mjs preview",
+    "test": "bun test"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4080420251103001",

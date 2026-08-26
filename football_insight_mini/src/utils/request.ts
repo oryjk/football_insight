@@ -1,3 +1,4 @@
+import { ApiError } from './apiError'
 import { getAccessToken } from './authStorage'
 import { API_BASE_URL } from '../config/apiBase'
 const REQUEST_TIMEOUT_MS = 20000
@@ -71,7 +72,7 @@ export function request<TResponse>(
             return
           }
 
-          reject(new Error(normalizeErrorMessage(response.data, statusCode)))
+          reject(new ApiError(normalizeErrorMessage(response.data, statusCode), statusCode, response.data))
         },
         fail: (error) => {
           const errMsg = error.errMsg || '网络请求失败'
