@@ -1,5 +1,5 @@
 <template>
-  <view class="sheet-mask" @tap="close">
+  <view v-if="visible" class="sheet-mask" @tap="close">
     <view class="sheet-card password-login-sheet" @tap.stop>
       <view class="section-heading">
         <view>

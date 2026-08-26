@@ -1,5 +1,5 @@
 <template>
-  <view class="sheet-mask" @tap="emit('close')">
+  <view v-if="bindState" class="sheet-mask" @tap="emit('close')">
     <view class="sheet-card" @tap.stop>
       <view class="section-heading">
         <view>
