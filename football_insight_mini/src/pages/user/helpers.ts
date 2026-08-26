@@ -198,3 +198,54 @@ function resolveRecentRefluxBenefitCaption(tierNumber: number): string {
 
   return 'V6 起开放'
 }
+
+export interface UserMembershipMeta {
+  code: string
+  badgeLabel: string
+  heroClass: string
+  levelHint: string
+  levelDescription: string
+}
+
+export function resolveUserMembershipMeta(tier: string | undefined): UserMembershipMeta {
+  const normalizedTier = tier?.trim() || 'V1'
+  const tierNumber = Number.parseInt(normalizedTier.replace(/^V/i, ''), 10)
+
+  if (normalizedTier === 'V3') {
+    return {
+      code: 'V3',
+      badgeLabel: 'V3 邀请会员',
+      heroClass: 'account-hero--v3',
+      levelHint: '邀请码会员',
+      levelDescription: '通过邀请码完成首次绑定，当前按 V3 等级展示。',
+    }
+  }
+
+  if (normalizedTier === 'V2') {
+    return {
+      code: 'V2',
+      badgeLabel: 'V2 进阶会员',
+      heroClass: 'account-hero--v2',
+      levelHint: '进阶会员',
+      levelDescription: '通过推荐好友注册已升级到 V2，回流频率按进阶档位开放。',
+    }
+  }
+
+  if (Number.isFinite(tierNumber) && tierNumber >= 4) {
+    return {
+      code: normalizedTier,
+      badgeLabel: `${normalizedTier} 推荐会员`,
+      heroClass: 'account-hero--v3',
+      levelHint: '推荐升级会员',
+      levelDescription: `当前已经通过推荐升级到 ${normalizedTier}，回流频率和后续会员权益会按更高档位开放。`,
+    }
+  }
+
+  return {
+    code: normalizedTier,
+    badgeLabel: `${normalizedTier} 标准会员`,
+    heroClass: 'account-hero--v1',
+    levelHint: '标准会员',
+    levelDescription: '当前是 V1 基础会员身份。',
+  }
+}

@@ -9,6 +9,7 @@ import {
   formatNotificationEmailLabel,
   isValidNotificationEmail,
   resolveCurrentUserInviteCode,
+  resolveUserMembershipMeta,
 } from './helpers'
 import type { MembershipTierGuide } from '../../utils/membershipRules'
 
@@ -164,5 +165,31 @@ describe('buildUserUpgradeSteps', () => {
         isCurrent: true,
       },
     ])
+  })
+})
+
+describe('resolveUserMembershipMeta', () => {
+  test('maps V3 to invite tier', () => {
+    const meta = resolveUserMembershipMeta('V3')
+    expect(meta.code).toBe('V3')
+    expect(meta.heroClass).toBe('account-hero--v3')
+    expect(meta.badgeLabel).toBe('V3 邀请会员')
+  })
+
+  test('maps V2 to advanced tier', () => {
+    const meta = resolveUserMembershipMeta('V2')
+    expect(meta.heroClass).toBe('account-hero--v2')
+  })
+
+  test('maps V4+ to referral ladder reusing v3 hero', () => {
+    const meta = resolveUserMembershipMeta('V7')
+    expect(meta.badgeLabel).toBe('V7 推荐会员')
+    expect(meta.heroClass).toBe('account-hero--v3')
+  })
+
+  test('defaults unknown or empty to standard member', () => {
+    expect(resolveUserMembershipMeta(undefined).code).toBe('V1')
+    expect(resolveUserMembershipMeta('  ').heroClass).toBe('account-hero--v1')
+    expect(resolveUserMembershipMeta('V1').badgeLabel).toBe('V1 标准会员')
   })
 })
