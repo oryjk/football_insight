@@ -5,6 +5,7 @@
 审核版本号由本项目后端的 mini-review 登记库统一分配（`f_i_mini_review_statuses` 表），**不再手动维护**。
 
 - 发版用 `bun run mp:release`：构建前 `scripts/sync-manifest-version.mjs` 会调 `POST /api/v1/mini-review/allocate` 申请版本号，并同步写入 `src/manifest.json` 和 `src/config/generatedMiniProgramVersion.ts`。
+- 发版位置：在 peiqian 上执行（推荐，ssh 命令见 README「微信小程序发布」）；本地 Mac 发版前必须先提交推送全部改动。
 - 登记库是唯一权威：最新版本仍在审核中则复用，已出审核则 `+0.0.1`；不要手动改 `manifest.json` 的 `versionName`。
 - 如果用户说"改版本号"或"指定版本号"，用显式覆盖：`MINI_PROGRAM_VERSION=x.y.z bun run build:mp-weixin`（作为指定版本传给登记接口）。
 - 纯本地离线构建（不登记、不递增版本）用 `MINI_REVIEW_SKIP=1 bun run build:mp-weixin`。

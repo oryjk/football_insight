@@ -114,7 +114,7 @@ bun run dev:mp-weixin
 bun run build:mp-weixin
 ```
 
-**小程序发版与审核版本号**：发版用 `bun run mp:release`（构建 + 向本项目后端 mini-review 登记库申请版本号 + `miniprogram-ci` 上传）。审核版本号由后端 `f_i_mini_review_statuses` 登记库统一分配，不要手动改 `manifest.json` 的 `versionName`；指定版本用 `MINI_PROGRAM_VERSION=x.y.z`，离线构建用 `MINI_REVIEW_SKIP=1`。详见 `football_insight_mini/README.md` 的「微信小程序发布」一节。
+**小程序发版与审核版本号**：发版用 `bun run mp:release`（构建 + 向本项目后端 mini-review 登记库申请版本号 + `miniprogram-ci` 上传）。**发版在 peiqian 上执行（推荐）**：上传私钥（`football_insight_mini/private.<appid>.key`）、`.env.ci.local`、bun 都已就位，且从干净 checkout 构建保证上传内容与 main 完全一致（本地 Mac 也能发，但必须先把改动全部提交推送）。审核版本号由后端 `f_i_mini_review_statuses` 登记库统一分配，不要手动改 `manifest.json` 的 `versionName`；指定版本用 `MINI_PROGRAM_VERSION=x.y.z`，离线构建用 `MINI_REVIEW_SKIP=1`。完整步骤与 ssh 命令见 `football_insight_mini/README.md` 的「微信小程序发布」一节。
 
 ### 抓取器
 
