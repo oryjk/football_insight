@@ -6,6 +6,7 @@ on:
     paths: ['football_insight_mini/**']
   pull_request:
     paths: ['football_insight_mini/**']
+  workflow_dispatch:
 
 jobs:
   boundaries:

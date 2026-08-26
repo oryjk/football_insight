@@ -32,7 +32,7 @@ Page（index.vue 编排）
 - 401 的清理登录态由消费方决定（如首页清 token 转登录浮层）；请求层不做全局导航，也**不做全局 401 回调注册**。
 - 断网/超时文案由请求层归一，并发失败只弹一个提示框。
 
-依赖方向由 `scripts/check-import-boundaries.mjs` 机器强制（已接入 `prebuild:mp-weixin` 与 GitHub Actions `.github/workflows/mini-boundaries.yml`，提交与发版链路都会执行）。import 与 `uni.request` 用 TypeScript AST 提取（Vue 只取 `<script>` 块，脚本依赖 devDependency `typescript`），说明符再解析成绝对路径判定，注释、字符串、模板文本里的示例代码不会误报：
+依赖方向由 `scripts/check-import-boundaries.mjs` 机器强制（已接入 `prebuild:mp-weixin` 与 GitHub Actions `.github/workflows/mini-boundaries.yml`，提交与发版链路都会执行，Actions 页也支持手动触发）。import 与 `uni.request` 用 TypeScript AST 提取（Vue 只取 `<script>` 块，脚本依赖 devDependency `typescript`），说明符再解析成绝对路径判定，注释、字符串、模板文本里的示例代码不会误报：
 
 1. 组件层（`src/components`、`src/pages/**/components`）禁止 import `api/**` 与认证存储；`src/components` 还禁止反向依赖页面层；
 2. 页面 A 的任何文件禁止 import 页面 B 的任何模块（helpers、页面容器、局部组件一律算）——跨页面共享：逻辑放 `src/utils`，组件进 `src/components`；
