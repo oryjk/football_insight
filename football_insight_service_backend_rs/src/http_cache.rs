@@ -169,6 +169,7 @@ fn matches_excluded_prefix(path: &str) -> bool {
     path.starts_with("/api/v1/auth/")
         || path.starts_with("/api/v1/ticket-watch/")
         || path.starts_with("/api/v1/system")
+        || path.starts_with("/api/v1/mini-review/")
         || path == "/football/wechat/webhook"
         || path == "/api/health"
 }
@@ -368,6 +369,43 @@ mod tests {
             )
             .await
             .unwrap();
+
+        assert_eq!(hits.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn does_not_cache_mini_review_review_status() {
+        // 审核状态可被 PUT 随时切换，读取必须实时，否则切换后小程序仍拿到缓存旧值。
+        let hits = Arc::new(AtomicUsize::new(0));
+        let cache = HttpResponseCache::new(Duration::from_secs(600));
+        let app = {
+            let hits = hits.clone();
+            Router::new()
+                .route(
+                    "/api/v1/mini-review/review-status",
+                    get(move || {
+                        let hits = hits.clone();
+                        async move {
+                            let value = hits.fetch_add(1, Ordering::SeqCst) + 1;
+                            format!("review-hit-{value}")
+                        }
+                    }),
+                )
+                .layer(from_fn_with_state(cache, cache_get_responses))
+        };
+
+        for _ in 0..2 {
+            let _ = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri("/api/v1/mini-review/review-status?project_code=football_insight_mini&version=1.0.56")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+        }
 
         assert_eq!(hits.load(Ordering::SeqCst), 2);
     }
