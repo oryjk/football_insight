@@ -95,18 +95,29 @@ function copy(): void {
 </script>
 
 <style scoped lang="css">
+/* 动画 keyframes 定义在组件内：user 页的 fi-fade-in-up 是页面局部样式，跨页引用不生效。 */
+@keyframes fi-match-id-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fi-match-id-card-in {
+  from { opacity: 0; transform: translateY(24rpx) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
 .match-id-mask {
   position: fixed;
   inset: 0;
   bottom: var(--window-bottom, 0px);
   z-index: 90;
-  background: rgba(18, 20, 28, 0.36);
+  background: var(--fi-color-overlay);
   backdrop-filter: blur(8rpx);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 32rpx;
-  animation: fi-overlay-fade-in 180ms ease both;
+  padding: 0 var(--fi-space-32);
+  animation: fi-match-id-overlay-in 180ms ease both;
 }
 
 .match-id-card {
@@ -115,33 +126,33 @@ function copy(): void {
   box-sizing: border-box;
   border-radius: var(--fi-radius-lg);
   background: rgba(255, 255, 255, 0.98);
-  padding: 28rpx 26rpx 32rpx;
-  box-shadow: 0 24rpx 56rpx rgba(12, 14, 20, 0.12);
-  animation: fi-fade-in-up 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  padding: var(--fi-space-28) var(--fi-space-24) var(--fi-space-32);
+  box-shadow: var(--fi-shadow-card-strong);
+  animation: fi-match-id-card-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .match-id-card__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12rpx;
+  gap: var(--fi-space-12);
 }
 
 .match-id-card__kicker {
   display: block;
   color: var(--fi-color-text-muted);
   font-size: var(--fi-font-22);
-  font-weight: 700;
+  font-weight: var(--fi-weight-bold);
   letter-spacing: 3rpx;
 }
 
 .match-id-card__title {
   display: block;
-  margin-top: 10rpx;
-  color: #2a2c31;
+  margin-top: var(--fi-space-10);
+  color: var(--fi-color-text-primary);
   font-size: var(--fi-font-44);
-  line-height: 1.08;
-  font-weight: 800;
+  line-height: var(--fi-leading-tight);
+  font-weight: var(--fi-weight-extrabold);
 }
 
 .match-id-card__close {
@@ -161,36 +172,36 @@ function copy(): void {
 
 .match-id-card__match {
   display: block;
-  margin-top: 14rpx;
+  margin-top: var(--fi-space-14);
   color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-26);
-  line-height: 1.5;
+  line-height: var(--fi-leading-normal);
 }
 
 .match-id-card__body {
-  margin-top: 22rpx;
+  margin-top: var(--fi-space-22);
   display: flex;
   flex-direction: column;
-  gap: 18rpx;
+  gap: var(--fi-space-18);
 }
 
 .match-id-value-panel {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18rpx;
-  padding: 26rpx 24rpx;
+  gap: var(--fi-space-18);
+  padding: var(--fi-space-24);
   border-radius: var(--fi-radius-md);
-  border: 1rpx solid var(--fi-border-subtle);
-  background: rgba(248, 249, 251, 0.85);
+  border: var(--fi-border-card);
+  background: var(--fi-color-page-soft);
 }
 
 .match-id-value-panel__value {
   color: var(--fi-primitive-ink);
   font-size: var(--fi-font-48);
-  font-weight: 800;
+  font-weight: var(--fi-weight-extrabold);
   letter-spacing: 2rpx;
-  line-height: 1;
+  line-height: var(--fi-leading-none);
   word-break: break-all;
 }
 
@@ -199,12 +210,12 @@ function copy(): void {
   margin: 0;
   min-width: 112rpx;
   height: 64rpx;
-  padding: 0 24rpx;
+  padding: 0 var(--fi-space-24);
   border-radius: var(--fi-radius-round);
   background: var(--fi-primitive-ink);
   color: var(--fi-primitive-white);
   font-size: var(--fi-font-24);
-  font-weight: 700;
+  font-weight: var(--fi-weight-bold);
   line-height: 64rpx;
 }
 
@@ -220,12 +231,12 @@ function copy(): void {
 .match-id-card__copy {
   color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-26);
-  line-height: 1.6;
+  line-height: var(--fi-leading-relaxed);
 }
 
 .match-id-actions {
   display: flex;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
 }
 
 .match-id-actions__button {
@@ -234,7 +245,7 @@ function copy(): void {
   height: 84rpx;
   border-radius: var(--fi-radius-round);
   font-size: var(--fi-font-26);
-  font-weight: 700;
+  font-weight: var(--fi-weight-bold);
   line-height: 84rpx;
 }
 

@@ -3159,7 +3159,7 @@ onUnload(() => {
 .watch-monitor-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12rpx;
+  gap: var(--fi-space-12);
 }
 .watch-monitor-actions__button {
   width: 100%;
@@ -3167,11 +3167,11 @@ onUnload(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10rpx;
+  gap: var(--fi-space-10);
   border-radius: 22rpx;
   background: #15161b;
   color: #ffffff;
-  font-size: 26rpx;
+  font-size: var(--fi-font-26);
   font-weight: 800;
   text-align: center;
   box-shadow: 0 8rpx 18rpx rgba(21, 22, 27, 0.12);
