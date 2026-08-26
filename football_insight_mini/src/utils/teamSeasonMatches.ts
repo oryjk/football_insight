@@ -196,3 +196,15 @@ export function resolveTeamSeasonMatches(
       }
     })
 }
+
+/** 赛季战绩文案（x胜 y平 z负）；live/scheduled 不计入。 */
+export function formatTeamSeasonRecord(matches: Array<Pick<TeamSeasonMatch, 'resultTone'>>): string {
+  const counts = { win: 0, draw: 0, loss: 0 }
+  for (const match of matches) {
+    if (match.resultTone === 'win' || match.resultTone === 'draw' || match.resultTone === 'loss') {
+      counts[match.resultTone] += 1
+    }
+  }
+
+  return `${counts.win}胜 ${counts.draw}平 ${counts.loss}负`
+}

@@ -53,17 +53,17 @@ src/pages/<domain>/
 
 ## Design token 规范
 
-`src/styles/fi-tokens.css` 按三层组织（由 `App.vue` 全局导入，兼容 `uni.css` 旧变量）：
+`src/styles/fi-tokens.css` 按三层组织（由 `App.vue` 全局导入，兼容 `uni.css` 旧变量），覆盖**颜色、间距、字号、行高、圆角、边框、阴影、字重**八个维度：
 
-1. **primitive**：原始色值（`--fi-primitive-*`），不直接在页面引用；
-2. **semantic**：语义别名（`--fi-color-*`），结构 UI 统一引用这一层；
-3. **component**：组件契约（`--fi-component-*`），组件级复合样式引用。
+1. **primitive**：原始值（`--fi-primitive-*`），不直接在页面引用；
+2. **semantic**：语义别名，结构 UI 统一引用这一层——颜色 `--fi-color-*`；间距 `--fi-space-<rpx>`（数字刻度，如 `--fi-space-18` = 18rpx）；字号 `--fi-font-<rpx>`；行高 `--fi-leading-*`；圆角 `--fi-radius-*`；边框/分割线 `--fi-border-*`、`--fi-color-divider*`；阴影 `--fi-shadow-*`；字重 `--fi-weight-*`；
+3. **component**：组件契约（`--fi-component-*`），组件级复合样式引用（卡片、kicker/标题、关闭按钮等）。
 
 规则：
 
 - 新增页面、组件、共享壳层的颜色**必须引用 token**（`var(--fi-color-*)`），不要新增散落 hex；需要新色值时先加 primitive，再建 semantic 别名。
 - 存量约 900 处散落 hex 按「触碰哪个文件就顺手迁移哪个」增量替换，不要求一次性重写；高频色（白、墨色、灰阶、红系、浅底）已有对应 token。
-- 圆角/阴影/间距 token 在首次需要时按同样三层规则补充进 token 文件，不要写在页面里到处复制。
+- 间距、字号、行高、圆角、边框、阴影、字重同样必须引用 token（刻度内取值优先；`--fi-space-*`/`--fi-font-*` 数字刻度覆盖高频值），不要在页面里硬编码这些值；刻度外的值先评估就近归档（视觉差 ≤2rpx 可并入相邻刻度），确需新值再进 token 文件。
 - **颜色例外**：球队/球衣等业务数据值、插画装饰色（如球场图、海报绘制色）不是视觉 token，保留原样，可在相邻注释标注 decorative。
 
 ## 跨端约束（H5 与小程序兼容）

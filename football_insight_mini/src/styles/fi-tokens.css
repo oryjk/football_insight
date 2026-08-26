@@ -1,11 +1,14 @@
 /* Football Insight design tokens（对齐 registration_system_mini 的 Neo 三层结构）：
- * primitive = 原始色值；semantic = 语义别名（页面引用这一层）；component = 组件契约。
- * 所有值均提炼自迁移前的存量用色，仅重组不发明，视觉零变化。
+ * primitive = 原始值；semantic = 语义别名（页面引用这一层）；component = 组件契约。
+ * 所有值均提炼自迁移前的存量用色/用值，仅重组不发明，视觉零变化。
+ * 覆盖维度：颜色、间距、字号、行高、圆角、边框、阴影、字重。
+ * 间距/字号采用与 rpx 数值对应的数字刻度（如 --fi-space-18 = 18rpx），
+ * 便于精确迁移与将来整体调整节奏；其余维度用语义名。
  * 规范见本目录 ../AGENTS.md「Design token 规范」。
  */
 :root,
 page {
-  /* ===== Primitive：原始色值（不直接在页面引用） ===== */
+  /* ===== Primitive：颜色 ===== */
   --fi-primitive-white: #ffffff;
   --fi-primitive-red: #dc2626;
   --fi-primitive-red-rgb: 220, 38, 38;
@@ -20,7 +23,67 @@ page {
   --fi-primitive-canvas-soft: #f7f8fa;
   --fi-primitive-ink-rgb: 21, 22, 27;
 
-  /* ===== Semantic：语义别名（结构 UI 引用这一层） ===== */
+  /* ===== Primitive：间距（数字刻度，单位 rpx） ===== */
+  --fi-primitive-space-4: 4rpx;
+  --fi-primitive-space-6: 6rpx;
+  --fi-primitive-space-8: 8rpx;
+  --fi-primitive-space-10: 10rpx;
+  --fi-primitive-space-12: 12rpx;
+  --fi-primitive-space-14: 14rpx;
+  --fi-primitive-space-16: 16rpx;
+  --fi-primitive-space-18: 18rpx;
+  --fi-primitive-space-20: 20rpx;
+  --fi-primitive-space-22: 22rpx;
+  --fi-primitive-space-24: 24rpx;
+  --fi-primitive-space-28: 28rpx;
+  --fi-primitive-space-32: 32rpx;
+  --fi-primitive-space-40: 40rpx;
+
+  /* ===== Primitive：字号（数字刻度，单位 rpx） ===== */
+  --fi-primitive-font-18: 18rpx;
+  --fi-primitive-font-20: 20rpx;
+  --fi-primitive-font-22: 22rpx;
+  --fi-primitive-font-24: 24rpx;
+  --fi-primitive-font-26: 26rpx;
+  --fi-primitive-font-28: 28rpx;
+  --fi-primitive-font-30: 30rpx;
+  --fi-primitive-font-32: 32rpx;
+  --fi-primitive-font-36: 36rpx;
+  --fi-primitive-font-44: 44rpx;
+  --fi-primitive-font-48: 48rpx;
+
+  /* ===== Primitive：行高 ===== */
+  --fi-primitive-leading-none: 1;
+  --fi-primitive-leading-tight: 1.1;
+  --fi-primitive-leading-snug: 1.2;
+  --fi-primitive-leading-normal: 1.5;
+  --fi-primitive-leading-relaxed: 1.7;
+
+  /* ===== Primitive：圆角 ===== */
+  --fi-primitive-radius-sm: 18rpx;
+  --fi-primitive-radius-md: 24rpx;
+  --fi-primitive-radius-lg: 28rpx;
+  --fi-primitive-radius-xl: 36rpx;
+  --fi-primitive-radius-round: 999rpx;
+
+  /* ===== Primitive：边框与分割线 ===== */
+  --fi-primitive-border-width: 2rpx;
+  --fi-primitive-divider: #ececf1;
+  --fi-primitive-divider-soft: #f0f1f5;
+  --fi-primitive-border-card: rgba(236, 236, 241, 0.95);
+  --fi-primitive-border-chip: rgba(232, 233, 238, 0.95);
+
+  /* ===== Primitive：阴影 ===== */
+  --fi-primitive-shadow-card: 0 20rpx 48rpx rgba(26, 28, 36, 0.06);
+  --fi-primitive-shadow-card-strong: 0 18rpx 46rpx rgba(26, 28, 36, 0.07);
+  --fi-primitive-shadow-soft: 0 8rpx 18rpx rgba(18, 20, 28, 0.06);
+
+  /* ===== Primitive：字重 ===== */
+  --fi-primitive-weight-bold: 700;
+  --fi-primitive-weight-extrabold: 800;
+  --fi-primitive-weight-black: 900;
+
+  /* ===== Semantic：颜色 ===== */
   /* 兼容 uni.css 时代的既有语义名（值保持不变） */
   --fi-color-primary: var(--fi-primitive-red);
   --fi-color-success: #4cd964;
@@ -43,11 +106,78 @@ page {
   --fi-color-page-soft: var(--fi-primitive-canvas-soft);
   --fi-color-overlay: rgba(var(--fi-primitive-ink-rgb), 0.46);
   --fi-color-success-accent: var(--fi-primitive-green);
+  --fi-color-divider: var(--fi-primitive-divider);
+  --fi-color-divider-soft: var(--fi-primitive-divider-soft);
+  --fi-color-border-card: var(--fi-primitive-border-card);
+  --fi-color-border-chip: var(--fi-primitive-border-chip);
 
-  /* ===== Component：组件契约（新组件样式引用这一层） ===== */
+  /* ===== Semantic：间距 / 字号（数字刻度直通） ===== */
+  --fi-space-4: var(--fi-primitive-space-4);
+  --fi-space-6: var(--fi-primitive-space-6);
+  --fi-space-8: var(--fi-primitive-space-8);
+  --fi-space-10: var(--fi-primitive-space-10);
+  --fi-space-12: var(--fi-primitive-space-12);
+  --fi-space-14: var(--fi-primitive-space-14);
+  --fi-space-16: var(--fi-primitive-space-16);
+  --fi-space-18: var(--fi-primitive-space-18);
+  --fi-space-20: var(--fi-primitive-space-20);
+  --fi-space-22: var(--fi-primitive-space-22);
+  --fi-space-24: var(--fi-primitive-space-24);
+  --fi-space-28: var(--fi-primitive-space-28);
+  --fi-space-32: var(--fi-primitive-space-32);
+  --fi-space-40: var(--fi-primitive-space-40);
+
+  --fi-font-18: var(--fi-primitive-font-18);
+  --fi-font-20: var(--fi-primitive-font-20);
+  --fi-font-22: var(--fi-primitive-font-22);
+  --fi-font-24: var(--fi-primitive-font-24);
+  --fi-font-26: var(--fi-primitive-font-26);
+  --fi-font-28: var(--fi-primitive-font-28);
+  --fi-font-30: var(--fi-primitive-font-30);
+  --fi-font-32: var(--fi-primitive-font-32);
+  --fi-font-36: var(--fi-primitive-font-36);
+  --fi-font-44: var(--fi-primitive-font-44);
+  --fi-font-48: var(--fi-primitive-font-48);
+
+  /* ===== Semantic：行高 / 圆角 / 边框 / 阴影 / 字重 ===== */
+  --fi-leading-none: var(--fi-primitive-leading-none);
+  --fi-leading-tight: var(--fi-primitive-leading-tight);
+  --fi-leading-snug: var(--fi-primitive-leading-snug);
+  --fi-leading-normal: var(--fi-primitive-leading-normal);
+  --fi-leading-relaxed: var(--fi-primitive-leading-relaxed);
+
+  --fi-radius-sm: var(--fi-primitive-radius-sm);
+  --fi-radius-md: var(--fi-primitive-radius-md);
+  --fi-radius-lg: var(--fi-primitive-radius-lg);
+  --fi-radius-xl: var(--fi-primitive-radius-xl);
+  --fi-radius-round: var(--fi-primitive-radius-round);
+
+  --fi-border-width: var(--fi-primitive-border-width);
+  --fi-border-card: var(--fi-primitive-border-width) solid var(--fi-color-border-card);
+  --fi-border-divider: var(--fi-primitive-border-width) solid var(--fi-color-divider);
+
+  --fi-shadow-card: var(--fi-primitive-shadow-card);
+  --fi-shadow-card-strong: var(--fi-primitive-shadow-card-strong);
+  --fi-shadow-soft: var(--fi-primitive-shadow-soft);
+
+  --fi-weight-bold: var(--fi-primitive-weight-bold);
+  --fi-weight-extrabold: var(--fi-primitive-weight-extrabold);
+  --fi-weight-black: var(--fi-primitive-weight-black);
+
+  /* ===== Component：组件契约 ===== */
   --fi-component-btn-bg: var(--fi-color-primary);
   --fi-component-btn-bg-deep: var(--fi-color-primary-deep);
   --fi-component-card-bg: var(--fi-primitive-white);
   --fi-component-card-text: var(--fi-color-text-primary);
+  --fi-component-card-radius: var(--fi-radius-xl);
+  --fi-component-card-border: var(--fi-border-card);
+  --fi-component-card-shadow: var(--fi-shadow-card);
   --fi-component-muted-text: var(--fi-color-text-muted);
+  --fi-component-kicker-text: var(--fi-color-text-muted);
+  --fi-component-kicker-size: var(--fi-font-22);
+  --fi-component-title-text: var(--fi-color-text-strong);
+  --fi-component-title-size: var(--fi-font-44);
+  --fi-component-close-bg: var(--fi-color-page);
+  --fi-component-close-text: var(--fi-color-text-secondary);
+  --fi-component-close-size: var(--fi-font-24);
 }
