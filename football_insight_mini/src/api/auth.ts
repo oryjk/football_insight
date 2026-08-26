@@ -10,22 +10,14 @@ import type {
   ResetPasswordPayload,
 } from '../types/auth'
 import { setAccessToken } from '../utils/authStorage'
+import { isUnauthorizedError } from '../utils/apiError'
 import { request } from '../utils/request'
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   try {
     return await request<CurrentUser>({ url: '/auth/me', auth: true })
   } catch (error) {
-    if (error instanceof Error && error.message.includes('401')) {
-      return null
-    }
-    if (error instanceof Error && error.message.includes('未登录')) {
-      return null
-    }
-    if (error instanceof Error && error.message.includes('Unauthorized')) {
-      return null
-    }
-    if (error instanceof Error && error.message.includes('not logged in')) {
+    if (isUnauthorizedError(error)) {
       return null
     }
     throw error

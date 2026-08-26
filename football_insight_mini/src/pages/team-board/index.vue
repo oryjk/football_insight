@@ -254,6 +254,7 @@ import type {
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { getAccessToken } from '../../utils/authStorage'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
+import { resolveTeamBoardLoadFailure } from './helpers'
 
 const teamId = ref<number | null>(null)
 const loading = ref(true)
@@ -319,8 +320,8 @@ async function loadBoard(): Promise<void> {
   try {
     board.value = await getTeamBoard(teamId.value)
   } catch (error) {
-    const message = extractApiErrorMessage(error, '战术板加载失败，请稍后重试。')
-    if (message.includes('未登录') || message.includes('Unauthorized') || message.includes('not logged in')) {
+    const failure = resolveTeamBoardLoadFailure(error, '战术板加载失败，请稍后重试。')
+    if (failure.kind === 'unauthorized') {
       rememberPostLoginRedirect({
         type: 'navigateTo',
         url: `/pages/team-board/index?teamId=${teamId.value}`,
@@ -329,7 +330,7 @@ async function loadBoard(): Promise<void> {
       return
     }
 
-    errorMessage.value = message
+    errorMessage.value = failure.message
   } finally {
     loading.value = false
   }
