@@ -30,7 +30,8 @@ COPY .env.example ./.env.example
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \
     cargo build --release --locked \
-    && cp target/release/football_insight_service_backend_rs /usr/local/bin/football_insight_service_backend_rs
+    && cp target/release/football_insight_service_backend_rs /usr/local/bin/football_insight_service_backend_rs \
+    && cp target/release/run_migrations /usr/local/bin/run_migrations
 
 FROM docker.m.daocloud.io/library/debian:bookworm-slim
 
@@ -47,9 +48,10 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
     && chown -R appuser:appuser /app
 
 COPY --from=builder /usr/local/bin/football_insight_service_backend_rs /usr/local/bin/football_insight_service_backend_rs
+COPY --from=builder /usr/local/bin/run_migrations /usr/local/bin/run_migrations
 COPY migrations ./migrations
 
-RUN chmod +x /usr/local/bin/football_insight_service_backend_rs \
+RUN chmod +x /usr/local/bin/football_insight_service_backend_rs /usr/local/bin/run_migrations \
     && chown -R appuser:appuser /app
 
 USER appuser
