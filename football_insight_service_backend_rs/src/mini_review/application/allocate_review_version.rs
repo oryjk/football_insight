@@ -46,6 +46,12 @@ impl AllocateReviewVersionUseCase {
             seed,
         });
 
+        if let Some(latest) = latest {
+            if latest.is_reviewing && latest.version == next.to_string() {
+                return Ok(latest);
+            }
+        }
+
         let created = MiniReviewStatus::new_reviewing(&project_code, next, chrono::Utc::now());
         match self.repository.create(created).await {
             Ok(status) => Ok(status),
@@ -212,7 +218,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn allocate_increments_past_reviewing_latest_version() {
+    async fn allocate_reuses_latest_reviewing_version() {
         let repository = Arc::new(FakeRepository::with_records(vec![status(
             "football_insight_mini",
             "1.0.55",
@@ -225,8 +231,8 @@ mod tests {
             .await
             .expect("allocate");
 
-        assert_eq!(status.version, "1.0.56");
-        assert!(status.is_reviewing);
+        assert_eq!(status.version, "1.0.55");
+        assert_eq!(repository.latest_record_version(), "1.0.55");
     }
 
     #[tokio::test]

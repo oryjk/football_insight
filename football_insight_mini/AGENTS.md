@@ -5,10 +5,10 @@
 审核版本号由本项目后端的 mini-review 登记库统一分配（`f_i_mini_review_statuses` 表），**不再手动维护**。
 
 - 发版用 `bun run mp:release`：构建前 `scripts/sync-manifest-version.mjs` 会调 `POST /api/v1/mini-review/allocate` 申请版本号，并同步写入 `src/manifest.json` 和 `src/config/generatedMiniProgramVersion.ts`。
-- 登记库是唯一权威：每次构建在库内最大版本基础上 `+0.0.1` 新建审核中记录（`is_reviewing` 不影响分配）；不要手动改 `manifest.json` 的 `versionName`。
+- 登记库是唯一权威：最新版本仍在审核中则复用，已出审核则 `+0.0.1`；不要手动改 `manifest.json` 的 `versionName`。
 - 如果用户说"改版本号"或"指定版本号"，用显式覆盖：`MINI_PROGRAM_VERSION=x.y.z bun run build:mp-weixin`（作为指定版本传给登记接口）。
 - 纯本地离线构建（不登记、不递增版本）用 `MINI_REVIEW_SKIP=1 bun run build:mp-weixin`。
-- 微信审核结束后在「我的 → 设置」（管理员账号）或 `PUT /api/v1/mini-review/review-status` 把当前版本标记 `is_reviewing=false`，让线上用户恢复会员/支付等入口。
+- 微信审核结束后要调 `PUT /api/v1/mini-review/review-status` 把当前版本标记 `is_reviewing=false`，否则后续构建会一直复用审核中的版本号。
 - 若构建分配了新版本号，`src/manifest.json` 与 `src/config/generatedMiniProgramVersion.ts` 的变更需要单独提交。
 
 运行时来源：`src/api/system.ts` 的 `MINI_PROGRAM_VERSION` 优先读 `src/config/generatedMiniProgramVersion.ts`，构建时生成。

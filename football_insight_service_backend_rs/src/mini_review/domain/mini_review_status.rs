@@ -137,16 +137,22 @@ pub struct AllocationInput {
     pub seed: Version,
 }
 
-/// 决定本次构建应使用的版本号：登记库最大版本 +0.0.1，每次构建都新建审核中记录。
-/// is_reviewing 只是运行时展示状态（由小程序「设置」入口或 PUT 维护），不影响分配；
+/// 决定本次构建应使用的版本号，登记库是唯一权威：
+/// 最新记录仍在审核中 → 复用它（重复构建不递增，任何构建机一致）；
+/// 最新记录已出审核 → 在它基础上递增 patch（删库重置后版本号随库回落）；
+/// 库内无记录 → 以构建侧 manifest 为起点递增。
 /// 本地 manifest 不参与后续分配，避免多台构建机因各自 manifest 状态不同而分叉。
 pub fn decide_next_version(input: &AllocationInput) -> Version {
     let Some(latest) = input.latest.as_ref() else {
         return input.seed.next_patch();
     };
-    Version::parse(&latest.version)
-        .unwrap_or(input.seed)
-        .next_patch()
+    let Ok(latest_version) = Version::parse(&latest.version) else {
+        return input.seed.next_patch();
+    };
+    if latest.is_reviewing {
+        return latest_version;
+    }
+    latest_version.next_patch()
 }
 
 #[cfg(test)]
@@ -193,12 +199,12 @@ mod tests {
     }
 
     #[test]
-    fn decide_next_version_increments_even_while_reviewing() {
+    fn decide_next_version_reuses_latest_reviewing_version() {
         let input = AllocationInput {
-            latest: Some(reviewing_status("1.0.55", true)),
+            latest: Some(reviewing_status("1.0.54", true)),
             seed: Version::parse("9.9.9").unwrap(),
         };
-        assert_eq!(decide_next_version(&input).to_string(), "1.0.56");
+        assert_eq!(decide_next_version(&input).to_string(), "1.0.54");
     }
 
     #[test]

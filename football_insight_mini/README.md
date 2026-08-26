@@ -176,7 +176,7 @@ bun run mp:preview -- --desc "预览说明"               # 只传预览版，�
 
 流程细节（`scripts/mini-ci.mjs` + `scripts/sync-manifest-version.mjs`）：
 
-1. `build:mp-weixin` 的 prebuild 钩子先向本项目后端登记接口 `POST /api/v1/mini-review/allocate` 申请版本号。**登记库（数据库）是唯一权威**：每次构建都在库内最大版本基础上 `+0.0.1` 新建审核中记录；仅当库内无任何记录时才以本地 manifest 为起点。本地 manifest 不参与后续分配（多台构建机结果一致），删库重置后版本号随库回落；`is_reviewing` 只是运行时展示状态（微信审核结束后在小程序「设置」或用 PUT 标记过审），不影响版本分配。
+1. `build:mp-weixin` 的 prebuild 钩子先向本项目后端登记接口 `POST /api/v1/mini-review/allocate` 申请版本号。**登记库（数据库）是唯一权威**：最新版本仍在审核中则**复用**，已出审核则在库内最大版本基础上 `+0.0.1` 并标记审核中；仅当库内无任何记录时才以本地 manifest 为起点。本地 manifest 不参与后续分配（多台构建机结果一致），删库重置后版本号随库回落。
 2. 构建 `dist/build/mp-weixin` 并执行组件注册检查。
 3. `miniprogram-ci` 以 `manifest.json` 的 `versionName` 上传到微信后台（默认 robot=1，落在「版本管理 → 开发版本」）。
 
@@ -201,5 +201,5 @@ ssh peiqian "cd /root/projects/football_insight \
 上传后的收尾：
 
 - 上传产物是**开发版本**：验证用 `mp:preview` 的二维码或在公众平台设为体验版；对外正式发布需在微信公众平台提审通过后点发布，CLI 不做这一步。
-- 微信审核结束后，管理员在小程序「我的 → 设置」把该版本切为已过审（或用 API key 调 `PUT /api/v1/mini-review/review-status`，body：`{"project_code":"football_insight_mini","version":"x.y.z","is_reviewing":false}`）；这只影响运行时审核态展示，不参与版本号分配。
+- 微信审核结束后，用 API key 调 `PUT /api/v1/mini-review/review-status`（body：`{"project_code":"football_insight_mini","version":"x.y.z","is_reviewing":false}`）把该版本标记为已过审，下一次构建才会分配新版本号。
 - 若本次分配了新版本号，`src/manifest.json` 与 `src/config/generatedMiniProgramVersion.ts` 会被更新，需要单独提交；版本被复用（仍审核中）时无文件变更。
