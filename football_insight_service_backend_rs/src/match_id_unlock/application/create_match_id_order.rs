@@ -13,7 +13,9 @@ use crate::{
             MATCH_ID_UNLOCK_MINIMUM_TIER, MATCH_ID_UNLOCK_ORDER_DESCRIPTION,
             MATCH_ID_UNLOCK_PRICE_CENTS, MatchIdUnlockError,
         },
-        ports::match_id_unlock_repository::MatchIdUnlockRepository,
+        ports::{
+            match_id_source::MatchIdSource, match_id_unlock_repository::MatchIdUnlockRepository,
+        },
     },
     payment::{
         domain::order::{NewPaymentOrder, WxPayParams, match_id_unlock_product_type},
@@ -23,6 +25,7 @@ use crate::{
 
 pub struct CreateMatchIdOrderUseCase {
     repository: Arc<dyn MatchIdUnlockRepository>,
+    match_id_source: Arc<dyn MatchIdSource>,
     order_repository: Arc<dyn OrderRepository>,
     user_membership_port: Arc<dyn UserMembershipPort>,
     wechat_pay_port: Arc<dyn WechatPayPort>,
@@ -31,12 +34,14 @@ pub struct CreateMatchIdOrderUseCase {
 impl CreateMatchIdOrderUseCase {
     pub fn new(
         repository: Arc<dyn MatchIdUnlockRepository>,
+        match_id_source: Arc<dyn MatchIdSource>,
         order_repository: Arc<dyn OrderRepository>,
         user_membership_port: Arc<dyn UserMembershipPort>,
         wechat_pay_port: Arc<dyn WechatPayPort>,
     ) -> Self {
         Self {
             repository,
+            match_id_source,
             order_repository,
             user_membership_port,
             wechat_pay_port,
@@ -47,7 +52,7 @@ impl CreateMatchIdOrderUseCase {
         &self,
         input: CreateMatchIdOrderInput,
     ) -> anyhow::Result<CreateMatchIdOrderOutput> {
-        if !self.repository.match_exists(input.match_id).await? {
+        if !self.match_id_source.known_match_id(input.match_id).await? {
             return Err(MatchIdUnlockError::MatchNotFound.into());
         }
 
@@ -133,7 +138,9 @@ mod tests {
         auth::ports::user_membership_port::UserMembershipPort,
         match_id_unlock::{
             domain::match_id_unlock::MatchIdUnlockError,
-            ports::match_id_unlock_repository::MatchIdUnlockRepository,
+            ports::{
+                match_id_source::MatchIdSource, match_id_unlock_repository::MatchIdUnlockRepository,
+            },
         },
         payment::{
             domain::order::{NewPaymentOrder, OrderStatus, PaymentOrder, WxPayParams},
@@ -141,17 +148,23 @@ mod tests {
         },
     };
 
+    struct FakeMatchIdSource {
+        known: bool,
+    }
+
+    #[async_trait]
+    impl MatchIdSource for FakeMatchIdSource {
+        async fn known_match_id(&self, _match_id: i64) -> anyhow::Result<bool> {
+            Ok(self.known)
+        }
+    }
+
     struct FakeRepository {
-        matches_exist: bool,
         unlocked_matches: Vec<i64>,
     }
 
     #[async_trait]
     impl MatchIdUnlockRepository for FakeRepository {
-        async fn match_exists(&self, _match_id: i64) -> anyhow::Result<bool> {
-            Ok(self.matches_exist)
-        }
-
         async fn find_unlock(&self, _user_id: Uuid, match_id: i64) -> anyhow::Result<bool> {
             Ok(self.unlocked_matches.contains(&match_id))
         }
@@ -251,6 +264,7 @@ mod tests {
 
     fn use_case(
         repository: FakeRepository,
+        known_match: bool,
         membership: FakeUserMembershipPort,
     ) -> (
         CreateMatchIdOrderUseCase,
@@ -261,6 +275,7 @@ mod tests {
         let wechat_pay_port = Arc::new(FakeWechatPayPort::default());
         let use_case = CreateMatchIdOrderUseCase::new(
             Arc::new(repository),
+            Arc::new(FakeMatchIdSource { known: known_match }),
             order_repository.clone(),
             Arc::new(membership),
             wechat_pay_port.clone(),
@@ -286,9 +301,9 @@ mod tests {
     async fn execute_creates_order_with_fixed_price_and_product_type() {
         let (use_case, order_repository, wechat_pay_port) = use_case(
             FakeRepository {
-                matches_exist: true,
                 unlocked_matches: vec![],
             },
+            true,
             FakeUserMembershipPort {
                 tier: Some("V5".to_string()),
                 open_id: Some("openid".to_string()),
@@ -315,9 +330,9 @@ mod tests {
     async fn execute_rejects_membership_tier_at_v6() {
         let (use_case, order_repository, _) = use_case(
             FakeRepository {
-                matches_exist: true,
                 unlocked_matches: vec![],
             },
+            true,
             FakeUserMembershipPort {
                 tier: Some("V6".to_string()),
                 open_id: Some("openid".to_string()),
@@ -347,9 +362,9 @@ mod tests {
     async fn execute_rejects_already_unlocked_match() {
         let (use_case, _, _) = use_case(
             FakeRepository {
-                matches_exist: true,
                 unlocked_matches: vec![571],
             },
+            true,
             FakeUserMembershipPort {
                 tier: Some("V5".to_string()),
                 open_id: Some("openid".to_string()),
@@ -371,9 +386,9 @@ mod tests {
     async fn execute_rejects_user_without_wechat_binding() {
         let (use_case, order_repository, _) = use_case(
             FakeRepository {
-                matches_exist: true,
                 unlocked_matches: vec![],
             },
+            true,
             FakeUserMembershipPort {
                 tier: Some("V5".to_string()),
                 open_id: None,
@@ -403,9 +418,9 @@ mod tests {
     async fn execute_rejects_missing_match() {
         let (use_case, _, _) = use_case(
             FakeRepository {
-                matches_exist: false,
                 unlocked_matches: vec![],
             },
+            false,
             FakeUserMembershipPort {
                 tier: Some("V5".to_string()),
                 open_id: Some("openid".to_string()),

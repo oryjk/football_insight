@@ -68,6 +68,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
     );
     let match_id_unlock_routes = build_match_id_unlock_routes(
         pool.clone(),
+        ticket_watch.ticket_monitor_port.clone(),
         payment.order_repository.clone(),
         user_membership_port.clone(),
         payment.wechat_pay_port.clone(),

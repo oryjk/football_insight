@@ -10,22 +10,27 @@ use crate::{
         domain::match_id_unlock::{
             MATCH_ID_UNLOCK_MINIMUM_TIER, MatchIdUnlockError, MatchIdUnlockSource,
         },
-        ports::match_id_unlock_repository::MatchIdUnlockRepository,
+        ports::{
+            match_id_source::MatchIdSource, match_id_unlock_repository::MatchIdUnlockRepository,
+        },
     },
 };
 
 pub struct GetMatchIdEntitlementUseCase {
     repository: Arc<dyn MatchIdUnlockRepository>,
+    match_id_source: Arc<dyn MatchIdSource>,
     user_membership_port: Arc<dyn UserMembershipPort>,
 }
 
 impl GetMatchIdEntitlementUseCase {
     pub fn new(
         repository: Arc<dyn MatchIdUnlockRepository>,
+        match_id_source: Arc<dyn MatchIdSource>,
         user_membership_port: Arc<dyn UserMembershipPort>,
     ) -> Self {
         Self {
             repository,
+            match_id_source,
             user_membership_port,
         }
     }
@@ -34,7 +39,7 @@ impl GetMatchIdEntitlementUseCase {
         &self,
         input: MatchIdEntitlementInput,
     ) -> anyhow::Result<MatchIdEntitlementView> {
-        if !self.repository.match_exists(input.match_id).await? {
+        if !self.match_id_source.known_match_id(input.match_id).await? {
             return Err(MatchIdUnlockError::MatchNotFound.into());
         }
 
@@ -93,21 +98,29 @@ mod tests {
         auth::ports::user_membership_port::UserMembershipPort,
         match_id_unlock::{
             domain::match_id_unlock::{MatchIdUnlockError, MatchIdUnlockSource},
-            ports::match_id_unlock_repository::MatchIdUnlockRepository,
+            ports::{
+                match_id_source::MatchIdSource, match_id_unlock_repository::MatchIdUnlockRepository,
+            },
         },
     };
 
+    struct FakeMatchIdSource {
+        known: bool,
+    }
+
+    #[async_trait]
+    impl MatchIdSource for FakeMatchIdSource {
+        async fn known_match_id(&self, _match_id: i64) -> anyhow::Result<bool> {
+            Ok(self.known)
+        }
+    }
+
     struct FakeRepository {
-        matches_exist: bool,
         unlocked_matches: Vec<i64>,
     }
 
     #[async_trait]
     impl MatchIdUnlockRepository for FakeRepository {
-        async fn match_exists(&self, _match_id: i64) -> anyhow::Result<bool> {
-            Ok(self.matches_exist)
-        }
-
         async fn find_unlock(&self, _user_id: Uuid, match_id: i64) -> anyhow::Result<bool> {
             Ok(self.unlocked_matches.contains(&match_id))
         }
@@ -145,10 +158,8 @@ mod tests {
 
     fn use_case(tier: Option<&str>, unlocked_matches: Vec<i64>) -> GetMatchIdEntitlementUseCase {
         GetMatchIdEntitlementUseCase::new(
-            Arc::new(FakeRepository {
-                matches_exist: true,
-                unlocked_matches,
-            }),
+            Arc::new(FakeRepository { unlocked_matches }),
+            Arc::new(FakeMatchIdSource { known: true }),
             Arc::new(FakeUserMembershipPort {
                 tier: tier.map(str::to_string),
             }),
@@ -235,9 +246,9 @@ mod tests {
     async fn missing_match_returns_match_not_found() {
         let use_case = GetMatchIdEntitlementUseCase::new(
             Arc::new(FakeRepository {
-                matches_exist: false,
                 unlocked_matches: vec![],
             }),
+            Arc::new(FakeMatchIdSource { known: false }),
             Arc::new(FakeUserMembershipPort {
                 tier: Some("V9".to_string()),
             }),

@@ -16,17 +16,6 @@ impl PostgresMatchIdUnlockRepository {
 
 #[async_trait]
 impl MatchIdUnlockRepository for PostgresMatchIdUnlockRepository {
-    async fn match_exists(&self, match_id: i64) -> anyhow::Result<bool> {
-        let row = sqlx::query_scalar::<_, i64>(
-            "SELECT match_id FROM f_i_matches WHERE match_id = $1 LIMIT 1",
-        )
-        .bind(match_id)
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(row.is_some())
-    }
-
     async fn find_unlock(&self, user_id: Uuid, match_id: i64) -> anyhow::Result<bool> {
         let row = sqlx::query_scalar::<_, uuid::Uuid>(
             "SELECT user_id FROM f_i_user_match_id_unlocks WHERE user_id = $1 AND match_id = $2 LIMIT 1",

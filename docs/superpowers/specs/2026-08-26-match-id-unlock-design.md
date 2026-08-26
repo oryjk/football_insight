@@ -15,7 +15,7 @@
 | 决策点 | 结论 | 备注 |
 | --- | --- | --- |
 | 付费范围 | 真接微信支付 | 复用现有 wxpay + 订单链路 |
-| id 含义 | 内部 `match_id`（`f_i_matches.match_id`，业务唯一键，数字） | 非 `external_match_id` |
+| id 含义 | 看板接口返回的 `match_id`（来自外部 ticket-monitor 服务，与回流订阅按场购买同一口径） | 非 `external_match_id`，也不是 `f_i_matches` 表的键（实测口径修正） |
 | 计费口径 | 按场次 | 5 元解锁一场，永久可见；换场次需重新付费；V6+ 全部免费 |
 | 门槛强度 | 软门槛 | 看板接口继续明文返回 `match_id`，老客户端零影响；详见"向后兼容" |
 
@@ -61,10 +61,10 @@ src/match_id_unlock/
   bootstrap.rs
 ```
 
-`bootstrap.rs` 暴露 `build_match_id_unlock_routes(pool, order_repository, wechat_pay_port, user_membership_port, token_port) -> Router`，在 `app.rs` merge。仓库 trait 提供两个能力：
+`bootstrap.rs` 暴露 `build_match_id_unlock_routes(pool, ticket_monitor_port, order_repository, user_membership_port, wechat_pay_port, token_port) -> Router`，在 `app.rs` merge（复用 ticket_watch 已构建的 `ticket_monitor_port`）。端口拆两个：
 
-- `find_unlock(user_id, match_id) -> Option<StoredUnlock>`（含 `match_exists(match_id)` 存在性检查，直接查 `f_i_matches`）
-- `insert_unlock(user_id, match_id, order_no)`（结算侧使用）
+- `MatchIdUnlockRepository`（Postgres）：`find_unlock(user_id, match_id)` 读取已解锁记录（写入由 payment 的结算事务负责）
+- `MatchIdSource`：`known_match_id(match_id)` 存在性校验。**口径修正（2026-08-27 自测发现）**：看板 `match_id` 来自 ticket-monitor 服务而非 `f_i_matches`（当前比赛 582 vs 表内业务键 288768/主键 677），实现为 `TicketMonitorMatchIdSource`（`fetch_all_matches` + 60 秒缓存），否则会出现"看板有比赛但解锁接口 404"
 
 ### 端点（均需 Bearer JWT，鉴权方式仿 payment handlers 内 `authenticate_user`）
 
@@ -83,7 +83,7 @@ GET /api/v1/match-id/entitlement?match_id={id}
 判定顺序：
 
 1. JWT 解析用户（401 未登录）。
-2. `match_exists` 校验（404 比赛不存在）。
+2. `MatchIdSource` 校验（ticket-monitor 口径，404 比赛不存在）。
 3. `get_user_membership_tier(user_id)`（该 port 实现已含 `resolve_effective_membership_tier` 过期回退 V3 逻辑）→ `membership_tier_rank >= membership_tier_rank("V6")` → `via: "membership"`。
 4. 否则查 unlocks 表，命中 → `via: "purchase"`。
 5. 否则 `unlocked: false, via: null`。
