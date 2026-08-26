@@ -13,6 +13,7 @@ onHide(() => {
 });
 </script>
 <style lang="css">
+@import "./styles/fi-tokens.css";
 @import "./uni.css";
 
 page {

@@ -1,4 +1,3 @@
-<!-- From: /Users/carlwang/football_insight/football_insight_mini/AGENTS.md -->
 # football_insight_mini 前端约定
 
 ## 审核版本号
@@ -13,6 +12,83 @@
 - 若构建分配了新版本号，`src/manifest.json` 与 `src/config/generatedMiniProgramVersion.ts` 的变更需要单独提交。
 
 运行时来源：`src/api/system.ts` 的 `MINI_PROGRAM_VERSION` 优先读 `src/config/generatedMiniProgramVersion.ts`，构建时生成。
+
+## 组件化与分层设计（对齐 registration_system_mini）
+
+目录职责：
+
+```text
+src/
+  api/           # 按业务域封装后端 API 原子调用，不承载页面 UI 状态
+  components/    # 跨页面通用组件（Fi* 前缀命名），只放 API 稳定、真正复用的
+  composables/   # 跨页面复用的组合式逻辑（use*）
+  config/        # 运行时与环境配置
+  pages/         # 页面；页面专属模块放各页面目录内
+  styles/        # design token（fi-tokens.css）
+  types/         # 后端 DTO、视图模型等共享类型
+  utils/         # 请求、存储、工具方法
+```
+
+页面拆分模式（优先结构）：
+
+```text
+src/pages/<domain>/
+  index.vue                 # 页面编排：生命周期、加载状态、导航、事件 wiring
+  helpers.ts                # 本页面纯函数/格式化/视图模型转换（现状命名，等价于 *State.ts）
+  use<Domain>Page.ts        # 可选：较重的页面级状态与动作编排 composable
+  <domain>Actions.ts        # 可选：页面级提交动作和 API 编排
+  components/               # 页面局部组件（XxxPanel/XxxCard/XxxSheet）
+```
+
+职责边界：
+
+- 页面 `index.vue` 只承担编排：生命周期、页面业务状态、异步流程、错误处理、路由、Toast/Confirm。**不要继续往大页面里堆模板和请求。**
+- 页面专属组件放 `src/pages/<domain>/components/`；只有稳定跨页面复用的组件才进 `src/components/`，命名带 `Fi` 前缀（如 `FiBottomSheet`）。
+- 子组件通过 `props` 接收数据、`emits` 发出意图；不要在页面局部展示组件里直接调用业务 API。父页面保留业务状态和异步流程。
+- 后端数据到展示模型的转换放页面 `helpers.ts`；跨页面复用的放 `src/utils/`。不要把转换逻辑散落在模板里。
+- API 原子封装始终在 `src/api/<domain>.ts`；页面级 API 编排才放 `*Actions.ts` / `use*Page.ts`。
+- 非声明式页面或组件超过约 **600 行**要主动评估拆分；超过约 **1000 行**必须按「页面编排 / 局部组件 / actions / helpers」小步拆分。
+- 当前超标页面（重构 backlog，触碰时优先拆分，不要顺手再加量）：`ticket-watch`（4000+ 行）、`home`（3000+ 行）、`user`（2700+ 行）、`seat-swap`（1700+ 行）、`insights`、`matches`（1000+ 行）。
+- 单次任务只做增量拆分或增量迁移，**不要顺手重写整套页面风格或路由结构**。
+
+## Design token 规范
+
+`src/styles/fi-tokens.css` 按三层组织（由 `App.vue` 全局导入，兼容 `uni.css` 旧变量）：
+
+1. **primitive**：原始色值（`--fi-primitive-*`），不直接在页面引用；
+2. **semantic**：语义别名（`--fi-color-*`），结构 UI 统一引用这一层；
+3. **component**：组件契约（`--fi-component-*`），组件级复合样式引用。
+
+规则：
+
+- 新增页面、组件、共享壳层的颜色**必须引用 token**（`var(--fi-color-*)`），不要新增散落 hex；需要新色值时先加 primitive，再建 semantic 别名。
+- 存量约 900 处散落 hex 按「触碰哪个文件就顺手迁移哪个」增量替换，不要求一次性重写；高频色（白、墨色、灰阶、红系、浅底）已有对应 token。
+- 圆角/阴影/间距 token 在首次需要时按同样三层规则补充进 token 文件，不要写在页面里到处复制。
+- **颜色例外**：球队/球衣等业务数据值、插画装饰色（如球场图、海报绘制色）不是视觉 token，保留原样，可在相邻注释标注 decorative。
+
+## 跨端约束（H5 与小程序兼容）
+
+本项目同时编译 H5 和微信小程序，必须保证两端可编译可运行：
+
+- 统一使用 `uni.*` API，不要直接调 `wx.*`；禁止浏览器 DOM API（`document.*`、`window.*`、`localStorage` 等），存储用 `uni.getStorageSync` / `uni.setStorageSync`。
+- 微信专属能力（支付、订阅消息、`open-type` 等）必须用条件编译 `<!-- #ifdef MP-WEIXIN -->` 隔离，并提供 H5 降级路径。
+- 样式统一 `rpx`，不混用 `px`/`vw`/`rem`；不用 `:hover`（用 `hover-class`）。
+- **运行时 Vue 组件必须直接从 `.vue` 文件导入**（如 `import FiLoading from "@/components/FiLoading.vue"`），不要通过 barrel 文件二次导出运行时组件——uni-app 小程序编译器可能不追踪二次导出，导致 WXML 有标签但 JSON 缺 `usingComponents`，构建成功却渲染不出。类型和纯函数可以走 barrel。
+- 新增页面/组件后执行 `bun run build:mp-weixin` 确认编译；构建尾部会自动跑组件注册检查，报 `Unregistered mini-program components` 时先核对 `.vue` 直接导入。
+
+### mp-weixin 样式/布局陷阱（勿再犯）
+
+小程序端 uni-app 组件编译为微信自定义组件，存在宿主节点与样式隔离，以下写法 H5 正常、小程序静默失效：
+
+1. 不要用 `custom-class` + 父级 scoped 样式给子组件根节点做布局——父级选择器带作用域 id 且被组件样式隔离挡住，整条规则失效。布局类加在自己模板内的包裹 view 上。
+2. flex 行容器里子组件宿主节点会收缩为内容宽，子组件内部 `width: 100%` 无法撑满。由 flex 容器侧解决（`flex-direction: column` + `align-items: stretch`）。
+3. 通用原则：**H5 显示正常不代表小程序正常**，跨组件宽度/布局样式必须在 mp-weixin 端实际验证。
+
+## 测试与验证
+
+- 不按 TDD 开发前端；页面、样式、交互、UI 调整以 `bun run type-check`、构建和模拟器/人工验证为准，**不机械新增测试**。
+- 只有涉及路由、接口调用、数据提交、权限、共享工具函数或关键业务状态变化时，才按风险补必要测试（现有 `helpers.test.ts` 模式保留）。
+- 提交前至少 `bun run type-check`；涉及页面流程或路由时补跑 `bun run build:mp-weixin`。
 
 ## 小程序弹框滚动锁
 

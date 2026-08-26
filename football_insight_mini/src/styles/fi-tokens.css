@@ -1,0 +1,50 @@
+/* Football Insight design tokens（对齐 registration_system_mini 的 Neo 三层结构）：
+ * primitive = 原始色值；semantic = 语义别名（页面引用这一层）；component = 组件契约。
+ * 所有值均提炼自迁移前的存量用色，仅重组不发明，视觉零变化。
+ * 规范见本目录 ../AGENTS.md「Design token 规范」。
+ */
+:root,
+page {
+  /* ===== Primitive：原始色值（不直接在页面引用） ===== */
+  --fi-primitive-white: #ffffff;
+  --fi-primitive-red: #dc2626;
+  --fi-primitive-red-deep: #b91c1c;
+  --fi-primitive-red-darker: #991b1b;
+  --fi-primitive-ink: #15161b;
+  --fi-primitive-ink-deep: #121212;
+  --fi-primitive-grey-text: #8f9198;
+  --fi-primitive-grey-text-deep: #6d7280;
+  --fi-primitive-canvas: #f6f7fb;
+  --fi-primitive-canvas-soft: #f7f8fa;
+  --fi-primitive-ink-rgb: 21, 22, 27;
+
+  /* ===== Semantic：语义别名（结构 UI 引用这一层） ===== */
+  /* 兼容 uni.css 时代的既有语义名（值保持不变） */
+  --fi-color-primary: var(--fi-primitive-red);
+  --fi-color-success: #4cd964;
+  --fi-color-warning: #f0ad4e;
+  --fi-color-error: #dd524d;
+  --fi-color-text: #333333;
+  --fi-color-text-grey: #999999;
+  --fi-color-bg: #ffffff;
+  --fi-color-bg-grey: #f6f5f2;
+  --fi-color-border: #c8c7cc;
+
+  /* 按存量实际用色补充的语义层 */
+  --fi-color-text-primary: var(--fi-primitive-ink);
+  --fi-color-text-strong: var(--fi-primitive-ink-deep);
+  --fi-color-text-secondary: var(--fi-primitive-grey-text-deep);
+  --fi-color-text-muted: var(--fi-primitive-grey-text);
+  --fi-color-primary-deep: var(--fi-primitive-red-deep);
+  --fi-color-primary-darker: var(--fi-primitive-red-darker);
+  --fi-color-page: var(--fi-primitive-canvas);
+  --fi-color-page-soft: var(--fi-primitive-canvas-soft);
+  --fi-color-overlay: rgba(var(--fi-primitive-ink-rgb), 0.46);
+
+  /* ===== Component：组件契约（新组件样式引用这一层） ===== */
+  --fi-component-btn-bg: var(--fi-color-primary);
+  --fi-component-btn-bg-deep: var(--fi-color-primary-deep);
+  --fi-component-card-bg: var(--fi-primitive-white);
+  --fi-component-card-text: var(--fi-color-text-primary);
+  --fi-component-muted-text: var(--fi-color-text-muted);
+}
