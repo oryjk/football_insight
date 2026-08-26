@@ -36,6 +36,12 @@
 			}
 		},
 		{
+			"path": "pages/user/settings/index",
+			"style": {
+				"navigationBarTitleText": "设置"
+			}
+		},
+		{
 			"path": "pages/membership-purchase/index",
 			"style": {
 				"navigationBarTitleText": "开通会员"

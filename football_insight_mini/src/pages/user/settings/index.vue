@@ -1,23 +1,20 @@
 <template>
-  <view class="sheet-mask" @tap="emit('close')">
-    <view class="sheet-card" @tap.stop>
-      <view class="section-heading">
-        <view>
-          <text class="section-kicker">设置</text>
-          <text class="section-title">运营工具</text>
-        </view>
-        <button class="sheet-close" @click="emit('close')">关闭</button>
+  <view class="settings-page">
+    <view class="settings-section">
+      <view class="settings-item">
+        <text class="settings-item__label">当前版本</text>
+        <text class="settings-item__value">{{ MINI_PROGRAM_VERSION }}</text>
       </view>
 
       <view class="settings-item">
-        <text class="settings-item__label">当前版本审核状态</text>
-        <text class="settings-item__value">{{ statusText }}</text>
+        <text class="settings-item__label">审核状态</text>
+        <text class="settings-item__value" :class="{ 'settings-item__value--reviewing': isReviewing }">{{ statusText }}</text>
       </view>
 
       <view class="settings-item settings-item--stacked">
         <view class="settings-item__row">
           <text class="settings-item__label">切换审核状态</text>
-          <text class="settings-item__caption">影响全量用户的会员/支付等入口显隐</text>
+          <text class="settings-item__caption">切换后全量用户的会员/支付等入口显隐会立即变化；仅管理员账号可切换。</text>
         </view>
 
         <view class="settings-options">
@@ -46,10 +43,6 @@ import { ref } from 'vue'
 import { getMiniReviewStatus, putMiniReviewReviewStatus } from '../../../api/miniReview'
 import { MINI_PROGRAM_VERSION } from '../../../api/system'
 import { extractApiErrorMessage } from '../../../utils/apiError'
-
-const emit = defineEmits<{
-  (e: 'close'): void
-}>()
 
 const isReviewing = ref(false)
 const statusText = ref('')
@@ -95,72 +88,19 @@ loadStatus()
 </script>
 
 <style scoped lang="css">
-.sheet-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  background: rgba(var(--fi-primitive-ink-rgb), 0.36);
-  backdrop-filter: blur(8rpx);
-  display: flex;
-  align-items: flex-end;
-}
-
-.sheet-card {
-  width: 100%;
-  max-height: 78vh;
-  border-radius: 36rpx 36rpx 0 0;
-  background: rgba(255, 255, 255, 0.98);
-  padding: 28rpx 24rpx 40rpx;
-  box-shadow: 0 -24rpx 56rpx rgba(12, 14, 20, 0.12);
-  overflow-y: auto;
-}
-
-.section-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12rpx;
-}
-
-.section-heading > view {
-  display: grid;
-  gap: 8rpx;
-  min-width: 0;
-}
-
-.section-kicker {
-  display: block;
-  color: var(--fi-color-text-muted);
-  font-size: 22rpx;
-  font-weight: 700;
-  letter-spacing: 3rpx;
-}
-
-.section-title {
-  display: block;
-  color: var(--fi-color-text-strong);
-  font-size: 44rpx;
-  line-height: 1.16;
-  font-weight: 800;
-}
-
-.sheet-close {
-  display: inline-flex;
-  margin: 0 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-  line-height: 1;
-  padding: 12rpx 18rpx;
-  border-radius: 999rpx;
+.settings-page {
+  min-height: 100vh;
   background: var(--fi-color-page);
-  color: var(--fi-color-text-secondary);
-  font-size: 24rpx;
+  padding: 24rpx 24rpx 40rpx;
+}
+
+.settings-section {
+  display: grid;
+  gap: 18rpx;
 }
 
 .settings-item {
-  margin-top: 22rpx;
-  padding: 22rpx 24rpx;
+  padding: 24rpx;
   border-radius: 24rpx;
   border: 2rpx solid rgba(232, 233, 238, 0.95);
   background: var(--fi-primitive-white);
@@ -169,7 +109,7 @@ loadStatus()
 }
 
 .settings-item--stacked {
-  gap: 16rpx;
+  gap: 18rpx;
 }
 
 .settings-item__row {
@@ -191,8 +131,12 @@ loadStatus()
 
 .settings-item__value {
   color: var(--fi-color-primary);
-  font-size: 24rpx;
+  font-size: 26rpx;
   font-weight: 700;
+}
+
+.settings-item__value--reviewing {
+  color: var(--fi-color-primary);
 }
 
 .settings-options {
@@ -205,7 +149,7 @@ loadStatus()
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 18rpx 24rpx;
+  padding: 20rpx 24rpx;
   border-radius: 999rpx;
   border: 2rpx solid rgba(232, 233, 238, 0.95);
   background: var(--fi-color-page);
