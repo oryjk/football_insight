@@ -302,6 +302,19 @@ function openSettingsPage() {
 async function loadUser(): Promise<void> {
   hasLocalAccessToken.value = Boolean(getAccessToken())
   loading.value = hasLocalAccessToken.value
+
+  // 设置入口的显隐不依赖审核模式：管理员在审核期间也需要进设置切换审核状态，
+  // 因此只要有登录 token 就先判一次白名单，再走审核模式的提前返回。
+  if (hasLocalAccessToken.value) {
+    try {
+      isReviewController.value = (await canControlMiniReview()).allowed
+    } catch {
+      isReviewController.value = false
+    }
+  } else {
+    isReviewController.value = false
+  }
+
   systemConfigUnderReview.value = await loadSystemConfigUnderReview()
 
   if (systemConfigUnderReview.value) {
@@ -331,16 +344,6 @@ async function loadUser(): Promise<void> {
     currentUser.value = userResult.value
   } else {
     currentUser.value = null
-  }
-
-  if (currentUser.value) {
-    try {
-      isReviewController.value = (await canControlMiniReview()).allowed
-    } catch {
-      isReviewController.value = false
-    }
-  } else {
-    isReviewController.value = false
   }
 
   if (notificationEmailResult.status === 'fulfilled') {
