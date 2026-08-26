@@ -31,7 +31,7 @@
 
 ### 数据表
 
-新迁移 `migrations/20260826120000_add_match_id_unlocks.sql`（纯增量）：
+新迁移 `migrations/20260826140000_add_match_id_unlocks.sql`（纯增量；版本号需避开已占用的 `20260826120000_add_mini_review_statuses.sql` 与 `20260826130000_seed_wechat_next_match_reply_enabled.sql`）：
 
 ```sql
 CREATE TABLE IF NOT EXISTS f_i_user_match_id_unlocks (
@@ -97,18 +97,21 @@ POST /api/v1/match-id/order
 
 响应 200：`{ "order_no": "...", "wx_pay_params": { timeStamp, nonceStr, package, signType, paySign } }`
 
+（字段名有意用 `wx_pay_params`，与 reflux DTO 的 `params` 不同；前后端在本设计内保持一致，实现时不要"改回" `params`。）
+
 下单前校验（按序）：
 
 - 未登录 → 401
 - 比赛不存在 → 404
 - V6+ 会员 → 400 "V6 及以上会员可直接查看，无需购买"（正常前端流程不会到达，防御）
 - 本场已解锁 → 409 "本场比赛 ID 已解锁，无需重复购买"
+- 未绑定微信（`get_user_open_id` 为空）→ 403 "请先绑定微信后再支付"（reflux 下单同款前置校验）
 
-通过后：`OrderRepository.create_order(NewPaymentOrder { amount_cents: 500, product_type: "match_id_unlock:{match_id}", ... })` → `WechatPayPort.unified_order(order_no, "解锁比赛ID", 500, openid)`，返回订单号与支付参数（与 reflux 订阅下单用例同构）。每次点击生成新单，废弃 pending 旧单，与 reflux 先例一致。
+通过后：`OrderRepository.create_order(NewPaymentOrder { amount_cents: 500, product_type: "match_id_unlock:{match_id}", ... })` → `WechatPayPort.unified_order(order_no, "解锁比赛ID", 500, openid)`，返回订单号与支付参数（与 reflux 订阅下单用例同构）。每次点击生成新订单；旧 pending 单自然遗留、不主动处置（与 reflux 实际行为一致，页面已有轮询 + entitlement 刷新兜底）。
 
 ### 支付结算
 
-- `payment/domain/order.rs` 新增 `parse_match_id_unlock_product_type(&str) -> Option<(i64,)>`（仿 reflux 解析器，解析 `match_id_unlock:{match_id}`）。
+- `payment/domain/order.rs` 新增 `parse_match_id_unlock_product_type(&str) -> Option<i64>`（仿 reflux 解析器，解析 `match_id_unlock:{match_id}` 中的场次 id）。
 - `handle_wechat_notify.rs` 在现有 reflux 分支旁增加 match_id_unlock 分支。
 - `PaymentSettlementPort` trait 新增 `settle_match_id_unlock_order(order)`，Postgres 实现在事务内：订单置 paid（复用现有置 paid SQL 模式）+ `INSERT INTO f_i_user_match_id_unlocks ... ON CONFLICT (user_id, match_id) DO NOTHING`（重复回调幂等）。
 
@@ -139,9 +142,9 @@ export function createMatchIdOrder(matchId: number): Promise<{ order_no: string;
 新增 `pages/ticket-watch/components/TicketMatchIdSheet.vue`（该页首个局部组件，遵循项目组件规范：props 进、emits 出、不调业务 API）：
 
 - props：`visible`、`matchId: number | null`、`matchLabel: string`（轮次 + 对阵 + 日期摘要）、`state: 'loading' | 'locked' | 'unlocked' | 'paying'`、`via`、`effectiveTier`
-- emits：`close`、`pay`、`copy`
+- emits：`close`、`pay`、`copy`、`upgrade`（升级按钮由页面处理跳转，组件不跳页面）
 - 已解锁态：比赛摘要 + 大字号 match_id + "复制"按钮（组件内 `uni.setClipboardData`，平台能力不属于业务 API）+ 来源说明（"会员权益" / "已购解锁"）
-- 锁定态：说明文案"V6 及以上会员可免费查看，或支付 ¥5 解锁本场比赛 ID"；主按钮"¥5 解锁本场"（emits pay）、次按钮"升级到 V6"（emits upgrade 或直接由页面跳转）
+- 锁定态：说明文案"V6 及以上会员可免费查看，或支付 ¥5 解锁本场比赛 ID"；主按钮"¥5 解锁本场"（emits pay）、次按钮"升级到 V6"（emits upgrade）
 - paying 态：主按钮置 loading 并禁用
 - 视觉沿用页面现有 subscription-dialog / recent-reflux-lock 的卡片与按钮语言
 
@@ -151,8 +154,10 @@ export function createMatchIdOrder(matchId: number): Promise<{ order_no: string;
 
 1. 无 `currentMatch` 直接返回；未登录按页面现有 401/未登录惯例引导。
 2. 打开 sheet（state=loading）→ `getMatchIdEntitlement(match_id)` → unlocked / locked。
-3. pay 事件：state=paying → `createMatchIdOrder` → `uni.requestPayment`（仅 MP-WEIXIN；H5 弹"请在微信小程序内完成支付"并回到锁定态）→ 复用页面现有 `waitForPaidOrder` 轮询 → paid 后刷新 entitlement → unlocked（via=purchase）。
+3. pay 事件：先检查微信绑定（复用页面 `has_wechat_binding` 状态，先例 `goToMembershipPurchase` 引导去"我的"页绑定）；state=paying → `createMatchIdOrder` → `uni.requestPayment`（仅 MP-WEIXIN；H5 弹"请在微信小程序内完成支付"并回到锁定态）→ 复用页面现有 `waitForPaidOrder` 轮询 → paid 后刷新 entitlement → unlocked（via=purchase）。
 4. copy 事件由组件内部完成并 toast。
+
+极端窗口说明：若订单 A 的支付回调延迟、用户又下新单 B 并支付，可能出现双付款；该窗口继承自 reflux 先例，由"下单前 409 已解锁校验 + 支付后 entitlement 刷新"缓解，本期不做自动退款。
 
 ### helpers 纯函数（+ 单测）
 
@@ -166,6 +171,7 @@ export function createMatchIdOrder(matchId: number): Promise<{ order_no: string;
 | 场景 | 行为 |
 | --- | --- |
 | 未登录点按钮 | 按页面现有未登录/401 惯例引导登录 |
+| 未绑定微信点付费 | 引导去"我的"页绑定（仿 `goToMembershipPurchase` 先例）；后端下单也返回 403 兜底 |
 | entitlement 404（比赛不存在） | toast 并关闭 sheet |
 | 下单 409（已解锁） | 刷新 entitlement 后展示解锁态 |
 | 支付取消/失败 | toast"支付未完成"，回到锁定态，不落权益 |
@@ -183,7 +189,7 @@ export function createMatchIdOrder(matchId: number): Promise<{ order_no: string;
 
 - 后端 `cargo test`：
   - entitlement 用例：V6 解锁 / 低于 V6 锁定 / 已购解锁 / 会员过期回退 V3 后锁定 / 比赛不存在 404
-  - 下单用例：V6 拒绝 / 已解锁 409 / 比赛不存在 404 / 正常下单（金额 500、product_type 编码、调用 unified_order）
+  - 下单用例：V6 拒绝 / 已解锁 409 / 未绑定微信 403 / 比赛不存在 404 / 正常下单（金额 500、product_type 编码、调用 unified_order）
   - 结算幂等：重复 notify 只落一行 unlock
   - product_type 解析往返
   - http_cache 排除前缀回归
