@@ -214,7 +214,7 @@
                 {{ refluxSubscriptionSubscribed ? '已开通' : '订阅提醒' }}
               </button>
               <button class="watch-monitor-actions__button" @tap="openMatchIdSheet">
-                比赛 ID
+                获取比赛 ID
               </button>
             </view>
 
