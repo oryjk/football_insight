@@ -259,7 +259,6 @@
             <text class="account-actions__label">账号管理</text>
             <text class="account-actions__caption">{{ loginPresentation.switchAccountCaption }}</text>
           </view>
-          <button class="settings-action" @click="openSettingsPage">设置</button>
           <button class="logout-action" @click="handleLogout">退出登录</button>
         </view>
       </template>
@@ -393,6 +392,15 @@
         </view>
       </view>
       </template>
+
+      <!-- 设置入口常驻：不受审核模式 / 登录状态影响，任何用户可见可点。 -->
+      <view class="panel settings-entry-panel" hover-class="settings-entry-panel--pressed" hover-stay-time="100" @click="openSettingsPage">
+        <view class="settings-entry-panel__body">
+          <text class="settings-entry-panel__title">设置</text>
+          <text class="settings-entry-panel__caption">查看当前版本审核状态</text>
+        </view>
+        <text class="settings-entry-panel__arrow">›</text>
+      </view>
     </view>
     </view>
 
@@ -512,7 +520,13 @@ const notificationEmailForm = ref('')
 const notificationEmailSheetVisible = ref(false)
 
 function openSettingsPage() {
-  uni.navigateTo({ url: '/pages/user/settings/index' })
+  uni.navigateTo({
+    url: '/pages/user/settings/index',
+    fail: (error) => {
+      console.error('[user] navigate to settings failed', error)
+      uni.showToast({ title: error?.errMsg || '打开设置失败', icon: 'none' })
+    },
+  })
 }
 const notificationEmailSaving = ref(false)
 const {
@@ -1806,20 +1820,41 @@ onShow(() => {
 .notification-email-panel__action::after {
   border: none;
 }
-.settings-action {
-  width: 100%;
-  height: 78rpx;
-  padding: 0 26rpx;
-  border-radius: 999rpx;
-  border: 2rpx solid rgba(232, 233, 238, 0.95);
-  background: var(--fi-primitive-white);
-  color: var(--fi-color-text-secondary);
-  font-size: 26rpx;
-  font-weight: 700;
-  line-height: 1;
-  display: inline-flex;
+.settings-entry-panel {
+  margin-top: 24rpx;
+  display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.settings-entry-panel--pressed {
+  transform: scale(0.99);
+  background: rgba(var(--fi-primitive-red-rgb), 0.04);
+}
+
+.settings-entry-panel__body {
+  display: grid;
+  gap: 6rpx;
+  min-width: 0;
+}
+
+.settings-entry-panel__title {
+  color: var(--fi-color-text-strong);
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.settings-entry-panel__caption {
+  color: var(--fi-color-text-muted);
+  font-size: 22rpx;
+}
+
+.settings-entry-panel__arrow {
+  color: var(--fi-color-text-muted);
+  font-size: 40rpx;
+  line-height: 1;
+  font-weight: 700;
 }
 
 .logout-action {
