@@ -20,4 +20,12 @@ pub trait PaymentSettlementPort: Send + Sync {
         user_id: Uuid,
         product: RefluxSubscriptionProductType,
     ) -> anyhow::Result<()>;
+
+    async fn settle_match_id_unlock_order(
+        &self,
+        order_no: &str,
+        transaction_id: &str,
+        user_id: Uuid,
+        match_id: i64,
+    ) -> anyhow::Result<()>;
 }

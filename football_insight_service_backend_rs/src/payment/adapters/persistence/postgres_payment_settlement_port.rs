@@ -285,6 +285,53 @@ impl PaymentSettlementPort for PostgresPaymentSettlementPort {
         tx.commit().await?;
         Ok(())
     }
+
+    async fn settle_match_id_unlock_order(
+        &self,
+        order_no: &str,
+        transaction_id: &str,
+        user_id: Uuid,
+        match_id: i64,
+    ) -> anyhow::Result<()> {
+        let mut tx = self.pool.begin().await?;
+
+        let order_update = sqlx::query(
+            r#"
+            UPDATE f_i_payment_orders
+            SET status = 'paid',
+                transaction_id = COALESCE(transaction_id, $2),
+                paid_at = COALESCE(paid_at, NOW()),
+                updated_at = NOW()
+            WHERE order_no = $1
+              AND status = 'pending'
+            "#,
+        )
+        .bind(order_no)
+        .bind(transaction_id)
+        .execute(&mut *tx)
+        .await?;
+
+        if order_update.rows_affected() == 0 {
+            tx.commit().await?;
+            return Ok(());
+        }
+
+        sqlx::query(
+            r#"
+            INSERT INTO f_i_user_match_id_unlocks (user_id, match_id, order_no)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (user_id, match_id) DO NOTHING
+            "#,
+        )
+        .bind(user_id)
+        .bind(match_id)
+        .bind(order_no)
+        .execute(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(())
+    }
 }
 
 fn resolve_reflux_subscription_expires_at(

@@ -8,6 +8,7 @@ use crate::{
     ai::bootstrap::build_ai_routes, auth::bootstrap::build_auth,
     auth_license::bootstrap::build_auth_license_routes, config::AppConfig,
     health::bootstrap::build_health_routes, insight::bootstrap::build_insight,
+    match_id_unlock::bootstrap::build_match_id_unlock_routes,
     mini_review::bootstrap::build_mini_review_routes, payment::bootstrap::build_payment,
     push_notification::bootstrap::build_push_notification_routes,
     reflux_subscription::bootstrap::build_reflux_subscription_routes,
@@ -65,6 +66,13 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         payment.wechat_pay_port.clone(),
         auth.token_port.clone(),
     );
+    let match_id_unlock_routes = build_match_id_unlock_routes(
+        pool.clone(),
+        payment.order_repository.clone(),
+        user_membership_port.clone(),
+        payment.wechat_pay_port.clone(),
+        auth.token_port.clone(),
+    );
 
     let auth_license_routes = build_auth_license_routes(pool.clone(), auth.token_port.clone());
     let mini_review_routes = build_mini_review_routes(
@@ -91,6 +99,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         .merge(team_board_routes)
         .merge(payment.routes)
         .merge(reflux_subscription_routes)
+        .merge(match_id_unlock_routes)
         .merge(auth_license_routes)
         .merge(push_notification_routes)
 }

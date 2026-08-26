@@ -38,6 +38,9 @@ import {
   resolveHistoryBoardLoadStrategy,
   resolveBlockInterestHeatLevel,
   resolveRecentRefluxPanelMode,
+  resolveMatchIdSheetState,
+  buildMatchIdSourceLabel,
+  buildTicketWatchMatchLabel,
   selectCompletedMatches,
   selectPurchasableRefluxSubscriptionPlans,
   selectRefluxStatsMatches,
@@ -972,6 +975,48 @@ describe('resolveRecentRefluxPanelMode', () => {
   test('keeps the recent reflux panel visible as a V6 benefit prompt below V6', () => {
     expect(resolveRecentRefluxPanelMode(false, 'V5')).toBe('locked')
     expect(resolveRecentRefluxPanelMode(false, null)).toBe('locked')
+  })
+})
+
+describe('resolveMatchIdSheetState', () => {
+  test('unlocks the sheet when entitlement reports unlocked', () => {
+    expect(resolveMatchIdSheetState({ unlocked: true })).toBe('unlocked')
+  })
+
+  test('keeps the sheet locked while entitlement is missing or not unlocked', () => {
+    expect(resolveMatchIdSheetState({ unlocked: false })).toBe('locked')
+    expect(resolveMatchIdSheetState(null)).toBe('locked')
+    expect(resolveMatchIdSheetState(undefined)).toBe('locked')
+  })
+})
+
+describe('buildMatchIdSourceLabel', () => {
+  test('labels membership and purchase unlock sources', () => {
+    expect(buildMatchIdSourceLabel('membership')).toBe('会员权益')
+    expect(buildMatchIdSourceLabel('purchase')).toBe('单场解锁')
+  })
+
+  test('returns an empty label without an unlock source', () => {
+    expect(buildMatchIdSourceLabel(null)).toBe('')
+    expect(buildMatchIdSourceLabel(undefined)).toBe('')
+  })
+})
+
+describe('buildTicketWatchMatchLabel', () => {
+  test('combines round, teams, and date into one label', () => {
+    expect(
+      buildTicketWatchMatchLabel({
+        round_number: 12,
+        home_team_name: '成都蓉城',
+        away_team_name: '上海海港',
+        match_date: '2026-08-30',
+      }),
+    ).toBe('第12轮 成都蓉城 VS 上海海港 · 2026-08-30')
+  })
+
+  test('returns an empty label without a match', () => {
+    expect(buildTicketWatchMatchLabel(null)).toBe('')
+    expect(buildTicketWatchMatchLabel(undefined)).toBe('')
   })
 })
 

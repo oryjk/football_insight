@@ -192,6 +192,19 @@ pub fn parse_reflux_subscription_product_type(
     })
 }
 
+pub fn match_id_unlock_product_type(match_id: i64) -> String {
+    format!("match_id_unlock:{match_id}")
+}
+
+pub fn parse_match_id_unlock_product_type(product_type: &str) -> Option<i64> {
+    let parts = product_type.trim().split(':').collect::<Vec<_>>();
+    if parts.len() != 2 || parts[0] != "match_id_unlock" {
+        return None;
+    }
+
+    parts[1].trim().parse::<i64>().ok()
+}
+
 pub fn membership_tier_from_product_type(product_type: &str) -> String {
     product_type
         .trim()
@@ -258,6 +271,7 @@ pub fn calculate_membership_checkout_price(
 mod tests {
     use super::{
         calculate_membership_checkout_price, default_membership_product_options,
+        match_id_unlock_product_type, parse_match_id_unlock_product_type,
         parse_reflux_subscription_product_type, reflux_subscription_product_type,
     };
 
@@ -346,6 +360,26 @@ mod tests {
         );
         assert!(
             parse_reflux_subscription_product_type("reflux_subscription:single_match::571")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn match_id_unlock_product_type_round_trips() {
+        let product_type = match_id_unlock_product_type(571);
+
+        assert_eq!(product_type, "match_id_unlock:571");
+        assert_eq!(parse_match_id_unlock_product_type(&product_type), Some(571));
+    }
+
+    #[test]
+    fn parse_match_id_unlock_product_type_rejects_other_products() {
+        assert!(parse_match_id_unlock_product_type("membership:V9").is_none());
+        assert!(parse_match_id_unlock_product_type("match_id_unlock:").is_none());
+        assert!(parse_match_id_unlock_product_type("match_id_unlock:abc").is_none());
+        assert!(parse_match_id_unlock_product_type("match_id_unlock:571:extra").is_none());
+        assert!(
+            parse_match_id_unlock_product_type("reflux_subscription:single_match:chengdu:571")
                 .is_none()
         );
     }

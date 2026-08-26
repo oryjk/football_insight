@@ -168,6 +168,7 @@ fn matches_excluded_prefix(path: &str) -> bool {
 
     path.starts_with("/api/v1/auth/")
         || path.starts_with("/api/v1/ticket-watch/")
+        || path.starts_with("/api/v1/match-id/")
         || path.starts_with("/api/v1/system")
         || path.starts_with("/api/v1/mini-review/")
         || path == "/football/wechat/webhook"
@@ -400,6 +401,43 @@ mod tests {
                 .oneshot(
                     Request::builder()
                         .uri("/api/v1/mini-review/review-status?project_code=football_insight_mini&version=1.0.56")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+        }
+
+        assert_eq!(hits.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn does_not_cache_match_id_entitlement() {
+        // 解锁状态在支付回调后会变化，且按用户区分，绝不能进缓存。
+        let hits = Arc::new(AtomicUsize::new(0));
+        let cache = HttpResponseCache::new(Duration::from_secs(600));
+        let app = {
+            let hits = hits.clone();
+            Router::new()
+                .route(
+                    "/api/v1/match-id/entitlement",
+                    get(move || {
+                        let hits = hits.clone();
+                        async move {
+                            let value = hits.fetch_add(1, Ordering::SeqCst) + 1;
+                            format!("entitlement-hit-{value}")
+                        }
+                    }),
+                )
+                .layer(from_fn_with_state(cache, cache_get_responses))
+        };
+
+        for _ in 0..2 {
+            let _ = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri("/api/v1/match-id/entitlement?match_id=571")
                         .body(Body::empty())
                         .unwrap(),
                 )

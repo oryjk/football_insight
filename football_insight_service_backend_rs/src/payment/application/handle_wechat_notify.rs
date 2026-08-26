@@ -1,7 +1,10 @@
 use std::{collections::HashMap, sync::Arc};
 
 use crate::payment::{
-    domain::order::{membership_tier_from_product_type, parse_reflux_subscription_product_type},
+    domain::order::{
+        membership_tier_from_product_type, parse_match_id_unlock_product_type,
+        parse_reflux_subscription_product_type,
+    },
     ports::{order_repository::OrderRepository, payment_settlement_port::PaymentSettlementPort},
 };
 
@@ -64,6 +67,15 @@ impl HandleWechatNotifyUseCase {
                     &transaction_id,
                     order.user_id,
                     product,
+                )
+                .await?;
+        } else if let Some(match_id) = parse_match_id_unlock_product_type(&order.product_type) {
+            self.payment_settlement_port
+                .settle_match_id_unlock_order(
+                    &out_trade_no,
+                    &transaction_id,
+                    order.user_id,
+                    match_id,
                 )
                 .await?;
         } else {
@@ -146,6 +158,16 @@ mod tests {
         ) -> anyhow::Result<()> {
             anyhow::bail!("payment settlement failed")
         }
+
+        async fn settle_match_id_unlock_order(
+            &self,
+            _order_no: &str,
+            _transaction_id: &str,
+            _user_id: Uuid,
+            _match_id: i64,
+        ) -> anyhow::Result<()> {
+            anyhow::bail!("payment settlement failed")
+        }
     }
 
     #[derive(Default)]
@@ -153,6 +175,7 @@ mod tests {
         calls: Mutex<usize>,
         tiers: Mutex<Vec<String>>,
         reflux_products: Mutex<Vec<crate::payment::domain::order::RefluxSubscriptionProductType>>,
+        unlocked_match_ids: Mutex<Vec<i64>>,
     }
 
     #[async_trait]
@@ -181,6 +204,21 @@ mod tests {
                 .lock()
                 .expect("reflux products")
                 .push(product);
+            Ok(())
+        }
+
+        async fn settle_match_id_unlock_order(
+            &self,
+            _order_no: &str,
+            _transaction_id: &str,
+            _user_id: Uuid,
+            match_id: i64,
+        ) -> anyhow::Result<()> {
+            *self.calls.lock().expect("calls") += 1;
+            self.unlocked_match_ids
+                .lock()
+                .expect("unlocked match ids")
+                .push(match_id);
             Ok(())
         }
     }
@@ -371,5 +409,53 @@ mod tests {
         assert_eq!(products[0].plan_code, "single_match");
         assert_eq!(products[0].team_code, "chengdu");
         assert_eq!(products[0].match_id, Some(571));
+    }
+
+    #[tokio::test]
+    async fn execute_dispatches_match_id_unlock_order() {
+        let user_id = Uuid::parse_str("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb").unwrap();
+        let repository = Arc::new(FakeOrderRepository {
+            order: Mutex::new(Some(PaymentOrder {
+                id: Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap(),
+                order_no: "20260826140001".to_string(),
+                user_id,
+                amount_cents: 500,
+                status: OrderStatus::Pending,
+                prepay_id: None,
+                transaction_id: None,
+                product_type: "match_id_unlock:571".to_string(),
+                paid_at: None,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            })),
+        });
+        let settlement_port = Arc::new(CountingPaymentSettlementPort::default());
+        let use_case = HandleWechatNotifyUseCase::new(repository, settlement_port.clone());
+
+        let result = use_case
+            .execute(
+                [
+                    ("return_code".to_string(), "SUCCESS".to_string()),
+                    ("result_code".to_string(), "SUCCESS".to_string()),
+                    ("out_trade_no".to_string(), "20260826140001".to_string()),
+                    ("transaction_id".to_string(), "wx_txn_match_id".to_string()),
+                    ("total_fee".to_string(), "500".to_string()),
+                ]
+                .into_iter()
+                .collect(),
+            )
+            .await
+            .expect("match id unlock notify should settle");
+
+        assert!(matches!(result, NotifyHandleResult::Success));
+        assert_eq!(*settlement_port.calls.lock().expect("calls"), 1);
+        assert_eq!(
+            settlement_port
+                .unlocked_match_ids
+                .lock()
+                .expect("unlocked match ids")
+                .as_slice(),
+            [571]
+        );
     }
 }

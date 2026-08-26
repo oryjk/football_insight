@@ -213,6 +213,9 @@
               >
                 {{ refluxSubscriptionSubscribed ? '已开通' : '订阅提醒' }}
               </button>
+              <button class="watch-monitor-actions__button" @tap="openMatchIdSheet">
+                比赛 ID
+              </button>
             </view>
 
             <text class="watch-match-card__note watch-match-card__note--reference">
@@ -922,6 +925,17 @@
         </button>
       </view>
     </view>
+
+    <TicketMatchIdSheet
+      :visible="matchIdSheetVisible"
+      :match-id="currentMatch?.match_id ?? null"
+      :match-label="matchIdMatchLabel"
+      :state="matchIdSheetState"
+      :via="matchIdEntitlement?.via ?? null"
+      @close="closeMatchIdSheet"
+      @pay="payForMatchId"
+      @upgrade="goToMembershipPurchase"
+    />
   </view>
   <view v-else-if="refluxSubscriptionSheetVisible" class="subscription-mask" @tap="closeRefluxSubscriptionSheet">
     <view class="subscription-dialog" @tap.stop>
@@ -995,6 +1009,8 @@ import {
   toggleTicketWatchBlockInterest,
 } from '../../api/ticketWatch'
 import { getOrderStatus } from '../../api/payment'
+import { createMatchIdOrder, getMatchIdEntitlement } from '../../api/matchIdUnlock'
+import type { MatchIdEntitlement } from '../../api/matchIdUnlock'
 import type { CurrentUser } from '../../types/auth'
 import type {
   TicketWatchBlockInterest,
@@ -1005,7 +1021,7 @@ import type {
   TicketWatchTrackedInterest,
   RefluxSubscriptionPlan,
 } from '../../types/ticketWatch'
-import { extractApiErrorMessage } from '../../utils/apiError'
+import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
 import { resolveMembershipBenefitsLocked } from '../../utils/membershipBenefits'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
 import { reportPageActivity } from '../../utils/userActivity'
@@ -1047,6 +1063,8 @@ import {
   isValidNotificationEmail,
   resolveRecentRefluxPanelMode,
   resolveRecentRefluxBucketRequiredTier,
+  resolveMatchIdSheetState,
+  buildTicketWatchMatchLabel,
   resolveHistoryBoardLoadStrategy,
   requireInventorySince,
   selectCompletedMatches,
@@ -1061,6 +1079,7 @@ import {
   type TicketWatchRecentRefluxBucketKey,
   toggleTicketWatchSectionCollapsed,
 } from './helpers'
+import TicketMatchIdSheet from './components/TicketMatchIdSheet.vue'
 
 type TicketWatchBoardMode = 'current' | 'history'
 type TicketWatchTab = TicketWatchBoardMode | 'history-stats'
@@ -1110,6 +1129,15 @@ const selectedRefluxSubscriptionPlanCode = ref('')
 const refluxSubscriptionEmail = ref('')
 const refluxSubscriptionSubscribed = ref(false)
 const refluxSubscriptionStatusLoading = ref(false)
+const matchIdSheetVisible = ref(false)
+const matchIdSheetState = ref<'loading' | 'locked' | 'unlocked' | 'paying'>('loading')
+const matchIdEntitlement = ref<MatchIdEntitlement | null>(null)
+// 微信支付仅小程序端可用；用运行时标记而非函数内 #ifdef 裸 return，
+// 避免 TS 把后续代码判为不可达而丢失类型收窄。
+const canRequestWxPayment = ref(false)
+// #ifdef MP-WEIXIN
+canRequestWxPayment.value = true
+// #endif
 const currentTrackedInterests = ref<TicketWatchTrackedInterest[]>([])
 const currentCollapsedSections = ref<TicketWatchCollapsedSectionState>({})
 const historyCollapsedSections = ref<TicketWatchCollapsedSectionState>({})
@@ -1127,6 +1155,8 @@ const selectedHistoryMatch = computed(() => {
 
   return historyMatches.value.find((match) => match.match_id === selectedHistoryMatchId.value) ?? null
 })
+
+const matchIdMatchLabel = computed(() => buildTicketWatchMatchLabel(currentMatch.value))
 
 const displayedHistoryMatch = computed(() => {
   if (displayedHistoryMatchId.value === null) {
@@ -1996,6 +2026,109 @@ async function waitForPaidOrder(orderNo: string): Promise<boolean> {
   }
 
   return false
+}
+
+function closeMatchIdSheet(): void {
+  if (matchIdSheetState.value === 'paying') {
+    return
+  }
+
+  matchIdSheetVisible.value = false
+}
+
+async function refreshMatchIdEntitlement(): Promise<void> {
+  const match = currentMatch.value
+  if (!match) {
+    return
+  }
+
+  try {
+    const entitlement = await getMatchIdEntitlement(match.match_id)
+    matchIdEntitlement.value = entitlement
+    matchIdSheetState.value = resolveMatchIdSheetState(entitlement)
+  } catch {
+    matchIdSheetState.value = 'locked'
+  }
+}
+
+async function openMatchIdSheet(): Promise<void> {
+  const match = currentMatch.value
+  if (!match || matchIdSheetState.value === 'paying') {
+    return
+  }
+
+  matchIdSheetVisible.value = true
+  matchIdSheetState.value = 'loading'
+  try {
+    const entitlement = await getMatchIdEntitlement(match.match_id)
+    matchIdEntitlement.value = entitlement
+    matchIdSheetState.value = resolveMatchIdSheetState(entitlement)
+  } catch (error) {
+    matchIdSheetVisible.value = false
+    uni.showToast({ title: extractApiErrorMessage(error, '获取解锁状态失败'), icon: 'none' })
+  }
+}
+
+async function payForMatchId(): Promise<void> {
+  const match = currentMatch.value
+  if (!match || matchIdSheetState.value === 'paying') {
+    return
+  }
+
+  if (!currentUser.value?.has_wechat_binding) {
+    goToUserPage()
+    return
+  }
+
+  if (!canRequestWxPayment.value) {
+    uni.showToast({ title: '请在微信小程序内完成支付', icon: 'none' })
+    return
+  }
+
+  matchIdSheetState.value = 'paying'
+
+  try {
+    const order = await createMatchIdOrder(match.match_id)
+
+    uni.requestPayment({
+      provider: 'wxpay',
+      timeStamp: order.wx_pay_params.timeStamp,
+      nonceStr: order.wx_pay_params.nonceStr,
+      package: order.wx_pay_params.package,
+      signType: order.wx_pay_params.signType,
+      paySign: order.wx_pay_params.paySign,
+      success: async () => {
+        const paid = await waitForPaidOrder(order.order_no)
+        if (paid) {
+          uni.showToast({ title: '已解锁', icon: 'success' })
+          await refreshMatchIdEntitlement()
+        } else {
+          matchIdSheetState.value = 'locked'
+          uni.showToast({ title: '支付成功，解锁确认中，请稍后再试', icon: 'none' })
+        }
+      },
+      fail: (err: any) => {
+        const msg = err?.errMsg || '支付取消'
+        uni.showToast({
+          title: msg.includes('cancel') || msg.includes('关闭') || msg.includes('fail') ? '支付已取消' : '支付失败',
+          icon: 'none',
+        })
+        matchIdSheetState.value = 'locked'
+      },
+    })
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.statusCode === 409) {
+      await refreshMatchIdEntitlement()
+      return
+    }
+
+    uni.showToast({ title: extractApiErrorMessage(error, '下单失败'), icon: 'none' })
+    matchIdSheetState.value = 'locked'
+  } finally {
+    if (matchIdSheetState.value === 'paying') {
+      matchIdSheetState.value = 'locked'
+    }
+  }
 }
 
 async function submitRefluxSubscriptionOrder(): Promise<void> {
@@ -3025,8 +3158,8 @@ onUnload(() => {
 }
 .watch-monitor-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14rpx;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12rpx;
 }
 .watch-monitor-actions__button {
   width: 100%;
@@ -3034,11 +3167,11 @@ onUnload(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12rpx;
+  gap: 10rpx;
   border-radius: 22rpx;
   background: #15161b;
   color: #ffffff;
-  font-size: 30rpx;
+  font-size: 26rpx;
   font-weight: 800;
   text-align: center;
   box-shadow: 0 8rpx 18rpx rgba(21, 22, 27, 0.12);
