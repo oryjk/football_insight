@@ -96,22 +96,71 @@ pub async fn allocate_handler(
     Ok(Json(status.into()))
 }
 
+/// 审核状态切换的调用方：构建脚本（静态密钥）或小程序端白名单用户（JWT）。
+enum ReviewControlActor {
+    Script,
+    MiniProgramUser,
+}
+
+/// PUT review-status 双通道鉴权：
+/// 1. 有效的 X-Api-Key（构建/运维脚本，与 allocate 一致）；
+/// 2. 有效的 Bearer JWT 且用户在 MINI_REVIEW_CONTROL_USER_IDS 白名单内（小程序「设置」入口）。
+fn authorize_review_control(
+    headers: &HeaderMap,
+    configured_key: &Option<String>,
+    token_port: &dyn crate::auth::ports::token_port::TokenPort,
+    control_user_ids: &[uuid::Uuid],
+) -> Result<ReviewControlActor, (StatusCode, String)> {
+    if authorize_api_key(headers, configured_key) {
+        return Ok(ReviewControlActor::Script);
+    }
+
+    if let Some(token) = extract_bearer_token(headers) {
+        return match token_port.verify_token(token) {
+            Ok(claims) if control_user_ids.contains(&claims.sub) => Ok(ReviewControlActor::MiniProgramUser),
+            Ok(_) => Err((StatusCode::FORBIDDEN, "当前账号无权切换审核状态".to_string())),
+            Err(_) => Err((StatusCode::UNAUTHORIZED, "请先登录".to_string())),
+        };
+    }
+
+    Err(api_key_unauthorized())
+}
+
+fn extract_bearer_token(headers: &HeaderMap) -> Option<&str> {
+    let header_value = headers.get(axum::http::header::AUTHORIZATION)?.to_str().ok()?;
+    header_value.strip_prefix("Bearer ")
+}
+
+/// 小程序端切换时的状态文案，与注册系统口径一致。
+fn mini_program_status_text(is_reviewing: bool) -> String {
+    if is_reviewing {
+        "审核中（小程序端切换）".to_string()
+    } else {
+        "已过审（小程序端切换）".to_string()
+    }
+}
+
 pub async fn set_review_status_handler(
     use_case: Arc<SetReviewStatusByProjectVersionUseCase>,
     configured_key: Option<String>,
+    token_port: std::sync::Arc<dyn crate::auth::ports::token_port::TokenPort>,
+    control_user_ids: Vec<uuid::Uuid>,
     headers: HeaderMap,
     Json(request): Json<SetReviewStatusRequest>,
 ) -> Result<Json<ReviewStatusDto>, (StatusCode, String)> {
-    if !authorize_api_key(&headers, &configured_key) {
-        return Err(api_key_unauthorized());
-    }
+    let actor = authorize_review_control(&headers, &configured_key, token_port.as_ref(), &control_user_ids)?;
+
+    let status_text = match actor {
+        ReviewControlActor::Script => request.status_text,
+        ReviewControlActor::MiniProgramUser => Some(mini_program_status_text(request.is_reviewing)),
+    };
 
     let status = use_case
         .execute(SetReviewStatusCommand {
             project_code: request.project_code,
             version: request.version,
             is_reviewing: request.is_reviewing,
-            status_text: request.status_text,
+            status_text,
         })
         .await
         .map_err(map_use_case_error)?;

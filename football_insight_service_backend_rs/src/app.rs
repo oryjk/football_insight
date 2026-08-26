@@ -20,8 +20,6 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
     let insight = build_insight(pool.clone());
     let admin_routes = build_admin_routes(pool.clone(), config);
     let health_routes = build_health_routes(pool.clone());
-    let mini_review_routes =
-        build_mini_review_routes(pool.clone(), config.mini_review_api_key.clone());
     let system_config = build_system_config_routes(pool.clone(), insight.repository.clone());
 
     let auth = build_auth(
@@ -69,6 +67,12 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
     );
 
     let auth_license_routes = build_auth_license_routes(pool.clone(), auth.token_port.clone());
+    let mini_review_routes = build_mini_review_routes(
+        pool.clone(),
+        config.mini_review_api_key.clone(),
+        auth.token_port.clone(),
+        config.mini_review_control_user_ids.clone(),
+    );
     let push_notification_routes = build_push_notification_routes(pool, auth.token_port.clone());
 
     Router::new()

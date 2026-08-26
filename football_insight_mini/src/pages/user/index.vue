@@ -259,6 +259,7 @@
             <text class="account-actions__label">账号管理</text>
             <text class="account-actions__caption">{{ loginPresentation.switchAccountCaption }}</text>
           </view>
+          <button v-if="settingsEntryVisible" class="settings-action" @click="settingsSheetVisible = true">设置</button>
           <button class="logout-action" @click="handleLogout">退出登录</button>
         </view>
       </template>
@@ -402,6 +403,8 @@
       @close="closeAiChat"
     />
 
+    <UserSettingsSheet v-if="settingsSheetVisible" @close="settingsSheetVisible = false" />
+
     <view v-if="showGuestChantWall" class="guest-chant-wall">
       <view class="guest-chant-wall__meta">
         <text class="guest-chant-wall__kicker">MATCHDAY AT PHOENIX HILL</text>
@@ -495,6 +498,8 @@ import {
 } from '../../utils/membershipRules'
 import { consumePostLoginRedirect, navigateToPostLoginTarget } from '../../utils/postLoginRedirect'
 import { useAiChatSheet } from '../../composables/useAiChatSheet'
+import { PRODUCT_OWNER_USER_ID } from '../../config/productOwner'
+import UserSettingsSheet from './components/UserSettingsSheet.vue'
 import {
   buildPasswordLoginPayload,
   resolveUserLoginPresentation,
@@ -509,6 +514,11 @@ const systemConfigUnderReview = ref(false)
 const notificationEmail = ref('')
 const notificationEmailForm = ref('')
 const notificationEmailSheetVisible = ref(false)
+const settingsSheetVisible = ref(false)
+// 「设置」入口只对产品负责人账号显示（与后端 MINI_REVIEW_CONTROL_USER_IDS 白名单一致）。
+const settingsEntryVisible = computed(
+  () => !!currentUser.value && !!PRODUCT_OWNER_USER_ID && currentUser.value.id === PRODUCT_OWNER_USER_ID,
+)
 const notificationEmailSaving = ref(false)
 const {
   aiChatVisible,
@@ -1801,6 +1811,22 @@ onShow(() => {
 .notification-email-panel__action::after {
   border: none;
 }
+.settings-action {
+  width: 100%;
+  height: 78rpx;
+  padding: 0 26rpx;
+  border-radius: 999rpx;
+  border: 2rpx solid rgba(232, 233, 238, 0.95);
+  background: var(--fi-primitive-white);
+  color: var(--fi-color-text-secondary);
+  font-size: 26rpx;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .logout-action {
   width: 100%;
   height: 78rpx;

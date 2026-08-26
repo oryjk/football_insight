@@ -20,3 +20,17 @@ export function getMiniReviewStatus(
 ): Promise<MiniReviewStatus> {
   return request<MiniReviewStatus>({ url: buildMiniReviewStatusUrl(projectCode, version) })
 }
+
+// 白名单用户（后端 env MINI_REVIEW_CONTROL_USER_IDS）在「我的 → 设置」切换当前版本审核状态。
+export function putMiniReviewReviewStatus(
+  projectCode: string = MINI_REVIEW_PROJECT_CODE,
+  version: string = MINI_PROGRAM_VERSION,
+  isReviewing: boolean,
+): Promise<MiniReviewStatus> {
+  return request<MiniReviewStatus>({
+    url: '/mini-review/review-status',
+    method: 'PUT',
+    data: { project_code: projectCode, version, is_reviewing: isReviewing },
+    auth: true,
+  })
+}

@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DatabasePoolConfig {
@@ -100,6 +101,7 @@ pub struct AppConfig {
     pub admin_owner_password: String,
     pub admin_owner_display_name: String,
     pub mini_review_api_key: Option<String>,
+    pub mini_review_control_user_ids: Vec<Uuid>,
 }
 
 #[derive(Debug, Clone)]
@@ -199,6 +201,24 @@ impl AppConfig {
             .ok()
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty());
+        let mini_review_control_user_ids = std::env::var("MINI_REVIEW_CONTROL_USER_IDS")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .map(|value| {
+                value
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|item| !item.is_empty())
+                    .map(|item| {
+                        item.parse::<Uuid>().with_context(|| {
+                            format!("MINI_REVIEW_CONTROL_USER_IDS 包含无效的用户 UUID: {item}")
+                        })
+                    })
+                    .collect::<Result<Vec<Uuid>>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
 
         Ok(Self {
             port,
@@ -230,6 +250,7 @@ impl AppConfig {
             admin_owner_password,
             admin_owner_display_name,
             mini_review_api_key,
+            mini_review_control_user_ids,
         })
     }
 }

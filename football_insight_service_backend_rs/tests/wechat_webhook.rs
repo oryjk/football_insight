@@ -70,6 +70,7 @@ async fn wechat_webhook_verification_returns_plaintext_echo() {
             admin_owner_password: "test-owner-password".to_string(),
             admin_owner_display_name: "Test Owner".to_string(),
             mini_review_api_key: None,
+            mini_review_control_user_ids: Vec::new(),
         },
     );
 
