@@ -11,6 +11,7 @@ use crate::system_config::ports::system_config_port::SystemConfigPort;
 
 const PRODUCT_INTRO_ARTICLE_URL: &str = "https://mp.weixin.qq.com/s?__biz=MzA3Nzc1NTk1Mg==&mid=2247483892&idx=1&sn=c41ff0a1987269db51417a11d0c7b885";
 const WECHAT_INVITE_REPLY_TEMPLATE_KEY: &str = "wechat_invite_reply_template";
+const WECHAT_NEXT_MATCH_REPLY_ENABLED_KEY: &str = "wechat_next_match_reply_enabled";
 
 #[derive(Debug, Clone)]
 pub struct WechatVerificationInput {
@@ -138,16 +139,20 @@ impl HandleWechatWebhookUseCase {
                     "wechat next match id text command received"
                 );
 
-                let reply_content = match self
-                    .current_standard_match_port
-                    .fetch_current_match_id()
-                    .await
-                {
-                    Ok(Some(match_id)) => next_match_id_message(&match_id),
-                    Ok(None) => next_match_missing_message(),
-                    Err(error) => {
-                        tracing::warn!(error = %error, "failed to fetch current-standard match id");
-                        next_match_missing_message()
+                let reply_content = if !self.next_match_reply_enabled().await {
+                    next_match_missing_message()
+                } else {
+                    match self
+                        .current_standard_match_port
+                        .fetch_current_match_id()
+                        .await
+                    {
+                        Ok(Some(match_id)) => next_match_id_message(&match_id),
+                        Ok(None) => next_match_missing_message(),
+                        Err(error) => {
+                            tracing::warn!(error = %error, "failed to fetch current-standard match id");
+                            next_match_missing_message()
+                        }
                     }
                 };
 
@@ -274,6 +279,32 @@ impl HandleWechatWebhookUseCase {
 
         build_invite_code_message(invite_code, custom_template.as_deref())
     }
+
+    async fn next_match_reply_enabled(&self) -> bool {
+        match self
+            .system_config_port
+            .get_config_value(WECHAT_NEXT_MATCH_REPLY_ENABLED_KEY)
+            .await
+        {
+            Ok(value) => parse_switch(value.as_deref()),
+            Err(error) => {
+                tracing::warn!(
+                    error = %error,
+                    "failed to read wechat next match reply switch, treating as disabled"
+                );
+                false
+            }
+        }
+    }
+}
+
+fn parse_switch(value: Option<&str>) -> bool {
+    value.is_some_and(|item| {
+        matches!(
+            item.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        )
+    })
 }
 
 fn normalize_text_command(input: &str) -> String {
@@ -576,6 +607,14 @@ mod tests {
     #[derive(Default)]
     struct FakeSystemConfigPort {
         invite_reply_template: Option<String>,
+        next_match_reply_enabled: Option<String>,
+    }
+
+    fn next_match_enabled_config() -> FakeSystemConfigPort {
+        FakeSystemConfigPort {
+            next_match_reply_enabled: Some("true".to_string()),
+            ..FakeSystemConfigPort::default()
+        }
     }
 
     #[async_trait]
@@ -598,7 +637,57 @@ mod tests {
                 return Ok(self.invite_reply_template.clone());
             }
 
+            if config_key == "wechat_next_match_reply_enabled" {
+                return Ok(self.next_match_reply_enabled.clone());
+            }
+
             Ok(None)
+        }
+    }
+
+    struct FailingSystemConfigPort;
+
+    #[async_trait]
+    impl SystemConfigPort for FailingSystemConfigPort {
+        async fn get_public_config(&self) -> anyhow::Result<PublicSystemConfig> {
+            Ok(PublicSystemConfig::new(
+                false,
+                AiChatMode::BackendProxy,
+                HomeBriefingMarquees::default(),
+                default_membership_tier_rules(),
+            ))
+        }
+
+        async fn get_ai_chat_config(&self) -> anyhow::Result<AiChatSystemConfig> {
+            Ok(AiChatSystemConfig::default())
+        }
+
+        async fn get_config_value(&self, _config_key: &str) -> anyhow::Result<Option<String>> {
+            Err(anyhow::anyhow!("config store unavailable"))
+        }
+    }
+
+    struct RecordingCurrentStandardMatchPort {
+        calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl RecordingCurrentStandardMatchPort {
+        fn new() -> Self {
+            Self {
+                calls: std::sync::atomic::AtomicUsize::new(0),
+            }
+        }
+
+        fn calls(&self) -> usize {
+            self.calls.load(std::sync::atomic::Ordering::SeqCst)
+        }
+    }
+
+    #[async_trait]
+    impl CurrentStandardMatchPort for RecordingCurrentStandardMatchPort {
+        async fn fetch_current_match_id(&self) -> anyhow::Result<Option<String>> {
+            self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(Some("MATCH_2026_001".to_string()))
         }
     }
 
@@ -702,7 +791,7 @@ mod tests {
             Arc::new(FakeRepository::default()),
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
-            Arc::new(FakeSystemConfigPort::default()),
+            Arc::new(next_match_enabled_config()),
         );
 
         let result = use_case
@@ -729,7 +818,7 @@ mod tests {
             Arc::new(FakeRepository::default()),
             Arc::new(FakeCryptoPort),
             Arc::new(FakeMissingCurrentStandardMatchPort),
-            Arc::new(FakeSystemConfigPort::default()),
+            Arc::new(next_match_enabled_config()),
         );
 
         let result = use_case
@@ -747,12 +836,117 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn handle_next_match_id_text_message_returns_missing_reply_when_switch_disabled() {
+        let current_match_port = Arc::new(RecordingCurrentStandardMatchPort::new());
+        let use_case = HandleWechatWebhookUseCase::new(
+            Arc::new(FakeRepository::default()),
+            Arc::new(FakeCryptoPort),
+            current_match_port.clone(),
+            Arc::new(FakeSystemConfigPort::default()),
+        );
+
+        let result = use_case
+            .handle_message(WechatMessageInput {
+                signature: "sig".to_string(),
+                timestamp: "1".to_string(),
+                nonce: "2".to_string(),
+                body: "下一场id".to_string(),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(result.contains("暂未获取到下一场比赛 id"));
+        assert_eq!(current_match_port.calls(), 0);
+    }
+
+    #[tokio::test]
+    async fn handle_next_match_id_text_message_returns_missing_reply_when_switch_explicitly_false()
+    {
+        let current_match_port = Arc::new(RecordingCurrentStandardMatchPort::new());
+        let use_case = HandleWechatWebhookUseCase::new(
+            Arc::new(FakeRepository::default()),
+            Arc::new(FakeCryptoPort),
+            current_match_port.clone(),
+            Arc::new(FakeSystemConfigPort {
+                next_match_reply_enabled: Some("false".to_string()),
+                ..FakeSystemConfigPort::default()
+            }),
+        );
+
+        let result = use_case
+            .handle_message(WechatMessageInput {
+                signature: "sig".to_string(),
+                timestamp: "1".to_string(),
+                nonce: "2".to_string(),
+                body: "下一场id".to_string(),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(result.contains("暂未获取到下一场比赛 id"));
+        assert_eq!(current_match_port.calls(), 0);
+    }
+
+    #[tokio::test]
+    async fn handle_next_match_id_text_message_returns_match_id_when_switch_value_is_one() {
+        let use_case = HandleWechatWebhookUseCase::new(
+            Arc::new(FakeRepository::default()),
+            Arc::new(FakeCryptoPort),
+            Arc::new(FakeCurrentStandardMatchPort),
+            Arc::new(FakeSystemConfigPort {
+                next_match_reply_enabled: Some("1".to_string()),
+                ..FakeSystemConfigPort::default()
+            }),
+        );
+
+        let result = use_case
+            .handle_message(WechatMessageInput {
+                signature: "sig".to_string(),
+                timestamp: "1".to_string(),
+                nonce: "2".to_string(),
+                body: "下一场id".to_string(),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(result.contains("MATCH_2026_001"));
+    }
+
+    #[tokio::test]
+    async fn handle_next_match_id_text_message_treats_config_error_as_disabled() {
+        let current_match_port = Arc::new(RecordingCurrentStandardMatchPort::new());
+        let use_case = HandleWechatWebhookUseCase::new(
+            Arc::new(FakeRepository::default()),
+            Arc::new(FakeCryptoPort),
+            current_match_port.clone(),
+            Arc::new(FailingSystemConfigPort),
+        );
+
+        let result = use_case
+            .handle_message(WechatMessageInput {
+                signature: "sig".to_string(),
+                timestamp: "1".to_string(),
+                nonce: "2".to_string(),
+                body: "下一场id".to_string(),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(result.contains("暂未获取到下一场比赛 id"));
+        assert_eq!(current_match_port.calls(), 0);
+    }
+
+    #[tokio::test]
     async fn handle_next_match_id_text_message_accepts_whitespace_and_uppercase() {
         let use_case = HandleWechatWebhookUseCase::new(
             Arc::new(FakeRepository::default()),
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
-            Arc::new(FakeSystemConfigPort::default()),
+            Arc::new(next_match_enabled_config()),
         );
 
         let result = use_case
@@ -775,7 +969,7 @@ mod tests {
             Arc::new(FakeRepository::default()),
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
-            Arc::new(FakeSystemConfigPort::default()),
+            Arc::new(next_match_enabled_config()),
         );
 
         let result = use_case
@@ -826,7 +1020,7 @@ mod tests {
             Arc::new(FakeRepository::default()),
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
-            Arc::new(FakeSystemConfigPort::default()),
+            Arc::new(next_match_enabled_config()),
         );
 
         let result = use_case
@@ -849,7 +1043,7 @@ mod tests {
             Arc::new(FakeRepository::default()),
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
-            Arc::new(FakeSystemConfigPort::default()),
+            Arc::new(next_match_enabled_config()),
         );
 
         let result = use_case
@@ -904,7 +1098,7 @@ mod tests {
             Arc::new(FakeRepository::default()),
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
-            Arc::new(FakeSystemConfigPort::default()),
+            Arc::new(next_match_enabled_config()),
         );
 
         let result = use_case
@@ -976,6 +1170,7 @@ mod tests {
                     "自定义入口\n邀请码：{invite_code}\n微信搜索小程序【洞察足球集散地】"
                         .to_string(),
                 ),
+                ..FakeSystemConfigPort::default()
             }),
         );
 
@@ -1003,6 +1198,7 @@ mod tests {
             Arc::new(FakeCurrentStandardMatchPort),
             Arc::new(FakeSystemConfigPort {
                 invite_reply_template: Some("只有入口，没有邀请码".to_string()),
+                ..FakeSystemConfigPort::default()
             }),
         );
 

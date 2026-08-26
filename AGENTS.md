@@ -46,8 +46,9 @@
 
 ## 当前部署约定
 
-- 线上域名入口：`peiqian`（`match.oryjk.cn` DNS 直接解析到 peiqian）；`jd` 为备用入口，其 Nginx 把 `/api/v1/` 反代到 peiqian
-- 后端发版必须 `jd`、`peiqian` 两台都执行，只发 `jd` 线上不生效
+- 线上域名入口：`jd`（`match.oryjk.cn` DNS 解析到 jd 公网 IP 117.72.164.211）；jd 的 Nginx 把 `/api/v1/`、`/football/wechat/webhook` 反代到 `peiqian`（内网 10.8.10.2:8092），`/football/` 前端静态资源由 jd 本地直接服务
+- 真正承接线上 API / 公众号 webhook 流量的后端是 `peiqian` 上的 Docker 容器；发版 `peiqian` 即对线上生效。jd 上也保留一个后端容器但不在流量路径上（备用，无需每次同步发版）
+- 生产数据库 `football-data-postgres` 运行在 `peiqian`；后端迁移在 `peiqian` 上用 `cargo run --bin run_migrations` 应用（`_sqlx_migrations` 表记账），部署脚本不会自动跑迁移
 - 生产 monorepo 目录：`/root/projects/football_insight`
 - 后端项目目录：`/root/projects/football_insight/football_insight_service_backend_rs`
 - 前端静态目录：`/root/docker_data/nginx/html/football/`
