@@ -48,7 +48,7 @@ src/pages/<domain>/
 - 后端数据到展示模型的转换放页面 `helpers.ts`；跨页面复用的放 `src/utils/`。不要把转换逻辑散落在模板里。
 - API 原子封装始终在 `src/api/<domain>.ts`；页面级 API 编排才放 `*Actions.ts` / `use*Page.ts`。
 - 非声明式页面或组件超过约 **600 行**要主动评估拆分；超过约 **1000 行**必须按「页面编排 / 局部组件 / actions / helpers」小步拆分。
-- 当前超标页面（重构 backlog，触碰时优先拆分，不要顺手再加量）：`ticket-watch`（4000+ 行）、`home`（3000+ 行）、`user`（2700+ 行）、`seat-swap`（1700+ 行）、`insights`、`matches`（1000+ 行）。
+- 当前超标页面（重构 backlog，触碰时优先拆分，不要顺手再加量）：`ticket-watch`（4000+ 行）、`user`（2700+ 行）、`seat-swap`（1700+ 行）。`home` 已按局部组件模式拆分完成（2026-08，`index.vue` 只做编排 + `components/` 十个局部组件），可作为拆分参考样板。
 - 单次任务只做增量拆分或增量迁移，**不要顺手重写整套页面风格或路由结构**。
 
 ## Design token 规范

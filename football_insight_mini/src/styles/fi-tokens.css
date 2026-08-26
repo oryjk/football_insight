@@ -8,8 +8,10 @@ page {
   /* ===== Primitive：原始色值（不直接在页面引用） ===== */
   --fi-primitive-white: #ffffff;
   --fi-primitive-red: #dc2626;
+  --fi-primitive-red-rgb: 220, 38, 38;
   --fi-primitive-red-deep: #b91c1c;
   --fi-primitive-red-darker: #991b1b;
+  --fi-primitive-green: #26a269;
   --fi-primitive-ink: #15161b;
   --fi-primitive-ink-deep: #121212;
   --fi-primitive-grey-text: #8f9198;
@@ -40,6 +42,7 @@ page {
   --fi-color-page: var(--fi-primitive-canvas);
   --fi-color-page-soft: var(--fi-primitive-canvas-soft);
   --fi-color-overlay: rgba(var(--fi-primitive-ink-rgb), 0.46);
+  --fi-color-success-accent: var(--fi-primitive-green);
 
   /* ===== Component：组件契约（新组件样式引用这一层） ===== */
   --fi-component-btn-bg: var(--fi-color-primary);

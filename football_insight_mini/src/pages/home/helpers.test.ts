@@ -8,6 +8,11 @@ import type {
   RoundReference,
 } from '../../types/insight'
 import {
+  buildHomeBriefingItems,
+  buildHomeHeadlineBody,
+  buildHomeHeroGuide,
+  buildHomeWatchPoints,
+  formatHomeTeamSeasonRecord,
   formatHomePulseCornerText,
   resolveHomePulseTechStats,
   resolveHomeTeamSeasonMatches,
@@ -664,5 +669,116 @@ describe('resolveHomeTeamSeasonMatches', () => {
       resultLabel: '平',
       resultTone: 'draw',
     })
+  })
+})
+
+describe('buildHomeHeroGuide', () => {
+  const leaders = { topTeamNames: ['上海海港'], topScorerNames: ['武磊'], source: 'live' as const }
+
+  test('combines team, scorer and finished lead match', () => {
+    const guide = buildHomeHeroGuide({
+      guideLeaders: leaders,
+      leadMatch: { status: 'finished' },
+    })
+
+    expect(guide).toEqual({
+      mode: 'team-and-scorer-with-match',
+      topTeamName: '上海海港',
+      topScorerName: '武磊',
+    })
+  })
+
+  test('marks live lead match explicitly', () => {
+    const guide = buildHomeHeroGuide({
+      guideLeaders: leaders,
+      leadMatch: { status: 'live' },
+    })
+
+    expect(guide.mode).toBe('team-and-scorer-with-live-match')
+  })
+
+  test('falls back to team-and-scorer without lead match', () => {
+    const guide = buildHomeHeroGuide({ guideLeaders: leaders, leadMatch: null })
+
+    expect(guide.mode).toBe('team-and-scorer')
+  })
+
+  test('falls back to generic copy when leaders missing', () => {
+    const guide = buildHomeHeroGuide({
+      guideLeaders: { topTeamNames: [], topScorerNames: [], source: 'live' },
+      leadMatch: { status: 'finished' },
+    })
+
+    expect(guide.mode).toBe('fallback')
+  })
+})
+
+describe('buildHomeBriefingItems', () => {
+  test('builds leader/scorer/assist items and skips missing ones', () => {
+    const items = buildHomeBriefingItems({
+      topTeam: { team_name: '上海海港', points: 30 },
+      leadingTeams: [{ team_name: '上海海港', points: 30, avatar_storage_url: 'a.png' }],
+      topScorer: { player_name: '武磊', score_value: '12' },
+      leadingScorers: [
+        { player_name: '武磊', team_name: '上海海港', score_value: '12', avatar_storage_url: 'b.png' },
+        { player_name: '队友', team_name: '上海海港', score_value: '12', avatar_storage_url: 'c.png' },
+      ],
+      topAssist: null,
+      leadingAssists: [],
+    })
+
+    expect(items.map(item => item.accent)).toEqual(['leader', 'scorer'])
+    expect(items[0].metricLabel).toBe('分领跑')
+    expect(items[1].metricLabel).toBe('球并列头名')
+    expect(items[1].entities.length).toBe(2)
+  })
+})
+
+describe('buildHomeHeadlineBody', () => {
+  test('prefers backend summary', () => {
+    expect(buildHomeHeadlineBody({ summary: '后端摘要', topScorer: null })).toBe('后端摘要')
+  })
+
+  test('derives copy from top scorer', () => {
+    expect(buildHomeHeadlineBody({ summary: null, topScorer: { player_name: '武磊' } }).includes('武磊')).toBe(true)
+  })
+
+  test('falls back to generic copy', () => {
+    expect(buildHomeHeadlineBody({ summary: null, topScorer: null }).includes('积分榜头部')).toBe(true)
+  })
+})
+
+describe('buildHomeWatchPoints', () => {
+  test('prefers backend bullets', () => {
+    expect(buildHomeWatchPoints({ bullets: ['a'], leadMatch: null, topTeam: null, topScorer: null, secondScorer: null }))
+      .toEqual(['a'])
+  })
+
+  test('derives points from lead match and standings', () => {
+    const items = buildHomeWatchPoints({
+      bullets: [],
+      leadMatch: { status: 'live', home_team_name: '甲', away_team_name: '乙' },
+      topTeam: { team_name: '上海海港' },
+      topScorer: { player_name: '武磊' },
+      secondScorer: { player_name: '对手' },
+    })
+
+    expect(items.length).toBe(3)
+    expect(items[0].includes('进行中焦点')).toBe(true)
+  })
+})
+
+describe('formatHomeTeamSeasonRecord', () => {
+  test('counts only finished results', () => {
+    const record = formatHomeTeamSeasonRecord([
+      { resultTone: 'win' },
+      { resultTone: 'win' },
+      { resultTone: 'draw' },
+      { resultTone: 'loss' },
+      { resultTone: 'live' },
+      { resultTone: 'scheduled' },
+    ])
+
+    expect(record).toBe('2胜 1平 1负')
   })
 })
