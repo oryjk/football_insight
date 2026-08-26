@@ -24,7 +24,13 @@ COPY src ./src
 COPY migrations ./migrations
 COPY .env.example ./.env.example
 
-RUN cargo build --release --locked
+# Cache mounts persist the cargo registry and target dir across builds, so
+# dependencies are not re-downloaded/recompiled when only src changes.
+# target/ lives only in the cache volume, so the binary must be copied out here.
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/app/target \
+    cargo build --release --locked \
+    && cp target/release/football_insight_service_backend_rs /usr/local/bin/football_insight_service_backend_rs
 
 FROM docker.m.daocloud.io/library/debian:bookworm-slim
 
@@ -40,7 +46,7 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
     && mkdir -p /app/logs \
     && chown -R appuser:appuser /app
 
-COPY --from=builder /app/target/release/football_insight_service_backend_rs /usr/local/bin/football_insight_service_backend_rs
+COPY --from=builder /usr/local/bin/football_insight_service_backend_rs /usr/local/bin/football_insight_service_backend_rs
 COPY migrations ./migrations
 
 RUN chmod +x /usr/local/bin/football_insight_service_backend_rs \
