@@ -15,17 +15,11 @@
       </view>
 
       <template v-else>
-        <view class="hero-card">
-          <view class="hero-card__icon-box">
-            <text class="hero-card__icon-mark">↔</text>
-          </view>
-          <view class="hero-card__body">
-            <text class="eyebrow">当前比赛 · 换座撮合</text>
-            <text class="hero-card__title">{{ matchTitle }}</text>
-            <text v-if="matchSummary" class="hero-card__summary">{{ matchSummary }}</text>
-          </view>
-          <text class="meta-pill">{{ candidatesCount }} 条意向</text>
-        </view>
+        <SeatSwapHero
+          :match-title="matchTitle"
+          :match-summary="matchSummary"
+          :candidates-count="candidatesCount"
+        />
 
         <view v-if="!currentView?.available" class="info-row">
           <text class="info-row__text">换座撮合只在成都蓉城当前比赛开放。</text>
@@ -35,274 +29,54 @@
           <button class="info-row__action" @tap="goToUserPage">去登录</button>
         </view>
 
-        <view class="seat-map-panel">
-          <view class="seat-map-panel__head">
-            <text class="seat-map-panel__title">座位区域</text>
-            <text class="seat-map-panel__hint">点分区可切换</text>
-          </view>
-          <view class="stadium-wrap">
-            <StadiumMap
-              :mode="mainMapMode"
-              :regions="regions"
-              :badges="regionBadgeCounts"
-              :filter-key="browsingFilterKey"
-              :current-key="currentView?.my_request?.current_region_key || ''"
-              :desired-keys="myDesiredKeys"
-              @region-tap="handleMainMapTap"
-            />
-          </view>
-          <view class="legend">
-            <view class="legend__items">
-              <template v-if="currentView?.my_request">
-                <view class="legend__item">
-                  <view class="legend__dot legend__dot--current"></view>
-                  <text>当前座位</text>
-                </view>
-                <view class="legend__item">
-                  <view class="legend__dot legend__dot--desired"></view>
-                  <text>目标座位</text>
-                </view>
-              </template>
-              <view v-else class="legend__item">
-                <view class="legend__dot legend__dot--hot"></view>
-                <text>有发布</text>
-              </view>
-            </view>
-            <text class="legend__hint">点分区可筛选</text>
-          </view>
-        </view>
+        <SeatSwapRegionPanel
+          :mode="mainMapMode"
+          :regions="regions"
+          :badges="regionBadgeCounts"
+          :filter-key="browsingFilterKey"
+          :current-key="currentView?.my_request?.current_region_key || ''"
+          :desired-keys="myDesiredKeys"
+          :has-my-request="!!currentView?.my_request"
+          @region-tap="handleMainMapTap"
+        />
 
-        <view v-if="browsingFilterKey" class="filter-row">
-          <view class="filter-row__main">
-            <text class="filter-row__label">目标座位 {{ browsingFilterName || browsingFilterKey }}</text>
-            <text class="filter-row__count">{{ filteredCandidates.length }} 条</text>
-          </view>
-          <button class="filter-row__clear" @tap="clearFilter">✕ 清除</button>
-        </view>
-
-        <template v-if="!browsingFilterKey">
-          <view class="section-row">
-            <text class="section-row__title">换座池</text>
-            <text class="section-row__sub">共 {{ candidatesCount }} 条</text>
-          </view>
-
-          <view v-if="!seatSwapRegionGroups.length" class="empty-row">
-            <text>当前还没有换座意向。</text>
-          </view>
-
-          <template v-for="group in seatSwapRegionGroups" :key="group.region_key">
-            <view
-              :id="buildSeatSwapRegionAnchorId(group.region_key)"
-              class="group-row"
-              :class="{ 'group-row--open': isRegionGroupExpanded(group.region_key) }"
-              @tap="toggleRegionGroup(group.region_key)"
-            >
-              <view class="group-row__main">
-                <text class="group-row__name">{{ group.region_name }}</text>
-                <text class="group-row__count">{{ group.requests.length }} 条</text>
-                <text v-if="groupHasMyDesired(group)" class="group-row__hit">命中目标座位</text>
-              </view>
-              <text class="group-row__caret">{{ isRegionGroupExpanded(group.region_key) ? '收起' : '展开' }}</text>
-            </view>
-            <template v-if="isRegionGroupExpanded(group.region_key)">
-              <SeatSwapCandidateCard
-                v-for="candidate in group.requests"
-                :key="candidate.request_id"
-                :candidate="candidate"
-                :action="candidateAction(candidate)"
-                @confirm="confirmCandidate"
-                @cancel-confirmation="cancelCandidateConfirmation"
-                @matched-cancel="openMatchedCancelForCandidate"
-              />
-            </template>
-          </template>
-        </template>
-
-        <template v-else>
-          <view v-if="!filteredCandidates.length" class="empty-row">
-            <text>该分区暂无换座意向。</text>
-          </view>
-          <SeatSwapCandidateCard
-            v-for="candidate in filteredCandidates"
-            :key="candidate.request_id"
-            :candidate="candidate"
-            :action="candidateAction(candidate)"
-            @confirm="confirmCandidate"
-            @cancel-confirmation="cancelCandidateConfirmation"
-            @matched-cancel="openMatchedCancelForCandidate"
-          />
-        </template>
+        <SeatSwapPoolList
+          :groups="seatSwapRegionGroups"
+          :expanded-keys="expandedRegionKeys"
+          :filter-key="browsingFilterKey"
+          :filter-name="browsingFilterName"
+          :filtered-candidates="filteredCandidates"
+          :total-count="candidatesCount"
+          :my-desired-keys="myDesiredKeys"
+          :is-logged-in="isLoggedIn"
+          :my-request-id="currentView?.my_request?.request_id ?? null"
+          @toggle-group="toggleRegionGroup"
+          @clear-filter="clearFilter"
+          @confirm="confirmCandidate"
+          @cancel-confirmation="cancelCandidateConfirmation"
+          @matched-cancel="openMatchedCancelForCandidate"
+        />
       </template>
     </view>
 
-    <view v-if="!loading && !errorMessage && currentView?.available" class="dock">
-      <button
-        v-if="!currentView?.my_request"
-        class="dock-cta"
-        @tap="handleDockCtaTap"
-      >
-        <text class="dock-cta__icon">+</text>
-        <text class="dock-cta__label">{{ isLoggedIn ? '发布我的换座' : '登录后发布' }}</text>
-      </button>
-      <view v-else class="dock-status" @tap="openManageSheet">
-        <view class="dock-status__body">
-          <view class="dock-status__dot"></view>
-          <text class="dock-status__seat dock-status__seat--current">{{ formatSeatLabel(currentView.my_request) }}</text>
-          <text class="dock-status__arrow">→</text>
-          <text class="dock-status__seat dock-status__seat--desired">{{ myDesiredSummary }}</text>
-          <text class="dock-status__manage">管理 ›</text>
-        </view>
-      </view>
-    </view>
+    <SeatSwapDock
+      v-if="!loading && !errorMessage && currentView?.available"
+      :has-my-request="!!currentView?.my_request"
+      :is-logged-in="isLoggedIn"
+      :current-seat-label="myRequestSeatLabel"
+      :desired-summary="myDesiredSummary"
+      @cta="handleDockCtaTap"
+      @manage="openManageSheet"
+    />
 
-    <FiBottomSheet
+    <SeatSwapPublishSheet
       v-model:visible="publishSheetVisible"
-      :eyebrow="publishSheetEyebrow"
-      :title="publishSheetTitle"
-      height="76vh"
-      compact-footer
-    >
-      <view class="steps">
-        <view
-          v-for="item in selectionSteps"
-          :key="item.step"
-          class="steps__item"
-          :class="{
-            'steps__item--active': selectionStep === item.step,
-            'steps__item--done': item.index < selectionStepIndex,
-          }"
-          @tap="jumpToStep(item.step)"
-        >
-          <text>{{ item.index }} · {{ item.label }}</text>
-        </view>
-      </view>
-
-      <StadiumMap
-        :mode="sheetMapMode"
-        :regions="regions"
-        :staged-current-key="stagedCurrentRegionKey"
-        :staged-desired-keys="stagedDesiredKeys"
-        :current-key="form.current_region_key"
-        :desired-keys="confirmedDesiredKeys"
-        @region-tap="handleSheetMapTap"
-      />
-
-      <template v-if="selectionStep === 'select_current'">
-        <view class="selected-tags">
-          <text
-            v-if="stagedCurrentRegionName"
-            class="tag tag--region"
-            :class="regionTagClass(stagedCurrentRegionName)"
-          >
-            已选 · {{ stagedCurrentRegionName }}
-          </text>
-          <text v-else class="tag tag--empty">先点球场中的当前分区</text>
-        </view>
-        <view class="row-input">
-          <view class="row-input__field">
-            <text class="row-input__label">当前排</text>
-            <input v-model="form.current_row" class="input-box" placeholder="如 8" />
-            <text v-if="formErrors.current_row" class="field-error">{{ formErrors.current_row }}</text>
-          </view>
-          <view class="row-input__field">
-            <text class="row-input__label">当前号</text>
-            <input v-model="form.current_seat_no" class="input-box" placeholder="如 15" />
-            <text v-if="formErrors.current_seat_no" class="field-error">{{ formErrors.current_seat_no }}</text>
-          </view>
-        </view>
-        <text v-if="formErrors.current_region_key" class="field-error">{{ formErrors.current_region_key }}</text>
-      </template>
-
-      <template v-else-if="selectionStep === 'select_desired'">
-        <view class="seat-selection-group">
-          <text class="seat-selection-group__title">当前座位</text>
-          <view
-            class="current-seat-card tag--region"
-            :class="regionTagClass(form.current_region_name)"
-          >
-            <text class="current-seat-card__region">{{ form.current_region_name }}</text>
-            <text class="current-seat-card__meta">{{ form.current_row }}排</text>
-            <text class="current-seat-card__meta">{{ form.current_seat_no }}号</text>
-          </view>
-        </view>
-        <view class="selected-tags">
-          <text v-if="!stagedDesiredSeats.length" class="tag tag--empty">先点球场中的目标分区(可多选)</text>
-        </view>
-        <view v-if="stagedDesiredSeats.length" class="desired-rows">
-          <text class="seat-selection-group__title seat-selection-group__title--full">目标座位</text>
-          <view
-            v-for="seat in stagedDesiredSeats"
-            :key="`desired-${seat.region_key}`"
-            class="desired-rows__item tag--region"
-            :class="regionTagClass(seat.region_name)"
-          >
-            <text class="desired-rows__name">{{ seat.region_name }}</text>
-          </view>
-        </view>
-        <text v-if="formErrors.desired_seats" class="field-error">{{ formErrors.desired_seats }}</text>
-      </template>
-
-      <template v-else>
-        <view class="seat-selection-group">
-          <text class="seat-selection-group__title">当前座位</text>
-          <view
-            class="current-seat-card tag--region"
-            :class="regionTagClass(form.current_region_name)"
-          >
-            <text class="current-seat-card__region">{{ form.current_region_name }}</text>
-            <text class="current-seat-card__meta">{{ form.current_row }}排</text>
-            <text class="current-seat-card__meta">{{ form.current_seat_no }}号</text>
-          </view>
-        </view>
-        <view class="desired-rows desired-rows--summary">
-          <text class="seat-selection-group__title seat-selection-group__title--full">目标座位</text>
-          <view
-            v-for="seat in form.desired_seats"
-            :key="`summary-desired-${seat.region_key}`"
-            class="desired-rows__item tag--region"
-            :class="regionTagClass(seat.region_name)"
-          >
-            <text class="desired-rows__name">{{ seat.region_name }}</text>
-          </view>
-        </view>
-        <view class="row-input row-input--contact">
-          <view class="row-input__field">
-            <text class="row-input__label">微信号</text>
-            <input v-model="form.wechat_id" class="input-box" placeholder="至少填一项" />
-          </view>
-          <view class="row-input__field">
-            <text class="row-input__label">手机号</text>
-            <input v-model="form.phone_number" class="input-box" type="number" placeholder="11 位手机号" />
-          </view>
-        </view>
-        <text v-if="formErrors.contact" class="field-error">{{ formErrors.contact }}</text>
-        <text v-if="formErrors.phone_number" class="field-error">{{ formErrors.phone_number }}</text>
-      </template>
-
-      <template #footer>
-        <view class="sheet-actions">
-          <button v-if="selectionStep !== 'select_current'" class="btn-ghost" @tap="goPreviousSelectionStep">上一步</button>
-          <button
-            v-if="selectionStep === 'select_current'"
-            class="btn-primary"
-            :disabled="!canConfirmCurrentSelection"
-            @tap="confirmCurrentSelection"
-          >下一步 →</button>
-          <button
-            v-else-if="selectionStep === 'select_desired'"
-            class="btn-primary"
-            :disabled="!canConfirmDesiredSelection"
-            @tap="confirmDesiredSelection"
-          >下一步 →</button>
-          <button
-            v-else
-            class="btn-primary"
-            :disabled="submitting"
-            @tap="submitForm"
-          >{{ submitting ? '提交中...' : (currentView?.my_request ? '更新发布' : '发布换座') }}</button>
-        </view>
-      </template>
-    </FiBottomSheet>
+      :regions="regions"
+      :my-request="currentView?.my_request ?? null"
+      :preset-candidate="pendingConfirmTarget"
+      :submitting="submitting"
+      @submit="submitForm"
+    />
 
     <SeatSwapManageSheet
       v-model:visible="manageSheetVisible"
@@ -326,15 +100,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, reactive, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiAiChatSheet from '../../components/FiAiChatSheet.vue'
-import FiBottomSheet from '../../components/FiBottomSheet.vue'
-import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
-import SeatSwapCandidateCard from '../../components/SeatSwapCandidateCard.vue'
 import SeatSwapManageSheet from '../../components/SeatSwapManageSheet.vue'
-import StadiumMap from '../../components/StadiumMap.vue'
+import SeatSwapHero from './components/SeatSwapHero.vue'
+import SeatSwapRegionPanel from './components/SeatSwapRegionPanel.vue'
+import SeatSwapPoolList from './components/SeatSwapPoolList.vue'
+import SeatSwapDock from './components/SeatSwapDock.vue'
+import SeatSwapPublishSheet from './components/SeatSwapPublishSheet.vue'
+import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import {
   MINI_SEAT_SWAP_SUBSCRIBE_TEMPLATE_ID,
   cancelSeatSwapCandidateConfirmation,
@@ -345,34 +121,24 @@ import {
   cancelMatchedSeatSwap,
 } from '../../api/seatSwap'
 import { getTicketWatchRegions } from '../../api/ticketWatch'
-import type { SeatSwapCurrentResponse, SeatSwapCandidate } from '../../types/seatSwap'
+import type { SeatSwapCandidate, SeatSwapCurrentResponse } from '../../types/seatSwap'
 import type { TicketWatchRegion } from '../../types/ticketWatch'
 import { getAccessToken } from '../../utils/authStorage'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { formatDatetime } from '../../utils/format'
-import { resolveSeatSwapRegionColorGroup } from '../../utils/stadiumRegions'
 import { useAiChatSheet } from '../../composables/useAiChatSheet'
 import {
-  buildSeatSwapRegionAnchorId,
   buildSeatSwapMockCurrentResponse,
   buildSeatSwapMockRegions,
-  canConfirmCurrentSeatRegion,
-  canConfirmDesiredSeatRegions,
+  buildSeatSwapRegionAnchorId,
   countSeatSwapDesiredRegions,
   filterSeatSwapRequestsByDesiredRegion,
   filterOutMySeatSwapRequest,
   formatSeatLabel,
   groupSeatSwapRequestsByRegion,
-  hasSeatSwapFormErrors,
-  previousSeatSwapStep,
   resolveSeatSwapBrowseFilterKey,
-  resolveSeatSwapCandidateAction,
   resolveDefaultExpandedSeatSwapRegionKeys,
   statusLabel,
-  toggleDesiredSeatRegion,
-  validateSeatSwapForm,
-  type SeatSwapFormErrors,
-  type SeatSwapSelectionStep,
   type SeatSwapFormState,
 } from './helpers'
 
@@ -385,7 +151,6 @@ const errorMessage = ref('')
 const currentView = ref<SeatSwapCurrentResponse | null>(null)
 const regions = ref<TicketWatchRegion[]>([])
 const isLoggedIn = ref(false)
-const formErrors = ref<SeatSwapFormErrors>({})
 
 const publishSheetVisible = ref(false)
 const manageSheetVisible = ref(false)
@@ -394,9 +159,6 @@ const browsingFilterKey = ref('')
 const pageScrollLocked = computed(() => publishSheetVisible.value || manageSheetVisible.value)
 const pageLockStyle = computed(() => pageScrollLocked.value ? 'overflow: hidden;' : '')
 
-const selectionStep = ref<SeatSwapSelectionStep>('select_current')
-const stagedCurrentRegionKey = ref('')
-const stagedDesiredSeats = ref<SeatSwapFormState['desired_seats']>([])
 const expandedRegionKeys = ref<string[]>([])
 const pendingConfirmTarget = ref<SeatSwapCandidate | null>(null)
 const pendingMatchedCancelTargetId = ref('')
@@ -410,22 +172,6 @@ const {
 } = useAiChatSheet()
 
 const cancelReason = ref('')
-
-const form = reactive<SeatSwapFormState>({
-  current_region_key: '',
-  current_region_name: '',
-  current_row: '',
-  current_seat_no: '',
-  wechat_id: '',
-  phone_number: '',
-  desired_seats: [],
-})
-
-const selectionSteps: Array<{ step: SeatSwapSelectionStep; index: number; label: string }> = [
-  { step: 'select_current', index: 1, label: '当前' },
-  { step: 'select_desired', index: 2, label: '目标' },
-  { step: 'ready_to_publish', index: 3, label: '联系' },
-]
 
 const matchTitle = computed(() => {
   const m = currentView.value?.current_match
@@ -469,6 +215,10 @@ const myDesiredSummary = computed(() => {
   return names.length ? names.join(' / ') : '未选择'
 })
 
+const myRequestSeatLabel = computed(() =>
+  currentView.value?.my_request ? formatSeatLabel(currentView.value.my_request) : '',
+)
+
 const myRequestStatusLabel = computed(() => statusLabel(currentView.value?.my_request?.status || ''))
 
 const mainMapMode = computed<'browse' | 'filter' | 'published'>(() => {
@@ -476,45 +226,6 @@ const mainMapMode = computed<'browse' | 'filter' | 'published'>(() => {
   if (currentView.value?.my_request) return 'published'
   return 'browse'
 })
-
-const sheetMapMode = computed<'select-current' | 'select-desired' | 'review'>(() => {
-  if (selectionStep.value === 'select_current') return 'select-current'
-  if (selectionStep.value === 'select_desired') return 'select-desired'
-  return 'review'
-})
-
-const stagedCurrentRegionName = computed(() => findRegion(stagedCurrentRegionKey.value)?.block_name || '')
-const stagedDesiredKeys = computed<string[]>(() => stagedDesiredSeats.value.map((s) => s.region_key).filter(Boolean))
-const confirmedDesiredKeys = computed<string[]>(() => form.desired_seats.map((s) => s.region_key).filter(Boolean))
-const confirmedDesiredSummary = computed(() => {
-  const names = form.desired_seats.map((s) => s.region_name)
-  return names.length ? names.join(' / ') : '未选择'
-})
-
-const selectionStepIndex = computed(() => {
-  if (selectionStep.value === 'select_current') return 1
-  if (selectionStep.value === 'select_desired') return 2
-  return 3
-})
-
-const publishSheetEyebrow = computed(() => `第 ${selectionStepIndex.value} 步 / 共 3 步`)
-
-const publishSheetTitle = computed(() => {
-  if (selectionStep.value === 'select_current') return '点选当前座位分区'
-  if (selectionStep.value === 'select_desired') {
-    return pendingConfirmTarget.value ? '已为你预填目标座位分区' : '点选目标座位分区'
-  }
-  return '补充联系方式并发布'
-})
-
-const canConfirmCurrentSelection = computed(() =>
-  canConfirmCurrentSeatRegion(
-    stagedCurrentRegionKey.value,
-    form.current_row,
-    form.current_seat_no,
-  ),
-)
-const canConfirmDesiredSelection = computed(() => canConfirmDesiredSeatRegions(stagedDesiredSeats.value))
 
 function regionKey(region: TicketWatchRegion): string {
   return region.block_key || region.block_name
@@ -525,24 +236,6 @@ function findRegion(key: string): TicketWatchRegion | undefined {
   return regions.value.find((r) => regionKey(r) === key)
 }
 
-function regionTagClass(regionName: string): string {
-  return `tag--region-${resolveSeatSwapRegionColorGroup(regionName)}`
-}
-
-function groupHasMyDesired(group: { region_key: string }): boolean {
-  return myDesiredKeys.value.includes(group.region_key)
-}
-
-function candidateAction(c: SeatSwapCandidate): ReturnType<typeof resolveSeatSwapCandidateAction> {
-  const mineId = currentView.value?.my_request?.request_id
-  return resolveSeatSwapCandidateAction({
-    candidateStatus: c.status,
-    candidateRequestId: c.request_id,
-    myRequestId: mineId,
-    isLoggedIn: isLoggedIn.value,
-  })
-}
-
 function syncExpandedRegionKeys(): void {
   const available = seatSwapRegionGroups.value.map((g) => g.region_key)
   expandedRegionKeys.value = expandedRegionKeys.value.filter((k) => available.includes(k))
@@ -551,57 +244,12 @@ function syncExpandedRegionKeys(): void {
   }
 }
 
-function isRegionGroupExpanded(key: string): boolean {
-  return expandedRegionKeys.value.includes(key)
-}
-
 function toggleRegionGroup(key: string): void {
-  if (isRegionGroupExpanded(key)) {
+  if (expandedRegionKeys.value.includes(key)) {
     expandedRegionKeys.value = expandedRegionKeys.value.filter((k) => k !== key)
   } else {
     expandedRegionKeys.value = [...expandedRegionKeys.value, key]
   }
-}
-
-function resetFormForNewRequest(): void {
-  form.current_region_key = ''
-  form.current_region_name = ''
-  form.current_row = ''
-  form.current_seat_no = ''
-  form.wechat_id = ''
-  form.phone_number = ''
-  form.desired_seats = []
-  formErrors.value = {}
-  stagedCurrentRegionKey.value = ''
-  stagedDesiredSeats.value = []
-  selectionStep.value = 'select_current'
-  pendingConfirmTarget.value = null
-  miniProgramNoticeEnabled.value = false
-}
-
-function fillFormFromMine(): void {
-  const mine = currentView.value?.my_request
-  if (!mine) {
-    resetFormForNewRequest()
-    return
-  }
-  form.current_region_key = mine.current_region_key
-  form.current_region_name = mine.current_region_name
-  form.current_row = mine.current_row
-  form.current_seat_no = mine.current_seat_no
-  form.wechat_id = mine.contact?.wechat_id || ''
-  form.phone_number = mine.contact?.phone_number || ''
-  form.desired_seats = mine.desired_seats.map((s) => ({
-    region_key: s.region_key,
-    region_name: s.region_name,
-    desired_row: s.desired_row || '',
-    desired_seat_no: s.desired_seat_no || '',
-  }))
-  stagedCurrentRegionKey.value = mine.current_region_key
-  stagedDesiredSeats.value = form.desired_seats.map((s) => ({ ...s }))
-  formErrors.value = {}
-  selectionStep.value = 'ready_to_publish'
-  miniProgramNoticeEnabled.value = Boolean(mine.seat_swap_notice_enabled)
 }
 
 async function loadPage(): Promise<void> {
@@ -665,103 +313,12 @@ async function scrollToSeatSwapRegion(regionKey: string): Promise<void> {
   })
 }
 
-function handleSheetMapTap(key: string): void {
-  const region = findRegion(key)
-  if (!region) return
-  formErrors.value = {}
-  if (selectionStep.value === 'select_current') {
-    stagedCurrentRegionKey.value = key
-  } else if (selectionStep.value === 'select_desired') {
-    if (key === form.current_region_key) return
-    stagedDesiredSeats.value = toggleDesiredSeatRegion(stagedDesiredSeats.value, {
-      region_key: key,
-      region_name: region.block_name,
-    })
-  }
-}
-
-function confirmCurrentSelection(): void {
-  const errors: SeatSwapFormErrors = {}
-  if (!stagedCurrentRegionKey.value.trim()) {
-    errors.current_region_key = '请选择当前座位分区'
-  }
-  if (!form.current_row.trim()) {
-    errors.current_row = '请输入当前排号'
-  }
-  if (!form.current_seat_no.trim()) {
-    errors.current_seat_no = '请输入当前座号'
-  }
-  if (hasSeatSwapFormErrors(errors)) {
-    formErrors.value = errors
-    return
-  }
-
-  const region = findRegion(stagedCurrentRegionKey.value)
-  if (!region) {
-    formErrors.value = { current_region_key: '请选择当前座位分区' }
-    return
-  }
-  form.current_region_key = regionKey(region)
-  form.current_region_name = region.block_name
-  if (pendingConfirmTarget.value && stagedDesiredSeats.value.length) {
-    form.desired_seats = stagedDesiredSeats.value.map((s) => ({ ...s }))
-    selectionStep.value = 'ready_to_publish'
-    return
-  }
-  selectionStep.value = 'select_desired'
-}
-
-function confirmDesiredSelection(): void {
-  if (!canConfirmDesiredSeatRegions(stagedDesiredSeats.value)) {
-    formErrors.value = { desired_seats: '请选择目标座位分区' }
-    return
-  }
-  form.desired_seats = stagedDesiredSeats.value.map((s) => ({ ...s }))
-  selectionStep.value = 'ready_to_publish'
-}
-
-function goPreviousSelectionStep(): void {
-  if (selectionStep.value === 'ready_to_publish') {
-    stagedDesiredSeats.value = form.desired_seats.map((s) => ({ ...s }))
-  }
-  selectionStep.value = previousSeatSwapStep(selectionStep.value)
-}
-
-function jumpToStep(target: SeatSwapSelectionStep): void {
-  const order: SeatSwapSelectionStep[] = ['select_current', 'select_desired', 'ready_to_publish']
-  const currentIdx = order.indexOf(selectionStep.value)
-  const targetIdx = order.indexOf(target)
-  if (targetIdx >= currentIdx) return
-  if (target === 'select_current') {
-    stagedCurrentRegionKey.value = form.current_region_key || stagedCurrentRegionKey.value
-  } else if (target === 'select_desired') {
-    stagedDesiredSeats.value = form.desired_seats.map((s) => ({ ...s }))
-  }
-  selectionStep.value = target
-}
-
 function openPublishSheet(): void {
-  if (currentView.value?.my_request) {
-    fillFormFromMine()
-  } else {
-    resetFormForNewRequest()
-  }
   publishSheetVisible.value = true
 }
 
 function openPublishSheetForCandidate(candidate: SeatSwapCandidate): void {
-  resetFormForNewRequest()
   pendingConfirmTarget.value = candidate
-  stagedDesiredSeats.value = [
-    {
-      region_key: candidate.current_region_key,
-      region_name: candidate.current_region_name,
-      desired_row: candidate.current_row || '',
-      desired_seat_no: candidate.current_seat_no || '',
-    },
-  ]
-  form.desired_seats = stagedDesiredSeats.value.map((seat) => ({ ...seat }))
-  selectionStep.value = 'select_current'
   publishSheetVisible.value = true
 }
 
@@ -789,11 +346,8 @@ function handleDockCtaTap(): void {
   openPublishSheet()
 }
 
-async function submitForm(): Promise<void> {
-  const errors = validateSeatSwapForm(form)
-  formErrors.value = errors
-  if (hasSeatSwapFormErrors(errors)) return
-
+async function submitForm(payload: { form: SeatSwapFormState; presetCandidate: SeatSwapCandidate | null }): Promise<void> {
+  const form = payload.form
   submitting.value = true
   try {
     const subscribeAccepted = await requestSeatSwapSubscribeMessage()
@@ -812,13 +366,14 @@ async function submitForm(): Promise<void> {
         desired_seat_no: s.desired_seat_no || null,
       })),
     })
-    if (pendingConfirmTarget.value) {
-      await confirmSeatSwapCandidate(pendingConfirmTarget.value.request_id)
+    if (payload.presetCandidate) {
+      await confirmSeatSwapCandidate(payload.presetCandidate.request_id)
       uni.showToast({ title: '已确认换座', icon: 'success' })
     } else {
       uni.showToast({ title: '发布成功', icon: 'success' })
     }
     publishSheetVisible.value = false
+    pendingConfirmTarget.value = null
     await loadPage()
   } catch (err) {
     uni.showToast({ title: extractApiErrorMessage(err, '发布失败'), icon: 'none' })
@@ -841,7 +396,6 @@ async function deleteRequest(): Promise<void> {
         ),
       }
     }
-    resetFormForNewRequest()
     miniProgramNoticeEnabled.value = false
     uni.showToast({ title: '已撤销', icon: 'success' })
     await loadPage()
@@ -980,7 +534,7 @@ onShow(() => {
 .page-root {
   position: relative;
   min-height: 100vh;
-  background: #f7f8fa;
+  background: var(--fi-color-page-soft);
 }
 
 .page-bg-img {
@@ -1000,7 +554,7 @@ onShow(() => {
   width: 100%;
   height: 100vh;
   background:
-    linear-gradient(180deg, rgba(246, 247, 244, 0.24) 0%, rgba(247, 248, 250, 0.74) 32%, #f7f8fa 58%, #f7f8fa 100%);
+    linear-gradient(180deg, rgba(246, 247, 244, 0.24) 0%, rgba(247, 248, 250, 0.74) 32%, var(--fi-color-page-soft) 58%, var(--fi-color-page-soft) 100%);
   pointer-events: none;
   z-index: 0;
 }
@@ -1009,20 +563,20 @@ onShow(() => {
   position: relative;
   z-index: 1;
   min-height: calc(100vh - var(--fi-brand-nav-height));
-  padding-top: calc(var(--fi-brand-nav-height) + 28rpx);
-  padding-right: 24rpx;
+  padding-top: calc(var(--fi-brand-nav-height) + var(--fi-space-28));
+  padding-right: var(--fi-space-24);
   padding-bottom: 240rpx;
-  padding-left: 24rpx;
+  padding-left: var(--fi-space-24);
   box-sizing: border-box;
 }
 
 .state-card {
-  margin-top: 22rpx;
-  padding: 28rpx;
-  border: 1rpx solid rgba(232, 233, 238, 0.95);
-  border-radius: 28rpx;
+  margin-top: var(--fi-space-22);
+  padding: var(--fi-space-28);
+  border: 1rpx solid var(--fi-color-border-chip);
+  border-radius: var(--fi-radius-lg);
   background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 12rpx 26rpx rgba(26, 28, 36, 0.06);
+  box-shadow: var(--fi-shadow-soft);
   text-align: center;
 }
 
@@ -1030,108 +584,31 @@ onShow(() => {
   color: #b42318;
 }
 
-.hero-card {
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
-  padding: 24rpx;
-  border: 2rpx solid rgba(232, 233, 238, 0.95);
-  border-radius: 28rpx;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 12rpx 26rpx rgba(26, 28, 36, 0.06);
-  margin-bottom: 16rpx;
-}
-
-.hero-card__icon-box {
-  flex-shrink: 0;
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 18rpx;
-  background: #f6f7fb;
-  border: 2rpx solid rgba(232, 233, 238, 0.95);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.hero-card__icon-mark {
-  color: #4b515d;
-  font-size: 36rpx;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.hero-card__body {
-  flex: 1;
-  min-width: 0;
-}
-
-.eyebrow {
-  display: block;
-  color: #8f9198;
-  font-size: 20rpx;
-  font-weight: 400;
-}
-
-.hero-card__title {
-  display: block;
-  margin-top: 6rpx;
-  color: #121212;
-  font-size: 32rpx;
-  line-height: 1.18;
-  font-weight: 400;
-}
-
-.hero-card__summary {
-  display: block;
-  margin-top: 6rpx;
-  color: #8f9198;
-  font-size: 22rpx;
-  line-height: 1.45;
-}
-
-.meta-pill {
-  flex-shrink: 0;
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-  line-height: 1;
-  padding: 12rpx 20rpx;
-  border-radius: 999rpx;
-  border: 2rpx solid rgba(232, 233, 238, 0.95);
-  background: #f6f7fb;
-  color: #6d7280;
-  font-size: 22rpx;
-  font-weight: 400;
-}
-
 .info-row {
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  padding: 18rpx 22rpx;
-  margin-bottom: 14rpx;
-  border-radius: 24rpx;
-  background: #f6f7fb;
+  gap: var(--fi-space-12);
+  padding: var(--fi-space-18) var(--fi-space-22);
+  margin-bottom: var(--fi-space-14);
+  border-radius: var(--fi-radius-md);
+  background: var(--fi-color-page);
   border: 1rpx dashed rgba(207, 211, 220, 0.95);
 }
 
 .info-row__text {
   flex: 1;
-  color: #6d7280;
-  font-size: 24rpx;
-  line-height: 1.5;
+  color: var(--fi-color-text-secondary);
+  font-size: var(--fi-font-24);
+  line-height: var(--fi-leading-normal);
 }
 
 .info-row__action {
   flex-shrink: 0;
-  padding: 10rpx 20rpx;
-  border-radius: 999rpx;
-  background: #15161b;
-  color: #fff;
-  font-size: 22rpx;
+  padding: var(--fi-space-10) var(--fi-space-20);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-primitive-ink);
+  color: var(--fi-primitive-white);
+  font-size: var(--fi-font-22);
   font-weight: 400;
 }
 
@@ -1139,585 +616,20 @@ onShow(() => {
   border: 0;
 }
 
-.stadium-wrap {
-  margin: 0 -24rpx;
-}
-
-.seat-map-panel {
-  position: sticky;
-  top: var(--fi-brand-nav-height);
-  z-index: 5;
-  margin: 4rpx -24rpx 0;
-  padding: 10rpx 24rpx 6rpx;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 8rpx 20rpx rgba(26, 28, 36, 0.06);
-}
-
-.seat-map-panel__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16rpx;
-  padding: 0 4rpx 2rpx;
-}
-
-.seat-map-panel__title {
-  color: #121212;
-  font-size: 24rpx;
-  font-weight: 500;
-}
-
-.seat-map-panel__hint {
-  color: #8f9198;
-  font-size: 20rpx;
-}
-
-.legend {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2rpx 4rpx 6rpx;
-  color: #8f9198;
-  font-size: 22rpx;
-}
-
-.legend__items {
-  display: flex;
-  align-items: center;
-  gap: 22rpx;
-}
-
-.legend__item {
-  display: flex;
-  align-items: center;
-  gap: 6rpx;
-}
-
-.legend__dot {
-  display: inline-block;
-  width: 16rpx;
-  height: 16rpx;
-  border-radius: 50%;
-}
-
-.legend__dot--current {
-  background: #e23b2e;
-}
-
-.legend__dot--desired {
-  background: #1d8a55;
-}
-
-.legend__dot--hot {
-  background: #15161b;
-}
-
-.legend__hint {
-  color: #8f9198;
-}
-
-.section-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 20rpx 8rpx 12rpx;
-}
-
-.section-row__title {
-  color: #121212;
-  font-size: 30rpx;
-  font-weight: 400;
-}
-
-.section-row__sub {
-  color: #8f9198;
-  font-size: 22rpx;
-}
-
-.group-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18rpx;
-  padding: 22rpx 12rpx;
-  border-top: 1rpx solid rgba(232, 233, 238, 0.95);
-}
-
-.group-row:first-of-type {
-  border-top: 0;
-}
-
-.group-row__main {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  flex-wrap: wrap;
-}
-
-.group-row__name {
-  color: #121212;
-  font-size: 28rpx;
-  font-weight: 400;
-}
-
-.group-row__count {
-  color: #8f9198;
-  font-size: 22rpx;
-}
-
-.group-row__hit {
-  font-size: 20rpx;
-  padding: 4rpx 14rpx;
-  border-radius: 999rpx;
-  background: #eef8f2;
-  color: #167348;
-  border: 1rpx solid rgba(29, 138, 85, 0.3);
-}
-
-.group-row__caret {
-  flex-shrink: 0;
-  font-size: 22rpx;
-  color: #9aa0aa;
-  padding: 6rpx 4rpx;
-  line-height: 1.2;
-}
-
-.filter-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18rpx 8rpx;
-  margin-bottom: 8rpx;
-  border-bottom: 1rpx solid rgba(232, 233, 238, 0.95);
-}
-
-.filter-row__main {
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-}
-
-.filter-row__label {
-  color: #121212;
-  font-size: 28rpx;
-  font-weight: 400;
-}
-
-.filter-row__count {
-  color: #8f9198;
-  font-size: 22rpx;
-}
-
-.filter-row__clear {
-  flex-shrink: 0;
-  background: #f6f7fb;
-  border: 1rpx solid rgba(232, 233, 238, 0.95);
-  color: #6d7280;
-  padding: 8rpx 18rpx;
-  border-radius: 999rpx;
-  font-size: 22rpx;
-  font-weight: 400;
-}
-
-.filter-row__clear::after {
-  border: 0;
-}
-
-.empty-row {
-  padding: 32rpx 12rpx;
-  text-align: center;
-  color: #8f9198;
-  font-size: 24rpx;
-}
-
-.dock {
-  position: fixed;
-  left: 24rpx;
-  right: 24rpx;
-  bottom: calc(24rpx + var(--window-bottom));
-  z-index: 8;
-}
-
-.dock-cta {
-  width: 100%;
-  padding: 26rpx 30rpx;
-  border-radius: 28rpx;
-  background: #15161b;
-  color: #fff;
-  font-size: 28rpx;
-  font-weight: 400;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14rpx;
-  box-shadow: 0 16rpx 36rpx rgba(21, 22, 27, 0.2);
-  letter-spacing: 1rpx;
-}
-
-.dock-cta::after {
-  border: 0;
-}
-
-.dock-cta__icon {
-  flex-shrink: 0;
-  display: inline-flex;
-  width: 36rpx;
-  height: 36rpx;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  align-items: center;
-  justify-content: center;
-  font-size: 26rpx;
-  line-height: 1;
-}
-
-.dock-cta__label {
-  font-size: 28rpx;
-}
-
-.dock-status {
-  padding: 20rpx 22rpx;
-  border-radius: 26rpx;
-  background: #15161b;
-  color: #fff;
-  box-shadow: 0 16rpx 36rpx rgba(21, 22, 27, 0.32);
-}
-
-.dock-status__dot {
-  flex: 0 0 auto;
-  width: 14rpx;
-  height: 14rpx;
-  border-radius: 50%;
-  background: #9aa0aa;
-  box-shadow: 0 0 0 6rpx rgba(154, 160, 170, 0.18);
-}
-
-.dock-status__manage {
-  flex: 0 0 auto;
-  margin-left: auto;
-  font-size: 22rpx;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.84);
-  padding: 12rpx 18rpx;
-  border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.dock-status__body {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  flex-wrap: nowrap;
-  font-size: 22rpx;
-  min-width: 0;
-}
-
-.dock-status__seat {
-  min-width: 0;
-  padding: 8rpx 14rpx;
-  border-radius: 12rpx;
-  font-weight: 400;
-  line-height: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dock-status__seat--current {
-  background: #fff1f0;
-  color: #b42318;
-}
-
-.dock-status__seat--desired {
-  flex: 1 1 auto;
-  background: #eef8f2;
-  color: #167348;
-}
-
-.dock-status__arrow {
-  flex: 0 0 auto;
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.steps {
-  display: flex;
-  gap: 10rpx;
-  margin: 0 0 18rpx;
-}
-
-.steps__item {
-  flex: 1;
-  min-width: 0;
-  text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 64rpx;
-  padding: 12rpx 10rpx;
-  border-radius: 999rpx;
-  background: #f6f7fb;
-  border: 1rpx solid rgba(232, 233, 238, 0.95);
-  color: #6d7280;
-  font-size: 21rpx;
-  font-weight: 400;
-  line-height: 1.2;
-  box-sizing: border-box;
-}
-
-.steps__item--done {
-  background: #eef8f2;
-  border-color: rgba(29, 138, 85, 0.3);
-  color: #167348;
-}
-
-.steps__item--active {
-  background: #15161b;
-  color: #fff;
-  border-color: #15161b;
-}
-
-.selected-tags {
-  display: flex;
-  gap: 10rpx;
-  flex-wrap: wrap;
-  margin: 18rpx 0 0;
-}
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 8rpx 16rpx;
-  border-radius: 999rpx;
-  font-size: 22rpx;
-  font-weight: 400;
-  border: 1rpx solid transparent;
-  line-height: 1;
-}
-
-.tag--region {
-  border-radius: 12rpx;
-  border-color: transparent;
-  color: #fff;
-  font-weight: 900;
-  box-shadow: 0 8rpx 18rpx rgba(18, 25, 20, 0.18);
-}
-
-.tag--region-blue { background: #336fbd; }
-.tag--region-green { background: #46ab59; }
-.tag--region-purple { background: #6c369b; }
-.tag--region-yellow { background: #f4c23a; color: #17191f; }
-.tag--region-navy { background: #0f215e; }
-.tag--region-red { background: #ec3b20; }
-.tag--region-vip { background: #b90000; }
-.tag--region-muted { background: #d9dee7; color: #17191f; }
-
-.tag--empty {
-  background: #fff1f0;
-  color: #c52018;
-  border-color: rgba(226, 59, 46, 0.42);
-  border-style: dashed;
-}
-
-.seat-selection-group {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-  margin: 18rpx 0 0;
-}
-
-.seat-selection-group__title {
-  color: #6d7280;
-  font-size: 22rpx;
-  font-weight: 400;
-  line-height: 1;
-}
-
-.seat-selection-group__title--full {
-  width: 100%;
-}
-
-.current-seat-card {
-  display: inline-flex;
-  align-items: center;
-  gap: 10rpx;
-  min-height: 54rpx;
-  padding: 0 16rpx;
-  border-radius: 14rpx;
-  box-sizing: border-box;
-}
-
-.current-seat-card__region {
-  font-size: 24rpx;
-  font-weight: 900;
-}
-
-.current-seat-card__meta {
-  font-size: 24rpx;
-  font-weight: 900;
-}
-
-.row-input {
-  display: flex;
-  gap: 16rpx;
-  margin-top: 12rpx;
-}
-
-.row-input--contact {
-  margin-bottom: 22rpx;
-}
-
-.row-input--full {
-  flex-direction: column;
-}
-
-.row-input__field {
-  flex: 1;
-}
-
-.row-input__label {
-  display: block;
-  color: #6d7280;
-  font-size: 22rpx;
-  font-weight: 400;
-  margin-bottom: 6rpx;
-}
-
-.input-box {
-  width: 100%;
-  height: 72rpx;
-  padding: 0 18rpx;
-  background: #ffffff;
-  border: 1rpx solid rgba(232, 233, 238, 0.95);
-  border-radius: 16rpx;
-  font-size: 26rpx;
-  font-weight: 400;
-  color: #121212;
-  box-sizing: border-box;
-}
-
-.input-box--short {
-  width: 140rpx;
-  flex-shrink: 0;
-}
-
-.textarea {
-  width: 100%;
-  min-height: 140rpx;
-  padding: 14rpx 18rpx;
-  background: #ffffff;
-  border: 1rpx solid rgba(232, 233, 238, 0.95);
-  border-radius: 16rpx;
-  font-size: 26rpx;
-  color: #121212;
-  box-sizing: border-box;
-}
-
-.desired-rows {
-  margin-top: 12rpx;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10rpx;
-}
-
-.desired-rows--summary {
-  margin-top: 16rpx;
-}
-
-.desired-rows__item {
-  display: inline-flex;
-  align-items: center;
-  min-height: 54rpx;
-  padding: 0 16rpx;
-  border-radius: 14rpx;
-  box-sizing: border-box;
-  box-shadow: 0 8rpx 18rpx rgba(18, 25, 20, 0.14);
-}
-
-.desired-rows__name {
-  font-size: 24rpx;
-  font-weight: 900;
-}
-
-.field-error {
-  display: block;
-  margin-top: 12rpx;
-  color: #b42318;
-  font-size: 22rpx;
-}
-
-.btn-primary {
-  flex: 1;
-  padding: 20rpx;
-  border-radius: 999rpx;
-  background: #15161b;
-  color: #fff;
-  font-size: 28rpx;
-  font-weight: 400;
-  box-shadow: 0 8rpx 18rpx rgba(21, 22, 27, 0.12);
-}
-
-.btn-primary[disabled] {
-  background: #c5c9d2;
-  box-shadow: none;
-}
-
-.btn-primary--danger {
-  background: #b42318;
-}
-
-.btn-primary::after {
-  border: 0;
-}
-
-.btn-ghost {
-  flex-shrink: 0;
-  padding: 20rpx 28rpx;
-  border-radius: 999rpx;
-  background: #ffffff;
-  border: 1rpx solid rgba(232, 233, 238, 0.95);
-  color: #6d7280;
-  font-size: 26rpx;
-  font-weight: 400;
-}
-
-.btn-ghost--danger {
-  border-color: rgba(180, 35, 24, 0.3);
-  color: #b42318;
-  background: #fff7f6;
-}
-
-.btn-ghost::after {
-  border: 0;
-}
-
 .ghost-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-top: 16rpx;
-  padding: 12rpx 22rpx;
-  border-radius: 999rpx;
-  background: #ffffff;
-  border: 1rpx solid rgba(232, 233, 238, 0.95);
-  color: #6d7280;
-  font-size: 24rpx;
+  margin-top: var(--fi-space-16);
+  padding: var(--fi-space-12) var(--fi-space-22);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-primitive-white);
+  border: 1rpx solid var(--fi-color-border-chip);
+  color: var(--fi-color-text-secondary);
+  font-size: var(--fi-font-24);
 }
 
 .ghost-action::after {
   border: 0;
-}
-
-.sheet-actions {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-
-.sheet-actions .btn-primary:only-child {
-  width: 100%;
-  min-width: 0;
-  flex: 1 1 auto;
 }
 </style>
