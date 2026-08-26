@@ -6,7 +6,8 @@ use crate::{
     auth::ports::token_port::TokenPort,
     mini_review::{
         adapters::web::handlers::{
-            allocate_handler, get_review_status_handler, set_review_status_handler,
+            allocate_handler, can_control_review_handler, get_review_status_handler,
+            set_review_status_handler,
         },
         application::{
             allocate_review_version::AllocateReviewVersionUseCase,
@@ -32,6 +33,8 @@ pub fn mini_review_routes(
     let set_api_key = api_key.clone();
     let set_token_port = token_port.clone();
     let set_control_user_ids = control_user_ids.clone();
+    let can_control_token_port = token_port;
+    let can_control_user_ids = control_user_ids;
 
     Router::new()
         .route(
@@ -55,6 +58,16 @@ pub fn mini_review_routes(
             "/api/v1/mini-review/allocate",
             post(move |headers, body| {
                 allocate_handler(allocate_use_case.clone(), api_key.clone(), headers, body)
+            }),
+        )
+        .route(
+            "/api/v1/mini-review/can-control",
+            get(move |headers| {
+                can_control_review_handler(
+                    can_control_token_port.clone(),
+                    can_control_user_ids.clone(),
+                    headers,
+                )
             }),
         )
 }
@@ -88,7 +101,10 @@ mod tests {
 
     #[async_trait]
     impl MiniReviewRepository for FakeRepository {
-        async fn find_latest(&self, project_code: &str) -> anyhow::Result<Option<MiniReviewStatus>> {
+        async fn find_latest(
+            &self,
+            project_code: &str,
+        ) -> anyhow::Result<Option<MiniReviewStatus>> {
             let records = self.records.lock().unwrap();
             Ok(records
                 .iter()
@@ -116,7 +132,10 @@ mod tests {
             Ok(status)
         }
 
-        async fn update_status(&self, status: MiniReviewStatus) -> anyhow::Result<MiniReviewStatus> {
+        async fn update_status(
+            &self,
+            status: MiniReviewStatus,
+        ) -> anyhow::Result<MiniReviewStatus> {
             let mut records = self.records.lock().unwrap();
             let record = records
                 .iter_mut()
@@ -132,7 +151,9 @@ mod tests {
     }
 
     fn test_token_port() -> Arc<JwtTokenPort> {
-        Arc::new(JwtTokenPort::new("test-secret-for-mini-review-routes".to_string()))
+        Arc::new(JwtTokenPort::new(
+            "test-secret-for-mini-review-routes".to_string(),
+        ))
     }
 
     fn issue_user_token(port: &JwtTokenPort, user_id: Uuid) -> String {
@@ -167,8 +188,12 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
-        let payload: serde_json::Value =
-            serde_json::from_slice(&axum::body::to_bytes(response.into_body(), 1024 * 64).await.unwrap()).unwrap();
+        let payload: serde_json::Value = serde_json::from_slice(
+            &axum::body::to_bytes(response.into_body(), 1024 * 64)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
         assert_eq!(payload["is_reviewing"], false);
         assert_eq!(payload["status_text"], "未登记版本");
     }
@@ -227,8 +252,12 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
-        let payload: serde_json::Value =
-            serde_json::from_slice(&axum::body::to_bytes(response.into_body(), 1024 * 64).await.unwrap()).unwrap();
+        let payload: serde_json::Value = serde_json::from_slice(
+            &axum::body::to_bytes(response.into_body(), 1024 * 64)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
         assert_eq!(payload["version"], "1.0.55");
         assert_eq!(payload["is_reviewing"], true);
     }
@@ -264,7 +293,12 @@ mod tests {
             ))
             .await
             .expect("seed record");
-        let app = mini_review_routes(repository, Some("secret".to_string()), test_token_port(), Vec::new());
+        let app = mini_review_routes(
+            repository,
+            Some("secret".to_string()),
+            test_token_port(),
+            Vec::new(),
+        );
 
         let response = app
             .oneshot(
@@ -282,8 +316,12 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
-        let payload: serde_json::Value =
-            serde_json::from_slice(&axum::body::to_bytes(response.into_body(), 1024 * 64).await.unwrap()).unwrap();
+        let payload: serde_json::Value = serde_json::from_slice(
+            &axum::body::to_bytes(response.into_body(), 1024 * 64)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
         assert_eq!(payload["is_reviewing"], false);
         assert_eq!(payload["status_text"], "已过审");
     }
@@ -325,8 +363,12 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
-        let payload: serde_json::Value =
-            serde_json::from_slice(&axum::body::to_bytes(response.into_body(), 1024 * 64).await.unwrap()).unwrap();
+        let payload: serde_json::Value = serde_json::from_slice(
+            &axum::body::to_bytes(response.into_body(), 1024 * 64)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
         assert_eq!(payload["is_reviewing"], false);
         assert_eq!(payload["status_text"], "已过审（小程序端切换）");
     }
@@ -408,5 +450,85 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn can_control_reports_whitelisted_user_as_allowed() {
+        let user_id = Uuid::new_v4();
+        let token_port = test_token_port();
+        let token = issue_user_token(&token_port, user_id);
+        let app = app_with_whitelist(None, vec![user_id]);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .uri("/api/v1/mini-review/can-control")
+                    .header("authorization", format!("Bearer {token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let payload: serde_json::Value = serde_json::from_slice(
+            &axum::body::to_bytes(response.into_body(), 1024 * 64)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(payload["allowed"], true);
+    }
+
+    #[tokio::test]
+    async fn can_control_reports_user_outside_whitelist_as_not_allowed() {
+        let token_port = test_token_port();
+        let token = issue_user_token(&token_port, Uuid::new_v4());
+        let app = app_with_whitelist(None, vec![Uuid::new_v4()]);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .uri("/api/v1/mini-review/can-control")
+                    .header("authorization", format!("Bearer {token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let payload: serde_json::Value = serde_json::from_slice(
+            &axum::body::to_bytes(response.into_body(), 1024 * 64)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(payload["allowed"], false);
+    }
+
+    #[tokio::test]
+    async fn can_control_defaults_to_not_allowed_without_login() {
+        let response = app_with_whitelist(None, vec![Uuid::new_v4()])
+            .oneshot(
+                Request::builder()
+                    .method(Method::GET)
+                    .uri("/api/v1/mini-review/can-control")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let payload: serde_json::Value = serde_json::from_slice(
+            &axum::body::to_bytes(response.into_body(), 1024 * 64)
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(payload["allowed"], false);
     }
 }

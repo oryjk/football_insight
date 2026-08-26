@@ -82,8 +82,8 @@
         />
       </template>
 
-      <!-- 设置入口常驻：不受审核模式 / 登录状态影响，任何用户可见可点。 -->
-      <view class="panel settings-entry-panel" hover-class="settings-entry-panel--pressed" hover-stay-time="100" @click="openSettingsPage">
+      <!-- 设置入口仅管理员（后端白名单判定）可见；不受审核模式影响。 -->
+      <view v-if="isReviewController" class="panel settings-entry-panel" hover-class="settings-entry-panel--pressed" hover-stay-time="100" @click="openSettingsPage">
         <view class="settings-entry-panel__body">
           <text class="settings-entry-panel__title">设置</text>
           <text class="settings-entry-panel__caption">查看当前版本审核状态</text>
@@ -138,6 +138,7 @@ import {
   logout,
   updateNotificationEmail,
 } from '../../api/auth'
+import { canControlMiniReview } from '../../api/miniReview'
 import { getPublicSystemConfig } from '../../api/system'
 import type { CurrentUser, MiniWechatBindingRequiredResponse } from '../../types/auth'
 import type { PublicSystemConfig } from '../../types/system'
@@ -168,6 +169,8 @@ import { useAiChatSheet } from '../../composables/useAiChatSheet'
 import { buildPasswordLoginPayload, resolveUserLoginPresentation } from './loginHelpers'
 
 const hasLocalAccessToken = ref(Boolean(getAccessToken()))
+// 设置入口仅对 MINI_REVIEW_CONTROL_USER_IDS 白名单用户（管理员）可见。
+const isReviewController = ref(false)
 const loading = ref(hasLocalAccessToken.value)
 const currentUser = ref<CurrentUser | null>(null)
 const publicConfig = ref<PublicSystemConfig | null>(null)
@@ -328,6 +331,16 @@ async function loadUser(): Promise<void> {
     currentUser.value = userResult.value
   } else {
     currentUser.value = null
+  }
+
+  if (currentUser.value) {
+    try {
+      isReviewController.value = (await canControlMiniReview()).allowed
+    } catch {
+      isReviewController.value = false
+    }
+  } else {
+    isReviewController.value = false
   }
 
   if (notificationEmailResult.status === 'fulfilled') {

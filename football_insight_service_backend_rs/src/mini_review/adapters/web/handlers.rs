@@ -4,7 +4,8 @@ use axum::{Json, extract::Query, http::HeaderMap, http::StatusCode};
 
 use crate::mini_review::{
     adapters::web::dto::{
-        AllocateRequest, ReviewStatusDto, ReviewStatusQuery, SetReviewStatusRequest,
+        AllocateRequest, CanControlReviewResponse, ReviewStatusDto, ReviewStatusQuery,
+        SetReviewStatusRequest,
     },
     application::{
         allocate_review_version::{AllocateCommand, AllocateReviewVersionUseCase},
@@ -117,8 +118,13 @@ fn authorize_review_control(
 
     if let Some(token) = extract_bearer_token(headers) {
         return match token_port.verify_token(token) {
-            Ok(claims) if control_user_ids.contains(&claims.sub) => Ok(ReviewControlActor::MiniProgramUser),
-            Ok(_) => Err((StatusCode::FORBIDDEN, "当前账号无权切换审核状态".to_string())),
+            Ok(claims) if control_user_ids.contains(&claims.sub) => {
+                Ok(ReviewControlActor::MiniProgramUser)
+            }
+            Ok(_) => Err((
+                StatusCode::FORBIDDEN,
+                "当前账号无权切换审核状态".to_string(),
+            )),
             Err(_) => Err((StatusCode::UNAUTHORIZED, "请先登录".to_string())),
         };
     }
@@ -127,8 +133,25 @@ fn authorize_review_control(
 }
 
 fn extract_bearer_token(headers: &HeaderMap) -> Option<&str> {
-    let header_value = headers.get(axum::http::header::AUTHORIZATION)?.to_str().ok()?;
+    let header_value = headers
+        .get(axum::http::header::AUTHORIZATION)?
+        .to_str()
+        .ok()?;
     header_value.strip_prefix("Bearer ")
+}
+
+/// 「我的 → 设置」入口显隐判定：当前 JWT 用户是否在 MINI_REVIEW_CONTROL_USER_IDS 白名单。
+/// 未登录 / token 无效 / 不在白名单一律返回 allowed=false（200），让前端只隐藏入口、不弹错误。
+pub async fn can_control_review_handler(
+    token_port: Arc<dyn crate::auth::ports::token_port::TokenPort>,
+    control_user_ids: Vec<uuid::Uuid>,
+    headers: HeaderMap,
+) -> Json<CanControlReviewResponse> {
+    let allowed = extract_bearer_token(&headers)
+        .and_then(|token| token_port.verify_token(token).ok())
+        .is_some_and(|claims| control_user_ids.contains(&claims.sub));
+
+    Json(CanControlReviewResponse { allowed })
 }
 
 /// 小程序端切换时的状态文案，与注册系统口径一致。
@@ -148,7 +171,12 @@ pub async fn set_review_status_handler(
     headers: HeaderMap,
     Json(request): Json<SetReviewStatusRequest>,
 ) -> Result<Json<ReviewStatusDto>, (StatusCode, String)> {
-    let actor = authorize_review_control(&headers, &configured_key, token_port.as_ref(), &control_user_ids)?;
+    let actor = authorize_review_control(
+        &headers,
+        &configured_key,
+        token_port.as_ref(),
+        &control_user_ids,
+    )?;
 
     let status_text = match actor {
         ReviewControlActor::Script => request.status_text,

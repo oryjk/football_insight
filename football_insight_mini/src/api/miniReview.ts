@@ -34,3 +34,8 @@ export function putMiniReviewReviewStatus(
     auth: true,
   })
 }
+
+// 「设置」入口显隐判定：仅白名单用户（管理员）返回 true；未登录/无权限一律 false。
+export function canControlMiniReview(): Promise<{ allowed: boolean }> {
+  return request<{ allowed: boolean }>({ url: '/mini-review/can-control', auth: true })
+}

@@ -8,6 +8,11 @@ pub struct ReviewStatusQuery {
     pub version: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct CanControlReviewResponse {
+    pub allowed: bool,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct AllocateRequest {
     pub project_code: String,

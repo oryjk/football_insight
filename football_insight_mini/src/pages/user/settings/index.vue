@@ -11,7 +11,7 @@
         <text class="settings-item__value" :class="{ 'settings-item__value--reviewing': isReviewing }">{{ statusText }}</text>
       </view>
 
-      <view class="settings-item settings-item--stacked">
+      <view v-if="canControl" class="settings-item settings-item--stacked">
         <view class="settings-item__row">
           <text class="settings-item__label">切换审核状态</text>
           <text class="settings-item__caption">切换后全量用户的会员/支付等入口显隐会立即变化；仅管理员账号可切换。</text>
@@ -62,7 +62,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { getMiniReviewStatus, putMiniReviewReviewStatus } from '../../../api/miniReview'
+import { canControlMiniReview, getMiniReviewStatus, putMiniReviewReviewStatus } from '../../../api/miniReview'
 import { MINI_PROGRAM_VERSION } from '../../../api/system'
 import { extractApiErrorMessage } from '../../../utils/apiError'
 import type { H5TestLoginUser } from '../../../types/auth'
@@ -103,6 +103,18 @@ loadH5TestUsers()
 
 const isReviewing = ref(false)
 const statusText = ref('')
+// 切换开关仅对白名单用户渲染；服务端 PUT 的白名单校验仍是最终防线。
+const canControl = ref(false)
+
+async function loadCanControl() {
+  try {
+    canControl.value = (await canControlMiniReview()).allowed
+  } catch {
+    canControl.value = false
+  }
+}
+
+void loadCanControl()
 
 async function loadStatus() {
   statusText.value = '查询中…'
