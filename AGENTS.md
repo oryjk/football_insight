@@ -97,7 +97,7 @@ cargo run
 
 **生产部署脚本**：
 - `./deploy_jd_docker.sh` — Docker 方式（out109 build → Harbor → jd 拉镜像）
-- `./deploy_peiqian_docker.sh` — Docker 方式（peiqian 本机 build，Dockerfile 内置 rsproxy 加速 → Harbor → peiqian 拉镜像；不依赖 out109）
+- `./deploy_peiqian_docker.sh` — Docker 方式（peiqian 本机 build + 本地镜像直接运行，不推 Harbor；自动清理只保留最近 10 个镜像；git 走 peiqian clash 代理）
 - `bash deploy/deploy-backend-docker.sh` — 旧 Docker 脚本，默认部署到 jd
 - `bash deploy/deploy-backend-binary.sh` — systemd 方式（jd 上 cargo build --release → systemctl restart）
 - 生产默认用 Docker 方式，systemd 为备用

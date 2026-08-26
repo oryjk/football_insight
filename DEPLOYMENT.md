@@ -96,18 +96,12 @@ cd football_insight_service_backend_rs
 ./deploy_peiqian_docker.sh
 ```
 
-两个 Docker 发布脚本都会完成：
-
-- 检查本地提交已经 push 到 `origin/main`
-- 在构建机拉取最新 monorepo
-- 在构建机构建 Docker 镜像并推送到 Harbor
+两个 Docker 发布脚本都会先检查本地提交已经 push 到 `origin/main`。
 
 其中：
 
-- `deploy_jd_docker.sh` 在 `out109` 构建后由 `jd` 拉取镜像并重启容器（可用 `BUILD_HOST` / `BUILD_REPO_DIR` 环境变量换构建机）
-- `deploy_peiqian_docker.sh` 直接在 `peiqian` 本机（`/root/projects/football_insight`）构建：生产环境就是 peiqian，不再依赖 out109 构建。Dockerfile 已内置 rsproxy / 国内镜像加速拉取依赖；git 同步带容错代理包装，首次部署会自动补齐 monorepo 工作区
-
-发布前需要在本地 `football_insight_service_backend_rs/.env` 或环境变量中提供 Harbor 凭据，例如 `HARBOR_PASSWORD`。不要提交真实 `.env`。
+- `deploy_jd_docker.sh`：在 `out109` 构建镜像并推送到 Harbor，`jd` 拉取镜像并重启容器（可用 `BUILD_HOST` / `BUILD_REPO_DIR` 环境变量换构建机）；发布前需要在本地 `football_insight_service_backend_rs/.env` 或环境变量中提供 Harbor 凭据 `HARBOR_PASSWORD`，不要提交真实 `.env`
+- `deploy_peiqian_docker.sh`（生产默认）：直接在 `peiqian` 本机（`/root/projects/football_insight`）构建，镜像只保留在 peiqian 本地、不推 Harbor，每次部署自动清理只保留最近 10 个历史 tag。Dockerfile 已内置 rsproxy / 国内镜像加速拉取依赖；git 同步走 peiqian 本机 clash 代理（`proxyOn`），订阅过期时在 peiqian 执行 `/root/clash/update-subscription.sh` 刷新；首次部署会自动补齐 monorepo 工作区
 
 ### 3. 数据库迁移
 
