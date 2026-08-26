@@ -27,7 +27,7 @@ IMAGE_NAME="${IMAGE_NAME:-football-insight-service-backend-rs}"
 IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 IMAGE_REF="${IMAGE_NAME}:${IMAGE_TAG}"
 LATEST_REF="${IMAGE_NAME}:latest"
-KEEP_IMAGES="${KEEP_IMAGES:-10}"
+KEEP_IMAGES="${KEEP_IMAGES:-5}"
 CONTAINER_NAME="${CONTAINER_NAME:-football-insight-service-backend-rs}"
 PORT="${PORT:-8092}"
 
