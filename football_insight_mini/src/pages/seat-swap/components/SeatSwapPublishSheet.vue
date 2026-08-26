@@ -147,7 +147,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import FiBottomSheet from '../../../components/FiBottomSheet.vue'
-import StadiumMap from '../../../components/StadiumMap.vue'
+import StadiumMap from './StadiumMap.vue'
 import type { SeatSwapCandidate, SeatSwapRequest } from '../../../types/seatSwap'
 import type { TicketWatchRegion } from '../../../types/ticketWatch'
 import { resolveSeatSwapRegionColorGroup } from '../../../utils/stadiumRegions'

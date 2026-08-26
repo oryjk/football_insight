@@ -1,0 +1,7 @@
+{
+  "pages": [
+    { "path": "pages/home/index" },
+    { "path": "pages/rankings/index" },
+    { "path": "pages/user/settings/index" }
+  ]
+}

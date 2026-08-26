@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import StadiumMap from '../../../components/StadiumMap.vue'
+import StadiumMap from './StadiumMap.vue'
 import type { TicketWatchRegion } from '../../../types/ticketWatch'
 
 defineProps<{

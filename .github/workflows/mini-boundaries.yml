@@ -1,0 +1,22 @@
+name: mini import boundaries
+
+on:
+  push:
+    branches: [main]
+    paths: ['football_insight_mini/**']
+  pull_request:
+    paths: ['football_insight_mini/**']
+
+jobs:
+  boundaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 安装检查脚本依赖
+        working-directory: football_insight_mini
+        run: npm install --no-save --no-package-lock typescript
+      - name: 依赖边界检查
+        run: node football_insight_mini/scripts/check-import-boundaries.mjs

@@ -32,14 +32,16 @@ Page（index.vue 编排）
 - 401 的清理登录态由消费方决定（如首页清 token 转登录浮层）；请求层不做全局导航，也**不做全局 401 回调注册**。
 - 断网/超时文案由请求层归一，并发失败只弹一个提示框。
 
-依赖方向由 `scripts/check-import-boundaries.mjs` 机器强制（已接入 `prebuild:mp-weixin`，发版链路必然执行）：
+依赖方向由 `scripts/check-import-boundaries.mjs` 机器强制（已接入 `prebuild:mp-weixin` 与 GitHub Actions `.github/workflows/mini-boundaries.yml`，提交与发版链路都会执行）。import 与 `uni.request` 用 TypeScript AST 提取（Vue 只取 `<script>` 块，脚本依赖 devDependency `typescript`），说明符再解析成绝对路径判定，注释、字符串、模板文本里的示例代码不会误报：
 
-1. 组件层（`src/components`、`src/pages/*/components`）禁止 import `api/**` 与认证存储；
-2. 页面 A 禁止 import 页面 B 的 helpers——跨页面共享逻辑放 `src/utils`；
+1. 组件层（`src/components`、`src/pages/**/components`）禁止 import `api/**` 与认证存储；`src/components` 还禁止反向依赖页面层；
+2. 页面 A 的任何文件禁止 import 页面 B 的任何模块（helpers、页面容器、局部组件一律算）——跨页面共享：逻辑放 `src/utils`，组件进 `src/components`；
 3. `api/**` 只能依赖 request/config/types/utils（api 内部互引合法）；
 4. 只有 `utils/request.ts` 可以直接调用 `uni.request`。
 
-例外必须显式登记在脚本的 `ALLOWLIST` 并注明原因与清理计划（当前：`FiAiChatSheet` 组件内调 AI api —— feature 模块待拆分；`api/ai.ts` 流式 `uni.request` —— enableChunked 无法走统一封装）。
+文件身份：pages.json 注册的页面入口和页面目录直属的 `*.vue`（`index.vue`、`RankingsContent.vue`、`MatchesContent.vue` 这类页面容器）属于页面层，允许依赖 api；只有 `components/` 子目录里的才算展示组件。页面深层既未注册也不在 `components/` 下的 `.vue` 会被直接判违规，逼着显式登记身份。
+
+例外必须显式登记在脚本的 `ALLOWLIST`（文件 × 规则，跨页例外精确到放行目标路径）并注明原因与清理计划（当前：`FiAiChatSheet` 组件内调 AI api —— feature 模块待拆分；`api/ai.ts` 流式 `uni.request` —— enableChunked 无法走统一封装；`rankings/index.vue` 跨页内嵌 `matches/MatchesContent.vue` —— 榜单 tab 内嵌整个赛程视图，仅放行这一个目标）。允许/禁止案例的回归测试在 `scripts/check-import-boundaries.test.ts`（fixture 树：`scripts/fixtures/import-boundaries/`），改检查规则时必须同步跑。
 
 Store 约定：只解决真实的跨页状态（登录用户、审核态配置）；页面 loading、弹层开关、筛选和表单状态留在页面/composable，不把请求结果全局化。
 
@@ -76,7 +78,7 @@ src/pages/<domain>/
 - 后端数据到展示模型的转换放页面 `helpers.ts`；跨页面复用的放 `src/utils/`。不要把转换逻辑散落在模板里。
 - API 原子封装始终在 `src/api/<domain>.ts`；页面级 API 编排才放 `*Actions.ts` / `use*Page.ts`。
 - 组件按**变化原因**拆，不按行数机械拆：非声明式页面或组件超过约 **600 行**要主动评估拆分；超过约 **1000 行**必须按「页面编排 / 局部组件 / actions / helpers」小步拆分。
-- 当前超标页面（重构 backlog，触碰时优先拆分，不要顺手再加量）：`ticket-watch`（4000+ 行）、`user`（2700+ 行）、`seat-swap`（1700+ 行）。`home` 已按局部组件模式拆分完成（2026-08，`index.vue` 只做编排 + `components/` 十个局部组件），可作为拆分参考样板。
+- 当前超标文件（重构 backlog，触碰时优先拆分，不要顺手再加量）：`ticket-watch/index.vue`（4100+ 行）、`matches/MatchesContent.vue`（1100 行页面容器，已过 1000 行阈值）。`user`、`seat-swap`、`home` 均已按局部组件模式拆分完成（`home`：`index.vue` 只做编排 + `components/` 局部组件，可作参考样板）。
 - 单次任务只做增量拆分或增量迁移，**不要顺手重写整套页面风格或路由结构**。
 
 ## Design token 规范

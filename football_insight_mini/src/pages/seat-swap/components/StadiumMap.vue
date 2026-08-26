@@ -29,15 +29,15 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { TicketWatchRegion } from '../types/ticketWatch'
+import type { TicketWatchRegion } from '../../../types/ticketWatch'
 import {
   canInteractSeatSwapMap,
   shouldDimSeatSwapRegion,
-} from '../pages/seat-swap/helpers'
+} from '../helpers'
 import {
   resolveSeatSwapRegionColorGroup,
   resolveSeatSwapRegionLayout,
-} from '../utils/stadiumRegions'
+} from '../../../utils/stadiumRegions'
 
 type Mode =
   | 'browse'
