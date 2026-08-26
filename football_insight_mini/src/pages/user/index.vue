@@ -363,8 +363,8 @@ async function saveNotificationEmail(email: string): Promise<void> {
 
 async function handleLogout(): Promise<void> {
   await logout()
-  currentUser.value = null
   uni.showToast({ title: '已退出登录', icon: 'success' })
+  await loadUser()
 }
 
 function handleCopyInviteCode(): void {
@@ -427,8 +427,11 @@ async function handleMiniWechatLogin(): Promise<void> {
     const result = await loginWithMiniWechat(code)
 
     if (result.status === 'authenticated') {
+      // 登录态标记必须立刻刷新，否则 isGuestPage 仍按未登录渲染（请先登录浮窗 + 歌词墙不消失）。
+      hasLocalAccessToken.value = Boolean(getAccessToken())
       currentUser.value = result.user
       uni.showToast({ title: '微信登录成功', icon: 'success' })
+      await loadUser()
       await redirectAfterLogin()
       return
     }
@@ -460,8 +463,10 @@ async function handleMiniWechatBind(payload: {
     })
 
     currentUser.value = result.user
+    hasLocalAccessToken.value = Boolean(getAccessToken())
     closeMiniWechatBindSheet()
     uni.showToast({ title: '微信绑定成功', icon: 'success' })
+    await loadUser()
     await redirectAfterLogin()
   } catch (error) {
     uni.showToast({ title: extractApiErrorMessage(error, '绑定失败'), icon: 'none' })
