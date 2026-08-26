@@ -9,6 +9,7 @@ pub mod health;
 pub mod http_cache;
 pub mod insight;
 pub mod logging;
+pub mod mini_review;
 pub mod payment;
 pub mod push_notification;
 pub mod reflux_subscription;

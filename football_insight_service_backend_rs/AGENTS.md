@@ -25,6 +25,16 @@
 - 提供 H5 所需 API
 - 处理账号系统
 - 处理公众号 webhook
+- 提供小程序审核版本登记库（`mini_review` 模块）
+
+## 小程序审核版本登记（mini_review）
+
+- 表：`f_i_mini_review_statuses`（迁移 `20260826120000_add_mini_review_statuses.sql`），登记库是版本号唯一权威
+- `GET /api/v1/mini-review/review-status?project_code=&version=`：小程序运行时公开查询，未登记版本视为不在审核
+- `POST /api/v1/mini-review/allocate`：构建脚本申请版本号（最新版本审核中→复用；已出审核→+0.0.1；空库→以 manifest 为起点递增）
+- `PUT /api/v1/mini-review/review-status`：微信审核结束后标记 `is_reviewing=false`
+- allocate 与 PUT 用请求头 `X-Api-Key` 静态鉴权，密钥来自后端 env `MINI_REVIEW_API_KEY`（为空时接口不开放）；与 `football_insight_mini/.env.ci.local` 同名键保持一致
+
 
 ## 当前账号体系
 

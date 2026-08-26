@@ -1,21 +1,22 @@
 #!/bin/bash
 
-# Build the football insight backend image on out109, push it to Harbor, then
-# deploy the image on the peiqian host.
+# Build the football insight backend image on peiqian itself, push it to
+# Harbor, then deploy the image on the peiqian host. The Dockerfile already
+# pulls Rust dependencies through rsproxy (and base images / apt through
+# China mirrors), so no extra build-host setup is required.
 #
 # Required flow:
 #   1. Commit and push locally
-#   2. out109 pulls the pushed commit
-#   3. out109 builds and pushes the Docker image to Harbor
+#   2. peiqian pulls the pushed commit into /root/projects/football_insight
+#   3. peiqian builds the Docker image (rsproxy-accelerated) and pushes to Harbor
 #   4. peiqian pulls the image and restarts the container
 #
 # Required secret:
 #   Put HARBOR_PASSWORD in .env, or export it before running this script.
 #
 # Optional:
-#   BUILD_USE_PROXY=1 runs the out109 build inside `zsh -ic 'proxy_on'`.
-#   Default is a direct connection (the build proxy at 172.17.64.1:7890 is
-#   not always reachable, while git and the docker mirror work directly).
+#   BUILD_HOST / BUILD_REPO_DIR override the build machine (e.g. out109).
+#   BUILD_USE_PROXY=1 runs the build inside `zsh -ic 'proxy_on'` (out109 only).
 
 set -euo pipefail
 
@@ -49,9 +50,9 @@ git_sync_branch() {
 }
 
 BRANCH="${DEPLOY_BRANCH:-main}"
-BUILD_HOST="${BUILD_HOST:-out109}"
+BUILD_HOST="${BUILD_HOST:-peiqian}"
 BUILD_REPO_URL="${BUILD_REPO_URL:-https://github.com/oryjk/football_insight.git}"
-BUILD_REPO_DIR="${BUILD_REPO_DIR:-/home/wangrui/projects/football_insight_monorepo}"
+BUILD_REPO_DIR="${BUILD_REPO_DIR:-/root/projects/football_insight}"
 BUILD_DIR="${BUILD_DIR:-${BUILD_REPO_DIR}/football_insight_service_backend_rs}"
 DEPLOY_HOST="${DEPLOY_HOST:-peiqian}"
 DEPLOY_REPO_URL="${DEPLOY_REPO_URL:-${BUILD_REPO_URL}}"
@@ -122,25 +123,39 @@ ssh "${BUILD_HOST}" \
     "BUILD_REPO_URL='${BUILD_REPO_URL}' BUILD_REPO_DIR='${BUILD_REPO_DIR}' BRANCH='${BRANCH}' bash -s" << 'EOF'
 set -euo pipefail
 
+git_with_proxy() {
+    if command -v zsh >/dev/null 2>&1; then
+        zsh -ic 'proxyOn >/dev/null 2>&1 || true; cd -- "$1"; shift; git -c http.version=HTTP/1.1 "$@"' \
+            git-with-proxy "${BUILD_REPO_DIR}" "$@"
+    else
+        git -c http.version=HTTP/1.1 "$@"
+    fi
+}
+
 git_sync_branch() {
     local branch="$1"
 
-    if git -c http.version=HTTP/1.1 fetch origin "${branch}"; then
+    if git_with_proxy fetch origin "${branch}"; then
         git checkout "${branch}"
-        git -c http.version=HTTP/1.1 pull --ff-only origin "${branch}"
+        git_with_proxy pull --ff-only origin "${branch}"
         return 0
     fi
 
     echo "⚠️ git 同步首次失败，5 秒后重试一次..."
     sleep 5
-    git -c http.version=HTTP/1.1 fetch origin "${branch}"
+    git_with_proxy fetch origin "${branch}"
     git checkout "${branch}"
-    git -c http.version=HTTP/1.1 pull --ff-only origin "${branch}"
+    git_with_proxy pull --ff-only origin "${branch}"
 }
 
 if [ ! -d "${BUILD_REPO_DIR}/.git" ]; then
     rm -rf "${BUILD_REPO_DIR}"
-    git clone --branch "${BRANCH}" "${BUILD_REPO_URL}" "${BUILD_REPO_DIR}"
+    mkdir -p "${BUILD_REPO_DIR}"
+    TEMP_CLONE_DIR="$(mktemp -d /tmp/football-insight-build-repo-XXXXXX)"
+    git_with_proxy clone --branch "${BRANCH}" "${BUILD_REPO_URL}" "${TEMP_CLONE_DIR}"
+    shopt -s dotglob nullglob
+    mv "${TEMP_CLONE_DIR}"/* "${BUILD_REPO_DIR}"/
+    rmdir "${TEMP_CLONE_DIR}"
 fi
 
 cd "${BUILD_REPO_DIR}"
@@ -169,20 +184,29 @@ ssh "${BUILD_HOST}" \
 set -euo pipefail
 export DOCKER_CONFIG
 
+git_with_proxy() {
+    if command -v zsh >/dev/null 2>&1; then
+        zsh -ic 'proxyOn >/dev/null 2>&1 || true; cd -- "$1"; shift; git -c http.version=HTTP/1.1 "$@"' \
+            git-with-proxy "${BUILD_REPO_DIR}" "$@"
+    else
+        git -c http.version=HTTP/1.1 "$@"
+    fi
+}
+
 git_sync_branch() {
     local branch="$1"
 
-    if git -c http.version=HTTP/1.1 fetch origin "${branch}"; then
+    if git_with_proxy fetch origin "${branch}"; then
         git checkout "${branch}"
-        git -c http.version=HTTP/1.1 pull --ff-only origin "${branch}"
+        git_with_proxy pull --ff-only origin "${branch}"
         return 0
     fi
 
     echo "⚠️ git 同步首次失败，5 秒后重试一次..."
     sleep 5
-    git -c http.version=HTTP/1.1 fetch origin "${branch}"
+    git_with_proxy fetch origin "${branch}"
     git checkout "${branch}"
-    git -c http.version=HTTP/1.1 pull --ff-only origin "${branch}"
+    git_with_proxy pull --ff-only origin "${branch}"
 }
 
 cd "${BUILD_REPO_DIR}"

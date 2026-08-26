@@ -131,23 +131,18 @@ bun run build:mp-weixin
 - `VITE_API_BASE_URL`
 - `VITE_MINI_PROGRAM_VERSION`
 
-小程序审核态判断当前对齐 `registration_system_mini` 的实现，不再走业务后端 `system_config`，而是直接请求：
+小程序审核态判断走本项目后端的 mini-review 登记库（与发版时的版本号登记同库），请求：
 
-- `GET https://match.oryjk.cn/mini-review/api/public/review-status?project_code=football_insight_mini&version={version}`
+- `GET /api/v1/mini-review/review-status?project_code=football_insight_mini&version={version}`
 
 其中：
 
 - `project_code` 固定为 `football_insight_mini`
-- `version` 使用当前小程序版本号 `VITE_MINI_PROGRAM_VERSION`
+- `version` 使用构建时生成的 `src/config/generatedMiniProgramVersion.ts` 里的版本号
 
 如果接口返回 `is_reviewing=true`，小程序会进入审核模式：不加载会员、支付、用户会员等级、回流看板会员权益等相关信息。
 
-当前项目已经内置：
-
-- `.env.development`
-- `.env.production`
-
-也就是说：
+API 地址默认值：
 
 - `bun run dev:mp-weixin` 默认连本地 `8092`
 - `bun run build:mp-weixin` 默认连线上 `match.oryjk.cn`
@@ -167,30 +162,31 @@ bun run build:mp-weixin
 - 后端: [football_insight_service_backend_rs](../football_insight_service_backend_rs/README.md)
 - 抓取器: [sina_csl_scraper](../sina_csl_scraper/README.md)
 
-## 微信 CI 上传
+## 微信小程序发布（mp-weixin 上传）
 
-本项目已经接入本机共享的微信小程序 CI CLI，可以直接在项目内执行：
-
-```bash
-bun run mp:preview
-bun run mp:upload
-```
-
-首次使用前：
-
-1. 复制 `.env.ci.local.example` 为 `.env.ci.local`
-2. 填写真实私钥路径 `MINI_PROGRAM_PRIVATE_KEY_PATH`
-3. 如需覆盖机器人编号，可修改 `MINI_PROGRAM_CI_ROBOT`
-
-示例：
+发布小程序用一条命令（构建 + 向本项目后端登记版本号 + `miniprogram-ci` 上传），流程与 `registration_system_mini` 一致：
 
 ```bash
-bun run mp:preview -- --robot 2 --desc "本地预览"
-bun run mp:upload -- --robot 2 --version 1.0.43 --desc "提交体验版"
+bun run mp:release -- --desc "本次变更说明"           # robot=1：日常开发版
+bun run mp:release -- --robot 2 --desc "体验版说明"    # robot=2：体验版专用线
+bun run mp:preview -- --desc "预览说明"               # 只传预览版，生成 dist/preview-qrcode.jpg
 ```
 
-说明：
+**robot 双轨约定**：`robot=1` 日常开发版本，随便传互不影响；`robot=2` 是体验版专用线——首次用 robot=2 上传后，需在公众平台「版本管理 → 开发版本」对该版本点一次「选为体验版」，之后每次 robot=2 上传的新代码会自动成为体验版内容。robot=1 的上传不会影响体验版。
 
-- 命令会先自动执行 `bun run build:mp-weixin`
-- 然后调用微信官方 `miniprogram-ci`
-- `preview` 默认在 `dist/build/mp-weixin/preview-qrcode.jpg` 输出预览二维码
+流程细节（`scripts/mini-ci.mjs` + `scripts/sync-manifest-version.mjs`）：
+
+1. `build:mp-weixin` 的 prebuild 钩子先向本项目后端登记接口 `POST /api/v1/mini-review/allocate` 申请版本号。**登记库（数据库）是唯一权威**：最新版本仍在审核中则**复用**，已出审核则在库内最大版本基础上 `+0.0.1` 并标记审核中；仅当库内无任何记录时才以本地 manifest 为起点。本地 manifest 不参与后续分配（多台构建机结果一致），删库重置后版本号随库回落。
+2. 构建 `dist/build/mp-weixin` 并执行组件注册检查。
+3. `miniprogram-ci` 以 `manifest.json` 的 `versionName` 上传到微信后台（默认 robot=1，落在「版本管理 → 开发版本」）。
+
+前置条件（缺失时脚本会明确报错）：
+
+- 项目根 `private.<appid>.key`：微信公众平台「开发管理 → 开发设置 → 小程序代码上传」下载的私钥（已 git-ignore）；可用 `MINI_CI_PRIVATE_KEY_PATH` 覆盖路径。
+- `.env.ci.local` 配置 `MINI_REVIEW_API_KEY`（git-ignore；与后端环境变量 `MINI_REVIEW_API_KEY` 保持一致）。纯本地离线构建可设 `MINI_REVIEW_SKIP=1` 跳过登记。
+
+上传后的收尾：
+
+- 上传产物是**开发版本**：验证用 `mp:preview` 的二维码或在公众平台设为体验版；对外正式发布需在微信公众平台提审通过后点发布，CLI 不做这一步。
+- 微信审核结束后，用 API key 调 `PUT /api/v1/mini-review/review-status`（body：`{"project_code":"football_insight_mini","version":"x.y.z","is_reviewing":false}`）把该版本标记为已过审，下一次构建才会分配新版本号。
+- 若本次分配了新版本号，`src/manifest.json` 与 `src/config/generatedMiniProgramVersion.ts` 会被更新，需要单独提交；版本被复用（仍审核中）时无文件变更。

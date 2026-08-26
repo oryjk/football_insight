@@ -97,7 +97,7 @@ cargo run
 
 **生产部署脚本**：
 - `./deploy_jd_docker.sh` — Docker 方式（out109 build → Harbor → jd 拉镜像）
-- `./deploy_peiqian_docker.sh` — Docker 方式（out109 build → Harbor → peiqian 拉镜像）
+- `./deploy_peiqian_docker.sh` — Docker 方式（peiqian 本机 build，Dockerfile 内置 rsproxy 加速 → Harbor → peiqian 拉镜像；不依赖 out109）
 - `bash deploy/deploy-backend-docker.sh` — 旧 Docker 脚本，默认部署到 jd
 - `bash deploy/deploy-backend-binary.sh` — systemd 方式（jd 上 cargo build --release → systemctl restart）
 - 生产默认用 Docker 方式，systemd 为备用
@@ -113,7 +113,7 @@ bun run dev:mp-weixin
 bun run build:mp-weixin
 ```
 
-**审核版本号**：用户说"改版本号"时，改的是 `.env.production` / `.env.development` 里的 `VITE_MINI_PROGRAM_VERSION`，同时更新 `src/api/system.ts` 里的 fallback。`manifest.json` 里的 `versionName` 只是展示用。
+**小程序发版与审核版本号**：发版用 `bun run mp:release`（构建 + 向本项目后端 mini-review 登记库申请版本号 + `miniprogram-ci` 上传）。审核版本号由后端 `f_i_mini_review_statuses` 登记库统一分配，不要手动改 `manifest.json` 的 `versionName`；指定版本用 `MINI_PROGRAM_VERSION=x.y.z`，离线构建用 `MINI_REVIEW_SKIP=1`。详见 `football_insight_mini/README.md` 的「微信小程序发布」一节。
 
 ### 抓取器
 

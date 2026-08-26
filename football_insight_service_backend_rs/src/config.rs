@@ -99,6 +99,7 @@ pub struct AppConfig {
     pub admin_owner_username: String,
     pub admin_owner_password: String,
     pub admin_owner_display_name: String,
+    pub mini_review_api_key: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -194,6 +195,10 @@ impl AppConfig {
             std::env::var("ADMIN_OWNER_PASSWORD").context("ADMIN_OWNER_PASSWORD is required")?;
         let admin_owner_display_name = std::env::var("ADMIN_OWNER_DISPLAY_NAME")
             .unwrap_or_else(|_| "Football Insight Owner".to_string());
+        let mini_review_api_key = std::env::var("MINI_REVIEW_API_KEY")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
 
         Ok(Self {
             port,
@@ -224,6 +229,7 @@ impl AppConfig {
             admin_owner_username,
             admin_owner_password,
             admin_owner_display_name,
+            mini_review_api_key,
         })
     }
 }

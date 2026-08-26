@@ -99,13 +99,13 @@ cd football_insight_service_backend_rs
 两个 Docker 发布脚本都会完成：
 
 - 检查本地提交已经 push 到 `origin/main`
-- 在 `out109` 拉取最新 monorepo
-- 在 `out109` 构建 Docker 镜像并推送到 Harbor
+- 在构建机拉取最新 monorepo
+- 在构建机构建 Docker 镜像并推送到 Harbor
 
 其中：
 
-- `deploy_jd_docker.sh` 会在 `jd` 拉取镜像并重启容器
-- `deploy_peiqian_docker.sh` 会在 `peiqian` 拉取镜像并重启容器，并自动补齐 `peiqian:/root/projects/football_insight` monorepo 工作区（首次部署时）
+- `deploy_jd_docker.sh` 在 `out109` 构建后由 `jd` 拉取镜像并重启容器（可用 `BUILD_HOST` / `BUILD_REPO_DIR` 环境变量换构建机）
+- `deploy_peiqian_docker.sh` 直接在 `peiqian` 本机（`/root/projects/football_insight`）构建：生产环境就是 peiqian，不再依赖 out109 构建。Dockerfile 已内置 rsproxy / 国内镜像加速拉取依赖；git 同步带容错代理包装，首次部署会自动补齐 monorepo 工作区
 
 发布前需要在本地 `football_insight_service_backend_rs/.env` 或环境变量中提供 Harbor 凭据，例如 `HARBOR_PASSWORD`。不要提交真实 `.env`。
 
