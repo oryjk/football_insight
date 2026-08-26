@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { ApiError } from '../../utils/apiError'
+import { ApiRequestError } from '../../utils/apiError'
 import type {
   MatchCard,
   OverviewMatch,
@@ -28,7 +28,6 @@ import {
   resolveHomeSupportWindowShortLabel,
   shouldShowHomeSupportLoading,
   isHomeAuthExpiredError,
-  isHomeAuthExpiredMessage,
   resolveHomeLoadPlan,
 } from './helpers'
 
@@ -179,20 +178,6 @@ describe('shouldShowHomeSupportLoading', () => {
       loading: true,
       hasCachedProfile: true,
     })).toBe(false)
-  })
-})
-
-describe('isHomeAuthExpiredMessage', () => {
-  test('recognizes common expired or missing login messages', () => {
-    expect(isHomeAuthExpiredMessage('请求失败（401）')).toBe(true)
-    expect(isHomeAuthExpiredMessage('请先登录')).toBe(true)
-    expect(isHomeAuthExpiredMessage('Unauthorized')).toBe(true)
-    expect(isHomeAuthExpiredMessage('invalid token')).toBe(true)
-    expect(isHomeAuthExpiredMessage('token expired')).toBe(true)
-  })
-
-  test('does not treat backend data errors as login expiration', () => {
-    expect(isHomeAuthExpiredMessage('error occurred while decoding column 0')).toBe(false)
   })
 })
 
@@ -787,18 +772,10 @@ describe('formatHomeTeamSeasonRecord', () => {
 
 
 describe('isHomeAuthExpiredError', () => {
-  test('uses statusCode from ApiError instead of message text', () => {
-    const error = new ApiError('Token expired', 401, { message: 'Token expired' })
-    expect(isHomeAuthExpiredError(error)).toBe(true)
-
-    const other = new ApiError('登录后才能查看', 403, null)
-    expect(isHomeAuthExpiredError(other)).toBe(false)
-  })
-
-  test('falls back to message matching for plain errors', () => {
-    expect(isHomeAuthExpiredError(new Error('please login first'))).toBe(false)
-    expect(isHomeAuthExpiredError(new Error('请先登录'))).toBe(true)
-    expect(isHomeAuthExpiredError('unauthorized')).toBe(false)
+  test('treats only HTTP 401 ApiRequestError as expired session', () => {
+    expect(isHomeAuthExpiredError(new ApiRequestError('未登录', 401))).toBe(true)
+    expect(isHomeAuthExpiredError(new ApiRequestError('登录后才能查看', 403))).toBe(false)
+    expect(isHomeAuthExpiredError(new Error('请先登录'))).toBe(false)
     expect(isHomeAuthExpiredError(null)).toBe(false)
   })
 })

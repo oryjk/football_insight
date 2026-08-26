@@ -10,8 +10,8 @@ import type {
   StandingsTable,
 } from '../../types/insight'
 import type { SupportMatchDetail } from '../../types/support'
-import { isApiError } from '../../utils/apiError'
-import { resolveMatchDisplayStatus } from '../matches/helpers'
+import { isUnauthorizedError } from '../../utils/apiError'
+import { resolveMatchDisplayStatus } from '../../utils/matchDisplayStatus'
 import type { HomeBriefingMarqueeAccent } from '../../utils/homeBriefingMarquees'
 
 export type HomeHeroGuide =
@@ -131,27 +131,9 @@ export function shouldShowHomeSupportLoading(options: {
   return options.loading && !options.hasCachedProfile
 }
 
-export function isHomeAuthExpiredMessage(message: string): boolean {
-  const normalized = message.trim().toLowerCase()
-  return normalized.includes('401')
-    || normalized.includes('登录')
-    || normalized.includes('unauthorized')
-    || normalized.includes('not logged in')
-    || normalized.includes('invalid token')
-    || normalized.includes('token expired')
-}
-
-/** 认证过期判断优先依据 HTTP 状态码；文案匹配仅兜底非 ApiError 的错误。 */
+/** 认证过期判断依据 HTTP 401 状态码（对齐注册系统，不做文案匹配）。 */
 export function isHomeAuthExpiredError(error: unknown): boolean {
-  if (isApiError(error)) {
-    return error.isUnauthorized
-  }
-
-  if (error instanceof Error) {
-    return isHomeAuthExpiredMessage(error.message)
-  }
-
-  return false
+  return isUnauthorizedError(error)
 }
 
 export function resolveHomeLoadPlan(hasAuthToken: boolean): HomeLoadPlan {

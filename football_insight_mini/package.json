@@ -7,14 +7,15 @@
     "dev:mp-weixin": "uni -p mp-weixin",
     "dev:mp-weixin:windows": "bash scripts/dev-mp-weixin-windows.sh",
     "build:h5": "uni build",
-    "prebuild:mp-weixin": "node scripts/sync-manifest-version.mjs",
+    "prebuild:mp-weixin": "node scripts/sync-manifest-version.mjs && node scripts/check-import-boundaries.mjs",
     "build:mp-weixin": "uni build -p mp-weixin && node scripts/verify-mp-component-registrations.mjs",
     "verify:mp-components": "node scripts/verify-mp-component-registrations.mjs",
     "sync:mp-weixin:windows": "bash scripts/sync-mp-weixin-dist.sh",
     "type-check": "vue-tsc --noEmit",
     "mp:release": "bun run build:mp-weixin && node scripts/mini-ci.mjs upload",
     "mp:preview": "node scripts/mini-ci.mjs preview",
-    "test": "bun test"
+    "test": "bun test",
+    "check:boundaries": "node scripts/check-import-boundaries.mjs"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4080420251103001",

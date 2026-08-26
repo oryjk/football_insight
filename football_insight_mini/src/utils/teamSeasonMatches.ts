@@ -1,5 +1,5 @@
 import type { MatchCard } from '../types/insight'
-import { resolveMatchDisplayStatus } from '../pages/matches/helpers'
+import { resolveMatchDisplayStatus } from './matchDisplayStatus'
 
 export interface TeamSeasonMatch {
   matchId: number

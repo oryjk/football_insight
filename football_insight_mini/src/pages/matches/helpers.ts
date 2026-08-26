@@ -1,7 +1,8 @@
 import type { MatchCard } from '../../types/insight'
+import { resolveMatchDisplayStatus } from '../../utils/matchDisplayStatus'
 
+export { resolveMatchDisplayStatus }
 type MatchDisplayStatus = MatchCard['status']
-const LIVE_INFERENCE_WINDOW_MS = 3 * 60 * 60 * 1000
 
 export interface MatchTechStatRow {
   key: string
@@ -10,28 +11,6 @@ export interface MatchTechStatRow {
   awayValue: string
   homeBarPercent: number
   awayBarPercent: number
-}
-
-export function resolveMatchDisplayStatus(
-  match: Pick<MatchCard, 'status' | 'match_date' | 'match_time'>,
-  nowIso = new Date().toISOString(),
-): MatchDisplayStatus {
-  if (match.status !== 'scheduled') {
-    return match.status
-  }
-
-  const kickoffAt = parseMatchKickoff(match.match_date, match.match_time)
-  const nowAt = new Date(nowIso).getTime()
-
-  if (!kickoffAt || Number.isNaN(nowAt)) {
-    return 'scheduled'
-  }
-
-  if (nowAt >= kickoffAt && nowAt < kickoffAt + LIVE_INFERENCE_WINDOW_MS) {
-    return 'live'
-  }
-
-  return 'scheduled'
 }
 
 export function buildCurrentRoundSectionTitle(
