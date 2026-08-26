@@ -2,6 +2,7 @@ pub mod bind_wechat_account;
 pub mod bind_wechat_mini_program_account;
 pub mod get_current_user;
 pub mod handle_wechat_webhook;
+pub mod login_as_h5_test_user;
 pub mod login_with_mini_wechat;
 pub mod login_with_password;
 pub mod login_with_wechat;

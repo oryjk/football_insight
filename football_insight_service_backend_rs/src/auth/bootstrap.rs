@@ -22,6 +22,7 @@ use crate::{
             get_current_user::GetCurrentUserUseCase,
             handle_wechat_webhook::HandleWechatWebhookUseCase,
             login_with_mini_wechat::CompleteMiniWechatLoginUseCase,
+            login_as_h5_test_user::LoginAsH5TestUserUseCase,
             login_with_password::LoginWithPasswordUseCase,
             login_with_wechat::CompleteWechatLoginUseCase, logout::LogoutUseCase,
             register_with_invite::RegisterWithInviteUseCase,
@@ -110,6 +111,12 @@ pub fn build_auth(
         auth_repository.clone(),
         token_port.clone(),
     ));
+    let login_as_h5_test_user_use_case = Arc::new(LoginAsH5TestUserUseCase::new(
+        auth_repository.clone(),
+        token_port.clone(),
+        config.h5_test_login_user_ids.clone(),
+        Duration::days(30),
+    ));
     let logout_use_case = Arc::new(LogoutUseCase::new());
     let wechat_webhook_use_case = Arc::new(HandleWechatWebhookUseCase::new(
         auth_repository.clone(),
@@ -131,6 +138,7 @@ pub fn build_auth(
             complete_mini_wechat_login_use_case,
             bind_mini_wechat_account_use_case,
             get_current_user_use_case.clone(),
+            login_as_h5_test_user_use_case,
             logout_use_case,
             wechat_webhook_use_case,
             auth_web_config,

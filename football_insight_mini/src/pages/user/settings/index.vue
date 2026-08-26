@@ -34,6 +34,28 @@
           </view>
         </view>
       </view>
+
+    <!-- #ifdef H5 -->
+    <view class="settings-section">
+      <view class="settings-item settings-item--stacked" v-if="h5TestUsers.length">
+        <view class="settings-item__row">
+          <text class="settings-item__label">H5 测试登录</text>
+          <text class="settings-item__caption">一键以测试身份登录，用于在 H5 上验证需要登录的场景。</text>
+        </view>
+
+        <view class="settings-options settings-options--stacked">
+          <view
+            v-for="user in h5TestUsers"
+            :key="user.id"
+            class="settings-option"
+            @click="handleH5TestLogin(user)"
+          >
+            <text>{{ h5TestUserLabel(user) }}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+    <!-- #endif -->
     </view>
   </view>
 </template>
@@ -43,6 +65,41 @@ import { ref } from 'vue'
 import { getMiniReviewStatus, putMiniReviewReviewStatus } from '../../../api/miniReview'
 import { MINI_PROGRAM_VERSION } from '../../../api/system'
 import { extractApiErrorMessage } from '../../../utils/apiError'
+import type { H5TestLoginUser } from '../../../types/auth'
+
+// #ifdef H5
+import { listH5TestLoginUsers, loginAsH5TestUser } from '../../../api/auth'
+
+const h5TestUsers = ref<H5TestLoginUser[]>([])
+
+function h5TestUserLabel(user: H5TestLoginUser): string {
+  return user.display_name || user.account_identifier
+}
+
+async function loadH5TestUsers() {
+  try {
+    const result = await listH5TestLoginUsers()
+    h5TestUsers.value = result.items
+  } catch {
+    // 后端未开放（403）时隐藏面板
+    h5TestUsers.value = []
+  }
+}
+
+async function handleH5TestLogin(user: H5TestLoginUser) {
+  try {
+    await loginAsH5TestUser(user.id)
+    uni.showToast({ title: `已切换为 ${h5TestUserLabel(user)}`, icon: 'none' })
+    setTimeout(() => {
+      uni.reLaunch({ url: '/pages/user/index' })
+    }, 600)
+  } catch (error) {
+    uni.showToast({ title: extractApiErrorMessage(error, '测试登录失败'), icon: 'none' })
+  }
+}
+
+loadH5TestUsers()
+// #endif
 
 const isReviewing = ref(false)
 const statusText = ref('')
@@ -142,6 +199,10 @@ loadStatus()
 .settings-options {
   display: flex;
   gap: 14rpx;
+}
+
+.settings-options--stacked {
+  flex-direction: column;
 }
 
 .settings-option {

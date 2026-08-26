@@ -1,4 +1,5 @@
 pub mod auth_repository;
+pub mod h5_test_login_port;
 pub mod current_standard_match_port;
 pub mod password_port;
 pub mod token_port;

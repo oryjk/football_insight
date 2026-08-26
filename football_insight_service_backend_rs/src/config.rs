@@ -102,6 +102,7 @@ pub struct AppConfig {
     pub admin_owner_display_name: String,
     pub mini_review_api_key: Option<String>,
     pub mini_review_control_user_ids: Vec<Uuid>,
+    pub h5_test_login_user_ids: Vec<Uuid>,
 }
 
 #[derive(Debug, Clone)]
@@ -201,24 +202,8 @@ impl AppConfig {
             .ok()
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty());
-        let mini_review_control_user_ids = std::env::var("MINI_REVIEW_CONTROL_USER_IDS")
-            .ok()
-            .map(|value| value.trim().to_string())
-            .filter(|value| !value.is_empty())
-            .map(|value| {
-                value
-                    .split(',')
-                    .map(str::trim)
-                    .filter(|item| !item.is_empty())
-                    .map(|item| {
-                        item.parse::<Uuid>().with_context(|| {
-                            format!("MINI_REVIEW_CONTROL_USER_IDS 包含无效的用户 UUID: {item}")
-                        })
-                    })
-                    .collect::<Result<Vec<Uuid>>>()
-            })
-            .transpose()?
-            .unwrap_or_default();
+        let mini_review_control_user_ids = parse_uuid_list_env("MINI_REVIEW_CONTROL_USER_IDS")?;
+        let h5_test_login_user_ids = parse_uuid_list_env("H5_TEST_LOGIN_USER_IDS")?;
 
         Ok(Self {
             port,
@@ -251,6 +236,7 @@ impl AppConfig {
             admin_owner_display_name,
             mini_review_api_key,
             mini_review_control_user_ids,
+            h5_test_login_user_ids,
         })
     }
 }
@@ -347,6 +333,26 @@ impl SmtpEmailConfig {
             from,
         })
     }
+}
+
+fn parse_uuid_list_env(key: &str) -> Result<Vec<Uuid>> {
+    std::env::var(key)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            value
+                .split(',')
+                .map(str::trim)
+                .filter(|item| !item.is_empty())
+                .map(|item| {
+                    item.parse::<Uuid>()
+                        .with_context(|| format!("{key} 包含无效的用户 UUID: {item}"))
+                })
+                .collect::<Result<Vec<Uuid>>>()
+        })
+        .transpose()
+        .map(|option| option.unwrap_or_default())
 }
 
 fn parse_bool_env(key: &str, default: bool) -> bool {

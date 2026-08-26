@@ -1,6 +1,7 @@
 import type {
   AuthResponse,
   CurrentUser,
+  H5TestLoginUser,
   LoginPayload,
   MiniWechatBindPayload,
   MiniWechatLoginResponse,
@@ -56,6 +57,21 @@ export function resetPassword(payload: ResetPasswordPayload): Promise<void> {
     url: '/auth/reset-password',
     method: 'POST',
     data: payload,
+  })
+}
+
+export function listH5TestLoginUsers(): Promise<{ items: H5TestLoginUser[] }> {
+  return request<{ items: H5TestLoginUser[] }>({ url: '/auth/h5-test-login/users' })
+}
+
+export function loginAsH5TestUser(userId: string): Promise<AuthResponse> {
+  return request<AuthResponse>({
+    url: '/auth/h5-test-login',
+    method: 'POST',
+    data: { user_id: userId },
+  }).then((response) => {
+    setAccessToken(response.access_token)
+    return response
   })
 }
 

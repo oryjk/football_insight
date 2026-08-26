@@ -18,6 +18,12 @@ export interface AuthResponse {
   user: CurrentUser
 }
 
+export interface H5TestLoginUser {
+  id: string
+  display_name: string | null
+  account_identifier: string
+}
+
 export interface MiniWechatBindingRequiredResponse {
   status: 'binding_required'
   bind_token: string

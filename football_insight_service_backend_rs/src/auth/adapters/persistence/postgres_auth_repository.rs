@@ -1258,6 +1258,50 @@ mod tests {
     }
 }
 
+impl PostgresAuthRepository {
+    /// H5 测试登录用：按用户 UUID 查活跃账号（不进 AuthRepository trait，避免波及全部实现）。
+    pub async fn find_active_user_by_id(&self, user_id: Uuid) -> anyhow::Result<Option<AuthUser>> {
+        let membership_tier_rules = self.load_membership_tier_rules().await?;
+        let user = sqlx::query_as::<_, AuthUserRow>(
+            r#"
+            SELECT id,
+                   account_identifier,
+                   display_name,
+                   (
+                       SELECT code
+                         FROM f_i_invite_codes AS invite_codes
+                        WHERE invite_codes.used_by_user_id = f_i_users.id
+                        LIMIT 1
+                   ) AS invite_code,
+                   avatar_url,
+                   (wx_open_id IS NOT NULL) AS has_wechat_binding,
+                   membership_tier,
+                   membership_expires_at,
+                   CASE
+                       WHEN official_wechat_open_id IS NULL THEN TRUE
+                       ELSE EXISTS (
+                           SELECT 1
+                             FROM f_i_wechat_followers AS followers
+                            WHERE followers.open_id = f_i_users.official_wechat_open_id
+                              AND followers.unsubscribed_at IS NULL
+                       )
+                   END AS membership_benefits_enabled,
+                   created_at,
+                   updated_at
+              FROM f_i_users
+             WHERE id = $1
+               AND status = 'active'
+             LIMIT 1
+            "#,
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(user.map(|item| item.into_auth_user(&membership_tier_rules)))
+    }
+}
+
 #[derive(Debug, FromRow)]
 struct AuthUserRow {
     id: Uuid,

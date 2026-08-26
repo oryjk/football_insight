@@ -47,6 +47,18 @@ impl From<AuthUser> for CurrentUserDto {
     }
 }
 
+#[derive(Debug, Serialize)]
+pub struct H5TestLoginUserDto {
+    pub id: uuid::Uuid,
+    pub display_name: Option<String>,
+    pub account_identifier: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct H5TestLoginUsersResponseDto {
+    pub items: Vec<H5TestLoginUserDto>,
+}
+
 impl From<AuthTokenBundle> for AuthResponseDto {
     fn from(value: AuthTokenBundle) -> Self {
         Self {

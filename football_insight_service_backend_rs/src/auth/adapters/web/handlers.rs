@@ -11,7 +11,10 @@ use reqwest::Url;
 use serde::Deserialize;
 
 use crate::auth::{
-    adapters::web::dto::{AuthResponseDto, CurrentUserDto, MiniWechatLoginResponseDto},
+    adapters::web::dto::{
+        AuthResponseDto, CurrentUserDto, H5TestLoginUserDto, H5TestLoginUsersResponseDto,
+        MiniWechatLoginResponseDto,
+    },
     application::{
         bind_wechat_account::{BindWechatAccountInput, BindWechatAccountUseCase},
         bind_wechat_mini_program_account::{
@@ -19,6 +22,7 @@ use crate::auth::{
         },
         get_current_user::GetCurrentUserUseCase,
         login_with_mini_wechat::{CompleteMiniWechatLoginInput, CompleteMiniWechatLoginUseCase},
+        login_as_h5_test_user::LoginAsH5TestUserUseCase,
         login_with_password::{LoginInput, LoginWithPasswordUseCase},
         login_with_wechat::{
             CompleteWechatLoginInput, CompleteWechatLoginUseCase, WechatLoginResult,
@@ -41,6 +45,11 @@ pub struct RegisterRequest {
     #[serde(alias = "phone_number")]
     pub account_identifier: String,
     pub password: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct H5TestLoginRequest {
+    pub user_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -273,6 +282,57 @@ pub async fn mini_wechat_bind_handler(
         })
         .await
         .map_err(map_auth_error)?;
+
+    Ok(Json(result.into()))
+}
+
+pub async fn h5_test_login_users_handler(
+    use_case: Arc<LoginAsH5TestUserUseCase>,
+) -> Result<Json<H5TestLoginUsersResponseDto>, (StatusCode, String)> {
+    if use_case.allowed_user_ids().is_empty() {
+        return Err((StatusCode::FORBIDDEN, "H5 测试登录未开放".to_string()));
+    }
+
+    let users = use_case
+        .list_users()
+        .await
+        .map_err(map_auth_error)?;
+
+    Ok(Json(H5TestLoginUsersResponseDto {
+        items: users
+            .into_iter()
+            .map(|user| H5TestLoginUserDto {
+                id: user.id,
+                display_name: user.display_name,
+                account_identifier: user.account_identifier,
+            })
+            .collect(),
+    }))
+}
+
+pub async fn h5_test_login_handler(
+    use_case: Arc<LoginAsH5TestUserUseCase>,
+    Json(request): Json<H5TestLoginRequest>,
+) -> Result<Json<AuthResponseDto>, (StatusCode, String)> {
+    if use_case.allowed_user_ids().is_empty() {
+        return Err((StatusCode::FORBIDDEN, "H5 测试登录未开放".to_string()));
+    }
+
+    let user_id = uuid::Uuid::parse_str(&request.user_id)
+        .map_err(|_| (StatusCode::BAD_REQUEST, "用户 ID 无效".to_string()))?;
+    let result = use_case
+        .execute(user_id)
+        .await
+        .map_err(|error| {
+            let message = error.to_string();
+            if message.contains("not available") {
+                (StatusCode::FORBIDDEN, "该用户不在 H5 测试登录白名单内".to_string())
+            } else if message.contains("not found") {
+                (StatusCode::NOT_FOUND, "用户不存在或已停用".to_string())
+            } else {
+                (StatusCode::INTERNAL_SERVER_ERROR, message)
+            }
+        })?;
 
     Ok(Json(result.into()))
 }

@@ -9,6 +9,7 @@ use crate::auth::application::{
     bind_wechat_account::BindWechatAccountUseCase,
     bind_wechat_mini_program_account::BindWechatMiniProgramAccountUseCase,
     get_current_user::GetCurrentUserUseCase, handle_wechat_webhook::HandleWechatWebhookUseCase,
+    login_as_h5_test_user::LoginAsH5TestUserUseCase,
     login_with_mini_wechat::CompleteMiniWechatLoginUseCase,
     login_with_password::LoginWithPasswordUseCase, login_with_wechat::CompleteWechatLoginUseCase,
     logout::LogoutUseCase, register_with_invite::RegisterWithInviteUseCase,
@@ -17,7 +18,8 @@ use crate::auth::application::{
 
 use super::{
     handlers::{
-        AuthWebConfig, get_current_user_handler, login_handler, logout_handler,
+        AuthWebConfig, get_current_user_handler, h5_test_login_handler,
+        h5_test_login_users_handler, login_handler, logout_handler,
         mini_wechat_bind_handler, mini_wechat_login_handler, register_handler,
         reset_password_handler, wechat_authorize_handler, wechat_bind_handler,
         wechat_callback_handler,
@@ -34,16 +36,26 @@ pub fn auth_routes(
     complete_mini_wechat_login_use_case: Arc<CompleteMiniWechatLoginUseCase>,
     bind_mini_wechat_account_use_case: Arc<BindWechatMiniProgramAccountUseCase>,
     get_current_user_use_case: Arc<GetCurrentUserUseCase>,
+    login_as_h5_test_user_use_case: Arc<LoginAsH5TestUserUseCase>,
     logout_use_case: Arc<LogoutUseCase>,
     wechat_webhook_use_case: Arc<HandleWechatWebhookUseCase>,
     web_config: Arc<AuthWebConfig>,
 ) -> Router {
     let authorize_config = web_config.clone();
+    let login_as_h5_test_user_use_case_2 = login_as_h5_test_user_use_case.clone();
 
     Router::new()
         .route(
             "/api/v1/auth/register",
             post(move |payload| register_handler(payload, register_with_invite_use_case.clone())),
+        )
+        .route(
+            "/api/v1/auth/h5-test-login/users",
+            get(move || h5_test_login_users_handler(login_as_h5_test_user_use_case.clone())),
+        )
+        .route(
+            "/api/v1/auth/h5-test-login",
+            post(move |body| h5_test_login_handler(login_as_h5_test_user_use_case_2.clone(), body)),
         )
         .route(
             "/api/v1/auth/login",
