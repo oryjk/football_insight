@@ -55,6 +55,7 @@
 - 后端生产优先使用 Docker 容器部署：`football-insight-service-backend-rs`
 - systemd unit `football-insight.service` 保留为备用部署方式，不是当前首选
 - Nginx 在 Docker 中运行
+- `match.oryjk.cn` 的 TLS 证书更换：在本地 Mac 执行 `bash deploy/renew-jd-nginx-ssl.sh [证书目录]`；证书已下载到 `~/Downloads` 时可省略参数，脚本会自动选最新的 `*_match.oryjk.cn_nginx` 目录。脚本会校验证书私钥配对/有效期，备份旧证书到 `ssl.bak.<时间戳>`，`nginx -t` 通过后 reload 并回读线上证书验证
 
 修改 `jd` 上 Nginx 时必须注意：
 
