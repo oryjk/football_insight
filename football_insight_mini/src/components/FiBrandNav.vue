@@ -1,5 +1,5 @@
 <template>
-    <view class="fi-brand-nav" :class="{ 'fi-brand-nav--transparent': transparent }">
+    <view class="fi-brand-nav" :class="{ 'fi-brand-nav--transparent': transparent, 'fi-brand-nav--h5': isH5 }">
         <view class="fi-brand-nav__status-spacer"></view>
         <view class="fi-brand-nav__bar">
             <view class="fi-brand-nav__brand" :style="brandStyle">
@@ -45,35 +45,59 @@ const emit = defineEmits<{
     (e: "open-ai"): void;
 }>();
 
-const aiButtonMetrics = ref({
-    top: 0,
-    right: 190,
-    height: 58,
-});
+const isH5 =
+    // #ifdef H5
+    true
+    // #endif
+    // #ifndef H5
+    false
+    // #endif
+;
 
-const brandMetrics = ref({
-    top: 0,
-    height: 64,
-});
+// 胶囊指标仅在小程序端可用；初始为 null 时不输出内联样式，交给 CSS 兜底，
+// 避免 H5 上错误地沿用 px 数值导致按钮压到品牌文案。
+const aiButtonMetrics = ref<{
+    top: number;
+    right: number;
+    height: number;
+} | null>(null);
+
+const brandMetrics = ref<{
+    top: number;
+    height: number;
+} | null>(null);
 
 const aiButtonStyle = computed(() => {
-    const top = aiButtonMetrics.value.top;
+    const metrics = aiButtonMetrics.value;
+    if (!metrics) {
+        return {};
+    }
+
     return {
-        top: top ? `${top}px` : "",
-        right: `${aiButtonMetrics.value.right}px`,
-        height: `${aiButtonMetrics.value.height}px`,
+        top: metrics.top ? `${metrics.top}px` : "",
+        right: `${metrics.right}px`,
+        height: `${metrics.height}px`,
     };
 });
 
 const brandStyle = computed(() => {
-    const top = brandMetrics.value.top;
+    const metrics = brandMetrics.value;
+    if (!metrics) {
+        return {};
+    }
+
     return {
-        top: top ? `${top}px` : "",
-        height: `${brandMetrics.value.height}px`,
+        top: metrics.top ? `${metrics.top}px` : "",
+        height: `${metrics.height}px`,
     };
 });
 
 function syncAiButtonWithMenuCapsule(): void {
+    // H5 没有微信胶囊按钮，布局走 CSS 流式兜底，不需要同步胶囊位置。
+    // #ifdef H5
+    return;
+    // #endif
+
     try {
         const systemInfo = uni.getSystemInfoSync();
         const menuButton = uni.getMenuButtonBoundingClientRect?.();
@@ -231,6 +255,7 @@ onMounted(() => {
     top: calc(var(--fi-brand-nav-status-height) + 20rpx);
     right: 190rpx;
     z-index: 82;
+    margin: 0;
     min-width: 122rpx;
     height: 58rpx;
     padding: 0 18rpx;
@@ -248,6 +273,27 @@ onMounted(() => {
     box-shadow: none;
     backdrop-filter: blur(12rpx);
     -webkit-backdrop-filter: blur(12rpx);
+}
+
+/* H5 没有右上角胶囊，品牌与 AI 按钮回到正常流式布局，两端分布。 */
+.fi-brand-nav--h5 .fi-brand-nav__bar {
+    min-height: auto;
+    padding: 20rpx 24rpx;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24rpx;
+}
+
+.fi-brand-nav--h5 .fi-brand-nav__brand {
+    position: static;
+    width: auto;
+    max-width: 60%;
+}
+
+.fi-brand-nav--h5 .fi-brand-nav__ai {
+    position: static;
+    flex-shrink: 0;
 }
 
 .fi-brand-nav__ai::after {

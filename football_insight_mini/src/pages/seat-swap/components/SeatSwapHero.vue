@@ -27,7 +27,7 @@ defineProps<{
   gap: var(--fi-space-18);
   padding: var(--fi-space-24);
   border: var(--fi-border-width) solid var(--fi-color-border-chip);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-radius-md);
   background: rgba(255, 255, 255, 0.96);
   box-shadow: var(--fi-shadow-soft);
   margin-bottom: var(--fi-space-16);

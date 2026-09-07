@@ -1,64 +1,67 @@
 <template>
-  <view class="seat-swap-candidate" :class="cardClass">
-    <view class="seat-swap-candidate__main">
-      <view class="seat-swap-candidate__content">
-        <view class="seat-swap-candidate__user">
-          <image
+  <div class="seat-swap-candidate" :class="cardClass">
+    <div class="seat-swap-candidate__main">
+      <div class="seat-swap-candidate__content">
+        <div class="seat-swap-candidate__user">
+          <img
             v-if="candidate.avatar_url"
             class="seat-swap-candidate__avatar"
             :src="candidate.avatar_url"
-            mode="aspectFill"
+            :alt="candidate.display_name"
           />
-          <view v-else class="seat-swap-candidate__avatar seat-swap-candidate__avatar--fallback">
-            <text>{{ fallbackInitial }}</text>
-          </view>
-          <view class="seat-swap-candidate__id">
-            <text class="seat-swap-candidate__name">{{ candidate.display_name }}</text>
-            <view class="seat-swap-candidate__seat">
-              <text class="seat-swap-candidate__seat-label">当前座位</text>
-              <text class="seat-swap-candidate__seat-value">{{ formatSeatSwapSeatLabel(candidate) }}</text>
-            </view>
-          </view>
-          <text v-if="statusText" class="seat-swap-candidate__status" :class="statusClass">
+          <div v-else class="seat-swap-candidate__avatar seat-swap-candidate__avatar--fallback">
+            <span>{{ fallbackInitial }}</span>
+          </div>
+          <div class="seat-swap-candidate__id">
+            <span class="seat-swap-candidate__name">{{ candidate.display_name }}</span>
+            <div class="seat-swap-candidate__seat">
+              <span class="seat-swap-candidate__seat-label">当前座位</span>
+              <span class="seat-swap-candidate__seat-value">{{ formatSeatSwapSeatLabel(candidate) }}</span>
+            </div>
+          </div>
+          <span v-if="statusText" class="seat-swap-candidate__status" :class="statusClass">
             {{ statusText }}
-          </text>
-        </view>
-        <view class="seat-swap-candidate__wants">
-          <text class="seat-swap-candidate__wants-label">目标座位</text>
-          <text class="seat-swap-candidate__wants-value">{{ desiredSeatText }}</text>
-        </view>
-        <view v-if="candidate.contact" class="seat-swap-candidate__contact">
-          <text v-if="candidate.contact.wechat_id" class="seat-swap-candidate__contact-line">
-            微信:{{ candidate.contact.wechat_id }}
-          </text>
-          <text v-if="candidate.contact.phone_number" class="seat-swap-candidate__contact-line">
-            手机:{{ candidate.contact.phone_number }}
-          </text>
-        </view>
-      </view>
+          </span>
+        </div>
+        <div class="seat-swap-candidate__wants">
+          <span class="seat-swap-candidate__wants-label">目标座位</span>
+          <span class="seat-swap-candidate__wants-value">{{ desiredSeatText }}</span>
+        </div>
+        <div v-if="candidate.contact" class="seat-swap-candidate__contact">
+          <span v-if="candidate.contact.wechat_id" class="seat-swap-candidate__contact-line">
+            微信：{{ candidate.contact.wechat_id }}
+          </span>
+          <span v-if="candidate.contact.phone_number" class="seat-swap-candidate__contact-line">
+            手机：{{ candidate.contact.phone_number }}
+          </span>
+        </div>
+      </div>
       <button
         v-if="action === 'confirm'"
+        type="button"
         class="seat-swap-candidate__action seat-swap-candidate__action--primary"
-        @tap.stop="emit('confirm', candidate.request_id)"
+        @click.stop="emit('confirm', candidate.request_id)"
       >
         {{ candidate.status === 'display_only' ? '我要换到这' : '确认换座' }}
       </button>
       <button
         v-else-if="action === 'cancel_confirmation'"
+        type="button"
         class="seat-swap-candidate__action seat-swap-candidate__action--secondary"
-        @tap.stop="emit('cancel-confirmation', candidate.request_id)"
+        @click.stop="emit('cancel-confirmation', candidate.request_id)"
       >
         取消匹配
       </button>
       <button
         v-else-if="action === 'matched_cancel'"
+        type="button"
         class="seat-swap-candidate__action seat-swap-candidate__action--matched-cancel"
-        @tap.stop="emit('matched-cancel', candidate.request_id)"
+        @click.stop="emit('matched-cancel', candidate.request_id)"
       >
         取消匹配
       </button>
-    </view>
-  </view>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -98,18 +101,18 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 
 <style scoped>
 .seat-swap-candidate {
-  margin: 10rpx 0;
-  padding: 22rpx;
-  border-radius: 16rpx;
+  margin: 5px 0;
+  padding: 12px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.96);
-  border: 1rpx solid rgba(232, 233, 238, 0.95);
-  box-shadow: 0 8rpx 18rpx rgba(26, 28, 36, 0.04);
+  border: 1px solid rgba(232, 233, 238, 0.95);
+  box-shadow: 0 4px 9px rgba(26, 28, 36, 0.04);
 }
 
 .seat-swap-candidate__main {
   display: flex;
   align-items: stretch;
-  gap: 18rpx;
+  gap: 9px;
 }
 
 .seat-swap-candidate__content {
@@ -120,15 +123,16 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 .seat-swap-candidate__user {
   display: flex;
   align-items: flex-start;
-  gap: 16rpx;
+  gap: 8px;
 }
 
 .seat-swap-candidate__avatar {
   flex-shrink: 0;
-  width: 64rpx;
-  height: 64rpx;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: #dde5ee;
+  object-fit: cover;
 }
 
 .seat-swap-candidate__avatar--fallback {
@@ -136,8 +140,7 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   align-items: center;
   justify-content: center;
   color: #4b5563;
-  font-size: 28rpx;
-  font-weight: 400;
+  font-size: 14px;
 }
 
 .seat-swap-candidate__id {
@@ -148,52 +151,51 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 .seat-swap-candidate__name {
   display: block;
   color: #121212;
-  font-size: 28rpx;
-  font-weight: 400;
+  font-size: 14px;
 }
 
 .seat-swap-candidate__seat {
   display: inline-flex;
   align-items: center;
   max-width: 100%;
-  margin-top: 8rpx;
+  margin-top: 4px;
   overflow: hidden;
-  border-radius: 16rpx;
+  border-radius: 9px;
   background: #fff1f0;
   color: #b42318;
 }
 
 .seat-swap-candidate__seat-label {
   flex-shrink: 0;
-  padding: 7rpx 10rpx 7rpx 12rpx;
+  padding: 4px 5px 4px 6px;
   background: rgba(226, 59, 46, 0.12);
   color: #b42318;
-  font-size: 20rpx;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1;
 }
 
 .seat-swap-candidate__seat-value {
   min-width: 0;
-  padding: 7rpx 14rpx 7rpx 10rpx;
+  padding: 4px 7px 4px 5px;
   overflow: hidden;
-  font-size: 26rpx;
+  font-size: 13px;
   font-weight: 800;
-  line-height: 1;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .seat-swap-candidate__status {
   flex-shrink: 0;
-  padding: 6rpx 14rpx;
-  border-radius: 999rpx;
+  padding: 3px 7px;
+  border-radius: 999px;
   background: #f6f7fb;
-  border: 1rpx solid rgba(232, 233, 238, 0.95);
+  border: 1px solid rgba(232, 233, 238, 0.95);
   color: #6d7280;
-  font-size: 20rpx;
-  font-weight: 400;
-  line-height: 1;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 
 .seat-swap-candidate__status--communicable {
@@ -223,97 +225,85 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 .seat-swap-candidate__wants {
   display: inline-flex;
   align-items: center;
-  max-width: calc(100% - 80rpx);
-  margin-top: 12rpx;
-  margin-left: 80rpx;
+  max-width: calc(100% - 40px);
+  margin-top: 6px;
+  margin-left: 40px;
   overflow: hidden;
-  border-radius: 16rpx;
+  border-radius: 9px;
   background: #eef8f2;
   color: #175c31;
-  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.5);
 }
 
 .seat-swap-candidate__wants-label {
   flex-shrink: 0;
-  padding: 7rpx 10rpx 7rpx 12rpx;
+  padding: 4px 5px 4px 6px;
   background: rgba(70, 171, 89, 0.12);
   color: rgba(24, 103, 67, 0.88);
-  font-size: 20rpx;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1;
 }
 
 .seat-swap-candidate__wants-value {
   min-width: 0;
-  padding: 7rpx 14rpx 7rpx 10rpx;
+  padding: 4px 7px 4px 5px;
   overflow: hidden;
-  font-size: 24rpx;
+  font-size: 12px;
   font-weight: 700;
-  line-height: 1;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .seat-swap-candidate__contact {
-  margin-top: 12rpx;
-  padding: 16rpx 18rpx;
-  border-radius: 16rpx;
+  margin-top: 6px;
+  padding: 8px 9px;
+  border-radius: 8px;
   background: #f6f7fb;
-  font-size: 22rpx;
+  font-size: 11px;
   color: #6f6a5f;
   display: flex;
   flex-direction: column;
-  gap: 4rpx;
-}
-
-.seat-swap-candidate__contact-line {
-  display: block;
+  gap: 2px;
 }
 
 .seat-swap-candidate__action {
   flex-shrink: 0;
-  align-self: stretch;
-  width: 168rpx;
-  min-height: 152rpx;
-  padding: 18rpx 20rpx;
-  border-radius: 26rpx;
+  align-self: center;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 11px;
   color: #fff;
-  font-size: 30rpx;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.25;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  cursor: pointer;
   text-align: center;
-}
-
-.seat-swap-candidate__action::after {
-  border: 0;
 }
 
 .seat-swap-candidate__action--primary {
   background: #15161b;
-  box-shadow: 0 10rpx 22rpx rgba(21, 22, 27, 0.12);
+  box-shadow: 0 5px 11px rgba(21, 22, 27, 0.12);
 }
 
 .seat-swap-candidate__action--secondary {
   background: #ffffff;
   color: #20242c;
-  border: 2rpx solid rgba(32, 36, 44, 0.16);
+  border: 1px solid rgba(32, 36, 44, 0.16);
   box-shadow: none;
 }
 
 .seat-swap-candidate__action--matched-cancel {
   background: rgba(255, 255, 255, 0.18);
   color: #ffffff;
-  border: 2rpx solid rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   box-shadow: none;
 }
 
 .seat-swap-candidate--matched {
   background: linear-gradient(180deg, #c61f26 0%, #b3131f 100%);
   border-color: rgba(152, 12, 24, 0.92);
-  box-shadow: 0 12rpx 28rpx rgba(138, 12, 22, 0.22);
+  box-shadow: 0 6px 14px rgba(138, 12, 22, 0.22);
 }
 
 .seat-swap-candidate--matched .seat-swap-candidate__avatar {
@@ -331,21 +321,10 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   color: #ffffff;
 }
 
-.seat-swap-candidate--matched .seat-swap-candidate__seat {
-  background: rgba(255, 255, 255, 0.14);
-}
-
-.seat-swap-candidate--matched .seat-swap-candidate__seat-label {
-  background: rgba(255, 255, 255, 0.14);
-}
-
+.seat-swap-candidate--matched .seat-swap-candidate__seat,
+.seat-swap-candidate--matched .seat-swap-candidate__seat-label,
 .seat-swap-candidate--matched .seat-swap-candidate__wants {
   background: rgba(255, 255, 255, 0.14);
-  box-shadow: none;
-}
-
-.seat-swap-candidate--matched .seat-swap-candidate__wants-label {
-  background: rgba(255, 255, 255, 0.12);
 }
 
 .seat-swap-candidate--matched .seat-swap-candidate__status {
@@ -354,18 +333,15 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   color: #ffffff;
 }
 
-.seat-swap-candidate--matched .seat-swap-candidate__status--matched {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
+.seat-swap-candidate--matched .seat-swap-candidate__contact {
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.16);
 }
 
-.seat-swap-candidate--matched .seat-swap-candidate__contact {
-  margin-top: 16rpx;
-  padding: 20rpx 22rpx;
-  background: rgba(255, 255, 255, 0.16);
-  border: 2rpx solid rgba(255, 255, 255, 0.16);
-  font-size: 25rpx;
-  gap: 8rpx;
+@media (max-width: 768px) {
+  .seat-swap-candidate__wants {
+    margin-left: 0;
+    max-width: 100%;
+  }
 }
 </style>

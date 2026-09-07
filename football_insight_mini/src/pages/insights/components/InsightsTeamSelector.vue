@@ -174,6 +174,9 @@ async function centerSelectedChip(): Promise<void> {
   color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-24);
   line-height: var(--fi-leading-none);
+  flex-shrink: 0;
+  white-space: nowrap;
+  margin: 0;
   transition: transform 220ms ease, box-shadow 220ms ease, background-color 220ms ease, color 220ms ease;
 }
 

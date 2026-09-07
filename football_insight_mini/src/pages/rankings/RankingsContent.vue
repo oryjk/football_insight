@@ -2,7 +2,7 @@
   <view class="page-root">
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
-    <view class="page-scroll" :class="{ 'page-scroll--locked': selectedRankingTeam || selectedStandingsTable }">
+    <view class="page-scroll" :class="{ 'page-scroll--locked': selectedRankingTeam || selectedRankingPlayer || selectedStandingsTable }">
       <view class="page">
       <FiLoading
         v-if="loading"
@@ -28,6 +28,7 @@
           v-model:active-category-slug="activeCategorySlug"
           :rankings="rankings"
           @open-team="openRankingTeamSheet"
+          @open-player="openRankingPlayerSheet"
         />
       </template>
 
@@ -39,9 +40,19 @@
         :category-score-text="selectedRankingTeamCategoryScoreText"
         :category-label-text="selectedRankingTeamCategoryLabelText"
         :matches="selectedRankingTeamMatches"
+        :ability-values="selectedRankingTeamAbilityValues"
         :loading="teamSeasonMatchesLoading"
         :error-message="teamSeasonMatchesErrorMessage"
         @close="closeRankingTeamSheet"
+      />
+
+      <RankingsPlayerSheet
+        v-if="selectedRankingPlayer"
+        :player="selectedRankingPlayer"
+        :category-label-text="selectedRankingPlayerCategoryLabelText"
+        :ability-values="selectedRankingPlayerAbilityDetail.values"
+        :raw-texts="selectedRankingPlayerAbilityDetail.rawTexts"
+        @close="closeRankingPlayerSheet"
       />
 
       <RankingsPosterSheet
@@ -64,10 +75,12 @@ import FiLoading from '../../components/FiLoading.vue'
 import RankingsStandingsLauncher from './components/RankingsStandingsLauncher.vue'
 import RankingsSurfacePanel from './components/RankingsSurfacePanel.vue'
 import RankingsTeamSeasonSheet from './components/RankingsTeamSeasonSheet.vue'
+import RankingsPlayerSheet from './components/RankingsPlayerSheet.vue'
 import RankingsPosterSheet from './components/RankingsPosterSheet.vue'
 import { getAvailableRounds, getMatches, getRankings } from '../../api/insight'
 import type {
   MatchCard,
+  PlayerRankingEntry,
   RankingsViewResponse,
   RoundReference,
   StandingsTable,
@@ -78,6 +91,7 @@ import { extractApiErrorMessage } from '../../utils/apiError'
 import { resolveTeamSeasonMatches, type TeamSeasonMatch } from '../../utils/teamSeasonMatches'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { sortStandingsPreviewTables } from './helpers'
+import { buildPlayerAbilityDetail, buildTeamAbilityValues, TEAM_ABILITY_FALLBACK } from './ability'
 import { buildStandingsPosterSharePath, buildStandingsPosterShareTitle, type StandingsRankingMode } from './poster'
 import { reportPageActivity } from '../../utils/userActivity'
 
@@ -111,6 +125,7 @@ const teamSeasonMatchesLoading = ref(false)
 const teamSeasonMatchesErrorMessage = ref('')
 const pendingAutoOpenStandingsSlug = ref<string | null>(null)
 const selectedRankingTeam = ref<SelectedRankingTeamSheet | null>(null)
+const selectedRankingPlayer = ref<PlayerRankingEntry | null>(null)
 
 const hasTeamCategories = computed(() => (rankings.value?.team_categories?.length ?? 0) > 0)
 const hasPlayerCategories = computed(() => (rankings.value?.player_categories?.length ?? 0) > 0)
@@ -162,6 +177,30 @@ const selectedRankingTeamMatches = computed<TeamSeasonMatch[]>(() => {
 
   return resolveTeamSeasonMatches(selectedRankingTeam.value.team, allSeasonMatches.value)
 })
+const teamAbilityByTeamId = computed<Map<number, number[]>>(() =>
+  buildTeamAbilityValues(rankings.value?.team_categories ?? []),
+)
+const selectedRankingTeamAbilityValues = computed<number[]>(() => {
+  if (!selectedRankingTeam.value) {
+    return TEAM_ABILITY_FALLBACK
+  }
+
+  return teamAbilityByTeamId.value.get(selectedRankingTeam.value.team.team_id) ?? TEAM_ABILITY_FALLBACK
+})
+const selectedRankingPlayerAbilityDetail = computed(() => {
+  if (!selectedRankingPlayer.value) {
+    return { values: TEAM_ABILITY_FALLBACK, rawTexts: [] as string[] }
+  }
+
+  return buildPlayerAbilityDetail(rankings.value?.player_categories ?? [], selectedRankingPlayer.value.player_id)
+})
+const selectedRankingPlayerCategoryLabelText = computed(() => {
+  if (!selectedRankingPlayer.value) {
+    return ''
+  }
+
+  return `${activePlayerCategoryLabel()} 第 ${selectedRankingPlayer.value.rank_no} 名`
+})
 const selectedRankingTeamStandingRankText = computed(() => {
   if (selectedRankingStandingsEntry.value) {
     return `第 ${selectedRankingStandingsEntry.value.rank_no}`
@@ -185,7 +224,7 @@ const selectedRankingTeamCategoryLabelText = computed(() => {
 })
 
 watch(
-  () => Boolean(selectedRankingTeam.value || selectedStandingsTable.value),
+  () => Boolean(selectedRankingTeam.value || selectedRankingPlayer.value || selectedStandingsTable.value),
   (locked) => {
     emit('page-scroll-lock-change', locked)
   },
@@ -267,6 +306,19 @@ function isStandingsCategory(): boolean {
 function activeTeamCategoryLabel(): string {
   const category = rankings.value?.team_categories.find((item) => item.slug === activeCategorySlug.value)
   return category?.label ?? '球队榜'
+}
+
+function activePlayerCategoryLabel(): string {
+  const category = rankings.value?.player_categories.find((item) => item.slug === activeCategorySlug.value)
+  return category?.label ?? '球员榜'
+}
+
+function openRankingPlayerSheet(entry: PlayerRankingEntry): void {
+  selectedRankingPlayer.value = entry
+}
+
+function closeRankingPlayerSheet(): void {
+  selectedRankingPlayer.value = null
 }
 
 function closeRankingTeamSheet(): void {

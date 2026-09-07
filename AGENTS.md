@@ -1,6 +1,6 @@
 # Football Insight Workspace Guide
 
-本目录下是一个已上线运行的足球数据产品（线上入口 `match.oryjk.cn`，部署拓扑见下方「当前部署约定」），前端架构参考了报名系统项目。当前是 monorepo，包含 3 个子项目：
+本目录下是一个已上线运行的足球数据产品（线上入口 `match.oryjk.cn`，部署拓扑见下方「当前部署约定」），前端架构参考了报名系统项目。当前是 monorepo，包含 4 个子项目：
 
 - `football_insight_service_backend_rs`
   - Rust + Axum + SQLx + PostgreSQL
@@ -8,6 +8,11 @@
 - `football_insight_mini`
   - uni-app + Vue 3 + TypeScript + Bun
   - 负责微信小程序，并支持编译为 H5
+- `football_insight_h5`
+  - Vite + Vue 3 + TypeScript + Bun（纯 H5，不依赖 uni-app）
+  - 面向小程序 web-view 嵌入场景的独立 H5 页面，当前有换座位页
+  - 鉴权：URL `?token=` 透传（web-view 场景）或后端 H5 测试登录白名单
+  - 纯函数与类型从 `football_insight_mini` 移植（`utils/seatSwap.ts`、`utils/stadiumRegions.ts`），后端 API 不变
 - `sina_csl_scraper`
   - Python + uv
   - 负责抓取新浪体育移动端数据、上传头像、写入 PostgreSQL

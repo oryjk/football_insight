@@ -574,7 +574,7 @@ onShow(() => {
   margin-top: var(--fi-space-22);
   padding: var(--fi-space-28);
   border: 1rpx solid var(--fi-color-border-chip);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-radius-md);
   background: rgba(255, 255, 255, 0.96);
   box-shadow: var(--fi-shadow-soft);
   text-align: center;

@@ -184,7 +184,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
 .stadium-map__field {
   position: relative;
   width: 100%;
-  height: 520rpx;
+  height: 560rpx;
   background: transparent;
   overflow: visible;
 }
@@ -196,7 +196,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 36rpx;
+  min-height: 44rpx;
   border-radius: 12rpx;
   box-sizing: border-box;
   margin: 0;
@@ -221,7 +221,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   display: block;
   max-width: 100%;
   overflow: hidden;
-  font-size: 17rpx;
+  font-size: var(--fi-font-20);
   font-weight: 900;
   text-align: center;
   text-overflow: ellipsis;

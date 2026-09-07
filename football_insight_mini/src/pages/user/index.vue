@@ -82,6 +82,15 @@
         />
       </template>
 
+      <!-- H5 测试登录入口：仅当后端配置 H5_TEST_LOGIN_USER_IDS 白名单时展示，不受审核模式影响。 -->
+      <!-- #ifdef H5 -->
+      <UserH5TestLoginPanel
+        :users="h5TestUsers"
+        :current-user-id="currentUser?.id"
+        @select="handleH5TestLoginSelect"
+      />
+      <!-- #endif -->
+
       <!-- 设置入口仅管理员（后端白名单判定）可见；不受审核模式影响。 -->
       <view v-if="isReviewController" class="panel settings-entry-panel" hover-class="settings-entry-panel--pressed" hover-stay-time="100" @click="openSettingsPage">
         <view class="settings-entry-panel__body">
@@ -124,6 +133,7 @@ import UserMembershipPanel from './components/UserMembershipPanel.vue'
 import UserPasswordLoginSheet from './components/UserPasswordLoginSheet.vue'
 import UserWechatBindSheet from './components/UserWechatBindSheet.vue'
 import UserNotificationEmailSheet from './components/UserNotificationEmailSheet.vue'
+import UserH5TestLoginPanel from './components/UserH5TestLoginPanel.vue'
 import badgeCheckIcon from '../../static/user/badge-check.svg'
 import calendarCheckIcon from '../../static/user/calendar-check.svg'
 import calendarDaysIcon from '../../static/user/calendar-days.svg'
@@ -134,13 +144,15 @@ import {
   getCurrentUser,
   getNotificationEmail,
   login,
+  loginAsH5TestUser,
   loginWithMiniWechat,
+  listH5TestLoginUsers,
   logout,
   updateNotificationEmail,
 } from '../../api/auth'
 import { canControlMiniReview } from '../../api/miniReview'
 import { getPublicSystemConfig } from '../../api/system'
-import type { CurrentUser, MiniWechatBindingRequiredResponse } from '../../types/auth'
+import type { CurrentUser, H5TestLoginUser, MiniWechatBindingRequiredResponse } from '../../types/auth'
 import type { PublicSystemConfig } from '../../types/system'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { getAccessToken } from '../../utils/authStorage'
@@ -213,8 +225,11 @@ const hasOpenSheet = computed(() =>
   || Boolean(miniWechatBindState.value)
   || notificationEmailSheetVisible.value,
 )
-const showGuestChantWall = computed(() => isGuestPage.value && !hasOpenSheet.value)
-const showGuestLoginFloat = computed(() => isGuestPage.value && !hasOpenSheet.value)
+// H5 测试登录面板展开时，隐藏游客歌词墙和登录浮窗，避免遮挡测试账号列表。
+const h5TestUsers = ref<H5TestLoginUser[]>([])
+const h5TestLoginPanelVisible = computed(() => isH5 && h5TestUsers.value.length > 0)
+const showGuestChantWall = computed(() => isGuestPage.value && !hasOpenSheet.value && !h5TestLoginPanelVisible.value)
+const showGuestLoginFloat = computed(() => isGuestPage.value && !hasOpenSheet.value && !h5TestLoginPanelVisible.value)
 
 const joinedAtLabel = computed(() => {
   if (!currentUser.value?.created_at) {
@@ -489,6 +504,32 @@ async function handleMiniWechatBind(payload: {
   }
 }
 
+async function loadH5TestUsers(): Promise<void> {
+  if (!isH5) {
+    return
+  }
+
+  // 后端未配置 H5_TEST_LOGIN_USER_IDS 白名单时接口返回 403，此时直接隐藏入口。
+  try {
+    const result = await listH5TestLoginUsers()
+    h5TestUsers.value = result.items
+  } catch {
+    h5TestUsers.value = []
+  }
+}
+
+async function handleH5TestLoginSelect(user: H5TestLoginUser): Promise<void> {
+  try {
+    const result = await loginAsH5TestUser(user.id)
+    hasLocalAccessToken.value = Boolean(getAccessToken())
+    currentUser.value = result.user
+    uni.showToast({ title: `已切换到 ${user.display_name?.trim() || user.account_identifier}`, icon: 'none' })
+    await loadUser()
+  } catch (error) {
+    uni.showToast({ title: extractApiErrorMessage(error, '测试登录失败'), icon: 'none' })
+  }
+}
+
 async function redirectAfterLogin(): Promise<void> {
   const target = consumePostLoginRedirect()
   if (!target || target.url === '/pages/user/index') {
@@ -523,6 +564,7 @@ function getMiniWechatCode(): Promise<string> {
 onShow(() => {
   reportPageActivity('user')
   void loadUser()
+  void loadH5TestUsers()
 })
 </script>
 
@@ -593,7 +635,7 @@ onShow(() => {
 
 .page-root--guest .page {
   justify-content: flex-end;
-  padding: 24rpx 28rpx calc(12rpx + env(safe-area-inset-bottom));
+  padding: 24rpx 28rpx calc(32rpx + env(safe-area-inset-bottom) + 100rpx);
 }
 
 .hero-card, .panel {

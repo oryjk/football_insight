@@ -42,7 +42,7 @@ const emit = defineEmits<{
 .dock-cta {
   width: 100%;
   padding: var(--fi-space-24) var(--fi-space-28);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-radius-md);
   background: var(--fi-primitive-ink);
   color: var(--fi-primitive-white);
   font-size: var(--fi-font-28);
@@ -78,7 +78,7 @@ const emit = defineEmits<{
 
 .dock-status {
   padding: var(--fi-space-20) var(--fi-space-22);
-  border-radius: 26rpx;
+  border-radius: 20rpx;
   background: var(--fi-primitive-ink);
   color: var(--fi-primitive-white);
   box-shadow: 0 16rpx 36rpx rgba(21, 22, 27, 0.32);

@@ -559,7 +559,7 @@ function submit(): void {
   padding: 0 var(--fi-space-18);
   background: var(--fi-primitive-white);
   border: 1rpx solid var(--fi-color-border-chip);
-  border-radius: 16rpx;
+  border-radius: 12rpx;
   font-size: var(--fi-font-26);
   font-weight: 400;
   color: var(--fi-color-text-strong);

@@ -63,19 +63,21 @@
       <view
         v-for="entry in teamEntries"
         :key="`${activeTeamCategory.slug}-${standingsRankingMode}-${entry.team_id}`"
-        class="ranking-row ranking-row--interactive"
+        class="ranking-row ranking-row--interactive ranking-row--team"
+        :class="resolveRankRowClass(entry.rank_no)"
         hover-class="ranking-row--pressed"
         hover-stay-time="100"
         @click="emit('open-team', entry)"
       >
         <view class="ranking-row__rank-wrap">
-          <text class="ranking-row__rank" :class="`ranking-row__rank--${entry.rank_no}`">#{{ entry.rank_no }}</text>
+          <text class="ranking-row__rank" :class="resolveRankBadgeClass(entry.rank_no)">{{ formatRankLabel(entry.rank_no) }}</text>
         </view>
         <image :src="entry.avatar_storage_url || ''" mode="aspectFit" class="ranking-row__avatar" />
         <view class="ranking-row__body">
           <text class="ranking-row__name">{{ entry.team_name }}</text>
           <text class="ranking-row__note">点击查看球队信息和赛程</text>
         </view>
+        <TeamAbilityHexagon :values="resolveTeamAbilityValues(entry.team_id)" />
         <view class="ranking-row__metric">
           <text class="ranking-row__metric-value">{{ entry.score_value }}</text>
           <text class="ranking-row__metric-note">{{ teamMetricLabel }}</text>
@@ -94,14 +96,21 @@
       <view
         v-for="entry in activePlayerCategory.entries"
         :key="`${activePlayerCategory.slug}-${entry.player_id}`"
-        class="ranking-row"
+        class="ranking-row ranking-row--player"
+        :class="resolveRankRowClass(entry.rank_no)"
       >
-        <text class="ranking-row__rank" :class="`ranking-row__rank--${entry.rank_no}`">#{{ entry.rank_no }}</text>
-        <image :src="entry.avatar_storage_url || ''" mode="aspectFill" class="ranking-row__avatar ranking-row__avatar--player" />
+        <text class="ranking-row__rank" :class="resolveRankBadgeClass(entry.rank_no)">{{ formatRankLabel(entry.rank_no) }}</text>
+        <image
+          :src="entry.avatar_storage_url || ''"
+          mode="aspectFill"
+          class="ranking-row__avatar ranking-row__avatar--player ranking-row__avatar--clickable"
+          @click.stop="emit('open-player', entry)"
+        />
         <view class="ranking-row__body">
           <text class="ranking-row__name">{{ entry.player_name }}</text>
           <text class="ranking-row__note">{{ entry.team_name }}</text>
         </view>
+        <TeamAbilityHexagon :values="resolvePlayerAbilityValues(entry.player_id)" />
         <view class="ranking-row__metric">
           <text class="ranking-row__metric-value">{{ entry.score_value }}</text>
           <text class="ranking-row__metric-note">{{ activePlayerCategory.label }}</text>
@@ -115,12 +124,15 @@
 import { computed, getCurrentInstance, nextTick, ref, watch } from 'vue'
 import type {
   PlayerRankingCategory,
+  PlayerRankingEntry,
   RankingsViewResponse,
   StandingsTable,
   TeamRankingCategory,
   TeamRankingEntry,
 } from '../../../types/insight'
 import { buildStandingsRankingEntries, type StandingsRankingMode } from '../poster'
+import { buildPlayerAbilityValues, buildTeamAbilityValues, TEAM_ABILITY_FALLBACK } from '../ability'
+import TeamAbilityHexagon from './TeamAbilityHexagon.vue'
 
 const props = defineProps<{
   rankings: RankingsViewResponse
@@ -134,6 +146,7 @@ const emit = defineEmits<{
   (e: 'update:standingsRankingMode', value: StandingsRankingMode): void
   (e: 'update:activeCategorySlug', value: string): void
   (e: 'open-team', entry: TeamRankingEntry): void
+  (e: 'open-player', entry: PlayerRankingEntry): void
 }>()
 
 const instance = getCurrentInstance()
@@ -170,6 +183,22 @@ const teamKicker = computed(() =>
 )
 const teamMetricLabel = computed(() => (isStandingsTeamCategory.value ? '积分' : '总计'))
 
+const teamAbilityByTeamId = computed<Map<number, number[]>>(() =>
+  buildTeamAbilityValues(teamCategories.value),
+)
+
+function resolveTeamAbilityValues(teamId: number): number[] {
+  return teamAbilityByTeamId.value.get(teamId) ?? TEAM_ABILITY_FALLBACK
+}
+
+const playerAbilityByPlayerId = computed<Map<number, number[]>>(() =>
+  buildPlayerAbilityValues(playerCategories.value),
+)
+
+function resolvePlayerAbilityValues(playerId: number): number[] {
+  return playerAbilityByPlayerId.value.get(playerId) ?? TEAM_ABILITY_FALLBACK
+}
+
 watch(
   categoryOptions,
   (items) => {
@@ -190,6 +219,28 @@ watch(
 watch(() => props.activeCategorySlug, () => {
   void centerActiveCategory()
 })
+
+// 前 3 名使用奖牌徽标和行高亮，其余名次保持 #n 文本。
+function resolveRankBadgeClass(rankNo: number): Record<string, boolean> {
+  return {
+    'ranking-row__rank--medal': rankNo <= 3,
+    'ranking-row__rank--1': rankNo === 1,
+    'ranking-row__rank--2': rankNo === 2,
+    'ranking-row__rank--3': rankNo === 3,
+  }
+}
+
+function resolveRankRowClass(rankNo: number): Record<string, boolean> {
+  return {
+    'ranking-row--top-1': rankNo === 1,
+    'ranking-row--top-2': rankNo === 2,
+    'ranking-row--top-3': rankNo === 3,
+  }
+}
+
+function formatRankLabel(rankNo: number): string {
+  return rankNo <= 3 ? `${rankNo}` : `#${rankNo}`
+}
 
 function hasRectShape(value: unknown): value is { left: number; width: number } {
   return !!value && typeof value === 'object'
@@ -421,7 +472,8 @@ async function centerActiveCategory(): Promise<void> {
   align-items: center;
   width: 100%;
   overflow: hidden;
-  padding: var(--fi-space-16) 0;
+  padding: var(--fi-space-16) 12rpx;
+  box-sizing: border-box;
   border-bottom: var(--fi-primitive-border-width) solid #eff1f5;
 }
 
@@ -429,6 +481,17 @@ async function centerActiveCategory(): Promise<void> {
   padding: var(--fi-space-14) 12rpx;
   border-radius: var(--fi-radius-md);
   transition: transform 180ms ease, background-color 180ms ease;
+}
+
+/* 球队行/球员行多出六边形能力图一列，能力图在列内居中并右移，避免与名称文案重叠 */
+.ranking-row--team,
+.ranking-row--player {
+  grid-template-columns: 72rpx 68rpx minmax(0, 1fr) 140rpx 112rpx;
+}
+
+.ranking-row--team .ability-hex,
+.ranking-row--player .ability-hex {
+  justify-self: end;
 }
 
 .ranking-row--pressed {
@@ -450,9 +513,54 @@ async function centerActiveCategory(): Promise<void> {
   white-space: nowrap;
 }
 
-.ranking-row__rank--1 { color: var(--fi-color-primary); }
-.ranking-row__rank--2 { color: #2563eb; }
-.ranking-row__rank--3 { color: #16a34a; }
+/* 前 3 名奖牌徽标：金 / 银 / 铜 */
+.ranking-row__rank--medal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: var(--fi-font-24);
+  font-weight: var(--fi-weight-extrabold);
+  line-height: 1;
+}
+
+.ranking-row__rank--medal.ranking-row__rank--1 {
+  background: linear-gradient(135deg, #f6c453 0%, #e89b0c 100%);
+  box-shadow: 0 6rpx 14rpx rgba(232, 155, 12, 0.35);
+}
+
+.ranking-row__rank--medal.ranking-row__rank--2 {
+  background: linear-gradient(135deg, #d7dee8 0%, #a8b3c2 100%);
+  box-shadow: 0 6rpx 14rpx rgba(148, 163, 184, 0.35);
+}
+
+.ranking-row__rank--medal.ranking-row__rank--3 {
+  background: linear-gradient(135deg, #e0995c 0%, #b06a32 100%);
+  box-shadow: 0 6rpx 14rpx rgba(176, 106, 50, 0.35);
+}
+
+/* 前 3 名行底色高亮 */
+.ranking-row--top-1,
+.ranking-row--top-2,
+.ranking-row--top-3 {
+  border-radius: var(--fi-radius-md);
+  border-bottom-color: transparent;
+}
+
+.ranking-row--top-1 {
+  background: linear-gradient(90deg, rgba(246, 196, 83, 0.14) 0%, rgba(246, 196, 83, 0.02) 70%, transparent 100%);
+}
+
+.ranking-row--top-2 {
+  background: linear-gradient(90deg, rgba(168, 179, 194, 0.16) 0%, rgba(168, 179, 194, 0.02) 70%, transparent 100%);
+}
+
+.ranking-row--top-3 {
+  background: linear-gradient(90deg, rgba(224, 153, 92, 0.14) 0%, rgba(224, 153, 92, 0.02) 70%, transparent 100%);
+}
 
 .ranking-row__avatar {
   width: 68rpx;
@@ -460,6 +568,10 @@ async function centerActiveCategory(): Promise<void> {
   border-radius: var(--fi-radius-round);
   background: #f5f6fa;
   flex-shrink: 0;
+}
+
+.ranking-row__avatar--clickable {
+  cursor: pointer;
 }
 
 .ranking-row__body,
@@ -496,6 +608,8 @@ async function centerActiveCategory(): Promise<void> {
   color: var(--fi-color-text-muted);
   font-size: var(--fi-font-22);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ranking-row__metric-value {

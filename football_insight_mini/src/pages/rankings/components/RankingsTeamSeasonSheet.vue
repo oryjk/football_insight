@@ -31,11 +31,35 @@
         </view>
       </view>
 
-      <FiLoading
-        v-if="loading"
-        title="赛季战绩加载中"
-        caption="正在整理这支球队本赛季的每场比赛。"
-      />
+      <view class="team-season-ability">
+        <view class="team-season-ability__heading">
+          <text class="team-season-ability__title">六维能力</text>
+          <text class="team-season-ability__caption">按全联盟最大值折算，满分 100</text>
+        </view>
+        <view class="team-season-ability__body">
+          <view class="team-season-ability__chart">
+            <TeamAbilityHexagon :values="abilityValues" :size="200" show-labels />
+          </view>
+          <view class="team-season-ability__legend">
+            <view
+              v-for="(axis, index) in abilityAxes"
+              :key="axis"
+              class="team-season-ability__legend-item"
+            >
+              <text class="team-season-ability__legend-dot" :class="`team-season-ability__legend-dot--${index + 1}`"></text>
+              <text class="team-season-ability__legend-label">{{ axis }}</text>
+              <text class="team-season-ability__legend-value">{{ formatAbilityScore(abilityValues[index]) }}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view v-if="loading" class="team-season-sheet__loading">
+        <FiLoading
+          title="赛季战绩加载中"
+          caption="正在整理这支球队本赛季的每场比赛。"
+        />
+      </view>
 
       <view v-else-if="errorMessage" class="state-card state-card--error team-season-sheet__state">
         <text>{{ errorMessage }}</text>
@@ -46,7 +70,7 @@
         scroll-y
         class="team-season-sheet__list"
         :scroll-top="scrollTop"
-        scroll-with-animation
+        :scroll-with-animation="scrollAnimated"
       >
         <view
           v-for="(match, index) in matches"
@@ -95,7 +119,9 @@
 <script setup lang="ts">
 import { computed, getCurrentInstance, nextTick, ref, watch } from 'vue'
 import FiLoading from '../../../components/FiLoading.vue'
+import TeamAbilityHexagon from './TeamAbilityHexagon.vue'
 import type { TeamRankingEntry } from '../../../types/insight'
+import { TEAM_ABILITY_AXES } from '../ability'
 import { buildTeamSeasonMatchRowId, formatTeamSeasonRecord, type TeamSeasonMatch } from '../../../utils/teamSeasonMatches'
 
 const props = defineProps<{
@@ -105,9 +131,16 @@ const props = defineProps<{
   categoryScoreText: string
   categoryLabelText: string
   matches: TeamSeasonMatch[]
+  abilityValues: number[]
   loading: boolean
   errorMessage: string
 }>()
+
+const abilityAxes = TEAM_ABILITY_AXES
+
+function formatAbilityScore(value: number | undefined): string {
+  return `${Math.round((value ?? 0) * 100)}`
+}
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -115,6 +148,8 @@ const emit = defineEmits<{
 
 const instance = getCurrentInstance()
 const scrollTop = ref(0)
+// 首次自动定位"下一场"时不做滚动动画，避免弹框打开瞬间画面跳动；之后再开启动画。
+const scrollAnimated = ref(false)
 
 const recordText = computed(() => formatTeamSeasonRecord(props.matches))
 const nextScheduledMatch = computed(() =>
@@ -170,6 +205,9 @@ async function centerMatch(matchId: number): Promise<void> {
     if (nextScrollTop !== scrollTop.value) {
       scrollTop.value = nextScrollTop
     }
+
+    // 首次定位完成后再允许滚动动画
+    scrollAnimated.value = true
   })
 }
 </script>
@@ -317,6 +355,101 @@ async function centerMatch(matchId: number): Promise<void> {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.team-season-ability {
+  margin-top: var(--fi-space-18);
+  padding: var(--fi-space-22) var(--fi-space-24);
+  border-radius: var(--fi-radius-md);
+  border: var(--fi-primitive-border-width) solid var(--fi-color-border-chip);
+  background: linear-gradient(160deg, rgba(250, 247, 240, 0.9), rgba(255, 255, 255, 0.98));
+  display: grid;
+  gap: var(--fi-space-18);
+}
+
+.team-season-ability__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--fi-space-12);
+}
+
+.team-season-ability__title {
+  color: var(--fi-color-text-strong);
+  font-size: var(--fi-font-28);
+  font-weight: var(--fi-weight-extrabold);
+  line-height: var(--fi-leading-none);
+}
+
+.team-season-ability__caption {
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-20);
+  line-height: var(--fi-leading-none);
+}
+
+.team-season-ability__body {
+  display: flex;
+  align-items: center;
+  gap: var(--fi-space-24);
+}
+
+/* 给顶点标注预留空间，避免左右两侧文字被裁切 */
+.team-season-ability__chart {
+  padding: 34rpx 62rpx;
+  flex-shrink: 0;
+}
+
+.team-season-ability__legend {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fi-space-14) var(--fi-space-16);
+}
+
+.team-season-ability__legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--fi-space-8);
+  min-width: 0;
+}
+
+.team-season-ability__legend-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(var(--fi-primitive-red-rgb, 214, 48, 49), 0.85);
+}
+
+.team-season-ability__legend-dot--2 { background: #e89b0c; }
+.team-season-ability__legend-dot--3 { background: #2563eb; }
+.team-season-ability__legend-dot--4 { background: #16a34a; }
+.team-season-ability__legend-dot--5 { background: #7c5cbf; }
+.team-season-ability__legend-dot--6 { background: #0e9aa7; }
+
+.team-season-ability__legend-label {
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-22);
+  line-height: var(--fi-leading-none);
+  white-space: nowrap;
+}
+
+.team-season-ability__legend-value {
+  margin-left: auto;
+  color: var(--fi-color-text-strong);
+  font-size: var(--fi-font-24);
+  font-weight: var(--fi-weight-extrabold);
+  line-height: var(--fi-leading-none);
+}
+
+/* 加载态预留与赛程列表相同的高度，避免数据到达时弹框高度突变造成抖动 */
+.team-season-sheet__loading {
+  margin-top: var(--fi-space-22);
+  min-height: 52vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .team-season-sheet__list {
