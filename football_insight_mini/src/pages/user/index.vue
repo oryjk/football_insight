@@ -113,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
@@ -131,20 +131,13 @@ import calendarCheckIcon from '../../static/user/calendar-check.svg'
 import calendarDaysIcon from '../../static/user/calendar-days.svg'
 import logInIcon from '../../static/user/log-in.svg'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
-import {
-  getCurrentUser,
-  getNotificationEmail,
-  listH5TestLoginUsers,
-  updateNotificationEmail,
-} from '../../api/auth'
+import { listH5TestLoginUsers } from '../../api/auth'
 import { isSessionSupersededError, useAppSession } from '../../stores/appSession'
-import { canControlMiniReview } from '../../api/miniReview'
-import type { CurrentUser, H5TestLoginUser, MiniWechatBindingRequiredResponse } from '../../types/auth'
+import type { H5TestLoginUser, MiniWechatBindingRequiredResponse } from '../../types/auth'
 import { useRuntimeConfig } from '../../stores/runtimeConfig'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { getAccessToken } from '../../utils/authStorage'
-import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
 import { reportPageActivity } from '../../utils/userActivity'
+import { createUserAccountEffects } from './accountEffects'
 import {
   buildUserAccountInfoItems,
   buildUserBenefitItems,
@@ -166,12 +159,13 @@ import {
 import { consumePostLoginRedirect, navigateToPostLoginTarget } from '../../utils/postLoginRedirect'
 import { buildPasswordLoginPayload, resolveUserLoginPresentation } from './loginHelpers'
 
-const hasLocalAccessToken = ref(Boolean(getAccessToken()))
 const session = useAppSession()
+// 当前用户与登录态共享自 appSession（唯一写入入口），本页只读。
+const currentUser = session.currentUser
+const hasAccessToken = session.hasAccessToken
 // 设置入口仅对 MINI_REVIEW_CONTROL_USER_IDS 白名单用户（管理员）可见。
 const isReviewController = ref(false)
-const loading = ref(hasLocalAccessToken.value)
-const currentUser = ref<CurrentUser | null>(null)
+const loading = ref(hasAccessToken.value)
 // 公共配置共享自 runtimeConfig store（60 秒缓存，失败保留上次成功值）。
 const runtimeConfig = useRuntimeConfig()
 const publicConfig = runtimeConfig.config
@@ -183,6 +177,24 @@ const notificationEmailSaving = ref(false)
 const miniWechatBindState = ref<MiniWechatBindingRequiredResponse | null>(null)
 const passwordLoginSheetVisible = ref(false)
 const passwordLoginSubmitting = ref(false)
+
+// 账号读写（白名单/审核态/邮箱）收口到 effects：内部按 session revision 防护，
+// 旧会话的迟到响应不写状态、不弹 toast。
+const accountEffects = createUserAccountEffects(session, {
+  loading,
+  systemConfigUnderReview,
+  isReviewController,
+  notificationEmail,
+  notificationEmailSheetVisible,
+  notificationEmailSaving,
+  miniWechatBindState,
+  passwordLoginSheetVisible,
+})
+
+// 会话被替代（新登录/退出/失效）时，丢弃按旧会话展示的私有状态。
+watch(session.revision, () => {
+  accountEffects.resetSessionScopedState()
+})
 
 const isH5 =
   // #ifdef H5
@@ -201,7 +213,7 @@ const accountInfoIconMap: Record<UserAccountInfoItem['iconName'], string> = {
   'log-in': logInIcon,
 }
 
-const isGuestPage = computed(() => !systemConfigUnderReview.value && (!hasLocalAccessToken.value || (!loading.value && !currentUser.value)))
+const isGuestPage = computed(() => !systemConfigUnderReview.value && (!hasAccessToken.value || (!loading.value && !currentUser.value)))
 const hasOpenSheet = computed(() =>
   passwordLoginSheetVisible.value
   || Boolean(miniWechatBindState.value)
@@ -297,57 +309,7 @@ function openSettingsPage() {
 }
 
 async function loadUser(): Promise<void> {
-  hasLocalAccessToken.value = Boolean(getAccessToken())
-  loading.value = hasLocalAccessToken.value
-
-  // 设置入口的显隐不依赖审核模式：管理员在审核期间也需要进设置切换审核状态，
-  // 因此只要有登录 token 就先判一次白名单，再走审核模式的提前返回。
-  if (hasLocalAccessToken.value) {
-    try {
-      isReviewController.value = (await canControlMiniReview()).allowed
-    } catch {
-      isReviewController.value = false
-    }
-  } else {
-    isReviewController.value = false
-  }
-
-  systemConfigUnderReview.value = await loadSystemConfigUnderReview()
-
-  if (systemConfigUnderReview.value) {
-    currentUser.value = null
-    miniWechatBindState.value = null
-    loading.value = false
-    return
-  }
-
-  if (!hasLocalAccessToken.value) {
-    currentUser.value = null
-    notificationEmail.value = ''
-    miniWechatBindState.value = null
-    loading.value = false
-    return
-  }
-
-  const [userResult, notificationEmailResult] = await Promise.allSettled([
-    getCurrentUser(),
-    getNotificationEmail(),
-    runtimeConfig.ensureRuntimeConfig(),
-  ])
-
-  if (userResult.status === 'fulfilled') {
-    currentUser.value = userResult.value
-  } else {
-    currentUser.value = null
-  }
-
-  if (notificationEmailResult.status === 'fulfilled') {
-    notificationEmail.value = notificationEmailResult.value.email?.trim() || ''
-  } else {
-    notificationEmail.value = ''
-  }
-
-  loading.value = false
+  await accountEffects.loadUser()
 }
 
 function openNotificationEmailSheet(): void {
@@ -355,17 +317,7 @@ function openNotificationEmailSheet(): void {
 }
 
 async function saveNotificationEmail(email: string): Promise<void> {
-  notificationEmailSaving.value = true
-  try {
-    const result = await updateNotificationEmail(email)
-    notificationEmail.value = result.email?.trim() || email
-    notificationEmailSheetVisible.value = false
-    uni.showToast({ title: '邮箱已保存', icon: 'success' })
-  } catch (error) {
-    uni.showToast({ title: extractApiErrorMessage(error, '邮箱保存失败'), icon: 'none' })
-  } finally {
-    notificationEmailSaving.value = false
-  }
+  await accountEffects.saveNotificationEmail(email)
 }
 
 async function handleLogout(): Promise<void> {
@@ -410,9 +362,8 @@ function handleLoginAction(): void {
 async function handlePasswordLogin(form: { accountIdentifier: string; password: string }): Promise<void> {
   passwordLoginSubmitting.value = true
   try {
-    const result = await session.loginWithPassword(buildPasswordLoginPayload(form))
-    hasLocalAccessToken.value = Boolean(getAccessToken())
-    currentUser.value = result.user
+    // token/user 由 session 发布，本页通过共享只读状态自动刷新。
+    await session.loginWithPassword(buildPasswordLoginPayload(form))
     passwordLoginSheetVisible.value = false
     await loadUser()
     uni.showToast({ title: '登录成功', icon: 'success' })
@@ -434,9 +385,7 @@ async function handleMiniWechatLogin(): Promise<void> {
     const result = await session.loginWithWechatCode(code)
 
     if (result.status === 'authenticated') {
-      // 登录态标记必须立刻刷新，否则 isGuestPage 仍按未登录渲染（请先登录浮窗 + 歌词墙不消失）。
-      hasLocalAccessToken.value = Boolean(getAccessToken())
-      currentUser.value = result.user
+      // 登录态由 session 同步发布，isGuestPage 基于共享只读状态自动切到已登录渲染。
       uni.showToast({ title: '微信登录成功', icon: 'success' })
       await loadUser()
       await redirectAfterLogin()
@@ -464,7 +413,7 @@ async function handleMiniWechatBind(payload: {
   avatarDataUrl: string
 }): Promise<void> {
   try {
-    const result = await session.bindWechatAccount({
+    await session.bindWechatAccount({
       bind_token: payload.bindToken,
       invite_code: payload.inviteCode || undefined,
       referral_code: payload.referralCode || undefined,
@@ -472,8 +421,6 @@ async function handleMiniWechatBind(payload: {
       avatar_data_url: payload.avatarDataUrl,
     })
 
-    currentUser.value = result.user
-    hasLocalAccessToken.value = Boolean(getAccessToken())
     closeMiniWechatBindSheet()
     uni.showToast({ title: '微信绑定成功', icon: 'success' })
     await loadUser()
@@ -502,9 +449,7 @@ async function loadH5TestUsers(): Promise<void> {
 
 async function handleH5TestLoginSelect(user: H5TestLoginUser): Promise<void> {
   try {
-    const result = await session.loginAsTestUser(user.id)
-    hasLocalAccessToken.value = Boolean(getAccessToken())
-    currentUser.value = result.user
+    await session.loginAsTestUser(user.id)
     uni.showToast({ title: `已切换到 ${user.display_name?.trim() || user.account_identifier}`, icon: 'none' })
     await loadUser()
   } catch (error) {
@@ -550,6 +495,7 @@ onShow(() => {
   reportPageActivity('user')
   void loadUser()
   void loadH5TestUsers()
+  void runtimeConfig.ensureRuntimeConfig()
 })
 </script>
 
