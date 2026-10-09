@@ -1,5 +1,3 @@
-export type AiChatMode = 'backend_proxy' | 'frontend_direct'
-
 export interface HomeBriefingMarquees {
   leader: string[]
   scorer: string[]
@@ -15,7 +13,6 @@ export interface MembershipTierRule {
 
 export interface PublicSystemConfig {
   wechat_login_enabled: boolean
-  ai_chat_mode?: AiChatMode
   home_briefing_marquees?: HomeBriefingMarquees
   membership_tier_rules?: MembershipTierRule[]
 }

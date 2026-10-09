@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
-import { initWechatCloud } from "./utils/wechatCloud";
 onLaunch(() => {
-  initWechatCloud();
   console.log("Football Insight mini launch");
 });
 onShow(() => {

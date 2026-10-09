@@ -1,6 +1,6 @@
 <template>
   <view class="page-root" :class="{ 'page-root--guest': isGuestPage }">
-    <FiBrandNav open-on-current-page :transparent="isGuestPage" @open-ai="openAiFromBrandNav" />
+    <FiBrandNav :transparent="isGuestPage" />
     <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
     <view class="page-scroll">
@@ -102,13 +102,6 @@
     </view>
     </view>
 
-    <FiAiChatSheet
-      :visible="aiChatVisible"
-      :current-user="currentAiUser"
-      :ai-chat-mode="aiPublicConfig?.ai_chat_mode"
-      @close="closeAiChat"
-    />
-
     <UserGuestChantWall v-if="showGuestChantWall" />
 
     <FiLoginFloat
@@ -123,7 +116,6 @@
 import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
-import FiAiChatSheet from '../../components/FiAiChatSheet.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
 import UserGuestChantWall from './components/UserGuestChantWall.vue'
 import UserSkeleton from './components/UserSkeleton.vue'
@@ -177,7 +169,6 @@ import {
   type MembershipTierGuide,
 } from '../../utils/membershipRules'
 import { consumePostLoginRedirect, navigateToPostLoginTarget } from '../../utils/postLoginRedirect'
-import { useAiChatSheet } from '../../composables/useAiChatSheet'
 import { buildPasswordLoginPayload, resolveUserLoginPresentation } from './loginHelpers'
 
 const hasLocalAccessToken = ref(Boolean(getAccessToken()))
@@ -190,13 +181,6 @@ const systemConfigUnderReview = ref(false)
 const notificationEmail = ref('')
 const notificationEmailSheetVisible = ref(false)
 const notificationEmailSaving = ref(false)
-const {
-  aiChatVisible,
-  currentAiUser,
-  aiPublicConfig,
-  openAiChat,
-  closeAiChat,
-} = useAiChatSheet()
 
 const miniWechatBindState = ref<MiniWechatBindingRequiredResponse | null>(null)
 const passwordLoginSheetVisible = ref(false)
@@ -420,10 +404,6 @@ function handleMembershipCardAction(): void {
       url: '/pages/membership-purchase/index',
     })
   }
-}
-
-function openAiFromBrandNav(): void {
-  void openAiChat()
 }
 
 function handleLoginAction(): void {

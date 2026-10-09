@@ -42,7 +42,7 @@ Page（index.vue 编排）
 
 文件身份：pages.json 注册的页面入口和页面目录直属的 `*.vue`（`index.vue`、`RankingsContent.vue`、`MatchesContent.vue` 这类页面容器）属于页面层，允许依赖 api；只有 `components/` 子目录里的才算展示组件。页面深层既未注册也不在 `components/` 下的 `.vue` 会被直接判违规，逼着显式登记身份。
 
-例外必须显式登记在脚本的 `ALLOWLIST`（文件 × 规则，跨页例外精确到放行目标路径）并注明原因与清理计划（当前：`FiAiChatSheet` 组件内调 AI api —— feature 模块待拆分；`api/ai.ts` 流式 `uni.request` —— enableChunked 无法走统一封装；`rankings/index.vue` 跨页内嵌 `matches/MatchesContent.vue` —— 榜单 tab 内嵌整个赛程视图，仅放行这一个目标）。允许/禁止案例的回归测试在 `scripts/check-import-boundaries.test.ts`（fixture 树：`scripts/fixtures/import-boundaries/`），改检查规则时必须同步跑。
+例外必须显式登记在脚本的 `ALLOWLIST`（文件 × 规则，跨页例外精确到放行目标路径）并注明原因与清理计划（当前：`rankings/index.vue` 跨页内嵌 `matches/MatchesContent.vue` —— 榜单 tab 内嵌整个赛程视图，仅放行这一个目标）。允许/禁止案例的回归测试在 `scripts/check-import-boundaries.test.ts`（fixture 树：`scripts/fixtures/import-boundaries/`），改检查规则时必须同步跑。
 
 Store 约定：只解决真实的跨页状态（登录用户、审核态配置）；页面 loading、弹层开关、筛选和表单状态留在页面/composable，不把请求结果全局化。
 

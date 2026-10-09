@@ -1,6 +1,6 @@
 <template>
   <view class="home-page-shell">
-    <FiBrandNav open-on-current-page @open-ai="openAiFromBrandNav" />
+    <FiBrandNav />
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
     <view class="page-scroll">
@@ -55,13 +55,6 @@
       </view>
     </view>
 
-    <FiAiChatSheet
-      :visible="aiChatVisible"
-      :current-user="currentAiUser"
-      :ai-chat-mode="publicConfig?.ai_chat_mode"
-      @close="handleCloseAiChat"
-    />
-
     <HomeTechStatsSheet
       v-if="selectedPulseMatch"
       :match="selectedPulseMatch"
@@ -94,7 +87,6 @@
 import { computed, ref } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
-import FiAiChatSheet from '../../components/FiAiChatSheet.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
 import HomeHeroBriefing from './components/HomeHeroBriefing.vue'
 import HomeSupportPanel from './components/HomeSupportPanel.vue'
@@ -104,11 +96,9 @@ import HomeRankingPanel from './components/HomeRankingPanel.vue'
 import HomeTechStatsSheet from './components/HomeTechStatsSheet.vue'
 import HomeTeamSeasonSheet from './components/HomeTeamSeasonSheet.vue'
 import HomeFavoriteTeamSheet from './components/HomeFavoriteTeamSheet.vue'
-import { getCurrentUser } from '../../api/auth'
 import { getAvailableRounds, getMatches, getOverview, getRankings } from '../../api/insight'
 import { getSupportProfile, listSupportTeams, setFavoriteTeam } from '../../api/support'
 import { getPublicSystemConfig } from '../../api/system'
-import type { CurrentUser } from '../../types/auth'
 import type {
   InsightOverviewResponse,
   MatchCard,
@@ -127,7 +117,6 @@ import { buildHomeBriefingMarqueeMap, splitBriefingMarqueeRows } from '../../uti
 import { buildHeadlineTitleParts } from '../../utils/homeViewText'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
 import { reportPageActivity } from '../../utils/userActivity'
-import { consumeOpenAiChatIntent } from '../../utils/aiEntryIntent'
 import {
   buildHomeBriefingItems,
   buildHomeHeadlineBody,
@@ -156,8 +145,6 @@ const rounds = ref<RoundReference[]>([])
 const rankings = ref<{ player_categories: PlayerRankingCategory[] } | null>(null)
 const guideRankings = ref<RankingsViewResponse | null>(null)
 const publicConfig = ref<PublicSystemConfig | null>(null)
-const currentAiUser = ref<CurrentUser | null>(null)
-const aiChatVisible = ref(false)
 const selectedPulseMatch = ref<HomePulseLeadMatch | null>(null)
 const selectedStandingsTeam = ref<OverviewStanding | null>(null)
 const allSeasonMatches = ref<MatchCard[] | null>(null)
@@ -486,74 +473,6 @@ async function loadSupportData() {
   }
 }
 
-async function loadCurrentAiUser() {
-  hasAuthToken.value = resolveHomeHasAuthToken(getAccessToken())
-
-  if (!hasAuthToken.value) {
-    currentAiUser.value = null
-    loginPromptVisible.value = true
-    return
-  }
-
-  try {
-    currentAiUser.value = await getCurrentUser()
-  } catch {
-    currentAiUser.value = null
-  }
-
-  if (!currentAiUser.value && hasAuthToken.value) {
-    setAccessToken(null)
-    hasAuthToken.value = false
-    loginPromptVisible.value = true
-  }
-}
-
-async function ensureAiUser(): Promise<CurrentUser | null> {
-  hasAuthToken.value = resolveHomeHasAuthToken(getAccessToken())
-
-  if (!hasAuthToken.value) {
-    return null
-  }
-
-  if (currentAiUser.value) {
-    return currentAiUser.value
-  }
-
-  await loadCurrentAiUser()
-  return currentAiUser.value
-}
-
-function promptAiLogin() {
-  uni.showModal({
-    title: '先登录再聊天',
-    content: '登录后才可以和小罗继续对话，现在去“我的”页登录吗？',
-    confirmText: '去登录',
-    success: ({ confirm }) => {
-      if (!confirm) {
-        return
-      }
-
-      uni.switchTab({
-        url: '/pages/user/index',
-      })
-    },
-  })
-}
-
-async function openAiChatDirectly(): Promise<void> {
-  const user = await ensureAiUser()
-  if (!user) {
-    promptAiLogin()
-    return
-  }
-
-  aiChatVisible.value = true
-}
-
-function openAiFromBrandNav(): void {
-  void openAiChatDirectly()
-}
-
 function handleSupportLogin() {
   rememberPostLoginRedirect({
     type: 'switchTab',
@@ -601,19 +520,11 @@ function openSupportMatch() {
   })
 }
 
-function handleCloseAiChat() {
-  aiChatVisible.value = false
-}
-
 onShow(() => {
   reportPageActivity('home')
   hasAuthToken.value = resolveHomeHasAuthToken(getAccessToken())
   void loadPage()
   void loadSupportData()
-
-  if (consumeOpenAiChatIntent()) {
-    void openAiChatDirectly()
-  }
 })
 </script>
 

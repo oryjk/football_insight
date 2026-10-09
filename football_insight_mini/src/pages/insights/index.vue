@@ -1,6 +1,6 @@
 <template>
   <view class="page-root">
-    <FiBrandNav open-on-current-page @open-ai="openAiFromBrandNav" />
+    <FiBrandNav />
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
     <view class="page-scroll">
@@ -86,13 +86,6 @@
     </view>
     </view>
 
-    <FiAiChatSheet
-      :visible="aiChatVisible"
-      :current-user="currentAiUser"
-      :ai-chat-mode="aiPublicConfig?.ai_chat_mode"
-      @close="closeAiChat"
-    />
-
     <FiLoginFloat v-if="showLoginFloat" @action="goToLogin" />
   </view>
 </template>
@@ -101,7 +94,6 @@
 import { computed, ref, watch } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
-import FiAiChatSheet from '../../components/FiAiChatSheet.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
 import FiLoading from '../../components/FiLoading.vue'
 import InsightsHeroCard from './components/InsightsHeroCard.vue'
@@ -121,7 +113,6 @@ import { resolveMembershipBenefitsLocked } from '../../utils/membershipBenefits'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
 import { reportPageActivity } from '../../utils/userActivity'
-import { useAiChatSheet } from '../../composables/useAiChatSheet'
 import {
   buildAssistContributionRows,
   buildOpponentContributionRows,
@@ -141,13 +132,6 @@ const assistsForPlayerExpanded = ref(false)
 const goalsAgainstOpponentExpanded = ref(false)
 const ticketWatchNavigating = ref(false)
 const systemConfigUnderReview = ref(false)
-const {
-  aiChatVisible,
-  currentAiUser,
-  aiPublicConfig,
-  openAiChat,
-  closeAiChat,
-} = useAiChatSheet()
 const membershipBenefitsLocked = computed(() =>
   resolveMembershipBenefitsLocked(currentUser.value),
 )
@@ -236,10 +220,6 @@ function openTicketWatch(): void {
       ticketWatchNavigating.value = false
     },
   })
-}
-
-function openAiFromBrandNav(): void {
-  void openAiChat()
 }
 
 async function loadUser(): Promise<void> {

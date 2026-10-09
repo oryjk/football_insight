@@ -13,14 +13,6 @@
                     <text class="fi-brand-nav__tagline">最懂球迷的工具</text>
                 </view>
             </view>
-            <button
-                class="fi-brand-nav__ai"
-                :style="aiButtonStyle"
-                @tap.stop="handleAiTap"
-            >
-                <text class="fi-brand-nav__ai-dot"></text>
-                <text>嗡嗡嗡～～</text>
-            </button>
         </view>
     </view>
 </template>
@@ -28,22 +20,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import logo from "../static/app-logo.jpg";
-import { requestOpenAiChat } from "../utils/aiEntryIntent";
 
-const props = withDefaults(
+withDefaults(
     defineProps<{
-        openOnCurrentPage?: boolean;
         transparent?: boolean;
     }>(),
     {
-        openOnCurrentPage: false,
         transparent: false,
     },
 );
-
-const emit = defineEmits<{
-    (e: "open-ai"): void;
-}>();
 
 const isH5 =
     // #ifdef H5
@@ -55,30 +40,11 @@ const isH5 =
 ;
 
 // 胶囊指标仅在小程序端可用；初始为 null 时不输出内联样式，交给 CSS 兜底，
-// 避免 H5 上错误地沿用 px 数值导致按钮压到品牌文案。
-const aiButtonMetrics = ref<{
-    top: number;
-    right: number;
-    height: number;
-} | null>(null);
-
+// 避免 H5 上错误地沿用 px 数值导致品牌错位。
 const brandMetrics = ref<{
     top: number;
     height: number;
 } | null>(null);
-
-const aiButtonStyle = computed(() => {
-    const metrics = aiButtonMetrics.value;
-    if (!metrics) {
-        return {};
-    }
-
-    return {
-        top: metrics.top ? `${metrics.top}px` : "",
-        right: `${metrics.right}px`,
-        height: `${metrics.height}px`,
-    };
-});
 
 const brandStyle = computed(() => {
     const metrics = brandMetrics.value;
@@ -92,29 +58,18 @@ const brandStyle = computed(() => {
     };
 });
 
-function syncAiButtonWithMenuCapsule(): void {
-    // H5 没有微信胶囊按钮，布局走 CSS 流式兜底，不需要同步胶囊位置。
+// 品牌与微信菜单胶囊垂直居中对齐；H5 没有胶囊，走 CSS 流式布局，不需要同步位置。
+function syncBrandWithMenuCapsule(): void {
     // #ifdef H5
     return;
     // #endif
 
     try {
-        const systemInfo = uni.getSystemInfoSync();
         const menuButton = uni.getMenuButtonBoundingClientRect?.();
 
-        if (
-            !systemInfo.windowWidth ||
-            !menuButton?.width ||
-            !menuButton?.height
-        ) {
+        if (!menuButton?.width || !menuButton?.height) {
             return;
         }
-
-        aiButtonMetrics.value = {
-            top: menuButton.top,
-            right: systemInfo.windowWidth - menuButton.left + 8,
-            height: menuButton.height,
-        };
 
         const brandHeight = 64;
         brandMetrics.value = {
@@ -126,20 +81,8 @@ function syncAiButtonWithMenuCapsule(): void {
     }
 }
 
-function handleAiTap(): void {
-    if (props.openOnCurrentPage) {
-        emit("open-ai");
-        return;
-    }
-
-    requestOpenAiChat();
-    uni.switchTab({
-        url: "/pages/home/index",
-    });
-}
-
 onMounted(() => {
-    syncAiButtonWithMenuCapsule();
+    syncBrandWithMenuCapsule();
 });
 </script>
 
@@ -178,15 +121,6 @@ onMounted(() => {
 .fi-brand-nav--transparent .fi-brand-nav__logo {
     border-color: rgba(255, 255, 255, 0.82);
     box-shadow: 0 10rpx 24rpx rgba(0, 0, 0, 0.22);
-}
-
-.fi-brand-nav--transparent .fi-brand-nav__ai {
-    background: rgba(255, 255, 255, 0.22);
-    border-color: rgba(255, 255, 255, 0.42);
-    color: #ffffff;
-    box-shadow: 0 10rpx 24rpx rgba(0, 0, 0, 0.16);
-    backdrop-filter: blur(14rpx);
-    -webkit-backdrop-filter: blur(14rpx);
 }
 
 .fi-brand-nav__status-spacer {
@@ -250,32 +184,7 @@ onMounted(() => {
     white-space: nowrap;
 }
 
-.fi-brand-nav__ai {
-    position: fixed;
-    top: calc(var(--fi-brand-nav-status-height) + 20rpx);
-    right: 190rpx;
-    z-index: 82;
-    margin: 0;
-    min-width: 122rpx;
-    height: 58rpx;
-    padding: 0 18rpx;
-    border-radius: 999rpx;
-    background: rgba(255, 255, 255, 0.2);
-    border: 1rpx solid rgba(21, 22, 27, 0.12);
-    color: #15161b;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8rpx;
-    font-size: 22rpx;
-    font-weight: 800;
-    line-height: 1;
-    box-shadow: none;
-    backdrop-filter: blur(12rpx);
-    -webkit-backdrop-filter: blur(12rpx);
-}
-
-/* H5 没有右上角胶囊，品牌与 AI 按钮回到正常流式布局，两端分布。 */
+/* H5 没有右上角胶囊，品牌回到正常流式布局。 */
 .fi-brand-nav--h5 .fi-brand-nav__bar {
     min-height: auto;
     padding: 20rpx 24rpx;
@@ -289,22 +198,5 @@ onMounted(() => {
     position: static;
     width: auto;
     max-width: 60%;
-}
-
-.fi-brand-nav--h5 .fi-brand-nav__ai {
-    position: static;
-    flex-shrink: 0;
-}
-
-.fi-brand-nav__ai::after {
-    border: 0;
-}
-
-.fi-brand-nav__ai-dot {
-    width: 9rpx;
-    height: 9rpx;
-    border-radius: 50%;
-    background: #25d366;
-    box-shadow: 0 0 0 6rpx rgba(37, 211, 102, 0.14);
 }
 </style>

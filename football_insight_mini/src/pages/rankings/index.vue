@@ -1,7 +1,7 @@
 <template>
   <page-meta :page-style="pageLockStyle" />
   <view class="page-root" :class="{ 'page-root--locked': pageScrollLocked }">
-    <FiBrandNav open-on-current-page @open-ai="openAiFromBrandNav" />
+    <FiBrandNav />
 
     <view>
       <RankingsContent
@@ -13,12 +13,6 @@
       <MatchesContent embedded />
     </view>
 
-    <FiAiChatSheet
-      :visible="aiChatVisible"
-      :current-user="currentAiUser"
-      :ai-chat-mode="aiPublicConfig?.ai_chat_mode"
-      @close="closeAiChat"
-    />
   </view>
 </template>
 
@@ -26,22 +20,13 @@
 import { computed, nextTick, ref } from 'vue'
 import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
-import FiAiChatSheet from '../../components/FiAiChatSheet.vue'
 import RankingsContent from './RankingsContent.vue'
 import MatchesContent from '../matches/MatchesContent.vue'
-import { useAiChatSheet } from '../../composables/useAiChatSheet'
 
 const rankingsContentRef = ref<InstanceType<typeof RankingsContent> | null>(null)
 const pendingSharedPosterSlug = ref<string | null>(null)
 const pageScrollLocked = ref(false)
 const pageLockStyle = computed(() => pageScrollLocked.value ? 'overflow: hidden;' : '')
-const {
-  aiChatVisible,
-  currentAiUser,
-  aiPublicConfig,
-  openAiChat,
-  closeAiChat,
-} = useAiChatSheet()
 
 async function openPendingSharedPoster(): Promise<void> {
   if (!pendingSharedPosterSlug.value) {
@@ -50,10 +35,6 @@ async function openPendingSharedPoster(): Promise<void> {
 
   await nextTick()
   await rankingsContentRef.value?.openSharedStandingsPoster(pendingSharedPosterSlug.value)
-}
-
-function openAiFromBrandNav(): void {
-  void openAiChat()
 }
 
 function handlePageScrollLockChange(locked: boolean): void {

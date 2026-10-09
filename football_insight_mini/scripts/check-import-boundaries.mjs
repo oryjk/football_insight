@@ -10,7 +10,7 @@
 //  2. 页面 A 的任何文件禁止 import 页面 B 的任何模块（helpers / 页面容器 / 局部组件，
 //     跨页面共享：逻辑放 src/utils，组件进 src/components）；
 //  3. api/** 只能依赖 request、config、types 与 utils 白名单；
-//  4. 只有 utils/request.ts 可以直接调用 uni.request（api/ai.ts 流式为例外）。
+//  4. 只有 utils/request.ts 可以直接调用 uni.request。
 // import 与 uni.request 用 TypeScript AST 提取（Vue 只取 <script> 块）：注释、字符串、模板文本里的
 // 示例代码不会误报，`uni.request ({ ... })` 这类带空白的调用表达式也不会漏检。
 // 已知边界：模板内联事件表达式不在检查范围。
@@ -28,11 +28,6 @@ const SRC = path.join(ROOT, 'src')
 
 // 规则值为 null：整个文件在该规则下放行；值为路径数组：只放行列出的目标（精确到文件）。
 const ALLOWLIST = {
-  // FiAiChatSheet 是 AI 聊天 feature 模块（视图+流式+存储一体，845 行），
-  // 待按“变化原因”拆分后移出例外（见 AGENTS.md backlog）。
-  'src/components/FiAiChatSheet.vue': { 'component-imports-api': null },
-  // AI 流式对话需要 enableChunked 的 uni.request，无法走统一 request 封装。
-  'src/api/ai.ts': { 'uni-request': null, 'api-extra-deps': null },
   // 榜单页 tab 内嵌整个赛程视图；只放行 MatchesContent 这一个目标。
   // 出现第二处跨页需求时先抽 composable / 共享组件，不要扩大此例外。
   'src/pages/rankings/index.vue': {
@@ -225,7 +220,7 @@ for (const file of allFiles) {
       // api 内部互相引用（同层模块）合法；其余只允许 utils 白名单、config、types。
       const normalized = target.replace(/\.(ts|vue)$/, '')
       const ok = under(normalized, 'src/api')
-        || ['src/utils/request', 'src/utils/apiError', 'src/utils/authStorage', 'src/utils/wechatCloud'].includes(normalized)
+        || ['src/utils/request', 'src/utils/apiError', 'src/utils/authStorage'].includes(normalized)
         || under(normalized, 'src/config')
         || under(normalized, 'src/types')
       if (!ok && !allowed(file, 'api-extra-deps', target)) {
