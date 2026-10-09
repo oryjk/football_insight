@@ -10,6 +10,7 @@ import process from "node:process";
 
 import JSON5 from "json5";
 import ci from "miniprogram-ci";
+import { verifyMiniProgramApiBase } from "./verify-mp-api-base.mjs";
 
 const projectRoot = path.resolve(new URL("..", import.meta.url).pathname);
 const command = process.argv[2];
@@ -55,6 +56,9 @@ const desc = argValue("--desc") || `v${manifest.versionName} CI 上传`;
 const setting = { es6: false, minifyJS: false, minifyWXML: false, minifyWXSS: false };
 
 async function main() {
+  if (command === "upload") {
+    console.log(`[mini-ci] 上传地址检查通过: ${verifyMiniProgramApiBase(projectRoot)}`);
+  }
   const project = new ci.Project({
     appid,
     type: "miniProgram",

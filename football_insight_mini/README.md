@@ -179,7 +179,7 @@ bun run mp:preview -- --desc "预览说明"               # 只传预览版，�
 流程细节（`scripts/mini-ci.mjs` + `scripts/sync-manifest-version.mjs`）：
 
 1. `build:mp-weixin` 的 prebuild 钩子先向本项目后端登记接口 `POST /api/v1/mini-review/allocate` 申请版本号。**登记库（数据库）是唯一权威**：最新版本仍在审核中则**复用**，已出审核则在库内最大版本基础上 `+0.0.1` 并标记审核中；仅当库内无任何记录时才以本地 manifest 为起点。本地 manifest 不参与后续分配（多台构建机结果一致），删库重置后版本号随库回落。
-2. 构建 `dist/build/mp-weixin` 并执行组件注册检查。
+2. 清除 Bun 提前加载的开发 API 地址，以 `NODE_ENV=production` 构建 `dist/build/mp-weixin`，然后检查组件注册和产物中的 API 地址。上传地址必须为 `https://match.oryjk.cn/api/v1`，地址错误时禁止上传。
 3. `miniprogram-ci` 以 `manifest.json` 的 `versionName` 上传到微信后台（默认 robot=1，落在「版本管理 → 开发版本」）。
 
 前置条件（缺失时脚本会明确报错）：
