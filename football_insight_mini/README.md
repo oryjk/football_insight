@@ -174,13 +174,17 @@ bun run mp:preview -- --desc "预览说明"               # 只传预览版，�
 
 **robot 双轨约定**：`robot=1` 日常开发版本，随便传互不影响；`robot=2` 是体验版专用线——首次用 robot=2 上传后，需在公众平台「版本管理 → 开发版本」对该版本点一次「选为体验版」，之后每次 robot=2 上传的新代码会自动成为体验版内容。robot=1 的上传不会影响体验版。
 
-发版链路统一使用 Bun：校验、版本登记与上传脚本直接用 `bun` 执行，uni 编译器用 `bunx --bun uni` 启动，无需另行安装 Node.js。
+**发版链路统一使用 Bun 与统一入口 `scripts/mini-release.mjs`**（`bun --no-env-file` 执行）：Git 发布门禁、版本登记、Vite/uni-app 编译、组件与 API 校验、`miniprogram-ci` 上传都由它编排，无需另行安装 Node.js。
 
-流程细节（`scripts/mini-ci.mjs` + `scripts/sync-manifest-version.mjs`）：
+流程细节（统一入口 `scripts/mini-release.mjs` + `scripts/mini-release-guards.mjs`）：
 
-1. `build:mp-weixin` 的 prebuild 钩子先向本项目后端登记接口 `POST /api/v1/mini-review/allocate` 申请版本号。**登记库（数据库）是唯一权威**：最新版本仍在审核中则**复用**，已出审核则在库内最大版本基础上 `+0.0.1` 并标记审核中；仅当库内无任何记录时才以本地 manifest 为起点。本地 manifest 不参与后续分配（多台构建机结果一致），删库重置后版本号随库回落。
-2. 清除 Bun 提前加载的开发 API 地址，以 `NODE_ENV=production` 构建 `dist/build/mp-weixin`，然后检查组件注册和产物中的 API 地址。上传地址必须为 `https://match.oryjk.cn/api/v1`，地址错误时禁止上传。
-3. `miniprogram-ci` 以 `manifest.json` 的 `versionName` 上传到微信后台（默认 robot=1，落在「版本管理 → 开发版本」）。
+1. 清理外层 `bun run` 可能提前注入的 `VITE_*` / `UNI_*` 变量，以 `NODE_ENV=production` 和显式 `.env.production` 重建子进程环境，编译固定 `--mode production`；入口创建临时空 envDir 经 `FOOTBALL_RELEASE_ENV_DIR` 传给 `vite.config.ts`，隔离 `.env.local` / `.env.production.local` 等本地覆盖层，构建结束自动清理。生产 API 必须精确为 `https://match.oryjk.cn/api/v1`，`.env.production` 缺失或值不符即拒绝。
+2. 正式 `mp:release` 先执行 Git 发布门禁：当前分支必须为 `main`、工作区干净、`fetch` 成功后本地 `HEAD` 与 `origin/main` 完全一致，任一不满足即拒绝。`build` 不需要 main 门禁，`preview`/`verify` 不触发门禁与版本登记。
+3. 边界检查后显式执行一次 `scripts/sync-manifest-version.mjs`（不再走 prebuild 钩子），向本项目后端登记接口 `POST /api/v1/mini-review/allocate` 申请版本号。**登记库（数据库）是唯一权威**：最新版本仍在审核中则**复用**，已出审核则在库内最大版本基础上 `+0.0.1` 并标记审核中；仅当库内无任何记录时才以本地 manifest 为起点。本地 manifest 不参与后续分配（多台构建机结果一致），删库重置后版本号随库回落。若新版本导致 `src/manifest.json` / `src/config/generatedMiniProgramVersion.ts` 变化，发布会在构建与上传前停止；必须提交并 push 版本文件后重新执行。
+4. 构建 `dist/build/mp-weixin` 并执行组件注册检查，再对编译后的 `config/apiBase.js` 独立求值 `exports.API_BASE_URL`（不用 require 缓存、沙箱内执行、限定时间），必须为 `https://match.oryjk.cn/api/v1`。任一步失败即中止，不能继续上传旧包。
+5. `scripts/mini-ci.mjs` 在加载微信 SDK 前再次执行产物 API 校验；正式 upload 还会再次校验 Git 门禁与 `fetch` 后的 `origin/main`，因此直接调用底层脚本也不能绕过发布门禁。随后以 `manifest.json` 的 `versionName` 上传到微信后台（默认 robot=1，落在「版本管理 → 开发版本」）。`mp:preview` 只校验并上传已有生产产物，不构建、不登记版本。
+
+验证入口：`MINI_REVIEW_SKIP=1 bun run build:mp-weixin` 只做生产构建与检查（不登记）；`bun run verify:mp-release` 只校验现有产物且无远程调用；`bun run test:mp-release` 执行发布链路回归测试。正式 `mp:release` 始终强制 `MINI_REVIEW_SKIP=0`，外层残留的离线变量不会跳过登记。后续不要再绕开统一入口自行拆分发布命令。
 
 前置条件（缺失时脚本会明确报错）：
 

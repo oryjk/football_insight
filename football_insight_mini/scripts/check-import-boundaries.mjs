@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// 依赖边界检查（pragmatic layering 的机器约束，接入 prebuild:mp-weixin 与 GitHub Actions）。
+// 依赖边界检查（pragmatic layering 的机器约束，由统一发布入口 scripts/mini-release.mjs 显式调用，并接入 GitHub Actions）。
 // 文件身份先按目录与 pages.json 判定，import 一律解析成绝对路径后再匹配，避免 '../api'、别名等写法绕过：
 //  - 组件层：src/components/**、src/pages/**/components/**
 //  - 页面层：pages.json 注册的页面入口（含 pages/user/settings/index 这类嵌套页面）、

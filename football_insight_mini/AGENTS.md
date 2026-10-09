@@ -4,11 +4,12 @@
 
 审核版本号由本项目后端的 mini-review 登记库统一分配（`f_i_mini_review_statuses` 表），**不再手动维护**。
 
-- 发版用 `bun run mp:release`：构建前 `scripts/sync-manifest-version.mjs` 会调 `POST /api/v1/mini-review/allocate` 申请版本号，并同步写入 `src/manifest.json` 和 `src/config/generatedMiniProgramVersion.ts`。
+- 发版用 `bun run mp:release`：统一入口 `scripts/mini-release.mjs` 编排 Git 门禁、版本登记、构建与上传；版本登记在边界检查后显式执行一次 `scripts/sync-manifest-version.mjs`（不再走 prebuild 钩子），调 `POST /api/v1/mini-review/allocate` 申请版本号，并同步写入 `src/manifest.json` 和 `src/config/generatedMiniProgramVersion.ts`。
+- 正式上传的 Git 门禁：当前分支必须为 `main`、工作区干净、`fetch` 后本地 `HEAD` 与 `origin/main` 完全一致；若登记分配的新版本改动了版本文件，发布会在构建和上传前停止，必须提交并 push 版本文件后重新执行。底层 `scripts/mini-ci.mjs` 在加载微信 SDK 前会重复产物 API 校验与上传 Git 门禁，直接调用也不能绕过。
 - 发版位置：默认在本地 Mac 构建并上传，发版前先提交推送全部业务改动；不再默认去 peiqian 发版。测试用 `bun run mp:release -- --robot 2 --desc "本次变更说明"`，流程见 README「微信小程序发布」。
 - 登记库是唯一权威：最新版本仍在审核中则复用，已出审核则 `+0.0.1`；不要手动改 `manifest.json` 的 `versionName`。
 - 如果用户说"改版本号"或"指定版本号"，用显式覆盖：`MINI_PROGRAM_VERSION=x.y.z bun run build:mp-weixin`（作为指定版本传给登记接口）。
-- 纯本地离线构建（不登记、不递增版本）用 `MINI_REVIEW_SKIP=1 bun run build:mp-weixin`。
+- 纯本地离线构建（不登记、不递增版本）用 `MINI_REVIEW_SKIP=1 bun run build:mp-weixin`；正式 `mp:release` 强制登记，外层残留的 `MINI_REVIEW_SKIP=1` 不会跳过。验证已有产物用 `bun run verify:mp-release`，发布链路回归测试用 `bun run test:mp-release`。
 - 微信审核结束后要调 `PUT /api/v1/mini-review/review-status` 把当前版本标记 `is_reviewing=false`，否则后续构建会一直复用审核中的版本号。
 - 若构建分配了新版本号，`src/manifest.json` 与 `src/config/generatedMiniProgramVersion.ts` 的变更需要单独提交。
 
@@ -33,7 +34,7 @@ Page（index.vue 编排）
 - 401 的清理登录态由消费方决定（如首页清 token 转登录浮层）；请求层不做全局导航，也**不做全局 401 回调注册**。
 - 断网/超时文案由请求层归一，并发失败只弹一个提示框。
 
-依赖方向由 `scripts/check-import-boundaries.mjs` 机器强制（已接入 `prebuild:mp-weixin` 与 GitHub Actions `.github/workflows/mini-boundaries.yml`，提交与发版链路都会执行，Actions 页也支持手动触发）。import 与 `uni.request` 用 TypeScript AST 提取（Vue 只取 `<script>` 块，脚本依赖 devDependency `typescript`），说明符再解析成绝对路径判定，注释、字符串、模板文本里的示例代码不会误报：
+依赖方向由 `scripts/check-import-boundaries.mjs` 机器强制（由统一发布入口 `scripts/mini-release.mjs` 在 build/upload 时显式执行，并接入 GitHub Actions `.github/workflows/mini-boundaries.yml`，提交与发版链路都会执行，Actions 页也支持手动触发）。import 与 `uni.request` 用 TypeScript AST 提取（Vue 只取 `<script>` 块，脚本依赖 devDependency `typescript`），说明符再解析成绝对路径判定，注释、字符串、模板文本里的示例代码不会误报：
 
 1. 组件层（`src/components`、`src/pages/**/components`）禁止 import `api/**` 与认证存储；`src/components` 还禁止反向依赖页面层；
 2. 页面 A 的任何文件禁止 import 页面 B 的任何模块（helpers、页面容器、局部组件一律算）——跨页面共享：逻辑放 `src/utils`，组件进 `src/components`；

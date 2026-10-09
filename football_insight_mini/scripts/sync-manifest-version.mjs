@@ -1,21 +1,21 @@
 #!/usr/bin/env bun
+// 审核版本号同步：向本项目 Rust 后端 mini-review 登记库申请版本号并回写 manifest/生成常量。
+// 由统一入口 scripts/mini-release.mjs 显式调用；import 本模块无副作用（不发请求、不写文件），
+// 全部依赖可注入，测试用 stub 即可覆盖登记语义。
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import JSON5 from "json5";
 
-const projectRoot = path.resolve(new URL("..", import.meta.url).pathname);
-const envPath = path.join(projectRoot, ".env.ci.local");
-const manifestPath = path.join(projectRoot, "src", "manifest.json");
-const generatedVersionPath = path.join(projectRoot, "src", "config", "generatedMiniProgramVersion.ts");
+const defaultProjectRoot = fileURLToPath(new URL("..", import.meta.url));
 
 // 审核版本登记走本项目 Rust 后端（match.oryjk.cn）的 mini-review 登记库，密钥放在 .env.ci.local（不入 git）。
-const DEFAULT_MINI_REVIEW_API_URL = "https://match.oryjk.cn/api/v1";
-const DEFAULT_MINI_REVIEW_PROJECT_CODE = "football_insight_mini";
+export const DEFAULT_MINI_REVIEW_API_URL = "https://match.oryjk.cn/api/v1";
+export const DEFAULT_MINI_REVIEW_PROJECT_CODE = "football_insight_mini";
 
-function parseEnvFile(filePath) {
+export function parseEnvFile(filePath) {
   if (!existsSync(filePath)) return {};
 
   const content = readFileSync(filePath, "utf8");
@@ -32,21 +32,29 @@ function parseEnvFile(filePath) {
   return env;
 }
 
-export function miniReviewConfig(env = parseEnvFile(envPath)) {
+export function miniReviewConfig({
+  env = process.env,
+  envFile = path.join(defaultProjectRoot, ".env.ci.local"),
+} = {}) {
+  const fileEnv = parseEnvFile(envFile);
   return {
-    apiKey: process.env.MINI_REVIEW_API_KEY || env.MINI_REVIEW_API_KEY || "",
-    baseUrl: (process.env.MINI_REVIEW_API_URL || env.MINI_REVIEW_API_URL || DEFAULT_MINI_REVIEW_API_URL).replace(/\/+$/, ""),
-    projectCode: process.env.MINI_REVIEW_PROJECT_CODE || env.MINI_REVIEW_PROJECT_CODE || DEFAULT_MINI_REVIEW_PROJECT_CODE,
-    skip: /^(1|true)$/i.test(String(process.env.MINI_REVIEW_SKIP ?? env.MINI_REVIEW_SKIP ?? "")),
+    apiKey: env.MINI_REVIEW_API_KEY || fileEnv.MINI_REVIEW_API_KEY || "",
+    baseUrl: (env.MINI_REVIEW_API_URL || fileEnv.MINI_REVIEW_API_URL || DEFAULT_MINI_REVIEW_API_URL).replace(/\/+$/, ""),
+    projectCode: env.MINI_REVIEW_PROJECT_CODE || fileEnv.MINI_REVIEW_PROJECT_CODE || DEFAULT_MINI_REVIEW_PROJECT_CODE,
+    skip: /^(1|true)$/i.test(String(env.MINI_REVIEW_SKIP ?? fileEnv.MINI_REVIEW_SKIP ?? "")),
   };
 }
 
-// 向 Go 后端登记并取得本次构建应使用的版本号（登记库是唯一权威，多台构建机结果一致）：
+// 向后端登记并取得本次构建应使用的版本号（登记库是唯一权威，多台构建机结果一致）：
 // 库内最新版本仍在审核中时复用；已出审核则在库内最大版本基础上 +0.0.1 新建并标记审核中；
 // 仅当库内无任何记录时才以本地 manifest 为起点。删库重置后版本号随库回落。
 // MINI_REVIEW_SKIP=1 时返回 null（离线本地构建，不登记）。
-export async function allocateReviewVersion({ explicitVersion = "", currentVersion = "" } = {}) {
-  const config = miniReviewConfig();
+export async function allocateReviewVersion({
+  config = miniReviewConfig(),
+  explicitVersion = "",
+  currentVersion = "",
+  fetchImpl = fetch,
+} = {}) {
   if (config.skip) return null;
   if (!config.apiKey) {
     throw new Error(
@@ -54,7 +62,7 @@ export async function allocateReviewVersion({ explicitVersion = "", currentVersi
     );
   }
 
-  const response = await fetch(`${config.baseUrl}/mini-review/allocate`, {
+  const response = await fetchImpl(`${config.baseUrl}/mini-review/allocate`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Api-Key": config.apiKey },
     body: JSON.stringify({
@@ -73,7 +81,7 @@ export async function allocateReviewVersion({ explicitVersion = "", currentVersi
   return payload.version;
 }
 
-function parseVersionCode(versionName) {
+export function parseVersionCode(versionName) {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(versionName || "").trim());
   if (!match) {
     throw new Error(`MINI_PROGRAM_VERSION 格式必须是 x.y.z，实际收到: ${versionName}`);
@@ -82,15 +90,23 @@ function parseVersionCode(versionName) {
   return String(Number(major) * 10000 + Number(minor) * 100 + Number(patch));
 }
 
-export async function syncManifestVersion(options = {}) {
-  const env = parseEnvFile(envPath);
+export async function syncManifestVersion({
+  projectRoot = defaultProjectRoot,
+  env = process.env,
+  allocate = allocateReviewVersion,
+} = {}) {
+  const envFile = path.join(projectRoot, ".env.ci.local");
+  const manifestPath = path.join(projectRoot, "src", "manifest.json");
+  const generatedVersionPath = path.join(projectRoot, "src", "config", "generatedMiniProgramVersion.ts");
+  const fileEnv = parseEnvFile(envFile);
   const manifest = JSON5.parse(readFileSync(manifestPath, "utf8"));
-  const explicitVersion = options.versionName || process.env.MINI_PROGRAM_VERSION || env.MINI_PROGRAM_VERSION || "";
+  const explicitVersion = env.MINI_PROGRAM_VERSION || fileEnv.MINI_PROGRAM_VERSION || "";
 
   // 版本号统一由审核登记接口决定（显式 MINI_PROGRAM_VERSION 作为指定版本传入）；
   // 跳过登记的离线构建退回 manifest 当前值。
+  const config = miniReviewConfig({ env, envFile });
   const versionName =
-    (await allocateReviewVersion({ explicitVersion, currentVersion: String(manifest.versionName || "") })) ||
+    (await allocate({ config, explicitVersion, currentVersion: String(manifest.versionName || "") })) ||
     explicitVersion ||
     manifest.versionName;
   if (!versionName) {
@@ -115,7 +131,7 @@ export async function syncManifestVersion(options = {}) {
   return { versionName, versionCode, changed: manifestChanged };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (import.meta.main) {
   try {
     const result = await syncManifestVersion();
     if (result) {
