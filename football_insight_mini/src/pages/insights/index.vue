@@ -103,12 +103,11 @@ import InsightsTeamSelector from './components/InsightsTeamSelector.vue'
 import InsightsSummaryPanel from './components/InsightsSummaryPanel.vue'
 import InsightsTeamBoardEntry from './components/InsightsTeamBoardEntry.vue'
 import InsightsContributionPanel from './components/InsightsContributionPanel.vue'
-import { getCurrentUser } from '../../api/auth'
 import { getLiveTeamInsights } from '../../api/insight'
 import type { TeamInsight, TeamInsightTeam } from '../../types/insight'
-import type { CurrentUser } from '../../types/auth'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
+import { useAppSession } from '../../stores/appSession'
 import { resolveMembershipBenefitsLocked } from '../../utils/membershipBenefits'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
@@ -122,7 +121,9 @@ import {
 const userLoading = ref(true)
 const loading = ref(false)
 const errorMessage = ref('')
-const currentUser = ref<CurrentUser | null>(null)
+// 登录用户共享自 appSession：读取走会话缓存，401 清理由 session 统一处理。
+const session = useAppSession()
+const currentUser = session.currentUser
 const teams = ref<TeamInsightTeam[]>([])
 const insights = ref<TeamInsight[]>([])
 const selectedTeamId = ref<number | null>(null)
@@ -226,9 +227,9 @@ async function loadUser(): Promise<void> {
   userLoading.value = true
 
   try {
-    currentUser.value = await getCurrentUser()
+    await session.ensureSessionReady()
   } catch {
-    currentUser.value = null
+    // 断网/5xx 由 session 保留 token 并记录可重试错误；页面沿用游客/锁定提示，不清会话。
   } finally {
     userLoading.value = false
   }
@@ -241,14 +242,22 @@ async function loadInsights(): Promise<void> {
 
   loading.value = true
   errorMessage.value = ''
+  // 洞察是会员私有数据：捕获 revision，旧账号的结果不发布。
+  const requestRevision = session.revision.value
 
   try {
     const response = await getLiveTeamInsights()
+    if (requestRevision !== session.revision.value) {
+      return
+    }
     teams.value = response.teams
     insights.value = response.insights
     selectedTeamId.value = response.teams[0]?.team_id ?? null
     resetExpandedState()
   } catch (error) {
+    if (requestRevision !== session.revision.value) {
+      return
+    }
     errorMessage.value = extractApiErrorMessage(error, '洞察加载失败，请稍后重试。')
   } finally {
     loading.value = false
@@ -284,7 +293,6 @@ onShow(async () => {
   if (systemConfigUnderReview.value) {
     userLoading.value = false
     loading.value = false
-    currentUser.value = null
     teams.value = []
     insights.value = []
     selectedTeamId.value = null

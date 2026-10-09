@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { effectScope, nextTick } from 'vue'
-import * as authApi from '../../api/auth'
+import { effectScope, nextTick, ref, type Ref } from 'vue'
 import * as ticketApi from '../../api/ticketWatch'
 import type { CurrentUser } from '../../types/auth'
 import type {
   TicketWatchInventoryEntry,
   TicketWatchMatchSummary,
+  TicketWatchTrackedInterest,
 } from '../../types/ticketWatch'
+import { ApiRequestError } from '../../utils/apiError'
+import type { AppSession, SessionStatus } from '../../stores/appSession'
 import { useTicketWatchBoards } from './useTicketWatchBoards'
 import { useTicketWatchMatchId } from './useTicketWatchMatchId'
 import { useTicketWatchPolling } from './useTicketWatchPolling'
@@ -35,11 +37,43 @@ function match(id: number): TicketWatchMatchSummary {
   }
 }
 
-const source = { ...ticketApi, getCurrentUser: authApi.getCurrentUser }
+const source = { ...ticketApi }
 const testGlobal = globalThis as typeof globalThis & { uni: typeof uni }
 const originalUni = testGlobal.uni
 const originalSetInterval = globalThis.setInterval
 const originalClearInterval = globalThis.clearInterval
+
+/** 页面 composable 的会话注入 stub：状态用可写 ref，action 默认不应被调用。 */
+type SessionStub = AppSession & { revision: Ref<number> }
+
+function createSessionStub(overrides: Partial<AppSession> = {}): SessionStub {
+  return {
+    currentUser: ref<CurrentUser | null>(null),
+    hasAccessToken: ref(false),
+    status: ref<SessionStatus>('guest'),
+    errorMessage: ref(''),
+    revision: ref(0),
+    ensureSessionReady: async () => null,
+    loginWithPassword: async () => {
+      throw new Error('unused')
+    },
+    registerAccount: async () => {
+      throw new Error('unused')
+    },
+    loginAsTestUser: async () => {
+      throw new Error('unused')
+    },
+    loginWithWechatCode: async () => {
+      throw new Error('unused')
+    },
+    bindWechatAccount: async () => {
+      throw new Error('unused')
+    },
+    logoutSession: async () => {},
+    invalidateSession: () => {},
+    ...overrides,
+  }
+}
 
 afterEach(() => {
   testGlobal.uni = originalUni
@@ -64,7 +98,7 @@ describe('ticket watch page effects', () => {
         return id === 1 ? first.promise : second.promise
       },
       getTicketWatchBlockInterests: async () => [],
-    })
+    }, createSessionStub())
     const oldSelection = boards.handleHistoryMatchSelect(1)
     const newSelection = boards.handleHistoryMatchSelect(2)
     second.resolve([
@@ -107,7 +141,7 @@ describe('ticket watch page effects', () => {
         inventoryCalls += 1
         return []
       },
-    })
+    }, createSessionStub())
     await boards.loadCurrentBoard()
     expect(inventoryCalls).toBe(0)
     expect(state.hasLoadedCurrentBoard.value).toBe(false)
@@ -127,7 +161,7 @@ describe('ticket watch page effects', () => {
       getCurrentTicketWatchBoard: async () => {
         throw new Error('offline')
       },
-    })
+    }, createSessionStub())
     await boards.loadCurrentBoard('poll')
     expect(state.currentMatch.value?.match_id).toBe(1)
     expect(state.currentLoading.value).toBe(false)
@@ -165,7 +199,7 @@ describe('ticket watch page effects', () => {
       }),
       requestTicketWatchPayment: () => payment.promise,
       waitForPaidOrder: () => confirmation.promise,
-    })
+    }, createSessionStub())
     const pending = actions.payForMatchId()
     await Promise.resolve()
     await actions.payForMatchId()
@@ -197,7 +231,7 @@ describe('ticket watch page effects', () => {
     const scope = effectScope()
     const state = useTicketWatchState()
     const polling = scope.run(() =>
-      useTicketWatchPolling(state, async () => {}),
+      useTicketWatchPolling(state, async () => {}, createSessionStub()),
     )!
     state.isMonitoringActive.value = true
     polling.startPolling()
@@ -227,13 +261,97 @@ describe('ticket watch page effects', () => {
     const scope = effectScope()
     const state = useTicketWatchState()
     const polling = scope.run(() =>
-      useTicketWatchPolling(state, () => request.promise),
+      useTicketWatchPolling(state, () => request.promise, createSessionStub()),
     )!
     const started = polling.toggleMonitoring()
     polling.stopPolling()
     polling.stopFreshnessClock()
     request.resolve()
     await started
+    expect(scheduled.size).toBe(0)
+    scope.stop()
+  })
+})
+
+describe('ticket watch account revision effects', () => {
+  test('用户 A 的兴趣结果晚到时不污染切换账号后的看板', async () => {
+    const state = useTicketWatchState()
+    const session = createSessionStub()
+    state.currentUser.value = { id: 'user-a' } as CurrentUser
+    const interestsA = deferred<TicketWatchTrackedInterest[]>()
+    const boards = useTicketWatchBoards(state, async () => {}, {
+      ...source,
+      getTicketWatchTrackedInterests: () => interestsA.promise,
+    }, session)
+
+    const pending = boards.loadCurrentTrackedInterests(1)
+    // A 的兴趣请求在途时切换到 B（revision 变化）。
+    session.revision.value += 1
+    interestsA.resolve([{ block_name: 'A1', started_at: '2026-09-01T10:00:00+08:00' }])
+    await pending
+
+    expect(state.currentTrackedInterests.value).toEqual([])
+  })
+
+  test('断网时会员档位镜像沿用 session 已确认用户，不误清会话', async () => {
+    const state = useTicketWatchState()
+    const session = createSessionStub({
+      currentUser: ref({ id: 'user-a', membership_tier: 'V6' } as CurrentUser),
+      hasAccessToken: ref(true),
+      status: ref<SessionStatus>('authenticated'),
+      ensureSessionReady: async () => {
+        throw new ApiRequestError('网络连接不可用，请检查网络后重试', 0, true)
+      },
+    })
+    const boards = useTicketWatchBoards(state, async () => {}, { ...source }, session)
+
+    await boards.loadViewerMembershipTier()
+
+    expect(state.currentUser.value?.id).toBe('user-a')
+    expect(state.viewerMembershipTier.value).toBe('V6')
+    expect(session.currentUser.value?.id).toBe('user-a')
+    expect(session.hasAccessToken.value).toBe(true)
+  })
+
+  test('会话确认游客后会员档位镜像清空', async () => {
+    const state = useTicketWatchState()
+    state.currentUser.value = { id: 'user-a', membership_tier: 'V6' } as CurrentUser
+    const session = createSessionStub()
+    const boards = useTicketWatchBoards(state, async () => {}, { ...source }, session)
+
+    await boards.loadViewerMembershipTier()
+
+    expect(state.currentUser.value).toBeNull()
+    expect(state.viewerMembershipTier.value).toBe('V1')
+  })
+
+  test('退出登录后旧的监控请求完成也不会重启轮询', async () => {
+    const scheduled = new Set<number>()
+    let nextId = 0
+    globalThis.setInterval = ((_callback: unknown, _delay: number) => {
+      const id = ++nextId
+      scheduled.add(id)
+      return id
+    }) as typeof setInterval
+    globalThis.clearInterval = ((id: number) => {
+      scheduled.delete(id)
+    }) as typeof clearInterval
+    const request = deferred<void>()
+    const session = createSessionStub()
+    const scope = effectScope()
+    const state = useTicketWatchState()
+    const polling = scope.run(() =>
+      useTicketWatchPolling(state, () => request.promise, session),
+    )!
+
+    const started = polling.toggleMonitoring()
+    // 监控的首次请求在途时退出登录（revision 变化）。
+    session.revision.value += 1
+    await nextTick()
+    request.resolve()
+    await started
+
+    expect(state.isMonitoringActive.value).toBe(false)
     expect(scheduled.size).toBe(0)
     scope.stop()
   })

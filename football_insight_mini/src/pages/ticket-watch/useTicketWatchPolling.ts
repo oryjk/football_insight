@@ -1,11 +1,14 @@
 import { watch, onScopeDispose } from 'vue'
 
+import { useAppSession, type AppSession } from '../../stores/appSession'
+
 import type { TicketWatchLoadReason } from './helpers'
 import type { TicketWatchState } from './useTicketWatchState'
 
 export function useTicketWatchPolling(
   state: TicketWatchState,
   loadCurrentBoard: (reason: TicketWatchLoadReason) => Promise<void>,
+  session: AppSession = useAppSession(),
 ) {
   const {
     activeTab,
@@ -105,6 +108,12 @@ export function useTicketWatchPolling(
   watch(pollIntervalSeconds, () => {
     if (activeTab.value === 'current' && isMonitoringActive.value)
       startPolling()
+  })
+  // 账号切换/退出：立即停止旧账号轮询；在途的旧请求完成后也不会重启
+  // （startPolling 以 isMonitoringActive 为门槛，私有数据由页面 revision watch 清理）。
+  watch(session.revision, () => {
+    handleStopMonitoring()
+    stopPolling()
   })
   onScopeDispose(() => {
     stopPolling()

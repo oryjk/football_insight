@@ -116,13 +116,12 @@
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { ref, computed } from 'vue'
 import { getMembershipProduct, createMembershipOrder } from '../../api/payment'
-import { getCurrentUser } from '../../api/auth'
-import type { CurrentUser } from '../../types/auth'
 import { getPublicSystemConfig } from '../../api/system'
 import type { PublicSystemConfig } from '../../types/system'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
+import { useAppSession } from '../../stores/appSession'
 import { reportPageActivity } from '../../utils/userActivity'
 import {
   buildMembershipTierGuides,
@@ -141,7 +140,9 @@ import {
 
 const product = ref<Awaited<ReturnType<typeof getMembershipProduct>> | null>(null)
 const publicConfig = ref<PublicSystemConfig | null>(null)
-const currentUser = ref<CurrentUser | null>(null)
+// 当前用户共享自 appSession；支付成功后强制刷新会话以拿到新会员等级。
+const session = useAppSession()
+const currentUser = session.currentUser
 const loading = ref(false)
 const selectedTier = ref('')
 const agreementAccepted = ref(false)
@@ -201,15 +202,14 @@ async function loadPurchaseData() {
   if (systemConfigUnderReview.value) {
     product.value = null
     publicConfig.value = null
-    currentUser.value = null
     selectedTier.value = ''
     return
   }
 
-  const [productResult, publicConfigResult, userResult] = await Promise.allSettled([
+  const [productResult, publicConfigResult] = await Promise.allSettled([
     getMembershipProduct(),
     getPublicSystemConfig(),
-    getCurrentUser(),
+    session.ensureSessionReady(),
   ])
 
   if (productResult.status === 'fulfilled') {
@@ -220,10 +220,6 @@ async function loadPurchaseData() {
 
   if (publicConfigResult.status === 'fulfilled') {
     publicConfig.value = publicConfigResult.value
-  }
-
-  if (userResult.status === 'fulfilled') {
-    currentUser.value = userResult.value
   }
 
   selectedTier.value = productOptions.value[0]?.target_tier ?? ''
@@ -259,9 +255,10 @@ async function handlePurchase() {
       success: async () => {
         uni.showToast({ title: '支付成功', icon: 'success' })
         try {
-          currentUser.value = await getCurrentUser()
+          // 支付完成后强制刷新会话，让新会员等级立刻共享给洞察/余票页面。
+          await session.ensureSessionReady({ force: true })
         } catch {
-          // ignore refresh error
+          // 刷新失败不阻断返回；后端付费记录仍为权威，下次 onShow 会重试。
         }
         setTimeout(() => {
           uni.navigateBack()

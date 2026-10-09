@@ -133,7 +133,8 @@ import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../con
 import { castSupportVote, getMatchSupportDetail } from '../../api/support'
 import type { SupportMatchDetail } from '../../types/support'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { getAccessToken, setPostLoginRedirectTarget } from '../../utils/authStorage'
+import { setPostLoginRedirectTarget } from '../../utils/authStorage'
+import { useAppSession } from '../../stores/appSession'
 import {
   resolveSupportCountdownLabel,
   resolveSupportCountdownSeconds,
@@ -151,6 +152,8 @@ const matchId = ref<number | null>(null)
 const posterImagePath = ref('')
 const liveCountdownSeconds = ref(0)
 let countdownTimer: ReturnType<typeof setInterval> | null = null
+// 登录标记共享自 appSession，退出/换号后自动更新。
+const session = useAppSession()
 
 const favoriteTeamId = computed(() => detail.value?.viewer.favorite_team_id ?? null)
 const favoriteTeam = computed(() => {
@@ -252,7 +255,7 @@ const canCastVote = computed(() => {
     return false
   }
 
-  if (!getAccessToken()) {
+  if (!session.hasAccessToken.value) {
     return true
   }
 
@@ -260,7 +263,7 @@ const canCastVote = computed(() => {
 })
 
 const voteButtonText = computed(() => {
-  return resolveSupportVoteButtonText(detail.value, favoriteTeam.value, !!getAccessToken())
+  return resolveSupportVoteButtonText(detail.value, favoriteTeam.value, session.hasAccessToken.value)
 })
 
 onLoad((options) => {
@@ -324,7 +327,7 @@ async function handleVote(): Promise<void> {
     return
   }
 
-  if (!getAccessToken()) {
+  if (!session.hasAccessToken.value) {
     setPostLoginRedirectTarget({
       type: 'navigateTo',
       url: `/pages/support/index?matchId=${matchId.value}`,

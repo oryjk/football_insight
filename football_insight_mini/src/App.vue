@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
+import { useAppSession } from "./stores/appSession";
+import { getAccessToken } from "./utils/authStorage";
+
 onLaunch(() => {
   console.log("Football Insight mini launch");
+  // 有本地 token 才在后台恢复会话；失败（含断网）不阻断公共首页，无 token 不自动登录。
+  if (getAccessToken()) {
+    void useAppSession().ensureSessionReady().catch(() => {});
+  }
 });
 onShow(() => {
   console.log("Football Insight mini show");

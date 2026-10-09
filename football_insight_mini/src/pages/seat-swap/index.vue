@@ -115,9 +115,9 @@ import {
 import { getTicketWatchRegions } from '../../api/ticketWatch'
 import type { SeatSwapCandidate, SeatSwapCurrentResponse } from '../../types/seatSwap'
 import type { TicketWatchRegion } from '../../types/ticketWatch'
-import { getAccessToken } from '../../utils/authStorage'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { formatDatetime } from '../../utils/format'
+import { useAppSession } from '../../stores/appSession'
 import {
   buildSeatSwapMockCurrentResponse,
   buildSeatSwapMockRegions,
@@ -141,7 +141,8 @@ const submitting = ref(false)
 const errorMessage = ref('')
 const currentView = ref<SeatSwapCurrentResponse | null>(null)
 const regions = ref<TicketWatchRegion[]>([])
-const isLoggedIn = ref(false)
+// 登录标记共享自 appSession，退出/换号后自动更新，不再读本地存储。
+const isLoggedIn = useAppSession().hasAccessToken
 
 const publishSheetVisible = ref(false)
 const manageSheetVisible = ref(false)
@@ -239,7 +240,6 @@ function toggleRegionGroup(key: string): void {
 async function loadPage(): Promise<void> {
   loading.value = true
   errorMessage.value = ''
-  isLoggedIn.value = !!getAccessToken()
   try {
     if (USE_SEAT_SWAP_MOCK_LARGE_DATA) {
       currentView.value = buildSeatSwapMockCurrentResponse({

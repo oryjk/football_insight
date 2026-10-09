@@ -1,4 +1,3 @@
-import { getCurrentUser } from '../../api/auth'
 import {
   getCurrentTicketWatchBoard,
   getTicketWatchBlockInterests,
@@ -18,6 +17,7 @@ import type {
   TicketWatchMatchSummary,
 } from '../../types/ticketWatch'
 import { extractApiErrorMessage } from '../../utils/apiError'
+import { useAppSession, type AppSession } from '../../stores/appSession'
 
 import {
   applyBlockInterestsToSections,
@@ -35,7 +35,6 @@ import type { TicketWatchState } from './useTicketWatchState'
 import { resolveFallbackMatchId, sumInventoryOccurrences } from './presentation'
 
 const boardApi = {
-  getCurrentUser,
   getCurrentTicketWatchBoard,
   getTicketWatchBlockInterests,
   getTicketWatchInventorySince,
@@ -52,9 +51,9 @@ export function useTicketWatchBoards(
   state: TicketWatchState,
   refreshRefluxSubscriptionStatus: () => Promise<void>,
   api = boardApi,
+  session: AppSession = useAppSession(),
 ) {
   const {
-    getCurrentUser,
     getCurrentTicketWatchBoard,
     getTicketWatchBlockInterests,
     getTicketWatchInventorySince,
@@ -111,14 +110,19 @@ export function useTicketWatchBoards(
       return
     }
 
+    // 用户/会员档位共享自 appSession；捕获 revision，旧账号结果不发布。
+    const requestRevision = session.revision.value
     try {
-      const user = await getCurrentUser()
-      currentUser.value = user
-      viewerMembershipTier.value = user?.membership_tier?.trim() || 'V1'
+      await session.ensureSessionReady()
     } catch {
-      currentUser.value = null
-      viewerMembershipTier.value = 'V1'
+      // 断网/5xx：session 保留 token 与已确认用户并记录可重试错误，
+      // 本地镜像沿用 session 当前用户，不清会话。
     }
+    if (requestRevision !== session.revision.value) {
+      return
+    }
+    currentUser.value = session.currentUser.value
+    viewerMembershipTier.value = session.currentUser.value?.membership_tier?.trim() || 'V1'
   }
 
   async function getMatchInterestSections(
@@ -133,8 +137,13 @@ export function useTicketWatchBoards(
       return
     }
 
-    currentTrackedInterests.value =
-      await getTicketWatchTrackedInterests(matchId)
+    // 兴趣区块是账号私有数据：旧账号的结果晚到时不发布。
+    const requestRevision = session.revision.value
+    const interests = await getTicketWatchTrackedInterests(matchId)
+    if (requestRevision !== session.revision.value) {
+      return
+    }
+    currentTrackedInterests.value = interests
   }
 
   function resetCurrentBoard(): void {
@@ -181,10 +190,15 @@ export function useTicketWatchBoards(
     }
 
     try {
+      const requestRevision = session.revision.value
       if (selectedTeam.value === 'yunnanyukun') {
-        await loadYukunCurrentBoard()
+        await loadYukunCurrentBoard(requestRevision)
       } else {
-        await loadChengduCurrentBoard()
+        await loadChengduCurrentBoard(requestRevision)
+      }
+      if (requestRevision !== session.revision.value) {
+        // 账号在看板请求期间切换/退出：revision watch 已清理状态，旧结果不标记已加载。
+        return
       }
       hasLoadedCurrentBoard.value = true
     } catch (error) {
@@ -200,9 +214,12 @@ export function useTicketWatchBoards(
     }
   }
 
-  async function loadChengduCurrentBoard(): Promise<void> {
+  async function loadChengduCurrentBoard(requestRevision: number): Promise<void> {
     await ensureRegions()
     const response = await getCurrentTicketWatchBoard()
+    if (requestRevision !== session.revision.value) {
+      return
+    }
     currentMatch.value = response.current_match
     currentMessage.value =
       response.message ||
@@ -223,8 +240,11 @@ export function useTicketWatchBoards(
     }
   }
 
-  async function loadYukunCurrentBoard(): Promise<void> {
+  async function loadYukunCurrentBoard(requestRevision: number): Promise<void> {
     const response = await getYukunCurrentTicketWatchMatch()
+    if (requestRevision !== session.revision.value) {
+      return
+    }
     const yukunMatch = response.current_match
 
     if (!yukunMatch) {
@@ -244,6 +264,9 @@ export function useTicketWatchBoards(
       getYukunTicketWatchInventory(yukunMatch.match_id, since),
       getYukunTicketWatchRegions(yukunMatch.match_id, since),
     ])
+    if (requestRevision !== session.revision.value) {
+      return
+    }
 
     currentSections.value = groupInventoryByPrice(yukunRegions, inventory)
     currentTrackedInterests.value = []
@@ -475,6 +498,7 @@ export function useTicketWatchBoards(
 
     selectedHistoryMatchId.value = matchId
     const requestToken = ++historySelectionRequestToken
+    const requestRevision = session.revision.value
     historySelectionLoading.value = true
 
     try {
@@ -482,7 +506,8 @@ export function useTicketWatchBoards(
 
       if (
         requestToken !== historySelectionRequestToken ||
-        selectedHistoryMatchId.value !== matchId
+        selectedHistoryMatchId.value !== matchId ||
+        requestRevision !== session.revision.value
       ) {
         return
       }

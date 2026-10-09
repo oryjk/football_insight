@@ -8,7 +8,7 @@ import {
   extractApiErrorMessage,
   isUnauthorizedError,
 } from '../../utils/apiError'
-import { getAccessToken } from '../../utils/authStorage'
+import { useAppSession, type AppSession } from '../../stores/appSession'
 
 import { resolveMatchIdSheetState } from './helpers'
 import type { TicketWatchState } from './useTicketWatchState'
@@ -26,6 +26,7 @@ export function useTicketWatchMatchId(
   state: TicketWatchState,
   goToUserPage: () => void,
   actions = matchIdActions,
+  session: AppSession = useAppSession(),
 ) {
   const {
     createMatchIdOrder,
@@ -94,13 +95,14 @@ export function useTicketWatchMatchId(
       return
     }
 
-    if (!getAccessToken()) {
+    if (!session.hasAccessToken.value) {
       promptMatchIdLogin()
       return
     }
 
     matchIdSheetVisible.value = true
     matchIdSheetState.value = 'loading'
+    const requestRevision = session.revision.value
     try {
       const entitlement = await getMatchIdEntitlement(match.match_id)
       matchIdEntitlement.value = entitlement
@@ -109,6 +111,8 @@ export function useTicketWatchMatchId(
       matchIdSheetVisible.value = false
       if (isUnauthorizedError(error)) {
         // token 失效与未登录走同一个登录引导，避免弹窗闪开即关、体感"没反应"。
+        // 仅失效当前 revision 的会话，不影响请求期间登录的新账号。
+        session.invalidateSession(requestRevision)
         promptMatchIdLogin()
         return
       }

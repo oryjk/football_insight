@@ -252,8 +252,8 @@ import type {
   TeamBoardViewResponse,
 } from '../../types/teamBoard'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { getAccessToken } from '../../utils/authStorage'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
+import { useAppSession } from '../../stores/appSession'
 import { resolveTeamBoardLoadFailure } from './helpers'
 
 const teamId = ref<number | null>(null)
@@ -266,6 +266,8 @@ const postCommentary = ref('')
 const composerErrorMessage = ref('')
 const commentDrafts = reactive<Record<string, string>>({})
 const board = ref<TeamBoardViewResponse | null>(null)
+// 登录标记与 401 失效统一走 appSession。
+const session = useAppSession()
 
 const posts = computed(() => board.value?.posts ?? [])
 const composerPresets = computed(() => board.value?.composer_presets ?? [])
@@ -305,7 +307,7 @@ async function loadBoard(): Promise<void> {
     return
   }
 
-  if (!getAccessToken()) {
+  if (!session.hasAccessToken.value) {
     rememberPostLoginRedirect({
       type: 'navigateTo',
       url: `/pages/team-board/index?teamId=${teamId.value}`,
@@ -316,12 +318,15 @@ async function loadBoard(): Promise<void> {
 
   loading.value = true
   errorMessage.value = ''
+  const requestRevision = session.revision.value
 
   try {
     board.value = await getTeamBoard(teamId.value)
   } catch (error) {
     const failure = resolveTeamBoardLoadFailure(error, '战术板加载失败，请稍后重试。')
     if (failure.kind === 'unauthorized') {
+      // 401：仅失效当前 revision 的会话，再走既有登录引导；不断改新账号状态。
+      session.invalidateSession(requestRevision)
       rememberPostLoginRedirect({
         type: 'navigateTo',
         url: `/pages/team-board/index?teamId=${teamId.value}`,

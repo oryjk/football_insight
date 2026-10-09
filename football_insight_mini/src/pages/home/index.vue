@@ -111,8 +111,8 @@ import type {
 import type { SupportProfile, SupportTeam } from '../../types/support'
 import type { PublicSystemConfig } from '../../types/system'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { getAccessToken, setAccessToken } from '../../utils/authStorage'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
+import { useAppSession } from '../../stores/appSession'
 import { buildHomeBriefingMarqueeMap, splitBriefingMarqueeRows } from '../../utils/homeBriefingMarquees'
 import { buildHeadlineTitleParts } from '../../utils/homeViewText'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
@@ -126,7 +126,6 @@ import {
   resolveHomeGuideLeaders,
   resolveHomeGuideNote,
   resolveHomeGuideReferenceRoundNumber,
-  resolveHomeHasAuthToken,
   resolveHomeLoadPlan,
   resolveHomePulseLeadMatch,
   resolveHomePulseMatches,
@@ -157,7 +156,9 @@ const supportTeams = ref<SupportTeam[]>([])
 const supportTeamsLoading = ref(false)
 const favoriteTeamSheetVisible = ref(false)
 const selectedFavoriteTeamId = ref<number | null>(null)
-const hasAuthToken = ref(resolveHomeHasAuthToken(getAccessToken()))
+// 登录标记共享自 appSession：token 只由 session 写/清，页面不再读存储或自行清 token。
+const session = useAppSession()
+const hasAuthToken = session.hasAccessToken
 const loginPromptVisible = ref(false)
 
 const standings = computed<OverviewStanding[]>(() => overview.value?.standings_top ?? [])
@@ -438,7 +439,6 @@ async function loadSupportTeams() {
 
 async function loadSupportData() {
   supportErrorMessage.value = ''
-  hasAuthToken.value = resolveHomeHasAuthToken(getAccessToken())
   loginPromptVisible.value = false
 
   if (!hasAuthToken.value) {
@@ -450,24 +450,32 @@ async function loadSupportData() {
   }
 
   supportLoading.value = true
+  // 助力资料是账号私有数据：捕获 revision，旧账号的结果/401 不发布、不影响新会话。
+  const requestRevision = session.revision.value
 
   try {
-    supportProfile.value = await getSupportProfile()
-    selectedFavoriteTeamId.value = supportProfile.value.favorite_team?.team_id ?? selectedFavoriteTeamId.value
+    const profile = await getSupportProfile()
+    if (requestRevision !== session.revision.value) {
+      return
+    }
+    supportProfile.value = profile
+    selectedFavoriteTeamId.value = profile.favorite_team?.team_id ?? selectedFavoriteTeamId.value
     void loadSupportTeams()
   } catch (error) {
-    const message = extractApiErrorMessage(error, '助力入口加载失败，请稍后重试。')
+    if (requestRevision !== session.revision.value) {
+      return
+    }
 
     if (isHomeAuthExpiredError(error)) {
-      setAccessToken(null)
-      hasAuthToken.value = false
+      // 401：仅失效当前 revision 的会话；断网/5xx 走下方重试提示，不清 token。
+      session.invalidateSession(requestRevision)
       supportProfile.value = null
       supportErrorMessage.value = ''
       loginPromptVisible.value = true
       return
     }
 
-    supportErrorMessage.value = message
+    supportErrorMessage.value = extractApiErrorMessage(error, '助力入口加载失败，请稍后重试。')
   } finally {
     supportLoading.value = false
   }
@@ -522,7 +530,6 @@ function openSupportMatch() {
 
 onShow(() => {
   reportPageActivity('home')
-  hasAuthToken.value = resolveHomeHasAuthToken(getAccessToken())
   void loadPage()
   void loadSupportData()
 })

@@ -210,7 +210,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick } from 'vue'
+import { nextTick, watch } from 'vue'
 import {
   onHide,
   onReady,
@@ -221,6 +221,7 @@ import {
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
 import { reportPageActivity } from '../../utils/userActivity'
+import { useAppSession } from '../../stores/appSession'
 import type { TicketWatchGroupedInventoryItem } from '../../types/ticketWatch'
 import type { TicketWatchTeam } from './types'
 import TicketBoardSkeleton from './components/TicketBoardSkeleton.vue'
@@ -311,8 +312,9 @@ const {
   closeRefluxSubscriptionSheet,
   submitRefluxSubscriptionOrder,
 } = useTicketWatchSubscription(state, goToUserPage)
+const session = useAppSession()
 const { closeMatchIdSheet, openMatchIdSheet, payForMatchId } =
-  useTicketWatchMatchId(state, goToUserPage)
+  useTicketWatchMatchId(state, goToUserPage, undefined, session)
 const {
   loadCurrentBoard,
   loadHistoryMatches,
@@ -321,7 +323,7 @@ const {
   resetCurrentBoard,
   resetHistoryBoard,
   handleHistoryMatchSelect,
-} = useTicketWatchBoards(state, refreshRefluxSubscriptionStatus)
+} = useTicketWatchBoards(state, refreshRefluxSubscriptionStatus, undefined, session)
 const {
   handleBlockInterestToggle,
   closeInterestConfirm,
@@ -334,7 +336,16 @@ const {
   stopFreshnessClock,
   handleStopMonitoring,
   toggleMonitoring,
-} = useTicketWatchPolling(state, loadCurrentBoard)
+} = useTicketWatchPolling(state, loadCurrentBoard, session)
+
+// 账号切换/退出：立即清理旧账号的私有看板数据（兴趣/订阅/会员档位），
+// 轮询停止由 useTicketWatchPolling 的 revision watch 负责；公共数据下次 onShow 以新会话重载。
+watch(session.revision, () => {
+  resetCurrentBoard()
+  resetHistoryBoard()
+  currentUser.value = null
+  viewerMembershipTier.value = 'V1'
+})
 
 function handleCurrentInterest(item: TicketWatchGroupedInventoryItem): void {
   if (currentMatch.value)
