@@ -378,6 +378,8 @@ export function useTicketWatchBoards(
 
     const match =
       historyMatches.value.find((item) => item.match_id === matchId) ?? null
+    // sections 混合了账号私有的兴趣标记：revision 变化后不再写入共享缓存。
+    const requestRevision = session.revision.value
     const [inventory, interests] = await Promise.all([
       getTicketWatchInventorySince(
         matchId,
@@ -390,10 +392,13 @@ export function useTicketWatchBoards(
       groupInventoryByPrice(regions.value, inventory),
       interests,
     )
+    // trend totals 是纯公共库存数据，不做 revision 防护。
     cacheHistoryTrendTotal(matchId, sumInventoryOccurrences(inventory))
-    historySectionsCache.value = {
-      ...historySectionsCache.value,
-      [matchId]: grouped,
+    if (requestRevision === session.revision.value) {
+      historySectionsCache.value = {
+        ...historySectionsCache.value,
+        [matchId]: grouped,
+      }
     }
     return grouped
   }
@@ -404,15 +409,18 @@ export function useTicketWatchBoards(
     const match =
       historyMatches.value.find((item) => item.match_id === matchId) ?? null
     const since = requireInventorySince(match?.sale_start_at)
+    const requestRevision = session.revision.value
     const [inventory, yukunRegions] = await Promise.all([
       getYukunTicketWatchInventory(matchId, since),
       getYukunTicketWatchRegions(matchId, since),
     ])
     const grouped = groupInventoryByPrice(yukunRegions, inventory)
     cacheHistoryTrendTotal(matchId, sumInventoryOccurrences(inventory))
-    historySectionsCache.value = {
-      ...historySectionsCache.value,
-      [matchId]: grouped,
+    if (requestRevision === session.revision.value) {
+      historySectionsCache.value = {
+        ...historySectionsCache.value,
+        [matchId]: grouped,
+      }
     }
     return grouped
   }
@@ -486,7 +494,12 @@ export function useTicketWatchBoards(
       return
     }
 
+    // 内部请求跨多个 await：发布前核对 revision，旧会话的结果不覆盖新会话视图。
+    const requestRevision = session.revision.value
     const grouped = await getHistoryInventorySections(matchId)
+    if (requestRevision !== session.revision.value) {
+      return
+    }
     displayedHistoryMatchId.value = matchId
     historySections.value = grouped
   }

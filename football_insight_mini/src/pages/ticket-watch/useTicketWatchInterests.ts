@@ -8,6 +8,7 @@ import type {
   TicketWatchMatchSummary,
 } from '../../types/ticketWatch'
 import { extractApiErrorMessage } from '../../utils/apiError'
+import { useAppSession, type AppSession } from '../../stores/appSession'
 
 import {
   applyBlockInterestToSections,
@@ -20,6 +21,7 @@ import { resolveInventoryBlockKey } from './presentation'
 export function useTicketWatchInterests(
   state: TicketWatchState,
   loadCurrentTrackedInterests: (matchId: number) => Promise<void>,
+  session: AppSession = useAppSession(),
 ) {
   const {
     currentSections,
@@ -31,8 +33,14 @@ export function useTicketWatchInterests(
   async function refreshMatchInterests(
     matchId: number,
     mode: TicketWatchBoardMode,
+    requestRevision: number = session.revision.value,
   ): Promise<void> {
     const interests = await getTicketWatchBlockInterests(matchId)
+
+    // 兴趣区块是账号私有数据：旧账号的结果晚到时不发布。
+    if (session.revision.value !== requestRevision) {
+      return
+    }
 
     if (mode === 'current') {
       currentSections.value = applyBlockInterestsToSections(
@@ -101,6 +109,7 @@ export function useTicketWatchInterests(
       return
     }
 
+    const requestRevision = session.revision.value
     interestToggleLoading.value = {
       ...interestToggleLoading.value,
       [toggleKey]: true,
@@ -112,6 +121,9 @@ export function useTicketWatchInterests(
         item.block_name,
       )
 
+      if (session.revision.value !== requestRevision) {
+        return
+      }
       if (mode === 'current') {
         currentSections.value = applyBlockInterestToSections(
           currentSections.value,
@@ -130,8 +142,14 @@ export function useTicketWatchInterests(
         }
       }
 
-      await refreshMatchInterests(match.match_id, mode)
+      if (session.revision.value !== requestRevision) {
+        return
+      }
+      await refreshMatchInterests(match.match_id, mode, requestRevision)
 
+      if (session.revision.value !== requestRevision) {
+        return
+      }
       uni.showToast({
         title: updatedInterest.viewer_interested
           ? `已标记想抢 ${item.block_name}`
@@ -139,11 +157,15 @@ export function useTicketWatchInterests(
         icon: 'none',
       })
     } catch (error) {
+      if (session.revision.value !== requestRevision) {
+        return
+      }
       uni.showToast({
         title: extractApiErrorMessage(error, '标记想抢区域失败，请稍后重试。'),
         icon: 'none',
       })
     } finally {
+      // loading 标记是纯 UI 状态：请求已结束就清理，不因 revision 变化而残留。
       const nextState = { ...interestToggleLoading.value }
       delete nextState[toggleKey]
       interestToggleLoading.value = nextState

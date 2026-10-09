@@ -3,6 +3,8 @@ import { effectScope, nextTick, ref, type Ref } from 'vue'
 import * as ticketApi from '../../api/ticketWatch'
 import type { CurrentUser } from '../../types/auth'
 import type {
+  RefluxSubscriptionPlansResponse,
+  RefluxSubscriptionStatusResponse,
   TicketWatchInventoryEntry,
   TicketWatchMatchSummary,
   TicketWatchTrackedInterest,
@@ -13,6 +15,7 @@ import { useTicketWatchBoards } from './useTicketWatchBoards'
 import { useTicketWatchMatchId } from './useTicketWatchMatchId'
 import { useTicketWatchPolling } from './useTicketWatchPolling'
 import { useTicketWatchState } from './useTicketWatchState'
+import { useTicketWatchSubscription } from './useTicketWatchSubscription'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -354,5 +357,141 @@ describe('ticket watch account revision effects', () => {
     expect(state.isMonitoringActive.value).toBe(false)
     expect(scheduled.size).toBe(0)
     scope.stop()
+  })
+})
+
+describe('ticket watch subscription revision effects', () => {
+  function unusedAction() {
+    return async () => {
+      throw new Error('unused')
+    }
+  }
+
+  test('订阅状态刷新在会话被替代后 resolve，不恢复邮箱与订阅标记', async () => {
+    const state = useTicketWatchState()
+    const session = createSessionStub()
+    state.currentMatch.value = match(1)
+    state.currentUser.value = { id: 'user-a' } as CurrentUser
+    const statusRequest = deferred<RefluxSubscriptionStatusResponse>()
+    const subscription = useTicketWatchSubscription(state, () => {}, {
+      createRefluxSubscriptionOrder: unusedAction(),
+      getRefluxSubscriptionPlans: unusedAction(),
+      getRefluxSubscriptionStatus: () => statusRequest.promise,
+      waitForPaidOrder: unusedAction(),
+      requestTicketWatchPayment: unusedAction(),
+    }, session)
+
+    const pending = subscription.refreshRefluxSubscriptionStatus()
+    // A 的刷新在途时切换到 B（revision 变化）。
+    session.revision.value += 1
+    statusRequest.resolve({
+      subscribed: true,
+      active_subscriptions: [],
+      email_target: { channel: 'email', target: 'a@example.com' },
+    })
+    await pending
+
+    expect(state.refluxSubscriptionEmail.value).toBe('')
+    expect(state.refluxSubscriptionSubscribed.value).toBe(false)
+    // finally 同样被 guard：loading 由页面 revision watch 统一复位。
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(true)
+  })
+
+  test('订阅套餐在会话被替代后到达，不发布 plans/email，不关弹层不 toast', async () => {
+    const toasts: string[] = []
+    testGlobal.uni = {
+      showToast: (options: { title: string }) => {
+        toasts.push(options.title)
+      },
+    } as unknown as typeof uni
+    const state = useTicketWatchState()
+    const session = createSessionStub()
+    state.currentMatch.value = match(1)
+    state.currentUser.value = { id: 'user-a' } as CurrentUser
+    const plansRequest = deferred<RefluxSubscriptionPlansResponse>()
+    const statusRequest = deferred<RefluxSubscriptionStatusResponse>()
+    const subscription = useTicketWatchSubscription(state, () => {}, {
+      createRefluxSubscriptionOrder: unusedAction(),
+      getRefluxSubscriptionPlans: () => plansRequest.promise,
+      getRefluxSubscriptionStatus: () => statusRequest.promise,
+      waitForPaidOrder: unusedAction(),
+      requestTicketWatchPayment: unusedAction(),
+    }, session)
+
+    const pending = subscription.openRefluxSubscriptionSheet()
+    await Promise.resolve()
+    expect(state.refluxSubscriptionSheetVisible.value).toBe(true)
+
+    session.revision.value += 1
+    plansRequest.resolve({
+      plans: [{
+        code: 'plan-1',
+        scope: 'single_match',
+        team_code: 'chengdu',
+        title: '单场订阅',
+        description: '',
+        price_cents: 100,
+      }],
+      active_subscriptions: [],
+      email_target: null,
+    })
+    statusRequest.resolve({
+      subscribed: true,
+      active_subscriptions: [],
+      email_target: { channel: 'email', target: 'a@example.com' },
+    })
+    await pending
+
+    expect(state.refluxSubscriptionPlans.value).toEqual([])
+    expect(state.selectedRefluxSubscriptionPlanCode.value).toBe('')
+    expect(state.refluxSubscriptionEmail.value).toBe('')
+    expect(state.refluxSubscriptionSubscribed.value).toBe(false)
+    expect(state.refluxSubscriptionLoading.value).toBe(true)
+    expect(toasts).toEqual([])
+  })
+
+  test('订阅支付完成后会话被替代，不置 subscribed、不关弹层、不弹成功 toast', async () => {
+    const toasts: string[] = []
+    testGlobal.uni = {
+      showToast: (options: { title: string }) => {
+        toasts.push(options.title)
+      },
+    } as unknown as typeof uni
+    const state = useTicketWatchState()
+    const session = createSessionStub()
+    state.currentMatch.value = match(1)
+    state.canRequestWxPayment.value = true
+    state.refluxSubscriptionEmail.value = 'a@example.com'
+    state.selectedRefluxSubscriptionPlanCode.value = 'plan-1'
+    state.refluxSubscriptionSheetVisible.value = true
+    const payment = deferred<void>()
+    const confirmation = deferred<boolean>()
+    const subscription = useTicketWatchSubscription(state, () => {}, {
+      createRefluxSubscriptionOrder: async () => ({
+        order_no: 'order-1',
+        params: { timeStamp: '', nonceStr: '', package: '', signType: 'RSA', paySign: '' },
+      }),
+      getRefluxSubscriptionPlans: unusedAction(),
+      getRefluxSubscriptionStatus: unusedAction(),
+      waitForPaidOrder: () => confirmation.promise,
+      requestTicketWatchPayment: () => payment.promise,
+    }, session)
+
+    const pending = subscription.submitRefluxSubscriptionOrder()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(state.refluxSubscriptionSubmitting.value).toBe(true)
+
+    payment.resolve()
+    await Promise.resolve()
+    // 支付完成、开通确认在途时切换到 B（revision 变化）。
+    session.revision.value += 1
+    confirmation.resolve(true)
+    await pending
+
+    expect(state.refluxSubscriptionSubscribed.value).toBe(false)
+    expect(state.refluxSubscriptionSheetVisible.value).toBe(true)
+    expect(state.refluxSubscriptionSubmitting.value).toBe(true)
+    expect(toasts).toEqual([])
   })
 })

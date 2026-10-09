@@ -271,11 +271,13 @@ const {
   pendingInterestSelection,
   isMonitoringActive,
   refluxSubscriptionSheetVisible,
+  refluxSubscriptionLoading,
   refluxSubscriptionSubmitting,
   refluxSubscriptionPlans,
   selectedRefluxSubscriptionPlanCode,
   refluxSubscriptionEmail,
   refluxSubscriptionSubscribed,
+  refluxSubscriptionStatusLoading,
   matchIdSheetVisible,
   matchIdSheetState,
   matchIdEntitlement,
@@ -306,13 +308,13 @@ const {
   toggleCurrentSectionCollapsed,
   toggleHistorySectionCollapsed,
 } = state
+const session = useAppSession()
 const {
   refreshRefluxSubscriptionStatus,
   openRefluxSubscriptionSheet,
   closeRefluxSubscriptionSheet,
   submitRefluxSubscriptionOrder,
-} = useTicketWatchSubscription(state, goToUserPage)
-const session = useAppSession()
+} = useTicketWatchSubscription(state, goToUserPage, undefined, session)
 const { closeMatchIdSheet, openMatchIdSheet, payForMatchId } =
   useTicketWatchMatchId(state, goToUserPage, undefined, session)
 const {
@@ -328,7 +330,7 @@ const {
   handleBlockInterestToggle,
   closeInterestConfirm,
   confirmPendingInterestSelection,
-} = useTicketWatchInterests(state, loadCurrentTrackedInterests)
+} = useTicketWatchInterests(state, loadCurrentTrackedInterests, session)
 const {
   startPolling,
   stopPolling,
@@ -345,6 +347,12 @@ watch(session.revision, () => {
   resetHistoryBoard()
   currentUser.value = null
   viewerMembershipTier.value = 'V1'
+  refluxSubscriptionSheetVisible.value = false
+  refluxSubscriptionLoading.value = false
+  refluxSubscriptionSubmitting.value = false
+  refluxSubscriptionStatusLoading.value = false
+  pendingInterestSelection.value = null
+  matchIdSheetVisible.value = false
 })
 
 function handleCurrentInterest(item: TicketWatchGroupedInventoryItem): void {

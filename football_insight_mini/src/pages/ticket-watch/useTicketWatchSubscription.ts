@@ -5,6 +5,8 @@ import {
 } from '../../api/ticketWatch'
 
 import { extractApiErrorMessage } from '../../utils/apiError'
+import { useAppSession, type AppSession } from '../../stores/appSession'
+import type { TicketWatchMatchSummary } from '../../types/ticketWatch'
 
 import {
   isRefluxSubscriptionActiveForCurrentMatch,
@@ -15,10 +17,27 @@ import type { TicketWatchState } from './useTicketWatchState'
 
 import { waitForPaidOrder, requestTicketWatchPayment } from './paymentActions'
 
+const subscriptionActions = {
+  createRefluxSubscriptionOrder,
+  getRefluxSubscriptionPlans,
+  getRefluxSubscriptionStatus,
+  waitForPaidOrder,
+  requestTicketWatchPayment,
+}
+
 export function useTicketWatchSubscription(
   state: TicketWatchState,
   goToUserPage: () => void,
+  actions = subscriptionActions,
+  session: AppSession = useAppSession(),
 ) {
+  const {
+    createRefluxSubscriptionOrder,
+    getRefluxSubscriptionPlans,
+    getRefluxSubscriptionStatus,
+    waitForPaidOrder,
+    requestTicketWatchPayment,
+  } = actions
   const {
     selectedTeam,
     currentMatch,
@@ -34,44 +53,62 @@ export function useTicketWatchSubscription(
     refluxSubscriptionStatusLoading,
   } = state
 
+  /** 订阅状态是账号私有数据：只在 revision 未变且比赛/球队快照一致时发布。 */
+  function isCurrentSnapshot(
+    requestRevision: number,
+    matchId: number,
+    teamCode: string,
+  ): boolean {
+    return session.revision.value === requestRevision
+      && currentMatch.value?.match_id === matchId
+      && selectedTeam.value === teamCode
+  }
+
   async function refreshRefluxSubscriptionStatus(): Promise<void> {
     const match = currentMatch.value
     if (!match || !currentUser.value || refluxSubscriptionStatusLoading.value) {
       return
     }
 
+    const requestRevision = session.revision.value
+    const teamCode = selectedTeam.value
     refluxSubscriptionStatusLoading.value = true
 
     try {
       const status = await getRefluxSubscriptionStatus(
-        resolveSelectedTeamCode(),
-        inferCurrentMatchSeason(),
+        teamCode,
+        inferCurrentMatchSeason(match),
         match.match_id,
       )
 
+      if (!isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+        return
+      }
       refluxSubscriptionEmail.value = status.email_target?.target || ''
       refluxSubscriptionSubscribed.value =
         status.subscribed ||
         isRefluxSubscriptionActiveForCurrentMatch(
           status.active_subscriptions,
-          resolveSelectedTeamCode(),
-          inferCurrentMatchSeason(),
+          teamCode,
+          inferCurrentMatchSeason(match),
           match.match_id,
         )
     } catch {
+      if (!isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+        return
+      }
       refluxSubscriptionSubscribed.value = false
       refluxSubscriptionEmail.value = ''
     } finally {
-      refluxSubscriptionStatusLoading.value = false
+      if (isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+        refluxSubscriptionStatusLoading.value = false
+      }
     }
   }
 
-  function resolveSelectedTeamCode(): string {
-    return selectedTeam.value
-  }
-
-  function inferCurrentMatchSeason(): number {
-    const match = currentMatch.value
+  function inferCurrentMatchSeason(
+    match: TicketWatchMatchSummary | null = currentMatch.value,
+  ): number {
     const rawYear =
       match?.kickoff_at?.slice(0, 4) || match?.match_date?.slice(0, 4)
     const year = Number.parseInt(rawYear || '', 10)
@@ -83,7 +120,8 @@ export function useTicketWatchSubscription(
       return
     }
 
-    if (!currentMatch.value) {
+    const match = currentMatch.value
+    if (!match) {
       uni.showToast({ title: '暂无当前比赛', icon: 'none' })
       return
     }
@@ -95,25 +133,27 @@ export function useTicketWatchSubscription(
 
     refluxSubscriptionSheetVisible.value = true
     refluxSubscriptionLoading.value = true
+    const requestRevision = session.revision.value
+    const teamCode = selectedTeam.value
 
     try {
       const [plans, status] = await Promise.all([
-        getRefluxSubscriptionPlans(
-          resolveSelectedTeamCode(),
-          currentMatch.value.match_id,
-        ),
+        getRefluxSubscriptionPlans(teamCode, match.match_id),
         getRefluxSubscriptionStatus(
-          resolveSelectedTeamCode(),
-          inferCurrentMatchSeason(),
-          currentMatch.value.match_id,
+          teamCode,
+          inferCurrentMatchSeason(match),
+          match.match_id,
         ),
       ])
 
+      if (!isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+        return
+      }
       const availablePlans = selectPurchasableRefluxSubscriptionPlans(
         plans.plans,
         plans.active_subscriptions,
-        resolveSelectedTeamCode(),
-        currentMatch.value.match_id,
+        teamCode,
+        match.match_id,
       )
 
       refluxSubscriptionPlans.value = availablePlans
@@ -124,18 +164,23 @@ export function useTicketWatchSubscription(
         status.subscribed ||
         isRefluxSubscriptionActiveForCurrentMatch(
           status.active_subscriptions,
-          resolveSelectedTeamCode(),
-          inferCurrentMatchSeason(),
-          currentMatch.value.match_id,
+          teamCode,
+          inferCurrentMatchSeason(match),
+          match.match_id,
         )
     } catch (error) {
+      if (!isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+        return
+      }
       uni.showToast({
         title: extractApiErrorMessage(error, '订阅套餐加载失败'),
         icon: 'none',
       })
       refluxSubscriptionSheetVisible.value = false
     } finally {
-      refluxSubscriptionLoading.value = false
+      if (isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+        refluxSubscriptionLoading.value = false
+      }
     }
   }
 
@@ -169,18 +214,26 @@ export function useTicketWatchSubscription(
       return
     }
 
+    const requestRevision = session.revision.value
+    const teamCode = selectedTeam.value
     refluxSubscriptionSubmitting.value = true
 
     try {
       const order = await createRefluxSubscriptionOrder({
         plan_code: selectedRefluxSubscriptionPlanCode.value,
-        team_code: resolveSelectedTeamCode(),
+        team_code: teamCode,
         match_id: match.match_id,
         email,
       })
 
+      if (!isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+        return
+      }
       await requestTicketWatchPayment(order.params)
       const paid = await waitForPaidOrder(order.order_no)
+      if (!isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+        return
+      }
       if (paid) {
         uni.showToast({ title: '订阅已开通', icon: 'success' })
         refluxSubscriptionSubscribed.value = true
@@ -189,12 +242,17 @@ export function useTicketWatchSubscription(
         uni.showToast({ title: '支付成功，开通确认中', icon: 'none' })
       }
     } catch (error) {
+      if (!isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+        return
+      }
       uni.showToast({
         title: extractApiErrorMessage(error, '订阅下单失败'),
         icon: 'none',
       })
     } finally {
-      refluxSubscriptionSubmitting.value = false
+      if (isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+        refluxSubscriptionSubmitting.value = false
+      }
     }
   }
 

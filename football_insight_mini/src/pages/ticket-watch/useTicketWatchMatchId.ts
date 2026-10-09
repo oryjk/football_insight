@@ -58,11 +58,19 @@ export function useTicketWatchMatchId(
       return
     }
 
+    // 解锁权益是账号私有数据：旧账号的结果晚到时不发布。
+    const requestRevision = session.revision.value
     try {
       const entitlement = await getMatchIdEntitlement(match.match_id)
+      if (session.revision.value !== requestRevision) {
+        return
+      }
       matchIdEntitlement.value = entitlement
       matchIdSheetState.value = resolveMatchIdSheetState(entitlement)
     } catch {
+      if (session.revision.value !== requestRevision) {
+        return
+      }
       matchIdSheetState.value = 'locked'
     }
   }
@@ -105,9 +113,16 @@ export function useTicketWatchMatchId(
     const requestRevision = session.revision.value
     try {
       const entitlement = await getMatchIdEntitlement(match.match_id)
+      if (session.revision.value !== requestRevision) {
+        return
+      }
       matchIdEntitlement.value = entitlement
       matchIdSheetState.value = resolveMatchIdSheetState(entitlement)
     } catch (error) {
+      if (session.revision.value !== requestRevision) {
+        // 请求期间会话已切换/退出：revision watch 已清理弹层，旧结果静默放弃。
+        return
+      }
       matchIdSheetVisible.value = false
       if (isUnauthorizedError(error)) {
         // token 失效与未登录走同一个登录引导，避免弹窗闪开即关、体感"没反应"。
@@ -140,12 +155,19 @@ export function useTicketWatchMatchId(
     }
 
     matchIdSheetState.value = 'paying'
+    const requestRevision = session.revision.value
 
     try {
       const order = await createMatchIdOrder(match.match_id)
 
+      if (session.revision.value !== requestRevision) {
+        return
+      }
       await requestTicketWatchPayment(order.wx_pay_params)
       const paid = await waitForPaidOrder(order.order_no)
+      if (session.revision.value !== requestRevision) {
+        return
+      }
       if (paid) {
         uni.showToast({ title: '已解锁', icon: 'success' })
         await refreshMatchIdEntitlement()
@@ -157,6 +179,9 @@ export function useTicketWatchMatchId(
         })
       }
     } catch (error) {
+      if (session.revision.value !== requestRevision) {
+        return
+      }
       if (error instanceof ApiRequestError && error.statusCode === 409) {
         await refreshMatchIdEntitlement()
         return
@@ -168,7 +193,10 @@ export function useTicketWatchMatchId(
       })
       matchIdSheetState.value = 'locked'
     } finally {
-      if (matchIdSheetState.value === 'paying') {
+      if (
+        session.revision.value === requestRevision
+        && matchIdSheetState.value === 'paying'
+      ) {
         matchIdSheetState.value = 'locked'
       }
     }
