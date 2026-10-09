@@ -105,3 +105,33 @@
 - 未 push 分支；未做真实版本登记/微信上传/管理员审核 PUT。
 - 报名系统仓库 `/Users/carlwang/registration_system` 全程只读参考，未修改。
 - API 契约、会员/审核规则、`sale_start_at + 10 minutes` 统计口径、视觉均保持；设计第 8 节项目（H5 一次性 code 桥接、分包等）不在本次范围。
+
+## 复审修复记录（2026-10-09，基于 d822fb8 的 review 发现）
+
+review 发现 4 个问题，逐问题一个 commit 修复，均在 `football_insight_mini/` 内：
+
+| 提交 | 问题 | 根因与修复 |
+| --- | --- | --- |
+| `872fe6c` | P2：旧 token 401 取消在途新登录 | `ensureSessionReady` 的 401 分支无条件递增 revision，把在途登录意图 B 的 revision 作废。修复：新增 `pendingAuthIntents` 计数（登录/注册/绑定意图期间 >0），401 分支在有认证意图在途时只清旧 token 会话状态，不递增 revision；无意图时 401 清会话语义不变。`src/stores/appSession.ts` |
+| `45f49f0` | P1：user 页未完成共享会话迁移 | `loadUser` 直接调 `getCurrentUser`/邮箱 API 写本地状态，无 revision 防护。修复：抽取 `src/pages/user/accountEffects.ts`（注入 session + API 依赖），所有私有请求成功/错误/finally 校验捕获 revision；`currentUser`/`hasAccessToken` 改 session 只读别名；`watch(session.revision)` 清理邮箱/弹层/绑定态等私有状态。 |
+| `21552d8` | P1：余票订阅迟到响应恢复旧账号数据 | `useTicketWatchSubscription` 全无 revision 防护；interests toggle、matchId 解锁/支付、历史看板缓存有漏。修复：订阅状态/套餐/下单/支付全流程捕获 revision + 比赛快照校验；`watch(session.revision)` 增补订阅 sheet/loading/matchId 弹层复位；历史 sections 缓存写入前校验。 |
+| `cae09bf` | P2：产物校验沙箱暴露宿主能力 | `runInNewContext` 注入宿主创建的 `exports` 对象，可经 `exports.constructor.constructor` 拿到宿主 `Function`→`process`。修复：不传任何宿主对象，`exports` 由被求值代码在沙箱 realm 内自建；取回导出值只接受字符串原始值；跨 realm 异常只读字符串 message。`scripts/verify-mp-api-base.mjs` |
+
+新增回归测试 13 个（deferred/逃逸 fixture，均验证修复前失败、修复后通过）：
+
+- `appSession.test.ts`：`登录 B 在途期间旧 token 的 401 先到，只清旧会话不取消 B`（修复前 B 被抛 SessionSupersededError）。
+- `pages/user/accountEffects.test.ts`（6 个）：A/B 切换迟到响应不写邮箱/不结束 loading/不 toast/不关弹层；正常路径发布；`resetSessionScopedState` 清理。
+- `pages/ticket-watch/effects.test.ts`（3 个）：订阅状态刷新/套餐/支付完成后会话被替代，不恢复邮箱/subscribed、不关弹层不 toast（已用 stash 暂存修复验证旧实现下 3 个全部失败）。
+- `verify-mp-api-base.test.ts`（3 个）：constructor 链逃逸改宿主 `process.env`（修复前实测 `Received: "yes"`）；沙箱无 process/Bun/require/fetch/XMLHttpRequest；非字符串导出拒绝。
+
+修复后验证（2026-10-09 实际执行，全部 exit 0）：
+
+| 命令 | 结果 |
+| --- | --- |
+| `bun test` | 382 pass / 0 fail，3736 expect，31 个文件（基线 369 + 13） |
+| `bun run type-check` | 通过 |
+| `bun run check:boundaries` | ✅ 通过 |
+| `bun run build:h5` | DONE Build complete |
+| `MINI_REVIEW_SKIP=1 bun run build:mp-weixin` | DONE；组件注册检查通过；产物 API 校验 `https://match.oryjk.cn/api/v1`（修复后的沙箱校验对真实产物通过） |
+
+版本文件 MD5 仍不变（1.0.64），无远程登记/上传；未验证项与上文一致（真机/视觉项本轮未新增验证）。与 review 描述的偏差：user 页 revision watch 未清 `h5TestUsers`（后端公共白名单，非会话私有，清了会导致 H5 登录入口闪烁）；interests 的 finally 清 loading key 不做 revision guard（纯 UI 状态，必须无条件清避免锁死）。
