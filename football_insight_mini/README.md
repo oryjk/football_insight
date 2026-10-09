@@ -4,6 +4,12 @@ Football Insight 的微信小程序前端，采用 `uni-app + Vue 3 + TypeScript
 
 当前策略不是替换现有 H5，而是在 monorepo 中作为独立前端子项目推进小程序版本。
 
+协作文档：
+
+- [AGENTS.md](AGENTS.md)：前端约定（分层、token、跨端约束、发布）
+- [docs/mini-architecture.md](docs/mini-architecture.md)：结构规范（目录职责、依赖方向、stores/会话、页面拆分）
+- [docs/mini-design-system.md](docs/mini-design-system.md)：视觉规范（三层 token、布局责任、Fi 组件契约）
+
 ## 小程序信息
 
 - AppID: `wxc61da17a97f6eb1b`

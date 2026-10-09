@@ -1,10 +1,11 @@
-/* Football Insight design tokens（对齐 registration_system_mini 的 Neo 三层结构）：
+/* Football Insight design tokens（足球自有视觉的三层组织）：
  * primitive = 原始值；semantic = 语义别名（页面引用这一层）；component = 组件契约。
  * 所有值均提炼自迁移前的存量用色/用值，仅重组不发明，视觉零变化。
  * 覆盖维度：颜色、间距、字号、行高、圆角、边框、阴影、字重。
  * 间距/字号采用与 rpx 数值对应的数字刻度（如 --fi-space-18 = 18rpx），
  * 便于精确迁移与将来整体调整节奏；其余维度用语义名。
- * 规范见本目录 ../AGENTS.md「Design token 规范」。
+ * 视觉身份由本项目决定；与报名系统的对齐仅限工程方法（三层 token 组织、Fi 命名），
+ * 不引入其主题皮肤。规范见 docs/mini-design-system.md 与 ../AGENTS.md「Design token 规范」。
  */
 :root,
 page {
@@ -19,8 +20,10 @@ page {
   --fi-primitive-ink-deep: #121212;
   --fi-primitive-grey-text: #8f9198;
   --fi-primitive-grey-text-deep: #6d7280;
+  --fi-primitive-grey-text-soft: #7a7f8b;
   --fi-primitive-canvas: #f6f7fb;
   --fi-primitive-canvas-soft: #f7f8fa;
+  --fi-primitive-surface-frosted: rgba(255, 255, 255, 0.92);
   --fi-primitive-ink-rgb: 21, 22, 27;
 
   /* ===== Primitive：间距（数字刻度，单位 rpx） ===== */
@@ -58,6 +61,7 @@ page {
   --fi-primitive-leading-tight: 1.1;
   --fi-primitive-leading-snug: 1.2;
   --fi-primitive-leading-normal: 1.5;
+  --fi-primitive-leading-loose: 1.6;
   --fi-primitive-leading-relaxed: 1.7;
 
   /* ===== Primitive：圆角 ===== */
@@ -78,6 +82,7 @@ page {
   --fi-primitive-shadow-card: 0 20rpx 48rpx rgba(26, 28, 36, 0.06);
   --fi-primitive-shadow-card-strong: 0 18rpx 46rpx rgba(26, 28, 36, 0.07);
   --fi-primitive-shadow-soft: 0 8rpx 18rpx rgba(18, 20, 28, 0.06);
+  --fi-primitive-shadow-floating: 0 24rpx 60rpx rgba(26, 28, 36, 0.08);
 
   /* ===== Primitive：字重 ===== */
   --fi-primitive-weight-bold: 700;
@@ -101,10 +106,12 @@ page {
   --fi-color-text-strong: var(--fi-primitive-ink-deep);
   --fi-color-text-secondary: var(--fi-primitive-grey-text-deep);
   --fi-color-text-muted: var(--fi-primitive-grey-text);
+  --fi-color-text-caption: var(--fi-primitive-grey-text-soft);
   --fi-color-primary-deep: var(--fi-primitive-red-deep);
   --fi-color-primary-darker: var(--fi-primitive-red-darker);
   --fi-color-page: var(--fi-primitive-canvas);
   --fi-color-page-soft: var(--fi-primitive-canvas-soft);
+  --fi-color-surface-frosted: var(--fi-primitive-surface-frosted);
   --fi-color-overlay: rgba(var(--fi-primitive-ink-rgb), 0.46);
   --fi-color-success-accent: var(--fi-primitive-green);
   --fi-color-divider: var(--fi-primitive-divider);
@@ -146,6 +153,7 @@ page {
   --fi-leading-tight: var(--fi-primitive-leading-tight);
   --fi-leading-snug: var(--fi-primitive-leading-snug);
   --fi-leading-normal: var(--fi-primitive-leading-normal);
+  --fi-leading-loose: var(--fi-primitive-leading-loose);
   --fi-leading-relaxed: var(--fi-primitive-leading-relaxed);
 
   --fi-radius-sm: var(--fi-primitive-radius-sm);
@@ -161,6 +169,7 @@ page {
   --fi-shadow-card: var(--fi-primitive-shadow-card);
   --fi-shadow-card-strong: var(--fi-primitive-shadow-card-strong);
   --fi-shadow-soft: var(--fi-primitive-shadow-soft);
+  --fi-shadow-floating: var(--fi-primitive-shadow-floating);
 
   --fi-weight-bold: var(--fi-primitive-weight-bold);
   --fi-weight-extrabold: var(--fi-primitive-weight-extrabold);
@@ -182,6 +191,18 @@ page {
   --fi-component-close-bg: var(--fi-color-page);
   --fi-component-close-text: var(--fi-color-text-secondary);
   --fi-component-close-size: var(--fi-font-24);
+  /* FiLoading 加载卡契约（值提取自组件原实现，视觉不变） */
+  --fi-component-loading-bg: var(--fi-color-surface-frosted);
+  --fi-component-loading-radius: var(--fi-radius-lg);
+  --fi-component-loading-shadow: var(--fi-shadow-floating);
+  --fi-component-loading-gap: var(--fi-space-12);
+  --fi-component-loading-padding: var(--fi-space-40) var(--fi-space-32);
+  --fi-component-loading-title-color: var(--fi-color-text-primary);
+  --fi-component-loading-title-size: var(--fi-font-34);
+  --fi-component-loading-title-weight: var(--fi-weight-bold);
+  --fi-component-loading-caption-color: var(--fi-color-text-caption);
+  --fi-component-loading-caption-size: var(--fi-font-26);
+  --fi-component-loading-caption-leading: var(--fi-leading-loose);
 }
 
 /* Ticket-watch migration: exact existing visual values, shared semantic aliases. */

@@ -16,22 +16,22 @@ defineProps<{
 .loading-card {
   display: flex;
   flex-direction: column;
-  gap: 12rpx;
-  padding: 40rpx 32rpx;
-  border-radius: 28rpx;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 24rpx 60rpx rgba(26, 28, 36, 0.08);
+  gap: var(--fi-component-loading-gap);
+  padding: var(--fi-component-loading-padding);
+  border-radius: var(--fi-component-loading-radius);
+  background: var(--fi-component-loading-bg);
+  box-shadow: var(--fi-component-loading-shadow);
 }
 
 .loading-card__title {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #15161b;
+  font-size: var(--fi-component-loading-title-size);
+  font-weight: var(--fi-component-loading-title-weight);
+  color: var(--fi-component-loading-title-color);
 }
 
 .loading-card__caption {
-  font-size: 26rpx;
-  line-height: 1.6;
-  color: #7a7f8b;
+  font-size: var(--fi-component-loading-caption-size);
+  line-height: var(--fi-component-loading-caption-leading);
+  color: var(--fi-component-loading-caption-color);
 }
 </style>

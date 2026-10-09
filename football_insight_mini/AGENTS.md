@@ -15,6 +15,11 @@
 
 运行时来源：`src/api/system.ts` 的 `MINI_PROGRAM_VERSION` 优先读 `src/config/generatedMiniProgramVersion.ts`，构建时生成。
 
+## 文档入口
+
+- 结构规范（目录职责、依赖方向、stores/会话约定、页面拆分模式）：[docs/mini-architecture.md](docs/mini-architecture.md)
+- 视觉规范（三层 token、布局责任、Fi 组件契约）：[docs/mini-design-system.md](docs/mini-design-system.md)
+
 ## 分层设计：pragmatic layering（对齐 registration_system_mini）
 
 采用注册系统同款的轻量分层，**明确排除**前端 DDD、use-case/port/adapter 严格分层和 `uni.*` 二次适配——uni-app 已承担跨端适配层，再包装只增加跳转成本，收益不足以覆盖复杂度：
@@ -85,7 +90,7 @@ src/pages/<domain>/
 
 ## Design token 规范
 
-`src/styles/fi-tokens.css` 按三层组织（由 `App.vue` 全局导入，兼容 `uni.css` 旧变量），覆盖**颜色、间距、字号、行高、圆角、边框、阴影、字重**八个维度：
+`src/styles/fi-tokens.css` 按三层组织（由 `App.vue` 全局导入，兼容 `uni.css` 旧变量），覆盖**颜色、间距、字号、行高、圆角、边框、阴影、字重**八个维度（完整视觉规范见 [docs/mini-design-system.md](docs/mini-design-system.md)）：
 
 1. **primitive**：原始值（`--fi-primitive-*`），不直接在页面引用；
 2. **semantic**：语义别名，结构 UI 统一引用这一层——颜色 `--fi-color-*`；间距 `--fi-space-<rpx>`（数字刻度，如 `--fi-space-18` = 18rpx）；字号 `--fi-font-<rpx>`；行高 `--fi-leading-*`；圆角 `--fi-radius-*`；边框/分割线 `--fi-border-*`、`--fi-color-divider*`；阴影 `--fi-shadow-*`；字重 `--fi-weight-*`；
