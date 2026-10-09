@@ -7,6 +7,12 @@
     compact-footer
     @update:visible="handleVisibleChange"
   >
+    <view v-if="presetCandidate" class="candidate-target">
+      <text class="candidate-target__label">我要换到 · {{ presetCandidate.display_name }}的座位</text>
+      <text class="candidate-target__seat">{{ formatSeatSwapSeatLabel(presetCandidate) }}</text>
+      <text class="candidate-target__hint">对方想换到 {{ formatSeatSwapDesiredSeats(presetCandidate.desired_seats) }}</text>
+      <text class="candidate-target__hint">目标已固定，填写你的座位和联系方式后确认换座。</text>
+    </view>
     <view class="steps">
       <view
         v-for="item in selectionSteps"
@@ -138,7 +144,7 @@
           class="btn-primary"
           :disabled="submitting"
           @tap="submit"
-        >{{ submitting ? '提交中...' : (myRequest ? '更新发布' : '发布换座') }}</button>
+        >{{ submitting ? '提交中...' : (presetCandidate ? '确认换座' : (myRequest ? '更新发布' : '发布换座')) }}</button>
       </view>
     </template>
   </FiBottomSheet>
@@ -150,7 +156,7 @@ import FiBottomSheet from '../../../components/FiBottomSheet.vue'
 import StadiumMap from './StadiumMap.vue'
 import type { SeatSwapCandidate, SeatSwapRequest } from '../../../types/seatSwap'
 import type { TicketWatchRegion } from '../../../types/ticketWatch'
-import { resolveSeatSwapRegionColorGroup } from '../../../utils/stadiumRegions'
+import { formatSeatSwapDesiredSeats, formatSeatSwapSeatLabel, resolveSeatSwapRegionColorGroup } from '../../../utils/stadiumRegions'
 import {
   canConfirmCurrentSeatRegion,
   canConfirmDesiredSeatRegions,
@@ -191,25 +197,33 @@ const form = reactive<SeatSwapFormState>({
   desired_seats: [],
 })
 
-const selectionSteps: Array<{ step: SeatSwapSelectionStep; index: number; label: string }> = [
-  { step: 'select_current', index: 1, label: '当前' },
-  { step: 'select_desired', index: 2, label: '目标' },
-  { step: 'ready_to_publish', index: 3, label: '联系' },
-]
+const selectionSteps = computed<Array<{ step: SeatSwapSelectionStep; index: number; label: string }>>(() =>
+  props.presetCandidate
+    ? [
+        { step: 'select_current', index: 1, label: '我的座位' },
+        { step: 'ready_to_publish', index: 2, label: '确认换座' },
+      ]
+    : [
+        { step: 'select_current', index: 1, label: '当前' },
+        { step: 'select_desired', index: 2, label: '目标' },
+        { step: 'ready_to_publish', index: 3, label: '联系' },
+      ],
+)
 
-const selectionStepIndex = computed(() => {
-  if (selectionStep.value === 'select_current') return 1
-  if (selectionStep.value === 'select_desired') return 2
-  return 3
-})
+const selectionStepIndex = computed(() =>
+  selectionSteps.value.find((item) => item.step === selectionStep.value)?.index || 1,
+)
 
-const sheetEyebrow = computed(() => `第 ${selectionStepIndex.value} 步 / 共 3 步`)
+const sheetEyebrow = computed(() =>
+  `${props.presetCandidate ? '定向换座 · ' : ''}第 ${selectionStepIndex.value} 步 / 共 ${selectionSteps.value.length} 步`,
+)
 
 const sheetTitle = computed(() => {
-  if (selectionStep.value === 'select_current') return '点选当前座位分区'
-  if (selectionStep.value === 'select_desired') {
-    return props.presetCandidate ? '已为你预填目标座位分区' : '点选目标座位分区'
+  if (props.presetCandidate) {
+    return selectionStep.value === 'select_current' ? '填写我的座位并发起换座' : '补充联系方式并确认换座'
   }
+  if (selectionStep.value === 'select_current') return '点选当前座位分区'
+  if (selectionStep.value === 'select_desired') return '点选目标座位分区'
   return '补充联系方式并发布'
 })
 
@@ -376,14 +390,14 @@ function goPreviousSelectionStep(): void {
   if (selectionStep.value === 'ready_to_publish') {
     stagedDesiredSeats.value = form.desired_seats.map((s) => ({ ...s }))
   }
-  selectionStep.value = previousSeatSwapStep(selectionStep.value)
+  selectionStep.value = previousSeatSwapStep(selectionStep.value, Boolean(props.presetCandidate))
 }
 
 function jumpToStep(target: SeatSwapSelectionStep): void {
-  const order: SeatSwapSelectionStep[] = ['select_current', 'select_desired', 'ready_to_publish']
+  const order = selectionSteps.value.map((item) => item.step)
   const currentIdx = order.indexOf(selectionStep.value)
   const targetIdx = order.indexOf(target)
-  if (targetIdx >= currentIdx) return
+  if (targetIdx < 0 || targetIdx >= currentIdx) return
   if (target === 'select_current') {
     stagedCurrentRegionKey.value = form.current_region_key || stagedCurrentRegionKey.value
   } else if (target === 'select_desired') {
@@ -413,6 +427,29 @@ function submit(): void {
 </script>
 
 <style scoped>
+.candidate-target {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fi-space-8);
+  margin-bottom: var(--fi-space-18);
+  padding: var(--fi-space-18);
+  border: 1rpx solid var(--fi-color-border-chip);
+  border-radius: var(--fi-radius-sm);
+  background: var(--fi-color-page);
+}
+
+.candidate-target__label,
+.candidate-target__hint {
+  color: var(--fi-color-text-secondary);
+  font-size: var(--fi-font-22);
+  line-height: var(--fi-leading-snug);
+}
+
+.candidate-target__seat {
+  color: var(--fi-color-text-strong);
+  font-size: var(--fi-font-28);
+}
+
 .steps {
   display: flex;
   gap: var(--fi-space-10);

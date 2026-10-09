@@ -314,6 +314,7 @@ async function scrollToSeatSwapRegion(regionKey: string): Promise<void> {
 }
 
 function openPublishSheet(): void {
+  pendingConfirmTarget.value = null
   publishSheetVisible.value = true
 }
 

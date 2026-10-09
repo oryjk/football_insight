@@ -575,4 +575,9 @@ describe('seat swap stadium selection flow', () => {
     expect(previousSeatSwapStep('select_desired')).toBe('select_current')
     expect(previousSeatSwapStep('select_current')).toBe('select_current')
   })
+
+  test('returns to my seat instead of editing the fixed peer seat when confirming a candidate', () => {
+    expect(previousSeatSwapStep('ready_to_publish', true)).toBe('select_current')
+    expect(previousSeatSwapStep('select_current', true)).toBe('select_current')
+  })
 })

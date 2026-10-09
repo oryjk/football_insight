@@ -305,8 +305,8 @@ export function resolveSeatSwapCandidateAction(input: {
   return 'confirm'
 }
 
-export function previousSeatSwapStep(step: SeatSwapSelectionStep): SeatSwapSelectionStep {
-  if (step === 'ready_to_publish') return 'select_desired'
+export function previousSeatSwapStep(step: SeatSwapSelectionStep, hasPresetCandidate = false): SeatSwapSelectionStep {
+  if (step === 'ready_to_publish') return hasPresetCandidate ? 'select_current' : 'select_desired'
   if (step === 'select_desired') return 'select_current'
   return 'select_current'
 }
