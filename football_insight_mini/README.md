@@ -174,6 +174,8 @@ bun run mp:preview -- --desc "预览说明"               # 只传预览版，�
 
 **robot 双轨约定**：`robot=1` 日常开发版本，随便传互不影响；`robot=2` 是体验版专用线——首次用 robot=2 上传后，需在公众平台「版本管理 → 开发版本」对该版本点一次「选为体验版」，之后每次 robot=2 上传的新代码会自动成为体验版内容。robot=1 的上传不会影响体验版。
 
+发版链路统一使用 Bun：校验、版本登记与上传脚本直接用 `bun` 执行，uni 编译器用 `bunx --bun uni` 启动，无需另行安装 Node.js。
+
 流程细节（`scripts/mini-ci.mjs` + `scripts/sync-manifest-version.mjs`）：
 
 1. `build:mp-weixin` 的 prebuild 钩子先向本项目后端登记接口 `POST /api/v1/mini-review/allocate` 申请版本号。**登记库（数据库）是唯一权威**：最新版本仍在审核中则**复用**，已出审核则在库内最大版本基础上 `+0.0.1` 并标记审核中；仅当库内无任何记录时才以本地 manifest 为起点。本地 manifest 不参与后续分配（多台构建机结果一致），删库重置后版本号随库回落。

@@ -27,8 +27,8 @@ describe('football mini ci release flow (aligned with registration_system_mini)'
   })
 
   test('wires mp:release to a full build followed by ci upload', () => {
-    expect(packageJson.scripts['mp:release']).toBe('bun run build:mp-weixin && node scripts/mini-ci.mjs upload')
-    expect(packageJson.scripts['mp:preview']).toBe('node scripts/mini-ci.mjs preview')
+    expect(packageJson.scripts['mp:release']).toBe('bun run build:mp-weixin && bun scripts/mini-ci.mjs upload')
+    expect(packageJson.scripts['mp:preview']).toBe('bun scripts/mini-ci.mjs preview')
     expect(packageJson.scripts['mp:upload']).toBeUndefined()
     expect(packageJson.scripts['build:mp-weixin']).toContain('verify-mp-component-registrations.mjs')
   })

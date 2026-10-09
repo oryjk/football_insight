@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // 小程序 CI 上传/预览：基于官方 miniprogram-ci。
 // 用法：
 //   bun run mp:release  -- [--robot 2] [--desc 文案]   # 构建 + 分配版本号 + 上传
