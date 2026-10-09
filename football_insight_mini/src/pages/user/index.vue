@@ -139,9 +139,8 @@ import {
 } from '../../api/auth'
 import { isSessionSupersededError, useAppSession } from '../../stores/appSession'
 import { canControlMiniReview } from '../../api/miniReview'
-import { getPublicSystemConfig } from '../../api/system'
 import type { CurrentUser, H5TestLoginUser, MiniWechatBindingRequiredResponse } from '../../types/auth'
-import type { PublicSystemConfig } from '../../types/system'
+import { useRuntimeConfig } from '../../stores/runtimeConfig'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { getAccessToken } from '../../utils/authStorage'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
@@ -173,7 +172,9 @@ const session = useAppSession()
 const isReviewController = ref(false)
 const loading = ref(hasLocalAccessToken.value)
 const currentUser = ref<CurrentUser | null>(null)
-const publicConfig = ref<PublicSystemConfig | null>(null)
+// 公共配置共享自 runtimeConfig store（60 秒缓存，失败保留上次成功值）。
+const runtimeConfig = useRuntimeConfig()
+const publicConfig = runtimeConfig.config
 const systemConfigUnderReview = ref(false)
 const notificationEmail = ref('')
 const notificationEmailSheetVisible = ref(false)
@@ -315,7 +316,6 @@ async function loadUser(): Promise<void> {
 
   if (systemConfigUnderReview.value) {
     currentUser.value = null
-    publicConfig.value = null
     miniWechatBindState.value = null
     loading.value = false
     return
@@ -323,17 +323,16 @@ async function loadUser(): Promise<void> {
 
   if (!hasLocalAccessToken.value) {
     currentUser.value = null
-    publicConfig.value = null
     notificationEmail.value = ''
     miniWechatBindState.value = null
     loading.value = false
     return
   }
 
-  const [userResult, publicConfigResult, notificationEmailResult] = await Promise.allSettled([
+  const [userResult, notificationEmailResult] = await Promise.allSettled([
     getCurrentUser(),
-    getPublicSystemConfig(),
     getNotificationEmail(),
+    runtimeConfig.ensureRuntimeConfig(),
   ])
 
   if (userResult.status === 'fulfilled') {
@@ -346,10 +345,6 @@ async function loadUser(): Promise<void> {
     notificationEmail.value = notificationEmailResult.value.email?.trim() || ''
   } else {
     notificationEmail.value = ''
-  }
-
-  if (publicConfigResult.status === 'fulfilled') {
-    publicConfig.value = publicConfigResult.value
   }
 
   loading.value = false

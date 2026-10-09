@@ -62,8 +62,9 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { canControlMiniReview, getMiniReviewStatus, putMiniReviewReviewStatus } from '../../../api/miniReview'
+import { canControlMiniReview, putMiniReviewReviewStatus } from '../../../api/miniReview'
 import { MINI_PROGRAM_VERSION } from '../../../api/system'
+import { useMiniReviewStatus } from '../../../stores/miniReview'
 import { extractApiErrorMessage } from '../../../utils/apiError'
 import type { H5TestLoginUser } from '../../../types/auth'
 
@@ -110,6 +111,8 @@ const isReviewing = ref(false)
 const statusText = ref('')
 // 切换开关仅对白名单用户渲染；服务端 PUT 的白名单校验仍是最终防线。
 const canControl = ref(false)
+// 审核状态共享自 miniReview store：管理员 PUT 成功后全应用观察同一值。
+const miniReview = useMiniReviewStatus()
 
 async function loadCanControl() {
   try {
@@ -123,14 +126,14 @@ void loadCanControl()
 
 async function loadStatus() {
   statusText.value = '查询中…'
-  try {
-    const status = await getMiniReviewStatus()
-    isReviewing.value = status.is_reviewing
-    statusText.value = status.status_text
-  } catch (error) {
-    console.warn('[user-settings] load review status failed', error)
+  const status = await miniReview.ensureMiniReviewReady({ force: true })
+  if (!status) {
+    console.warn('[user-settings] load review status failed', miniReview.errorMessage.value)
     statusText.value = '查询失败'
+    return
   }
+  isReviewing.value = status.is_reviewing
+  statusText.value = status.status_text
 }
 
 function handleToggle(nextReviewing: boolean) {
@@ -150,6 +153,8 @@ function handleToggle(nextReviewing: boolean) {
 async function applyToggle(nextReviewing: boolean) {
   try {
     const status = await putMiniReviewReviewStatus(undefined, undefined, nextReviewing)
+    // PUT 成功立即发布共享审核值，并使先前在途 GET 失效，所有页面观察同一值。
+    miniReview.setMiniReviewStatus(status)
     isReviewing.value = status.is_reviewing
     statusText.value = status.status_text
     uni.showToast({ title: nextReviewing ? '已切为审核中' : '已切为已过审', icon: 'none' })

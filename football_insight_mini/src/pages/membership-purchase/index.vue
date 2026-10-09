@@ -116,8 +116,7 @@
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { ref, computed } from 'vue'
 import { getMembershipProduct, createMembershipOrder } from '../../api/payment'
-import { getPublicSystemConfig } from '../../api/system'
-import type { PublicSystemConfig } from '../../types/system'
+import { useRuntimeConfig } from '../../stores/runtimeConfig'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
@@ -139,7 +138,9 @@ import {
 } from './helpers'
 
 const product = ref<Awaited<ReturnType<typeof getMembershipProduct>> | null>(null)
-const publicConfig = ref<PublicSystemConfig | null>(null)
+// 公共配置共享自 runtimeConfig store（60 秒缓存，失败保留上次成功值）。
+const runtimeConfig = useRuntimeConfig()
+const publicConfig = runtimeConfig.config
 // 当前用户共享自 appSession；支付成功后强制刷新会话以拿到新会员等级。
 const session = useAppSession()
 const currentUser = session.currentUser
@@ -201,14 +202,13 @@ async function loadPurchaseData() {
   systemConfigUnderReview.value = await loadSystemConfigUnderReview()
   if (systemConfigUnderReview.value) {
     product.value = null
-    publicConfig.value = null
     selectedTier.value = ''
     return
   }
 
-  const [productResult, publicConfigResult] = await Promise.allSettled([
+  const [productResult] = await Promise.allSettled([
     getMembershipProduct(),
-    getPublicSystemConfig(),
+    runtimeConfig.ensureRuntimeConfig(),
     session.ensureSessionReady(),
   ])
 
@@ -216,10 +216,6 @@ async function loadPurchaseData() {
     product.value = productResult.value
   } else {
     uni.showToast({ title: extractApiErrorMessage(productResult.reason, '会员信息加载失败'), icon: 'none' })
-  }
-
-  if (publicConfigResult.status === 'fulfilled') {
-    publicConfig.value = publicConfigResult.value
   }
 
   selectedTier.value = productOptions.value[0]?.target_tier ?? ''

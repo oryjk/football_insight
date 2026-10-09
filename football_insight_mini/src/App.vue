@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
 import { useAppSession } from "./stores/appSession";
+import { useRuntimeConfig } from "./stores/runtimeConfig";
+import { useMiniReviewStatus } from "./stores/miniReview";
 import { getAccessToken } from "./utils/authStorage";
 
 onLaunch(() => {
@@ -9,6 +11,9 @@ onLaunch(() => {
   if (getAccessToken()) {
     void useAppSession().ensureSessionReady().catch(() => {});
   }
+  // 公共配置与审核状态后台预加载；失败不阻断首页，页面 onShow 会复用缓存或重试。
+  void useRuntimeConfig().ensureRuntimeConfig();
+  void useMiniReviewStatus().ensureMiniReviewReady();
 });
 onShow(() => {
   console.log("Football Insight mini show");

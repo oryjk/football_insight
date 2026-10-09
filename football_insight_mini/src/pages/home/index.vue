@@ -98,7 +98,6 @@ import HomeTeamSeasonSheet from './components/HomeTeamSeasonSheet.vue'
 import HomeFavoriteTeamSheet from './components/HomeFavoriteTeamSheet.vue'
 import { getAvailableRounds, getMatches, getOverview, getRankings } from '../../api/insight'
 import { getSupportProfile, listSupportTeams, setFavoriteTeam } from '../../api/support'
-import { getPublicSystemConfig } from '../../api/system'
 import type {
   InsightOverviewResponse,
   MatchCard,
@@ -109,10 +108,10 @@ import type {
   RoundReference,
 } from '../../types/insight'
 import type { SupportProfile, SupportTeam } from '../../types/support'
-import type { PublicSystemConfig } from '../../types/system'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
+import { useRuntimeConfig } from '../../stores/runtimeConfig'
 import { buildHomeBriefingMarqueeMap, splitBriefingMarqueeRows } from '../../utils/homeBriefingMarquees'
 import { buildHeadlineTitleParts } from '../../utils/homeViewText'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
@@ -143,7 +142,9 @@ const liveMatches = ref<MatchCard[]>([])
 const rounds = ref<RoundReference[]>([])
 const rankings = ref<{ player_categories: PlayerRankingCategory[] } | null>(null)
 const guideRankings = ref<RankingsViewResponse | null>(null)
-const publicConfig = ref<PublicSystemConfig | null>(null)
+// 公共配置共享自 runtimeConfig store（失败保留上次成功值）。
+const runtimeConfig = useRuntimeConfig()
+const publicConfig = runtimeConfig.config
 const selectedPulseMatch = ref<HomePulseLeadMatch | null>(null)
 const selectedStandingsTeam = ref<OverviewStanding | null>(null)
 const allSeasonMatches = ref<MatchCard[] | null>(null)
@@ -401,17 +402,17 @@ async function loadPage() {
 
 async function loadDeferredHomeData() {
   try {
-    const [rankingsResponse, liveMatchesResponse, roundsResponse, publicSystemConfig] = await Promise.all([
+    const [rankingsResponse, liveMatchesResponse, roundsResponse] = await Promise.all([
       getRankings({ mode: 'live', season: currentSeason, roundNumber: null }),
       getMatches({ mode: 'live', season: currentSeason, roundNumber: null }),
       getAvailableRounds(currentSeason),
-      getPublicSystemConfig(),
+      // 公共配置走共享 store（60 秒缓存/失败保留上次成功值），结果由 store 发布。
+      runtimeConfig.ensureRuntimeConfig(),
     ])
 
     rankings.value = rankingsResponse
     liveMatches.value = liveMatchesResponse.matches
     rounds.value = roundsResponse
-    publicConfig.value = publicSystemConfig
 
     const guideReferenceRoundNumber = resolveHomeGuideReferenceRoundNumber(roundsResponse)
     guideRankings.value = guideReferenceRoundNumber === null
