@@ -68,4 +68,44 @@ describe('mini-program upload API address', () => {
     expect(() => verifyMiniProgramApiBase(artifact('exports.API_BASE_URL = process.env.VITE_API_BASE_URL;'))).toThrow('无法读取编译包')
     expect(() => verifyMiniProgramApiBase(artifact('exports.API_BASE_URL = require("./other.js");'))).toThrow('无法读取编译包')
   }, 15000)
+
+  test('sandbox escape via constructor chains cannot reach the host realm', () => {
+    // 制品即使导出正确地址，也不得经宿主对象原型链（exports.constructor.constructor = 宿主 Function）
+    // 触达宿主 process/Bun 并产生宿主可观察的副作用（这里以改写宿主 process.env 为探针）。
+    const root = artifact(`
+      try {
+        const hostProcess = exports.constructor.constructor('return process')();
+        hostProcess.env.__FI_SANDBOX_PWNED__ = 'yes';
+      } catch (e) {}
+      try {
+        const hostBun = exports.constructor.constructor('return typeof Bun !== "undefined" && Bun')();
+        if (hostBun) hostProcess.env.__FI_SANDBOX_PWNED_BUN__ = 'yes';
+      } catch (e) {}
+      exports.API_BASE_URL = ${JSON.stringify(productionApi)};
+    `)
+    delete process.env.__FI_SANDBOX_PWNED__
+    delete process.env.__FI_SANDBOX_PWNED_BUN__
+    try {
+      expect(verifyMiniProgramApiBase(root)).toBe(productionApi)
+      expect(process.env.__FI_SANDBOX_PWNED__).toBeUndefined()
+      expect(process.env.__FI_SANDBOX_PWNED_BUN__).toBeUndefined()
+    } finally {
+      delete process.env.__FI_SANDBOX_PWNED__
+      delete process.env.__FI_SANDBOX_PWNED_BUN__
+    }
+  })
+
+  test('sandbox evaluation provides no network/process/require capabilities', () => {
+    // 校验拒绝时的报错会带上实际导出值，借此观察沙箱内各宿主能力的可见性。
+    const root = artifact(
+      `exports.API_BASE_URL = ['process:'+typeof process, 'Bun:'+typeof Bun, 'require:'+typeof require, 'fetch:'+typeof fetch, 'XMLHttpRequest:'+typeof XMLHttpRequest].join(' ');`,
+    )
+    expect(() => verifyMiniProgramApiBase(root)).toThrow('process:undefined Bun:undefined require:undefined fetch:undefined XMLHttpRequest:undefined')
+  })
+
+  test('rejects a non-string export without trusting sandbox objects', () => {
+    // 即使对象 toString 能拼出生产地址，也只有真实字符串导出才被接受（沙箱对象不当宿主可信值用）。
+    const root = artifact(`exports.API_BASE_URL = { toString() { return ${JSON.stringify(productionApi)}; } };`)
+    expect(() => verifyMiniProgramApiBase(root)).toThrow('小程序上传产物的 API 地址必须是')
+  })
 })
