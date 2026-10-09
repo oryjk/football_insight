@@ -4,9 +4,13 @@
       <view class="match-id-card__head">
         <view>
           <text class="match-id-card__kicker">比赛 ID</text>
-          <text class="match-id-card__title">{{ state === 'unlocked' ? '已解锁' : '获取比赛 ID' }}</text>
+          <text class="match-id-card__title">{{
+            state === 'unlocked' ? '已解锁' : '获取比赛 ID'
+          }}</text>
         </view>
-        <button class="match-id-card__close" :disabled="paying" @tap="close">×</button>
+        <button class="match-id-card__close" :disabled="paying" @tap="close">
+          ×
+        </button>
       </view>
 
       <text class="match-id-card__match">{{ matchLabel }}</text>
@@ -20,12 +24,22 @@
       </view>
 
       <view v-else class="match-id-card__body">
-        <text class="match-id-card__copy">V6 及以上会员可免费查看，或支付 ¥5 解锁本场比赛 ID。</text>
+        <text class="match-id-card__copy"
+          >V6 及以上会员可免费查看，或支付 ¥5 解锁本场比赛 ID。</text
+        >
         <view class="match-id-actions">
-          <button class="match-id-actions__button match-id-actions__button--ghost" :disabled="paying" @tap="upgrade">
+          <button
+            class="match-id-actions__button match-id-actions__button--ghost"
+            :disabled="paying"
+            @tap="upgrade"
+          >
             升级到 V6
           </button>
-          <button class="match-id-actions__button match-id-actions__button--pay" :disabled="paying" @tap="pay">
+          <button
+            class="match-id-actions__button match-id-actions__button--pay"
+            :disabled="paying"
+            @tap="pay"
+          >
             {{ paying ? '处理中...' : '¥5 解锁本场' }}
           </button>
         </view>
@@ -97,13 +111,23 @@ function copy(): void {
 <style scoped lang="css">
 /* 动画 keyframes 定义在组件内：user 页的 fi-fade-in-up 是页面局部样式，跨页引用不生效。 */
 @keyframes fi-match-id-overlay-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes fi-match-id-card-in {
-  from { opacity: 0; transform: translateY(24rpx) scale(0.98); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(24rpx) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .match-id-mask {
@@ -125,7 +149,7 @@ function copy(): void {
   max-width: 640rpx;
   box-sizing: border-box;
   border-radius: var(--fi-radius-lg);
-  background: rgba(255, 255, 255, 0.98);
+  background: var(--fi-color-ticket-history-trend-summary-item-background-2);
   padding: var(--fi-space-28) var(--fi-space-24) var(--fi-space-32);
   box-shadow: var(--fi-shadow-card-strong);
   animation: fi-match-id-card-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -143,7 +167,7 @@ function copy(): void {
   color: var(--fi-color-text-muted);
   font-size: var(--fi-font-22);
   font-weight: var(--fi-weight-bold);
-  letter-spacing: 3rpx;
+  letter-spacing: var(--fi-space-3);
 }
 
 .match-id-card__title {
@@ -200,7 +224,7 @@ function copy(): void {
   color: var(--fi-primitive-ink);
   font-size: var(--fi-font-48);
   font-weight: var(--fi-weight-extrabold);
-  letter-spacing: 2rpx;
+  letter-spacing: var(--fi-space-2);
   line-height: var(--fi-leading-none);
   word-break: break-all;
 }

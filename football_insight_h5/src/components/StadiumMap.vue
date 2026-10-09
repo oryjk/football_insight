@@ -143,7 +143,8 @@ const renderedRegions = computed(() =>
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 22px;
+  /* 百分比布局已定义区域高度，避免最小高度撑大色块而重叠。 */
+  min-height: 0;
   border: 0;
   border-radius: 6px;
   box-sizing: border-box;
@@ -154,7 +155,7 @@ const renderedRegions = computed(() =>
   font: inherit;
   line-height: 1.1;
   box-shadow: 0 4px 9px rgba(18, 25, 20, 0.18);
-  transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease, filter 0.16s ease;
+  transition: box-shadow 0.16s ease, opacity 0.16s ease, filter 0.16s ease;
 }
 
 .stadium-region__name {
@@ -275,11 +276,11 @@ const renderedRegions = computed(() =>
 
 .stadium-region--current,
 .stadium-region--desired {
-  transform: scale(1.08);
   box-shadow: 0 6px 13px rgba(18, 25, 20, 0.24);
   z-index: 3;
 }
 
+/* 高亮只改变描边、阴影和层级，保持点击矩形不侵入相邻区域。 */
 .stadium-region--current {
   outline: 2.5px solid rgba(216, 155, 52, 0.9);
   outline-offset: 1px;
@@ -291,7 +292,6 @@ const renderedRegions = computed(() =>
 }
 
 .stadium-region--filter {
-  transform: scale(1.14);
   outline: 2.5px solid #15161b;
   outline-offset: 1px;
   box-shadow: 0 7px 14px rgba(18, 25, 20, 0.32);

@@ -196,7 +196,8 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 44rpx;
+  /* 百分比布局已定义区域高度，避免最小高度撑大色块而重叠。 */
+  min-height: 0;
   border-radius: 12rpx;
   box-sizing: border-box;
   margin: 0;
@@ -206,7 +207,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   font: inherit;
   line-height: 1.1;
   box-shadow: 0 8rpx 18rpx rgba(18, 25, 20, 0.18);
-  transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease, filter 0.16s ease;
+  transition: box-shadow 0.16s ease, opacity 0.16s ease, filter 0.16s ease;
 }
 
 .stadium-region::after {
@@ -317,20 +318,18 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
 .stadium-price-legend__ticket--red { background: #ec3b20; }
 .stadium-price-legend__ticket--vip { background: #b90000; }
 
+/* 高亮只改变描边、阴影和层级，保持点击矩形不侵入相邻区域。 */
 .stadium-region--current {
-  transform: scale(1.06);
   box-shadow: 0 12rpx 26rpx rgba(18, 25, 20, 0.24);
   z-index: 3;
 }
 
 .stadium-region--desired {
-  transform: scale(1.06);
   box-shadow: 0 12rpx 26rpx rgba(18, 25, 20, 0.24);
   z-index: 3;
 }
 
 .stadium-region--filter {
-  transform: scale(1.12);
   box-shadow: 0 14rpx 28rpx rgba(18, 25, 20, 0.32);
   z-index: 4;
 }
@@ -357,7 +356,6 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
 
 .stadium-map--review .stadium-region--review-current,
 .stadium-map--review .stadium-region--review-desired {
-  transform: scale(1.08);
   border-color: rgba(23, 25, 31, 0.34);
   color: #17191f;
   opacity: 1;

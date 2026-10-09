@@ -136,6 +136,8 @@ interface RingSegment {
   side: SeatSwapRegionLayout['side']
 }
 
+// 布局单位为球场容器的百分比；色块宽度必须小于同排中心间距。
+// 转角的弯曲偏移需为相邻侧边色块留出垂直间隙。
 const innerRingMetrics: RingMetrics = {
   ring: 'inner',
   leftColumnX: 15,
@@ -144,14 +146,14 @@ const innerRingMetrics: RingMetrics = {
   topRightX: 80,
   bottomLeftX: 20,
   bottomRightX: 80,
-  topY: 16.5,
+  topY: 16.9,
   bottomY: 73.5,
   sideTopY: 24.8,
   sideBottomY: 65.2,
-  horizontalItemW: 7.8,
+  horizontalItemW: 7.4,
   verticalItemW: 7.2,
   itemH: 6.6,
-  cornerY: 3.2,
+  cornerY: 1.2,
 }
 
 const outerRingMetrics: RingMetrics = {
@@ -163,10 +165,10 @@ const outerRingMetrics: RingMetrics = {
   bottomLeftX: 13.5,
   bottomRightX: 86.5,
   topY: 8,
-  bottomY: 88,
+  bottomY: 88.4,
   sideTopY: 18.5,
   sideBottomY: 73.5,
-  horizontalItemW: 9.2,
+  horizontalItemW: 8.8,
   verticalItemW: 7,
   itemH: 6.6,
   cornerY: 3.4,
@@ -187,9 +189,9 @@ const outerRingSegments: RingSegment[] = [
 ]
 
 const vipLayouts: Record<string, SeatSwapRegionLayout> = {
-  VIP1: { ring: 'vip', side: 'vip', left: 37.2, top: 77.3, width: 8.2, height: 3.8 },
-  VIP2: { ring: 'vip', side: 'vip', left: 45.9, top: 77.3, width: 8.2, height: 3.8 },
-  VIP3: { ring: 'vip', side: 'vip', left: 54.6, top: 77.3, width: 8.2, height: 3.8 },
+  VIP1: { ring: 'vip', side: 'vip', left: 37.2, top: 78.2, width: 8.2, height: 4.8 },
+  VIP2: { ring: 'vip', side: 'vip', left: 45.9, top: 78.2, width: 8.2, height: 4.8 },
+  VIP3: { ring: 'vip', side: 'vip', left: 54.6, top: 78.2, width: 8.2, height: 4.8 },
 }
 
 function resolveCounterclockwiseRing(
