@@ -68,7 +68,8 @@ import { extractApiErrorMessage } from '../../../utils/apiError'
 import type { H5TestLoginUser } from '../../../types/auth'
 
 // #ifdef H5
-import { listH5TestLoginUsers, loginAsH5TestUser } from '../../../api/auth'
+import { listH5TestLoginUsers } from '../../../api/auth'
+import { isSessionSupersededError, useAppSession } from '../../../stores/appSession'
 
 const h5TestUsers = ref<H5TestLoginUser[]>([])
 
@@ -88,12 +89,16 @@ async function loadH5TestUsers() {
 
 async function handleH5TestLogin(user: H5TestLoginUser) {
   try {
-    await loginAsH5TestUser(user.id)
+    await useAppSession().loginAsTestUser(user.id)
     uni.showToast({ title: `已切换为 ${h5TestUserLabel(user)}`, icon: 'none' })
     setTimeout(() => {
       uni.reLaunch({ url: '/pages/user/index' })
     }, 600)
   } catch (error) {
+    // 被更新的登录/退出替代的操作静默放弃，不提示成功也不跳转。
+    if (isSessionSupersededError(error)) {
+      return
+    }
     uni.showToast({ title: extractApiErrorMessage(error, '测试登录失败'), icon: 'none' })
   }
 }

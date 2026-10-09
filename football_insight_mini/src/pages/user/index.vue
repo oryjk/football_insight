@@ -132,16 +132,12 @@ import calendarDaysIcon from '../../static/user/calendar-days.svg'
 import logInIcon from '../../static/user/log-in.svg'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import {
-  bindMiniWechatAccount,
   getCurrentUser,
   getNotificationEmail,
-  login,
-  loginAsH5TestUser,
-  loginWithMiniWechat,
   listH5TestLoginUsers,
-  logout,
   updateNotificationEmail,
 } from '../../api/auth'
+import { isSessionSupersededError, useAppSession } from '../../stores/appSession'
 import { canControlMiniReview } from '../../api/miniReview'
 import { getPublicSystemConfig } from '../../api/system'
 import type { CurrentUser, H5TestLoginUser, MiniWechatBindingRequiredResponse } from '../../types/auth'
@@ -172,6 +168,7 @@ import { consumePostLoginRedirect, navigateToPostLoginTarget } from '../../utils
 import { buildPasswordLoginPayload, resolveUserLoginPresentation } from './loginHelpers'
 
 const hasLocalAccessToken = ref(Boolean(getAccessToken()))
+const session = useAppSession()
 // 设置入口仅对 MINI_REVIEW_CONTROL_USER_IDS 白名单用户（管理员）可见。
 const isReviewController = ref(false)
 const loading = ref(hasLocalAccessToken.value)
@@ -377,7 +374,7 @@ async function saveNotificationEmail(email: string): Promise<void> {
 }
 
 async function handleLogout(): Promise<void> {
-  await logout()
+  await session.logoutSession()
   uni.showToast({ title: '已退出登录', icon: 'success' })
   await loadUser()
 }
@@ -418,7 +415,7 @@ function handleLoginAction(): void {
 async function handlePasswordLogin(form: { accountIdentifier: string; password: string }): Promise<void> {
   passwordLoginSubmitting.value = true
   try {
-    const result = await login(buildPasswordLoginPayload(form))
+    const result = await session.loginWithPassword(buildPasswordLoginPayload(form))
     hasLocalAccessToken.value = Boolean(getAccessToken())
     currentUser.value = result.user
     passwordLoginSheetVisible.value = false
@@ -426,6 +423,10 @@ async function handlePasswordLogin(form: { accountIdentifier: string; password: 
     uni.showToast({ title: '登录成功', icon: 'success' })
     await redirectAfterLogin()
   } catch (error) {
+    // 被更新的登录/退出替代的操作静默放弃，不提示成功也不跳转。
+    if (isSessionSupersededError(error)) {
+      return
+    }
     uni.showToast({ title: extractApiErrorMessage(error, '登录失败'), icon: 'none' })
   } finally {
     passwordLoginSubmitting.value = false
@@ -435,7 +436,7 @@ async function handlePasswordLogin(form: { accountIdentifier: string; password: 
 async function handleMiniWechatLogin(): Promise<void> {
   try {
     const code = await getMiniWechatCode()
-    const result = await loginWithMiniWechat(code)
+    const result = await session.loginWithWechatCode(code)
 
     if (result.status === 'authenticated') {
       // 登录态标记必须立刻刷新，否则 isGuestPage 仍按未登录渲染（请先登录浮窗 + 歌词墙不消失）。
@@ -449,6 +450,9 @@ async function handleMiniWechatLogin(): Promise<void> {
 
     miniWechatBindState.value = result
   } catch (error) {
+    if (isSessionSupersededError(error)) {
+      return
+    }
     uni.showToast({ title: extractApiErrorMessage(error, '微信登录失败'), icon: 'none' })
   }
 }
@@ -465,7 +469,7 @@ async function handleMiniWechatBind(payload: {
   avatarDataUrl: string
 }): Promise<void> {
   try {
-    const result = await bindMiniWechatAccount({
+    const result = await session.bindWechatAccount({
       bind_token: payload.bindToken,
       invite_code: payload.inviteCode || undefined,
       referral_code: payload.referralCode || undefined,
@@ -480,6 +484,9 @@ async function handleMiniWechatBind(payload: {
     await loadUser()
     await redirectAfterLogin()
   } catch (error) {
+    if (isSessionSupersededError(error)) {
+      return
+    }
     uni.showToast({ title: extractApiErrorMessage(error, '绑定失败'), icon: 'none' })
   }
 }
@@ -500,12 +507,15 @@ async function loadH5TestUsers(): Promise<void> {
 
 async function handleH5TestLoginSelect(user: H5TestLoginUser): Promise<void> {
   try {
-    const result = await loginAsH5TestUser(user.id)
+    const result = await session.loginAsTestUser(user.id)
     hasLocalAccessToken.value = Boolean(getAccessToken())
     currentUser.value = result.user
     uni.showToast({ title: `已切换到 ${user.display_name?.trim() || user.account_identifier}`, icon: 'none' })
     await loadUser()
   } catch (error) {
+    if (isSessionSupersededError(error)) {
+      return
+    }
     uni.showToast({ title: extractApiErrorMessage(error, '测试登录失败'), icon: 'none' })
   }
 }
