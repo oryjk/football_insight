@@ -669,3 +669,94 @@ page {
   --fi-color-ticket-collapse-pill-background: var( --fi-primitive-ticket-collapse-pill-background );
   --fi-color-ticket-collapse-pill-color: var( --fi-primitive-ticket-collapse-pill-color );
 }
+
+/* 赛程组件：从原有样式提取，保留原始值。 */
+:root,
+page {
+  /* primitive */
+  --fi-primitive-matches-600: 600rpx;
+  --fi-primitive-matches-page-bg-fade-background: linear-gradient(180deg, transparent 45%, rgba(247,248,250,0.55) 78%, #f7f8fa 100%);
+  --fi-primitive-matches-96: 96rpx;
+  --fi-primitive-matches-season-progress-track-background: #e6eaf1;
+  --fi-primitive-matches-season-progress-fill-background: linear-gradient(90deg, #15161b, #3a3d47);
+  --fi-primitive-matches-season-progress-dot-inner-border-radius: 50%;
+  --fi-primitive-matches-season-progress-dot-current-season-progress-dot-inner-box-shadow: 0 2rpx 10rpx rgba(220, 38, 38, 0.28);
+  --fi-primitive-matches-season-progress-dot-current-season-progress-dot-selected-season-p-box-shadow: 0 4rpx 18rpx rgba(220, 38, 38, 0.42);
+  --fi-primitive-matches-sheet-mask-background: rgba(18, 20, 28, 0.36);
+  --fi-primitive-matches-sheet-card-box-shadow: 0 -24rpx 56rpx rgba(12,14,20,0.12);
+  --fi-primitive-matches-100: 100rpx;
+  --fi-primitive-matches-tech-stats-sheet-summary-border: 2rpx solid rgba(232, 233, 238, 0.95);
+  --fi-primitive-matches-tech-stats-sheet-summary-box-shadow: 0 12rpx 28rpx rgba(18, 20, 28, 0.06);
+  --fi-primitive-matches-tech-stats-sheet-teams-line-height: 1.35;
+  --fi-primitive-matches-44: 44rpx;
+  --fi-primitive-matches-tech-stat-row-border-top: 2rpx solid #f0f1f5;
+  --fi-primitive-matches-84: 84rpx;
+  --fi-primitive-matches-tech-stat-row-label-color: #2a2c31;
+  --fi-primitive-matches-tech-stat-row-track-background: #eceef3;
+  --fi-primitive-matches-schedule-dialog-sheet-background: rgba(255,255,255,0.94);
+  --fi-primitive-matches-schedule-dialog-sheet-border: 2rpx solid rgba(236, 236, 241, 0.95);
+  --fi-primitive-matches-schedule-dialog-sheet-box-shadow: 0 28rpx 60rpx rgba(26,28,36,0.08);
+  --fi-primitive-matches-schedule-dialog-background: rgba(21, 22, 27, 0.32);
+  --fi-primitive-matches-match-card-border: 2rpx solid rgba(255,255,255,0.55);
+  --fi-primitive-matches-match-card-box-shadow: 0 14rpx 36rpx rgba(26,28,36,0.05);
+  --fi-primitive-matches-5: 5rpx;
+  --fi-primitive-matches-match-card-before-background: #c4c8d0;
+  --fi-primitive-matches-match-card-finished-before-background: linear-gradient(180deg, #3d9c72, #2d8c63);
+  --fi-primitive-matches-match-card-live-before-background: linear-gradient(180deg, #ef4444, #dc2626);
+  --fi-primitive-matches-match-card-live-box-shadow: 0 16rpx 40rpx rgba(220, 38, 38, 0.12);
+  --fi-primitive-matches-match-card-postponed-before-background: #d97706;
+  --fi-primitive-matches-match-card-scheduled-before-background: linear-gradient(180deg, #c4c8d0, #a8adb8);
+  --fi-primitive-matches-56: 56rpx;
+  --fi-primitive-matches-match-card-team-name-color: #151515;
+  --fi-primitive-matches-match-card-score-line-height: 0.92;
+  --fi-primitive-matches-match-card-status-tag-background: rgba(220, 38, 38, 0.12);
+  --fi-primitive-matches-1: 1rpx;
+  --fi-primitive-matches-meta-note-before-background: #9aa0aa;
+  --fi-primitive-matches-meta-note-before-box-shadow: 0 0 0 6rpx rgba(154, 160, 170, 0.12);
+  --fi-primitive-matches-state-card-error-text-color: #c03a2b;
+  --fi-primitive-matches-state-card-empty-text-color: #767a84;
+
+  /* semantic / component */
+  --fi-space-600: var(--fi-primitive-matches-600);
+  --fi-component-matches-page-bg-fade-background: var(--fi-primitive-matches-page-bg-fade-background);
+  --fi-space-96: var(--fi-primitive-matches-96);
+  --fi-color-season-progress-track-background: var(--fi-primitive-matches-season-progress-track-background);
+  --fi-component-matches-season-progress-fill-background: var(--fi-primitive-matches-season-progress-fill-background);
+  --fi-radius-season-progress-dot-inner-border-radius: var(--fi-primitive-matches-season-progress-dot-inner-border-radius);
+  --fi-shadow-season-progress-dot-current-season-progress-dot-inner-box-shadow: var(--fi-primitive-matches-season-progress-dot-current-season-progress-dot-inner-box-shadow);
+  --fi-shadow-season-progress-dot-current-season-progress-dot-selected-season-p-box-shadow: var(--fi-primitive-matches-season-progress-dot-current-season-progress-dot-selected-season-p-box-shadow);
+  --fi-color-sheet-mask-background: var(--fi-primitive-matches-sheet-mask-background);
+  --fi-shadow-sheet-card-box-shadow: var(--fi-primitive-matches-sheet-card-box-shadow);
+  --fi-space-100: var(--fi-primitive-matches-100);
+  --fi-component-matches-tech-stats-sheet-summary-border: var(--fi-primitive-matches-tech-stats-sheet-summary-border);
+  --fi-shadow-tech-stats-sheet-summary-box-shadow: var(--fi-primitive-matches-tech-stats-sheet-summary-box-shadow);
+  --fi-leading-tech-stats-sheet-teams-line-height: var(--fi-primitive-matches-tech-stats-sheet-teams-line-height);
+  --fi-space-44: var(--fi-primitive-matches-44);
+  --fi-component-matches-tech-stat-row-border-top: var(--fi-primitive-matches-tech-stat-row-border-top);
+  --fi-space-84: var(--fi-primitive-matches-84);
+  --fi-color-tech-stat-row-label-color: var(--fi-primitive-matches-tech-stat-row-label-color);
+  --fi-color-tech-stat-row-track-background: var(--fi-primitive-matches-tech-stat-row-track-background);
+  --fi-color-schedule-dialog-sheet-background: var(--fi-primitive-matches-schedule-dialog-sheet-background);
+  --fi-component-matches-schedule-dialog-sheet-border: var(--fi-primitive-matches-schedule-dialog-sheet-border);
+  --fi-shadow-schedule-dialog-sheet-box-shadow: var(--fi-primitive-matches-schedule-dialog-sheet-box-shadow);
+  --fi-color-schedule-dialog-background: var(--fi-primitive-matches-schedule-dialog-background);
+  --fi-component-matches-match-card-border: var(--fi-primitive-matches-match-card-border);
+  --fi-shadow-match-card-box-shadow: var(--fi-primitive-matches-match-card-box-shadow);
+  --fi-space-5: var(--fi-primitive-matches-5);
+  --fi-color-match-card-before-background: var(--fi-primitive-matches-match-card-before-background);
+  --fi-component-matches-match-card-finished-before-background: var(--fi-primitive-matches-match-card-finished-before-background);
+  --fi-component-matches-match-card-live-before-background: var(--fi-primitive-matches-match-card-live-before-background);
+  --fi-shadow-match-card-live-box-shadow: var(--fi-primitive-matches-match-card-live-box-shadow);
+  --fi-color-match-card-postponed-before-background: var(--fi-primitive-matches-match-card-postponed-before-background);
+  --fi-component-matches-match-card-scheduled-before-background: var(--fi-primitive-matches-match-card-scheduled-before-background);
+  --fi-space-56: var(--fi-primitive-matches-56);
+  --fi-color-match-card-team-name-color: var(--fi-primitive-matches-match-card-team-name-color);
+  --fi-font-56: var(--fi-primitive-matches-56);
+  --fi-leading-match-card-score-line-height: var(--fi-primitive-matches-match-card-score-line-height);
+  --fi-color-match-card-status-tag-background: var(--fi-primitive-matches-match-card-status-tag-background);
+  --fi-space-1: var(--fi-primitive-matches-1);
+  --fi-color-meta-note-before-background: var(--fi-primitive-matches-meta-note-before-background);
+  --fi-shadow-meta-note-before-box-shadow: var(--fi-primitive-matches-meta-note-before-box-shadow);
+  --fi-color-state-card-error-text-color: var(--fi-primitive-matches-state-card-error-text-color);
+  --fi-color-state-card-empty-text-color: var(--fi-primitive-matches-state-card-empty-text-color);
+}

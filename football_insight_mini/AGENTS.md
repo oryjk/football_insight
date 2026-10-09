@@ -79,7 +79,7 @@ src/pages/<domain>/
 - 后端数据到展示模型的转换放页面 `helpers.ts`；跨页面复用的放 `src/utils/`。不要把转换逻辑散落在模板里。
 - API 原子封装始终在 `src/api/<domain>.ts`；页面级 API 编排才放 `*Actions.ts` / `use*Page.ts`。
 - 组件按**变化原因**拆，不按行数机械拆：非声明式页面或组件超过约 **600 行**要主动评估拆分；超过约 **1000 行**必须按「页面编排 / 局部组件 / actions / helpers」小步拆分。
-- 当前超标文件（重构 backlog，触碰时优先拆分，不要顺手再加量）：`matches/MatchesContent.vue`（1100 行页面容器，已过 1000 行阈值）。`user`、`seat-swap`、`home`、`ticket-watch` 均已按局部组件模式拆分完成（`home`、`ticket-watch`：`index.vue` 只做编排 + `components/` 局部组件；`ticket-watch` 的请求、支付、轮询拆到页面 composable，可作参考样板）。
+- 页面拆分进度：`user`、`seat-swap`、`home`、`rankings`、`ticket-watch`、`matches` 均已按局部组件模式拆分。`matches` 的赛季进度、对阵卡片、即将到来、最近赛果及弹窗放在 `components/`，请求与业务状态在 `useMatchesPage.ts`，纯展示转换在 `presentation.ts`；`MatchesContent.vue` 与保留的独立入口共享这些模块，分别保留渐进加载与整批加载行为。`home`、`ticket-watch`、`matches` 可作为页面编排参考。
 - 单次任务只做增量拆分或增量迁移，**不要顺手重写整套页面风格或路由结构**。
 
 ## Design token 规范
