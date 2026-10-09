@@ -47,7 +47,8 @@ const ENSURE_SUCCESS_CACHE_MS = 60_000
  * 认证写入的唯一入口：api/auth 只做原子请求，token（fi_access_token）与当前用户
  * 只由本模块在核对 revision / token 快照后发布或清除。
  *
- * revision 在新登录意图、成功替换 token、退出及认证失效时递增；
+ * revision 在新登录意图、成功替换 token、退出及认证失效时递增（旧 token 401 时
+ * 若仍有在途的新登录意图，只清旧 token 会话状态、不递增 revision，以免取消新登录）；
  * 所有异步结果与 finally 都核对捕获的 revision 与 token 快照，旧账号的请求
  * （成功、401、错误、finally）不能改新账号状态。
  */
@@ -59,6 +60,7 @@ export function createAppSession(source: typeof authApi = authApi): AppSession {
   const revision = ref(0)
 
   let lastEnsureSuccessAt = 0
+  let pendingAuthIntents = 0
   let inFlightEnsure: {
     revision: number
     token: string
@@ -83,9 +85,15 @@ export function createAppSession(source: typeof authApi = authApi): AppSession {
   /** 新登录意图：递增 revision 使旧 token 发出的在途请求全部失效。 */
   function beginAuthIntent(): number {
     revision.value += 1
+    pendingAuthIntents += 1
     status.value = 'loading'
     errorMessage.value = ''
     return revision.value
+  }
+
+  /** 登录意图结束（成功或失败）；ensure 的 401 据此判断是否还有在途新登录。 */
+  function endAuthIntent(): void {
+    pendingAuthIntents = Math.max(0, pendingAuthIntents - 1)
   }
 
   /** 发布新 token 时再次递增 revision，使登录等待期间用旧 token 发出的刷新也失效。 */
@@ -124,6 +132,8 @@ export function createAppSession(source: typeof authApi = authApi): AppSession {
       }
       settleAuthIntentFailure(intentRevision, error, fallback)
       throw error
+    } finally {
+      endAuthIntent()
     }
   }
 
@@ -174,7 +184,16 @@ export function createAppSession(source: typeof authApi = authApi): AppSession {
         }
 
         if (user === null) {
-          // 401：仅失效当前 revision 的会话。
+          // 401：旧 token 已失效。若还有在途的新登录意图，只清旧 token 会话状态，
+          // 不递增 revision，避免把在途新登录的 intentRevision 作废。
+          if (pendingAuthIntents > 0) {
+            setAccessToken(null)
+            currentUser.value = null
+            hasAccessToken.value = false
+            lastEnsureSuccessAt = 0
+            return null
+          }
+          // 无在途登录意图：仅失效当前 revision 的会话。
           revision.value += 1
           clearLocalSession()
           return null
@@ -241,6 +260,8 @@ export function createAppSession(source: typeof authApi = authApi): AppSession {
       }
       settleAuthIntentFailure(intentRevision, error, '微信登录失败')
       throw error
+    } finally {
+      endAuthIntent()
     }
   }
 

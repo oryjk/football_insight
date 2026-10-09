@@ -426,6 +426,40 @@ describe('登录与刷新交错竞态', () => {
     expect(session.currentUser.value).toMatchObject({ id: 'b' })
     expect(session.status.value).toBe('authenticated')
   })
+
+  test('登录 B 在途期间旧 token 的 401 先到，只清旧会话不取消 B', async () => {
+    const stub = createSourceStub()
+    const session = createAppSession(stub.source)
+    await establishSessionA(session, stub)
+
+    const loginB = deferred<AuthResponse>()
+    stub.handlers.login = () => loginB.promise
+    const promiseB = session.loginWithPassword({ account_identifier: 'b', password: 'y' })
+    const errorB = captureError(() => promiseB)
+    const revisionWithIntent = session.revision.value
+
+    // B 等待期间，旧 token A 的刷新返回 401：只应清掉旧会话，不应取消在途的 B。
+    const meA = deferred<CurrentUser | null>()
+    stub.handlers.getCurrentUser = () => meA.promise
+    const refresh = session.ensureSessionReady({ force: true })
+
+    meA.resolve(null)
+    await expect(refresh).resolves.toBeNull()
+
+    // 旧 token 会话状态已清除，但 revision 不因 401 递增（不取消 B 的登录意图）。
+    expect(getStoredToken()).toBeNull()
+    expect(session.currentUser.value).toBeNull()
+    expect(session.hasAccessToken.value).toBe(false)
+    expect(session.revision.value).toBe(revisionWithIntent)
+
+    loginB.resolve(buildAuthResponse(userB, 'token-b'))
+    await expect(promiseB).resolves.toMatchObject({ access_token: 'token-b' })
+    expect(await errorB).toBeNull()
+
+    expect(getStoredToken()).toBe('token-b')
+    expect(session.currentUser.value).toMatchObject({ id: 'b' })
+    expect(session.status.value).toBe('authenticated')
+  })
 })
 
 describe('logoutSession', () => {
