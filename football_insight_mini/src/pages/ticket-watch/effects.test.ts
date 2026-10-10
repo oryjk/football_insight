@@ -590,3 +590,62 @@ describe('ticket watch subscription revision effects', () => {
     expect(state.refluxSubscriptionEmail.value).toBe('b@example.com')
   })
 })
+
+describe('ticket watch matchId session reset effects', () => {
+  test('解锁下单在途时切换账号：重置 sheet 状态与权益，新账号可重新打开并解锁', async () => {
+    const toasts: string[] = []
+    testGlobal.uni = {
+      showToast: (options: { title: string }) => {
+        toasts.push(options.title)
+      },
+    } as unknown as typeof uni
+    const state = useTicketWatchState()
+    const session = createSessionStub({ hasAccessToken: ref(true) })
+    state.currentMatch.value = match(1)
+    state.currentUser.value = { has_wechat_binding: true } as CurrentUser
+    state.canRequestWxPayment.value = true
+    state.matchIdSheetVisible.value = true
+    const orderRequest = deferred<{
+      order_no: string
+      wx_pay_params: { timeStamp: string; nonceStr: string; package: string; signType: string; paySign: string }
+    }>()
+    const actions = useTicketWatchMatchId(state, () => {}, {
+      createMatchIdOrder: () => orderRequest.promise,
+      getMatchIdEntitlement: async () => ({
+        unlocked: true,
+        via: 'purchase',
+        effective_tier: 'V1',
+      }),
+      requestTicketWatchPayment: async () => {},
+      waitForPaidOrder: async () => true,
+    }, session)
+
+    // 旧账号下单在途。
+    const pendingA = actions.payForMatchId()
+    await Promise.resolve()
+    expect(state.matchIdSheetState.value).toBe('paying')
+
+    // 切换账号：会话 reset 重置解锁操作状态与私有权益。
+    session.revision.value += 1
+    actions.resetMatchIdSessionState()
+    expect(state.matchIdSheetState.value).toBe('locked')
+    expect(state.matchIdEntitlement.value).toBeNull()
+    expect(state.matchIdSheetVisible.value).toBe(false)
+
+    // 旧下单晚到：不恢复 paying，也不修改新流程。
+    orderRequest.resolve({
+      order_no: 'order-a',
+      wx_pay_params: { timeStamp: '', nonceStr: '', package: '', signType: 'RSA', paySign: '' },
+    })
+    await pendingA
+    expect(state.matchIdSheetState.value).toBe('locked')
+    expect(state.matchIdEntitlement.value).toBeNull()
+
+    // 新账号可重新打开 sheet 并发布自己的权益。
+    await actions.openMatchIdSheet()
+    expect(state.matchIdSheetVisible.value).toBe(true)
+    expect(state.matchIdSheetState.value).toBe('unlocked')
+    expect(state.matchIdEntitlement.value?.unlocked).toBe(true)
+    expect(toasts).toEqual([])
+  })
+})

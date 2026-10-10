@@ -315,7 +315,7 @@ const {
   closeRefluxSubscriptionSheet,
   submitRefluxSubscriptionOrder,
 } = useTicketWatchSubscription(state, goToUserPage, undefined, session)
-const { closeMatchIdSheet, openMatchIdSheet, payForMatchId } =
+const { closeMatchIdSheet, openMatchIdSheet, payForMatchId, resetMatchIdSessionState } =
   useTicketWatchMatchId(state, goToUserPage, undefined, session)
 const {
   loadCurrentBoard,
@@ -352,7 +352,8 @@ watch(session.revision, () => {
   refluxSubscriptionSubmitting.value = false
   refluxSubscriptionStatusLoading.value = false
   pendingInterestSelection.value = null
-  matchIdSheetVisible.value = false
+  // 解锁 sheet 状态与私有权益一并重置（旧下单/支付的 finally 被 revision 防护跳过）。
+  resetMatchIdSessionState()
 })
 
 function handleCurrentInterest(item: TicketWatchGroupedInventoryItem): void {

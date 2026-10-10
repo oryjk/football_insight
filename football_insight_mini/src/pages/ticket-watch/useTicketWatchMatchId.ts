@@ -52,6 +52,17 @@ export function useTicketWatchMatchId(
     matchIdSheetVisible.value = false
   }
 
+  /**
+   * 会话切换/退出时重置解锁操作状态与私有权益：旧下单/支付的 finally
+   * 因 revision 防护跳过清理，paying 与 entitlement 只能在这里复位，
+   * 否则新账号的 openMatchIdSheet 一直被 paying 挡住。
+   */
+  function resetMatchIdSessionState(): void {
+    matchIdSheetVisible.value = false
+    matchIdSheetState.value = 'locked'
+    matchIdEntitlement.value = null
+  }
+
   async function refreshMatchIdEntitlement(): Promise<void> {
     const match = currentMatch.value
     if (!match) {
@@ -202,5 +213,5 @@ export function useTicketWatchMatchId(
     }
   }
 
-  return { closeMatchIdSheet, openMatchIdSheet, payForMatchId }
+  return { closeMatchIdSheet, openMatchIdSheet, payForMatchId, resetMatchIdSessionState }
 }
