@@ -8,7 +8,7 @@ import {
 import type * as authApi from '../api/auth'
 import type { AuthResponse, CurrentUser, MiniWechatLoginResponse } from '../types/auth'
 import { ApiRequestError } from '../utils/apiError'
-import { AUTH_TOKEN_STORAGE_KEY } from '../utils/authStorage'
+import { AUTH_TOKEN_STORAGE_KEY, MANUAL_LOGOUT_STORAGE_KEY, hasManualLogout } from '../utils/authStorage'
 
 type AuthSource = typeof authApi
 
@@ -633,6 +633,359 @@ describe('invalidateSession', () => {
     expect(session.currentUser.value).toBeNull()
     expect(session.status.value).toBe('guest')
     expect(session.revision.value).toBe(currentRevision + 1)
+  })
+})
+
+describe('bootstrapSession 启动恢复（第一阶段静默登录）', () => {
+  function buildWechatAuthenticated(user: CurrentUser, token: string): MiniWechatLoginResponse {
+    return { status: 'authenticated', ...buildAuthResponse(user, token) }
+  }
+
+  function buildBindingRequired(): MiniWechatLoginResponse {
+    return {
+      status: 'binding_required',
+      bind_token: 'bind-token',
+      expires_at: '2026-02-01T00:00:00Z',
+      display_name: '微信用户',
+      avatar_url: null,
+    }
+  }
+
+  test('MP 已有有效 token：复用 ensure 恢复同一用户，不获取微信 code', async () => {
+    const stub = createSourceStub()
+    storage[AUTH_TOKEN_STORAGE_KEY] = 'token-a'
+    stub.handlers.getCurrentUser = () => Promise.resolve(userA)
+    let codeCalls = 0
+    const session = createAppSession(stub.source, {
+      getMiniWechatCode: () => {
+        codeCalls += 1
+        return Promise.resolve('code')
+      },
+    })
+
+    await expect(session.bootstrapSession({ allowSilentWechat: true })).resolves.toMatchObject({ id: 'a' })
+    expect(stub.calls.getCurrentUser).toBe(1)
+    expect(codeCalls).toBe(0)
+    expect(stub.calls.loginWithMiniWechat).toBe(0)
+    expect(session.status.value).toBe('authenticated')
+  })
+
+  test('MP 无 token 且已绑定微信：后台探测恢复原 user id 与 token，无 toast/导航由页面决定', async () => {
+    const stub = createSourceStub()
+    stub.handlers.loginWithMiniWechat = () => Promise.resolve(buildWechatAuthenticated(userA, 'token-wechat'))
+    const session = createAppSession(stub.source, { getMiniWechatCode: () => Promise.resolve('code-1') })
+
+    await expect(session.bootstrapSession({ allowSilentWechat: true })).resolves.toMatchObject({ id: 'a' })
+    expect(stub.calls.loginWithMiniWechat).toBe(1)
+    expect(getStoredToken()).toBe('token-wechat')
+    expect(session.currentUser.value).toMatchObject({ id: 'a' })
+    expect(session.status.value).toBe('authenticated')
+  })
+
+  test('MP 首次未绑定：binding_required 作为正常游客结果，不建号、不绑定、不写 token', async () => {
+    const stub = createSourceStub()
+    stub.handlers.loginWithMiniWechat = () => Promise.resolve(buildBindingRequired())
+    const session = createAppSession(stub.source, { getMiniWechatCode: () => Promise.resolve('code-1') })
+
+    await expect(session.bootstrapSession({ allowSilentWechat: true })).resolves.toBeNull()
+    expect(getStoredToken()).toBeNull()
+    expect(session.currentUser.value).toBeNull()
+    expect(session.status.value).toBe('guest')
+    // bind_token 不进入持久化：存储里没有任何 binding 相关内容。
+    expect(Object.keys(storage)).toEqual([])
+    expect(stub.calls.register).toBe(0)
+    expect(stub.calls.bindMiniWechatAccount).toBe(0)
+  })
+
+  test('MP 旧 token 401：失效旧会话后允许本次恢复操作尝试微信登录', async () => {
+    const stub = createSourceStub()
+    storage[AUTH_TOKEN_STORAGE_KEY] = 'token-expired'
+    stub.handlers.getCurrentUser = () => Promise.resolve(null)
+    stub.handlers.loginWithMiniWechat = () => Promise.resolve(buildWechatAuthenticated(userB, 'token-b'))
+    const session = createAppSession(stub.source, { getMiniWechatCode: () => Promise.resolve('code-1') })
+
+    await expect(session.bootstrapSession({ allowSilentWechat: true })).resolves.toMatchObject({ id: 'b' })
+    expect(getStoredToken()).toBe('token-b')
+    expect(session.currentUser.value).toMatchObject({ id: 'b' })
+  })
+
+  test('me 断网/403/5xx：不调用微信接口、不清已有会话，错误可观察', async () => {
+    const stub = createSourceStub()
+    storage[AUTH_TOKEN_STORAGE_KEY] = 'token-a'
+    stub.handlers.getCurrentUser = () =>
+      Promise.reject(new ApiRequestError('网络连接不可用，请检查网络后重试', 0, true))
+    let codeCalls = 0
+    const session = createAppSession(stub.source, {
+      getMiniWechatCode: () => {
+        codeCalls += 1
+        return Promise.resolve('code')
+      },
+    })
+
+    await expect(session.bootstrapSession({ allowSilentWechat: true })).resolves.toBeNull()
+    expect(codeCalls).toBe(0)
+    expect(stub.calls.loginWithMiniWechat).toBe(0)
+    expect(getStoredToken()).toBe('token-a')
+    expect(session.status.value).toBe('error')
+    expect(session.errorMessage.value.length > 0).toBe(true)
+  })
+
+  test('并发 bootstrap 只获取一次 code、一次登录', async () => {
+    const stub = createSourceStub()
+    const codeRequest = deferred<string>()
+    let codeCalls = 0
+    stub.handlers.loginWithMiniWechat = () => Promise.resolve(buildWechatAuthenticated(userA, 'token-a'))
+    const session = createAppSession(stub.source, {
+      getMiniWechatCode: () => {
+        codeCalls += 1
+        return codeRequest.promise
+      },
+    })
+
+    const first = session.bootstrapSession({ allowSilentWechat: true })
+    const second = session.bootstrapSession({ allowSilentWechat: true })
+    codeRequest.resolve('code-1')
+
+    await expect(first).resolves.toMatchObject({ id: 'a' })
+    await expect(second).resolves.toMatchObject({ id: 'a' })
+    expect(codeCalls).toBe(1)
+    expect(stub.calls.loginWithMiniWechat).toBe(1)
+  })
+
+  test('未知/失败结果本次启动不反复探测；新 store 冷启动可再次探测', async () => {
+    const stub = createSourceStub()
+    let codeCalls = 0
+    stub.handlers.loginWithMiniWechat = () => Promise.resolve(buildBindingRequired())
+    const deps = {
+      getMiniWechatCode: () => {
+        codeCalls += 1
+        return Promise.resolve('code-1')
+      },
+    }
+    const session = createAppSession(stub.source, deps)
+
+    await expect(session.bootstrapSession({ allowSilentWechat: true })).resolves.toBeNull()
+    // 同一次启动内再次 bootstrap：不再探测微信。
+    await expect(session.bootstrapSession({ allowSilentWechat: true })).resolves.toBeNull()
+    expect(codeCalls).toBe(1)
+    expect(stub.calls.loginWithMiniWechat).toBe(1)
+
+    // 冷启动（新 store 实例、同一本地存储）：允许重新探测。
+    const coldStart = createAppSession(stub.source, deps)
+    await expect(coldStart.bootstrapSession({ allowSilentWechat: true })).resolves.toBeNull()
+    expect(codeCalls).toBe(2)
+    expect(stub.calls.loginWithMiniWechat).toBe(2)
+  })
+
+  test('H5（allowSilentWechat=false）：无 token 从不获取 code', async () => {
+    const stub = createSourceStub()
+    let codeCalls = 0
+    const session = createAppSession(stub.source, {
+      getMiniWechatCode: () => {
+        codeCalls += 1
+        return Promise.resolve('code')
+      },
+    })
+
+    await expect(session.bootstrapSession({ allowSilentWechat: false })).resolves.toBeNull()
+    expect(codeCalls).toBe(0)
+    expect(stub.calls.loginWithMiniWechat).toBe(0)
+    expect(session.status.value).toBe('guest')
+  })
+
+  test('H5（allowSilentWechat=false）：旧 token 401 也不探测微信', async () => {
+    const stub = createSourceStub()
+    storage[AUTH_TOKEN_STORAGE_KEY] = 'token-expired'
+    stub.handlers.getCurrentUser = () => Promise.resolve(null)
+    let codeCalls = 0
+    const session = createAppSession(stub.source, {
+      getMiniWechatCode: () => {
+        codeCalls += 1
+        return Promise.resolve('code')
+      },
+    })
+
+    await expect(session.bootstrapSession({ allowSilentWechat: false })).resolves.toBeNull()
+    expect(codeCalls).toBe(0)
+    expect(getStoredToken()).toBeNull()
+    expect(session.status.value).toBe('guest')
+  })
+
+  test('自动恢复等待 code 时用户退出：迟到的 code/响应/finally 全部失效', async () => {
+    const stub = createSourceStub()
+    const codeRequest = deferred<string>()
+    const loginRequest = deferred<MiniWechatLoginResponse>()
+    stub.handlers.loginWithMiniWechat = () => loginRequest.promise
+    stub.handlers.logout = () => Promise.resolve()
+    const session = createAppSession(stub.source, { getMiniWechatCode: () => codeRequest.promise })
+
+    const bootstrap = session.bootstrapSession({ allowSilentWechat: true })
+    await Promise.resolve()
+    // 恢复还在等 code，用户显式退出（写标记 + 递增 revision）。
+    await session.logoutSession()
+
+    codeRequest.resolve('code-late')
+    await expect(bootstrap).resolves.toBeNull()
+
+    // 迟到的 code 不能发出认证请求；即使请求已发出，迟到的成功也不能复活会话。
+    expect(stub.calls.loginWithMiniWechat).toBe(0)
+    expect(getStoredToken()).toBeNull()
+    expect(session.currentUser.value).toBeNull()
+    expect(session.status.value).toBe('guest')
+    expect(hasManualLogout()).toBe(true)
+  })
+
+  test('自动恢复等待 code 时显式密码登录：迟到 code 不发认证请求，新会话不受影响', async () => {
+    const stub = createSourceStub()
+    const codeRequest = deferred<string>()
+    stub.handlers.login = () => Promise.resolve(buildAuthResponse(userA, 'token-a'))
+    const session = createAppSession(stub.source, { getMiniWechatCode: () => codeRequest.promise })
+
+    const bootstrap = session.bootstrapSession({ allowSilentWechat: true })
+    await Promise.resolve()
+    await session.loginWithPassword({ account_identifier: 'a', password: 'x' })
+
+    codeRequest.resolve('code-late')
+    await expect(bootstrap).resolves.toBeNull()
+
+    expect(stub.calls.loginWithMiniWechat).toBe(0)
+    expect(getStoredToken()).toBe('token-a')
+    expect(session.currentUser.value).toMatchObject({ id: 'a' })
+    expect(session.status.value).toBe('authenticated')
+  })
+
+  test('me 在途期间外部退出导致 revision 变化：不等同于自身 401，不探测微信', async () => {
+    const stub = createSourceStub()
+    storage[AUTH_TOKEN_STORAGE_KEY] = 'token-a'
+    const meRequest = deferred<CurrentUser | null>()
+    stub.handlers.getCurrentUser = () => meRequest.promise
+    stub.handlers.logout = () => Promise.resolve()
+    let codeCalls = 0
+    const session = createAppSession(stub.source, {
+      getMiniWechatCode: () => {
+        codeCalls += 1
+        return Promise.resolve('code')
+      },
+    })
+
+    const bootstrap = session.bootstrapSession({ allowSilentWechat: true })
+    await Promise.resolve()
+    // me 在途时用户显式退出：revision 变化来自外部退出，不是 bootstrap 自己的 401。
+    await session.logoutSession()
+    meRequest.resolve(null)
+
+    await expect(bootstrap).resolves.toBeNull()
+    expect(codeCalls).toBe(0)
+    expect(stub.calls.loginWithMiniWechat).toBe(0)
+    expect(session.status.value).toBe('guest')
+    expect(hasManualLogout()).toBe(true)
+  })
+})
+
+describe('手动退出标记', () => {
+  test('主动退出立即写标记；远端 logout 失败仍退出且标记保留', async () => {
+    const stub = createSourceStub()
+    const session = createAppSession(stub.source)
+    await establishSessionA(session, stub)
+    expect(hasManualLogout()).toBe(false)
+
+    stub.handlers.logout = () => Promise.reject(new ApiRequestError('请求失败（500）', 500))
+    await session.logoutSession()
+
+    expect(hasManualLogout()).toBe(true)
+    expect(storage[MANUAL_LOGOUT_STORAGE_KEY]).toBe('true')
+    expect(session.status.value).toBe('guest')
+  })
+
+  test('手动退出后新 store（冷启动）读取同一存储仍阻止自动登录', async () => {
+    const stub = createSourceStub()
+    const session = createAppSession(stub.source)
+    await establishSessionA(session, stub)
+    stub.handlers.logout = () => Promise.resolve()
+    await session.logoutSession()
+
+    let codeCalls = 0
+    stub.handlers.loginWithMiniWechat = () =>
+      Promise.resolve({ status: 'authenticated', ...buildAuthResponse(userB, 'token-b') })
+    const coldStart = createAppSession(stub.source, {
+      getMiniWechatCode: () => {
+        codeCalls += 1
+        return Promise.resolve('code')
+      },
+    })
+
+    await expect(coldStart.bootstrapSession({ allowSilentWechat: true })).resolves.toBeNull()
+    expect(codeCalls).toBe(0)
+    expect(stub.calls.loginWithMiniWechat).toBe(0)
+    expect(coldStart.status.value).toBe('guest')
+  })
+
+  test('force ensure 不清手动退出标记', async () => {
+    const stub = createSourceStub()
+    const session = createAppSession(stub.source)
+    await establishSessionA(session, stub)
+    stub.handlers.logout = () => Promise.resolve()
+    await session.logoutSession()
+    expect(hasManualLogout()).toBe(true)
+
+    // 退出后存储里塞回一个 token（例如其他入口写入），force ensure 不得清标记。
+    storage[AUTH_TOKEN_STORAGE_KEY] = 'token-a'
+    stub.handlers.getCurrentUser = () => Promise.resolve(userA)
+    await session.ensureSessionReady({ force: true })
+    expect(hasManualLogout()).toBe(true)
+  })
+
+  test('明确密码/微信/绑定/测试登录解除手动退出标记', async () => {
+    const stub = createSourceStub()
+    const session = createAppSession(stub.source, { getMiniWechatCode: () => Promise.resolve('code') })
+    await establishSessionA(session, stub)
+    stub.handlers.logout = () => Promise.resolve()
+
+    // 密码登录
+    await session.logoutSession()
+    expect(hasManualLogout()).toBe(true)
+    await session.loginWithPassword({ account_identifier: 'a', password: 'x' })
+    expect(hasManualLogout()).toBe(false)
+
+    // 微信登录
+    await session.logoutSession()
+    stub.handlers.loginWithMiniWechat = () =>
+      Promise.resolve({ status: 'authenticated', ...buildAuthResponse(userA, 'token-wechat') })
+    await session.loginWithMiniWechat()
+    expect(hasManualLogout()).toBe(false)
+
+    // 绑定登录
+    await session.logoutSession()
+    stub.handlers.bindMiniWechatAccount = () => Promise.resolve(buildAuthResponse(userA, 'token-bind'))
+    await session.bindWechatAccount({
+      bind_token: 'bind-token',
+      display_name: '用户a',
+      avatar_data_url: 'data:image/png;base64,x',
+    })
+    expect(hasManualLogout()).toBe(false)
+
+    // 测试登录
+    await session.logoutSession()
+    stub.handlers.loginAsH5TestUser = () => Promise.resolve(buildAuthResponse(userB, 'token-test'))
+    await session.loginAsTestUser('user-b')
+    expect(hasManualLogout()).toBe(false)
+  })
+
+  test('401 失效不产生手动退出标记，下次冷启动可自动恢复', async () => {
+    const stub = createSourceStub()
+    const session = createAppSession(stub.source)
+    await establishSessionA(session, stub)
+
+    stub.handlers.getCurrentUser = () => Promise.resolve(null)
+    await session.ensureSessionReady({ force: true })
+    expect(hasManualLogout()).toBe(false)
+
+    // 冷启动（新实例）：401 失效的账号允许静默恢复。
+    stub.handlers.loginWithMiniWechat = () =>
+      Promise.resolve({ status: 'authenticated', ...buildAuthResponse(userA, 'token-new') })
+    const coldStart = createAppSession(stub.source, { getMiniWechatCode: () => Promise.resolve('code') })
+    await expect(coldStart.bootstrapSession({ allowSilentWechat: true })).resolves.toMatchObject({ id: 'a' })
+    expect(getStoredToken()).toBe('token-new')
   })
 })
 

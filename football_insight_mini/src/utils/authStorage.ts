@@ -1,5 +1,6 @@
 export const AUTH_TOKEN_STORAGE_KEY = 'fi_access_token'
 export const POST_LOGIN_REDIRECT_STORAGE_KEY = 'fi_post_login_redirect'
+export const MANUAL_LOGOUT_STORAGE_KEY = 'fi_manual_logout'
 
 export interface PostLoginRedirectTarget {
   url: string
@@ -48,4 +49,22 @@ export function setPostLoginRedirectTarget(target: PostLoginRedirectTarget | nul
   }
 
   uni.removeStorageSync(POST_LOGIN_REDIRECT_STORAGE_KEY)
+}
+
+/**
+ * 手动退出标记：用户主动退出后持久化，跨冷启动禁止 MP 静默微信恢复；
+ * 只有明确的认证操作（密码/微信/绑定/测试登录）才解除。只读写本 key，
+ * 不触碰其他本地数据。
+ */
+export function hasManualLogout(): boolean {
+  const flag = uni.getStorageSync(MANUAL_LOGOUT_STORAGE_KEY)
+  return flag === 'true' || flag === true
+}
+
+export function setManualLogout(): void {
+  uni.setStorageSync(MANUAL_LOGOUT_STORAGE_KEY, 'true')
+}
+
+export function clearManualLogout(): void {
+  uni.removeStorageSync(MANUAL_LOGOUT_STORAGE_KEY)
 }

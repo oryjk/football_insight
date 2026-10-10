@@ -69,6 +69,7 @@ function createSessionStub(overrides: Partial<AppSession> = {}): SessionStub {
     loginWithMiniWechat: async () => {
       throw new Error('unused')
     },
+    bootstrapSession: async () => null,
     bindWechatAccount: async () => {
       throw new Error('unused')
     },

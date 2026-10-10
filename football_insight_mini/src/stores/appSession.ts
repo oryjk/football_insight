@@ -9,7 +9,13 @@ import type {
   RegisterPayload,
 } from '../types/auth'
 import { extractApiErrorMessage } from '../utils/apiError'
-import { getAccessToken, setAccessToken } from '../utils/authStorage'
+import {
+  clearManualLogout,
+  getAccessToken,
+  hasManualLogout,
+  setAccessToken,
+  setManualLogout,
+} from '../utils/authStorage'
 
 export type SessionStatus = 'guest' | 'loading' | 'authenticated' | 'error'
 
@@ -42,6 +48,13 @@ export interface AppSession {
    */
   loginWithMiniWechat(): Promise<MiniWechatLoginResponse>
   bindWechatAccount(payload: MiniWechatBindPayload): Promise<AuthResponse>
+  /**
+   * 启动恢复入口：已有 token 走 ensureSessionReady 恢复同一用户；
+   * 无 token / 旧 token 被 401 失效时，仅当 allowSilentWechat（MP）且未手动退出，
+   * 才允许一次后台微信探测；binding_required/失败一律静默回游客，不建号不写 token。
+   * 同一次启动的并发调用合并为一个操作。
+   */
+  bootstrapSession(options: { allowSilentWechat: boolean }): Promise<CurrentUser | null>
   logoutSession(): Promise<void>
   invalidateSession(expectedRevision: number): void
 }
@@ -98,6 +111,9 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
     token: string
     promise: Promise<CurrentUser | null>
   } | null = null
+  // 同一次启动的 bootstrap 合并为一个操作；实例级标记保证每次冷启动最多探测一次微信。
+  let inFlightBootstrap: Promise<CurrentUser | null> | null = null
+  let silentWechatAttempted = false
 
   function clearLocalSession(): void {
     setAccessToken(null)
@@ -116,6 +132,9 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
 
   /** 新登录意图：递增 revision 使旧 token 发出的在途请求全部失效。 */
   function beginAuthIntent(): number {
+    // 只有明确的认证操作（密码/注册/微信/绑定/测试登录）才解除手动退出标记；
+    // 静默探测进入这里前已被 hasManualLogout 挡住，不会误清。
+    clearManualLogout()
     revision.value += 1
     activeAuthIntentRevision = revision.value
     status.value = 'loading'
@@ -268,6 +287,79 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
     return entry.promise
   }
 
+  async function runBootstrap(options: { allowSilentWechat: boolean }): Promise<CurrentUser | null> {
+    const hadToken = Boolean(getAccessToken())
+
+    if (hadToken) {
+      // 已有 token：复用共享 ensure 恢复同一用户，不调用微信 code 接口。
+      let user: CurrentUser | null = null
+      try {
+        user = await ensureSessionReady()
+      } catch {
+        // 断网/超时/403/5xx：ensure 已保留 token/user 并记录可观察错误；
+        // 被外部操作替代的 ensure 抛 superseded，也走这里——返回当前已确认用户，不探测微信。
+        return currentUser.value
+      }
+      if (user) {
+        return user
+      }
+
+      // ensure 返回 null：旧 token 被 401 失效，或等待期间被外部退出/新登录替代。
+      // 外部退出（手动退出标记）与在途显式登录都必须让当前恢复操作立即停止；
+      // 只有确认是「旧 token 401 失效」才允许继续微信探测。
+      if (hasManualLogout() || hasActiveAuthIntent()) {
+        return null
+      }
+      if (getAccessToken()) {
+        return currentUser.value
+      }
+    }
+
+    if (!options.allowSilentWechat) {
+      return null
+    }
+    if (hasManualLogout()) {
+      // 用户主动退出过：跨冷启动也不自动恢复，只有显式登录能解除。
+      return null
+    }
+    if (silentWechatAttempted) {
+      // 首次未知用户的自动探测每次启动最多一次；同次启动失败后由显式登录重试。
+      return null
+    }
+    if (hasActiveAuthIntent()) {
+      // 已有显式认证操作在途：不并行探测。
+      return null
+    }
+
+    // 后台微信探测：只在 MP（allowSilentWechat）发生；binding_required/失败静默回游客。
+    silentWechatAttempted = true
+    const intentRevision = beginAuthIntent()
+    try {
+      const response = await runMiniWechatAuth(intentRevision)
+      return response.status === 'authenticated' ? response.user : null
+    } catch {
+      // 失败（断网/5xx/接口错误）已记录可诊断 errorMessage；被替代则状态由新操作负责。
+      return null
+    }
+  }
+
+  function bootstrapSession(options: { allowSilentWechat: boolean }): Promise<CurrentUser | null> {
+    // 同一次启动操作身份合并并发请求；迟到的 finally 不清掉新的 promise。
+    if (inFlightBootstrap) {
+      return inFlightBootstrap
+    }
+
+    const promise = runBootstrap(options)
+    inFlightBootstrap = promise
+    const clearIfCurrent = () => {
+      if (inFlightBootstrap === promise) {
+        inFlightBootstrap = null
+      }
+    }
+    promise.then(clearIfCurrent, clearIfCurrent)
+    return promise
+  }
+
   function loginWithPassword(payload: LoginPayload): Promise<AuthResponse> {
     const intentRevision = beginAuthIntent()
     return runAuthIntent(intentRevision, () => source.login(payload), '登录失败')
@@ -325,6 +417,9 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
 
   async function logoutSession(): Promise<void> {
     revision.value += 1
+    // 主动退出：立即持久化手动退出标记，跨冷启动禁止 MP 静默自动恢复；
+    // 只有显式认证操作（密码/微信/绑定/测试登录）才解除。
+    setManualLogout()
     // 先发起携带旧 token 的注销请求（request 层同步读取 token），再同步清本地会话；
     // 远端失败不恢复本地退出，旧 logout 完成也不会清掉期间登录的新账号。
     const remoteLogout = hasAccessToken.value
@@ -358,6 +453,7 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
     loginAsTestUser,
     loginWithMiniWechat,
     bindWechatAccount,
+    bootstrapSession,
     logoutSession,
     invalidateSession,
   }
