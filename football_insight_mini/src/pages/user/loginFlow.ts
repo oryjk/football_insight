@@ -18,7 +18,6 @@ export interface UserLoginFlowState {
 export interface UserLoginFlowDeps {
   redirectAfterLogin: () => Promise<void>
   showToast: (title: string, icon: 'success' | 'none') => void
-  getMiniWechatCode: () => Promise<string>
 }
 
 const defaultDeps: UserLoginFlowDeps = {
@@ -35,21 +34,6 @@ const defaultDeps: UserLoginFlowDeps = {
     }
   },
   showToast: (title, icon) => uni.showToast({ title, icon }),
-  getMiniWechatCode: () => new Promise((resolve, reject) => {
-    uni.login({
-      success: (result) => {
-        if (!result.code) {
-          reject(new Error('微信登录 code 获取失败'))
-          return
-        }
-
-        resolve(result.code)
-      },
-      fail: (error) => {
-        reject(new Error(error.errMsg || '微信登录失败'))
-      },
-    })
-  }),
 }
 
 export interface MiniWechatBindForm {
@@ -159,15 +143,9 @@ export function createUserLoginFlow(
   }
 
   async function loginWithMiniWechat(): Promise<void> {
-    let code: string
-    try {
-      code = await deps.getMiniWechatCode()
-    } catch (error) {
-      deps.showToast(extractApiErrorMessage(error, '微信登录失败'), 'none')
-      return
-    }
-
-    const action = session.loginWithWechatCode(code)
+    // code 获取与换 token 都在 session 的认证意图内完成（意图在调用瞬间建立），
+    // 本页不再自己先等 code；等待期间被退出/新登录替代后，迟到结果全部失效。
+    const action = session.loginWithMiniWechat()
     const submit = trackSubmit()
     try {
       const result = await action

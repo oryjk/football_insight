@@ -207,11 +207,7 @@ const loginFlow = createUserLoginFlow(
 // 但本页自己发起的认证提交（beginAuthIntent 同步递增 revision）只清展示数据，
 // 保留正在填写的认证表单（密码弹层/绑定 token），失败后可原地修改重试。
 watch(session.revision, (newRevision) => {
-  if (loginFlow.isOwnAuthSubmit(newRevision)) {
-    accountEffects.resetPrivateViewState()
-    return
-  }
-  accountEffects.resetSessionScopedState()
+  accountEffects.handleSessionRevisionChange(loginFlow.isOwnAuthSubmit(newRevision))
 })
 
 const isH5 =

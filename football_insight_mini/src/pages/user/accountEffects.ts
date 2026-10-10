@@ -44,6 +44,11 @@ export interface UserAccountEffects {
   resetAuthFormState(): void
   /** 会话 revision 变化时调用：丢弃按旧会话展示的私有状态（展示数据 + 认证表单）。 */
   resetSessionScopedState(): void
+  /**
+   * 页面 watch(session.revision) 的处理入口：本页自己在途的认证提交只清展示数据、
+   * 保留认证表单；退出/被其他操作替代则全量清理。
+   */
+  handleSessionRevisionChange(isOwnAuthSubmit: boolean): void
 }
 
 /**
@@ -157,12 +162,21 @@ export function createUserAccountEffects(
     resetAuthFormState()
   }
 
+  function handleSessionRevisionChange(isOwnAuthSubmit: boolean): void {
+    if (isOwnAuthSubmit) {
+      resetPrivateViewState()
+      return
+    }
+    resetSessionScopedState()
+  }
+
   return {
     loadUser,
     saveNotificationEmail,
     resetPrivateViewState,
     resetAuthFormState,
     resetSessionScopedState,
+    handleSessionRevisionChange,
   }
 }
 

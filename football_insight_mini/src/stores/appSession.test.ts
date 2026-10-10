@@ -493,6 +493,76 @@ describe('登录与刷新交错竞态', () => {
   })
 })
 
+describe('微信认证意图从获取 code 前建立', () => {
+  test('第一次 code 慢、第二次登录成功、用户退出后第一次 code 才返回：不发旧认证请求，最终 guest', async () => {
+    const stub = createSourceStub()
+    const slowCode = deferred<string>()
+    const codeQueue: Array<Promise<string>> = [slowCode.promise, Promise.resolve('code-fast')]
+    const session = createAppSession(stub.source, {
+      getMiniWechatCode: () => codeQueue.shift() ?? Promise.resolve('code-extra'),
+    })
+
+    const first = session.loginWithMiniWechat()
+    const firstError = captureError(() => first)
+
+    stub.handlers.loginWithMiniWechat = () =>
+      Promise.resolve({ status: 'authenticated', ...buildAuthResponse(userB, 'token-b') })
+    await session.loginWithMiniWechat()
+    expect(stub.calls.loginWithMiniWechat).toBe(1)
+    expect(session.currentUser.value).toMatchObject({ id: 'b' })
+
+    stub.handlers.logout = () => Promise.resolve()
+    await session.logoutSession()
+    expect(session.status.value).toBe('guest')
+
+    // 第一次的慢 code 此刻才返回：意图已被替代，不允许再发认证请求。
+    slowCode.resolve('code-slow')
+    expect(await firstError).toBeInstanceOf(SessionSupersededError)
+    expect(stub.calls.loginWithMiniWechat).toBe(1)
+    expect(getStoredToken()).toBeNull()
+    expect(session.currentUser.value).toBeNull()
+    expect(session.status.value).toBe('guest')
+  })
+
+  test('code 在新密码登录完成后才返回：旧 code 不换 token，会话与错误提示属于新登录', async () => {
+    const stub = createSourceStub()
+    const slowCode = deferred<string>()
+    const session = createAppSession(stub.source, { getMiniWechatCode: () => slowCode.promise })
+
+    const pending = session.loginWithMiniWechat()
+    const pendingError = captureError(() => pending)
+
+    stub.handlers.login = () => Promise.resolve(buildAuthResponse(userA, 'token-a'))
+    await session.loginWithPassword({ account_identifier: 'a', password: 'x' })
+    expect(session.currentUser.value).toMatchObject({ id: 'a' })
+
+    slowCode.resolve('code-late')
+    expect(await pendingError).toBeInstanceOf(SessionSupersededError)
+    expect(stub.calls.loginWithMiniWechat).toBe(0)
+    expect(getStoredToken()).toBe('token-a')
+    expect(session.currentUser.value).toMatchObject({ id: 'a' })
+    expect(session.errorMessage.value).toBe('')
+  })
+
+  test('code 在被替代后失败：不覆盖新会话的状态与错误信息', async () => {
+    const stub = createSourceStub()
+    const slowCode = deferred<string>()
+    const session = createAppSession(stub.source, { getMiniWechatCode: () => slowCode.promise })
+
+    const pending = session.loginWithMiniWechat()
+    const pendingError = captureError(() => pending)
+
+    stub.handlers.login = () => Promise.resolve(buildAuthResponse(userA, 'token-a'))
+    await session.loginWithPassword({ account_identifier: 'a', password: 'x' })
+
+    slowCode.reject(new Error('用户取消微信授权'))
+    expect(await pendingError).toBeInstanceOf(SessionSupersededError)
+    expect(stub.calls.loginWithMiniWechat).toBe(0)
+    expect(session.status.value).toBe('authenticated')
+    expect(session.errorMessage.value).toBe('')
+  })
+})
+
 describe('logoutSession', () => {
   test('先发起带旧 token 的后端注销请求，再同步清本地会话', async () => {
     const stub = createSourceStub()
@@ -608,7 +678,7 @@ describe('会话发布与工具函数', () => {
 
   test('微信 binding_required 不发布 token，保持游客态并返回响应', async () => {
     const stub = createSourceStub()
-    const session = createAppSession(stub.source)
+    const session = createAppSession(stub.source, { getMiniWechatCode: () => Promise.resolve('wechat-code') })
     stub.handlers.loginWithMiniWechat = () =>
       Promise.resolve({
         status: 'binding_required',
@@ -618,7 +688,7 @@ describe('会话发布与工具函数', () => {
         avatar_url: null,
       })
 
-    const response = await session.loginWithWechatCode('wechat-code')
+    const response = await session.loginWithMiniWechat()
 
     expect(response.status).toBe('binding_required')
     expect(getStoredToken()).toBeNull()
@@ -628,13 +698,14 @@ describe('会话发布与工具函数', () => {
 
   test('微信 code 登录成功发布 token', async () => {
     const stub = createSourceStub()
-    const session = createAppSession(stub.source)
+    const session = createAppSession(stub.source, { getMiniWechatCode: () => Promise.resolve('wechat-code') })
     stub.handlers.loginWithMiniWechat = () =>
       Promise.resolve({ status: 'authenticated', ...buildAuthResponse(userA, 'token-wechat') })
 
-    const response = await session.loginWithWechatCode('wechat-code')
+    const response = await session.loginWithMiniWechat()
 
     expect(response.status).toBe('authenticated')
+    expect(stub.calls.loginWithMiniWechat).toBe(1)
     expect(getStoredToken()).toBe('token-wechat')
     expect(session.currentUser.value).toMatchObject({ id: 'a' })
   })

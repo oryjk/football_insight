@@ -35,13 +35,41 @@ export interface AppSession {
   loginWithPassword(payload: LoginPayload): Promise<AuthResponse>
   registerAccount(payload: RegisterPayload): Promise<AuthResponse>
   loginAsTestUser(userId: string): Promise<AuthResponse>
-  loginWithWechatCode(code: string): Promise<MiniWechatLoginResponse>
+  /**
+   * 显式微信登录完整入口：认证意图在调用瞬间、获取 code 前建立，
+   * code 获取与 code 换 token 在同一个操作身份内完成；被替代后迟到的
+   * code/响应不再发认证请求，也不复活会话。
+   */
+  loginWithMiniWechat(): Promise<MiniWechatLoginResponse>
   bindWechatAccount(payload: MiniWechatBindPayload): Promise<AuthResponse>
   logoutSession(): Promise<void>
   invalidateSession(expectedRevision: number): void
 }
 
+export interface AppSessionDeps {
+  /** 微信 code 提供方（默认 uni.login）；测试注入可控延迟的 code promise。 */
+  getMiniWechatCode?: () => Promise<string>
+}
+
 const ENSURE_SUCCESS_CACHE_MS = 60_000
+
+function defaultGetMiniWechatCode(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    uni.login({
+      success: (result) => {
+        if (!result.code) {
+          reject(new Error('微信登录 code 获取失败'))
+          return
+        }
+
+        resolve(result.code)
+      },
+      fail: (error) => {
+        reject(new Error(error.errMsg || '微信登录失败'))
+      },
+    })
+  })
+}
 
 /**
  * 认证写入的唯一入口：api/auth 只做原子请求，token（fi_access_token）与当前用户
@@ -52,7 +80,8 @@ const ENSURE_SUCCESS_CACHE_MS = 60_000
  * 所有异步结果与 finally 都核对捕获的 revision 与 token 快照，旧账号的请求
  * （成功、401、错误、finally）不能改新账号状态。
  */
-export function createAppSession(source: typeof authApi = authApi): AppSession {
+export function createAppSession(source: typeof authApi = authApi, deps: AppSessionDeps = {}): AppSession {
+  const getMiniWechatCode = deps.getMiniWechatCode ?? defaultGetMiniWechatCode
   const currentUser = ref<CurrentUser | null>(null)
   const hasAccessToken = ref(Boolean(getAccessToken()))
   const status = ref<SessionStatus>('guest')
@@ -254,9 +283,15 @@ export function createAppSession(source: typeof authApi = authApi): AppSession {
     return runAuthIntent(intentRevision, () => source.loginAsH5TestUser(userId), '测试登录失败')
   }
 
-  async function loginWithWechatCode(code: string): Promise<MiniWechatLoginResponse> {
-    const intentRevision = beginAuthIntent()
+  /**
+   * 微信 code 换 token 的共享实现：调用方必须先建立认证意图（beginAuthIntent），
+   * code 获取与兑换在同一操作身份内。等待 code 期间被退出/新登录替代后，
+   * 迟到的 code 不再发起认证请求，迟到响应/错误/finally 全部失效。
+   */
+  async function runMiniWechatAuth(intentRevision: number): Promise<MiniWechatLoginResponse> {
     try {
+      const code = await getMiniWechatCode()
+      assertRevisionCurrent(intentRevision)
       const response = await source.loginWithMiniWechat(code)
       assertRevisionCurrent(intentRevision)
       if (response.status === 'authenticated') {
@@ -275,6 +310,12 @@ export function createAppSession(source: typeof authApi = authApi): AppSession {
     } finally {
       endAuthIntent(intentRevision)
     }
+  }
+
+  function loginWithMiniWechat(): Promise<MiniWechatLoginResponse> {
+    // 认证意图在调用瞬间、获取 code 前建立：旧 code 迟到不能复活已被替代的会话。
+    const intentRevision = beginAuthIntent()
+    return runMiniWechatAuth(intentRevision)
   }
 
   function bindWechatAccount(payload: MiniWechatBindPayload): Promise<AuthResponse> {
@@ -315,7 +356,7 @@ export function createAppSession(source: typeof authApi = authApi): AppSession {
     loginWithPassword,
     registerAccount,
     loginAsTestUser,
-    loginWithWechatCode,
+    loginWithMiniWechat,
     bindWechatAccount,
     logoutSession,
     invalidateSession,

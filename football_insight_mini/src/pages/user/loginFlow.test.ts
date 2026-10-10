@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { ref } from 'vue'
+import { effectScope, ref, watch } from 'vue'
 import { createUserLoginFlow, type UserLoginFlowDeps, type UserLoginFlowState, type UserLoginFlow } from './loginFlow'
 import { createUserAccountEffects, type UserAccountEffects, type UserAccountEffectsState } from './accountEffects'
 import { createAppSession, SessionSupersededError, type AppSession } from '../../stores/appSession'
@@ -58,6 +58,7 @@ let storage: Record<string, unknown>
 
 interface SourceStub {
   source: AuthSource
+  calls: Record<'login' | 'loginWithMiniWechat' | 'bindMiniWechatAccount' | 'logout', number>
   handlers: {
     login: () => Promise<AuthResponse>
     loginWithMiniWechat: () => Promise<MiniWechatLoginResponse>
@@ -72,6 +73,12 @@ function unexpectedCall(name: string): () => Promise<never> {
 
 function createSourceStub(): SourceStub {
   const stub: SourceStub = {
+    calls: {
+      login: 0,
+      loginWithMiniWechat: 0,
+      bindMiniWechatAccount: 0,
+      logout: 0,
+    },
     handlers: {
       login: unexpectedCall('login'),
       loginWithMiniWechat: unexpectedCall('loginWithMiniWechat'),
@@ -82,12 +89,24 @@ function createSourceStub(): SourceStub {
   }
   stub.source = {
     getCurrentUser: unexpectedCall('getCurrentUser'),
-    login: () => stub.handlers.login(),
+    login: () => {
+      stub.calls.login += 1
+      return stub.handlers.login()
+    },
     register: unexpectedCall('register'),
     loginAsH5TestUser: unexpectedCall('loginAsH5TestUser'),
-    loginWithMiniWechat: () => stub.handlers.loginWithMiniWechat(),
-    bindMiniWechatAccount: () => stub.handlers.bindMiniWechatAccount(),
-    logout: () => stub.handlers.logout(),
+    loginWithMiniWechat: () => {
+      stub.calls.loginWithMiniWechat += 1
+      return stub.handlers.loginWithMiniWechat()
+    },
+    bindMiniWechatAccount: () => {
+      stub.calls.bindMiniWechatAccount += 1
+      return stub.handlers.bindMiniWechatAccount()
+    },
+    logout: () => {
+      stub.calls.logout += 1
+      return stub.handlers.logout()
+    },
   } as unknown as AuthSource
   return stub
 }
@@ -115,12 +134,12 @@ interface FlowFixture {
   toasts: string[]
   redirects: number
   loadUserRequest: Deferred<void>
+  wechatCodeQueue: Array<Promise<string>>
   deps: UserLoginFlowDeps
 }
 
 function createFlowFixture(): FlowFixture {
   const stub = createSourceStub()
-  const session = createAppSession(stub.source)
   const state: UserLoginFlowState = {
     passwordLoginSheetVisible: ref(false),
     passwordLoginSubmitting: ref(false),
@@ -129,11 +148,12 @@ function createFlowFixture(): FlowFixture {
   const toasts: string[] = []
   const loadUserRequest = deferred<void>()
   const fixture: FlowFixture = {
-    session,
+    session: {} as AppSession,
     state,
     toasts,
     redirects: 0,
     loadUserRequest,
+    wechatCodeQueue: [],
     deps: {
       redirectAfterLogin: async () => {
         fixture.redirects += 1
@@ -141,9 +161,12 @@ function createFlowFixture(): FlowFixture {
       showToast: (title) => {
         toasts.push(title)
       },
-      getMiniWechatCode: () => Promise.resolve('wechat-code'),
     },
   }
+  // 微信 code 由 session 的认证流程获取：测试通过队列注入可控延迟的 code。
+  fixture.session = createAppSession(stub.source, {
+    getMiniWechatCode: () => fixture.wechatCodeQueue.shift() ?? Promise.resolve('wechat-code'),
+  })
   ;(fixture as { stub?: SourceStub }).stub = stub
   return fixture
 }
@@ -359,6 +382,281 @@ describe('user 登录编排 revision 防护', () => {
 
 // 保持 SessionSupersededError 引用（竞态语义文档化）：被替代的操作以该错误收尾。
 void SessionSupersededError
+
+describe('微信 code 竞态（认证意图在获取 code 前建立）', () => {
+  test('第一次 code 慢、第二次微信登录成功、退出后第一次 code 才返回：认证 API 只调一次，最终游客，无旧成功提示/跳转', async () => {
+    const fixture = createFlowFixture()
+    const stub = getStub(fixture)
+    const slowCode = deferred<string>()
+    fixture.wechatCodeQueue.push(slowCode.promise, Promise.resolve('code-fast'))
+    stub.handlers.loginWithMiniWechat = () =>
+      Promise.resolve({ status: 'authenticated', ...buildAuthResponse(userB, 'token-b') })
+    stub.handlers.logout = () => Promise.resolve()
+    const flow = createFlow(fixture)
+
+    const pendingFirst = flow.loginWithMiniWechat()
+    await flushMicrotasks()
+    // 慢 code 还没返回：不能发出任何认证请求。
+    expect(stub.calls.loginWithMiniWechat).toBe(0)
+
+    const pendingSecond = flow.loginWithMiniWechat()
+    await flushMicrotasks()
+    fixture.loadUserRequest.resolve()
+    await pendingSecond
+
+    expect(stub.calls.loginWithMiniWechat).toBe(1)
+    expect(fixture.toasts).toEqual(['微信登录成功'])
+    expect(fixture.redirects).toBe(1)
+    expect(fixture.session.currentUser.value).toMatchObject({ id: 'b' })
+
+    await flow.logout()
+    expect(fixture.toasts).toEqual(['微信登录成功', '已退出登录'])
+    expect(fixture.session.status.value).toBe('guest')
+
+    // 第一次的慢 code 此刻才返回：意图早已被替代，不能再发认证请求、不能复活会话。
+    slowCode.resolve('code-slow')
+    await pendingFirst
+    await flushMicrotasks()
+
+    expect(stub.calls.loginWithMiniWechat).toBe(1)
+    expect(fixture.toasts).toEqual(['微信登录成功', '已退出登录'])
+    expect(fixture.redirects).toBe(1)
+    expect(fixture.session.currentUser.value).toBeNull()
+    expect(fixture.session.status.value).toBe('guest')
+    expect(fixture.state.miniWechatBindState.value).toBeNull()
+  })
+
+  test('code 在新密码登录完成后才返回：不发旧认证请求、不提示旧错误，密码登录流程不受影响', async () => {
+    const fixture = createFlowFixture()
+    const stub = getStub(fixture)
+    const slowCode = deferred<string>()
+    fixture.wechatCodeQueue.push(slowCode.promise)
+    stub.handlers.login = () => Promise.resolve(buildAuthResponse(userA, 'token-a'))
+    const flow = createFlow(fixture)
+
+    const pendingWechat = flow.loginWithMiniWechat()
+    await flushMicrotasks()
+
+    fixture.state.passwordLoginSheetVisible.value = true
+    const pendingPassword = flow.submitPasswordLogin({ accountIdentifier: 'a', password: 'x' })
+    await flushMicrotasks()
+    fixture.loadUserRequest.resolve()
+    await pendingPassword
+    expect(fixture.toasts).toEqual(['登录成功'])
+
+    slowCode.resolve('code-late')
+    await pendingWechat
+    await flushMicrotasks()
+
+    expect(stub.calls.loginWithMiniWechat).toBe(0)
+    expect(fixture.toasts).toEqual(['登录成功'])
+    expect(fixture.redirects).toBe(1)
+    expect(fixture.session.currentUser.value).toMatchObject({ id: 'a' })
+    expect(fixture.state.passwordLoginSubmitting.value).toBe(false)
+  })
+
+  test('code 在新绑定登录完成后才失败：不提示旧错误，新会话不受影响', async () => {
+    const fixture = createFlowFixture()
+    const stub = getStub(fixture)
+    const slowCode = deferred<string>()
+    fixture.wechatCodeQueue.push(slowCode.promise)
+    const flow = createFlow(fixture)
+
+    const pendingWechat = flow.loginWithMiniWechat()
+    await flushMicrotasks()
+
+    fixture.state.miniWechatBindState.value = {
+      status: 'binding_required',
+      bind_token: 'bind-token',
+      expires_at: '2026-02-01T00:00:00Z',
+      display_name: '微信用户',
+      avatar_url: null,
+    }
+    stub.handlers.bindMiniWechatAccount = () => Promise.resolve(buildAuthResponse(userA, 'token-bind'))
+    const pendingBind = flow.bindMiniWechatAccount({
+      bindToken: 'bind-token',
+      inviteCode: '',
+      referralCode: '',
+      displayName: '微信用户',
+      avatarDataUrl: 'data:image/png;base64,x',
+    })
+    await flushMicrotasks()
+    fixture.loadUserRequest.resolve()
+    await pendingBind
+    expect(fixture.toasts).toEqual(['微信绑定成功'])
+
+    slowCode.reject(new Error('用户取消微信授权'))
+    await pendingWechat
+    await flushMicrotasks()
+
+    expect(stub.calls.loginWithMiniWechat).toBe(0)
+    expect(fixture.toasts).toEqual(['微信绑定成功'])
+    expect(fixture.session.currentUser.value).toMatchObject({ id: 'a' })
+    expect(fixture.session.errorMessage.value).toBe('')
+  })
+})
+
+describe('revision 监听与认证表单上下文（真实 Vue watcher）', () => {
+  function createEffects(fixture: FlowFixture): UserAccountEffects {
+    const state: UserAccountEffectsState = {
+      loading: ref(false),
+      systemConfigUnderReview: ref(false),
+      isReviewController: ref(false),
+      notificationEmail: ref('a@example.com'),
+      notificationEmailSheetVisible: ref(false),
+      notificationEmailSaving: ref(false),
+      miniWechatBindState: fixture.state.miniWechatBindState,
+      passwordLoginSheetVisible: fixture.state.passwordLoginSheetVisible,
+      passwordLoginSubmitting: fixture.state.passwordLoginSubmitting,
+    }
+    ;(fixture as unknown as { accountState: UserAccountEffectsState }).accountState = state
+    return createUserAccountEffects(fixture.session, state, {
+      canControlMiniReview: () => Promise.resolve({ allowed: false }),
+      getNotificationEmail: () => Promise.resolve({ email: null }),
+      updateNotificationEmail: () => Promise.resolve({ email: null }),
+      loadSystemConfigUnderReview: () => Promise.resolve(false),
+      showToast: () => {},
+    })
+  }
+
+  /** 与页面相同的接线，但走真实 Vue watch：revision 变化由 session 真实发布触发。 */
+  function wirePageRevisionWatch(fixture: FlowFixture, flow: UserLoginFlow, effects: UserAccountEffects): () => void {
+    const scope = effectScope()
+    scope.run(() => {
+      watch(fixture.session.revision, (newRevision) => {
+        effects.handleSessionRevisionChange(flow.isOwnAuthSubmit(newRevision))
+      })
+    })
+    return () => scope.stop()
+  }
+
+  test('密码登录成功：真实 watcher 下弹层关闭、toast、跳转、会话发布', async () => {
+    const fixture = createFlowFixture()
+    getStub(fixture).handlers.login = () => Promise.resolve(buildAuthResponse(userA, 'token-a'))
+    fixture.state.passwordLoginSheetVisible.value = true
+    const flow = createFlow(fixture)
+    const effects = createEffects(fixture)
+    const stop = wirePageRevisionWatch(fixture, flow, effects)
+
+    const pending = flow.submitPasswordLogin({ accountIdentifier: 'a', password: 'x' })
+    await flushMicrotasks()
+    fixture.loadUserRequest.resolve()
+    await pending
+    await flushMicrotasks()
+
+    expect(fixture.state.passwordLoginSheetVisible.value).toBe(false)
+    expect(fixture.state.passwordLoginSubmitting.value).toBe(false)
+    expect(fixture.toasts).toEqual(['登录成功'])
+    expect(fixture.redirects).toBe(1)
+    expect(fixture.session.currentUser.value).toMatchObject({ id: 'a' })
+    stop()
+  })
+
+  test('微信登录 authenticated：真实 watcher 下提示成功并跳转', async () => {
+    const fixture = createFlowFixture()
+    getStub(fixture).handlers.loginWithMiniWechat = () =>
+      Promise.resolve({ status: 'authenticated', ...buildAuthResponse(userA, 'token-wechat') })
+    const flow = createFlow(fixture)
+    const effects = createEffects(fixture)
+    const stop = wirePageRevisionWatch(fixture, flow, effects)
+
+    const pending = flow.loginWithMiniWechat()
+    await flushMicrotasks()
+    fixture.loadUserRequest.resolve()
+    await pending
+    await flushMicrotasks()
+
+    expect(fixture.toasts).toEqual(['微信登录成功'])
+    expect(fixture.redirects).toBe(1)
+    expect(fixture.session.currentUser.value).toMatchObject({ id: 'a' })
+    expect(fixture.state.miniWechatBindState.value).toBeNull()
+    stop()
+  })
+
+  test('微信登录 binding_required：真实 watcher 下展示绑定表单、不 toast', async () => {
+    const fixture = createFlowFixture()
+    getStub(fixture).handlers.loginWithMiniWechat = () =>
+      Promise.resolve({
+        status: 'binding_required',
+        bind_token: 'bind-token',
+        expires_at: '2026-02-01T00:00:00Z',
+        display_name: '微信用户',
+        avatar_url: null,
+      })
+    const flow = createFlow(fixture)
+    const effects = createEffects(fixture)
+    const stop = wirePageRevisionWatch(fixture, flow, effects)
+
+    await flow.loginWithMiniWechat()
+    await flushMicrotasks()
+
+    expect(fixture.state.miniWechatBindState.value?.bind_token).toBe('bind-token')
+    expect(fixture.toasts).toEqual([])
+    expect(fixture.session.currentUser.value).toBeNull()
+    stop()
+  })
+
+  test('绑定失败：真实 watcher 下保留绑定表单与 bind_token，可原地重试', async () => {
+    const fixture = createFlowFixture()
+    const stub = getStub(fixture)
+    stub.handlers.bindMiniWechatAccount = () =>
+      Promise.reject(new ApiRequestError('邀请码无效', 400))
+    fixture.state.miniWechatBindState.value = {
+      status: 'binding_required',
+      bind_token: 'bind-token',
+      expires_at: '2026-02-01T00:00:00Z',
+      display_name: '微信用户',
+      avatar_url: null,
+    }
+    const flow = createFlow(fixture)
+    const effects = createEffects(fixture)
+    const stop = wirePageRevisionWatch(fixture, flow, effects)
+
+    await flow.bindMiniWechatAccount({
+      bindToken: 'bind-token',
+      inviteCode: 'bad-code',
+      referralCode: '',
+      displayName: '微信用户',
+      avatarDataUrl: 'data:image/png;base64,x',
+    })
+    await flushMicrotasks()
+
+    expect(fixture.toasts).toEqual(['邀请码无效'])
+    expect(fixture.state.miniWechatBindState.value?.bind_token).toBe('bind-token')
+    stop()
+  })
+
+  test('真正退出：真实 watcher 下清空认证表单与绑定上下文', async () => {
+    const fixture = createFlowFixture()
+    const stub = getStub(fixture)
+    stub.handlers.login = () => Promise.resolve(buildAuthResponse(userA, 'token-a'))
+    stub.handlers.logout = () => Promise.resolve()
+    await fixture.session.loginWithPassword({ account_identifier: 'a', password: 'x' })
+    fixture.state.miniWechatBindState.value = {
+      status: 'binding_required',
+      bind_token: 'bind-token',
+      expires_at: '2026-02-01T00:00:00Z',
+      display_name: '微信用户',
+      avatar_url: null,
+    }
+    fixture.state.passwordLoginSheetVisible.value = true
+    const flow = createFlow(fixture)
+    const effects = createEffects(fixture)
+    const stop = wirePageRevisionWatch(fixture, flow, effects)
+
+    const pending = flow.logout()
+    await flushMicrotasks()
+    fixture.loadUserRequest.resolve()
+    await pending
+    await flushMicrotasks()
+
+    expect(fixture.state.miniWechatBindState.value).toBeNull()
+    expect(fixture.state.passwordLoginSheetVisible.value).toBe(false)
+    expect(fixture.session.currentUser.value).toBeNull()
+    expect(fixture.toasts).toEqual(['已退出登录'])
+    stop()
+  })
+})
 
 describe('revision 监听与认证表单上下文（watcher 联动）', () => {
   function createEffects(fixture: FlowFixture): UserAccountEffects {
