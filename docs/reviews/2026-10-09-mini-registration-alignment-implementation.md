@@ -135,3 +135,34 @@ review 发现 4 个问题，逐问题一个 commit 修复，均在 `football_ins
 | `MINI_REVIEW_SKIP=1 bun run build:mp-weixin` | DONE；组件注册检查通过；产物 API 校验 `https://match.oryjk.cn/api/v1`（修复后的沙箱校验对真实产物通过） |
 
 版本文件 MD5 仍不变（1.0.64），无远程登记/上传；未验证项与上文一致（真机/视觉项本轮未新增验证）。与 review 描述的偏差：user 页 revision watch 未清 `h5TestUsers`（后端公共白名单，非会话私有，清了会导致 H5 登录入口闪烁）；interests 的 finally 清 loading key 不做 revision guard（纯 UI 状态，必须无条件清避免锁死）。
+
+## 第二轮复审修复记录（2026-10-10，基于 08b31ac 的 review 发现）
+
+review 发现 5 个问题，逐问题一个 commit 修复，均在 `football_insight_mini/` 内，第一轮修复未撤销：
+
+| 提交 | 问题 | 根因与修复 |
+| --- | --- | --- |
+| `b23b664` | P1：旧登录请求仍影响当前会话的 401 处理 | `pendingAuthIntents` 计数包含已被替代的意图，B 会话的 401 被 A 的在途登录保护（revision 不递增、status 残留 authenticated）。修复：改为 `activeAuthIntentRevision`（最新意图的 intentRevision，结束清空），`hasActiveAuthIntent()` 要求 intentRevision 等于当前 revision——被替代的意图自然不匹配；当前会话 401 正常递增 revision 触发页面清理，在途新登录受保护的语义保留。`src/stores/appSession.ts` |
+| `0d9e95b` | P2：被替代的登录仍提示成功并跳转 | handler 编排在 `action → loadUser → toast → 跳转` 的间隙无 revision 校验。修复：抽取 `src/pages/user/loginFlow.ts`（`createUserLoginFlow` 注入依赖），密码/微信/绑定/H5 测试/退出五个 handler 统一走 `settleSuccess`（loadUser 后校验 revision 再 toast/跳转）与 `settleFailure`（superseded 静默放弃）；logout 期间有新登录则不提示「已退出登录」。 |
+| `54d69cb` | P2：认证提交开始就清掉重试表单 | `watch(session.revision)` 无条件全量 reset，提交 begin（revision+1）即关闭密码弹层、清除绑定 token，失败后无法原地重试。修复：reset 拆为 `resetPrivateViewState`（展示数据）与 `resetAuthFormState`（表单/token）；watcher 经 `loginFlow.isOwnAuthSubmit(revision)` 区分——本页在途提交只清展示数据保留表单，退出/被其他操作替代仍全量清理。 |
+| `c5ad8e0` | P2：切换球队后订阅刷新卡 loading | 旧请求 finally 因快照失效跳过清理，`resetCurrentBoard` 不复位订阅标记，`statusLoading` 永久卡住后续刷新。修复：`resetCurrentBoard`（switchTeam 与 revision watch 公共路径）复位 statusLoading/plansLoading/submitting/sheet 四个标记；旧 finally 不清新请求 loading 的 guard 保留。`useTicketWatchBoards.ts` |
+| `2e894c0` | P2：切换账号后解锁流程卡 paying | watcher 只关 sheet 可见性，`matchIdSheetState`/权益未清，旧 finally 被 revision 防护跳过，`paying` 残留挡住 `openMatchIdSheet`。修复：matchId composable 新增 `resetMatchIdSessionState()`（sheetState='locked'、entitlement=null、关弹层），revision watch 改调它；旧下单/支付结果的 revision 防护不变。 |
+
+新增回归测试 16 个（deferred 可控延迟响应，均验证修复前失败、修复后通过；页面 watcher/handler 无法直接单测的部分用复刻旧编排/旧 watcher 分支的临时变体验证失败后恢复）：
+
+- `appSession.test.ts`：`被替代的旧登录仍在途，不阻止当前会话的 401 完全失效`（相反顺序的既有用例「登录 B 在途 + 旧 token 401 先到」继续通过）。
+- `pages/user/loginFlow.test.ts`（9 个）：登录成功后 loadUser 期间被退出替代不提示不跳转、A 在途 B 成功 A 静默、退出等待期间新登录不提示「已退出」等。
+- `pages/user/accountEffects.test.ts`（新增 3 个）：绑定提交在途 revision 变化保留表单与 token 可原地重试（完整复现 review 场景）、退出/被替代全量清理、`resetPrivateViewState` 只清展示数据。
+- `pages/ticket-watch/effects.test.ts`（新增 3 个）：切换球队复位 loading 后可再次刷新、旧请求不清新请求 loading、切换账号重置解锁状态新账号可重新打开并解锁。
+
+修复后验证（2026-10-10 实际执行，全部 exit 0）：
+
+| 命令 | 结果 |
+| --- | --- |
+| `bun test` | 398 pass / 0 fail，3810 expect，32 个文件（基线 382 + 16） |
+| `bun run type-check` | 通过 |
+| `bun run check:boundaries` | ✅ 通过 |
+| `bun run build:h5` | DONE Build complete |
+| `MINI_REVIEW_SKIP=1 bun run build:mp-weixin` | DONE；组件注册检查通过；产物 API 校验 `https://match.oryjk.cn/api/v1` |
+
+版本文件 MD5 仍不变（1.0.64），无远程登记/上传/部署。未验证项不变：真机/开发者工具端到端操作（支付、微信登录 code、视觉）未跑，全部为单元级 deferred 竞态测试。说明：`UserAccountEffectsState` 接口新增 `passwordLoginSubmitting` 必填字段（既有 fixture 已适配，未删既有测试）。
