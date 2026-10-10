@@ -255,6 +255,11 @@ export function useTicketWatchSubscription(
         return
       }
       await requestTicketWatchPayment(order.params)
+      // 原生支付等待期间上下文可能已失效（reset/换比赛/切账号）：
+      // 已执行的真实支付不取消，但失效页面不再发起确认读与后续结果发布。
+      if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) {
+        return
+      }
       const paid = await waitForPaidOrder(order.order_no)
       if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) {
         return

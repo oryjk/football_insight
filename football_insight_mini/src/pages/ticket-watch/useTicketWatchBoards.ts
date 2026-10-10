@@ -94,12 +94,9 @@ export function useTicketWatchBoards(
     systemConfigUnderReview,
     refluxSubscriptionEmail,
     refluxSubscriptionSubscribed,
-    refluxSubscriptionSheetVisible,
-    refluxSubscriptionLoading,
-    refluxSubscriptionSubmitting,
-    refluxSubscriptionStatusLoading,
     currentTrackedInterests,
     membershipBenefitsLocked,
+    resetCurrentMatchScopedState,
   } = state
   let historySelectionRequestToken = 0
   // 看板请求 owner：reset/球队切换作废旧请求并允许新上下文立即重载；
@@ -169,12 +166,15 @@ export function useTicketWatchBoards(
 
   /**
    * 当前比赛上下文被替换（含从无到有的首次发布）：递增 generation，
-   * 使按旧上下文发出的订阅/套餐/下单/支付请求永久失效。
-   * 同一比赛的普通库存轮询返回相同 match_id，不会递增 generation。
+   * 使按旧上下文发出的订阅/套餐/下单/支付请求永久失效，并统一复位
+   * 旧比赛的订阅/解锁状态与 loading/sheet/paying 标记（旧请求的 finally
+   * 按 generation 跳过清理，标记只能在这里复位）。
+   * 同一比赛的普通库存轮询返回相同 match_id，不递增 generation 也不复位。
    */
   function publishCurrentMatch(match: TicketWatchMatchSummary | null): void {
     if ((match?.match_id ?? null) !== (currentMatch.value?.match_id ?? null)) {
       currentBoardGeneration.value += 1
+      resetCurrentMatchScopedState()
     }
     currentMatch.value = match
   }
@@ -192,14 +192,10 @@ export function useTicketWatchBoards(
     currentMatch.value = null
     currentSections.value = []
     currentTrackedInterests.value = []
-    refluxSubscriptionSubscribed.value = false
-    refluxSubscriptionEmail.value = ''
-    // 球队/比赛切换使旧订阅请求的快照失效、其 finally 跳过清理：
-    // loading/sheet 标记在这里复位，否则后续刷新与开 sheet 一直被在途标记挡住。
-    refluxSubscriptionStatusLoading.value = false
-    refluxSubscriptionLoading.value = false
-    refluxSubscriptionSubmitting.value = false
-    refluxSubscriptionSheetVisible.value = false
+    // 球队/比赛切换与自然 rollover 走同一个比赛状态 reset：旧订阅/解锁请求的
+    // 快照失效、其 finally 跳过清理，loading/sheet/paying/权益标记在这里复位，
+    // 否则后续刷新与开 sheet 一直被旧在途标记挡住。
+    resetCurrentMatchScopedState()
     currentErrorMessage.value = ''
     hasLoadedCurrentBoard.value = false
     currentMessage.value = '暂无当前比赛。'

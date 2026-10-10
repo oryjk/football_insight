@@ -12,6 +12,7 @@ import type {
   TicketWatchTrackedInterest,
 } from '../../types/ticketWatch'
 import { ApiRequestError } from '../../utils/apiError'
+import type { MatchIdEntitlement } from '../../api/matchIdUnlock'
 import type { AppSession, SessionStatus } from '../../stores/appSession'
 import { useTicketWatchBoards } from './useTicketWatchBoards'
 import { useTicketWatchMatchId } from './useTicketWatchMatchId'
@@ -2152,4 +2153,356 @@ describe('ticket watch 页内 tab 补载与历史选择 owner（真实 boards + 
     expect(f.state.historySelectionLoading.value).toBe(false)
     f.stop()
   })
+})
+
+describe('ticket watch 比赛上下文替换统一复位（自然 rollover 边界）', () => {
+  function unusedAction() {
+    return async () => {
+      throw new Error('unused')
+    }
+  }
+
+  function boardResponse(id: number): TicketWatchCurrentBoardResponse {
+    return {
+      current_match: match(id),
+      group_ticket_active: false,
+      message: '',
+      inventory: [],
+      block_interests: [],
+      tracked_interests: [],
+    }
+  }
+
+  function subscriptionStatus(
+    email: string | null,
+    subscribed: boolean,
+  ): RefluxSubscriptionStatusResponse {
+    return {
+      subscribed,
+      active_subscriptions: [],
+      email_target: email ? { channel: 'email', target: email } : null,
+    }
+  }
+
+  async function flushMicrotasks(): Promise<void> {
+    for (let i = 0; i < 20; i += 1) {
+      await Promise.resolve()
+    }
+  }
+
+  function prepareLoadedCurrentBoard(
+    state: ReturnType<typeof useTicketWatchState>,
+  ): void {
+    state.regions.value = [
+      { block_name: 'A1', price: '180', usable_count: 10, estate: 0 },
+    ]
+    state.currentMatch.value = match(1)
+    state.currentUser.value = { id: 'user-a' } as CurrentUser
+    state.hasLoadedCurrentBoard.value = true
+    state.currentLoading.value = false
+  }
+
+  test('自然 rollover 复位旧比赛订阅状态：新比赛状态刷新立即发出并发布，旧结果失效', async () => {
+    const state = useTicketWatchState()
+    const session = createSessionStub()
+    prepareLoadedCurrentBoard(state)
+    state.refluxSubscriptionEmail.value = 'old@example.com'
+    state.refluxSubscriptionSubscribed.value = true
+    const oldStatus = deferred<RefluxSubscriptionStatusResponse>()
+    const newStatus = deferred<RefluxSubscriptionStatusResponse>()
+    let statusCalls = 0
+    const subscription = useTicketWatchSubscription(state, () => {}, {
+      createRefluxSubscriptionOrder: unusedAction(),
+      getRefluxSubscriptionPlans: unusedAction(),
+      getRefluxSubscriptionStatus: () => {
+        statusCalls += 1
+        return statusCalls === 1 ? oldStatus.promise : newStatus.promise
+      },
+      waitForPaidOrder: unusedAction(),
+      requestTicketWatchPayment: unusedAction(),
+    }, session)
+    const boards = useTicketWatchBoards(state, subscription.refreshRefluxSubscriptionStatus, {
+      ...source,
+      getCurrentTicketWatchBoard: async () => boardResponse(2),
+    }, session)
+
+    // 旧比赛 A 的订阅状态请求在途。
+    const pendingOld = subscription.refreshRefluxSubscriptionStatus()
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(true)
+
+    // 自然轮询把当前比赛从 A 替换为 B：generation 递增，旧比赛的订阅状态/loading
+    // 统一复位，新比赛的状态刷新不被旧在途标记挡住。
+    await boards.loadCurrentBoard('poll')
+    expect(state.currentBoardGeneration.value).toBe(1)
+    expect(state.currentMatch.value?.match_id).toBe(2)
+    expect(statusCalls).toBe(2)
+    expect(state.refluxSubscriptionEmail.value).toBe('')
+    expect(state.refluxSubscriptionSubscribed.value).toBe(false)
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(true)
+
+    // 旧比赛的状态响应晚到：结果与 finally 都失效，不清新请求的 loading。
+    oldStatus.resolve(subscriptionStatus('stale@example.com', true))
+    await pendingOld
+    expect(state.refluxSubscriptionEmail.value).toBe('')
+    expect(state.refluxSubscriptionSubscribed.value).toBe(false)
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(true)
+
+    // 新比赛的状态正常发布并清理 loading。
+    newStatus.resolve(subscriptionStatus('b@example.com', true))
+    await flushMicrotasks()
+    expect(state.refluxSubscriptionEmail.value).toBe('b@example.com')
+    expect(state.refluxSubscriptionSubscribed.value).toBe(true)
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(false)
+  })
+
+  test('自然 rollover 复位套餐 sheet：旧 plans 失效，重开立即发出新请求并发布', async () => {
+    const toasts: string[] = []
+    testGlobal.uni = {
+      showToast: (options: { title: string }) => {
+        toasts.push(options.title)
+      },
+    } as unknown as typeof uni
+    const state = useTicketWatchState()
+    const session = createSessionStub()
+    prepareLoadedCurrentBoard(state)
+    const oldPlans = deferred<RefluxSubscriptionPlansResponse>()
+    const newPlans = deferred<RefluxSubscriptionPlansResponse>()
+    let plansCalls = 0
+    const subscription = useTicketWatchSubscription(state, () => {}, {
+      createRefluxSubscriptionOrder: unusedAction(),
+      getRefluxSubscriptionPlans: () => {
+        plansCalls += 1
+        return plansCalls === 1 ? oldPlans.promise : newPlans.promise
+      },
+      getRefluxSubscriptionStatus: async () => subscriptionStatus(null, false),
+      waitForPaidOrder: unusedAction(),
+      requestTicketWatchPayment: unusedAction(),
+    }, session)
+    const boards = useTicketWatchBoards(state, subscription.refreshRefluxSubscriptionStatus, {
+      ...source,
+      getCurrentTicketWatchBoard: async () => boardResponse(2),
+    }, session)
+
+    // 旧比赛 A 的套餐 sheet 打开，plans 请求在途。
+    const pendingOld = subscription.openRefluxSubscriptionSheet()
+    expect(state.refluxSubscriptionSheetVisible.value).toBe(true)
+    expect(state.refluxSubscriptionLoading.value).toBe(true)
+
+    // 自然轮询替换比赛：旧 sheet 关闭、loading 复位、旧比赛 plans 缓存清空。
+    await boards.loadCurrentBoard('poll')
+    expect(state.currentMatch.value?.match_id).toBe(2)
+    expect(state.refluxSubscriptionSheetVisible.value).toBe(false)
+    expect(state.refluxSubscriptionLoading.value).toBe(false)
+    expect(state.refluxSubscriptionPlans.value).toEqual([])
+
+    // 旧 plans 晚到：不发布、不重开旧 sheet、不弹旧错误。
+    oldPlans.resolve({
+      plans: [{
+        code: 'plan-stale',
+        scope: 'single_match',
+        team_code: 'chengdurongcheng',
+        title: '旧套餐',
+        description: '',
+        price_cents: 100,
+      }],
+      active_subscriptions: [],
+      email_target: { channel: 'email', target: 'stale@example.com' },
+    })
+    await pendingOld
+    expect(state.refluxSubscriptionPlans.value).toEqual([])
+    expect(state.refluxSubscriptionSheetVisible.value).toBe(false)
+    expect(toasts).toEqual([])
+
+    // 新比赛可立即重开 sheet：发出新 plans 请求并正常发布。
+    const pendingNew = subscription.openRefluxSubscriptionSheet()
+    expect(plansCalls).toBe(2)
+    newPlans.resolve({
+      plans: [{
+        code: 'plan-new',
+        scope: 'single_match',
+        team_code: 'chengdurongcheng',
+        title: '新套餐',
+        description: '',
+        price_cents: 200,
+      }],
+      active_subscriptions: [],
+      email_target: { channel: 'email', target: 'fresh@example.com' },
+    })
+    await pendingNew
+    expect(state.refluxSubscriptionPlans.value.map((plan) => plan.code)).toEqual(['plan-new'])
+    expect(state.refluxSubscriptionSheetVisible.value).toBe(true)
+    expect(state.refluxSubscriptionLoading.value).toBe(false)
+    expect(toasts).toEqual([])
+  })
+
+  test('自然 rollover 复位解锁 paying：旧订单不拉起支付，sheet 可立即关闭并重开', async () => {
+    const toasts: string[] = []
+    testGlobal.uni = {
+      showToast: (options: { title: string }) => {
+        toasts.push(options.title)
+      },
+    } as unknown as typeof uni
+    const state = useTicketWatchState()
+    const session = createSessionStub({ hasAccessToken: ref(true) })
+    prepareLoadedCurrentBoard(state)
+    state.currentUser.value = { id: 'user-a', has_wechat_binding: true } as CurrentUser
+    state.canRequestWxPayment.value = true
+    state.matchIdSheetVisible.value = true
+    const orderRequest = deferred<{
+      order_no: string
+      wx_pay_params: { timeStamp: string; nonceStr: string; package: string; signType: string; paySign: string }
+    }>()
+    let paymentCalls = 0
+    let entitlementCalls = 0
+    const unlock = useTicketWatchMatchId(state, () => {}, {
+      createMatchIdOrder: () => orderRequest.promise,
+      getMatchIdEntitlement: async () => {
+        entitlementCalls += 1
+        return { unlocked: true, via: 'purchase', effective_tier: 'V1' }
+      },
+      requestTicketWatchPayment: async () => {
+        paymentCalls += 1
+      },
+      waitForPaidOrder: unusedAction(),
+    }, session)
+    const boards = useTicketWatchBoards(state, async () => {}, {
+      ...source,
+      getCurrentTicketWatchBoard: async () => boardResponse(2),
+    }, session)
+
+    // 旧比赛 A 的解锁下单在途，状态为 paying。
+    const pendingOld = unlock.payForMatchId()
+    await Promise.resolve()
+    expect(state.matchIdSheetState.value).toBe('paying')
+
+    // 自然轮询替换比赛：paying/sheet/权益同步复位。
+    await boards.loadCurrentBoard('poll')
+    expect(state.currentMatch.value?.match_id).toBe(2)
+    expect(state.matchIdSheetState.value).toBe('locked')
+    expect(state.matchIdSheetVisible.value).toBe(false)
+    expect(state.matchIdEntitlement.value).toBeNull()
+
+    // 旧订单晚到：不拉起微信支付，finally 也不复活旧状态。
+    orderRequest.resolve({
+      order_no: 'order-stale',
+      wx_pay_params: { timeStamp: '', nonceStr: '', package: '', signType: 'RSA', paySign: '' },
+    })
+    await pendingOld
+    expect(paymentCalls).toBe(0)
+    expect(state.matchIdSheetState.value).toBe('locked')
+    expect(toasts).toEqual([])
+
+    // 新比赛可立即关闭/重开 sheet 并查询权益。
+    unlock.closeMatchIdSheet()
+    await unlock.openMatchIdSheet()
+    expect(entitlementCalls).toBe(1)
+    expect(state.matchIdSheetVisible.value).toBe(true)
+    expect(state.matchIdSheetState.value).toBe('unlocked')
+    expect(toasts).toEqual([])
+  })
+
+  test('同 generation 关闭再打开解锁 sheet：旧权益请求的迟到失败不关新 sheet、不弹旧错误', async () => {
+    const toasts: string[] = []
+    testGlobal.uni = {
+      showToast: (options: { title: string }) => {
+        toasts.push(options.title)
+      },
+    } as unknown as typeof uni
+    const state = useTicketWatchState()
+    const session = createSessionStub({ hasAccessToken: ref(true) })
+    prepareLoadedCurrentBoard(state)
+    const oldEntitlement = deferred<MatchIdEntitlement>()
+    let entitlementCalls = 0
+    const unlock = useTicketWatchMatchId(state, () => {}, {
+      createMatchIdOrder: unusedAction(),
+      getMatchIdEntitlement: () => {
+        entitlementCalls += 1
+        return entitlementCalls === 1
+          ? oldEntitlement.promise
+          : Promise.resolve({ unlocked: true, via: 'purchase', effective_tier: 'V1' })
+      },
+      requestTicketWatchPayment: unusedAction(),
+      waitForPaidOrder: unusedAction(),
+    }, session)
+
+    // 同一比赛打开 sheet（GET1 在途）→ loading 中关闭 → 重开（GET2）。
+    const pendingOld = unlock.openMatchIdSheet()
+    expect(state.matchIdSheetState.value).toBe('loading')
+    unlock.closeMatchIdSheet()
+    expect(state.matchIdSheetVisible.value).toBe(false)
+    await unlock.openMatchIdSheet()
+    expect(entitlementCalls).toBe(2)
+    expect(state.matchIdSheetState.value).toBe('unlocked')
+    expect(state.matchIdSheetVisible.value).toBe(true)
+
+    // GET1 迟到失败：owner 已失效，不能关闭新 sheet 或弹旧错误。
+    oldEntitlement.reject(new Error('old fetch timeout'))
+    await pendingOld
+    expect(state.matchIdSheetVisible.value).toBe(true)
+    expect(state.matchIdSheetState.value).toBe('unlocked')
+    expect(toasts).toEqual([])
+  })
+
+  for (const mode of ['subscription', 'unlock'] as const) {
+    test(`原生支付等待期间上下文失效（${mode}）：不再发起确认读、不发布旧结果`, async () => {
+      const toasts: string[] = []
+      testGlobal.uni = {
+        showToast: (options: { title: string }) => {
+          toasts.push(options.title)
+        },
+      } as unknown as typeof uni
+      const state = useTicketWatchState()
+      const session = createSessionStub({ hasAccessToken: ref(true) })
+      prepareLoadedCurrentBoard(state)
+      state.currentUser.value = { id: 'user-a', has_wechat_binding: true } as CurrentUser
+      state.canRequestWxPayment.value = true
+      const payment = deferred<void>()
+      let confirmations = 0
+      const boards = useTicketWatchBoards(state, async () => {}, { ...source }, session)
+      let action: Promise<void>
+      if (mode === 'subscription') {
+        state.refluxSubscriptionEmail.value = 'a@example.com'
+        state.selectedRefluxSubscriptionPlanCode.value = 'plan-1'
+        state.refluxSubscriptionSheetVisible.value = true
+        const subscription = useTicketWatchSubscription(state, () => {}, {
+          createRefluxSubscriptionOrder: async () => ({
+            order_no: 'order-1',
+            params: { timeStamp: '', nonceStr: '', package: '', signType: 'RSA', paySign: '' },
+          }),
+          getRefluxSubscriptionPlans: unusedAction(),
+          getRefluxSubscriptionStatus: unusedAction(),
+          waitForPaidOrder: async () => {
+            confirmations += 1
+            return true
+          },
+          requestTicketWatchPayment: () => payment.promise,
+        }, session)
+        action = subscription.submitRefluxSubscriptionOrder()
+      } else {
+        state.matchIdSheetVisible.value = true
+        const unlock = useTicketWatchMatchId(state, () => {}, {
+          createMatchIdOrder: async () => ({
+            order_no: 'order-1',
+            wx_pay_params: { timeStamp: '', nonceStr: '', package: '', signType: 'RSA', paySign: '' },
+          }),
+          getMatchIdEntitlement: unusedAction(),
+          requestTicketWatchPayment: () => payment.promise,
+          waitForPaidOrder: async () => {
+            confirmations += 1
+            return true
+          },
+        }, session)
+        action = unlock.payForMatchId()
+      }
+      await flushMicrotasks()
+
+      // 原生支付等待期间比赛上下文被复位：真实支付不取消，
+      // 但失效页面不再发起确认读，也不发布旧结果/旧 toast。
+      boards.resetCurrentBoard()
+      payment.resolve()
+      await action
+      expect(confirmations).toBe(0)
+      expect(toasts).toEqual([])
+    })
+  }
 })

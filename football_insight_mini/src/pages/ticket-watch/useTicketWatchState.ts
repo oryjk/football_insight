@@ -202,6 +202,28 @@ export function useTicketWatchState() {
     resolveMembershipBenefitsLocked(currentUser.value),
   )
 
+  /**
+   * 当前比赛上下文被实际替换（自然轮询 rollover、变为 null、手动 reset、换球队）时，
+   * 统一失效旧比赛的订阅与解锁状态：在途订阅/套餐/下单/解锁请求已被 generation
+   * 失效，其结果与 finally 会跳过发布和清理，因此 loading/sheet/paying/权益标记
+   * 必须在这里同步复位，否则新比赛的刷新与开 sheet 一直被旧在途标记挡住，
+   * 新比赛还会沿用旧比赛的 email/subscribed。
+   * 同一 match_id 的普通轮询不得调用本动作，合法在途操作不受影响。
+   */
+  function resetCurrentMatchScopedState(): void {
+    refluxSubscriptionSheetVisible.value = false
+    refluxSubscriptionLoading.value = false
+    refluxSubscriptionSubmitting.value = false
+    refluxSubscriptionStatusLoading.value = false
+    refluxSubscriptionPlans.value = []
+    selectedRefluxSubscriptionPlanCode.value = ''
+    refluxSubscriptionEmail.value = ''
+    refluxSubscriptionSubscribed.value = false
+    matchIdSheetVisible.value = false
+    matchIdSheetState.value = 'locked'
+    matchIdEntitlement.value = null
+  }
+
   function buildCurrentSectionCollapseKey(section: string): string {
     return `current:${currentMatch.value?.match_id ?? 0}:${section}`
   }
@@ -310,6 +332,7 @@ export function useTicketWatchState() {
     membershipBadgeTier,
     membershipExclusiveLabel,
     membershipBenefitsLocked,
+    resetCurrentMatchScopedState,
     isCurrentSectionCollapsed,
     isHistorySectionCollapsed,
     toggleCurrentSectionCollapsed,
