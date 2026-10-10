@@ -54,9 +54,9 @@ export function useTicketWatchMatchId(
       && currentBoardGeneration.value === requestGeneration
   }
 
-  // 解锁 sheet 请求 owner：open/refresh 各自递增，close/reset 使之失效；
-  // 同一 generation 内关闭再打开时，旧权益请求的迟到成功/失败不得覆盖、
-  // 关闭新 sheet 或弹旧错误。
+  // 解锁 sheet 请求 owner：open/refresh/pay 各自递增接管，close/reset 使之失效；
+  // 同一 generation 内关闭再打开、或 loading 中直接发起支付时，旧权益请求的
+  // 迟到成功/失败不得覆盖、关闭新 sheet 或弹旧错误。
   let matchIdSheetRequestOwner = 0
 
   function closeMatchIdSheet(): void {
@@ -202,9 +202,11 @@ export function useTicketWatchMatchId(
     matchIdSheetState.value = 'paying'
     const requestRevision = session.revision.value
     const requestGeneration = currentBoardGeneration.value
-    // 下单/支付同属 sheet 上下文：close/reset 会递增 owner，
+    // 下单/支付接管新的 sheet owner：此前在途的权益查询（open/refresh）随之
+    // 失效，其迟到成功不得覆盖 paying、迟到失败不得关 sheet/弹旧错误；
+    // close（paying 时被挡）与 reset 会再次递增 owner，
     // 失效后的旧流程不再发起确认读、不再改 sheet 状态。
-    const owner = matchIdSheetRequestOwner
+    const owner = ++matchIdSheetRequestOwner
     const isStale = () =>
       owner !== matchIdSheetRequestOwner
       || !isCurrentMatchContext(requestRevision, requestGeneration)

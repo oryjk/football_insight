@@ -2153,6 +2153,67 @@ describe('ticket watch 页内 tab 补载与历史选择 owner（真实 boards + 
     expect(f.state.historySelectionLoading.value).toBe(false)
     f.stop()
   })
+
+  for (const outcome of ['success', 'failure'] as const) {
+    test(`list 沿用同一选择也接管 owner：在途用户同选择读取的迟到${outcome === 'success' ? '成功不回退 display/cache' : '失败不弹旧 toast'}`, async () => {
+      const toasts: string[] = []
+      testGlobal.uni = {
+        showToast: (options: { title: string }) => {
+          toasts.push(options.title)
+        },
+      } as unknown as typeof uni
+      const f = createTabFixture({ tab: 'history' })
+      // 初次加载 [1,2,3]：list 接管选择 1 并缓存。
+      const initial = f.boards.loadHistoryMatches('initial')
+      await f.flush()
+      f.historyMatchesCalls[0].resolve([statsOff(1), statsOff(2), statsOff(3)])
+      await f.flush()
+      f.inventoryCalls[0].resolve(inventoryEntry(1))
+      await initial
+      await f.flush()
+      expect(f.state.displayedHistoryMatchId.value).toBe(1)
+      expect(f.state.historySelectionLoading.value).toBe(false)
+
+      // 普通非阻塞 list 刷新在途；用户点 A=2，发出库存 GET1。
+      const refresh = f.boards.loadHistoryMatches('initial')
+      await f.flush()
+      const selectA = f.boards.handleHistoryMatchSelect(2)
+      await f.flush()
+      expect(f.inventoryCalls.length).toBe(2)
+
+      // list 返回并沿用 A=2：递增共享 owner 发出自己的 GET2，
+      // 使用户 GET1 失效，并由本次 list 同步持有 selectionLoading。
+      f.historyMatchesCalls[1].resolve([statsOff(1), statsOff(2), statsOff(3)])
+      await f.flush()
+      expect(f.inventoryCalls.length).toBe(3)
+      expect(f.state.historySelectionLoading.value).toBe(true)
+
+      // list 的 GET2 先成功：正常发布并写缓存、复位 loading。
+      f.inventoryCalls[2].resolve(inventoryEntry(20))
+      await refresh
+      await f.flush()
+      expect(f.state.displayedHistoryMatchId.value).toBe(2)
+      expect(f.state.historySections.value[0]?.total_occurrences).toBe(20)
+      expect(f.state.historySectionsCache.value[2]?.[0]?.total_occurrences).toBe(20)
+      expect(f.state.historySelectionLoading.value).toBe(false)
+
+      // 用户 GET1 迟到：owner 已失效——成功不回退 display/cache，
+      // 失败不弹旧 toast，finally 也不清 loading。
+      if (outcome === 'success') {
+        f.inventoryCalls[1].resolve(inventoryEntry(2))
+      } else {
+        f.inventoryCalls[1].reject(new Error('old user A failed'))
+      }
+      await selectA
+      await f.flush()
+      expect(f.state.displayedHistoryMatchId.value).toBe(2)
+      expect(f.state.historySections.value[0]?.total_occurrences).toBe(20)
+      expect(f.state.historySectionsCache.value[2]?.[0]?.total_occurrences).toBe(20)
+      expect(f.state.historySelectionLoading.value).toBe(false)
+      expect(toasts).toEqual([])
+      f.stop()
+    })
+  }
 })
 
 describe('ticket watch 比赛上下文替换统一复位（自然 rollover 边界）', () => {
@@ -2503,6 +2564,82 @@ describe('ticket watch 比赛上下文替换统一复位（自然 rollover 边�
       await action
       expect(confirmations).toBe(0)
       expect(toasts).toEqual([])
+    })
+  }
+
+  for (const outcome of ['success', 'failure'] as const) {
+    test(`解锁 sheet loading 中发起支付接管 owner：旧权益 GET 迟到${outcome === 'success' ? '成功不覆盖 paying' : '失败不关 sheet 不弹旧错误'}`, async () => {
+      const toasts: string[] = []
+      testGlobal.uni = {
+        showToast: (options: { title: string }) => {
+          toasts.push(options.title)
+        },
+      } as unknown as typeof uni
+      const state = useTicketWatchState()
+      const session = createSessionStub({ hasAccessToken: ref(true) })
+      prepareLoadedCurrentBoard(state)
+      state.currentUser.value = { id: 'user-a', has_wechat_binding: true } as CurrentUser
+      state.canRequestWxPayment.value = true
+      const entitlement = deferred<MatchIdEntitlement>()
+      const order = deferred<{
+        order_no: string
+        wx_pay_params: { timeStamp: string; nonceStr: string; package: string; signType: string; paySign: string }
+      }>()
+      const confirmation = deferred<boolean>()
+      let orders = 0
+      let entitlementCalls = 0
+      const unlock = useTicketWatchMatchId(state, () => {}, {
+        createMatchIdOrder: () => {
+          orders += 1
+          return order.promise
+        },
+        getMatchIdEntitlement: () => {
+          entitlementCalls += 1
+          return entitlementCalls === 1
+            ? entitlement.promise
+            : Promise.resolve({ unlocked: true, via: 'purchase', effective_tier: 'V1' })
+        },
+        requestTicketWatchPayment: async () => {},
+        waitForPaidOrder: () => confirmation.promise,
+      }, session)
+
+      // 打开 sheet：权益 GET1 在途，state=loading（真实组件此时支付按钮可点）。
+      const open = unlock.openMatchIdSheet()
+      expect(state.matchIdSheetState.value).toBe('loading')
+      expect(state.matchIdSheetVisible.value).toBe(true)
+
+      // loading 中点击支付：pay 接管新 owner，旧 GET1 随之失效，order POST 在途。
+      const pay = unlock.payForMatchId()
+      expect(state.matchIdSheetState.value).toBe('paying')
+      expect(orders).toBe(1)
+
+      // 旧 GET1 迟到：成功不得覆盖 paying/关闭 sheet；失败不得关 sheet/弹旧错误。
+      if (outcome === 'success') {
+        entitlement.resolve({ unlocked: false, via: null, effective_tier: 'V1' })
+      } else {
+        entitlement.reject(new Error('old entitlement failure'))
+      }
+      await open
+      expect(state.matchIdSheetState.value).toBe('paying')
+      expect(state.matchIdSheetVisible.value).toBe(true)
+      expect(toasts).toEqual([])
+
+      // 重复点击支付：paying 防护仍在，不发第二订单。
+      await unlock.payForMatchId()
+      expect(orders).toBe(1)
+
+      // 合法下单/支付/确认链路不受影响：确认后 refresh 发布 unlocked。
+      order.resolve({
+        order_no: 'order-1',
+        wx_pay_params: { timeStamp: '', nonceStr: '', package: '', signType: 'RSA', paySign: '' },
+      })
+      await flushMicrotasks()
+      confirmation.resolve(true)
+      await pay
+      expect(entitlementCalls).toBe(2)
+      expect(state.matchIdSheetState.value).toBe('unlocked')
+      expect(state.matchIdSheetVisible.value).toBe(true)
+      expect(toasts).toEqual(['已解锁'])
     })
   }
 })

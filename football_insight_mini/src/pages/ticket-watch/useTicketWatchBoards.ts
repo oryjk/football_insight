@@ -439,8 +439,8 @@ export function useTicketWatchBoards(
       return
     }
 
-    // list 改变选中比赛（为空或已不在列表）时接管选择 owner；
-    // 沿用当前选择时只捕获序号，用户在途/随后的选择操作会让本次发布失效。
+    // list 改变选中比赛（为空或已不在列表）时先切换到列表首场比赛；
+    // 无论是否改变选择，sync 都会递增共享选择 owner 并持有 loading（见下）。
     const selectionMissing =
       selectedHistoryMatchId.value === null ||
       !historyMatches.value.some(
@@ -453,7 +453,6 @@ export function useTicketWatchBoards(
     await syncDisplayedHistoryMatch(
       selectedHistoryMatchId.value,
       isStale,
-      selectionMissing,
     )
   }
 
@@ -480,8 +479,8 @@ export function useTicketWatchBoards(
       return
     }
 
-    // list 改变选中比赛（为空或已不在列表）时接管选择 owner；
-    // 沿用当前选择时只捕获序号，用户在途/随后的选择操作会让本次发布失效。
+    // list 改变选中比赛（为空或已不在列表）时先切换到列表首场比赛；
+    // 无论是否改变选择，sync 都会递增共享选择 owner 并持有 loading（见下）。
     const selectionMissing =
       selectedHistoryMatchId.value === null ||
       !historyMatches.value.some(
@@ -494,7 +493,6 @@ export function useTicketWatchBoards(
     await syncDisplayedHistoryMatch(
       selectedHistoryMatchId.value,
       isStale,
-      selectionMissing,
     )
   }
 
@@ -634,7 +632,6 @@ export function useTicketWatchBoards(
   async function syncDisplayedHistoryMatch(
     matchId: number | null,
     isStale: () => boolean = () => false,
-    takeOverSelection = false,
   ): Promise<void> {
     if (matchId === null) {
       displayedHistoryMatchId.value = null
@@ -642,15 +639,14 @@ export function useTicketWatchBoards(
       return
     }
 
-    // 与 handleHistoryMatchSelect 共用选择发布序号：list 接管（改变选中比赛）时
-    // 递增序号使在途用户选择失效，并由本次同步持有/复位 selectionLoading；
-    // 沿用时仅捕获序号，用户在途或随后的选择操作都会让本次发布失效。
-    const selectionToken = takeOverSelection
-      ? ++historySelectionRequestToken
-      : historySelectionRequestToken
-    if (takeOverSelection) {
-      historySelectionLoading.value = true
-    }
+    // 与 handleHistoryMatchSelect 共用选择发布序号：list 每次发起库存读取
+    // （含沿用当前选择）都递增共享 owner——同一选择的旧在途读取（无论来自
+    // 用户点击还是更早的 list）随之失效，其迟到成功不得回写 display/cache、
+    // 迟到失败不得弹旧 toast 或逃回外层 historyError；本次同步持有
+    // selectionLoading，且仅在自己仍是当前 owner 时复位，旧 finally 不得
+    // 清新请求的 loading。
+    const selectionToken = ++historySelectionRequestToken
+    historySelectionLoading.value = true
     // 内部请求跨多个 await：发布前核对 board owner/revision/选择序号，
     // 旧上下文或被取代选择的结果不覆盖新视图。
     const requestRevision = session.revision.value
@@ -676,10 +672,7 @@ export function useTicketWatchBoards(
       }
       throw error
     } finally {
-      if (
-        takeOverSelection &&
-        selectionToken === historySelectionRequestToken
-      ) {
+      if (selectionToken === historySelectionRequestToken) {
         historySelectionLoading.value = false
       }
     }
