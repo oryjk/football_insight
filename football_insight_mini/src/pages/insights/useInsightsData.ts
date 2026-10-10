@@ -35,7 +35,7 @@ export interface InsightsData {
   resetExpandedState: () => void
   /** 会话身份变化（revision 递增）时同步丢弃旧账号私有缓存/选择/展开/错误/loading。 */
   resetSessionScopedState: () => void
-  /** 审核中视图：停止 loading 并清空会员数据，不发起任何请求。 */
+  /** 审核中视图：停止 loading、清空会员数据、使在途读取 owner 失效（旧响应不再发布），不发起任何请求。 */
   applyUnderReviewView: () => void
 }
 
@@ -87,6 +87,9 @@ export function useInsightsData(deps: InsightsDataDeps): InsightsData {
   }
 
   function applyUnderReviewView(): void {
+    // 进入审核视图：在途读取的 owner 一并失效，迟到的成功/失败/finally 不再发布。
+    loadOwner = null
+    inFlightLoad = null
     userLoading.value = false
     loading.value = false
     teams.value = []

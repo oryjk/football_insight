@@ -5,7 +5,7 @@ import { useHomeSupportData, type HomeSupportData } from './useHomeSupportData'
 import { createAppSession, type AppSession } from '../../stores/appSession'
 import type * as authApi from '../../api/auth'
 import type { AuthResponse, CurrentUser, MiniWechatLoginResponse } from '../../types/auth'
-import type { SupportProfile } from '../../types/support'
+import type { SupportProfile, SupportTeam } from '../../types/support'
 import { ApiRequestError } from '../../utils/apiError'
 import { AUTH_TOKEN_STORAGE_KEY } from '../../utils/authStorage'
 
@@ -180,6 +180,7 @@ interface HomeSupportFixture {
 function wireHomeSupportFixture(options: {
   source: Partial<AuthSource>
   getMiniWechatCode?: () => Promise<string>
+  setFavoriteTeam?: (payload: { team_id: number }) => Promise<SupportTeam>
 }): HomeSupportFixture {
   let meCalls = 0
   const source = { ...options.source } as Record<string, unknown>
@@ -202,6 +203,7 @@ function wireHomeSupportFixture(options: {
       return request.promise
     },
     listSupportTeams: () => Promise.resolve([]),
+    setFavoriteTeam: options.setFavoriteTeam,
   })
   const sync = createHomeSessionSync({
     loadSupportData: support.loadSupportData,
@@ -496,6 +498,157 @@ describe('home 私有加载编排（真实 session + watch + 加载入口）', (
     await flushMicrotasks()
     expect(support.supportProfile.value?.favorite_team?.team_id).toBe(2)
     expect(support.supportLoading.value).toBe(false)
+    fixture.stop()
+  })
+
+  test('同账号设置主队成功：submit 返回 true 且提交状态复位', async () => {
+    const putRequests: Array<Deferred<SupportTeam>> = []
+    const fixture = wireHomeSupportFixture({
+      source: {
+        login: (payload: { account_identifier: string }) =>
+          Promise.resolve({
+            access_token: `token-${payload.account_identifier}`,
+            expires_at: '2026-02-01T00:00:00Z',
+            user: { ...userA, id: payload.account_identifier },
+          } as AuthResponse),
+      },
+      setFavoriteTeam: () => {
+        const request = deferred<SupportTeam>()
+        putRequests.push(request)
+        return request.promise
+      },
+    })
+    const { session, support, profileRequests } = fixture
+
+    await session.loginWithPassword({ account_identifier: 'a', password: 'x' })
+    await nextTick()
+    await flushMicrotasks()
+    profileRequests[0].resolve(buildSupportProfile(1, 'team1'))
+    await flushMicrotasks()
+
+    const submit = support.submitFavoriteTeam(2)
+    await flushMicrotasks()
+    expect(putRequests.length).toBe(1)
+    expect(support.favoriteSubmitting.value).toBe(true)
+
+    putRequests[0].resolve({ team_id: 2, team_name: 'team2', avatar_storage_url: null, rank_no: null })
+    // true：页面侧继续关闭 sheet/toast，并接 loadSupportData({ force: true }) 写后刷新。
+    await expect(submit).resolves.toBe(true)
+    expect(support.favoriteSubmitting.value).toBe(false)
+    fixture.stop()
+  })
+
+  test('设置主队写等待期间切换账号：旧 PUT 成功不关闭新账号 sheet、不强制刷新其读取', async () => {
+    const putRequests: Array<Deferred<SupportTeam>> = []
+    const fixture = wireHomeSupportFixture({
+      source: {
+        login: (payload: { account_identifier: string }) =>
+          Promise.resolve({
+            access_token: `token-${payload.account_identifier}`,
+            expires_at: '2026-02-01T00:00:00Z',
+            user: { ...userA, id: payload.account_identifier },
+          } as AuthResponse),
+      },
+      setFavoriteTeam: () => {
+        const request = deferred<SupportTeam>()
+        putRequests.push(request)
+        return request.promise
+      },
+    })
+    const { session, support, profileRequests } = fixture
+
+    // 登录 A 并加载缓存。
+    await session.loginWithPassword({ account_identifier: 'a', password: 'x' })
+    await nextTick()
+    await flushMicrotasks()
+    expect(profileRequests.length).toBe(1)
+    profileRequests[0].resolve(buildSupportProfile(1, 'team1'))
+    await flushMicrotasks()
+
+    // A 发起设置主队写（PUT 在途）。
+    const submit = support.submitFavoriteTeam(2)
+    await flushMicrotasks()
+    expect(putRequests.length).toBe(1)
+    expect(support.favoriteSubmitting.value).toBe(true)
+
+    // 写等待期间登录 B：缓存/提交状态同步复位，B 的 profile GET 在途；B 打开了自己的主队 sheet。
+    await session.loginWithPassword({ account_identifier: 'b', password: 'x' })
+    await nextTick()
+    await flushMicrotasks()
+    expect(profileRequests.length).toBe(2)
+    expect(support.favoriteSubmitting.value).toBe(false)
+    support.favoriteTeamSheetVisible.value = true
+
+    // A 的旧 PUT 迟到成功：提交判为失效（false），真实 handler 凭 false 不关闭 B 的
+    // sheet、不 toast、不 force 刷新替换 B 在途的 GET。
+    putRequests[0].resolve({ team_id: 2, team_name: 'team2', avatar_storage_url: null, rank_no: null })
+    await expect(submit).resolves.toBe(false)
+    await flushMicrotasks()
+    expect(profileRequests.length).toBe(2)
+    expect(support.favoriteTeamSheetVisible.value).toBe(true)
+    expect(support.favoriteSubmitting.value).toBe(false)
+
+    // B 的读取正常发布、不被旧写干扰。
+    profileRequests[1].resolve(buildSupportProfile(3, 'B-team'))
+    await flushMicrotasks()
+    expect(support.supportProfile.value?.favorite_team?.team_id).toBe(3)
+    expect(support.supportLoading.value).toBe(false)
+    expect(support.supportErrorMessage.value).toBe('')
+    fixture.stop()
+  })
+
+  test('设置主队写等待期间切换账号：旧 PUT 迟到失败不抛出，finally 不清新提交的 submitting', async () => {
+    const putRequests: Array<Deferred<SupportTeam>> = []
+    const fixture = wireHomeSupportFixture({
+      source: {
+        login: (payload: { account_identifier: string }) =>
+          Promise.resolve({
+            access_token: `token-${payload.account_identifier}`,
+            expires_at: '2026-02-01T00:00:00Z',
+            user: { ...userA, id: payload.account_identifier },
+          } as AuthResponse),
+      },
+      setFavoriteTeam: () => {
+        const request = deferred<SupportTeam>()
+        putRequests.push(request)
+        return request.promise
+      },
+    })
+    const { session, support, profileRequests } = fixture
+
+    await session.loginWithPassword({ account_identifier: 'a', password: 'x' })
+    await nextTick()
+    await flushMicrotasks()
+    profileRequests[0].resolve(buildSupportProfile(1, 'team1'))
+    await flushMicrotasks()
+
+    // A 的写在途 → 切换 B → B 加载完成后发起自己的新写（新 owner）。
+    const submit = support.submitFavoriteTeam(2)
+    await flushMicrotasks()
+    await session.loginWithPassword({ account_identifier: 'b', password: 'x' })
+    await nextTick()
+    await flushMicrotasks()
+    expect(profileRequests.length).toBe(2)
+    profileRequests[1].resolve(buildSupportProfile(3, 'B-team'))
+    await flushMicrotasks()
+
+    const submitB = support.submitFavoriteTeam(4)
+    await flushMicrotasks()
+    expect(putRequests.length).toBe(2)
+    expect(support.favoriteSubmitting.value).toBe(true)
+
+    // A 的旧 PUT 迟到失败：返回 false 不抛出（页面侧不 toast）；旧 finally 不清 B 提交的 submitting。
+    putRequests[0].reject(new ApiRequestError('old write fail', 500))
+    await expect(submit).resolves.toBe(false)
+    await flushMicrotasks()
+    expect(support.favoriteSubmitting.value).toBe(true)
+    expect(support.supportErrorMessage.value).toBe('')
+
+    // B 的写成功：返回 true，finally 正常复位。
+    putRequests[1].resolve({ team_id: 4, team_name: 'team4', avatar_storage_url: null, rank_no: null })
+    await expect(submitB).resolves.toBe(true)
+    await flushMicrotasks()
+    expect(support.favoriteSubmitting.value).toBe(false)
     fixture.stop()
   })
 

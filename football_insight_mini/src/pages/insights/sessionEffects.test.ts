@@ -373,7 +373,7 @@ describe('insights 私有加载编排（真实 session + watch + 加载入口）
     fixture.stop()
   })
 
-  test('审核查询等待期间账号切换：旧 onShow 不发布审核/加载状态、不续请求', async () => {
+  test('审核查询等待期间账号切换：审核 false 照常发布，旧 onShow 不续私有请求', async () => {
     const fixture = wireInsightsFixture({
       source: {
         login: (payload: { account_identifier: string }) =>
@@ -395,17 +395,19 @@ describe('insights 私有加载编排（真实 session + watch + 加载入口）
     await flushMicrotasks()
     expect(data.selectedTeamId.value).toBe(1)
 
-    // 与页面 onShow 相同的实际组合：操作身份在第一个 await（审核查询）之前建立，
-    // 审核/loadUser 每个 await 之后都核对身份。
+    // 与页面 onShow 相同的实际组合：操作身份在第一个 await（审核查询）之前建立；
+    // 审核结果与账号无关照常发布，私有链路在审核/loadUser 每个 await 之后核对身份。
+    const reviewFlag = ref(false)
     const auditRequest = deferred<boolean>()
     const shown = (async () => {
       const shownRevision = session.revision.value
       const underReview = await auditRequest.promise
-      if (session.revision.value !== shownRevision) {
-        return
-      }
+      reviewFlag.value = underReview
       if (underReview) {
         data.applyUnderReviewView()
+        return
+      }
+      if (session.revision.value !== shownRevision) {
         return
       }
       const stillCurrent = await data.loadUser()
@@ -425,17 +427,88 @@ describe('insights 私有加载编排（真实 session + watch + 加载入口）
     await flushMicrotasks()
     expect(data.selectedTeamId.value).toBe(2)
 
-    // 审核查询迟到返回：旧 onShow 已失效——不再 loadUser/loadInsights 重读 B，
-    // 后续的读取失败也就不会遮盖 B 已加载成功的数据。
+    // 审核查询迟到返回 false：审核 gate 照常发布；旧 onShow 已失效——
+    // 不再 loadUser/loadInsights 重读 B，后续读取失败也不会遮盖 B 已加载成功的数据。
     auditRequest.resolve(false)
     await shown
     await flushMicrotasks()
 
+    expect(reviewFlag.value).toBe(false)
     expect(insightRequests.length).toBe(2)
     expect(session.currentUser.value?.id).toBe('b')
     expect(data.selectedTeamId.value).toBe(2)
     expect(data.errorMessage.value).toBe('')
     expect(data.loading.value).toBe(false)
+    fixture.stop()
+  })
+
+  test('审核查询等待期间账号切换且审核中：仍发布审核 gate 并使新账号在途读取失效', async () => {
+    const fixture = wireInsightsFixture({
+      source: {
+        login: (payload: { account_identifier: string }) =>
+          Promise.resolve({
+            access_token: `token-${payload.account_identifier}`,
+            expires_at: '2026-02-01T00:00:00Z',
+            user: { ...userA, id: payload.account_identifier },
+          } as AuthResponse),
+      },
+    })
+    const { session, data, insightRequests } = fixture
+
+    await session.loginWithPassword({ account_identifier: 'a', password: 'x' })
+    await nextTick()
+    await flushMicrotasks()
+    expect(insightRequests.length).toBe(1)
+    insightRequests[0].resolve(buildTeamInsightsResponse(1))
+    await flushMicrotasks()
+
+    // 与页面 onShow 相同的实际组合。
+    const reviewFlag = ref(false)
+    const auditRequest = deferred<boolean>()
+    const shown = (async () => {
+      const shownRevision = session.revision.value
+      const underReview = await auditRequest.promise
+      reviewFlag.value = underReview
+      if (underReview) {
+        data.applyUnderReviewView()
+        return
+      }
+      if (session.revision.value !== shownRevision) {
+        return
+      }
+      const stillCurrent = await data.loadUser()
+      if (!stillCurrent) {
+        return
+      }
+      await data.loadInsights()
+    })()
+    await flushMicrotasks()
+
+    // 审核查询在途期间用户登录 B：watcher 发起 B 的读取（仍在途）。
+    await session.loginWithPassword({ account_identifier: 'b', password: 'x' })
+    await nextTick()
+    await flushMicrotasks()
+    expect(insightRequests.length).toBe(2)
+    expect(data.loading.value).toBe(true)
+
+    // 审核查询迟到返回 true：审核限制与账号无关，必须保留——发布审核 gate、
+    // 清掉会员数据并使 B 的在途读取 owner 失效；不再 loadUser/loadInsights。
+    auditRequest.resolve(true)
+    await shown
+    await flushMicrotasks()
+
+    expect(reviewFlag.value).toBe(true)
+    expect(insightRequests.length).toBe(2)
+    expect(data.teams.value).toEqual([])
+    expect(data.selectedTeamId.value).toBeNull()
+    expect(data.loading.value).toBe(false)
+
+    // B 的在途读取迟到成功：owner 已被审核视图失效，不再发布会员数据。
+    insightRequests[1].resolve(buildTeamInsightsResponse(2))
+    await flushMicrotasks()
+    expect(data.teams.value).toEqual([])
+    expect(data.selectedTeamId.value).toBeNull()
+    expect(data.errorMessage.value).toBe('')
     fixture.stop()
   })
 

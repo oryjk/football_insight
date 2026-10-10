@@ -97,7 +97,6 @@ import HomeTechStatsSheet from './components/HomeTechStatsSheet.vue'
 import HomeTeamSeasonSheet from './components/HomeTeamSeasonSheet.vue'
 import HomeFavoriteTeamSheet from './components/HomeFavoriteTeamSheet.vue'
 import { getAvailableRounds, getMatches, getOverview, getRankings } from '../../api/insight'
-import { setFavoriteTeam } from '../../api/support'
 import type {
   InsightOverviewResponse,
   MatchCard,
@@ -163,6 +162,7 @@ const {
   loginPromptVisible,
   favoriteTeamSheetVisible,
   selectedFavoriteTeamId,
+  submitFavoriteTeam,
   loadSupportData,
   loadSupportTeams,
   resetSessionScopedState: resetHomeSupportSessionState,
@@ -467,13 +467,19 @@ function closeFavoriteTeamSheet() {
 }
 
 async function handleConfirmFavoriteTeam() {
-  if (!selectedFavoriteTeamId.value) {
+  const teamId = selectedFavoriteTeamId.value
+  if (!teamId) {
     uni.showToast({ title: '请先选择一支主队', icon: 'none' })
     return
   }
 
   try {
-    await setFavoriteTeam({ team_id: selectedFavoriteTeamId.value })
+    // 写操作身份从 submit 调用瞬间（PUT 发出前）建立；返回 false = 等待期间会话已切换，
+    // 旧写成功不得关闭新账号的 sheet/toast，也不得 force 刷新替换新账号在途的读取。
+    const completed = await submitFavoriteTeam(teamId)
+    if (!completed) {
+      return
+    }
     favoriteTeamSheetVisible.value = false
     uni.showToast({ title: '主队已更新', icon: 'success' })
     // 写后强制刷新：不与写前在途的 profile GET 合并——旧快照迟到后不能覆盖刚写入的选择。

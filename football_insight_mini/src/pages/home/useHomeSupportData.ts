@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue'
-import { getSupportProfile, listSupportTeams } from '../../api/support'
-import type { SupportProfile, SupportTeam } from '../../types/support'
+import { getSupportProfile, listSupportTeams, setFavoriteTeam } from '../../api/support'
+import type { SetFavoriteTeamPayload, SupportProfile, SupportTeam } from '../../types/support'
 import type { AppSession } from '../../stores/appSession'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { isHomeAuthExpiredError } from './helpers'
@@ -10,6 +10,8 @@ export interface HomeSupportDataDeps {
   /** 测试注入可控的私有/公开读取；默认走真实 api 层。 */
   getSupportProfile?: () => Promise<SupportProfile>
   listSupportTeams?: () => Promise<SupportTeam[]>
+  /** 测试注入可控的写操作；默认走真实 api 层。 */
+  setFavoriteTeam?: (payload: SetFavoriteTeamPayload) => Promise<SupportTeam>
 }
 
 export interface HomeSupportData {
@@ -21,6 +23,15 @@ export interface HomeSupportData {
   loginPromptVisible: Ref<boolean>
   favoriteTeamSheetVisible: Ref<boolean>
   selectedFavoriteTeamId: Ref<number | null>
+  /** 设置主队写操作是否提交中（会话作用域，跨账号同步复位）。 */
+  favoriteSubmitting: Ref<boolean>
+  /**
+   * 设置主队写操作（带操作身份）。返回 true 表示写成功且调用方仍属于原会话，
+   * 可继续关闭 sheet/toast/写后强制刷新；返回 false 表示等待期间会话已切换——
+   * 旧写的成功/失败都不再作用于新账号页面（错误也被吞掉，由新会话自己处理）。
+   * 写成功后的刷新必须走 loadSupportData({ force: true })。
+   */
+  submitFavoriteTeam: (teamId: number) => Promise<boolean>
   /**
    * 普通加载：同 revision 的在途读取合并（onShow 与 currentUser watcher 同会话只发一次）。
    * force（写后刷新，如设置主队成功后）：不合并写前在途读取——旧 owner 立即失效，
@@ -41,6 +52,9 @@ export interface HomeSupportData {
  *   私有请求；正常刷新（上一请求已结束）建立新 owner；
  * - 写后刷新（设置主队成功后）走 force 入口：不与写前在途 GET 合并，写前读取的
  *   成功/失败/finally 全部失效，避免旧主队快照迟到后覆盖刚写入的新选择；
+ * - 设置主队写操作带独立 owner（submitFavoriteTeam）：PUT 等待期间会话被切换时，
+ *   旧写的成功/失败/finally 都不作用于新账号（不关 sheet、不 toast、不强制刷新、
+ *   不清新提交的 submitting）；写成功且仍有效时由页面接 force 写后刷新；
  * - success/catch/finally 都核对 owner + revision：旧账号的迟到结果不发布、
  *   旧 finally 不清掉新请求的 loading；ensure 之后发私有请求前同样核对。
  */
@@ -48,6 +62,7 @@ export function useHomeSupportData(deps: HomeSupportDataDeps): HomeSupportData {
   const session = deps.session
   const fetchSupportProfile = deps.getSupportProfile ?? getSupportProfile
   const fetchSupportTeams = deps.listSupportTeams ?? listSupportTeams
+  const writeFavoriteTeam = deps.setFavoriteTeam ?? setFavoriteTeam
 
   const supportLoading = ref(true)
   const supportErrorMessage = ref('')
@@ -57,10 +72,13 @@ export function useHomeSupportData(deps: HomeSupportDataDeps): HomeSupportData {
   const loginPromptVisible = ref(false)
   const favoriteTeamSheetVisible = ref(false)
   const selectedFavoriteTeamId = ref<number | null>(null)
+  const favoriteSubmitting = ref(false)
 
   // 私有加载的 owner：每次新加载（非合并）替换；旧请求凭 owner + revision 判定失效。
   let loadOwner: symbol | null = null
   let inFlightLoad: { revision: number; promise: Promise<void> } | null = null
+  // 设置主队写操作的 owner：每次新写替换；旧写的成功/失败/finally 凭 owner + revision 判定失效。
+  let submitOwner: symbol | null = null
 
   function applyGuestView(): void {
     supportProfile.value = null
@@ -80,6 +98,9 @@ export function useHomeSupportData(deps: HomeSupportDataDeps): HomeSupportData {
     supportLoading.value = false
     favoriteTeamSheetVisible.value = false
     selectedFavoriteTeamId.value = null
+    // 写操作状态同步复位：旧写的 finally 凭 owner 判定失效，不会清掉新账号新提交的 submitting。
+    submitOwner = null
+    favoriteSubmitting.value = false
     loginPromptVisible.value = !session.currentUser.value
   }
 
@@ -187,6 +208,33 @@ export function useHomeSupportData(deps: HomeSupportDataDeps): HomeSupportData {
     return promise
   }
 
+  async function submitFavoriteTeam(teamId: number): Promise<boolean> {
+    // 写操作身份在调用瞬间、PUT 发出前建立。
+    const requestRevision = session.revision.value
+    const owner = Symbol('home-favorite-submit')
+    submitOwner = owner
+    favoriteSubmitting.value = true
+    const isCurrent = () => submitOwner === owner && session.revision.value === requestRevision
+
+    try {
+      await writeFavoriteTeam({ team_id: teamId })
+      // false = 等待 PUT 期间会话已切换：旧写成功不得关闭新账号的 sheet/toast，
+      // 也不得 force 刷新替换新账号在途的读取。
+      return isCurrent()
+    } catch (error) {
+      if (!isCurrent()) {
+        // 旧 actor 的迟到失败不影响新账号：吞掉错误，不写 errorMessage。
+        return false
+      }
+      throw error
+    } finally {
+      // 旧 finally 不清掉新 owner 的提交中状态。
+      if (isCurrent()) {
+        favoriteSubmitting.value = false
+      }
+    }
+  }
+
   return {
     supportLoading,
     supportErrorMessage,
@@ -196,6 +244,8 @@ export function useHomeSupportData(deps: HomeSupportDataDeps): HomeSupportData {
     loginPromptVisible,
     favoriteTeamSheetVisible,
     selectedFavoriteTeamId,
+    favoriteSubmitting,
+    submitFavoriteTeam,
     loadSupportData,
     loadSupportTeams,
     resetSessionScopedState,
