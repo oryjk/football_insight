@@ -1001,6 +1001,38 @@ describe('启动恢复与显式操作的替代关系（显式操作一旦发生�
     expect(getStoredToken()).toBe('token-b')
   })
 
+  test('bootstrap 等待 me 期间旧 token 被业务 401 失效（invalidateSession）：me 返回后仍继续微信恢复', async () => {
+    const stub = createSourceStub()
+    storage[AUTH_TOKEN_STORAGE_KEY] = 'token-expired'
+    const meRequest = deferred<CurrentUser | null>()
+    stub.handlers.getCurrentUser = () => meRequest.promise
+    let codeCalls = 0
+    stub.handlers.loginWithMiniWechat = () =>
+      Promise.resolve({ status: 'authenticated', ...buildAuthResponse(userB, 'token-b') })
+    const session = createAppSession(stub.source, {
+      getMiniWechatCode: () => {
+        codeCalls += 1
+        return Promise.resolve('code-1')
+      },
+    })
+
+    const bootstrap = session.bootstrapSession({ allowSilentWechat: true })
+    await Promise.resolve()
+
+    // me 在途期间，首页等私有请求用旧 token 发出并先返回 401：业务 401 失效旧会话
+    // （revision 变化但不是显式登录/退出），不得取消本次启动的恢复操作。
+    session.invalidateSession(session.revision.value)
+    expect(getStoredToken()).toBeNull()
+    expect(hasManualLogout()).toBe(false)
+
+    // 旧 token 的 me 此刻才返回 401：ensure 已被替代，但恢复操作本身仍有效。
+    meRequest.resolve(null)
+    await expect(bootstrap).resolves.toMatchObject({ id: 'b' })
+    expect(codeCalls).toBe(1)
+    expect(stub.calls.loginWithMiniWechat).toBe(1)
+    expect(getStoredToken()).toBe('token-b')
+  })
+
   test('显式密码登录先于 bootstrap：复用已登录会话，不探测微信', async () => {
     const stub = createSourceStub()
     stub.handlers.login = () => Promise.resolve(buildAuthResponse(userA, 'token-a'))

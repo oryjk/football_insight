@@ -103,9 +103,7 @@ import InsightsTeamSelector from './components/InsightsTeamSelector.vue'
 import InsightsSummaryPanel from './components/InsightsSummaryPanel.vue'
 import InsightsTeamBoardEntry from './components/InsightsTeamBoardEntry.vue'
 import InsightsContributionPanel from './components/InsightsContributionPanel.vue'
-import { getLiveTeamInsights } from '../../api/insight'
-import type { TeamInsight, TeamInsightTeam } from '../../types/insight'
-import { extractApiErrorMessage } from '../../utils/apiError'
+import type { TeamInsight } from '../../types/insight'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
 import { resolveMembershipBenefitsLocked } from '../../utils/membershipBenefits'
@@ -118,25 +116,39 @@ import {
   buildPlayerContributionRows,
 } from './helpers'
 import { createInsightsSessionSync } from './sessionEffects'
+import { useInsightsData } from './useInsightsData'
 
-const userLoading = ref(true)
-const loading = ref(false)
-const errorMessage = ref('')
 // 登录用户共享自 appSession：读取走会话缓存，401 清理由 session 统一处理。
 const session = useAppSession()
 const currentUser = session.currentUser
-const teams = ref<TeamInsightTeam[]>([])
-const insights = ref<TeamInsight[]>([])
-const selectedTeamId = ref<number | null>(null)
-const goalsForOpponentExpanded = ref(false)
-const goalsForPlayerExpanded = ref(false)
-const assistsForPlayerExpanded = ref(false)
-const goalsAgainstOpponentExpanded = ref(false)
 const ticketWatchNavigating = ref(false)
 const systemConfigUnderReview = ref(false)
 const membershipBenefitsLocked = computed(() =>
   resolveMembershipBenefitsLocked(currentUser.value),
 )
+// 会员洞察（账号私有数据）的加载编排：onShow 与 currentUser watcher 同会话合并请求，
+// 旧账号结果不发布、旧 finally 不清新 loading；会话身份变化同步清旧缓存。
+const {
+  userLoading,
+  loading,
+  errorMessage,
+  teams,
+  insights,
+  selectedTeamId,
+  goalsForOpponentExpanded,
+  goalsForPlayerExpanded,
+  assistsForPlayerExpanded,
+  goalsAgainstOpponentExpanded,
+  loadUser,
+  loadInsights,
+  resetExpandedState,
+  resetSessionScopedState: resetInsightsSessionState,
+  applyUnderReviewView,
+} = useInsightsData({
+  session,
+  isUnderReview: () => systemConfigUnderReview.value,
+  isMembershipLocked: () => membershipBenefitsLocked.value,
+})
 const showLoginFloat = computed(() => !systemConfigUnderReview.value && !userLoading.value && !currentUser.value)
 const shouldLockTicketWatchEntry = computed(() =>
   !userLoading.value && (!currentUser.value || membershipBenefitsLocked.value),
@@ -189,20 +201,23 @@ watch(selectedTeamId, () => {
 })
 
 // 后台静默恢复/登录发布已认证用户后，直接刷新会员洞察，无需再次切 Tab；审核中不拉取。
+// 会话身份变化（revision）先同步清掉旧账号私有缓存，跨账号不沿用。
+// 单一组合 watch 保证同一次发布里 reset 先于 load，且多次 revision 递增只触发一轮。
 const insightsSessionSync = createInsightsSessionSync({
   isUnderReview: () => systemConfigUnderReview.value,
   loadInsights: () => loadInsights(),
+  resetSessionScopedState: resetInsightsSessionState,
 })
-watch(currentUser, (user) => {
-  insightsSessionSync.handleSessionUserPublished(user)
+watch([session.revision, currentUser], ([revision, user], [previousRevision, previousUser]) => {
+  if (revision !== previousRevision) {
+    insightsSessionSync.handleSessionRevisionChange()
+  }
+  // 只有真正发布了新用户（引用变化）才刷新私有数据：beginAuthIntent 只递增 revision、
+  // currentUser 仍是旧账号，此时不能发旧 token 的私有请求。
+  if (user !== previousUser) {
+    insightsSessionSync.handleSessionUserPublished(user)
+  }
 })
-
-function resetExpandedState(): void {
-  goalsForOpponentExpanded.value = false
-  goalsForPlayerExpanded.value = false
-  assistsForPlayerExpanded.value = false
-  goalsAgainstOpponentExpanded.value = false
-}
 
 function openTicketWatch(): void {
   if (!currentUser.value) {
@@ -233,47 +248,6 @@ function openTicketWatch(): void {
   })
 }
 
-async function loadUser(): Promise<void> {
-  userLoading.value = true
-
-  try {
-    await session.ensureSessionReady()
-  } catch {
-    // 断网/5xx 由 session 保留 token 并记录可重试错误；页面沿用游客/锁定提示，不清会话。
-  } finally {
-    userLoading.value = false
-  }
-}
-
-async function loadInsights(): Promise<void> {
-  if (!currentUser.value || membershipBenefitsLocked.value) {
-    return
-  }
-
-  loading.value = true
-  errorMessage.value = ''
-  // 洞察是会员私有数据：捕获 revision，旧账号的结果不发布。
-  const requestRevision = session.revision.value
-
-  try {
-    const response = await getLiveTeamInsights()
-    if (requestRevision !== session.revision.value) {
-      return
-    }
-    teams.value = response.teams
-    insights.value = response.insights
-    selectedTeamId.value = response.teams[0]?.team_id ?? null
-    resetExpandedState()
-  } catch (error) {
-    if (requestRevision !== session.revision.value) {
-      return
-    }
-    errorMessage.value = extractApiErrorMessage(error, '洞察加载失败，请稍后重试。')
-  } finally {
-    loading.value = false
-  }
-}
-
 function goToUserPage(): void {
   uni.switchTab({ url: '/pages/user/index' })
 }
@@ -301,14 +275,15 @@ onShow(async () => {
   ticketWatchNavigating.value = false
   systemConfigUnderReview.value = await loadSystemConfigUnderReview()
   if (systemConfigUnderReview.value) {
-    userLoading.value = false
-    loading.value = false
-    teams.value = []
-    insights.value = []
-    selectedTeamId.value = null
+    applyUnderReviewView()
     return
   }
-  await loadUser()
+  // onShow 生命周期跨 await 保留身份：loadUser 等待期间会话被替代（如切账号）时
+  // 返回 false，停止后续 loadInsights，避免旧 continuation 读取/遮盖新账号已加载的数据。
+  const stillCurrent = await loadUser()
+  if (!stillCurrent) {
+    return
+  }
   await loadInsights()
 })
 </script>

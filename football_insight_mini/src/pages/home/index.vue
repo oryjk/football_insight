@@ -97,7 +97,7 @@ import HomeTechStatsSheet from './components/HomeTechStatsSheet.vue'
 import HomeTeamSeasonSheet from './components/HomeTeamSeasonSheet.vue'
 import HomeFavoriteTeamSheet from './components/HomeFavoriteTeamSheet.vue'
 import { getAvailableRounds, getMatches, getOverview, getRankings } from '../../api/insight'
-import { getSupportProfile, listSupportTeams, setFavoriteTeam } from '../../api/support'
+import { setFavoriteTeam } from '../../api/support'
 import type {
   InsightOverviewResponse,
   MatchCard,
@@ -107,7 +107,6 @@ import type {
   RankingsViewResponse,
   RoundReference,
 } from '../../types/insight'
-import type { SupportProfile, SupportTeam } from '../../types/support'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
@@ -121,7 +120,6 @@ import {
   buildHomeHeadlineBody,
   buildHomeHeroGuide,
   buildHomeWatchPoints,
-  isHomeAuthExpiredError,
   resolveHomeGuideLeaders,
   resolveHomeGuideNote,
   resolveHomeGuideReferenceRoundNumber,
@@ -134,6 +132,7 @@ import {
   type HomeTeamSeasonMatch,
 } from './helpers'
 import { createHomeSessionSync } from './sessionEffects'
+import { useHomeSupportData } from './useHomeSupportData'
 
 const currentSeason = new Date().getFullYear()
 const loading = ref(true)
@@ -151,21 +150,39 @@ const selectedStandingsTeam = ref<OverviewStanding | null>(null)
 const allSeasonMatches = ref<MatchCard[] | null>(null)
 const teamSeasonMatchesLoading = ref(false)
 const teamSeasonMatchesErrorMessage = ref('')
-const supportLoading = ref(true)
-const supportErrorMessage = ref('')
-const supportProfile = ref<SupportProfile | null>(null)
-const supportTeams = ref<SupportTeam[]>([])
-const supportTeamsLoading = ref(false)
-const favoriteTeamSheetVisible = ref(false)
-const selectedFavoriteTeamId = ref<number | null>(null)
 // 登录标记共享自 appSession：token 只由 session 写/清，页面不再读存储或自行清 token。
 const session = useAppSession()
 const hasAuthToken = session.hasAccessToken
-const loginPromptVisible = ref(false)
-// 后台静默恢复/登录/退出发布 currentUser 后，助力面板（私有）随会话刷新，无需重新进入页面。
-const homeSessionSync = createHomeSessionSync({ loadSupportData: () => loadSupportData() })
-watch(session.currentUser, (user) => {
-  homeSessionSync.handleSessionUserPublished(user)
+// 助力面板（账号私有数据）的加载编排：私有读取先等共享 ensure 确认用户，
+// onShow/currentUser watcher 同会话合并请求，旧账号结果不发布、旧 finally 不清新 loading。
+const {
+  supportLoading,
+  supportErrorMessage,
+  supportProfile,
+  supportTeams,
+  loginPromptVisible,
+  favoriteTeamSheetVisible,
+  selectedFavoriteTeamId,
+  loadSupportData,
+  loadSupportTeams,
+  resetSessionScopedState: resetHomeSupportSessionState,
+} = useHomeSupportData({ session })
+// 后台静默恢复/登录/退出发布 currentUser 后，助力面板（私有）随会话刷新，无需重新进入页面；
+// 会话身份变化（revision）先同步清掉旧账号私有缓存，跨账号不沿用。
+// 单一组合 watch 保证同一次发布里 reset 先于 load，且多次 revision 递增只触发一轮。
+const homeSessionSync = createHomeSessionSync({
+  loadSupportData: () => loadSupportData(),
+  resetSessionScopedState: resetHomeSupportSessionState,
+})
+watch([session.revision, session.currentUser], ([revision, user], [previousRevision, previousUser]) => {
+  if (revision !== previousRevision) {
+    homeSessionSync.handleSessionRevisionChange()
+  }
+  // 只有真正发布了新用户（引用变化）才刷新私有数据：beginAuthIntent 只递增 revision、
+  // currentUser 仍是旧账号，此时不能发旧 token 的私有请求。
+  if (user !== previousUser) {
+    homeSessionSync.handleSessionUserPublished(user)
+  }
 })
 
 const standings = computed<OverviewStanding[]>(() => overview.value?.standings_top ?? [])
@@ -429,65 +446,6 @@ async function loadDeferredHomeData() {
   }
 }
 
-async function loadSupportTeams() {
-  if (supportTeams.value.length || supportTeamsLoading.value) {
-    return
-  }
-
-  supportTeamsLoading.value = true
-  try {
-    supportTeams.value = await listSupportTeams()
-  } catch (error) {
-    console.warn('[home] support teams load failed', error)
-  } finally {
-    supportTeamsLoading.value = false
-  }
-}
-
-async function loadSupportData() {
-  supportErrorMessage.value = ''
-  loginPromptVisible.value = false
-
-  if (!hasAuthToken.value) {
-    supportProfile.value = null
-    supportTeams.value = []
-    loginPromptVisible.value = true
-    supportLoading.value = false
-    return
-  }
-
-  supportLoading.value = true
-  // 助力资料是账号私有数据：捕获 revision，旧账号的结果/401 不发布、不影响新会话。
-  const requestRevision = session.revision.value
-
-  try {
-    const profile = await getSupportProfile()
-    if (requestRevision !== session.revision.value) {
-      return
-    }
-    supportProfile.value = profile
-    selectedFavoriteTeamId.value = profile.favorite_team?.team_id ?? selectedFavoriteTeamId.value
-    void loadSupportTeams()
-  } catch (error) {
-    if (requestRevision !== session.revision.value) {
-      return
-    }
-
-    if (isHomeAuthExpiredError(error)) {
-      // 401：仅失效当前 revision 的会话；断网/5xx 走下方重试提示，不清 token。
-      session.invalidateSession(requestRevision)
-      supportProfile.value = null
-      supportErrorMessage.value = ''
-      loginPromptVisible.value = true
-      return
-    }
-
-    supportErrorMessage.value = extractApiErrorMessage(error, '助力入口加载失败，请稍后重试。')
-  } finally {
-    supportLoading.value = false
-  }
-}
-
 function handleSupportLogin() {
   rememberPostLoginRedirect({
     type: 'switchTab',
@@ -518,7 +476,8 @@ async function handleConfirmFavoriteTeam() {
     await setFavoriteTeam({ team_id: selectedFavoriteTeamId.value })
     favoriteTeamSheetVisible.value = false
     uni.showToast({ title: '主队已更新', icon: 'success' })
-    await loadSupportData()
+    // 写后强制刷新：不与写前在途的 profile GET 合并——旧快照迟到后不能覆盖刚写入的选择。
+    await loadSupportData({ force: true })
   } catch (error) {
     uni.showToast({ title: extractApiErrorMessage(error, '主队设置失败'), icon: 'none' })
   }

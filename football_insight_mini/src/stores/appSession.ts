@@ -309,18 +309,21 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
       try {
         user = await ensureSessionReady()
       } catch {
-        // 断网/超时/403/5xx：ensure 已保留 token/user 并记录可观察错误；
-        // 被外部操作替代的 ensure 抛 superseded，也走这里——返回当前已确认用户，不探测微信。
-        return currentUser.value
+        // 断网/超时/403/5xx：ensure 已保留 token/user 并记录可观察错误，token 仍在，
+        // 落到下方「token 仍在」分支返回已确认用户，不探测微信。
+        // 被业务 401（invalidateSession）打断的 ensure 抛 superseded：这不是显式操作，
+        // 不取消本次启动恢复——token 已被清时同样落到下方允许继续微信探测。
+        // 被退出/显式新登录替代也走这里，由下方标记检查挡住。
+        user = null
       }
       if (user) {
         return user
       }
 
-      // ensure 返回 null：旧 token 被 401 失效，或等待期间被外部退出/新登录替代。
+      // ensure 返回 null 或被打断：旧 token 被 401 失效，或等待期间被外部退出/新登录替代。
       // 外部退出（手动退出标记）、在途显式登录与已发生过的显式操作（即使意图已结束，
       // 如审核/me 等待期间完成的 binding_required 或失败）都必须让当前恢复操作立即
-      // 停止；只有确认是「旧 token 401 失效」才允许继续微信探测。
+      // 停止；只有确认是「旧 token 401/业务 401 失效」且无任何显式操作才允许继续微信探测。
       if (hasManualLogout() || hasActiveAuthIntent() || startupRecoverySupersededByExplicit) {
         return null
       }
