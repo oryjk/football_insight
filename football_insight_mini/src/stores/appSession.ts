@@ -60,7 +60,10 @@ export function createAppSession(source: typeof authApi = authApi): AppSession {
   const revision = ref(0)
 
   let lastEnsureSuccessAt = 0
-  let pendingAuthIntents = 0
+  // 最新一个认证意图的 intentRevision；意图结束（成功/失败/被替代）时清空。
+  // 只有 intentRevision 仍等于当前 revision 的意图才算「当前有效」——
+  // 被替代的意图即使还在途，也不能保护当前会话免于 401 失效。
+  let activeAuthIntentRevision: number | null = null
   let inFlightEnsure: {
     revision: number
     token: string
@@ -85,15 +88,23 @@ export function createAppSession(source: typeof authApi = authApi): AppSession {
   /** 新登录意图：递增 revision 使旧 token 发出的在途请求全部失效。 */
   function beginAuthIntent(): number {
     revision.value += 1
-    pendingAuthIntents += 1
+    activeAuthIntentRevision = revision.value
     status.value = 'loading'
     errorMessage.value = ''
     return revision.value
   }
 
-  /** 登录意图结束（成功或失败）；ensure 的 401 据此判断是否还有在途新登录。 */
-  function endAuthIntent(): void {
-    pendingAuthIntents = Math.max(0, pendingAuthIntents - 1)
+  /** 登录意图结束（成功或失败）；ensure 的 401 据此判断是否还有当前有效的新登录在途。 */
+  function endAuthIntent(intentRevision: number): void {
+    if (activeAuthIntentRevision === intentRevision) {
+      activeAuthIntentRevision = null
+    }
+  }
+
+  /** 是否存在「当前有效」的认证意图：未结束且未被更新的操作替代。 */
+  function hasActiveAuthIntent(): boolean {
+    return activeAuthIntentRevision !== null
+      && activeAuthIntentRevision === revision.value
   }
 
   /** 发布新 token 时再次递增 revision，使登录等待期间用旧 token 发出的刷新也失效。 */
@@ -133,7 +144,7 @@ export function createAppSession(source: typeof authApi = authApi): AppSession {
       settleAuthIntentFailure(intentRevision, error, fallback)
       throw error
     } finally {
-      endAuthIntent()
+      endAuthIntent(intentRevision)
     }
   }
 
@@ -184,9 +195,10 @@ export function createAppSession(source: typeof authApi = authApi): AppSession {
         }
 
         if (user === null) {
-          // 401：旧 token 已失效。若还有在途的新登录意图，只清旧 token 会话状态，
-          // 不递增 revision，避免把在途新登录的 intentRevision 作废。
-          if (pendingAuthIntents > 0) {
+          // 401：旧 token 已失效。若还有当前有效的新登录在途，只清旧 token 会话状态，
+          // 不递增 revision，避免把在途新登录的 intentRevision 作废；
+          // 已被替代的意图不算在内，当前会话的 401 必须完全失效。
+          if (hasActiveAuthIntent()) {
             setAccessToken(null)
             currentUser.value = null
             hasAccessToken.value = false
@@ -261,7 +273,7 @@ export function createAppSession(source: typeof authApi = authApi): AppSession {
       settleAuthIntentFailure(intentRevision, error, '微信登录失败')
       throw error
     } finally {
-      endAuthIntent()
+      endAuthIntent(intentRevision)
     }
   }
 

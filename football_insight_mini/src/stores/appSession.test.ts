@@ -460,6 +460,37 @@ describe('登录与刷新交错竞态', () => {
     expect(session.currentUser.value).toMatchObject({ id: 'b' })
     expect(session.status.value).toBe('authenticated')
   })
+
+  test('被替代的旧登录仍在途，不阻止当前会话的 401 完全失效', async () => {
+    const stub = createSourceStub()
+    const session = createAppSession(stub.source)
+    const loginA = deferred<AuthResponse>()
+    stub.handlers.login = () => loginA.promise
+    const promiseA = session.loginWithPassword({ account_identifier: 'a', password: 'x' })
+    const errorA = captureError(() => promiseA)
+
+    // B 登录成功，A 仍在途（已被替代的旧意图）。
+    stub.handlers.login = () => Promise.resolve(buildAuthResponse(userB, 'token-b'))
+    await session.loginWithPassword({ account_identifier: 'b', password: 'y' })
+    expect(session.status.value).toBe('authenticated')
+    const revisionAfterB = session.revision.value
+
+    // 当前会话（B）的 /auth/me 返回 401：必须完全失效，不能被 A 的在途请求保护。
+    stub.handlers.getCurrentUser = () => Promise.resolve(null)
+    await expect(session.ensureSessionReady({ force: true })).resolves.toBeNull()
+
+    expect(getStoredToken()).toBeNull()
+    expect(session.currentUser.value).toBeNull()
+    expect(session.hasAccessToken.value).toBe(false)
+    expect(session.status.value).toBe('guest')
+    expect(session.revision.value).toBe(revisionAfterB + 1)
+
+    // A 晚到：superseded，不恢复任何状态。
+    loginA.resolve(buildAuthResponse(userA, 'token-a'))
+    expect(await errorA).toBeInstanceOf(SessionSupersededError)
+    expect(getStoredToken()).toBeNull()
+    expect(session.status.value).toBe('guest')
+  })
 })
 
 describe('logoutSession', () => {
