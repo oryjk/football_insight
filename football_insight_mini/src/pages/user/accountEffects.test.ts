@@ -99,6 +99,7 @@ function createState(overrides?: Partial<UserAccountEffectsDeps>): StateFixture 
     notificationEmailSaving: ref(false),
     miniWechatBindState: ref<MiniWechatBindingRequiredResponse | null>(null),
     passwordLoginSheetVisible: ref(false),
+    passwordLoginSubmitting: ref(false),
     toasts,
     deps,
     emailRequest,
@@ -211,6 +212,7 @@ describe('user 页账号读写 revision 防护', () => {
       avatar_url: null,
     }
     state.passwordLoginSheetVisible.value = true
+    state.passwordLoginSubmitting.value = true
     state.isReviewController.value = true
     state.loading.value = true
 
@@ -222,7 +224,37 @@ describe('user 页账号读写 revision 防护', () => {
     expect(state.notificationEmailSaving.value).toBe(false)
     expect(state.miniWechatBindState.value).toBeNull()
     expect(state.passwordLoginSheetVisible.value).toBe(false)
+    expect(state.passwordLoginSubmitting.value).toBe(false)
     expect(state.isReviewController.value).toBe(false)
     expect(state.loading.value).toBe(false)
+  })
+
+  test('resetPrivateViewState 只清展示数据，保留正在提交的认证表单上下文', () => {
+    const stub = createSessionStub()
+    const state = createState()
+    state.notificationEmail.value = 'a@example.com'
+    state.isReviewController.value = true
+    state.loading.value = true
+    state.miniWechatBindState.value = {
+      status: 'binding_required',
+      bind_token: 'bind-token',
+      expires_at: '2026-02-01T00:00:00Z',
+      display_name: '微信用户',
+      avatar_url: null,
+    }
+    state.passwordLoginSheetVisible.value = true
+    state.passwordLoginSubmitting.value = true
+
+    const effects = createUserAccountEffects(stub.session, state, state.deps)
+    effects.resetPrivateViewState()
+
+    // 旧账号展示数据被清理。
+    expect(state.notificationEmail.value).toBe('')
+    expect(state.isReviewController.value).toBe(false)
+    expect(state.loading.value).toBe(false)
+    // 认证表单上下文保留：绑定 token、密码弹层与提交标记不受影响。
+    expect(state.miniWechatBindState.value?.bind_token).toBe('bind-token')
+    expect(state.passwordLoginSheetVisible.value).toBe(true)
+    expect(state.passwordLoginSubmitting.value).toBe(true)
   })
 })

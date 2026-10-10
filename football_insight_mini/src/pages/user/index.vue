@@ -188,11 +188,7 @@ const accountEffects = createUserAccountEffects(session, {
   notificationEmailSaving,
   miniWechatBindState,
   passwordLoginSheetVisible,
-})
-
-// 会话被替代（新登录/退出/失效）时，丢弃按旧会话展示的私有状态。
-watch(session.revision, () => {
-  accountEffects.resetSessionScopedState()
+  passwordLoginSubmitting,
 })
 
 // 登录/绑定/退出编排收口到 loginFlow：action 返回后、loadUser 完成后、toast/跳转前
@@ -206,6 +202,17 @@ const loginFlow = createUserLoginFlow(
   },
   () => accountEffects.loadUser(),
 )
+
+// 会话被替代（新登录/退出/失效）时，丢弃按旧会话展示的私有状态；
+// 但本页自己发起的认证提交（beginAuthIntent 同步递增 revision）只清展示数据，
+// 保留正在填写的认证表单（密码弹层/绑定 token），失败后可原地修改重试。
+watch(session.revision, (newRevision) => {
+  if (loginFlow.isOwnAuthSubmit(newRevision)) {
+    accountEffects.resetPrivateViewState()
+    return
+  }
+  accountEffects.resetSessionScopedState()
+})
 
 const isH5 =
   // #ifdef H5

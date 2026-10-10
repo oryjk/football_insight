@@ -16,6 +16,7 @@ export interface UserAccountEffectsState {
   notificationEmailSaving: Ref<boolean>
   miniWechatBindState: Ref<MiniWechatBindingRequiredResponse | null>
   passwordLoginSheetVisible: Ref<boolean>
+  passwordLoginSubmitting: Ref<boolean>
 }
 
 export interface UserAccountEffectsDeps {
@@ -37,7 +38,11 @@ const defaultDeps: UserAccountEffectsDeps = {
 export interface UserAccountEffects {
   loadUser(): Promise<void>
   saveNotificationEmail(email: string): Promise<void>
-  /** 会话 revision 变化时调用：丢弃按旧会话展示的私有状态。 */
+  /** 只清旧账号的私有展示数据（邮箱/白名单/loading），保留正在提交的认证表单。 */
+  resetPrivateViewState(): void
+  /** 清认证表单上下文（密码弹层/绑定 token）；用于退出或被其他认证操作替代时。 */
+  resetAuthFormState(): void
+  /** 会话 revision 变化时调用：丢弃按旧会话展示的私有状态（展示数据 + 认证表单）。 */
   resetSessionScopedState(): void
 }
 
@@ -133,19 +138,30 @@ export function createUserAccountEffects(
     }
   }
 
-  function resetSessionScopedState(): void {
+  function resetPrivateViewState(): void {
     state.notificationEmail.value = ''
     state.notificationEmailSheetVisible.value = false
     state.notificationEmailSaving.value = false
-    state.miniWechatBindState.value = null
-    state.passwordLoginSheetVisible.value = false
     state.isReviewController.value = false
     state.loading.value = false
+  }
+
+  function resetAuthFormState(): void {
+    state.miniWechatBindState.value = null
+    state.passwordLoginSheetVisible.value = false
+    state.passwordLoginSubmitting.value = false
+  }
+
+  function resetSessionScopedState(): void {
+    resetPrivateViewState()
+    resetAuthFormState()
   }
 
   return {
     loadUser,
     saveNotificationEmail,
+    resetPrivateViewState,
+    resetAuthFormState,
     resetSessionScopedState,
   }
 }
