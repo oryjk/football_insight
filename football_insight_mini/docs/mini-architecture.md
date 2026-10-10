@@ -45,6 +45,9 @@ scripts/         # 构建/发布/校验脚本（mini-release.mjs 统一入口、
 Store 只解决真实的跨页状态；页面 loading、弹层开关、筛选和表单状态留在页面/composable，不把请求结果全局化。三个 store 都是模块级 `ref/computed` 单例，用 Vue 响应式，无 Pinia。
 
 - `stores/appSession.ts`：登录用户会话。只读 refs：`currentUser`、`hasAccessToken`、`status`（`guest | loading | authenticated | error`）、`errorMessage`、`revision`。入口 `ensureSessionReady({ force? })`：无 token 不请求 `/auth/me`；同 revision 并发合并在途请求；成功缓存 60 秒；`force` 绕过缓存仍合并在途（会员购买成功后用 `force: true` 刷新）。
+- 启动恢复入口 `bootstrapSession({ allowSilentWechat })`（仅 `App.vue` onLaunch 调用，后台执行）：已有 token 走 `ensureSessionReady`；无 token 或旧 token 被 401 失效时，仅当 `allowSilentWechat`（MP）且未手动退出，允许一次后台微信探测（`uni.login` + `/auth/mini-wechat/login`）；`binding_required`/失败静默回游客，不建号、不写 token、不弹表单。同次启动并发合并，微信探测每次启动最多一次；显式认证/退出替代本次启动恢复，迟到的审核或 me 不重启探测。H5 仍恢复已有 token，但不自动探测微信。
+- 显式微信登录走 `loginWithMiniWechat()`：认证意图在调用瞬间、获取 code 前建立，code 获取与换 token 在同一操作身份内；被替代后迟到的 code/响应不再发认证请求。微信 code 提供方可通过 `createAppSession(source, { getMiniWechatCode })` 注入（默认 `uni.login`）。
+- 手动退出标记 `fi_manual_logout`（`utils/authStorage.ts` 的 `hasManualLogout/setManualLogout/clearManualLogout`）：`logoutSession` 同步写入，跨冷启动禁止静默恢复；只有显式认证操作（密码/注册/微信/绑定/测试登录）解除；`ensureSessionReady` 与 401 失效不动该标记。
 - `stores/runtimeConfig.ts`：`PublicSystemConfig` 共享（公告、会员规则等）。`ensureRuntimeConfig({ force? })`，成功缓存 60 秒、并发去重；刷新失败保留最后一次成功 config，但 `available`/`errorMessage` 反映本次失败。
 - `stores/miniReview.ts`：`MiniReviewStatus` 共享。审核查询失败返回 null（兼容 `resolveSystemConfigUnderReview(null) === false`），暴露 `ready`（已尝试）与 `available`（已获取）区分状态；管理员 PUT 成功后调 `setMiniReviewStatus` 发布新值并使在途 GET 失效。`utils/systemConfig.ts` 作为兼容入口委托该 store。
 
@@ -81,8 +84,13 @@ src/pages/<domain>/
 
 ## 生命周期与刷新约定
 
-- `App.vue` 以非阻塞方式初始化已有 token 的会话和公共配置/审核态预加载；会话失败不阻断公共首页，无 token 的 H5/MP 不自动登录。
+- `App.vue` 以后台方式执行启动恢复（`bootstrapSession`，仅 MP 允许微信静默探测，已确认审核中时不探测）和公共配置/审核态预加载；公开页面不等待会话恢复，无 token 的 H5 不自动登录。
 - 页面 `onShow` 走共享 store 入口（`ensureSessionReady` / `ensureRuntimeConfig` / `ensureMiniReviewReady`），不各自缓存 currentUser/config。
+- 后台恢复/登录发布 `currentUser` 后，已在前台的页面通过 watch 会话状态刷新私有区，无需再次切 Tab：`user` 页经 `accountEffects.handleSessionRevisionChange`（同 revision 并发加载合并），首页助力面板经 `home/sessionEffects`，洞察页经 `insights/sessionEffects`（审核中不拉会员数据），余票页经 `ticket-watch/sessionSync`（恢复只重载数据，不自动开启监控/轮询，隐藏页面不启动轮询）。
+- 余票当前看板有生命周期 generation（`useTicketWatchState.currentBoardGeneration`，单调递增不归零）：reset/切换球队/比赛上下文替换时递增；订阅状态、套餐加载、下单、支付确认及比赛 ID 解锁捕获 generation + session revision + 球队/比赛快照，每个异步阶段校验；同一 generation 内重叠操作以请求 owner 序号判定谁清 loading。同一比赛的普通库存轮询不递增 generation。
+- 首页与洞察私有读取等待共享会话确认并按 owner 合并；跨会话先清缓存/选择，旧结果、错误和 finally 放弃。首页有效主队 PUT 后强制刷新，旧账号 PUT 不影响新读取；洞察首个 await 前捕获私有链身份，审核 gate 独立于账号。
+- 余票 board owner 与订阅 generation 独立：reset 后立即允许新 current/history 请求；恢复先重载可见看板，真实 activeTab watcher 补载尚未加载的目标，已载 cache 复用并遵守 hidden/审核/会员门控。历史列表与用户选择每次库存读取共用单调 owner，旧 cache/display/error/toast/finally 不发布。
+- 实际比赛替换统一同步复位订阅/解锁状态，正常同比赛 poll 保留合法操作。解锁 open/close/refresh/pay 按操作 owner 防护，支付开始使旧权益查询失效；原生支付返回后重新验证上下文，失效页面不再继续确认读取，已发出的真实支付不取消。
 - 共享数据失败允许下一次页面 `onShow` 或显式重试；不新增常驻定时器。余票看板轮询随页面离开/账号切换停止（`useTicketWatchPolling.ts`）。
 - 统计口径：抢票/余票/回流相关统计统一以 `sale_start_at + 10 minutes` 起算，缺起售时间的比赛报错或跳过该统计入口。
 
