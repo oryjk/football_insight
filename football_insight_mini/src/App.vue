@@ -3,17 +3,29 @@ import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
 import { useAppSession } from "./stores/appSession";
 import { useRuntimeConfig } from "./stores/runtimeConfig";
 import { useMiniReviewStatus } from "./stores/miniReview";
-import { getAccessToken } from "./utils/authStorage";
+
+// 仅微信小程序允许静默微信探测；H5 保持显式登录，不调用 uni.login。
+const allowSilentWechat =
+  // #ifdef MP-WEIXIN
+  true
+  // #endif
+  // #ifndef MP-WEIXIN
+  false
+  // #endif
 
 onLaunch(() => {
   console.log("Football Insight mini launch");
-  // 有本地 token 才在后台恢复会话；失败（含断网）不阻断公共首页，无 token 不自动登录。
-  if (getAccessToken()) {
-    void useAppSession().ensureSessionReady().catch(() => {});
-  }
+  // 启动会话恢复在后台进行，不阻塞公开赛果/榜单/首页。
+  // 已确认审核中时不发起新的自动微信探测；审核查询失败按既有策略视为未确认审核中。
+  void (async () => {
+    const miniReview = useMiniReviewStatus();
+    await miniReview.ensureMiniReviewReady();
+    await useAppSession()
+      .bootstrapSession({ allowSilentWechat: allowSilentWechat && !miniReview.isUnderReview.value })
+      .catch(() => {});
+  })();
   // 公共配置与审核状态后台预加载；失败不阻断首页，页面 onShow 会复用缓存或重试。
   void useRuntimeConfig().ensureRuntimeConfig();
-  void useMiniReviewStatus().ensureMiniReviewReady();
 });
 onShow(() => {
   console.log("Football Insight mini show");

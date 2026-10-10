@@ -84,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
@@ -133,6 +133,7 @@ import {
   type HomePulseLeadMatch,
   type HomeTeamSeasonMatch,
 } from './helpers'
+import { createHomeSessionSync } from './sessionEffects'
 
 const currentSeason = new Date().getFullYear()
 const loading = ref(true)
@@ -161,6 +162,11 @@ const selectedFavoriteTeamId = ref<number | null>(null)
 const session = useAppSession()
 const hasAuthToken = session.hasAccessToken
 const loginPromptVisible = ref(false)
+// 后台静默恢复/登录/退出发布 currentUser 后，助力面板（私有）随会话刷新，无需重新进入页面。
+const homeSessionSync = createHomeSessionSync({ loadSupportData: () => loadSupportData() })
+watch(session.currentUser, (user) => {
+  homeSessionSync.handleSessionUserPublished(user)
+})
 
 const standings = computed<OverviewStanding[]>(() => overview.value?.standings_top ?? [])
 const scorers = computed<OverviewPlayer[]>(() => overview.value?.top_scorers ?? [])

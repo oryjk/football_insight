@@ -245,6 +245,7 @@ import { useTicketWatchInterests } from './useTicketWatchInterests'
 import { useTicketWatchPolling } from './useTicketWatchPolling'
 import { useTicketWatchSubscription } from './useTicketWatchSubscription'
 import { useTicketWatchMatchId } from './useTicketWatchMatchId'
+import { createTicketWatchSessionSync } from './sessionSync'
 
 const state = useTicketWatchState()
 const {
@@ -342,18 +343,27 @@ const {
 
 // 账号切换/退出：立即清理旧账号的私有看板数据（兴趣/订阅/会员档位），
 // 轮询停止由 useTicketWatchPolling 的 revision watch 负责；公共数据下次 onShow 以新会话重载。
+// 后台静默恢复/登录发布已认证用户后，可见页面直接重载当前看板，无需再次切 Tab。
+const sessionSync = createTicketWatchSessionSync(state, session, {
+  resetSessionScopedBoards: () => {
+    resetCurrentBoard()
+    resetHistoryBoard()
+    currentUser.value = null
+    viewerMembershipTier.value = 'V1'
+    refluxSubscriptionSheetVisible.value = false
+    refluxSubscriptionLoading.value = false
+    refluxSubscriptionSubmitting.value = false
+    refluxSubscriptionStatusLoading.value = false
+    pendingInterestSelection.value = null
+    // 解锁 sheet 状态与私有权益一并重置（旧下单/支付的 finally 被 revision 防护跳过）。
+    resetMatchIdSessionState()
+  },
+  loadViewerMembershipTier,
+  loadCurrentBoard,
+})
+
 watch(session.revision, () => {
-  resetCurrentBoard()
-  resetHistoryBoard()
-  currentUser.value = null
-  viewerMembershipTier.value = 'V1'
-  refluxSubscriptionSheetVisible.value = false
-  refluxSubscriptionLoading.value = false
-  refluxSubscriptionSubmitting.value = false
-  refluxSubscriptionStatusLoading.value = false
-  pendingInterestSelection.value = null
-  // 解锁 sheet 状态与私有权益一并重置（旧下单/支付的 finally 被 revision 防护跳过）。
-  resetMatchIdSessionState()
+  sessionSync.handleSessionRevisionChange()
 })
 
 function handleCurrentInterest(item: TicketWatchGroupedInventoryItem): void {

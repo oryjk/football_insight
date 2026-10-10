@@ -58,8 +58,9 @@ let storage: Record<string, unknown>
 
 interface SourceStub {
   source: AuthSource
-  calls: Record<'login' | 'loginWithMiniWechat' | 'bindMiniWechatAccount' | 'logout', number>
+  calls: Record<'getCurrentUser' | 'login' | 'loginWithMiniWechat' | 'bindMiniWechatAccount' | 'logout', number>
   handlers: {
+    getCurrentUser: () => Promise<CurrentUser | null>
     login: () => Promise<AuthResponse>
     loginWithMiniWechat: () => Promise<MiniWechatLoginResponse>
     bindMiniWechatAccount: () => Promise<AuthResponse>
@@ -74,12 +75,14 @@ function unexpectedCall(name: string): () => Promise<never> {
 function createSourceStub(): SourceStub {
   const stub: SourceStub = {
     calls: {
+      getCurrentUser: 0,
       login: 0,
       loginWithMiniWechat: 0,
       bindMiniWechatAccount: 0,
       logout: 0,
     },
     handlers: {
+      getCurrentUser: unexpectedCall('getCurrentUser'),
       login: unexpectedCall('login'),
       loginWithMiniWechat: unexpectedCall('loginWithMiniWechat'),
       bindMiniWechatAccount: unexpectedCall('bindMiniWechatAccount'),
@@ -88,7 +91,10 @@ function createSourceStub(): SourceStub {
     source: {} as AuthSource,
   }
   stub.source = {
-    getCurrentUser: unexpectedCall('getCurrentUser'),
+    getCurrentUser: () => {
+      stub.calls.getCurrentUser += 1
+      return stub.handlers.getCurrentUser()
+    },
     login: () => {
       stub.calls.login += 1
       return stub.handlers.login()
@@ -498,6 +504,8 @@ describe('微信 code 竞态（认证意图在获取 code 前建立）', () => {
 
 describe('revision 监听与认证表单上下文（真实 Vue watcher）', () => {
   function createEffects(fixture: FlowFixture): UserAccountEffects {
+    // watcher 触发的恢复刷新会走真实 session.ensureSessionReady：按当前会话用户应答。
+    getStub(fixture).handlers.getCurrentUser = () => Promise.resolve(fixture.session.currentUser.value)
     const state: UserAccountEffectsState = {
       loading: ref(false),
       systemConfigUnderReview: ref(false),

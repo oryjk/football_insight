@@ -61,7 +61,11 @@ export function createUserAccountEffects(
   state: UserAccountEffectsState,
   deps: UserAccountEffectsDeps = defaultDeps,
 ): UserAccountEffects {
-  async function loadUser(): Promise<void> {
+  // 页面 onShow 初始化与会话恢复通知可能同时触发 loadUser：同一会话（revision）的
+  // 并发加载合并为一个请求，避免白名单/邮箱接口被重复调用。
+  let inFlightLoad: { revision: number; promise: Promise<void> } | null = null
+
+  async function performLoadUser(): Promise<void> {
     const requestRevision = session.revision.value
     const isCurrent = () => session.revision.value === requestRevision
 
@@ -162,12 +166,32 @@ export function createUserAccountEffects(
     resetAuthFormState()
   }
 
+  function loadUser(): Promise<void> {
+    const loadRevision = session.revision.value
+    if (inFlightLoad && inFlightLoad.revision === loadRevision) {
+      return inFlightLoad.promise
+    }
+
+    const promise = performLoadUser()
+    inFlightLoad = { revision: loadRevision, promise }
+    const clearIfCurrent = () => {
+      if (inFlightLoad?.promise === promise) {
+        inFlightLoad = null
+      }
+    }
+    promise.then(clearIfCurrent, clearIfCurrent)
+    return promise
+  }
+
   function handleSessionRevisionChange(isOwnAuthSubmit: boolean): void {
     if (isOwnAuthSubmit) {
       resetPrivateViewState()
       return
     }
     resetSessionScopedState()
+    // 后台静默恢复/其他登录发布后：页面已在前台时直接刷新私有区（游客态内部早退），
+    // 无需再次切 Tab；与同 revision 的初始化/登录后加载合并在途请求。
+    void loadUser()
   }
 
   return {

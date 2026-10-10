@@ -117,6 +117,7 @@ import {
   buildOpponentContributionRows,
   buildPlayerContributionRows,
 } from './helpers'
+import { createInsightsSessionSync } from './sessionEffects'
 
 const userLoading = ref(true)
 const loading = ref(false)
@@ -185,6 +186,15 @@ onShareAppMessage(() => ({
 
 watch(selectedTeamId, () => {
   resetExpandedState()
+})
+
+// 后台静默恢复/登录发布已认证用户后，直接刷新会员洞察，无需再次切 Tab；审核中不拉取。
+const insightsSessionSync = createInsightsSessionSync({
+  isUnderReview: () => systemConfigUnderReview.value,
+  loadInsights: () => loadInsights(),
+})
+watch(currentUser, (user) => {
+  insightsSessionSync.handleSessionUserPublished(user)
 })
 
 function resetExpandedState(): void {

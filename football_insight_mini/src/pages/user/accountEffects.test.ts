@@ -257,4 +257,57 @@ describe('user 页账号读写 revision 防护', () => {
     expect(state.passwordLoginSheetVisible.value).toBe(true)
     expect(state.passwordLoginSubmitting.value).toBe(true)
   })
+
+  test('同一会话（revision）的并发 loadUser 合并为一个请求', async () => {
+    const stub = createSessionStub()
+    const state = createState({
+      getNotificationEmail: () => Promise.resolve({ email: 'a@example.com' }),
+    })
+    const effects = createUserAccountEffects(stub.session, state, state.deps)
+
+    // 页面 onShow 初始化与会话恢复完成通知同时触发：只执行一次真实加载。
+    await Promise.all([effects.loadUser(), effects.loadUser(), effects.loadUser()])
+
+    expect(stub.ensureCalls).toBe(1)
+    expect(state.notificationEmail.value).toBe('a@example.com')
+    expect(state.loading.value).toBe(false)
+  })
+
+  test('会话被替代（非本页提交）时 handleSessionRevisionChange 全量清理并重新加载私有区', async () => {
+    const stub = createSessionStub()
+    const state = createState({
+      getNotificationEmail: () => Promise.resolve({ email: 'restored@example.com' }),
+    })
+    state.notificationEmail.value = 'stale@example.com'
+    state.miniWechatBindState.value = {
+      status: 'binding_required',
+      bind_token: 'bind-token',
+      expires_at: '2026-02-01T00:00:00Z',
+      display_name: '微信用户',
+      avatar_url: null,
+    }
+    const effects = createUserAccountEffects(stub.session, state, state.deps)
+
+    // 后台静默恢复/其他登录发布用户：清掉旧展示并立即刷新私有区（无需切 Tab）。
+    effects.handleSessionRevisionChange(false)
+    expect(state.miniWechatBindState.value).toBeNull()
+    await flushMicrotasks()
+
+    expect(stub.ensureCalls).toBe(1)
+    expect(state.notificationEmail.value).toBe('restored@example.com')
+    expect(state.loading.value).toBe(false)
+  })
+
+  test('本页自己在途认证提交的 revision 变化只清展示数据，不触发额外加载', async () => {
+    const stub = createSessionStub()
+    const state = createState()
+    state.notificationEmail.value = 'a@example.com'
+    const effects = createUserAccountEffects(stub.session, state, state.deps)
+
+    effects.handleSessionRevisionChange(true)
+    await flushMicrotasks()
+
+    expect(state.notificationEmail.value).toBe('')
+    expect(stub.ensureCalls).toBe(0)
+  })
 })

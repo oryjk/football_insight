@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { effectScope, nextTick, ref, type Ref } from 'vue'
+import { effectScope, nextTick, ref, watch, type Ref } from 'vue'
 import * as ticketApi from '../../api/ticketWatch'
 import type { CurrentUser } from '../../types/auth'
 import type {
@@ -16,6 +16,7 @@ import { useTicketWatchMatchId } from './useTicketWatchMatchId'
 import { useTicketWatchPolling } from './useTicketWatchPolling'
 import { useTicketWatchState } from './useTicketWatchState'
 import { useTicketWatchSubscription } from './useTicketWatchSubscription'
+import { createTicketWatchSessionSync } from './sessionSync'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -648,5 +649,156 @@ describe('ticket watch matchId session reset effects', () => {
     expect(state.matchIdSheetState.value).toBe('unlocked')
     expect(state.matchIdEntitlement.value?.unlocked).toBe(true)
     expect(toasts).toEqual([])
+  })
+})
+
+describe('ticket watch session sync（后台恢复后刷新私有区）', () => {
+  interface SyncFixture {
+    state: ReturnType<typeof useTicketWatchState>
+    session: SessionStub
+    sessionUser: Ref<CurrentUser | null>
+    resetCalls: number
+    tierLoads: number
+    boardLoads: string[]
+    stop: () => void
+  }
+
+  /** 与页面相同的接线，走真实 Vue watch：revision 变化由会话 stub 真实发布触发。 */
+  function createSyncFixture(options?: { underReview?: boolean }): SyncFixture {
+    const state = useTicketWatchState()
+    const sessionUser = ref<CurrentUser | null>(null)
+    const session = createSessionStub({ currentUser: sessionUser })
+    state.systemConfigUnderReview.value = options?.underReview ?? false
+    // 制造一些旧会话留下的脏状态，验证 revision 变化时被复位。
+    state.currentMatch.value = match(1)
+    state.refluxSubscriptionStatusLoading.value = true
+    state.refluxSubscriptionSheetVisible.value = true
+
+    const fixture: SyncFixture = {
+      state,
+      session,
+      sessionUser,
+      resetCalls: 0,
+      tierLoads: 0,
+      boardLoads: [],
+      stop: () => {},
+    }
+    const sync = createTicketWatchSessionSync(state, session, {
+      resetSessionScopedBoards: () => {
+        fixture.resetCalls += 1
+        state.currentMatch.value = null
+        state.refluxSubscriptionStatusLoading.value = false
+        state.refluxSubscriptionSheetVisible.value = false
+      },
+      loadViewerMembershipTier: async () => {
+        fixture.tierLoads += 1
+        state.currentUser.value = sessionUser.value
+      },
+      loadCurrentBoard: async (reason) => {
+        fixture.boardLoads.push(reason)
+      },
+    })
+
+    const scope = effectScope()
+    scope.run(() => {
+      watch(session.revision, () => {
+        sync.handleSessionRevisionChange()
+      })
+    })
+    fixture.stop = () => scope.stop()
+    return fixture
+  }
+
+  test('后台恢复发布已认证用户：复位旧状态并重载档位与当前看板，无需切 Tab', async () => {
+    const fixture = createSyncFixture()
+
+    // 后台静默恢复完成：session 发布用户并递增 revision。
+    fixture.sessionUser.value = { id: 'user-a', membership_tier: 'V3' } as CurrentUser
+    fixture.session.revision.value += 1
+    await nextTick()
+    await nextTick()
+
+    expect(fixture.resetCalls).toBe(1)
+    expect(fixture.state.currentMatch.value).toBeNull()
+    expect(fixture.tierLoads).toBe(1)
+    expect(fixture.boardLoads).toEqual(['initial'])
+    expect(fixture.state.currentUser.value?.id).toBe('user-a')
+    fixture.stop()
+  })
+
+  test('退出/失效（无用户发布）：只清理私有状态，不重载看板', async () => {
+    const fixture = createSyncFixture()
+
+    fixture.session.revision.value += 1
+    await nextTick()
+
+    expect(fixture.resetCalls).toBe(1)
+    expect(fixture.tierLoads).toBe(0)
+    expect(fixture.boardLoads).toEqual([])
+    fixture.stop()
+  })
+
+  test('审核中即使恢复了用户也不加载会员看板数据', async () => {
+    const fixture = createSyncFixture({ underReview: true })
+
+    fixture.sessionUser.value = { id: 'user-a' } as CurrentUser
+    fixture.session.revision.value += 1
+    await nextTick()
+    await nextTick()
+
+    expect(fixture.resetCalls).toBe(1)
+    expect(fixture.tierLoads).toBe(0)
+    expect(fixture.boardLoads).toEqual([])
+    fixture.stop()
+  })
+
+  test('会员权益锁定时恢复只刷新档位镜像，不加载看板', async () => {
+    const fixture = createSyncFixture()
+
+    fixture.sessionUser.value = {
+      id: 'user-a',
+      membership_tier: 'V3',
+      membership_benefits_enabled: false,
+    } as CurrentUser
+    fixture.session.revision.value += 1
+    await nextTick()
+    await nextTick()
+
+    expect(fixture.tierLoads).toBe(1)
+    expect(fixture.boardLoads).toEqual([])
+    fixture.stop()
+  })
+
+  test('隐藏页面的后台恢复不启动轮询', async () => {
+    const scheduled = new Set<number>()
+    let nextId = 0
+    globalThis.setInterval = ((_callback: unknown, _delay: number) => {
+      const id = ++nextId
+      scheduled.add(id)
+      return id
+    }) as typeof setInterval
+    globalThis.clearInterval = ((id: number) => {
+      scheduled.delete(id)
+    }) as typeof clearInterval
+
+    const fixture = createSyncFixture()
+    const scope = effectScope()
+    // 页面已隐藏：freshness clock 停止（pageVisible=false），监控未开启。
+    const polling = scope.run(() =>
+      useTicketWatchPolling(fixture.state, async () => {}, fixture.session),
+    )!
+    polling.stopPolling()
+    polling.stopFreshnessClock()
+
+    fixture.sessionUser.value = { id: 'user-a' } as CurrentUser
+    fixture.session.revision.value += 1
+    await nextTick()
+    await nextTick()
+
+    expect(fixture.boardLoads).toEqual(['initial'])
+    expect(fixture.state.isMonitoringActive.value).toBe(false)
+    expect(scheduled.size).toBe(0)
+    scope.stop()
+    fixture.stop()
   })
 })
