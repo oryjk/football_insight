@@ -42,7 +42,17 @@ export function useTicketWatchMatchId(
     matchIdSheetState,
     matchIdEntitlement,
     canRequestWxPayment,
+    currentBoardGeneration,
   } = state
+
+  /**
+   * 解锁权益/下单/支付是账号私有操作：revision 覆盖账号切换，
+   * board generation 覆盖 A→B→A（切走再切回同一比赛）的上下文替换。
+   */
+  function isCurrentMatchContext(requestRevision: number, requestGeneration: number): boolean {
+    return session.revision.value === requestRevision
+      && currentBoardGeneration.value === requestGeneration
+  }
 
   function closeMatchIdSheet(): void {
     if (matchIdSheetState.value === 'paying') {
@@ -69,17 +79,18 @@ export function useTicketWatchMatchId(
       return
     }
 
-    // 解锁权益是账号私有数据：旧账号的结果晚到时不发布。
+    // 解锁权益是账号私有数据：旧账号/旧看板上下文的结果晚到时不发布。
     const requestRevision = session.revision.value
+    const requestGeneration = currentBoardGeneration.value
     try {
       const entitlement = await getMatchIdEntitlement(match.match_id)
-      if (session.revision.value !== requestRevision) {
+      if (!isCurrentMatchContext(requestRevision, requestGeneration)) {
         return
       }
       matchIdEntitlement.value = entitlement
       matchIdSheetState.value = resolveMatchIdSheetState(entitlement)
     } catch {
-      if (session.revision.value !== requestRevision) {
+      if (!isCurrentMatchContext(requestRevision, requestGeneration)) {
         return
       }
       matchIdSheetState.value = 'locked'
@@ -122,16 +133,17 @@ export function useTicketWatchMatchId(
     matchIdSheetVisible.value = true
     matchIdSheetState.value = 'loading'
     const requestRevision = session.revision.value
+    const requestGeneration = currentBoardGeneration.value
     try {
       const entitlement = await getMatchIdEntitlement(match.match_id)
-      if (session.revision.value !== requestRevision) {
+      if (!isCurrentMatchContext(requestRevision, requestGeneration)) {
         return
       }
       matchIdEntitlement.value = entitlement
       matchIdSheetState.value = resolveMatchIdSheetState(entitlement)
     } catch (error) {
-      if (session.revision.value !== requestRevision) {
-        // 请求期间会话已切换/退出：revision watch 已清理弹层，旧结果静默放弃。
+      if (!isCurrentMatchContext(requestRevision, requestGeneration)) {
+        // 请求期间会话已切换/退出或看板上下文被替换：旧结果静默放弃。
         return
       }
       matchIdSheetVisible.value = false
@@ -167,16 +179,18 @@ export function useTicketWatchMatchId(
 
     matchIdSheetState.value = 'paying'
     const requestRevision = session.revision.value
+    const requestGeneration = currentBoardGeneration.value
 
     try {
       const order = await createMatchIdOrder(match.match_id)
 
-      if (session.revision.value !== requestRevision) {
+      // 上下文（含 A→B→A 后的同名比赛）已失效的旧订单不得拉起微信支付。
+      if (!isCurrentMatchContext(requestRevision, requestGeneration)) {
         return
       }
       await requestTicketWatchPayment(order.wx_pay_params)
       const paid = await waitForPaidOrder(order.order_no)
-      if (session.revision.value !== requestRevision) {
+      if (!isCurrentMatchContext(requestRevision, requestGeneration)) {
         return
       }
       if (paid) {
@@ -190,7 +204,7 @@ export function useTicketWatchMatchId(
         })
       }
     } catch (error) {
-      if (session.revision.value !== requestRevision) {
+      if (!isCurrentMatchContext(requestRevision, requestGeneration)) {
         return
       }
       if (error instanceof ApiRequestError && error.statusCode === 409) {
@@ -205,7 +219,7 @@ export function useTicketWatchMatchId(
       matchIdSheetState.value = 'locked'
     } finally {
       if (
-        session.revision.value === requestRevision
+        isCurrentMatchContext(requestRevision, requestGeneration)
         && matchIdSheetState.value === 'paying'
       ) {
         matchIdSheetState.value = 'locked'

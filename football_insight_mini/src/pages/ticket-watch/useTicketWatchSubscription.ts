@@ -43,6 +43,7 @@ export function useTicketWatchSubscription(
     currentMatch,
     canRequestWxPayment,
     currentUser,
+    currentBoardGeneration,
     refluxSubscriptionSheetVisible,
     refluxSubscriptionLoading,
     refluxSubscriptionSubmitting,
@@ -53,13 +54,24 @@ export function useTicketWatchSubscription(
     refluxSubscriptionStatusLoading,
   } = state
 
-  /** 订阅状态是账号私有数据：只在 revision 未变且比赛/球队快照一致时发布。 */
+  // 同类操作在同一 generation 内允许先后重叠（reset 已清 loading，旧请求仍在途）：
+  // 只有当前 owner 能清自己的 loading，旧请求的 finally 不得清理新请求。
+  let statusRequestOwner = 0
+  let sheetRequestOwner = 0
+  let submitRequestOwner = 0
+
+  /**
+   * 订阅状态是账号私有数据：只在 revision、board generation、比赛/球队快照一致时发布。
+   * generation 覆盖 A→B→A：仅比较球队/比赛 ID 无法识别「切走再切回」后的旧请求。
+   */
   function isCurrentSnapshot(
     requestRevision: number,
+    requestGeneration: number,
     matchId: number,
     teamCode: string,
   ): boolean {
     return session.revision.value === requestRevision
+      && currentBoardGeneration.value === requestGeneration
       && currentMatch.value?.match_id === matchId
       && selectedTeam.value === teamCode
   }
@@ -71,7 +83,9 @@ export function useTicketWatchSubscription(
     }
 
     const requestRevision = session.revision.value
+    const requestGeneration = currentBoardGeneration.value
     const teamCode = selectedTeam.value
+    const owner = ++statusRequestOwner
     refluxSubscriptionStatusLoading.value = true
 
     try {
@@ -81,7 +95,7 @@ export function useTicketWatchSubscription(
         match.match_id,
       )
 
-      if (!isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+      if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) {
         return
       }
       refluxSubscriptionEmail.value = status.email_target?.target || ''
@@ -94,13 +108,16 @@ export function useTicketWatchSubscription(
           match.match_id,
         )
     } catch {
-      if (!isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+      if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) {
         return
       }
       refluxSubscriptionSubscribed.value = false
       refluxSubscriptionEmail.value = ''
     } finally {
-      if (isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+      if (
+        owner === statusRequestOwner
+        && isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)
+      ) {
         refluxSubscriptionStatusLoading.value = false
       }
     }
@@ -134,7 +151,9 @@ export function useTicketWatchSubscription(
     refluxSubscriptionSheetVisible.value = true
     refluxSubscriptionLoading.value = true
     const requestRevision = session.revision.value
+    const requestGeneration = currentBoardGeneration.value
     const teamCode = selectedTeam.value
+    const owner = ++sheetRequestOwner
 
     try {
       const [plans, status] = await Promise.all([
@@ -146,7 +165,7 @@ export function useTicketWatchSubscription(
         ),
       ])
 
-      if (!isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+      if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) {
         return
       }
       const availablePlans = selectPurchasableRefluxSubscriptionPlans(
@@ -169,7 +188,7 @@ export function useTicketWatchSubscription(
           match.match_id,
         )
     } catch (error) {
-      if (!isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+      if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) {
         return
       }
       uni.showToast({
@@ -178,7 +197,10 @@ export function useTicketWatchSubscription(
       })
       refluxSubscriptionSheetVisible.value = false
     } finally {
-      if (isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+      if (
+        owner === sheetRequestOwner
+        && isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)
+      ) {
         refluxSubscriptionLoading.value = false
       }
     }
@@ -215,7 +237,9 @@ export function useTicketWatchSubscription(
     }
 
     const requestRevision = session.revision.value
+    const requestGeneration = currentBoardGeneration.value
     const teamCode = selectedTeam.value
+    const owner = ++submitRequestOwner
     refluxSubscriptionSubmitting.value = true
 
     try {
@@ -226,12 +250,13 @@ export function useTicketWatchSubscription(
         email,
       })
 
-      if (!isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+      // 上下文（含 A→B→A 后的同名比赛）已失效的旧订单不得拉起微信支付。
+      if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) {
         return
       }
       await requestTicketWatchPayment(order.params)
       const paid = await waitForPaidOrder(order.order_no)
-      if (!isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+      if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) {
         return
       }
       if (paid) {
@@ -242,7 +267,7 @@ export function useTicketWatchSubscription(
         uni.showToast({ title: '支付成功，开通确认中', icon: 'none' })
       }
     } catch (error) {
-      if (!isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+      if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) {
         return
       }
       uni.showToast({
@@ -250,7 +275,10 @@ export function useTicketWatchSubscription(
         icon: 'none',
       })
     } finally {
-      if (isCurrentSnapshot(requestRevision, match.match_id, teamCode)) {
+      if (
+        owner === submitRequestOwner
+        && isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)
+      ) {
         refluxSubscriptionSubmitting.value = false
       }
     }

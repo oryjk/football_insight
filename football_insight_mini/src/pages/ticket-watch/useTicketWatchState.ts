@@ -49,6 +49,9 @@ export function useTicketWatchState() {
   const historyTrendTotals = ref<Record<number, number>>({})
   const hasLoadedCurrentBoard = ref(false)
   const hasLoadedHistoryBoard = ref(false)
+  // 当前看板生命周期：reset/球队切换/比赛上下文替换时单调递增（不归零），
+  // 订阅/套餐/下单/支付等请求捕获 generation，过期请求永不发布结果或清 loading。
+  const currentBoardGeneration = ref(0)
   const currentBoardRequestInFlight = ref(false)
   const historyBoardRequestInFlight = ref(false)
   const historySelectionLoading = ref(false)
@@ -252,6 +255,7 @@ export function useTicketWatchState() {
     historyTrendTotals,
     hasLoadedCurrentBoard,
     hasLoadedHistoryBoard,
+    currentBoardGeneration,
     currentBoardRequestInFlight,
     historyBoardRequestInFlight,
     historySelectionLoading,

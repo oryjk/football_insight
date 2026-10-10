@@ -20,10 +20,12 @@ import { createTicketWatchSessionSync } from './sessionSync'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((accept) => {
+  let reject!: (error: unknown) => void
+  const promise = new Promise<T>((accept, decline) => {
     resolve = accept
+    reject = decline
   })
-  return { promise, resolve }
+  return { promise, resolve, reject }
 }
 
 function match(id: number): TicketWatchMatchSummary {
@@ -800,5 +802,418 @@ describe('ticket watch session sync（后台恢复后刷新私有区）', () => 
     expect(scheduled.size).toBe(0)
     scope.stop()
     fixture.stop()
+  })
+})
+
+describe('ticket watch board generation（A→B→A 旧请求防复活）', () => {
+  function unusedAction() {
+    return async () => {
+      throw new Error('unused')
+    }
+  }
+
+  function statusResponse(email: string | null, subscribed: boolean): RefluxSubscriptionStatusResponse {
+    return {
+      subscribed,
+      active_subscriptions: [],
+      email_target: email ? { channel: 'email', target: email } : null,
+    }
+  }
+
+  function createSubscriptionPair(
+    state: ReturnType<typeof useTicketWatchState>,
+    session: SessionStub,
+    handlers: {
+      getRefluxSubscriptionStatus?: () => Promise<RefluxSubscriptionStatusResponse>
+      getRefluxSubscriptionPlans?: () => Promise<RefluxSubscriptionPlansResponse>
+      createRefluxSubscriptionOrder?: () => Promise<{
+        order_no: string
+        params: { timeStamp: string; nonceStr: string; package: string; signType: string; paySign: string }
+      }>
+      waitForPaidOrder?: () => Promise<boolean>
+      requestTicketWatchPayment?: () => Promise<void>
+    },
+  ) {
+    return useTicketWatchSubscription(state, () => {}, {
+      createRefluxSubscriptionOrder: handlers.createRefluxSubscriptionOrder ?? unusedAction(),
+      getRefluxSubscriptionPlans: handlers.getRefluxSubscriptionPlans ?? unusedAction(),
+      getRefluxSubscriptionStatus: handlers.getRefluxSubscriptionStatus ?? unusedAction(),
+      waitForPaidOrder: handlers.waitForPaidOrder ?? unusedAction(),
+      requestTicketWatchPayment: handlers.requestTicketWatchPayment ?? unusedAction(),
+    }, session)
+  }
+
+  test('旧 A 状态请求 pending → B → A → 新 A pending → 旧 A 返回：邮箱/subscribed 不被写入，新 loading 仍 true', async () => {
+    const state = useTicketWatchState()
+    const session = createSessionStub()
+    state.currentMatch.value = match(1)
+    state.currentUser.value = { id: 'user-a' } as CurrentUser
+    const oldStatus = deferred<RefluxSubscriptionStatusResponse>()
+    const newStatus = deferred<RefluxSubscriptionStatusResponse>()
+    let statusCalls = 0
+    const subscription = createSubscriptionPair(state, session, {
+      getRefluxSubscriptionStatus: () => {
+        statusCalls += 1
+        return statusCalls === 1 ? oldStatus.promise : newStatus.promise
+      },
+    })
+    const boards = useTicketWatchBoards(state, async () => {}, { ...source }, session)
+
+    const pendingOld = subscription.refreshRefluxSubscriptionStatus()
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(true)
+
+    // A → B → A：两次 reset（比赛上下文被替换），随后新 A 的订阅请求开始。
+    boards.resetCurrentBoard()
+    boards.resetCurrentBoard()
+    state.currentMatch.value = match(1)
+    const pendingNew = subscription.refreshRefluxSubscriptionStatus()
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(true)
+    expect(statusCalls).toBe(2)
+
+    // 旧 A 晚到：不覆盖新请求的上下文，也不清掉新 loading。
+    oldStatus.resolve(statusResponse('stale@example.com', true))
+    await pendingOld
+    expect(state.refluxSubscriptionEmail.value).toBe('')
+    expect(state.refluxSubscriptionSubscribed.value).toBe(false)
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(true)
+
+    newStatus.resolve(statusResponse('fresh@example.com', true))
+    await pendingNew
+    expect(state.refluxSubscriptionEmail.value).toBe('fresh@example.com')
+    expect(state.refluxSubscriptionSubscribed.value).toBe(true)
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(false)
+  })
+
+  test('新 A 先发布结果 → 旧 A 后成功：保留新结果，不清新 owner 的 loading', async () => {
+    const state = useTicketWatchState()
+    const session = createSessionStub()
+    state.currentMatch.value = match(1)
+    state.currentUser.value = { id: 'user-a' } as CurrentUser
+    const oldStatus = deferred<RefluxSubscriptionStatusResponse>()
+    const newStatus = deferred<RefluxSubscriptionStatusResponse>()
+    let statusCalls = 0
+    const subscription = createSubscriptionPair(state, session, {
+      getRefluxSubscriptionStatus: () => {
+        statusCalls += 1
+        return statusCalls === 1 ? oldStatus.promise : newStatus.promise
+      },
+    })
+    const boards = useTicketWatchBoards(state, async () => {}, { ...source }, session)
+
+    const pendingOld = subscription.refreshRefluxSubscriptionStatus()
+    boards.resetCurrentBoard()
+    boards.resetCurrentBoard()
+    state.currentMatch.value = match(1)
+    const pendingNew = subscription.refreshRefluxSubscriptionStatus()
+
+    // 新 A 先返回并发布。
+    newStatus.resolve(statusResponse('fresh@example.com', true))
+    await pendingNew
+    expect(state.refluxSubscriptionEmail.value).toBe('fresh@example.com')
+    expect(state.refluxSubscriptionSubscribed.value).toBe(true)
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(false)
+
+    // 旧 A 后成功：不覆盖新结果。
+    oldStatus.resolve(statusResponse('stale@example.com', false))
+    await pendingOld
+    expect(state.refluxSubscriptionEmail.value).toBe('fresh@example.com')
+    expect(state.refluxSubscriptionSubscribed.value).toBe(true)
+  })
+
+  test('新 A 先发布结果 → 旧 A 后失败：保留新结果，不弹旧错误、不清空新邮箱', async () => {
+    const state = useTicketWatchState()
+    const session = createSessionStub()
+    state.currentMatch.value = match(1)
+    state.currentUser.value = { id: 'user-a' } as CurrentUser
+    const oldStatus = deferred<RefluxSubscriptionStatusResponse>()
+    let statusCalls = 0
+    const subscription = createSubscriptionPair(state, session, {
+      getRefluxSubscriptionStatus: () => {
+        statusCalls += 1
+        return statusCalls === 1
+          ? oldStatus.promise
+          : Promise.resolve(statusResponse('fresh@example.com', true))
+      },
+    })
+    const boards = useTicketWatchBoards(state, async () => {}, { ...source }, session)
+
+    const pendingOld = subscription.refreshRefluxSubscriptionStatus()
+    boards.resetCurrentBoard()
+    boards.resetCurrentBoard()
+    state.currentMatch.value = match(1)
+    await subscription.refreshRefluxSubscriptionStatus()
+    expect(state.refluxSubscriptionEmail.value).toBe('fresh@example.com')
+
+    // 旧 A 后失败：catch 分支同样被 generation 挡住，不能清空新结果。
+    oldStatus.reject(new ApiRequestError('网络连接不可用，请检查网络后重试', 0, true))
+    await pendingOld
+    expect(state.refluxSubscriptionEmail.value).toBe('fresh@example.com')
+    expect(state.refluxSubscriptionSubscribed.value).toBe(true)
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(false)
+  })
+
+  test('套餐加载在 A→B→A 后才返回：不发布旧 plans/email，不关新 sheet、不清新 loading', async () => {
+    const toasts: string[] = []
+    testGlobal.uni = {
+      showToast: (options: { title: string }) => {
+        toasts.push(options.title)
+      },
+    } as unknown as typeof uni
+    const state = useTicketWatchState()
+    const session = createSessionStub()
+    state.currentMatch.value = match(1)
+    state.currentUser.value = { id: 'user-a' } as CurrentUser
+    const oldPlans = deferred<RefluxSubscriptionPlansResponse>()
+    const newPlans = deferred<RefluxSubscriptionPlansResponse>()
+    let plansCalls = 0
+    const subscription = createSubscriptionPair(state, session, {
+      getRefluxSubscriptionPlans: () => {
+        plansCalls += 1
+        return plansCalls === 1 ? oldPlans.promise : newPlans.promise
+      },
+      getRefluxSubscriptionStatus: () =>
+        Promise.resolve(statusResponse('fresh@example.com', false)),
+    })
+    const boards = useTicketWatchBoards(state, async () => {}, { ...source }, session)
+
+    const pendingOld = subscription.openRefluxSubscriptionSheet()
+    expect(state.refluxSubscriptionLoading.value).toBe(true)
+
+    // A → B → A：旧 sheet 被 reset 关闭，新 sheet 重新打开（新请求仍在途）。
+    boards.resetCurrentBoard()
+    boards.resetCurrentBoard()
+    state.currentMatch.value = match(1)
+    const pendingNew = subscription.openRefluxSubscriptionSheet()
+    expect(state.refluxSubscriptionSheetVisible.value).toBe(true)
+    expect(state.refluxSubscriptionLoading.value).toBe(true)
+
+    // 旧套餐请求晚到：不覆盖新 sheet 的数据与 loading。
+    oldPlans.resolve({
+      plans: [{
+        code: 'plan-stale',
+        scope: 'single_match',
+        team_code: 'chengdurongcheng',
+        title: '旧套餐',
+        description: '',
+        price_cents: 100,
+      }],
+      active_subscriptions: [],
+      email_target: { channel: 'email', target: 'stale@example.com' },
+    })
+    await pendingOld
+    expect(state.refluxSubscriptionPlans.value).toEqual([])
+    expect(state.refluxSubscriptionEmail.value).toBe('')
+    expect(state.refluxSubscriptionLoading.value).toBe(true)
+
+    newPlans.resolve({
+      plans: [{
+        code: 'plan-new',
+        scope: 'single_match',
+        team_code: 'chengdurongcheng',
+        title: '新套餐',
+        description: '',
+        price_cents: 200,
+      }],
+      active_subscriptions: [],
+      email_target: { channel: 'email', target: 'fresh@example.com' },
+    })
+    await pendingNew
+    expect(state.refluxSubscriptionPlans.value.map((plan) => plan.code)).toEqual(['plan-new'])
+    expect(state.refluxSubscriptionEmail.value).toBe('fresh@example.com')
+    expect(state.refluxSubscriptionLoading.value).toBe(false)
+    expect(toasts).toEqual([])
+  })
+
+  test('下单在途时 A→B→A：旧订单不能在上下文失效后拉起微信支付', async () => {
+    const toasts: string[] = []
+    testGlobal.uni = {
+      showToast: (options: { title: string }) => {
+        toasts.push(options.title)
+      },
+    } as unknown as typeof uni
+    const state = useTicketWatchState()
+    const session = createSessionStub()
+    state.currentMatch.value = match(1)
+    state.currentUser.value = { id: 'user-a' } as CurrentUser
+    state.canRequestWxPayment.value = true
+    state.refluxSubscriptionEmail.value = 'a@example.com'
+    state.selectedRefluxSubscriptionPlanCode.value = 'plan-1'
+    state.refluxSubscriptionSheetVisible.value = true
+    const orderRequest = deferred<{
+      order_no: string
+      params: { timeStamp: string; nonceStr: string; package: string; signType: string; paySign: string }
+    }>()
+    let paymentCalls = 0
+    const subscription = createSubscriptionPair(state, session, {
+      createRefluxSubscriptionOrder: () => orderRequest.promise,
+      requestTicketWatchPayment: () => {
+        paymentCalls += 1
+        return Promise.resolve()
+      },
+      waitForPaidOrder: () => Promise.resolve(true),
+    })
+    const boards = useTicketWatchBoards(state, async () => {}, { ...source }, session)
+
+    const pendingOld = subscription.submitRefluxSubscriptionOrder()
+    expect(state.refluxSubscriptionSubmitting.value).toBe(true)
+
+    // 下单在途时 A → B → A：旧订单返回后不得拉起微信支付、不得修改新 sheet。
+    boards.resetCurrentBoard()
+    boards.resetCurrentBoard()
+    state.currentMatch.value = match(1)
+    state.refluxSubscriptionSheetVisible.value = true
+
+    orderRequest.resolve({
+      order_no: 'order-stale',
+      params: { timeStamp: '', nonceStr: '', package: '', signType: 'RSA', paySign: '' },
+    })
+    await pendingOld
+
+    expect(paymentCalls).toBe(0)
+    expect(state.refluxSubscriptionSubscribed.value).toBe(false)
+    expect(toasts).toEqual([])
+  })
+
+  test('支付确认在途时 A→B→A：旧支付结果不修改新 sheet 状态', async () => {
+    const toasts: string[] = []
+    testGlobal.uni = {
+      showToast: (options: { title: string }) => {
+        toasts.push(options.title)
+      },
+    } as unknown as typeof uni
+    const state = useTicketWatchState()
+    const session = createSessionStub()
+    state.currentMatch.value = match(1)
+    state.currentUser.value = { id: 'user-a' } as CurrentUser
+    state.canRequestWxPayment.value = true
+    state.refluxSubscriptionEmail.value = 'a@example.com'
+    state.selectedRefluxSubscriptionPlanCode.value = 'plan-1'
+    state.refluxSubscriptionSheetVisible.value = true
+    const confirmation = deferred<boolean>()
+    const subscription = createSubscriptionPair(state, session, {
+      createRefluxSubscriptionOrder: () =>
+        Promise.resolve({
+          order_no: 'order-1',
+          params: { timeStamp: '', nonceStr: '', package: '', signType: 'RSA', paySign: '' },
+        }),
+      requestTicketWatchPayment: () => Promise.resolve(),
+      waitForPaidOrder: () => confirmation.promise,
+    })
+    const boards = useTicketWatchBoards(state, async () => {}, { ...source }, session)
+
+    const pendingOld = subscription.submitRefluxSubscriptionOrder()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    boards.resetCurrentBoard()
+    boards.resetCurrentBoard()
+    state.currentMatch.value = match(1)
+    state.refluxSubscriptionSheetVisible.value = true
+
+    confirmation.resolve(true)
+    await pendingOld
+
+    expect(state.refluxSubscriptionSubscribed.value).toBe(false)
+    expect(state.refluxSubscriptionSheetVisible.value).toBe(true)
+    expect(toasts).toEqual([])
+  })
+
+  test('比赛 ID 解锁下单在途时 A→B→A：旧订单不拉起微信支付', async () => {
+    const toasts: string[] = []
+    testGlobal.uni = {
+      showToast: (options: { title: string }) => {
+        toasts.push(options.title)
+      },
+    } as unknown as typeof uni
+    const state = useTicketWatchState()
+    const session = createSessionStub({ hasAccessToken: ref(true) })
+    state.currentMatch.value = match(1)
+    state.currentUser.value = { has_wechat_binding: true } as CurrentUser
+    state.canRequestWxPayment.value = true
+    state.matchIdSheetVisible.value = true
+    const orderRequest = deferred<{
+      order_no: string
+      wx_pay_params: { timeStamp: string; nonceStr: string; package: string; signType: string; paySign: string }
+    }>()
+    let paymentCalls = 0
+    const actions = useTicketWatchMatchId(state, () => {}, {
+      createMatchIdOrder: () => orderRequest.promise,
+      getMatchIdEntitlement: async () => ({
+        unlocked: true,
+        via: 'purchase',
+        effective_tier: 'V1',
+      }),
+      requestTicketWatchPayment: () => {
+        paymentCalls += 1
+        return Promise.resolve()
+      },
+      waitForPaidOrder: async () => true,
+    }, session)
+    const boards = useTicketWatchBoards(state, async () => {}, { ...source }, session)
+
+    const pendingOld = actions.payForMatchId()
+    await Promise.resolve()
+    expect(state.matchIdSheetState.value).toBe('paying')
+
+    boards.resetCurrentBoard()
+    boards.resetCurrentBoard()
+    state.currentMatch.value = match(1)
+
+    orderRequest.resolve({
+      order_no: 'order-stale',
+      wx_pay_params: { timeStamp: '', nonceStr: '', package: '', signType: 'RSA', paySign: '' },
+    })
+    await pendingOld
+
+    expect(paymentCalls).toBe(0)
+    expect(toasts).toEqual([])
+  })
+
+  test('同一比赛的普通库存轮询不失效在途的合法订阅请求', async () => {
+    const state = useTicketWatchState()
+    const session = createSessionStub()
+    state.regions.value = [
+      { block_name: 'A1', price: '180', usable_count: 10, estate: 0 },
+    ]
+    state.currentMatch.value = match(1)
+    state.currentUser.value = { id: 'user-a' } as CurrentUser
+    state.hasLoadedCurrentBoard.value = true
+    state.currentLoading.value = false
+    const statusRequest = deferred<RefluxSubscriptionStatusResponse>()
+    const subscription = createSubscriptionPair(state, session, {
+      getRefluxSubscriptionStatus: () => statusRequest.promise,
+    })
+    const boards = useTicketWatchBoards(state, async () => {}, {
+      ...source,
+      getCurrentTicketWatchBoard: async () => ({
+        current_match: match(1),
+        group_ticket_active: false,
+        message: '',
+        inventory: [],
+        block_interests: [],
+        tracked_interests: [],
+      }),
+    }, session)
+
+    const pendingStatus = subscription.refreshRefluxSubscriptionStatus()
+    // 同一场比赛的库存轮询：不递增 generation，在途订阅请求保持有效。
+    await boards.loadCurrentBoard('poll')
+
+    statusRequest.resolve(statusResponse('a@example.com', true))
+    await pendingStatus
+    expect(state.refluxSubscriptionEmail.value).toBe('a@example.com')
+    expect(state.refluxSubscriptionSubscribed.value).toBe(true)
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(false)
+  })
+
+  test('generation 单调递增且 reset 不归零', () => {
+    const state = useTicketWatchState()
+    const boards = useTicketWatchBoards(state, async () => {}, { ...source }, createSessionStub())
+
+    expect(state.currentBoardGeneration.value).toBe(0)
+    boards.resetCurrentBoard()
+    expect(state.currentBoardGeneration.value).toBe(1)
+    boards.resetCurrentBoard()
+    expect(state.currentBoardGeneration.value).toBe(2)
   })
 })

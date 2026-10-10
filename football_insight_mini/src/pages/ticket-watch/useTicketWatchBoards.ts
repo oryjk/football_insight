@@ -81,6 +81,7 @@ export function useTicketWatchBoards(
     historyTrendTotals,
     hasLoadedCurrentBoard,
     hasLoadedHistoryBoard,
+    currentBoardGeneration,
     currentBoardRequestInFlight,
     historyBoardRequestInFlight,
     historySelectionLoading,
@@ -150,7 +151,22 @@ export function useTicketWatchBoards(
     currentTrackedInterests.value = interests
   }
 
+  /**
+   * 当前比赛上下文被替换（含从无到有的首次发布）：递增 generation，
+   * 使按旧上下文发出的订阅/套餐/下单/支付请求永久失效。
+   * 同一比赛的普通库存轮询返回相同 match_id，不会递增 generation。
+   */
+  function publishCurrentMatch(match: TicketWatchMatchSummary | null): void {
+    if ((match?.match_id ?? null) !== (currentMatch.value?.match_id ?? null)) {
+      currentBoardGeneration.value += 1
+    }
+    currentMatch.value = match
+  }
+
   function resetCurrentBoard(): void {
+    // 先递增 generation：reset 前发出的订阅/下单请求在此刻永久失效，
+    // 其迟到结果与 finally 不得写数据或清掉新请求的 loading。
+    currentBoardGeneration.value += 1
     currentMatch.value = null
     currentSections.value = []
     currentTrackedInterests.value = []
@@ -230,7 +246,7 @@ export function useTicketWatchBoards(
     if (requestRevision !== session.revision.value) {
       return
     }
-    currentMatch.value = response.current_match
+    publishCurrentMatch(response.current_match)
     currentMessage.value =
       response.message ||
       (response.group_ticket_active ? '当前为套票窗口。' : '暂无当前比赛。')
@@ -258,14 +274,14 @@ export function useTicketWatchBoards(
     const yukunMatch = response.current_match
 
     if (!yukunMatch) {
-      currentMatch.value = null
+      publishCurrentMatch(null)
       currentMessage.value = response.message || '暂无云南玉昆的当前比赛。'
       currentSections.value = []
       currentTrackedInterests.value = []
       return
     }
 
-    currentMatch.value = yukunMatch
+    publishCurrentMatch(yukunMatch)
     currentMessage.value = ''
     void refreshRefluxSubscriptionStatus()
     const since = requireInventorySince(yukunMatch.sale_start_at)
