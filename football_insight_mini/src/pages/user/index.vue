@@ -132,12 +132,12 @@ import calendarDaysIcon from '../../static/user/calendar-days.svg'
 import logInIcon from '../../static/user/log-in.svg'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { listH5TestLoginUsers } from '../../api/auth'
-import { isSessionSupersededError, useAppSession } from '../../stores/appSession'
+import { useAppSession } from '../../stores/appSession'
 import type { H5TestLoginUser, MiniWechatBindingRequiredResponse } from '../../types/auth'
 import { useRuntimeConfig } from '../../stores/runtimeConfig'
-import { extractApiErrorMessage } from '../../utils/apiError'
 import { reportPageActivity } from '../../utils/userActivity'
 import { createUserAccountEffects } from './accountEffects'
+import { createUserLoginFlow, type MiniWechatBindForm } from './loginFlow'
 import {
   buildUserAccountInfoItems,
   buildUserBenefitItems,
@@ -156,8 +156,7 @@ import {
   resolveMembershipTierGuide,
   type MembershipTierGuide,
 } from '../../utils/membershipRules'
-import { consumePostLoginRedirect, navigateToPostLoginTarget } from '../../utils/postLoginRedirect'
-import { buildPasswordLoginPayload, resolveUserLoginPresentation } from './loginHelpers'
+import { resolveUserLoginPresentation } from './loginHelpers'
 
 const session = useAppSession()
 // 当前用户与登录态共享自 appSession（唯一写入入口），本页只读。
@@ -195,6 +194,18 @@ const accountEffects = createUserAccountEffects(session, {
 watch(session.revision, () => {
   accountEffects.resetSessionScopedState()
 })
+
+// 登录/绑定/退出编排收口到 loginFlow：action 返回后、loadUser 完成后、toast/跳转前
+// 都核对 revision，被更新操作替代的旧操作不提示成功、不跳转、不改新操作状态。
+const loginFlow = createUserLoginFlow(
+  session,
+  {
+    passwordLoginSheetVisible,
+    passwordLoginSubmitting,
+    miniWechatBindState,
+  },
+  () => accountEffects.loadUser(),
+)
 
 const isH5 =
   // #ifdef H5
@@ -321,9 +332,7 @@ async function saveNotificationEmail(email: string): Promise<void> {
 }
 
 async function handleLogout(): Promise<void> {
-  await session.logoutSession()
-  uni.showToast({ title: '已退出登录', icon: 'success' })
-  await loadUser()
+  await loginFlow.logout()
 }
 
 function handleCopyInviteCode(): void {
@@ -356,81 +365,23 @@ function handleLoginAction(): void {
     return
   }
 
-  void handleMiniWechatLogin()
+  void loginFlow.loginWithMiniWechat()
 }
 
 async function handlePasswordLogin(form: { accountIdentifier: string; password: string }): Promise<void> {
-  passwordLoginSubmitting.value = true
-  try {
-    // token/user 由 session 发布，本页通过共享只读状态自动刷新。
-    await session.loginWithPassword(buildPasswordLoginPayload(form))
-    passwordLoginSheetVisible.value = false
-    await loadUser()
-    uni.showToast({ title: '登录成功', icon: 'success' })
-    await redirectAfterLogin()
-  } catch (error) {
-    // 被更新的登录/退出替代的操作静默放弃，不提示成功也不跳转。
-    if (isSessionSupersededError(error)) {
-      return
-    }
-    uni.showToast({ title: extractApiErrorMessage(error, '登录失败'), icon: 'none' })
-  } finally {
-    passwordLoginSubmitting.value = false
-  }
+  await loginFlow.submitPasswordLogin(form)
 }
 
 async function handleMiniWechatLogin(): Promise<void> {
-  try {
-    const code = await getMiniWechatCode()
-    const result = await session.loginWithWechatCode(code)
-
-    if (result.status === 'authenticated') {
-      // 登录态由 session 同步发布，isGuestPage 基于共享只读状态自动切到已登录渲染。
-      uni.showToast({ title: '微信登录成功', icon: 'success' })
-      await loadUser()
-      await redirectAfterLogin()
-      return
-    }
-
-    miniWechatBindState.value = result
-  } catch (error) {
-    if (isSessionSupersededError(error)) {
-      return
-    }
-    uni.showToast({ title: extractApiErrorMessage(error, '微信登录失败'), icon: 'none' })
-  }
+  await loginFlow.loginWithMiniWechat()
 }
 
 function closeMiniWechatBindSheet(): void {
   miniWechatBindState.value = null
 }
 
-async function handleMiniWechatBind(payload: {
-  bindToken: string
-  inviteCode: string
-  referralCode: string
-  displayName: string
-  avatarDataUrl: string
-}): Promise<void> {
-  try {
-    await session.bindWechatAccount({
-      bind_token: payload.bindToken,
-      invite_code: payload.inviteCode || undefined,
-      referral_code: payload.referralCode || undefined,
-      display_name: payload.displayName,
-      avatar_data_url: payload.avatarDataUrl,
-    })
-
-    closeMiniWechatBindSheet()
-    uni.showToast({ title: '微信绑定成功', icon: 'success' })
-    await loadUser()
-    await redirectAfterLogin()
-  } catch (error) {
-    if (isSessionSupersededError(error)) {
-      return
-    }
-    uni.showToast({ title: extractApiErrorMessage(error, '绑定失败'), icon: 'none' })
-  }
+async function handleMiniWechatBind(payload: MiniWechatBindForm): Promise<void> {
+  await loginFlow.bindMiniWechatAccount(payload)
 }
 
 async function loadH5TestUsers(): Promise<void> {
@@ -448,47 +399,7 @@ async function loadH5TestUsers(): Promise<void> {
 }
 
 async function handleH5TestLoginSelect(user: H5TestLoginUser): Promise<void> {
-  try {
-    await session.loginAsTestUser(user.id)
-    uni.showToast({ title: `已切换到 ${user.display_name?.trim() || user.account_identifier}`, icon: 'none' })
-    await loadUser()
-  } catch (error) {
-    if (isSessionSupersededError(error)) {
-      return
-    }
-    uni.showToast({ title: extractApiErrorMessage(error, '测试登录失败'), icon: 'none' })
-  }
-}
-
-async function redirectAfterLogin(): Promise<void> {
-  const target = consumePostLoginRedirect()
-  if (!target || target.url === '/pages/user/index') {
-    return
-  }
-
-  try {
-    await navigateToPostLoginTarget(target)
-  } catch (error) {
-    uni.showToast({ title: extractApiErrorMessage(error, '登录后跳转失败'), icon: 'none' })
-  }
-}
-
-function getMiniWechatCode(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    uni.login({
-      success: (result) => {
-        if (!result.code) {
-          reject(new Error('微信登录 code 获取失败'))
-          return
-        }
-
-        resolve(result.code)
-      },
-      fail: (error) => {
-        reject(new Error(error.errMsg || '微信登录失败'))
-      },
-    })
-  })
+  await loginFlow.loginAsH5TestUser(user)
 }
 
 onShow(() => {
