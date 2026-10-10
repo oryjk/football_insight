@@ -321,6 +321,7 @@ const { closeMatchIdSheet, openMatchIdSheet, payForMatchId, resetMatchIdSessionS
 const {
   loadCurrentBoard,
   loadHistoryMatches,
+  loadBoardForTab,
   loadViewerMembershipTier,
   loadCurrentTrackedInterests,
   resetCurrentBoard,
@@ -375,6 +376,15 @@ const sessionSync = createTicketWatchSessionSync(state, session, {
 
 watch(session.revision, () => {
   sessionSync.handleSessionRevisionChange()
+})
+
+// 页内 tab 切换不会触发 onShow：会话恢复只重载可见 tab，另一块已被清空的
+// 看板靠这里在进入时按当前会话补载；已加载的看板复用，隐藏页面不发起读取。
+watch(activeTab, (tab) => {
+  if (!isTicketWatchPageVisible()) {
+    return
+  }
+  loadBoardForTab(tab)
 })
 
 function handleCurrentInterest(item: TicketWatchGroupedInventoryItem): void {

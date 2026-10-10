@@ -31,7 +31,7 @@ import {
   type TicketWatchLoadReason,
 } from './helpers'
 import type { TicketWatchState } from './useTicketWatchState'
-import type { TicketWatchTeam } from './types'
+import type { TicketWatchTab, TicketWatchTeam } from './types'
 
 import { resolveFallbackMatchId, sumInventoryOccurrences } from './presentation'
 
@@ -99,6 +99,7 @@ export function useTicketWatchBoards(
     refluxSubscriptionSubmitting,
     refluxSubscriptionStatusLoading,
     currentTrackedInterests,
+    membershipBenefitsLocked,
   } = state
   let historySelectionRequestToken = 0
   // 看板请求 owner：reset/球队切换作废旧请求并允许新上下文立即重载；
@@ -442,16 +443,22 @@ export function useTicketWatchBoards(
       return
     }
 
-    if (
+    // list 改变选中比赛（为空或已不在列表）时接管选择 owner；
+    // 沿用当前选择时只捕获序号，用户在途/随后的选择操作会让本次发布失效。
+    const selectionMissing =
       selectedHistoryMatchId.value === null ||
       !historyMatches.value.some(
         (match) => match.match_id === selectedHistoryMatchId.value,
       )
-    ) {
+    if (selectionMissing) {
       selectedHistoryMatchId.value = historyMatches.value[0].match_id
     }
 
-    await syncDisplayedHistoryMatch(selectedHistoryMatchId.value, isStale)
+    await syncDisplayedHistoryMatch(
+      selectedHistoryMatchId.value,
+      isStale,
+      selectionMissing,
+    )
   }
 
   async function loadYukunHistoryMatches(
@@ -477,16 +484,22 @@ export function useTicketWatchBoards(
       return
     }
 
-    if (
+    // list 改变选中比赛（为空或已不在列表）时接管选择 owner；
+    // 沿用当前选择时只捕获序号，用户在途/随后的选择操作会让本次发布失效。
+    const selectionMissing =
       selectedHistoryMatchId.value === null ||
       !historyMatches.value.some(
         (match) => match.match_id === selectedHistoryMatchId.value,
       )
-    ) {
+    if (selectionMissing) {
       selectedHistoryMatchId.value = historyMatches.value[0].match_id
     }
 
-    await syncDisplayedHistoryMatch(selectedHistoryMatchId.value, isStale)
+    await syncDisplayedHistoryMatch(
+      selectedHistoryMatchId.value,
+      isStale,
+      selectionMissing,
+    )
   }
 
   async function getHistoryInventorySections(
@@ -625,6 +638,7 @@ export function useTicketWatchBoards(
   async function syncDisplayedHistoryMatch(
     matchId: number | null,
     isStale: () => boolean = () => false,
+    takeOverSelection = false,
   ): Promise<void> {
     if (matchId === null) {
       displayedHistoryMatchId.value = null
@@ -632,14 +646,47 @@ export function useTicketWatchBoards(
       return
     }
 
-    // 内部请求跨多个 await：发布前核对 owner/revision，旧上下文的结果不覆盖新视图。
-    const requestRevision = session.revision.value
-    const grouped = await getHistoryInventorySections(matchId, isStale)
-    if (isStale() || requestRevision !== session.revision.value) {
-      return
+    // 与 handleHistoryMatchSelect 共用选择发布序号：list 接管（改变选中比赛）时
+    // 递增序号使在途用户选择失效，并由本次同步持有/复位 selectionLoading；
+    // 沿用时仅捕获序号，用户在途或随后的选择操作都会让本次发布失效。
+    const selectionToken = takeOverSelection
+      ? ++historySelectionRequestToken
+      : historySelectionRequestToken
+    if (takeOverSelection) {
+      historySelectionLoading.value = true
     }
-    displayedHistoryMatchId.value = matchId
-    historySections.value = grouped
+    // 内部请求跨多个 await：发布前核对 board owner/revision/选择序号，
+    // 旧上下文或被取代选择的结果不覆盖新视图。
+    const requestRevision = session.revision.value
+    const isSelectionStale = () =>
+      isStale() ||
+      requestRevision !== session.revision.value ||
+      selectionToken !== historySelectionRequestToken
+    try {
+      const grouped = await getHistoryInventorySections(
+        matchId,
+        isSelectionStale,
+      )
+      if (isSelectionStale()) {
+        return
+      }
+      displayedHistoryMatchId.value = matchId
+      historySections.value = grouped
+    } catch (error) {
+      // 旧 list/被取代选择的库存失败：不逃回外层 list catch 写 historyError
+      // 遮住已成功的新选择；仍是当前上下文的失败向上抛，由 list 错误分支处理。
+      if (isSelectionStale()) {
+        return
+      }
+      throw error
+    } finally {
+      if (
+        takeOverSelection &&
+        selectionToken === historySelectionRequestToken
+      ) {
+        historySelectionLoading.value = false
+      }
+    }
   }
 
   async function handleHistoryMatchSelect(matchId: number): Promise<void> {
@@ -683,12 +730,31 @@ export function useTicketWatchBoards(
     }
   }
 
+  /**
+   * 页内 tab 切换的补载入口（onShow 不会因页内 tab 切换再触发）：
+   * 进入尚未加载的看板时按当前会话加载；已加载的看板复用，不重复请求。
+   * history / history-stats 共用历史看板数据；不触碰监控开关与轮询。
+   */
+  function loadBoardForTab(tab: TicketWatchTab): void {
+    if (systemConfigUnderReview.value || membershipBenefitsLocked.value) {
+      return
+    }
+    if (tab === 'current') {
+      if (!hasLoadedCurrentBoard.value) {
+        void loadCurrentBoard('initial')
+      }
+    } else if (!hasLoadedHistoryBoard.value) {
+      void loadHistoryMatches('initial')
+    }
+  }
+
   return {
     ensureRegions,
     loadViewerMembershipTier,
     loadCurrentTrackedInterests,
     loadCurrentBoard,
     loadHistoryMatches,
+    loadBoardForTab,
     resetCurrentBoard,
     resetHistoryBoard,
     handleHistoryMatchSelect,

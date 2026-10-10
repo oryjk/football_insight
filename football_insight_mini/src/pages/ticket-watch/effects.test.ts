@@ -1342,6 +1342,10 @@ describe('ticket watch 会话恢复看板重载（真实 boards + sessionSync + 
     const scope = effectScope()
     scope.run(() => {
       watch(session.revision, () => sync.handleSessionRevisionChange())
+      // 与页面 @tab 的 watch 相同接线：可见时进入尚未加载的看板按当前会话补载。
+      watch(state.activeTab, (tab) => {
+        if (visible) boards.loadBoardForTab(tab)
+      })
     })
 
     async function flush(): Promise<void> {
@@ -1695,6 +1699,457 @@ describe('ticket watch 会话恢复看板重载（真实 boards + sessionSync + 
     expect(f.state.historyTrendTotals.value[3]).toBe(3)
     expect(f.state.displayedHistoryMatchId.value).toBe(3)
     expect(f.state.hasLoadedHistoryBoard.value).toBe(true)
+    f.stop()
+  })
+})
+
+describe('ticket watch 页内 tab 补载与历史选择 owner（真实 boards + Vue watch）', () => {
+  function createTabFixture(options?: {
+    tab?: 'current' | 'history' | 'history-stats'
+    visible?: boolean
+  }) {
+    const state = useTicketWatchState()
+    state.regions.value = [
+      { block_name: 'A1', price: '180', usable_count: 10, estate: 0 },
+    ]
+    state.activeTab.value = options?.tab ?? 'current'
+    state.currentLoading.value = false
+    state.historyLoading.value = false
+    const sessionUser = ref<CurrentUser | null>(null)
+    const session = createSessionStub({
+      currentUser: sessionUser,
+      ensureSessionReady: async () => sessionUser.value,
+    })
+    const currentBoardCalls: Array<{
+      promise: Promise<TicketWatchCurrentBoardResponse>
+      resolve: (value: TicketWatchCurrentBoardResponse) => void
+    }> = []
+    const historyMatchesCalls: Array<{
+      promise: Promise<TicketWatchMatchSummary[]>
+      resolve: (value: TicketWatchMatchSummary[]) => void
+    }> = []
+    const inventoryCalls: Array<{
+      matchId: number
+      promise: Promise<TicketWatchInventoryEntry[]>
+      resolve: (value: TicketWatchInventoryEntry[]) => void
+      reject: (error: unknown) => void
+      settled: boolean
+    }> = []
+    const boards = useTicketWatchBoards(state, async () => {}, {
+      ...source,
+      getCurrentTicketWatchBoard: () => {
+        const request = deferred<TicketWatchCurrentBoardResponse>()
+        currentBoardCalls.push(request)
+        return request.promise
+      },
+      getTicketWatchMatches: () => {
+        const request = deferred<TicketWatchMatchSummary[]>()
+        historyMatchesCalls.push(request)
+        return request.promise
+      },
+      getTicketWatchInventorySince: (matchId: number) => {
+        const request = deferred<TicketWatchInventoryEntry[]>()
+        inventoryCalls.push({ matchId, ...request, settled: false })
+        return request.promise
+      },
+      getTicketWatchBlockInterests: async () => [],
+    }, session)
+    let visible = options?.visible ?? true
+    const sync = createTicketWatchSessionSync(state, session, {
+      resetSessionScopedBoards: () => {
+        boards.resetCurrentBoard()
+        boards.resetHistoryBoard()
+        state.currentUser.value = null
+        state.viewerMembershipTier.value = 'V1'
+      },
+      loadViewerMembershipTier: boards.loadViewerMembershipTier,
+      loadCurrentBoard: boards.loadCurrentBoard,
+      loadHistoryMatches: boards.loadHistoryMatches,
+      isPageVisible: () => visible,
+    })
+    const scope = effectScope()
+    scope.run(() => {
+      watch(session.revision, () => sync.handleSessionRevisionChange())
+      // 与页面 @tab 的 watch 相同接线：可见时进入尚未加载的看板按当前会话补载。
+      watch(state.activeTab, (tab) => {
+        if (visible) boards.loadBoardForTab(tab)
+      })
+    })
+
+    async function flush(): Promise<void> {
+      await nextTick()
+      for (let i = 0; i < 20; i += 1) {
+        await Promise.resolve()
+      }
+      await nextTick()
+    }
+
+    function resolveBoard(
+      current: TicketWatchMatchSummary | null,
+    ): void {
+      currentBoardCalls[currentBoardCalls.length - 1].resolve({
+        current_match: current,
+        group_ticket_active: false,
+        message: '',
+        inventory: [],
+        block_interests: [],
+        tracked_interests: [],
+      })
+    }
+
+    function resolveInventory(
+      matchId: number,
+      entries: TicketWatchInventoryEntry[],
+    ): void {
+      for (const call of inventoryCalls) {
+        if (!call.settled && call.matchId === matchId) {
+          call.settled = true
+          call.resolve(entries)
+        }
+      }
+    }
+
+    async function publishSessionUser(id: string): Promise<void> {
+      sessionUser.value = { id, membership_tier: 'V3' } as CurrentUser
+      session.revision.value += 1
+      await flush()
+    }
+
+    return {
+      state,
+      session,
+      boards,
+      currentBoardCalls,
+      historyMatchesCalls,
+      inventoryCalls,
+      resolveBoard,
+      resolveInventory,
+      flush,
+      publishSessionUser,
+      stop: () => scope.stop(),
+    }
+  }
+
+  function statsOff(id: number): TicketWatchMatchSummary {
+    return { ...match(id), include_in_reflux_stats: false }
+  }
+
+  function inventoryEntry(
+    occurrences: number,
+  ): TicketWatchInventoryEntry[] {
+    return [
+      {
+        block_name: 'A1',
+        occurrences,
+        latest_time: '2026-09-01T10:15:00+08:00',
+      },
+    ]
+  }
+
+  test('恢复只重载 current 后页内切到 history：按当前会话补载历史看板', async () => {
+    const f = createTabFixture()
+    await f.publishSessionUser('user-b')
+    expect(f.currentBoardCalls.length).toBe(1)
+    expect(f.historyMatchesCalls.length).toBe(0)
+    f.resolveBoard(match(1))
+    await f.flush()
+    expect(f.state.hasLoadedCurrentBoard.value).toBe(true)
+    expect(f.state.hasLoadedHistoryBoard.value).toBe(false)
+
+    // 页内 tab 切换不触发 onShow：进入未加载的 history → 按当前会话补载。
+    f.state.activeTab.value = 'history'
+    await f.flush()
+    expect(f.historyMatchesCalls.length).toBe(1)
+    f.historyMatchesCalls[0].resolve([match(9)])
+    await f.flush()
+    f.resolveInventory(9, [])
+    await f.flush()
+    expect(f.state.hasLoadedHistoryBoard.value).toBe(true)
+    expect(f.state.displayedHistoryMatchId.value).toBe(9)
+    f.stop()
+  })
+
+  test('恢复只重载 history 后页内切回 current：按当前会话补载当前看板', async () => {
+    const f = createTabFixture({ tab: 'history' })
+    await f.publishSessionUser('user-b')
+    expect(f.historyMatchesCalls.length).toBe(1)
+    expect(f.currentBoardCalls.length).toBe(0)
+    f.historyMatchesCalls[0].resolve([match(9)])
+    await f.flush()
+    f.resolveInventory(9, [])
+    await f.flush()
+    expect(f.state.hasLoadedHistoryBoard.value).toBe(true)
+
+    f.state.activeTab.value = 'current'
+    await f.flush()
+    expect(f.currentBoardCalls.length).toBe(1)
+    f.resolveBoard(match(2))
+    await f.flush()
+    expect(f.state.currentMatch.value?.match_id).toBe(2)
+    expect(f.state.hasLoadedCurrentBoard.value).toBe(true)
+    f.stop()
+  })
+
+  test('已加载看板在 tab 间切换时复用：history-stats 与 history 共用历史数据', async () => {
+    const f = createTabFixture()
+    // 常态 onShow：两块看板都已加载。
+    const current = f.boards.loadCurrentBoard('initial')
+    const history = f.boards.loadHistoryMatches('initial')
+    await f.flush()
+    f.resolveBoard(match(1))
+    f.historyMatchesCalls[0].resolve([match(9)])
+    await f.flush()
+    f.resolveInventory(9, [])
+    await current
+    await history
+    await f.flush()
+
+    f.state.activeTab.value = 'history'
+    await f.flush()
+    f.state.activeTab.value = 'history-stats'
+    await f.flush()
+    f.state.activeTab.value = 'current'
+    await f.flush()
+    expect(f.currentBoardCalls.length).toBe(1)
+    expect(f.historyMatchesCalls.length).toBe(1)
+    f.stop()
+  })
+
+  test('隐藏页面/审核中/权益锁定时 tab 切换不补载', async () => {
+    const hidden = createTabFixture({ visible: false })
+    hidden.state.activeTab.value = 'history'
+    await hidden.flush()
+    expect(hidden.historyMatchesCalls.length).toBe(0)
+    hidden.stop()
+
+    const reviewing = createTabFixture()
+    reviewing.state.systemConfigUnderReview.value = true
+    reviewing.state.activeTab.value = 'history'
+    await reviewing.flush()
+    expect(reviewing.historyMatchesCalls.length).toBe(0)
+    reviewing.stop()
+
+    const locked = createTabFixture()
+    locked.state.currentUser.value = {
+      id: 'user-a',
+      membership_benefits_enabled: false,
+    } as CurrentUser
+    locked.state.activeTab.value = 'history'
+    await locked.flush()
+    expect(locked.historyMatchesCalls.length).toBe(0)
+    locked.stop()
+  })
+
+  test('非阻塞历史刷新与用户选择竞态：list 对旧选择的迟到发布不覆盖新选择', async () => {
+    testGlobal.uni = { showToast: () => {} } as unknown as typeof uni
+    const f = createTabFixture({ tab: 'history' })
+    // 首次加载 [1,2,3]，displayed=1。
+    const initial = f.boards.loadHistoryMatches('initial')
+    await f.flush()
+    f.historyMatchesCalls[0].resolve([statsOff(1), statsOff(2), statsOff(3)])
+    await f.flush()
+    expect(f.inventoryCalls.length).toBe(1)
+    f.inventoryCalls[0].resolve(inventoryEntry(1))
+    await initial
+    await f.flush()
+    expect(f.state.displayedHistoryMatchId.value).toBe(1)
+    expect(f.state.hasLoadedHistoryBoard.value).toBe(true)
+
+    // 第二次 onShow 的非阻塞刷新：selector 保持可见（无 blocking loading）。
+    const refresh = f.boards.loadHistoryMatches('initial')
+    await f.flush()
+    expect(f.state.historyLoading.value).toBe(false)
+    expect(f.historyMatchesCalls.length).toBe(2)
+
+    // 用户选择 A=2：库存请求在途。
+    const selectA = f.boards.handleHistoryMatchSelect(2)
+    await f.flush()
+    expect(f.inventoryCalls.length).toBe(2)
+
+    // list 刷新返回，沿用用户已选的 A=2，发出自己的库存请求。
+    f.historyMatchesCalls[1].resolve([statsOff(1), statsOff(2), statsOff(3)])
+    await f.flush()
+    expect(f.inventoryCalls.length).toBe(3)
+
+    // 用户改选 B=3 并成功。
+    const selectB = f.boards.handleHistoryMatchSelect(3)
+    await f.flush()
+    f.inventoryCalls[3].resolve(inventoryEntry(30))
+    await selectB
+    await f.flush()
+    expect(f.state.selectedHistoryMatchId.value).toBe(3)
+    expect(f.state.displayedHistoryMatchId.value).toBe(3)
+    expect(f.state.historySections.value[0]?.total_occurrences).toBe(30)
+
+    // list 对旧选择 A 的库存晚到：不覆盖 displayed/sections、不写缓存、不报错误。
+    f.inventoryCalls[2].resolve(inventoryEntry(20))
+    await refresh
+    await f.flush()
+    expect(f.state.selectedHistoryMatchId.value).toBe(3)
+    expect(f.state.displayedHistoryMatchId.value).toBe(3)
+    expect(f.state.historySections.value[0]?.total_occurrences).toBe(30)
+    expect(f.state.historySectionsCache.value[2] ?? null).toBeNull()
+    expect(f.state.historyErrorMessage.value).toBe('')
+    expect(f.state.historySelectionLoading.value).toBe(false)
+
+    // 用户旧选择 A 的库存晚到：同样失效。
+    f.inventoryCalls[1].resolve(inventoryEntry(2))
+    await selectA
+    await f.flush()
+    expect(f.state.displayedHistoryMatchId.value).toBe(3)
+    expect(f.state.historySections.value[0]?.total_occurrences).toBe(30)
+    f.stop()
+  })
+
+  test('非阻塞历史刷新与用户选择竞态：list 旧选择的库存失败不写 historyError 遮住新选择', async () => {
+    const toasts: string[] = []
+    testGlobal.uni = {
+      showToast: (options: { title: string }) => {
+        toasts.push(options.title)
+      },
+    } as unknown as typeof uni
+    const f = createTabFixture({ tab: 'history' })
+    const initial = f.boards.loadHistoryMatches('initial')
+    await f.flush()
+    f.historyMatchesCalls[0].resolve([statsOff(1), statsOff(2), statsOff(3)])
+    await f.flush()
+    f.inventoryCalls[0].resolve(inventoryEntry(1))
+    await initial
+    await f.flush()
+
+    const refresh = f.boards.loadHistoryMatches('initial')
+    await f.flush()
+    const selectA = f.boards.handleHistoryMatchSelect(2)
+    await f.flush()
+    f.historyMatchesCalls[1].resolve([statsOff(1), statsOff(2), statsOff(3)])
+    await f.flush()
+    expect(f.inventoryCalls.length).toBe(3)
+    const selectB = f.boards.handleHistoryMatchSelect(3)
+    await f.flush()
+    f.inventoryCalls[3].resolve(inventoryEntry(30))
+    await selectB
+    await f.flush()
+
+    // list 对旧选择 A 的库存失败：不逃回外层 list catch 写 historyError。
+    f.inventoryCalls[2].reject(new Error('old list A inventory failed'))
+    await refresh
+    await f.flush()
+    expect(f.state.historyErrorMessage.value).toBe('')
+    expect(f.state.selectedHistoryMatchId.value).toBe(3)
+    expect(f.state.displayedHistoryMatchId.value).toBe(3)
+    expect(f.state.historySections.value[0]?.total_occurrences).toBe(30)
+    expect(f.state.hasLoadedHistoryBoard.value).toBe(true)
+
+    // 用户旧选择 A 的库存失败：不弹 toast。
+    f.inventoryCalls[1].reject(new Error('old selection A failed'))
+    await selectA
+    await f.flush()
+    expect(toasts).toEqual([])
+    expect(f.state.historySelectionLoading.value).toBe(false)
+    f.stop()
+  })
+
+  test('list 刷新后选中比赛失效：list 接管选择 owner 并复位 loading，旧选择 finally 不干扰', async () => {
+    const toasts: string[] = []
+    testGlobal.uni = {
+      showToast: (options: { title: string }) => {
+        toasts.push(options.title)
+      },
+    } as unknown as typeof uni
+    const f = createTabFixture({ tab: 'history' })
+    const initial = f.boards.loadHistoryMatches('initial')
+    await f.flush()
+    f.historyMatchesCalls[0].resolve([statsOff(1), statsOff(2)])
+    await f.flush()
+    f.inventoryCalls[0].resolve(inventoryEntry(1))
+    await initial
+    await f.flush()
+    expect(f.state.displayedHistoryMatchId.value).toBe(1)
+
+    // 非阻塞刷新在途时用户选择 2。
+    const refresh = f.boards.loadHistoryMatches('initial')
+    await f.flush()
+    const selectA = f.boards.handleHistoryMatchSelect(2)
+    await f.flush()
+    expect(f.state.historySelectionLoading.value).toBe(true)
+    expect(f.inventoryCalls.length).toBe(2)
+
+    // list 返回 [3]：比赛 2 已不在列表 → list 接管选择 owner 并持有 loading。
+    f.historyMatchesCalls[1].resolve([statsOff(3)])
+    await f.flush()
+    expect(f.state.selectedHistoryMatchId.value).toBe(3)
+    expect(f.state.historySelectionLoading.value).toBe(true)
+    expect(f.inventoryCalls.length).toBe(3)
+
+    // 旧选择 2 晚到：不发布、不清 list 持有的 loading、不弹 toast。
+    f.inventoryCalls[1].resolve(inventoryEntry(20))
+    await selectA
+    await f.flush()
+    expect(f.state.displayedHistoryMatchId.value).toBe(1)
+    expect(f.state.historySelectionLoading.value).toBe(true)
+    expect(toasts).toEqual([])
+
+    // list 的 sections(3) 完成：正常发布并复位 loading。
+    f.inventoryCalls[2].resolve(inventoryEntry(30))
+    await refresh
+    await f.flush()
+    expect(f.state.displayedHistoryMatchId.value).toBe(3)
+    expect(f.state.historySections.value[0]?.total_occurrences).toBe(30)
+    expect(f.state.historySelectionLoading.value).toBe(false)
+    expect(f.state.historyErrorMessage.value).toBe('')
+    f.stop()
+  })
+
+  test('选择 A→B→A：旧 list 对 A 的迟到发布不能复活', async () => {
+    testGlobal.uni = { showToast: () => {} } as unknown as typeof uni
+    const f = createTabFixture({ tab: 'history' })
+    const initial = f.boards.loadHistoryMatches('initial')
+    await f.flush()
+    f.historyMatchesCalls[0].resolve([statsOff(1), statsOff(2), statsOff(3)])
+    await f.flush()
+    f.inventoryCalls[0].resolve(inventoryEntry(1))
+    await initial
+    await f.flush()
+
+    const refresh = f.boards.loadHistoryMatches('initial')
+    await f.flush()
+    // 用户选 A=2（T1）→ list 沿用 A 发库存（捕获 T1）→ 改选 B=3（T2）→ 再选 A=2（T3）。
+    const selectA1 = f.boards.handleHistoryMatchSelect(2)
+    await f.flush()
+    f.historyMatchesCalls[1].resolve([statsOff(1), statsOff(2), statsOff(3)])
+    await f.flush()
+    const selectB = f.boards.handleHistoryMatchSelect(3)
+    await f.flush()
+    const selectA2 = f.boards.handleHistoryMatchSelect(2)
+    await f.flush()
+    expect(f.inventoryCalls.length).toBe(5)
+
+    // 旧 list 的 A 库存晚到：序号已失效，不复活。
+    f.inventoryCalls[2].resolve(inventoryEntry(20))
+    await f.flush()
+    expect(f.state.displayedHistoryMatchId.value).toBe(1)
+
+    // 新选择 A2 成功发布。
+    f.inventoryCalls[4].resolve(inventoryEntry(22))
+    await selectA2
+    await f.flush()
+    expect(f.state.selectedHistoryMatchId.value).toBe(2)
+    expect(f.state.displayedHistoryMatchId.value).toBe(2)
+    expect(f.state.historySections.value[0]?.total_occurrences).toBe(22)
+
+    // selectB 与 selectA1 的库存晚到：都失效。
+    f.inventoryCalls[3].resolve(inventoryEntry(30))
+    await selectB
+    await f.flush()
+    expect(f.state.displayedHistoryMatchId.value).toBe(2)
+    expect(f.state.historySections.value[0]?.total_occurrences).toBe(22)
+    f.inventoryCalls[1].resolve(inventoryEntry(2))
+    await selectA1
+    await refresh
+    await f.flush()
+    expect(f.state.displayedHistoryMatchId.value).toBe(2)
+    expect(f.state.historySections.value[0]?.total_occurrences).toBe(22)
+    expect(f.state.historySelectionLoading.value).toBe(false)
     f.stop()
   })
 })
