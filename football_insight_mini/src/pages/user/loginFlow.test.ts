@@ -3,8 +3,11 @@ import { effectScope, ref, watch } from 'vue'
 import { createUserLoginFlow, type UserLoginFlowDeps, type UserLoginFlowState, type UserLoginFlow } from './loginFlow'
 import { createUserAccountEffects, type UserAccountEffects, type UserAccountEffectsState } from './accountEffects'
 import { createAppSession, SessionSupersededError, type AppSession } from '../../stores/appSession'
+import { createMiniReviewStore } from '../../stores/miniReview'
 import type * as authApi from '../../api/auth'
+import type * as miniReviewApi from '../../api/miniReview'
 import type { AuthResponse, CurrentUser, MiniWechatLoginResponse } from '../../types/auth'
+import type { MiniReviewStatus } from '../../types/system'
 import { ApiRequestError } from '../../utils/apiError'
 import { AUTH_TOKEN_STORAGE_KEY } from '../../utils/authStorage'
 
@@ -141,6 +144,7 @@ interface FlowFixture {
   redirects: number
   loadUserRequest: Deferred<void>
   wechatCodeQueue: Array<Promise<string>>
+  wechatCodeCalls: number
   deps: UserLoginFlowDeps
 }
 
@@ -160,6 +164,7 @@ function createFlowFixture(): FlowFixture {
     redirects: 0,
     loadUserRequest,
     wechatCodeQueue: [],
+    wechatCodeCalls: 0,
     deps: {
       redirectAfterLogin: async () => {
         fixture.redirects += 1
@@ -171,7 +176,10 @@ function createFlowFixture(): FlowFixture {
   }
   // 微信 code 由 session 的认证流程获取：测试通过队列注入可控延迟的 code。
   fixture.session = createAppSession(stub.source, {
-    getMiniWechatCode: () => fixture.wechatCodeQueue.shift() ?? Promise.resolve('wechat-code'),
+    getMiniWechatCode: () => {
+      fixture.wechatCodeCalls += 1
+      return fixture.wechatCodeQueue.shift() ?? Promise.resolve('wechat-code')
+    },
   })
   ;(fixture as { stub?: SourceStub }).stub = stub
   return fixture
@@ -663,6 +671,128 @@ describe('revision 监听与认证表单上下文（真实 Vue watcher）', () =
     expect(fixture.session.currentUser.value).toBeNull()
     expect(fixture.toasts).toEqual(['已退出登录'])
     stop()
+  })
+
+  describe('慢审核结束后的迟到 bootstrap（真实 miniReview 等待 + Vue watcher）', () => {
+    function buildReviewStatus(isReviewing: boolean): MiniReviewStatus {
+      return {
+        project_code: 'football_insight_mini',
+        version: '1.0.0',
+        is_reviewing: isReviewing,
+        status_text: '',
+      }
+    }
+
+    /**
+     * 与 App.vue onLaunch 相同的后台恢复编排：先等审核查询，再按最新审核态 bootstrap。
+     * 审核 GET 由 deferred 控制，模拟「慢审核」。
+     */
+    function createLaunchHarness(fixture: FlowFixture) {
+      const reviewRequest = deferred<MiniReviewStatus>()
+      const miniReview = createMiniReviewStore({
+        getMiniReviewStatus: () => reviewRequest.promise,
+      } as unknown as typeof miniReviewApi)
+      const run = async () => {
+        await miniReview.ensureMiniReviewReady()
+        await fixture.session.bootstrapSession({
+          allowSilentWechat: !miniReview.isUnderReview.value,
+        })
+      }
+      return { reviewRequest, run }
+    }
+
+    test('显式 binding_required 完成后 bootstrap 才发起：不再获取 code/调用认证 API，绑定表单保留', async () => {
+      const fixture = createFlowFixture()
+      const stub = getStub(fixture)
+      stub.handlers.loginWithMiniWechat = () =>
+        Promise.resolve({
+          status: 'binding_required',
+          bind_token: 'bind-1',
+          expires_at: '2026-02-01T00:00:00Z',
+          display_name: '微信用户',
+          avatar_url: null,
+        })
+      const flow = createFlow(fixture)
+      const effects = createEffects(fixture)
+      const stop = wirePageRevisionWatch(fixture, flow, effects)
+      const launch = createLaunchHarness(fixture)
+      // App 冷启动：审核 GET pending，bootstrap 尚未发起。
+      const pendingLaunch = launch.run()
+
+      // 审核等待期间：用户明确点击微信登录 → binding_required，真实 flow 发布绑定表单。
+      await flow.loginWithMiniWechat()
+      await flushMicrotasks()
+      expect(fixture.state.miniWechatBindState.value?.bind_token).toBe('bind-1')
+      expect(fixture.wechatCodeCalls).toBe(1)
+
+      // 审核返回「非审核中」：App 此刻才 bootstrap。
+      launch.reviewRequest.resolve(buildReviewStatus(false))
+      await pendingLaunch
+      await flushMicrotasks()
+
+      // 显式操作已替代本次启动的自动恢复：不再获取 code、不再调用微信认证 API，
+      // 真实 watcher 不得清掉用户正在填写的绑定表单（bind_token 保留可继续提交）。
+      expect(fixture.wechatCodeCalls).toBe(1)
+      expect(stub.calls.loginWithMiniWechat).toBe(1)
+      expect(fixture.state.miniWechatBindState.value?.bind_token).toBe('bind-1')
+      expect(fixture.session.currentUser.value).toBeNull()
+      expect(fixture.session.status.value).toBe('guest')
+      expect(fixture.toasts).toEqual([])
+      stop()
+    })
+
+    test('显式微信登录失败后 bootstrap 才发起：不接管、不再探测，错误提示保留可原地重试', async () => {
+      const fixture = createFlowFixture()
+      const stub = getStub(fixture)
+      stub.handlers.loginWithMiniWechat = () =>
+        Promise.reject(new ApiRequestError('微信登录不可用', 500))
+      const flow = createFlow(fixture)
+      const effects = createEffects(fixture)
+      const stop = wirePageRevisionWatch(fixture, flow, effects)
+      const launch = createLaunchHarness(fixture)
+      const pendingLaunch = launch.run()
+
+      // 审核等待期间：显式微信登录失败（意图已结束），用户准备在页面上重试。
+      await flow.loginWithMiniWechat()
+      await flushMicrotasks()
+      expect(fixture.toasts).toEqual(['微信登录不可用'])
+      expect(fixture.wechatCodeCalls).toBe(1)
+
+      launch.reviewRequest.resolve(buildReviewStatus(false))
+      await pendingLaunch
+      await flushMicrotasks()
+
+      // 显式失败同样替代本次启动的自动恢复：不再次探测、不弹新的错误提示。
+      expect(fixture.wechatCodeCalls).toBe(1)
+      expect(stub.calls.loginWithMiniWechat).toBe(1)
+      expect(fixture.toasts).toEqual(['微信登录不可用'])
+      expect(fixture.session.currentUser.value).toBeNull()
+      expect(fixture.session.status.value).toBe('guest')
+      stop()
+    })
+
+    test('无显式操作时，慢审核结束后的 bootstrap 正常静默恢复已绑定账号', async () => {
+      const fixture = createFlowFixture()
+      const stub = getStub(fixture)
+      stub.handlers.loginWithMiniWechat = () =>
+        Promise.resolve({ status: 'authenticated', ...buildAuthResponse(userA, 'token-wechat') })
+      const flow = createFlow(fixture)
+      const effects = createEffects(fixture)
+      const stop = wirePageRevisionWatch(fixture, flow, effects)
+      const launch = createLaunchHarness(fixture)
+      const pendingLaunch = launch.run()
+
+      // 用户没有任何显式操作；审核结束后正常探测一次并完成恢复。
+      launch.reviewRequest.resolve(buildReviewStatus(false))
+      await pendingLaunch
+      await flushMicrotasks()
+
+      expect(fixture.wechatCodeCalls).toBe(1)
+      expect(stub.calls.loginWithMiniWechat).toBe(1)
+      expect(fixture.session.currentUser.value).toMatchObject({ id: 'a' })
+      expect(fixture.session.status.value).toBe('authenticated')
+      stop()
+    })
   })
 })
 

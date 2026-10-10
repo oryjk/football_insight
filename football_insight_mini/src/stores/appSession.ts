@@ -53,6 +53,9 @@ export interface AppSession {
    * 无 token / 旧 token 被 401 失效时，仅当 allowSilentWechat（MP）且未手动退出，
    * 才允许一次后台微信探测；binding_required/失败一律静默回游客，不建号不写 token。
    * 同一次启动的并发调用合并为一个操作。
+   * 显式认证/退出一旦发生（即使意图已结束，如审核等待期间完成的 binding_required
+   * 或失败），即替代本次启动的自动恢复：迟到的 bootstrap 不再探测微信。
+   * 业务 401（invalidateSession）导致的 revision 变化不算显式操作，不取消恢复。
    */
   bootstrapSession(options: { allowSilentWechat: boolean }): Promise<CurrentUser | null>
   logoutSession(): Promise<void>
@@ -114,6 +117,10 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
   // 同一次启动的 bootstrap 合并为一个操作；实例级标记保证每次冷启动最多探测一次微信。
   let inFlightBootstrap: Promise<CurrentUser | null> | null = null
   let silentWechatAttempted = false
+  // 启动恢复的取消身份：显式认证操作（密码/注册/微信/绑定/测试登录）或退出一旦发生，
+  // 即替代本次启动的自动恢复——即使其意图已结束（如 binding_required 或失败）。
+  // 与业务 401 导致的 revision 变化无关；自动探测（silent 意图）不是显式操作，不置位。
+  let startupRecoverySupersededByExplicit = false
 
   function clearLocalSession(): void {
     setAccessToken(null)
@@ -131,10 +138,16 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
   }
 
   /** 新登录意图：递增 revision 使旧 token 发出的在途请求全部失效。 */
-  function beginAuthIntent(): number {
-    // 只有明确的认证操作（密码/注册/微信/绑定/测试登录）才解除手动退出标记；
-    // 静默探测进入这里前已被 hasManualLogout 挡住，不会误清。
-    clearManualLogout()
+  function beginAuthIntent(options?: { silent?: boolean }): number {
+    // 自动探测（silent）不是显式操作：不解除手动退出标记，也不替代启动恢复自身；
+    // 进入前已被 hasManualLogout 挡住，不会误清。
+    if (options?.silent !== true) {
+      // 只有明确的认证操作（密码/注册/微信/绑定/测试登录）才解除手动退出标记。
+      clearManualLogout()
+      // 显式操作替代本次启动的自动恢复：即使意图随后结束（binding_required/失败），
+      // 迟到的 bootstrap（如慢审核结束后才发起）也不得再探测微信或覆盖表单。
+      startupRecoverySupersededByExplicit = true
+    }
     revision.value += 1
     activeAuthIntentRevision = revision.value
     status.value = 'loading'
@@ -305,9 +318,10 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
       }
 
       // ensure 返回 null：旧 token 被 401 失效，或等待期间被外部退出/新登录替代。
-      // 外部退出（手动退出标记）与在途显式登录都必须让当前恢复操作立即停止；
-      // 只有确认是「旧 token 401 失效」才允许继续微信探测。
-      if (hasManualLogout() || hasActiveAuthIntent()) {
+      // 外部退出（手动退出标记）、在途显式登录与已发生过的显式操作（即使意图已结束，
+      // 如审核/me 等待期间完成的 binding_required 或失败）都必须让当前恢复操作立即
+      // 停止；只有确认是「旧 token 401 失效」才允许继续微信探测。
+      if (hasManualLogout() || hasActiveAuthIntent() || startupRecoverySupersededByExplicit) {
         return null
       }
       if (getAccessToken()) {
@@ -322,6 +336,11 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
       // 用户主动退出过：跨冷启动也不自动恢复，只有显式登录能解除。
       return null
     }
+    if (startupRecoverySupersededByExplicit) {
+      // 显式认证/退出一旦发生（无论成功/binding_required/失败），即替代本次启动的
+      // 自动恢复：迟到的 bootstrap（如慢审核结束后才发起）不再探测微信。
+      return null
+    }
     if (silentWechatAttempted) {
       // 首次未知用户的自动探测每次启动最多一次；同次启动失败后由显式登录重试。
       return null
@@ -333,7 +352,7 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
 
     // 后台微信探测：只在 MP（allowSilentWechat）发生；binding_required/失败静默回游客。
     silentWechatAttempted = true
-    const intentRevision = beginAuthIntent()
+    const intentRevision = beginAuthIntent({ silent: true })
     try {
       const response = await runMiniWechatAuth(intentRevision)
       return response.status === 'authenticated' ? response.user : null
@@ -420,6 +439,8 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
     // 主动退出：立即持久化手动退出标记，跨冷启动禁止 MP 静默自动恢复；
     // 只有显式认证操作（密码/微信/绑定/测试登录）才解除。
     setManualLogout()
+    // 退出同样是显式操作：替代本次启动的自动恢复（如在途/迟到的 bootstrap）。
+    startupRecoverySupersededByExplicit = true
     // 先发起携带旧 token 的注销请求（request 层同步读取 token），再同步清本地会话；
     // 远端失败不恢复本地退出，旧 logout 完成也不会清掉期间登录的新账号。
     const remoteLogout = hasAccessToken.value

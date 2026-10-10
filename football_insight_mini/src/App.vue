@@ -17,10 +17,13 @@ onLaunch(() => {
   console.log("Football Insight mini launch");
   // 启动会话恢复在后台进行，不阻塞公开赛果/榜单/首页。
   // 已确认审核中时不发起新的自动微信探测；审核查询失败按既有策略视为未确认审核中。
+  // 审核查询等待期间用户完成的显式登录/退出（即使其意图已结束）会替代本次启动的
+  // 自动恢复：session 记录该替代关系，迟到的 bootstrap 不再探测微信、不覆盖表单。
+  const session = useAppSession();
   void (async () => {
     const miniReview = useMiniReviewStatus();
     await miniReview.ensureMiniReviewReady();
-    await useAppSession()
+    await session
       .bootstrapSession({ allowSilentWechat: allowSilentWechat && !miniReview.isUnderReview.value })
       .catch(() => {});
   })();

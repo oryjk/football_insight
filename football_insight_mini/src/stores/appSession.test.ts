@@ -882,6 +882,147 @@ describe('bootstrapSession 启动恢复（第一阶段静默登录）', () => {
   })
 })
 
+describe('启动恢复与显式操作的替代关系（显式操作一旦发生即替代本次启动自动恢复）', () => {
+  function buildBindingRequiredResponse(): MiniWechatLoginResponse {
+    return {
+      status: 'binding_required',
+      bind_token: 'bind-token',
+      expires_at: '2026-02-01T00:00:00Z',
+      display_name: '微信用户',
+      avatar_url: null,
+    }
+  }
+
+  test('显式微信登录（binding_required）先于 bootstrap 完成：迟到的启动恢复不再探测微信', async () => {
+    const stub = createSourceStub()
+    let codeCalls = 0
+    stub.handlers.loginWithMiniWechat = () => Promise.resolve(buildBindingRequiredResponse())
+    const session = createAppSession(stub.source, {
+      getMiniWechatCode: () => {
+        codeCalls += 1
+        return Promise.resolve(`code-${codeCalls}`)
+      },
+    })
+
+    // 审核查询还在等待：用户明确点击微信登录，binding_required 完成且意图已结束，
+    // 绑定表单已打开（页面持有 bind_token）。
+    const explicit = await session.loginWithMiniWechat()
+    expect(explicit.status).toBe('binding_required')
+    expect(codeCalls).toBe(1)
+    expect(stub.calls.loginWithMiniWechat).toBe(1)
+
+    // 审核此刻才返回非审核，App 才启动 bootstrap：显式操作已替代本次启动的自动恢复。
+    await expect(session.bootstrapSession({ allowSilentWechat: true })).resolves.toBeNull()
+
+    // 不得再次获取 code、不得再次调用微信认证 API；不写 token、保持游客。
+    expect(codeCalls).toBe(1)
+    expect(stub.calls.loginWithMiniWechat).toBe(1)
+    expect(getStoredToken()).toBeNull()
+    expect(session.currentUser.value).toBeNull()
+    expect(session.status.value).toBe('guest')
+  })
+
+  test('显式微信登录失败后，迟到的 bootstrap 也不接管本次启动恢复', async () => {
+    const stub = createSourceStub()
+    let codeCalls = 0
+    stub.handlers.loginWithMiniWechat = () =>
+      Promise.reject(new ApiRequestError('微信登录不可用', 500))
+    const session = createAppSession(stub.source, {
+      getMiniWechatCode: () => {
+        codeCalls += 1
+        return Promise.resolve(`code-${codeCalls}`)
+      },
+    })
+
+    // 显式登录失败（意图已结束），用户准备在页面上重试。
+    const explicitError = await captureError(() => session.loginWithMiniWechat())
+    expect(explicitError).toBeInstanceOf(ApiRequestError)
+    expect(codeCalls).toBe(1)
+
+    // 审核结束后的迟到 bootstrap 不得再次探测微信。
+    await expect(session.bootstrapSession({ allowSilentWechat: true })).resolves.toBeNull()
+    expect(codeCalls).toBe(1)
+    expect(stub.calls.loginWithMiniWechat).toBe(1)
+    expect(getStoredToken()).toBeNull()
+    expect(session.status.value).toBe('guest')
+  })
+
+  test('bootstrap 等待 me 期间发生显式 binding_required（意图已结束）：me 返回后不再探测微信', async () => {
+    const stub = createSourceStub()
+    storage[AUTH_TOKEN_STORAGE_KEY] = 'token-expired'
+    const meRequest = deferred<CurrentUser | null>()
+    stub.handlers.getCurrentUser = () => meRequest.promise
+    let codeCalls = 0
+    stub.handlers.loginWithMiniWechat = () => Promise.resolve(buildBindingRequiredResponse())
+    const session = createAppSession(stub.source, {
+      getMiniWechatCode: () => {
+        codeCalls += 1
+        return Promise.resolve(`code-${codeCalls}`)
+      },
+    })
+
+    const bootstrap = session.bootstrapSession({ allowSilentWechat: true })
+    await Promise.resolve()
+
+    // bootstrap 还在等待 me：用户完成显式微信登录（binding_required，意图已结束）。
+    const explicit = await session.loginWithMiniWechat()
+    expect(explicit.status).toBe('binding_required')
+    expect(codeCalls).toBe(1)
+
+    // 旧 token 的 me 此刻才返回 401：本次恢复已被显式操作替代，不得继续探测。
+    meRequest.resolve(null)
+    await expect(bootstrap).resolves.toBeNull()
+    expect(codeCalls).toBe(1)
+    expect(stub.calls.loginWithMiniWechat).toBe(1)
+  })
+
+  test('启动前旧 token 被业务 401 失效（invalidateSession，非显式操作）：bootstrap 仍允许微信恢复', async () => {
+    const stub = createSourceStub()
+    storage[AUTH_TOKEN_STORAGE_KEY] = 'token-expired'
+    let codeCalls = 0
+    stub.handlers.loginWithMiniWechat = () =>
+      Promise.resolve({ status: 'authenticated', ...buildAuthResponse(userB, 'token-b') })
+    const session = createAppSession(stub.source, {
+      getMiniWechatCode: () => {
+        codeCalls += 1
+        return Promise.resolve('code-1')
+      },
+    })
+
+    // 审核等待期间，首页等私有请求用旧 token 发出并 401：按现有流程失效旧会话。
+    // 这是业务 401 导致的 revision 变化，不是显式登录/退出，不得取消启动恢复。
+    session.invalidateSession(session.revision.value)
+    expect(getStoredToken()).toBeNull()
+    expect(hasManualLogout()).toBe(false)
+
+    await expect(session.bootstrapSession({ allowSilentWechat: true })).resolves.toMatchObject({ id: 'b' })
+    expect(codeCalls).toBe(1)
+    expect(stub.calls.loginWithMiniWechat).toBe(1)
+    expect(getStoredToken()).toBe('token-b')
+  })
+
+  test('显式密码登录先于 bootstrap：复用已登录会话，不探测微信', async () => {
+    const stub = createSourceStub()
+    stub.handlers.login = () => Promise.resolve(buildAuthResponse(userA, 'token-a'))
+    let codeCalls = 0
+    const session = createAppSession(stub.source, {
+      getMiniWechatCode: () => {
+        codeCalls += 1
+        return Promise.resolve('code')
+      },
+    })
+
+    await session.loginWithPassword({ account_identifier: 'a', password: 'x' })
+    expect(session.currentUser.value).toMatchObject({ id: 'a' })
+
+    // 审核结束后迟到的 bootstrap：已有显式登录的会话，直接复用，不探测微信。
+    await expect(session.bootstrapSession({ allowSilentWechat: true })).resolves.toMatchObject({ id: 'a' })
+    expect(codeCalls).toBe(0)
+    expect(stub.calls.loginWithMiniWechat).toBe(0)
+    expect(stub.calls.getCurrentUser).toBe(0)
+  })
+})
+
 describe('手动退出标记', () => {
   test('主动退出立即写标记；远端 logout 失败仍退出且标记保留', async () => {
     const stub = createSourceStub()
