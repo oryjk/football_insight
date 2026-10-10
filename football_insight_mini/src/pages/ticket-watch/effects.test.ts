@@ -5,6 +5,8 @@ import type { CurrentUser } from '../../types/auth'
 import type {
   RefluxSubscriptionPlansResponse,
   RefluxSubscriptionStatusResponse,
+  TicketWatchCurrentBoardResponse,
+  TicketWatchCurrentMatchResponse,
   TicketWatchInventoryEntry,
   TicketWatchMatchSummary,
   TicketWatchTrackedInterest,
@@ -662,11 +664,16 @@ describe('ticket watch session sync（后台恢复后刷新私有区）', () => 
     resetCalls: number
     tierLoads: number
     boardLoads: string[]
+    historyLoads: string[]
+    setVisible: (visible: boolean) => void
     stop: () => void
   }
 
   /** 与页面相同的接线，走真实 Vue watch：revision 变化由会话 stub 真实发布触发。 */
-  function createSyncFixture(options?: { underReview?: boolean }): SyncFixture {
+  function createSyncFixture(options?: {
+    underReview?: boolean
+    visible?: boolean
+  }): SyncFixture {
     const state = useTicketWatchState()
     const sessionUser = ref<CurrentUser | null>(null)
     const session = createSessionStub({ currentUser: sessionUser })
@@ -683,7 +690,13 @@ describe('ticket watch session sync（后台恢复后刷新私有区）', () => 
       resetCalls: 0,
       tierLoads: 0,
       boardLoads: [],
+      historyLoads: [],
+      setVisible: () => {},
       stop: () => {},
+    }
+    let visible = options?.visible ?? true
+    fixture.setVisible = (value: boolean) => {
+      visible = value
     }
     const sync = createTicketWatchSessionSync(state, session, {
       resetSessionScopedBoards: () => {
@@ -699,6 +712,10 @@ describe('ticket watch session sync（后台恢复后刷新私有区）', () => 
       loadCurrentBoard: async (reason) => {
         fixture.boardLoads.push(reason)
       },
+      loadHistoryMatches: async (reason) => {
+        fixture.historyLoads.push(reason)
+      },
+      isPageVisible: () => visible,
     })
 
     const scope = effectScope()
@@ -771,7 +788,7 @@ describe('ticket watch session sync（后台恢复后刷新私有区）', () => 
     fixture.stop()
   })
 
-  test('隐藏页面的后台恢复不启动轮询', async () => {
+  test('隐藏页面的后台恢复不启动轮询、不发起重载', async () => {
     const scheduled = new Set<number>()
     let nextId = 0
     globalThis.setInterval = ((_callback: unknown, _delay: number) => {
@@ -783,7 +800,7 @@ describe('ticket watch session sync（后台恢复后刷新私有区）', () => 
       scheduled.delete(id)
     }) as typeof clearInterval
 
-    const fixture = createSyncFixture()
+    const fixture = createSyncFixture({ visible: false })
     const scope = effectScope()
     // 页面已隐藏：freshness clock 停止（pageVisible=false），监控未开启。
     const polling = scope.run(() =>
@@ -797,7 +814,11 @@ describe('ticket watch session sync（后台恢复后刷新私有区）', () => 
     await nextTick()
     await nextTick()
 
-    expect(fixture.boardLoads).toEqual(['initial'])
+    // 隐藏页面只复位私有数据，不在后台发起重载（下次 onShow 统一加载）。
+    expect(fixture.resetCalls).toBe(1)
+    expect(fixture.tierLoads).toBe(0)
+    expect(fixture.boardLoads).toEqual([])
+    expect(fixture.historyLoads).toEqual([])
     expect(fixture.state.isMonitoringActive.value).toBe(false)
     expect(scheduled.size).toBe(0)
     scope.stop()
@@ -1215,5 +1236,465 @@ describe('ticket watch board generation（A→B→A 旧请求防复活）', () =
     expect(state.currentBoardGeneration.value).toBe(1)
     boards.resetCurrentBoard()
     expect(state.currentBoardGeneration.value).toBe(2)
+  })
+})
+
+describe('ticket watch 会话恢复看板重载（真实 boards + sessionSync + Vue watch）', () => {
+  interface Deferred<T> {
+    promise: Promise<T>
+    resolve: (value: T) => void
+    reject: (error: unknown) => void
+  }
+
+  interface InventoryCall {
+    matchId: number
+    request: Deferred<TicketWatchInventoryEntry[]>
+    settled: boolean
+  }
+
+  function boardResponse(
+    current: TicketWatchMatchSummary | null,
+  ): TicketWatchCurrentBoardResponse {
+    return {
+      current_match: current,
+      group_ticket_active: false,
+      message: '',
+      inventory: [],
+      block_interests: [],
+      tracked_interests: [],
+    }
+  }
+
+  function inventoryEntry(occurrences: number): TicketWatchInventoryEntry[] {
+    return [
+      {
+        block_name: 'A1',
+        occurrences,
+        latest_time: '2026-09-01T10:15:00+08:00',
+      },
+    ]
+  }
+
+  /** 与页面相同的真实接线：真实 boards/state/sessionSync + 真实 Vue watch，仅 API 层打桩。 */
+  function createBoardSyncFixture(options?: {
+    tab?: 'current' | 'history' | 'history-stats'
+    team?: 'chengdurongcheng' | 'yunnanyukun'
+    visible?: boolean
+    ensureReady?: () => Promise<CurrentUser | null>
+  }) {
+    const state = useTicketWatchState()
+    state.regions.value = [
+      { block_name: 'A1', price: '180', usable_count: 10, estate: 0 },
+    ]
+    state.activeTab.value = options?.tab ?? 'current'
+    state.selectedTeam.value = options?.team ?? 'chengdurongcheng'
+    state.currentLoading.value = false
+    state.historyLoading.value = false
+    const sessionUser = ref<CurrentUser | null>(null)
+    const session = createSessionStub({
+      currentUser: sessionUser,
+      ensureSessionReady:
+        options?.ensureReady ?? (async () => sessionUser.value),
+    })
+    const currentBoardCalls: Deferred<TicketWatchCurrentBoardResponse>[] = []
+    const yukunCurrentCalls: Deferred<TicketWatchCurrentMatchResponse>[] = []
+    const historyMatchesCalls: Deferred<TicketWatchMatchSummary[]>[] = []
+    const inventoryCalls: InventoryCall[] = []
+    const boards = useTicketWatchBoards(state, async () => {}, {
+      ...source,
+      getCurrentTicketWatchBoard: () => {
+        const request = deferred<TicketWatchCurrentBoardResponse>()
+        currentBoardCalls.push(request)
+        return request.promise
+      },
+      getYukunCurrentTicketWatchMatch: () => {
+        const request = deferred<TicketWatchCurrentMatchResponse>()
+        yukunCurrentCalls.push(request)
+        return request.promise
+      },
+      getYukunTicketWatchInventory: async () => [],
+      getYukunTicketWatchRegions: async () => [],
+      getTicketWatchMatches: () => {
+        const request = deferred<TicketWatchMatchSummary[]>()
+        historyMatchesCalls.push(request)
+        return request.promise
+      },
+      getTicketWatchInventorySince: (matchId: number) => {
+        const request = deferred<TicketWatchInventoryEntry[]>()
+        inventoryCalls.push({ matchId, request, settled: false })
+        return request.promise
+      },
+      getTicketWatchBlockInterests: async () => [],
+    }, session)
+    let visible = options?.visible ?? true
+    const sync = createTicketWatchSessionSync(state, session, {
+      resetSessionScopedBoards: () => {
+        boards.resetCurrentBoard()
+        boards.resetHistoryBoard()
+        state.currentUser.value = null
+        state.viewerMembershipTier.value = 'V1'
+      },
+      loadViewerMembershipTier: boards.loadViewerMembershipTier,
+      loadCurrentBoard: boards.loadCurrentBoard,
+      loadHistoryMatches: boards.loadHistoryMatches,
+      isPageVisible: () => visible,
+    })
+    const scope = effectScope()
+    scope.run(() => {
+      watch(session.revision, () => sync.handleSessionRevisionChange())
+    })
+
+    async function flush(): Promise<void> {
+      await nextTick()
+      for (let i = 0; i < 20; i += 1) {
+        await Promise.resolve()
+      }
+      await nextTick()
+    }
+
+    function resolveInventory(
+      matchId: number,
+      entries: TicketWatchInventoryEntry[],
+    ): void {
+      for (const call of inventoryCalls) {
+        if (!call.settled && call.matchId === matchId) {
+          call.settled = true
+          call.request.resolve(entries)
+        }
+      }
+    }
+
+    async function publishSessionUser(id: string): Promise<void> {
+      sessionUser.value = { id, membership_tier: 'V3' } as CurrentUser
+      session.revision.value += 1
+      await flush()
+    }
+
+    return {
+      state,
+      session,
+      sessionUser,
+      boards,
+      currentBoardCalls,
+      yukunCurrentCalls,
+      historyMatchesCalls,
+      inventoryCalls,
+      resolveInventory,
+      flush,
+      publishSessionUser,
+      setVisible: (value: boolean) => {
+        visible = value
+      },
+      stop: () => scope.stop(),
+    }
+  }
+
+  test('游客 current 在途时静默登录成功：reset 允许新请求，旧结果与 finally 全部失效', async () => {
+    const f = createBoardSyncFixture()
+    const guest = f.boards.loadCurrentBoard()
+    await f.flush()
+    expect(f.currentBoardCalls.length).toBe(1)
+    expect(f.state.currentBoardRequestInFlight.value).toBe(true)
+
+    // 后台静默登录成功并发布用户：revision watch 走真实 sessionSync。
+    await f.publishSessionUser('user-b')
+    // 新会话的 current 请求不被旧 inFlight 挡住。
+    expect(f.currentBoardCalls.length).toBe(2)
+    expect(f.state.currentLoading.value).toBe(true)
+
+    // 旧游客响应晚到：不发布、不清新请求的 loading/inFlight。
+    f.currentBoardCalls[0].resolve(boardResponse(match(1)))
+    await guest
+    await f.flush()
+    expect(f.state.currentMatch.value).toBeNull()
+    expect(f.state.hasLoadedCurrentBoard.value).toBe(false)
+    expect(f.state.currentBoardRequestInFlight.value).toBe(true)
+    expect(f.state.currentLoading.value).toBe(true)
+
+    // 新会话响应正常发布。
+    f.currentBoardCalls[1].resolve(boardResponse(match(2)))
+    await f.flush()
+    expect(f.state.currentMatch.value?.match_id).toBe(2)
+    expect(f.state.hasLoadedCurrentBoard.value).toBe(true)
+    expect(f.state.currentBoardRequestInFlight.value).toBe(false)
+    expect(f.state.currentLoading.value).toBe(false)
+    f.stop()
+  })
+
+  test('同会话同球队的在途 current 请求仍合并：poll 不重复发请求', async () => {
+    const f = createBoardSyncFixture()
+    const initial = f.boards.loadCurrentBoard('initial')
+    await f.flush()
+    await f.boards.loadCurrentBoard('poll')
+    await f.boards.loadCurrentBoard('initial')
+    expect(f.currentBoardCalls.length).toBe(1)
+
+    f.currentBoardCalls[0].resolve(boardResponse(match(1)))
+    await initial
+    await f.flush()
+    expect(f.state.hasLoadedCurrentBoard.value).toBe(true)
+
+    // 请求完成后新的 poll 可以再发请求。
+    const poll = f.boards.loadCurrentBoard('poll')
+    await f.flush()
+    expect(f.currentBoardCalls.length).toBe(2)
+    f.currentBoardCalls[1].resolve(boardResponse(match(1)))
+    await poll
+    await f.flush()
+    expect(f.state.currentMatch.value?.match_id).toBe(1)
+    expect(f.state.currentBoardRequestInFlight.value).toBe(false)
+    f.stop()
+  })
+
+  test('恢复时可见 tab 为 history：清空的历史看板按新会话重载，不请求 current', async () => {
+    const f = createBoardSyncFixture({ tab: 'history' })
+    // 游客历史看板已加载。
+    const guestHistory = f.boards.loadHistoryMatches('initial')
+    await f.flush()
+    expect(f.historyMatchesCalls.length).toBe(1)
+    f.historyMatchesCalls[0].resolve([match(99)])
+    await f.flush()
+    f.resolveInventory(99, [])
+    await guestHistory
+    await f.flush()
+    expect(f.state.historyMatches.value.map((item) => item.match_id)).toEqual([99])
+    expect(f.state.displayedHistoryMatchId.value).toBe(99)
+    expect(f.state.hasLoadedHistoryBoard.value).toBe(true)
+
+    await f.publishSessionUser('user-b')
+    // 历史看板被 reset 清空后按可见 tab 重载；current 看板不请求。
+    expect(f.state.historyMatches.value).toEqual([])
+    expect(f.state.hasLoadedHistoryBoard.value).toBe(false)
+    expect(f.historyMatchesCalls.length).toBe(2)
+    expect(f.currentBoardCalls.length).toBe(0)
+
+    f.historyMatchesCalls[1].resolve([match(100)])
+    await f.flush()
+    f.resolveInventory(100, [])
+    await f.flush()
+    expect(f.state.historyMatches.value.map((item) => item.match_id)).toEqual([100])
+    expect(f.state.selectedHistoryMatchId.value).toBe(100)
+    expect(f.state.displayedHistoryMatchId.value).toBe(100)
+    expect(f.state.hasLoadedHistoryBoard.value).toBe(true)
+    expect(f.state.historyLoading.value).toBe(false)
+    f.stop()
+  })
+
+  test('恢复时可见 tab 为 history-stats：重载历史看板而非 current', async () => {
+    const f = createBoardSyncFixture({ tab: 'history-stats' })
+    await f.publishSessionUser('user-b')
+    expect(f.historyMatchesCalls.length).toBe(1)
+    expect(f.currentBoardCalls.length).toBe(0)
+
+    f.historyMatchesCalls[0].resolve([match(100)])
+    await f.flush()
+    f.resolveInventory(100, [])
+    await f.flush()
+    expect(f.state.historyMatches.value.map((item) => item.match_id)).toEqual([100])
+    expect(f.state.hasLoadedHistoryBoard.value).toBe(true)
+    f.stop()
+  })
+
+  test('球队切换作废旧上下文：旧球队晚到结果不发布、不清新 loading，新球队库存阶段不被订阅 generation 误判', async () => {
+    const f = createBoardSyncFixture()
+    const chengdu = f.boards.loadCurrentBoard()
+    await f.flush()
+    expect(f.currentBoardCalls.length).toBe(1)
+
+    // 页面 switchTeam 的 boards 层等价序列：reset 后新球队上下文重载。
+    f.state.selectedTeam.value = 'yunnanyukun'
+    f.boards.resetCurrentBoard()
+    f.boards.resetHistoryBoard()
+    const yukun = f.boards.loadCurrentBoard('initial')
+    await f.flush()
+    expect(f.yukunCurrentCalls.length).toBe(1)
+    expect(f.state.currentLoading.value).toBe(true)
+
+    // 旧成都响应晚到：不发布、不清新请求状态。
+    f.currentBoardCalls[0].resolve(boardResponse(match(1)))
+    await chengdu
+    await f.flush()
+    expect(f.state.currentMatch.value).toBeNull()
+    expect(f.state.currentBoardRequestInFlight.value).toBe(true)
+    expect(f.state.currentLoading.value).toBe(true)
+
+    // 玉昆响应：publishCurrentMatch 递增订阅 generation 后，
+    // 同一请求的库存/区域阶段仍属同一 owner，不被误判为旧。
+    const generationBefore = f.state.currentBoardGeneration.value
+    f.yukunCurrentCalls[0].resolve({
+      current_match: match(7),
+      group_ticket_active: false,
+      message: '',
+    })
+    await yukun
+    await f.flush()
+    expect(f.state.currentBoardGeneration.value).toBe(generationBefore + 1)
+    expect(f.state.currentMatch.value?.match_id).toBe(7)
+    expect(f.state.hasLoadedCurrentBoard.value).toBe(true)
+    expect(f.state.currentLoading.value).toBe(false)
+    expect(f.state.currentBoardRequestInFlight.value).toBe(false)
+    f.stop()
+  })
+
+  test('恢复链 tier 在途时会话再次变化：旧 reload 不再请求看板', async () => {
+    const ensure = deferred<CurrentUser | null>()
+    const f = createBoardSyncFixture({ ensureReady: () => ensure.promise })
+    f.sessionUser.value = { id: 'user-b', membership_tier: 'V3' } as CurrentUser
+    f.session.revision.value += 1
+    await f.flush()
+    // tier 在途，看板尚未请求。
+    expect(f.currentBoardCalls.length).toBe(0)
+    expect(f.historyMatchesCalls.length).toBe(0)
+
+    // 恢复期间会话被退出/替换。
+    f.sessionUser.value = null
+    f.session.revision.value += 1
+    await f.flush()
+    ensure.resolve(null)
+    await f.flush()
+    expect(f.currentBoardCalls.length).toBe(0)
+    expect(f.historyMatchesCalls.length).toBe(0)
+    expect(f.state.currentUser.value).toBeNull()
+    f.stop()
+  })
+
+  test('恢复链 tier 在途时切换球队：旧 reload 不再请求看板', async () => {
+    const ensure = deferred<CurrentUser | null>()
+    const f = createBoardSyncFixture({ ensureReady: () => ensure.promise })
+    f.sessionUser.value = { id: 'user-b', membership_tier: 'V3' } as CurrentUser
+    f.session.revision.value += 1
+    await f.flush()
+
+    f.state.selectedTeam.value = 'yunnanyukun'
+    ensure.resolve(f.sessionUser.value)
+    await f.flush()
+    expect(f.currentBoardCalls.length).toBe(0)
+    expect(f.yukunCurrentCalls.length).toBe(0)
+    expect(f.historyMatchesCalls.length).toBe(0)
+    f.stop()
+  })
+
+  test('恢复链在途时页面隐藏：不再继续 reload', async () => {
+    const ensure = deferred<CurrentUser | null>()
+    const f = createBoardSyncFixture({ ensureReady: () => ensure.promise })
+    f.sessionUser.value = { id: 'user-b', membership_tier: 'V3' } as CurrentUser
+    f.session.revision.value += 1
+    await f.flush()
+
+    f.setVisible(false)
+    ensure.resolve(f.sessionUser.value)
+    await f.flush()
+    expect(f.currentBoardCalls.length).toBe(0)
+    expect(f.historyMatchesCalls.length).toBe(0)
+    f.stop()
+  })
+
+  test('隐藏页面的恢复：只清理私有数据，不发起 reload', async () => {
+    const f = createBoardSyncFixture({ visible: false })
+    f.state.currentMatch.value = match(1)
+    await f.publishSessionUser('user-b')
+    expect(f.state.currentMatch.value).toBeNull()
+    expect(f.state.currentUser.value).toBeNull()
+    expect(f.currentBoardCalls.length).toBe(0)
+    expect(f.historyMatchesCalls.length).toBe(0)
+    f.stop()
+  })
+
+  test('reset 作废旧历史选择请求：旧结果不覆盖新上下文、不写缓存、不清新 loading', async () => {
+    const f = createBoardSyncFixture({ tab: 'history' })
+    const initial = f.boards.loadHistoryMatches('initial')
+    await f.flush()
+    f.historyMatchesCalls[0].resolve([match(1), match(2)])
+    await f.flush()
+    f.resolveInventory(1, [])
+    f.resolveInventory(2, [])
+    await initial
+    await f.flush()
+    expect(f.state.displayedHistoryMatchId.value).toBe(1)
+
+    // 用户选择比赛 2：库存请求在途。
+    const staleSelection = f.boards.handleHistoryMatchSelect(2)
+    await f.flush()
+    expect(f.state.historySelectionLoading.value).toBe(true)
+    const staleInventory = f.inventoryCalls.find(
+      (call) => !call.settled && call.matchId === 2,
+    )
+    expect(staleInventory?.matchId).toBe(2)
+
+    // 会话恢复：reset 作废旧选择并重载历史 [3, 4]。
+    await f.publishSessionUser('user-b')
+    expect(f.state.historySelectionLoading.value).toBe(false)
+    expect(f.historyMatchesCalls.length).toBe(2)
+    f.historyMatchesCalls[1].resolve([match(3), match(4)])
+    await f.flush()
+    f.resolveInventory(3, inventoryEntry(3))
+    f.resolveInventory(4, [])
+    await f.flush()
+    expect(f.state.displayedHistoryMatchId.value).toBe(3)
+    expect(f.state.historySections.value[0]?.total_occurrences).toBe(3)
+
+    // 新会话选择比赛 4：loading 归新请求所有。
+    const freshSelection = f.boards.handleHistoryMatchSelect(4)
+    await f.flush()
+    expect(f.state.historySelectionLoading.value).toBe(true)
+
+    // 旧选择（比赛 2）晚到：不覆盖 displayed/sections、不写缓存、不清新 loading。
+    staleInventory!.settled = true
+    staleInventory!.request.resolve(inventoryEntry(22))
+    await staleSelection
+    await f.flush()
+    expect(f.state.displayedHistoryMatchId.value).toBe(3)
+    expect(f.state.historySections.value[0]?.total_occurrences).toBe(3)
+    expect(f.state.historySectionsCache.value[2] ?? null).toBeNull()
+    expect(f.state.historySelectionLoading.value).toBe(true)
+
+    // 新选择正常完成。
+    f.resolveInventory(4, inventoryEntry(4))
+    await freshSelection
+    await f.flush()
+    expect(f.state.displayedHistoryMatchId.value).toBe(4)
+    expect(f.state.historySections.value[0]?.total_occurrences).toBe(4)
+    expect(f.state.historySelectionLoading.value).toBe(false)
+    f.stop()
+  })
+
+  test('reset 作废旧 trend/看板请求：旧 finally 不清新 trend loading、不写旧上下文', async () => {
+    const f = createBoardSyncFixture({ tab: 'history' })
+    const initial = f.boards.loadHistoryMatches('initial')
+    await f.flush()
+    f.historyMatchesCalls[0].resolve([match(1)])
+    await f.flush()
+    // trend(1) 先发起，sections(1) 其次；都保持在途。
+    expect(f.inventoryCalls.map((call) => call.matchId)).toEqual([1, 1])
+
+    // 会话恢复：reset 作废旧 trend/看板请求，新会话重载历史 [3]。
+    await f.publishSessionUser('user-b')
+    expect(f.historyMatchesCalls.length).toBe(2)
+    f.historyMatchesCalls[1].resolve([match(3)])
+    await f.flush()
+    expect(f.state.historyTrendLoading.value).toBe(true)
+
+    // 旧 trend(1) 晚到：不清新 loading、不写旧 match 的 totals。
+    const [staleTrend, staleSections] = f.inventoryCalls
+    staleTrend.request.resolve(inventoryEntry(5))
+    await f.flush()
+    expect(f.state.historyTrendLoading.value).toBe(true)
+    expect(f.state.historyTrendTotals.value[1] ?? null).toBeNull()
+
+    // 旧 sections(1) 晚到：不覆盖新 displayed、不写缓存。
+    staleSections.request.resolve(inventoryEntry(9))
+    await initial
+    await f.flush()
+    expect(f.state.displayedHistoryMatchId.value).toBeNull()
+    expect(f.state.historySectionsCache.value[1] ?? null).toBeNull()
+
+    // 新会话请求完成：trend/sections 正常发布。
+    f.resolveInventory(3, inventoryEntry(3))
+    await f.flush()
+    expect(f.state.historyTrendLoading.value).toBe(false)
+    expect(f.state.historyTrendTotals.value[3]).toBe(3)
+    expect(f.state.displayedHistoryMatchId.value).toBe(3)
+    expect(f.state.hasLoadedHistoryBoard.value).toBe(true)
+    f.stop()
   })
 })

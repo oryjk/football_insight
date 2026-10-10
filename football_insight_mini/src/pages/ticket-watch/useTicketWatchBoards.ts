@@ -31,6 +31,7 @@ import {
   type TicketWatchLoadReason,
 } from './helpers'
 import type { TicketWatchState } from './useTicketWatchState'
+import type { TicketWatchTeam } from './types'
 
 import { resolveFallbackMatchId, sumInventoryOccurrences } from './presentation'
 
@@ -100,6 +101,20 @@ export function useTicketWatchBoards(
     currentTrackedInterests,
   } = state
   let historySelectionRequestToken = 0
+  // 看板请求 owner：reset/球队切换作废旧请求并允许新上下文立即重载；
+  // 所有 success/catch/finally 都核对 owner，旧请求不写数据、不清新 loading。
+  // owner 与订阅 generation（currentBoardGeneration）独立：合法 board 请求自己的
+  // publishCurrentMatch 会递增订阅 generation，不能以 generation 判定自身新旧。
+  interface BoardRequestOwner {
+    owner: number
+    revision: number
+    team: TicketWatchTeam
+  }
+  let currentBoardRequestSeq = 0
+  let activeCurrentBoardRequest: BoardRequestOwner | null = null
+  let historyBoardRequestSeq = 0
+  let activeHistoryBoardRequest: BoardRequestOwner | null = null
+  let historyTrendRequestSeq = 0
   async function ensureRegions(): Promise<void> {
     if (regions.value.length) {
       return
@@ -167,6 +182,12 @@ export function useTicketWatchBoards(
     // 先递增 generation：reset 前发出的订阅/下单请求在此刻永久失效，
     // 其迟到结果与 finally 不得写数据或清掉新请求的 loading。
     currentBoardGeneration.value += 1
+    // 作废在途 board 请求 owner：reset 后新上下文允许立即重载；
+    // 旧请求的成功/失败/finally 全部被 owner 检查挡住，不写数据、不清新 loading。
+    currentBoardRequestSeq += 1
+    activeCurrentBoardRequest = null
+    currentBoardRequestInFlight.value = false
+    currentLoading.value = false
     currentMatch.value = null
     currentSections.value = []
     currentTrackedInterests.value = []
@@ -184,6 +205,16 @@ export function useTicketWatchBoards(
   }
 
   function resetHistoryBoard(): void {
+    // 作废在途的历史列表/选择/trend 请求：旧请求的成功/catch/finally
+    // 不得覆盖新上下文、不写共享缓存、不清新请求的 loading。
+    historyBoardRequestSeq += 1
+    activeHistoryBoardRequest = null
+    historyBoardRequestInFlight.value = false
+    historyLoading.value = false
+    historySelectionRequestToken += 1
+    historySelectionLoading.value = false
+    historyTrendRequestSeq += 1
+    historyTrendLoading.value = false
     historyMatches.value = []
     historySections.value = []
     historySectionsCache.value = {}
@@ -197,9 +228,21 @@ export function useTicketWatchBoards(
   async function loadCurrentBoard(
     reason: TicketWatchLoadReason = 'initial',
   ): Promise<void> {
-    if (currentBoardRequestInFlight.value) {
+    const requestRevision = session.revision.value
+    const requestTeam = selectedTeam.value
+    // 同会话同球队的在途请求直接复用（普通 poll 合并）；
+    // reset/球队切换已作废旧 owner，新上下文允许立即发起新请求。
+    const active = activeCurrentBoardRequest
+    if (
+      active &&
+      active.revision === requestRevision &&
+      active.team === requestTeam
+    ) {
       return
     }
+    const owner = ++currentBoardRequestSeq
+    activeCurrentBoardRequest = { owner, revision: requestRevision, team: requestTeam }
+    const isOwner = () => activeCurrentBoardRequest?.owner === owner
 
     const strategy = resolveCurrentBoardLoadStrategy(
       hasLoadedCurrentBoard.value,
@@ -216,18 +259,20 @@ export function useTicketWatchBoards(
     }
 
     try {
-      const requestRevision = session.revision.value
-      if (selectedTeam.value === 'yunnanyukun') {
-        await loadYukunCurrentBoard(requestRevision)
+      if (requestTeam === 'yunnanyukun') {
+        await loadYukunCurrentBoard(owner, requestRevision)
       } else {
-        await loadChengduCurrentBoard(requestRevision)
+        await loadChengduCurrentBoard(owner, requestRevision)
       }
-      if (requestRevision !== session.revision.value) {
-        // 账号在看板请求期间切换/退出：revision watch 已清理状态，旧结果不标记已加载。
+      if (!isOwner() || requestRevision !== session.revision.value) {
+        // 账号/上下文在看板请求期间切换：revision watch 已清理状态，旧结果不标记已加载。
         return
       }
       hasLoadedCurrentBoard.value = true
     } catch (error) {
+      if (!isOwner() || requestRevision !== session.revision.value) {
+        return
+      }
       if (reason === 'initial' || !hasLoadedCurrentBoard.value) {
         currentErrorMessage.value = extractApiErrorMessage(
           error,
@@ -235,15 +280,24 @@ export function useTicketWatchBoards(
         )
       }
     } finally {
-      currentLoading.value = false
-      currentBoardRequestInFlight.value = false
+      if (isOwner()) {
+        activeCurrentBoardRequest = null
+        currentLoading.value = false
+        currentBoardRequestInFlight.value = false
+      }
     }
   }
 
-  async function loadChengduCurrentBoard(requestRevision: number): Promise<void> {
+  async function loadChengduCurrentBoard(
+    owner: number,
+    requestRevision: number,
+  ): Promise<void> {
     await ensureRegions()
     const response = await getCurrentTicketWatchBoard()
-    if (requestRevision !== session.revision.value) {
+    if (
+      activeCurrentBoardRequest?.owner !== owner ||
+      requestRevision !== session.revision.value
+    ) {
       return
     }
     publishCurrentMatch(response.current_match)
@@ -266,9 +320,15 @@ export function useTicketWatchBoards(
     }
   }
 
-  async function loadYukunCurrentBoard(requestRevision: number): Promise<void> {
+  async function loadYukunCurrentBoard(
+    owner: number,
+    requestRevision: number,
+  ): Promise<void> {
+    const isStale = () =>
+      activeCurrentBoardRequest?.owner !== owner ||
+      requestRevision !== session.revision.value
     const response = await getYukunCurrentTicketWatchMatch()
-    if (requestRevision !== session.revision.value) {
+    if (isStale()) {
       return
     }
     const yukunMatch = response.current_match
@@ -281,6 +341,8 @@ export function useTicketWatchBoards(
       return
     }
 
+    // publishCurrentMatch 递增的是订阅 generation，不影响本请求的 owner：
+    // 后续库存/区域阶段仍是同一合法请求的延续。
     publishCurrentMatch(yukunMatch)
     currentMessage.value = ''
     void refreshRefluxSubscriptionStatus()
@@ -290,7 +352,7 @@ export function useTicketWatchBoards(
       getYukunTicketWatchInventory(yukunMatch.match_id, since),
       getYukunTicketWatchRegions(yukunMatch.match_id, since),
     ])
-    if (requestRevision !== session.revision.value) {
+    if (isStale()) {
       return
     }
 
@@ -301,9 +363,20 @@ export function useTicketWatchBoards(
   async function loadHistoryMatches(
     reason: TicketWatchHistoryLoadReason = 'initial',
   ): Promise<void> {
-    if (historyBoardRequestInFlight.value) {
+    const requestRevision = session.revision.value
+    const requestTeam = selectedTeam.value
+    // 同会话同球队的在途请求直接复用；reset/球队切换后的新上下文允许立即重载。
+    const active = activeHistoryBoardRequest
+    if (
+      active &&
+      active.revision === requestRevision &&
+      active.team === requestTeam
+    ) {
       return
     }
+    const owner = ++historyBoardRequestSeq
+    activeHistoryBoardRequest = { owner, revision: requestRevision, team: requestTeam }
+    const isOwner = () => activeHistoryBoardRequest?.owner === owner
 
     const strategy = resolveHistoryBoardLoadStrategy(
       hasLoadedHistoryBoard.value,
@@ -320,26 +393,44 @@ export function useTicketWatchBoards(
     }
 
     try {
-      if (selectedTeam.value === 'yunnanyukun') {
-        await loadYukunHistoryMatches()
+      if (requestTeam === 'yunnanyukun') {
+        await loadYukunHistoryMatches(owner, requestRevision)
       } else {
-        await loadChengduHistoryMatches()
+        await loadChengduHistoryMatches(owner, requestRevision)
+      }
+      if (!isOwner() || requestRevision !== session.revision.value) {
+        return
       }
       hasLoadedHistoryBoard.value = true
     } catch (error) {
+      if (!isOwner() || requestRevision !== session.revision.value) {
+        return
+      }
       historyErrorMessage.value = extractApiErrorMessage(
         error,
         '历史比赛库存加载失败，请稍后重试。',
       )
     } finally {
-      historyLoading.value = false
-      historyBoardRequestInFlight.value = false
+      if (isOwner()) {
+        activeHistoryBoardRequest = null
+        historyLoading.value = false
+        historyBoardRequestInFlight.value = false
+      }
     }
   }
 
-  async function loadChengduHistoryMatches(): Promise<void> {
+  async function loadChengduHistoryMatches(
+    owner: number,
+    requestRevision: number,
+  ): Promise<void> {
+    const isStale = () =>
+      activeHistoryBoardRequest?.owner !== owner ||
+      requestRevision !== session.revision.value
     await ensureRegions()
     const matches = await getTicketWatchMatches()
+    if (isStale()) {
+      return
+    }
     historyMatches.value = selectCompletedMatches(matches)
     void loadHistoryRefluxTrendTotals(
       selectRefluxStatsMatches(historyMatches.value),
@@ -360,13 +451,21 @@ export function useTicketWatchBoards(
       selectedHistoryMatchId.value = historyMatches.value[0].match_id
     }
 
-    await syncDisplayedHistoryMatch(selectedHistoryMatchId.value)
+    await syncDisplayedHistoryMatch(selectedHistoryMatchId.value, isStale)
   }
 
-  async function loadYukunHistoryMatches(): Promise<void> {
-    historyMatches.value = selectCompletedMatches(
-      await getYukunTicketWatchMatches(),
-    )
+  async function loadYukunHistoryMatches(
+    owner: number,
+    requestRevision: number,
+  ): Promise<void> {
+    const isStale = () =>
+      activeHistoryBoardRequest?.owner !== owner ||
+      requestRevision !== session.revision.value
+    const matches = await getYukunTicketWatchMatches()
+    if (isStale()) {
+      return
+    }
+    historyMatches.value = selectCompletedMatches(matches)
 
     void loadHistoryRefluxTrendTotals(
       selectRefluxStatsMatches(historyMatches.value),
@@ -387,11 +486,12 @@ export function useTicketWatchBoards(
       selectedHistoryMatchId.value = historyMatches.value[0].match_id
     }
 
-    await syncDisplayedHistoryMatch(selectedHistoryMatchId.value)
+    await syncDisplayedHistoryMatch(selectedHistoryMatchId.value, isStale)
   }
 
   async function getHistoryInventorySections(
     matchId: number,
+    isStale: () => boolean = () => false,
   ): Promise<TicketWatchGroupedInventorySection[]> {
     const cached = historySectionsCache.value[matchId]
     if (cached) {
@@ -399,12 +499,12 @@ export function useTicketWatchBoards(
     }
 
     if (selectedTeam.value === 'yunnanyukun') {
-      return getYukunHistoryInventorySections(matchId)
+      return getYukunHistoryInventorySections(matchId, isStale)
     }
 
     const match =
       historyMatches.value.find((item) => item.match_id === matchId) ?? null
-    // sections 混合了账号私有的兴趣标记：revision 变化后不再写入共享缓存。
+    // sections 混合了账号私有的兴趣标记：上下文失效后不再写入共享缓存。
     const requestRevision = session.revision.value
     const [inventory, interests] = await Promise.all([
       getTicketWatchInventorySince(
@@ -418,9 +518,8 @@ export function useTicketWatchBoards(
       groupInventoryByPrice(regions.value, inventory),
       interests,
     )
-    // trend totals 是纯公共库存数据，不做 revision 防护。
-    cacheHistoryTrendTotal(matchId, sumInventoryOccurrences(inventory))
-    if (requestRevision === session.revision.value) {
+    if (!isStale() && requestRevision === session.revision.value) {
+      cacheHistoryTrendTotal(matchId, sumInventoryOccurrences(inventory))
       historySectionsCache.value = {
         ...historySectionsCache.value,
         [matchId]: grouped,
@@ -431,6 +530,7 @@ export function useTicketWatchBoards(
 
   async function getYukunHistoryInventorySections(
     matchId: number,
+    isStale: () => boolean = () => false,
   ): Promise<TicketWatchGroupedInventorySection[]> {
     const match =
       historyMatches.value.find((item) => item.match_id === matchId) ?? null
@@ -441,8 +541,8 @@ export function useTicketWatchBoards(
       getYukunTicketWatchRegions(matchId, since),
     ])
     const grouped = groupInventoryByPrice(yukunRegions, inventory)
-    cacheHistoryTrendTotal(matchId, sumInventoryOccurrences(inventory))
-    if (requestRevision === session.revision.value) {
+    if (!isStale() && requestRevision === session.revision.value) {
+      cacheHistoryTrendTotal(matchId, sumInventoryOccurrences(inventory))
       historySectionsCache.value = {
         ...historySectionsCache.value,
         [matchId]: grouped,
@@ -481,6 +581,9 @@ export function useTicketWatchBoards(
     }
 
     historyTrendLoading.value = true
+    // trend 请求 owner：reset 作废旧请求，其迟到写入与 finally 不影响新上下文。
+    const owner = ++historyTrendRequestSeq
+    const requestRevision = session.revision.value
 
     try {
       const isYukun = selectedTeam.value === 'yunnanyukun'
@@ -498,6 +601,12 @@ export function useTicketWatchBoards(
                   requireInventorySince(match.sale_start_at),
                   resolveFallbackMatchId(match),
                 )
+            if (
+              owner !== historyTrendRequestSeq ||
+              requestRevision !== session.revision.value
+            ) {
+              return
+            }
             cacheHistoryTrendTotal(
               match.match_id,
               sumInventoryOccurrences(inventory),
@@ -507,12 +616,15 @@ export function useTicketWatchBoards(
       }
     } catch {
     } finally {
-      historyTrendLoading.value = false
+      if (owner === historyTrendRequestSeq) {
+        historyTrendLoading.value = false
+      }
     }
   }
 
   async function syncDisplayedHistoryMatch(
     matchId: number | null,
+    isStale: () => boolean = () => false,
   ): Promise<void> {
     if (matchId === null) {
       displayedHistoryMatchId.value = null
@@ -520,10 +632,10 @@ export function useTicketWatchBoards(
       return
     }
 
-    // 内部请求跨多个 await：发布前核对 revision，旧会话的结果不覆盖新会话视图。
+    // 内部请求跨多个 await：发布前核对 owner/revision，旧上下文的结果不覆盖新视图。
     const requestRevision = session.revision.value
-    const grouped = await getHistoryInventorySections(matchId)
-    if (requestRevision !== session.revision.value) {
+    const grouped = await getHistoryInventorySections(matchId, isStale)
+    if (isStale() || requestRevision !== session.revision.value) {
       return
     }
     displayedHistoryMatchId.value = matchId
@@ -538,23 +650,22 @@ export function useTicketWatchBoards(
     selectedHistoryMatchId.value = matchId
     const requestToken = ++historySelectionRequestToken
     const requestRevision = session.revision.value
+    const isStale = () =>
+      requestToken !== historySelectionRequestToken ||
+      requestRevision !== session.revision.value
     historySelectionLoading.value = true
 
     try {
-      const grouped = await getHistoryInventorySections(matchId)
+      const grouped = await getHistoryInventorySections(matchId, isStale)
 
-      if (
-        requestToken !== historySelectionRequestToken ||
-        selectedHistoryMatchId.value !== matchId ||
-        requestRevision !== session.revision.value
-      ) {
+      if (isStale() || selectedHistoryMatchId.value !== matchId) {
         return
       }
 
       displayedHistoryMatchId.value = matchId
       historySections.value = grouped
     } catch (error) {
-      if (requestToken !== historySelectionRequestToken) {
+      if (isStale()) {
         return
       }
 

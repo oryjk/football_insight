@@ -341,9 +341,18 @@ const {
   toggleMonitoring,
 } = useTicketWatchPolling(state, loadCurrentBoard, session)
 
+// 页面可见身份：onShow 递增并置可见，onHide/onUnload 失效。
+// onShow 的 await 链与 sessionSync 恢复链据此决定 hide/unload 后是否继续后续读取；
+// pageEntered 在 onHide 时保持 true（仅控制首屏渲染遮罩），不能当作可见身份。
+let pageShowToken = 0
+let pageVisible = false
+function isTicketWatchPageVisible(): boolean {
+  return pageVisible
+}
+
 // 账号切换/退出：立即清理旧账号的私有看板数据（兴趣/订阅/会员档位），
 // 轮询停止由 useTicketWatchPolling 的 revision watch 负责；公共数据下次 onShow 以新会话重载。
-// 后台静默恢复/登录发布已认证用户后，可见页面直接重载当前看板，无需再次切 Tab。
+// 后台静默恢复/登录发布已认证用户后，可见页面按当前 activeTab 重载被清空的看板，无需再次切 Tab。
 const sessionSync = createTicketWatchSessionSync(state, session, {
   resetSessionScopedBoards: () => {
     resetCurrentBoard()
@@ -360,6 +369,8 @@ const sessionSync = createTicketWatchSessionSync(state, session, {
   },
   loadViewerMembershipTier,
   loadCurrentBoard,
+  loadHistoryMatches,
+  isPageVisible: isTicketWatchPageVisible,
 })
 
 watch(session.revision, () => {
@@ -423,10 +434,17 @@ onShareAppMessage(() => {
 
 onShow(() => {
   reportPageActivity('ticket_watch')
+  pageVisible = true
+  const showToken = ++pageShowToken
   void (async () => {
+    // 捕获本次 onShow 的可见身份：hide/unload/再次 onShow 后不再继续后续读取。
+    const isCurrentShow = () => pageVisible && showToken === pageShowToken
     pageEntered.value = true
     startFreshnessClock()
     systemConfigUnderReview.value = await loadSystemConfigUnderReview()
+    if (!isCurrentShow()) {
+      return
+    }
     if (systemConfigUnderReview.value) {
       stopPolling()
       currentLoading.value = false
@@ -438,11 +456,17 @@ onShow(() => {
       return
     }
     await loadViewerMembershipTier()
+    if (!isCurrentShow()) {
+      return
+    }
     if (membershipBenefitsLocked.value) {
       stopPolling()
       return
     }
     await Promise.all([loadCurrentBoard('initial'), loadHistoryMatches()])
+    if (!isCurrentShow()) {
+      return
+    }
     if (isMonitoringActive.value) {
       startPolling()
     }
@@ -456,11 +480,13 @@ onReady(() => {
 })
 
 onHide(() => {
+  pageVisible = false
   stopPolling()
   stopFreshnessClock()
 })
 
 onUnload(() => {
+  pageVisible = false
   stopPolling()
   stopFreshnessClock()
   pageEntered.value = false
