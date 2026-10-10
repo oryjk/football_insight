@@ -92,6 +92,10 @@ export function useTicketWatchBoards(
     systemConfigUnderReview,
     refluxSubscriptionEmail,
     refluxSubscriptionSubscribed,
+    refluxSubscriptionSheetVisible,
+    refluxSubscriptionLoading,
+    refluxSubscriptionSubmitting,
+    refluxSubscriptionStatusLoading,
     currentTrackedInterests,
   } = state
   let historySelectionRequestToken = 0
@@ -152,6 +156,12 @@ export function useTicketWatchBoards(
     currentTrackedInterests.value = []
     refluxSubscriptionSubscribed.value = false
     refluxSubscriptionEmail.value = ''
+    // 球队/比赛切换使旧订阅请求的快照失效、其 finally 跳过清理：
+    // loading/sheet 标记在这里复位，否则后续刷新与开 sheet 一直被在途标记挡住。
+    refluxSubscriptionStatusLoading.value = false
+    refluxSubscriptionLoading.value = false
+    refluxSubscriptionSubmitting.value = false
+    refluxSubscriptionSheetVisible.value = false
     currentErrorMessage.value = ''
     hasLoadedCurrentBoard.value = false
     currentMessage.value = '暂无当前比赛。'

@@ -494,4 +494,99 @@ describe('ticket watch subscription revision effects', () => {
     expect(state.refluxSubscriptionSubmitting.value).toBe(true)
     expect(toasts).toEqual([])
   })
+
+  test('订阅状态请求在途时切换球队/比赛：reset 复位 loading，之后可再次刷新', async () => {
+    const state = useTicketWatchState()
+    const session = createSessionStub()
+    state.currentMatch.value = match(1)
+    state.currentUser.value = { id: 'user-a' } as CurrentUser
+    const statusA = deferred<RefluxSubscriptionStatusResponse>()
+    let statusCalls = 0
+    const subscription = useTicketWatchSubscription(state, () => {}, {
+      createRefluxSubscriptionOrder: unusedAction(),
+      getRefluxSubscriptionPlans: unusedAction(),
+      getRefluxSubscriptionStatus: () => {
+        statusCalls += 1
+        return statusCalls === 1
+          ? statusA.promise
+          : Promise.resolve({
+            subscribed: true,
+            active_subscriptions: [],
+            email_target: { channel: 'email', target: 'b@example.com' },
+          })
+      },
+      waitForPaidOrder: unusedAction(),
+      requestTicketWatchPayment: unusedAction(),
+    }, session)
+    const boards = useTicketWatchBoards(state, async () => {}, { ...source }, session)
+
+    // 旧比赛的订阅状态请求在途。
+    const pendingA = subscription.refreshRefluxSubscriptionStatus()
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(true)
+
+    // 切换球队/比赛：reset 流程复位 loading（旧 finally 因快照失效跳过清理）。
+    boards.resetCurrentBoard()
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(false)
+    expect(state.refluxSubscriptionSheetVisible.value).toBe(false)
+
+    // 旧请求晚到：不恢复旧数据，也不再改动 loading。
+    statusA.resolve({
+      subscribed: true,
+      active_subscriptions: [],
+      email_target: { channel: 'email', target: 'stale@example.com' },
+    })
+    await pendingA
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(false)
+    expect(state.refluxSubscriptionEmail.value).toBe('')
+
+    // 新比赛下可以再次刷新并正常发布。
+    state.currentMatch.value = match(2)
+    await subscription.refreshRefluxSubscriptionStatus()
+    expect(statusCalls).toBe(2)
+    expect(state.refluxSubscriptionEmail.value).toBe('b@example.com')
+    expect(state.refluxSubscriptionSubscribed.value).toBe(true)
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(false)
+  })
+
+  test('旧订阅请求晚到不清掉新请求的 loading', async () => {
+    const state = useTicketWatchState()
+    const session = createSessionStub()
+    state.currentMatch.value = match(1)
+    state.currentUser.value = { id: 'user-a' } as CurrentUser
+    const statusA = deferred<RefluxSubscriptionStatusResponse>()
+    const statusB = deferred<RefluxSubscriptionStatusResponse>()
+    let statusCalls = 0
+    const subscription = useTicketWatchSubscription(state, () => {}, {
+      createRefluxSubscriptionOrder: unusedAction(),
+      getRefluxSubscriptionPlans: unusedAction(),
+      getRefluxSubscriptionStatus: () => {
+        statusCalls += 1
+        return statusCalls === 1 ? statusA.promise : statusB.promise
+      },
+      waitForPaidOrder: unusedAction(),
+      requestTicketWatchPayment: unusedAction(),
+    }, session)
+    const boards = useTicketWatchBoards(state, async () => {}, { ...source }, session)
+
+    const pendingA = subscription.refreshRefluxSubscriptionStatus()
+    boards.resetCurrentBoard()
+    // 新比赛的新请求已开始。
+    state.currentMatch.value = match(2)
+    const pendingB = subscription.refreshRefluxSubscriptionStatus()
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(true)
+
+    // 旧请求晚到：finally 跳过，不能清新请求的 loading。
+    statusA.resolve({ subscribed: false, active_subscriptions: [], email_target: null })
+    await pendingA
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(true)
+
+    statusB.resolve({
+      subscribed: true,
+      active_subscriptions: [],
+      email_target: { channel: 'email', target: 'b@example.com' },
+    })
+    await pendingB
+    expect(state.refluxSubscriptionStatusLoading.value).toBe(false)
+    expect(state.refluxSubscriptionEmail.value).toBe('b@example.com')
+  })
 })
