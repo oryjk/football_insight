@@ -273,13 +273,20 @@ function goToTeamBoard(): void {
 onShow(async () => {
   reportPageActivity('insights')
   ticketWatchNavigating.value = false
-  systemConfigUnderReview.value = await loadSystemConfigUnderReview()
-  if (systemConfigUnderReview.value) {
+  // onShow 操作身份在第一个 await 之前建立：审核查询或 loadUser 任一 await 跨越了
+  // 会话身份变化（如等待期间切换账号/退出/会话失效）时，本次 onShow 立即失效——
+  // 不发布审核/加载状态、不再继续后续请求；新会话的数据由它自己的 watcher/onShow 负责。
+  const shownRevision = session.revision.value
+  const underReview = await loadSystemConfigUnderReview()
+  if (session.revision.value !== shownRevision) {
+    return
+  }
+  systemConfigUnderReview.value = underReview
+  if (underReview) {
     applyUnderReviewView()
     return
   }
-  // onShow 生命周期跨 await 保留身份：loadUser 等待期间会话被替代（如切账号）时
-  // 返回 false，停止后续 loadInsights，避免旧 continuation 读取/遮盖新账号已加载的数据。
+  // loadUser 等待期间会话被替代时返回 false，同样停止后续 loadInsights。
   const stillCurrent = await loadUser()
   if (!stillCurrent) {
     return

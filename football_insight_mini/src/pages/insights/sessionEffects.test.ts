@@ -373,6 +373,72 @@ describe('insights 私有加载编排（真实 session + watch + 加载入口）
     fixture.stop()
   })
 
+  test('审核查询等待期间账号切换：旧 onShow 不发布审核/加载状态、不续请求', async () => {
+    const fixture = wireInsightsFixture({
+      source: {
+        login: (payload: { account_identifier: string }) =>
+          Promise.resolve({
+            access_token: `token-${payload.account_identifier}`,
+            expires_at: '2026-02-01T00:00:00Z',
+            user: { ...userA, id: payload.account_identifier },
+          } as AuthResponse),
+      },
+    })
+    const { session, data, insightRequests } = fixture
+
+    // A 登录并加载出缓存。
+    await session.loginWithPassword({ account_identifier: 'a', password: 'x' })
+    await nextTick()
+    await flushMicrotasks()
+    expect(insightRequests.length).toBe(1)
+    insightRequests[0].resolve(buildTeamInsightsResponse(1))
+    await flushMicrotasks()
+    expect(data.selectedTeamId.value).toBe(1)
+
+    // 与页面 onShow 相同的实际组合：操作身份在第一个 await（审核查询）之前建立，
+    // 审核/loadUser 每个 await 之后都核对身份。
+    const auditRequest = deferred<boolean>()
+    const shown = (async () => {
+      const shownRevision = session.revision.value
+      const underReview = await auditRequest.promise
+      if (session.revision.value !== shownRevision) {
+        return
+      }
+      if (underReview) {
+        data.applyUnderReviewView()
+        return
+      }
+      const stillCurrent = await data.loadUser()
+      if (!stillCurrent) {
+        return
+      }
+      await data.loadInsights()
+    })()
+    await flushMicrotasks()
+
+    // 审核查询在途期间用户登录 B：组合 watcher 发布 B 并成功加载 B 的洞察。
+    await session.loginWithPassword({ account_identifier: 'b', password: 'x' })
+    await nextTick()
+    await flushMicrotasks()
+    expect(insightRequests.length).toBe(2)
+    insightRequests[1].resolve(buildTeamInsightsResponse(2))
+    await flushMicrotasks()
+    expect(data.selectedTeamId.value).toBe(2)
+
+    // 审核查询迟到返回：旧 onShow 已失效——不再 loadUser/loadInsights 重读 B，
+    // 后续的读取失败也就不会遮盖 B 已加载成功的数据。
+    auditRequest.resolve(false)
+    await shown
+    await flushMicrotasks()
+
+    expect(insightRequests.length).toBe(2)
+    expect(session.currentUser.value?.id).toBe('b')
+    expect(data.selectedTeamId.value).toBe(2)
+    expect(data.errorMessage.value).toBe('')
+    expect(data.loading.value).toBe(false)
+    fixture.stop()
+  })
+
   test('ensure 等待期间用户退出：迟到的 ensure 回调不再读取/发布', async () => {
     storage[AUTH_TOKEN_STORAGE_KEY] = 'token-a'
     const meRequest = deferred<CurrentUser | null>()
