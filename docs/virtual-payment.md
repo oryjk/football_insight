@@ -35,13 +35,14 @@
 | `product_id` | 微信后台已发布的道具 ID |
 | `price_cents` | 道具价格（分），必须与 key、业务结算价及微信后台一致 |
 | `enabled` | 是否允许新增购买；默认 false |
+| `membership_duration_months` | 会员有效期（月），默认 12，范围 1–1200；12 表示一个自然年，比赛 ID/提醒商品不使用此字段 |
 | `allowed_user_ids` | 允许账号 UUID 数组；空数组表示普通公开商品，V3 测试商品必须指定账号 |
 | `remark` | 内部备注 |
 | `created_at` / `updated_at` | 创建/修改时间，更新时自动刷新 |
 
 映射 key 规则：
 
-- `membership:V3@1`：私有 VIP3 测试商品，1 分，沿用现有 V3 普通等级规则；仅白名单账号可见并购买。
+- `membership:V3@1`：私有 VIP3 测试商品，1 分，V3 权益，默认一年；仅白名单账号可见并购买。
 - `membership:V6@3900`：V6 年会员，3900 分。
 - `membership:V7@3500`：V7 补差价升级，3500 分。不同档位/补差价的固定价格道具分别添加；V9 续费复用 V9 完整价格道具。
 - `match_id_unlock@500`：单场比赛 ID 解锁，500 分；具体比赛由订单绑定。
@@ -50,13 +51,17 @@
 查询与更新示例（用数据库管理工具连接生产库执行，不在聊天中发送连接串）：
 
 ```sql
-SELECT product_key, name, product_id, price_cents, enabled, remark, updated_at
+SELECT product_key, name, product_id, price_cents, membership_duration_months, enabled, remark, updated_at
 FROM f_i_virtual_payment_products ORDER BY product_key;
 
 -- 修改微信道具 ID：应先确认新道具已发布，价格相同。
 UPDATE f_i_virtual_payment_products
 SET product_id = '微信后台新的已发布道具ID', name = 'V6 年会员'
 WHERE product_key = 'membership:V6@3900';
+
+-- 修改新订单的会员期限，无需部署/重启；旧订单保留购买时快照。
+UPDATE f_i_virtual_payment_products SET membership_duration_months = 12
+WHERE product_key = 'membership:V3@1';
 
 -- 暂停/恢复新增购买，无需重启后端。
 UPDATE f_i_virtual_payment_products SET enabled = FALSE
@@ -65,9 +70,9 @@ UPDATE f_i_virtual_payment_products SET enabled = TRUE
 WHERE product_key = 'membership:V6@3900';
 ```
 
-添加其他商品参考 `football_insight_service_backend_rs/config/virtual-payment-products.example.sql`；示例中未发布商品保持停用。商品表只保存道具映射，不覆盖原有业务定价。会员定价仍在 `f_i_system_configs` 的 `membership_product`，提醒套餐定价仍在原套餐表；比赛 ID 解锁仍按原业务固定 5 元。修改会员/提醒售价时需同步对应数据库业务定价、微信后台道具价格，以及商品表的 `product_key` / `price_cents`；金额不一致或映射缺失时拒绝支付，不回退普通支付。
+添加其他商品参考 `football_insight_service_backend_rs/config/virtual-payment-products.example.sql`；示例中未发布商品保持停用。商品表保存道具映射及会员有效期，不覆盖原有业务定价。会员定价仍在 `f_i_system_configs` 的 `membership_product`，提醒套餐定价仍在原套餐表；比赛 ID 解锁仍按原业务固定 5 元。修改会员/提醒售价时需同步对应数据库业务定价、微信后台道具价格，以及商品表的 `product_key` / `price_cents`；金额不一致或映射缺失时拒绝支付，不回退普通支付。
 
-每次准备支付会话/下单实时读库，无进程内缓存。公开购买状态接口也实时检查启用商品，排除 HTTP 响应缓存；数据库读取失败时关闭购买。历史订单保存购买时的微信商品 ID 与金额，修改或停用商品不会改变其查单、发货或退款。密钥、OfferID 和购买总开关继续使用环境变量。
+每次准备支付会话/下单实时读库，无进程内缓存。会员列表和公开购买状态接口都实时读库，支付路径排除 HTTP 响应缓存；数据库读取失败时关闭购买。历史订单保存购买时的微信商品 ID、金额和会员期限，修改或停用商品不会改变其查单、发货或退款。密钥、OfferID 和购买总开关继续使用环境变量。
 
 本次仅增加数据库表和支付读库逻辑；商品管理页面未包含在此次改动中。
 
@@ -117,7 +122,7 @@ WHERE product_key = 'membership:V6@3900';
 
 列表仅为允许账号追加 VIP3 测试选项，匿名及其他账号均不显示；下单接口从当前账号目录选取商品，底层生成支付参数时再按订单账号检查白名单。数据库约束禁止 V3 商品使用空白名单。旧系统会员配置中的 V3（含空格或大小写变体）不会作为公共付费选项返回。
 
-VIP3 对应项目既有 V3，付款确认后授予普通 V3 权益，不是 V6 年会员；界面服务声明针对该商品使用普通等级说明。真实支付结果由服务端确认后生效，测试程序不会替用户实际付款。
+VIP3 对应项目既有 V3，付款确认后授予 V3 权益，到期日按订单保存的商品期限计算（默认 12 个月）；界面服务声明和卡片读取后台返回的期限。到期后沿用既有会员等级回退策略。真实支付结果由服务端确认后生效，测试程序不会替用户实际付款。
 
 ## 订单确认与退款
 
@@ -149,3 +154,11 @@ MINI_REVIEW_SKIP=1 bun run build:mp-weixin
 - [虚拟支付接入](https://developers.weixin.qq.com/miniprogram/dev/platform-capabilities/business-capabilities/virtual-payment.html)
 - [客户端支付接口](https://developers.weixin.qq.com/miniprogram/dev/api/payment/wx.requestVirtualPayment.html)
 - [查询订单](https://developers.weixin.qq.com/miniprogram/dev/server/API/VirtualPayment/api_query_order.html)
+
+## 会员有效期数据库配置
+
+`20261013230000` 为商品与虚拟订单增加 `membership_duration_months`，全部现有商品和历史订单默认为 12。会员发货以订单快照设置到期日，新订单从商品实时读取期限；前端显示对应有效期，升级道具按实际补差价规格读取。会员等级与金额不变，比赛 ID 和提醒套餐沿用各自原有权益范围。
+
+`20261013230100` 为已经确认付款但缺少到期日的旧 V3 订单补齐期限，从原支付时间计算，只有当前权益仍等于订单旧授予快照才调整账号；保留后续人工修改/购买并修复退款链。先完成结构更新，再部署新后端，最后单独事务回填，避免旧后端继续生成无期限 V3。
+
+本地隔离后端 18093 已重启：修改商品 12→1→12 个月立即反映在同一进程的会员接口，指定/其他/匿名账号的访问限制保持有效。18 项隔离 PostgreSQL 测试覆盖订单期限快照、补差价规格、已付款 V3 回填、重复执行与多笔订单退款链；552 项前端测试、类型与边界检查、H5/小程序构建通过。生产更新与上传待执行。

@@ -18,6 +18,7 @@ fn map(row: &sqlx::postgres::PgRow) -> VirtualOrder {
         open_id: row.get("open_id"),
         product_id: row.get("product_id"),
         amount_cents: row.get("amount_cents"),
+        membership_duration_months: row.get("membership_duration_months"),
         wx_order_id: row.get("wx_order_id"),
     }
 }
@@ -25,12 +26,12 @@ fn map(row: &sqlx::postgres::PgRow) -> VirtualOrder {
 #[async_trait::async_trait]
 impl VirtualOrderRepository for PostgresVirtualOrderRepository {
     async fn record(&self, order: VirtualOrder) -> anyhow::Result<()> {
-        sqlx::query("INSERT INTO f_i_virtual_payment_orders(order_no,open_id,product_id,amount_cents) VALUES($1,$2,$3,$4)")
-            .bind(order.order_no).bind(order.open_id).bind(order.product_id).bind(order.amount_cents).execute(&self.pool).await?;
+        sqlx::query("INSERT INTO f_i_virtual_payment_orders(order_no,open_id,product_id,amount_cents,membership_duration_months) VALUES($1,$2,$3,$4,$5)")
+            .bind(order.order_no).bind(order.open_id).bind(order.product_id).bind(order.amount_cents).bind(order.membership_duration_months).execute(&self.pool).await?;
         Ok(())
     }
     async fn find(&self, order_no: &str) -> anyhow::Result<Option<VirtualOrder>> {
-        Ok(sqlx::query("SELECT order_no,open_id,product_id,amount_cents,wx_order_id FROM f_i_virtual_payment_orders WHERE order_no=$1").bind(order_no).fetch_optional(&self.pool).await?.as_ref().map(map))
+        Ok(sqlx::query("SELECT order_no,open_id,product_id,amount_cents,wx_order_id,membership_duration_months FROM f_i_virtual_payment_orders WHERE order_no=$1").bind(order_no).fetch_optional(&self.pool).await?.as_ref().map(map))
     }
     async fn record_delivery(&self, delivery: &Delivery) -> anyhow::Result<()> {
         let result = sqlx::query("UPDATE f_i_virtual_payment_orders SET wx_order_id=$2 WHERE order_no=$1 AND (wx_order_id IS NULL OR wx_order_id=$2)")
@@ -158,8 +159,9 @@ impl VirtualOrderRepository for PostgresVirtualOrderRepository {
         Ok(())
     }
     async fn pending_orders(&self) -> anyhow::Result<Vec<VirtualOrder>> {
-        let rows = sqlx::query("WITH candidates AS (SELECT v.order_no FROM f_i_virtual_payment_orders v JOIN f_i_payment_orders p USING(order_no) WHERE p.status IN ('pending','paid') AND NOT v.delivery_acknowledged AND v.created_at>NOW()-INTERVAL '30 days' AND (v.last_checked_at IS NULL OR v.last_checked_at<NOW()-INTERVAL '60 seconds') ORDER BY v.last_checked_at NULLS FIRST,v.created_at LIMIT 20) UPDATE f_i_virtual_payment_orders v SET last_checked_at=NOW() FROM candidates c WHERE v.order_no=c.order_no RETURNING v.order_no,v.open_id,v.product_id,v.amount_cents,v.wx_order_id")
+        let rows = sqlx::query("WITH candidates AS (SELECT v.order_no FROM f_i_virtual_payment_orders v JOIN f_i_payment_orders p USING(order_no) WHERE p.status IN ('pending','paid') AND NOT v.delivery_acknowledged AND v.created_at>NOW()-INTERVAL '30 days' AND (v.last_checked_at IS NULL OR v.last_checked_at<NOW()-INTERVAL '60 seconds') ORDER BY v.last_checked_at NULLS FIRST,v.created_at LIMIT 20) UPDATE f_i_virtual_payment_orders v SET last_checked_at=NOW() FROM candidates c WHERE v.order_no=c.order_no RETURNING v.order_no,v.open_id,v.product_id,v.amount_cents,v.wx_order_id,v.membership_duration_months")
             .fetch_all(&self.pool).await?;
+        // The pending query returns metadata snapshots, including duration, for reconciliation.
         Ok(rows.iter().map(map).collect())
     }
 }

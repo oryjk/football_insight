@@ -32,12 +32,14 @@ fn resolve_membership_settlement(
     current_expires_at: Option<DateTime<Utc>>,
     paid_tier: &str,
     now: DateTime<Utc>,
+    has_order_duration: bool,
 ) -> MembershipSettlement {
     let current_effective_tier =
         resolve_effective_membership_tier(current_tier, current_expires_at, now);
     let paid_tier_rank = membership_tier_rank(paid_tier);
     let current_effective_tier_rank = membership_tier_rank(&current_effective_tier);
-    let is_paid_membership_tier = paid_tier_rank >= membership_tier_rank("V6");
+    let is_paid_membership_tier =
+        paid_tier_rank >= membership_tier_rank("V6") || (paid_tier == "V3" && has_order_duration);
     let should_apply_paid_tier = (is_paid_membership_tier || paid_tier == "V3")
         && paid_tier_rank > current_effective_tier_rank;
     let should_refresh_paid_expiration =
@@ -71,7 +73,8 @@ mod tests {
             .single()
             .expect("valid expiration");
 
-        let settlement = resolve_membership_settlement("V9", Some(existing_expires_at), "V9", now);
+        let settlement =
+            resolve_membership_settlement("V9", Some(existing_expires_at), "V9", now, false);
 
         assert_eq!(settlement.effective_tier, "V9");
         assert!(settlement.should_refresh_paid_expiration);
@@ -84,7 +87,7 @@ mod tests {
             .single()
             .expect("valid now");
 
-        let settlement = resolve_membership_settlement("V3", None, "V3", now);
+        let settlement = resolve_membership_settlement("V3", None, "V3", now, false);
 
         assert_eq!(settlement.effective_tier, "V3");
         assert!(!settlement.should_refresh_paid_expiration);
@@ -141,15 +144,28 @@ impl PaymentSettlementPort for PostgresPaymentSettlementPort {
                 (membership_tier, membership_expires_at)
             })
             .unwrap_or_else(|| ("V1".to_string(), None));
-        let settlement =
-            resolve_membership_settlement(&current_tier, current_expires_at, tier, Utc::now());
+        let duration: Option<i32> = sqlx::query_scalar(
+            "SELECT membership_duration_months FROM f_i_virtual_payment_orders WHERE order_no=$1",
+        )
+        .bind(order_no)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let settlement = resolve_membership_settlement(
+            &current_tier,
+            current_expires_at,
+            tier,
+            Utc::now(),
+            duration.is_some(),
+        );
+        // Only historical ordinary payment orders have no virtual duration snapshot.
+        let duration_months = duration.unwrap_or(12);
 
         sqlx::query(
             r#"
             UPDATE f_i_users
             SET membership_tier = $2,
                 membership_expires_at = CASE
-                    WHEN $3 THEN NOW() + INTERVAL '1 year'
+                    WHEN $3 THEN NOW() + make_interval(months => $4)
                     ELSE membership_expires_at
                 END,
                 updated_at = NOW()
@@ -159,6 +175,7 @@ impl PaymentSettlementPort for PostgresPaymentSettlementPort {
         .bind(user_id)
         .bind(&settlement.effective_tier)
         .bind(settlement.should_refresh_paid_expiration)
+        .bind(duration_months)
         .execute(&mut *tx)
         .await?;
 

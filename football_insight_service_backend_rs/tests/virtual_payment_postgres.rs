@@ -222,6 +222,253 @@ async fn unreadable_catalog_rejects_purchase_without_creating_virtual_order() {
     db.close().await;
 }
 
+#[tokio::test]
+#[ignore = "requires an explicit disposable database"]
+async fn duration_changes_apply_to_new_orders_and_existing_orders_keep_their_snapshot() {
+    let db = Database::new().await;
+    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='f_i_virtual_payment_products' AND column_name='membership_duration_months')").fetch_one(&db.pool).await.unwrap();
+    assert!(exists, "membership duration must be a product field");
+    let service = catalog_service(&db);
+    catalog_checkout(&db, &service, "durationoriginal", "membership:V6", 3900)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE f_i_virtual_payment_products SET membership_duration_months=1 WHERE product_key='membership:V6@3900'").execute(&db.pool).await.unwrap();
+    catalog_checkout(&db, &service, "durationchanged", "membership:V6", 3900)
+        .await
+        .unwrap();
+    for (order_no, expected) in [("durationoriginal", 12), ("durationchanged", 1)] {
+        let months: i32 = sqlx::query_scalar(
+            "SELECT membership_duration_months FROM f_i_virtual_payment_orders WHERE order_no=$1",
+        )
+        .bind(order_no)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+        assert_eq!(months, expected);
+    }
+    sqlx::query("UPDATE f_i_virtual_payment_products SET enabled=FALSE")
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    for (order_no, expected) in [("durationoriginal", 12), ("durationchanged", 1)] {
+        service.reconcile(order_no, Some(db.user)).await.unwrap();
+        let correct: bool = sqlx::query_scalar("SELECT abs(EXTRACT(EPOCH FROM (membership_expires_at-(NOW()+make_interval(months => $2))))) < 10 FROM f_i_users WHERE id=$1").bind(db.user).bind(expected).fetch_one(&db.pool).await.unwrap();
+        assert!(
+            correct,
+            "fulfillment must use order duration even after disabling the catalog"
+        );
+    }
+    db.refund("durationchanged", "durationchangedrefund", 3900)
+        .await
+        .unwrap();
+    let restored: bool = sqlx::query_scalar(
+        "SELECT membership_expires_at > NOW()+INTERVAL '11 months' FROM f_i_users WHERE id=$1",
+    )
+    .bind(db.user)
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    assert!(restored);
+    db.refund("durationoriginal", "durationoriginalrefund", 3900)
+        .await
+        .unwrap();
+    assert_eq!(db.membership().await["tier"], "V1");
+    assert!(db.membership().await["expires_at"].is_null());
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires an explicit disposable database"]
+async fn catalog_duration_uses_the_actual_upgrade_sku_and_refreshes_after_database_edit() {
+    let db = Database::new().await;
+    sqlx::query("INSERT INTO f_i_virtual_payment_products(product_key,name,product_id,price_cents,enabled,membership_duration_months) VALUES('membership:V7@5900','V7 年会员','v7full',5900,TRUE,12),('membership:V7@3500','V7 升级','v7upgrade',3500,TRUE,3)").execute(&db.pool).await.unwrap();
+    let catalog = football_insight_service_backend_rs::payment::application::get_membership_product::GetMembershipProductUseCase::new(
+        Arc::new(football_insight_service_backend_rs::system_config::adapters::persistence::postgres_system_config_port::PostgresSystemConfigPort::new(db.pool.clone())),
+        Arc::new(football_insight_service_backend_rs::payment::adapters::persistence::postgres_virtual_product_repository::PostgresVirtualProductRepository::new(db.pool.clone())),
+    );
+    let upgrade = catalog
+        .with_duration_for_tier(catalog.execute().await.unwrap(), Some("V6"), Some(db.user))
+        .await
+        .unwrap();
+    assert_eq!(
+        upgrade
+            .find_option("V7")
+            .unwrap()
+            .membership_duration_months,
+        Some(3)
+    );
+    let full = catalog
+        .with_duration_for_tier(catalog.execute().await.unwrap(), Some("V1"), Some(db.user))
+        .await
+        .unwrap();
+    assert_eq!(
+        full.find_option("V7").unwrap().membership_duration_months,
+        Some(12)
+    );
+    sqlx::query("UPDATE f_i_virtual_payment_products SET membership_duration_months=1 WHERE product_key='membership:V7@3500'").execute(&db.pool).await.unwrap();
+    let changed = catalog
+        .with_duration_for_tier(catalog.execute().await.unwrap(), Some("V6"), Some(db.user))
+        .await
+        .unwrap();
+    assert_eq!(
+        changed
+            .find_option("V7")
+            .unwrap()
+            .membership_duration_months,
+        Some(1)
+    );
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires an explicit disposable database"]
+async fn legacy_v3_expiry_backfill_preserves_later_changes_and_repairs_refund_snapshots() {
+    for scenario in ["original", "manual", "refunded", "successor"] {
+        let db = Database::with_duration(false).await;
+        db.repos()
+            .0
+            .create_order(NewPaymentOrder {
+                order_no: "legacyv3paid".into(),
+                user_id: db.user,
+                amount_cents: 1,
+                product_type: "membership:V3".into(),
+            })
+            .await
+            .unwrap();
+        let before = serde_json::json!({"tier":"V1","expires_at":null});
+        let after = serde_json::json!({"tier":"V3","expires_at":null});
+        sqlx::query("UPDATE f_i_payment_orders SET status=$1,paid_at='2026-10-13T12:00:00Z' WHERE order_no='legacyv3paid'").bind(if scenario=="refunded"{"refunded"}else{"paid"}).execute(&db.pool).await.unwrap();
+        sqlx::query("INSERT INTO f_i_virtual_payment_orders(order_no,open_id,product_id,amount_cents,wx_order_id,grant_before,grant_after) VALUES('legacyv3paid','buyer','test',1,'WXlegacyv3paid',$1,$2)").bind(&before).bind(&after).execute(&db.pool).await.unwrap();
+        sqlx::query("UPDATE f_i_users SET membership_tier=$2 WHERE id=$1")
+            .bind(db.user)
+            .bind(if scenario == "manual" { "V9" } else { "V3" })
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        if scenario == "successor" {
+            db.repos()
+                .0
+                .create_order(NewPaymentOrder {
+                    order_no: "legacysuccessor".into(),
+                    user_id: db.user,
+                    amount_cents: 3900,
+                    product_type: "membership:V6".into(),
+                })
+                .await
+                .unwrap();
+            sqlx::query("UPDATE f_i_users SET membership_tier='V6',membership_expires_at='2027-10-13T13:00:00Z' WHERE id=$1").bind(db.user).execute(&db.pool).await.unwrap();
+            let successor = db.membership().await;
+            sqlx::query("UPDATE f_i_payment_orders SET status='paid',paid_at='2026-10-13T13:00:00Z' WHERE order_no='legacysuccessor'").execute(&db.pool).await.unwrap();
+            sqlx::query("INSERT INTO f_i_virtual_payment_orders(order_no,open_id,product_id,amount_cents,wx_order_id,grant_before,grant_after) VALUES('legacysuccessor','buyer','fi_v6_year_39',3900,'WXlegacysuccessor',$1,$2)").bind(&after).bind(successor).execute(&db.pool).await.unwrap();
+        }
+        let current = db.membership().await;
+        sqlx::raw_sql(include_str!(
+            "../migrations/20261013230000_add_membership_duration.sql"
+        ))
+        .execute(&db.pool)
+        .await
+        .unwrap();
+        sqlx::raw_sql(include_str!(
+            "../migrations/20261013230100_backfill_paid_v3_expiration.sql"
+        ))
+        .execute(&db.pool)
+        .await
+        .unwrap();
+        if scenario == "original" {
+            let correct: bool = sqlx::query_scalar("SELECT membership_expires_at='2027-10-13T12:00:00Z'::timestamptz FROM f_i_users WHERE id=$1").bind(db.user).fetch_one(&db.pool).await.unwrap();
+            assert!(correct, "use original paid time, not migration time");
+        } else {
+            assert_eq!(
+                db.membership().await,
+                current,
+                "preserve later or refunded membership state"
+            );
+        }
+        if scenario == "successor" {
+            db.refund("legacysuccessor", "legacysuccessorrefund", 3900)
+                .await
+                .unwrap();
+            let correct: bool = sqlx::query_scalar("SELECT membership_tier='V3' AND membership_expires_at='2027-10-13T12:00:00Z'::timestamptz FROM f_i_users WHERE id=$1").bind(db.user).fetch_one(&db.pool).await.unwrap();
+            assert!(correct, "refund successor restores the repaired V3 expiry");
+        }
+        if scenario != "refunded" {
+            db.refund("legacyv3paid", "legacyv3refund", 1)
+                .await
+                .unwrap();
+            assert_eq!(
+                db.membership().await["tier"],
+                if scenario == "manual" { "V9" } else { "V1" }
+            );
+            assert!(db.membership().await["expires_at"].is_null());
+        }
+        db.close().await;
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires an explicit disposable database"]
+async fn legacy_multiple_v3_orders_keep_latest_expiry_and_chronological_refund_chain() {
+    let db = Database::with_duration(false).await;
+    let initial = serde_json::json!({"tier":"V1","expires_at":null});
+    let legacy = serde_json::json!({"tier":"V3","expires_at":null});
+    for (order, paid_at, before) in [
+        ("legacyv3first", "2026-10-13T12:00:00Z", &initial),
+        ("legacyv3last", "2026-10-13T13:00:00Z", &legacy),
+    ] {
+        db.repos()
+            .0
+            .create_order(NewPaymentOrder {
+                order_no: order.into(),
+                user_id: db.user,
+                amount_cents: 1,
+                product_type: "membership:V3".into(),
+            })
+            .await
+            .unwrap();
+        sqlx::query(
+            "UPDATE f_i_payment_orders SET status='paid',paid_at=$2::timestamptz WHERE order_no=$1",
+        )
+        .bind(order)
+        .bind(paid_at)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO f_i_virtual_payment_orders(order_no,open_id,product_id,amount_cents,wx_order_id,grant_before,grant_after) VALUES($1,'buyer','test',1,'WX'||$1,$2,$3)")
+            .bind(order).bind(before).bind(&legacy).execute(&db.pool).await.unwrap();
+    }
+    sqlx::query("UPDATE f_i_users SET membership_tier='V3' WHERE id=$1")
+        .bind(db.user)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    sqlx::raw_sql(include_str!(
+        "../migrations/20261013230000_add_membership_duration.sql"
+    ))
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    for _ in 0..2 {
+        sqlx::raw_sql(include_str!(
+            "../migrations/20261013230100_backfill_paid_v3_expiration.sql"
+        ))
+        .execute(&db.pool)
+        .await
+        .unwrap();
+        let matches: bool = sqlx::query_scalar("SELECT membership_expires_at='2027-10-13T13:00:00Z'::timestamptz FROM f_i_users WHERE id=$1").bind(db.user).fetch_one(&db.pool).await.unwrap();
+        assert!(matches, "latest paid grant wins and backfill is idempotent");
+    }
+    db.refund("legacyv3last", "legacyv3lastrefund", 1)
+        .await
+        .unwrap();
+    let matches: bool = sqlx::query_scalar("SELECT membership_tier='V3' AND membership_expires_at='2027-10-13T12:00:00Z'::timestamptz FROM f_i_users WHERE id=$1").bind(db.user).fetch_one(&db.pool).await.unwrap();
+    assert!(matches, "latest refund restores the earlier repaired grant");
+    db.refund("legacyv3first", "legacyv3firstrefund", 1)
+        .await
+        .unwrap();
+    assert_eq!(db.membership().await, initial);
+    db.close().await;
+}
+
 struct Database {
     admin: PgPool,
     pool: PgPool,
@@ -306,8 +553,8 @@ async fn restricted_v3_product_only_allows_its_buyer_and_grants_v3_after_payment
     service.reconcile_pending().await.unwrap();
     assert_eq!(db.membership().await["tier"], "V3");
     assert!(
-        db.membership().await["expires_at"].is_null(),
-        "existing V3 uses ordinary membership rules"
+        !db.membership().await["expires_at"].is_null(),
+        "paid V3 must receive the configured membership expiry"
     );
     db.refund("restrictedv3buyer", "restrictedv3refund", 1)
         .await
@@ -338,6 +585,9 @@ async fn product_catalog_migration_seeds_published_v6() {
 }
 impl Database {
     async fn new() -> Self {
+        Self::with_duration(true).await
+    }
+    async fn with_duration(include_duration: bool) -> Self {
         let url = std::env::var("VIRTUAL_PAYMENT_TEST_DATABASE_URL")
             .expect("explicit disposable database required");
         assert!(
@@ -374,6 +624,20 @@ impl Database {
             include_str!("../migrations/20261013223000_add_restricted_virtual_products.sql"),
         ] {
             sqlx::raw_sql(migration).execute(&pool).await.unwrap();
+        }
+        if include_duration {
+            sqlx::raw_sql(include_str!(
+                "../migrations/20261013230000_add_membership_duration.sql"
+            ))
+            .execute(&pool)
+            .await
+            .unwrap();
+            sqlx::raw_sql(include_str!(
+                "../migrations/20261013230100_backfill_paid_v3_expiration.sql"
+            ))
+            .execute(&pool)
+            .await
+            .unwrap();
         }
         let user = Uuid::new_v4();
         sqlx::query("INSERT INTO f_i_users(id,wx_open_id,account_identifier,display_name,password_hash) VALUES($1,'buyer','buyer','Buyer','unused')").bind(user).execute(&pool).await.unwrap();
@@ -416,6 +680,7 @@ impl Database {
                 open_id: "buyer".into(),
                 product_id: product.into(),
                 amount_cents: amount,
+                membership_duration_months: 12,
                 wx_order_id: None,
             })
             .await

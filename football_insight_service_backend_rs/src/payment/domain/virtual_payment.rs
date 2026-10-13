@@ -23,6 +23,7 @@ pub enum VirtualPaymentError {
 pub struct VirtualProduct {
     pub product_id: String,
     pub price_cents: i32,
+    pub membership_duration_months: i32,
 }
 
 #[derive(Debug, Clone)]
@@ -30,6 +31,7 @@ pub struct PrivateMembershipProduct {
     pub product_type: String,
     pub name: String,
     pub price_cents: i32,
+    pub membership_duration_months: i32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -47,6 +49,7 @@ pub struct VirtualOrder {
     pub open_id: String,
     pub product_id: String,
     pub amount_cents: i32,
+    pub membership_duration_months: i32,
     pub wx_order_id: Option<String>,
 }
 

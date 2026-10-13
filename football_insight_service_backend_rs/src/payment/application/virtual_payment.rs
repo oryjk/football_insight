@@ -214,6 +214,7 @@ impl WechatPayPort for VirtualPaymentService {
                 open_id: openid.into(),
                 product_id: product.product_id.clone(),
                 amount_cents,
+                membership_duration_months: product.membership_duration_months,
                 wx_order_id: None,
             })
             .await?;

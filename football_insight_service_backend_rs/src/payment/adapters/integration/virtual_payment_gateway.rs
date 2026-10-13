@@ -269,6 +269,7 @@ mod tests {
             open_id: "buyer".into(),
             product_id: "v6".into(),
             amount_cents: 3900,
+            membership_duration_months: 12,
             wx_order_id: None,
         };
         let response = json!({"order":{"status":2,"order_id":"ORDER123","env_type":1,"order_type":7,"order_fee":3900,"paid_fee":3900,"refund_fee":0,"left_fee":3900,"wx_order_id":"WX123"}});

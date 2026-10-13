@@ -9,6 +9,8 @@ import {
   getMembershipPayPriceCents,
   isMembershipUpgradePrice,
   normalizeMembershipProductOptions,
+  formatMembershipDuration,
+  buildMembershipPurchaseAgreement,
 } from './helpers'
 
 const backendProductOptions = [
@@ -41,6 +43,20 @@ const backendProductOptions = [
     description: '购买后立即升级为 V9 会员，最近回流速览权限与 V8 一致。',
   },
 ]
+
+describe('configured membership duration', () => {
+  test('shows one calendar year for twelve months and shorter product durations accurately', () => {
+    expect(formatMembershipDuration(12)).toBe('一年')
+    expect(formatMembershipDuration(3)).toBe('3 个月')
+    expect(formatMembershipDuration(24)).toBe('2 年')
+    expect(formatMembershipDuration(undefined)).toBe('一年')
+  })
+  test('uses the selected product duration in the purchase agreement', () => {
+    expect(buildMembershipPurchaseAgreement(3)[0].includes('有效期为3 个月')).toBe(true)
+    expect(buildMembershipPurchaseAgreement(12)[0].includes('有效期为一年')).toBe(true)
+    expect(buildMembershipPurchaseAgreement(3)[1]).toBe(MEMBERSHIP_PURCHASE_AGREEMENT_POINTS[1])
+  })
+})
 
 describe('normalizeMembershipProductOptions', () => {
   test('does not provide frontend fallback products when backend catalog is missing', () => {

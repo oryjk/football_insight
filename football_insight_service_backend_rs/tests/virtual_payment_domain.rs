@@ -26,6 +26,7 @@ fn payment_data_contains_exact_price_and_no_secrets() {
     let product = VirtualProduct {
         product_id: "v7_upgrade".into(),
         price_cents: 3500,
+        membership_duration_months: 12,
     };
     let data = build_sign_data("123", "ORDER123", &product).unwrap();
     let value: serde_json::Value = serde_json::from_str(&data).unwrap();
@@ -43,6 +44,7 @@ fn order() -> VirtualOrder {
         open_id: "buyer".into(),
         product_id: "v6".into(),
         amount_cents: 3900,
+        membership_duration_months: 12,
         wx_order_id: None,
     }
 }

@@ -23,6 +23,7 @@ pub struct MembershipProductOptionResponse {
     pub title: String,
     pub subtitle: String,
     pub description: String,
+    pub membership_duration_months: Option<i32>,
 }
 
 impl MembershipProductResponse {
@@ -75,6 +76,7 @@ impl MembershipProductOptionResponse {
             title: value.title,
             subtitle: value.subtitle,
             description: value.description,
+            membership_duration_months: value.membership_duration_months,
         }
     }
 }

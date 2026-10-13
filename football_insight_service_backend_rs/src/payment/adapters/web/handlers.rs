@@ -93,6 +93,14 @@ pub async fn get_membership_product_handler(
         None => None,
     };
 
+    let product = state
+        .get_membership_product_use_case
+        .with_duration_for_tier(product, current_tier.as_deref(), user_id)
+        .await
+        .map_err(|error| {
+            tracing::error!(%error,"failed to get membership duration");
+            (StatusCode::INTERNAL_SERVER_ERROR, "获取会员信息失败".into())
+        })?;
     Ok(Json(MembershipProductResponse::from_product_for_tier(
         product,
         current_tier.as_deref(),

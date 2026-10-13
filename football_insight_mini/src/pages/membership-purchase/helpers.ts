@@ -8,6 +8,19 @@ export const MEMBERSHIP_PURCHASE_AGREEMENT_POINTS = [
   '本会员属于虚拟服务，支付成功后将即时开通对应会员权益。请在支付前确认所选档位、价格及账号信息；除因平台原因导致服务无法开通或法律法规另有规定外，支付后不支持退款。',
 ]
 
+export function formatMembershipDuration(months: number | null | undefined): string {
+  const duration = typeof months === 'number' && Number.isInteger(months) && months > 0 ? months : 12
+  if (duration === 12) return '一年'
+  return duration % 12 === 0 ? `${duration / 12} 年` : `${duration} 个月`
+}
+
+export function buildMembershipPurchaseAgreement(months: number | null | undefined): string[] {
+  return [
+    MEMBERSHIP_PURCHASE_AGREEMENT_POINTS[0].replace('有效期为一年', `有效期为${formatMembershipDuration(months)}`),
+    ...MEMBERSHIP_PURCHASE_AGREEMENT_POINTS.slice(1),
+  ]
+}
+
 export function normalizeMembershipProductOptions(
   product: MembershipProduct | null | undefined,
 ): MembershipProductOption[] {

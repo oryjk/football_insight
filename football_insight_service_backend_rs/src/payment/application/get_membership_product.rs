@@ -162,8 +162,46 @@ impl GetMembershipProductUseCase {
                         title: private.name,
                         subtitle: "仅限指定账号".into(),
                         description: format!("支付确认后开通 {tier}，权益按现有等级规则执行。"),
+                        membership_duration_months: Some(private.membership_duration_months),
                     });
             }
+        }
+        Ok(product)
+    }
+
+    pub async fn with_duration_for_tier(
+        &self,
+        mut product: MembershipProduct,
+        current_tier: Option<&str>,
+        user_id: Option<uuid::Uuid>,
+    ) -> anyhow::Result<MembershipProduct> {
+        let options = product.products.clone();
+        for option in &mut product.products {
+            let price = current_tier
+                .and_then(|tier| {
+                    crate::payment::domain::order::calculate_membership_checkout_price(
+                        &options,
+                        tier,
+                        &option.target_tier,
+                    )
+                    .ok()
+                })
+                .map(|price| price.pay_price_cents)
+                .unwrap_or(option.price_cents);
+            option.membership_duration_months = None;
+            let Ok(key) = crate::payment::domain::virtual_payment::product_key(
+                &crate::payment::domain::order::membership_product_type_for_tier(
+                    &option.target_tier,
+                ),
+                price,
+            ) else {
+                continue;
+            };
+            option.membership_duration_months = self
+                .products
+                .find_enabled(&key, user_id.unwrap_or_default())
+                .await?
+                .map(|product| product.membership_duration_months);
         }
         Ok(product)
     }

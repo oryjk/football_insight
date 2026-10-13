@@ -18,6 +18,7 @@ export interface MembershipProductOption {
   title: string
   subtitle: string
   description: string
+  membership_duration_months?: number | null
 }
 
 export interface CreateOrderResponse {

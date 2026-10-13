@@ -39,6 +39,7 @@
             {{ formatMembershipUpgradeNote(option) }}
           </text>
           <text class="product-card__description">{{ option.description }}</text>
+          <text class="product-card__description">有效期：{{ formatMembershipDuration(option.membership_duration_months) }}</text>
         </view>
       </view>
       <view v-else class="purchase-empty-card">
@@ -138,7 +139,8 @@ import {
   type MembershipTierGuide,
 } from '../../utils/membershipRules'
 import {
-  MEMBERSHIP_PURCHASE_AGREEMENT_POINTS,
+  buildMembershipPurchaseAgreement,
+  formatMembershipDuration,
   filterMembershipProductOptionsForUpgrade,
   formatMembershipUpgradeNote,
   formatMembershipPrice,
@@ -160,9 +162,7 @@ const currentUser = session.currentUser
 const loading = ref(false)
 const selectedTier = ref('')
 const agreementAccepted = ref(false)
-const agreementPoints = computed(() => selectedProduct.value?.target_tier === 'V3'
-  ? ['本商品开通项目现有 V3 等级，等级及权益按当前会员规则执行。', ...MEMBERSHIP_PURCHASE_AGREEMENT_POINTS.slice(1)]
-  : MEMBERSHIP_PURCHASE_AGREEMENT_POINTS)
+const agreementPoints = computed(() => buildMembershipPurchaseAgreement(selectedProduct.value?.membership_duration_months))
 const paymentAvailable = ref(false)
 const paymentUnavailableMessage = ref('请稍后再试。')
 

@@ -167,7 +167,7 @@ fn matches_excluded_prefix(path: &str) -> bool {
     }
 
     path.starts_with("/api/v1/auth/")
-        || path.starts_with("/api/v1/payment/virtual/")
+        || path.starts_with("/api/v1/payment/")
         || path.starts_with("/api/v1/ticket-watch/")
         || path.starts_with("/api/v1/match-id/")
         || path.starts_with("/api/v1/system")
@@ -375,6 +375,32 @@ mod tests {
             .unwrap();
 
         assert_eq!(hits.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn membership_catalog_duration_is_not_cached_after_product_edit() {
+        let months = Arc::new(AtomicUsize::new(12));
+        let state = months.clone();
+        let app=Router::new().route("/api/v1/payment/membership-product",get(move || {
+            let state=state.clone();
+            async move { axum::Json(serde_json::json!({"membership_duration_months":state.load(Ordering::SeqCst)})) }
+        })).layer(from_fn_with_state(HttpResponseCache::new(Duration::from_secs(600)),cache_get_responses));
+        for expected in [12, 1] {
+            months.store(expected, Ordering::SeqCst);
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri("/api/v1/payment/membership-product")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let body = to_bytes(response.into_body(), 1024).await.unwrap();
+            let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(value["membership_duration_months"], expected);
+        }
     }
 
     #[tokio::test]

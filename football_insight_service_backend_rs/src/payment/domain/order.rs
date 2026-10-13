@@ -70,6 +70,8 @@ pub struct MembershipProductOption {
     pub title: String,
     pub subtitle: String,
     pub description: String,
+    #[serde(default)]
+    pub membership_duration_months: Option<i32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -97,6 +99,7 @@ pub fn default_membership_product_options() -> Vec<MembershipProductOption> {
             title: "V6 回流速览会员".to_string(),
             subtitle: "查看 30 分钟内".to_string(),
             description: "购买后立即升级为 V6 会员，可查看最近 30 分钟内的回流区域。".to_string(),
+            membership_duration_months: None,
         },
         MembershipProductOption {
             target_tier: "V7".to_string(),
@@ -104,6 +107,7 @@ pub fn default_membership_product_options() -> Vec<MembershipProductOption> {
             title: "V7 进阶回流会员".to_string(),
             subtitle: "查看 10 分钟内".to_string(),
             description: "购买后立即升级为 V7 会员，可查看最近 10 分钟内的回流区域。".to_string(),
+            membership_duration_months: None,
         },
         MembershipProductOption {
             target_tier: "V8".to_string(),
@@ -111,6 +115,7 @@ pub fn default_membership_product_options() -> Vec<MembershipProductOption> {
             title: "V8 高阶回流会员".to_string(),
             subtitle: "查看 3 分钟内".to_string(),
             description: "购买后立即升级为 V8 会员，可查看最近 3 分钟内的回流区域。".to_string(),
+            membership_duration_months: None,
         },
         MembershipProductOption {
             target_tier: "V9".to_string(),
@@ -118,6 +123,7 @@ pub fn default_membership_product_options() -> Vec<MembershipProductOption> {
             title: "V9 旗舰回流会员".to_string(),
             subtitle: "同 V8 速览权限".to_string(),
             description: "购买后立即升级为 V9 会员，最近回流速览权限与 V8 一致。".to_string(),
+            membership_duration_months: None,
         },
     ]
 }
