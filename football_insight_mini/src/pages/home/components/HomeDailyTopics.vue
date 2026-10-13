@@ -9,7 +9,7 @@
         </view>
       </view>
     </view>
-    <text class="daily-topics__intro">成都蓉城新闻 · AI 整理 · 每篇四川话播报</text>
+    <text class="daily-topics__intro">成都蓉城新闻</text>
     <view v-if="loading && !edition.items.length" class="daily-topics__state">
       <text class="daily-topics__state-title">正在加载最新话题</text>
       <text class="daily-topics__state-copy">成都蓉城相关新闻与来源</text>

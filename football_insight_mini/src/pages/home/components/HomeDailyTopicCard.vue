@@ -1,7 +1,7 @@
 <template>
   <view class="topic-card">
     <view class="topic-card__top">
-      <text class="topic-card__category">AI 整理</text>
+      <text class="topic-card__category">蓉城动态</text>
       <text class="topic-card__number">{{ indexLabel }}</text>
     </view>
     <view class="topic-card__reading" role="button" :aria-label="`阅读${item.title}`" hover-class="topic-card__reading--pressed" @tap="emit('read', item.id)">
