@@ -13,6 +13,7 @@ import xml.etree.ElementTree as ET
 import requests
 
 from .models import SourceArticle, canonical_url, parse_timestamp
+from .discovery import listing_entries
 from .publishers import is_article_body, normalize_publication_time, public_json_document, visible_publication_times
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,11 @@ MAX_SOURCES = 30
 MAX_DOWNLOADS = 90
 MAX_DOCUMENT_CHARS = 2_000_000
 MIN_BODY_CHARS = 40
+
+
+def _valid_original_body(article: SourceArticle) -> bool:
+    return (MIN_BODY_CHARS <= len(article.body.strip()) <= 100_000
+            and len(article.title.strip()) + len(article.body.strip()) >= 80)
 
 
 class _ArticleHTML(HTMLParser):
@@ -182,7 +188,8 @@ def _feed_entries(text: str, feed: dict):
             yield {**fields, "url": urljoin(feed["url"], fields["url"]), "publisher": feed["publisher"]}
 
 
-def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, session=None) -> list[SourceArticle]:
+def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, session=None,
+                    require_available: bool = False) -> list[SourceArticle]:
     """Return at most 30 recent full originals; warn safely per failed source."""
     if now.tzinfo is None or now.utcoffset() is None or max_age_hours <= 0:
         raise ValueError("Collection requires aware now and positive maximum age")
@@ -198,9 +205,7 @@ def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, ses
     def accept(article):
         if not cutoff <= article.published_at <= now:
             return
-        if (not MIN_BODY_CHARS <= len(article.body.strip()) <= 100_000
-                or len(article.title.strip()) + len(article.body.strip()) < 80
-                or "蓉城" not in article.title + article.body):
+        if not _valid_original_body(article) or "蓉城" not in article.title + article.body:
             return
         body_hash = hashlib.sha256(" ".join(article.body.split()).encode()).hexdigest()
         if article.url not in seen_urls and body_hash not in seen_bodies:
@@ -217,13 +222,28 @@ def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, ses
             return accepted
 
     candidates = list(config.get("articles", [])[:MAX_DOWNLOADS])
+    available = 0
     for feed in config.get("feeds", [])[:20]:
         try:
             text, _ = _fetch_text(session, feed["url"])
-            candidates.extend(list(_feed_entries(text, feed))[:MAX_DOWNLOADS])
+            entries = list(_feed_entries(text, feed))[:MAX_DOWNLOADS]
+            keywords = feed.get('keywords')
+            candidates.extend(item for item in entries if not keywords or any(word in item.get('title', '') for word in keywords))
+            available += 1
         except (requests.RequestException, ValueError, TypeError, KeyError, ET.ParseError):
             logger.warning("Skipped news feed: unavailable or invalid feed")
 
+    for listing in config.get('listings', [])[:20]:
+        try:
+            text, resolved = _fetch_text(session, listing['url'])
+            candidates.extend(listing_entries(text, {**listing, 'url': resolved}))
+            available += 1
+        except (requests.RequestException, ValueError, TypeError, KeyError, re.error):
+            logger.warning('Skipped news listing: unavailable or unrecognized publisher list')
+    if require_available and (config.get('listings') or config.get('feeds')) and not available:
+        raise ValueError('all configured news discovery sources unavailable')
+
+    original_attempts = original_successes = 0
     for item in candidates:
         if len(accepted) >= MAX_SOURCES or len(attempted_urls) >= MAX_DOWNLOADS:
             break
@@ -234,8 +254,13 @@ def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, ses
             attempted_urls.add(url)
             if item.get("published_at") and parse_timestamp(item["published_at"], now) < cutoff:
                 continue
+            original_attempts += 1
             text, resolved_url = _fetch_text(session, url)
-            accept(_extract_original(text, {**item, "url": resolved_url}, now))
+            article = _extract_original(text, {**item, "url": resolved_url}, now)
+            original_successes += int(_valid_original_body(article))
+            accept(article)
         except (requests.RequestException, ValueError, TypeError, KeyError):
             logger.warning("Skipped original news: unavailable, invalid body, or publication metadata")
+    if require_available and original_attempts and not original_successes:
+        raise ValueError('all discovered original bodies unavailable or unverifiable')
     return accepted

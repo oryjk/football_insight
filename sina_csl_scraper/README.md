@@ -6,6 +6,8 @@
 
 local233 的安装路径、真实 CPU 基准、私有配置加载和手动运行命令见 [local233 今日话题运行说明](docs/topics-local233.md)。已有真实批次可用 `topics refresh-audio` 只刷新四川话音频：所有音频成功后才更新数据库，不再调用 LLM、不改原正文和来源。
 
+local233 现已在每天北京时间 **07:00–22:30，每半小时** 检查并更新今日话题，入口为 `./update_daily_topics.sh`，使用 `config/rongcheng-news-auto.json` 持续发现体坛周报与中新网的新原文。每日命令 `topics daily-update --write-db` 只处理比已发布来源更新、且未发布过的材料；正文和每篇音频全部成功后才原子发布，无新文章或失败时保留现有内容。日志在 `data/topics/daily.log`，运行状态在 `data/topics/daily-status.json`，cron 模板在 `deploy/topics-daily.cron.example`。
+
 `topics/` 是独立的新闻生成链路，不混入赛季同步：`sources` 采集原文，`generation` 调用正文 LLM，`tts` 调用本地 Qwen，`pipeline` 负责缓存与音频发布，`repository` 原子写库，`cli` 提供入口。小程序只请求 Rust 读取接口并播放 MinIO 音频。
 
 准备本地 Qwen 推理程序（复用已下载的 0.6B CustomVoice 权重，Mac 使用 Metal）：

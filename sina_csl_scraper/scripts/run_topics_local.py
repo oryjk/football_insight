@@ -1,4 +1,4 @@
-"""Manual local233 entry point; credentials stay in private files/process memory."""
+"""Local233 entry point; credentials stay in private files/process memory."""
 from __future__ import annotations
 
 import json
@@ -42,8 +42,8 @@ def main() -> None:
     loaded = arguments[:1] == ['--env-loaded']
     if loaded:
         arguments = arguments[1:]
-    if not arguments or arguments[0] not in {'collect', 'generate', 'tts', 'refresh-audio'}:
-        print('Usage: uv run --no-sync python scripts/run_topics_local.py {collect|generate|tts|refresh-audio} [topic options]')
+    if not arguments or arguments[0] not in {'collect', 'generate', 'tts', 'refresh-audio', 'daily-update'}:
+        print('Usage: uv run --no-sync python scripts/run_topics_local.py {collect|generate|tts|refresh-audio|daily-update} [topic options]')
         raise SystemExit(0 if arguments[:1] in [['--help'], ['-h']] else 2)
     if not loaded:
         files = [root / '.env.topics', root / '.env.sync']

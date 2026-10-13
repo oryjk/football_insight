@@ -1,0 +1,25 @@
+{
+  "feeds": [
+    {
+      "url": "https://www.chinanews.com.cn/rss/sports.xml",
+      "publisher": "中国新闻网",
+      "keywords": ["蓉城"]
+    }
+  ],
+  "listings": [
+    {
+      "url": "https://www.ttplus.cn/innerfb.html",
+      "publisher": "体坛周报／体坛+",
+      "allowed_hosts": ["www.ttplus.cn", "ttplus.cn"],
+      "path_pattern": "^/publish/app/data/\\d{4}/\\d{2}/\\d{2}/\\d+/os_news\\.html$",
+      "keywords": ["蓉城"]
+    },
+    {
+      "url": "https://www.ttplus.cn/",
+      "publisher": "体坛周报／体坛+",
+      "allowed_hosts": ["www.ttplus.cn", "ttplus.cn"],
+      "path_pattern": "^/publish/app/data/\\d{4}/\\d{2}/\\d{2}/\\d+/os_news\\.html$",
+      "keywords": ["蓉城"]
+    }
+  ]
+}

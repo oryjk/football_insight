@@ -1,8 +1,11 @@
 """Only writes the table provisioned by the Rust migration, never creates tables."""
 from __future__ import annotations
 
+from datetime import datetime
+
 import psycopg
 from psycopg.types.json import Jsonb
+from .models import canonical_url, parse_timestamp
 
 
 class TopicRepository:
@@ -29,3 +32,19 @@ class TopicRepository:
                     ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload
                 ''', (edition['id'], payload['team_id'], payload['edition_date'], payload['updated_at'],
                       Jsonb(payload), edition['source_fingerprint'], edition['generator_version']))
+
+    def published_sources(self, team_id: int) -> tuple[set[str], datetime | None]:
+        """Use publication history as the durable deduplication baseline."""
+        with psycopg.connect(self.database_url) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute('''
+                    SELECT DISTINCT source->>'url', source->>'published_at'
+                    FROM f_i_daily_topic_editions
+                    CROSS JOIN LATERAL jsonb_array_elements(payload->'items') AS item
+                    CROSS JOIN LATERAL jsonb_array_elements(item->'sources') AS source
+                    WHERE team_id = %s
+                ''', (team_id,))
+                rows = cursor.fetchall()
+        urls = {canonical_url(url) for url, _ in rows}
+        dates = [parse_timestamp(timestamp) for _, timestamp in rows if timestamp]
+        return urls, max(dates) if dates else None

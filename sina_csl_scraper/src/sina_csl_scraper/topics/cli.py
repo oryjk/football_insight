@@ -13,8 +13,10 @@ import typer
 
 from ..assets import MinioAssetTarget
 from .generation import TopicGenerator
+from .daily import DailyFinalizationError, run_daily_update
 from .models import SHANGHAI, parse_timestamp
 from .pipeline import NoTopicsError, generate_edition, refresh_edition_audio
+from .pipeline import _atomic_json
 from .repository import TopicRepository
 from .sources import collect_sources
 from .storage import SshMinioTarget
@@ -70,6 +72,10 @@ def _target() -> MinioAssetTarget | SshMinioTarget:
         region=os.getenv('FI_MINIO_REGION', 'us-east-1'), public_base_url=os.getenv('FI_MINIO_PUBLIC_BASE_URL'))
 
 
+class TopicJobBusy(ValueError):
+    """Another process owns the cache and its status files."""
+
+
 @contextmanager
 def _lock(cache_dir: Path):
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -77,7 +83,7 @@ def _lock(cache_dir: Path):
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise ValueError('another topic generation is using this cache') from None
+            raise TopicJobBusy('another topic generation is using this cache') from None
         yield
 
 
@@ -145,6 +151,65 @@ def generate(config: Path = typer.Option(..., exists=True, dir_okay=False),
         raise typer.Exit(1) from None
     except Exception as error:
         typer.echo(f'generation failed ({type(error).__name__}); previous database edition retained', err=True)
+        raise typer.Exit(1) from None
+
+
+@app.command('daily-update')
+def daily_update(config: Path = typer.Option(..., exists=True, dir_okay=False),
+                 output_dir: Path = Path('data/topics'), team_id: int = typer.Option(77680, min=1),
+                 limit: int = typer.Option(5, min=1, max=5), max_age_hours: int = typer.Option(72, min=1, max=168),
+                 write_db: bool = False, at: str | None = None) -> None:
+    """Publish fresh news only after every article has verified uploaded audio."""
+    failure = None
+
+    def failed_result(error):
+        return {'status': 'failed', 'error_type': type(error).__name__,
+                'previous_retained': not isinstance(error, DailyFinalizationError),
+                'finished_at': datetime.now(SHANGHAI).isoformat()}
+
+    try:
+        if not write_db:
+            raise ValueError('daily-update requires explicit --write-db')
+        database_url = os.getenv('FI_DATABASE_URL') or os.getenv('DATABASE_URL')
+        if not database_url:
+            raise ValueError('FI_DATABASE_URL is required')
+        now = _now(at)
+
+        def generator():
+            base_url, model = os.getenv('FI_TOPIC_LLM_BASE_URL'), os.getenv('FI_TOPIC_LLM_MODEL')
+            if not base_url or not model:
+                raise ValueError('article LLM configuration is missing')
+            return TopicGenerator(base_url=base_url, model=model, api_key=os.getenv('FI_TOPIC_LLM_API_KEY'))
+
+        with _lock(output_dir):
+            try:
+                repository = TopicRepository(database_url)
+                repository.check_schema()
+                _atomic_json(output_dir / 'daily-status.json', {'status': 'running', 'started_at': now.isoformat()})
+                sources = collect_sources(_config(config), now, max_age_hours, require_available=True)
+                result = run_daily_update(sources, repository=repository, generator_factory=generator,
+                    tts_factory=lambda: _tts(output_dir), target_factory=_target,
+                    cache_dir=output_dir, now=now, team_id=team_id, limit=limit, max_age_hours=max_age_hours)
+                result.update(finished_at=datetime.now(SHANGHAI).isoformat(),
+                              previous_retained=result['status'] != 'published')
+                try:
+                    _atomic_json(output_dir / 'daily-status.json', result)
+                except OSError as error:
+                    if result['status'] == 'published':
+                        raise DailyFinalizationError('database published; status checkpoint failed') from error
+                    raise
+            except Exception as error:
+                failure = failed_result(error)
+                try:
+                    _atomic_json(output_dir / 'daily-status.json', failure)
+                except OSError:
+                    pass
+                raise
+        typer.echo(json.dumps(result, ensure_ascii=False))
+    except TopicJobBusy:
+        typer.echo(json.dumps({'status': 'already_running', 'previous_retained': True}), err=True)
+    except Exception as error:
+        typer.echo(json.dumps(failure or failed_result(error), ensure_ascii=False), err=True)
         raise typer.Exit(1) from None
 
 

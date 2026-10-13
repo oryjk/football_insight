@@ -1,4 +1,4 @@
-# local233 今日话题手动运行
+# local233 今日话题每日更新与手动运行
 
 此链路使用 Kimi Code `k3-256k` 整理真实新闻全文，用本机 Qwen Eric 四川话音色生成每篇独立音频，复用头像/球队 logo 的 `MinioAssetTarget` 上传，再通过 Python 原子 upsert 发布批次。Rust 只读数据库，小程序直接播放 HTTPS MinIO URL。
 
@@ -11,6 +11,33 @@
 - AAC：已安装 `ffmpeg` / `ffprobe`。先生成 24kHz 单声道 PCM16，检查非静音和削波，再转换 AAC/m4a。
 
 官方模型与 Eric 音色说明：[Qwen 固定模型快照](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/blob/85e237c12c027371202489a0ec509ded67b5e4b5/README.md)。这不是拿 Mac Metal 的速度推算 CPU。
+
+## 每日自动更新
+
+local233 已配置 betalpha 用户 crontab：每天北京时间 **07:00–22:30，每半小时** 执行 `./update_daily_topics.sh --scheduled`。系统时区已确认是 Asia/Shanghai，cron 服务已运行；既有比赛和头像任务保留。模板为 `deploy/topics-daily.cron.example`。07:00 为首次触发，22:30 为最后一次触发；23:00 截止自动执行。正文、CPU 语音和上传全部成功后才发布。
+
+自动来源配置为 `config/rongcheng-news-auto.json`：从[体坛周报中国足球频道](https://www.ttplus.cn/innerfb.html)和首页发现蓉城文章，并读取[中新网体育 RSS](https://www.chinanews.com.cn/rss/sports.xml)。列表只用于找原文地址，发布材料必须再读取完整原文与真实发布时间；不把列表摘要当正文。默认采集最近 72 小时，最多生成 5 篇，不足不补造。
+
+每日入口 `topics daily-update` 读取数据库已发布来源历史与最新来源时间。相同 URL、早于或等于最新已发布来源时间的旧新闻不重新生成，也不改发布日期；扩充采集范围不会让较旧报道覆盖当前内容。
+
+- 有新材料：Kimi 整理正文，Qwen CPU 逐篇合成 AAC，MinIO 上传成功，所有文章音频都为 ready 后才原子发布。
+- 无新材料或没有可发布话题：正常结束，数据库内容、文章 ID、发布时间和音频 URL 保留。
+- 采集源/正文全部不可用、生成、语音、上传或数据库写入失败：记录失败，保留原已发布内容。部分来源失败可继续使用其它已验证原文。
+- 未完成批次记入 `data/topics/daily-state.json`；重试复用正文和已完成音频，即使跨天也不重新请求已生成正文。原材料超过 72 小时则放弃该待处理批次，等待新新闻。
+
+运行路径仍为 `/home/betalpha/projects/football_insight/sina_csl_scraper`。锁防止并发执行，整体任务最长 6 小时，自动任务同时以当天 23:00 为截止时间。截止中断时保留待处理材料与已完成缓存，下一工作时段重试。凭据自动加载既有 `.env.topics` / `.env.sync`，数据库连接复用当前本地后端的生产库隧道；不自动建表或执行迁移。
+
+手动执行同一个每日任务：
+
+```bash
+./update_daily_topics.sh
+cat data/topics/daily-status.json
+tail -n 60 data/topics/daily.log
+```
+
+日志、状态、缓存和原文均为 Git 忽略的运行产物。CLI 只在持有生成锁时更新共享状态；锁冲突不会覆盖正在执行任务的状态。若数据库已成功提交但本地状态保存失败，会如实记录已发布，不声称旧数据库内容仍保留。
+
+2026-10-13 实测自动来源取得 6 篇完整原文，均不比已发布来源更新，因此结果为 `no_new`；线上两篇正文、ID、更新时间及 ready 音频保持一致。生成/上传/写库失败、部分音频失败、跨天重试、过期待处理材料、原文不可用与并发状态均有回归验证。
 
 ## 配置与手动入口
 
@@ -75,10 +102,11 @@ uv run --no-sync python scripts/run_topics_local.py tts \
 
 两篇在原批次 `2b36e149bf1ed7567bbefae8c619ea523be539689892a3eb79f996e04db9e7db` 中原子更新，未改变原文、来源、日期、生成器版本、材料指纹或文章 id。数据库与实际 18092 GET JSON 一致，limit=1 验证成功。再次执行刷新命令仅耗时 4.593 秒，两份音频缓存文件均未修改。详细运行 JSON 在 `data/topics/benchmarks/full-chain-verification.json`，不提交 Git。
 
-没有添加定时任务。每次手动运行后可读：
+前述 CPU 基准阶段未添加定时任务；后续按用户授权安装了上述每日 07:00–22:30 半小时更新任务。运行后可读生产接口或本地接口：
 
 ```text
 http://172.16.60.233:18092/api/v1/daily-topics?team_id=77680&limit=5
+https://match.oryjk.cn/api/v1/daily-topics?team_id=77680&limit=5
 ```
 
-本次不部署、不重启生产后端；保留 local233 微信真实凭据与 ticket-monitor 配置。
+自动更新只修改 Python 和本机定时任务，不重启后端；生产已运行此前部署的读取接口，直接读取新数据库批次。
