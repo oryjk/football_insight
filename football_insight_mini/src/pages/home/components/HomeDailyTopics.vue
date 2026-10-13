@@ -24,17 +24,22 @@
         <text>{{ errorMessage }} · 当前展示上次发布内容</text>
         <button class="daily-topics__retry" @tap="emit('retry')">重试</button>
       </view>
-      <swiper class="daily-topics__swiper" :current="activeIndex" :next-margin="edition.items.length > 1 ? '56rpx' : '0rpx'" :circular="false" :autoplay="false" @change="onSlideChange">
+      <swiper class="daily-topics__swiper" :current="activeIndex" :circular="false" :autoplay="false" @change="onSlideChange">
         <swiper-item v-for="(item, index) in edition.items" :key="item.id">
-          <HomeDailyTopicCard :item="item" :index-label="`${String(index + 1).padStart(2, '0')} / ${String(edition.items.length).padStart(2, '0')}`" :audio-ready="availableAudioIds.includes(item.id)" :audio-playing="activeAudioId === item.id && audioStatus === 'playing'" :audio-loading="activeAudioId === item.id && audioStatus === 'loading'" @read="emit('read', $event)" @play="emit('play', $event)" />
+          <view class="daily-topics__slide">
+            <HomeDailyTopicCard :item="item" :index-label="`${String(index + 1).padStart(2, '0')} / ${String(edition.items.length).padStart(2, '0')}`" :audio-ready="availableAudioIds.includes(item.id)" :audio-playing="activeAudioId === item.id && audioStatus === 'playing'" :audio-loading="activeAudioId === item.id && audioStatus === 'loading'" @read="emit('read', $event)" @play="emit('play', $event)" />
+          </view>
         </swiper-item>
       </swiper>
-      <view class="daily-topics__meta">
-        <text class="daily-topics__updated">{{ edition.updatedLabel }}</text>
-        <view v-if="edition.items.length > 1" class="daily-topics__dots">
-          <view v-for="(item, index) in edition.items" :key="item.id" class="daily-topics__dot" :class="{ 'daily-topics__dot--active': index === activeIndex }" />
+      <view v-if="edition.items.length > 1" class="daily-topics__navigation">
+        <text class="daily-topics__hint">{{ activeIndex === edition.items.length - 1 ? '已到最后一篇' : '左滑查看下一篇' }}</text>
+        <view class="daily-topics__dots">
+          <button v-for="(item, index) in edition.items" :key="item.id" class="daily-topics__dot-button" :aria-label="`查看第 ${index + 1} 篇：${item.title}`" :aria-pressed="index === activeIndex" hover-class="daily-topics__dot-button--pressed" @tap="activeIndex = index">
+            <view class="daily-topics__dot" :class="{ 'daily-topics__dot--active': index === activeIndex }" />
+          </button>
         </view>
       </view>
+      <text class="daily-topics__updated">{{ edition.updatedLabel }}</text>
     </template>
   </view>
 </template>
@@ -62,9 +67,14 @@ watch(() => props.edition.items.length, length => { if (activeIndex.value >= len
 .daily-topics__date { color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); }
 .daily-topics__intro { display: block; margin-top: var(--fi-space-14); margin-bottom: var(--fi-space-24); color: var(--fi-color-text-secondary); font-size: var(--fi-font-26); line-height: var(--fi-leading-normal); }
 .daily-topics__swiper { height: calc(var(--fi-space-topic-card-height) + var(--fi-space-12)); }
-.daily-topics__meta { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-12); margin-top: var(--fi-space-6); }
-.daily-topics__updated { color: var(--fi-color-text-caption); font-size: var(--fi-font-20); line-height: var(--fi-leading-normal); }
-.daily-topics__dots { display: flex; align-items: center; gap: var(--fi-space-8); flex-shrink: 0; }
+.daily-topics__slide { box-sizing: border-box; height: 100%; padding-bottom: var(--fi-space-12); display: flex; flex-direction: column; align-items: stretch; }
+.daily-topics__navigation { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-12); }
+.daily-topics__hint { color: var(--fi-color-text-secondary); font-size: var(--fi-font-22); line-height: var(--fi-leading-normal); }
+.daily-topics__updated { display: block; margin-top: var(--fi-space-6); color: var(--fi-color-text-caption); font-size: var(--fi-font-20); line-height: var(--fi-leading-normal); }
+.daily-topics__dots { display: flex; align-items: center; flex-shrink: 0; }
+.daily-topics__dot-button { width: var(--fi-space-44); height: var(--fi-space-44); display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; border-radius: var(--fi-radius-round); background: transparent; line-height: var(--fi-leading-normal); }
+.daily-topics__dot-button::after { border: 0; }
+.daily-topics__dot-button--pressed { background: var(--fi-color-topic-audio-surface); }
 .daily-topics__dot { width: var(--fi-space-8); height: var(--fi-space-8); border-radius: var(--fi-radius-round); background: var(--fi-color-divider); }
 .daily-topics__dot--active { width: var(--fi-space-20); background: var(--fi-color-primary); }
 .daily-topics__state { padding: var(--fi-space-40) var(--fi-space-28); border-radius: var(--fi-radius-lg); background: var(--fi-color-bg); border: var(--fi-border-card); }
