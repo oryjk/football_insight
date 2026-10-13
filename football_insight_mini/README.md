@@ -161,7 +161,9 @@ bun run build:mp-weixin
 - `project_code` 固定为 `football_insight_mini`
 - `version` 使用构建时生成的 `src/config/generatedMiniProgramVersion.ts` 里的版本号
 
-如果接口返回 `is_reviewing=true`，小程序会进入审核模式：不加载会员、支付、用户会员等级、回流看板会员权益等相关信息。
+生产构建中，如果接口返回 `is_reviewing=true`，小程序会进入审核模式：不加载会员、支付、用户会员等级、回流看板会员权益等相关信息。
+
+通过 `bun run dev:mp-weixin` 启动的开发构建使用 `import.meta.env.DEV` 判断，忽略审核状态对功能展示的限制；「我的」、洞察和余票看板正常展示。设置页仍显示真实审核状态。这里的开发构建不等同于微信后台的开发版本或体验版：通过 `build:mp-weixin` / `mp:release` 生成的生产包继续按审核状态展示。
 
 API 地址默认值：
 

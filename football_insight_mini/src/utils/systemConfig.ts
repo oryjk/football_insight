@@ -14,7 +14,9 @@ export async function loadSystemConfig(): Promise<MiniReviewStatus | null> {
 }
 
 export async function loadSystemConfigUnderReview(): Promise<boolean> {
-  return resolveSystemConfigUnderReview(await loadSystemConfig())
+  const store = useMiniReviewStatus()
+  await store.ensureMiniReviewReady()
+  return store.isUnderReview.value
 }
 
 export function resetSystemConfigCacheForTest(): void {

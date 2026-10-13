@@ -8,6 +8,8 @@ const MINI_REVIEW_CACHE_MS = 60_000
 export interface MiniReviewStore {
   readonly status: Readonly<Ref<MiniReviewStatus | null>>
   readonly isUnderReview: Readonly<Ref<boolean>>
+  /** 个人页等待审核查询期间的展示限制；开发构建始终不限制。 */
+  readonly shouldRestrictFeatures: Readonly<Ref<boolean>>
   readonly loading: Readonly<Ref<boolean>>
   /** ready 区分「已尝试过」；available 区分「本次已获取到」。 */
   readonly ready: Readonly<Ref<boolean>>
@@ -22,15 +24,22 @@ export interface MiniReviewStore {
  * 审核状态共享（project code football_insight_mini + 生成版本号，见 api/miniReview）：
  * 并发调用合并在途请求，成功值缓存 60 秒；查询失败返回 null（isUnderReview=false，
  * 兼容既有显隐基线），不永久缓存，下次 onShow/显式重试可重新请求。
- * 本次不调整审核失败时的业务显隐政策。
+ * 生产构建沿用审核失败时的业务显隐政策；开发构建保留真实 status 供设置页展示，
+ * 但 isUnderReview / shouldRestrictFeatures 始终为 false。
  */
-export function createMiniReviewStore(source: typeof miniReviewApi = miniReviewApi): MiniReviewStore {
+export function createMiniReviewStore(
+  source: typeof miniReviewApi = miniReviewApi,
+  options: { isDevelopment?: boolean } = {},
+): MiniReviewStore {
+  const isDevelopment = options.isDevelopment ?? Boolean(import.meta.env.DEV)
   const status = ref<MiniReviewStatus | null>(null)
   const loading = ref(false)
   const ready = ref(false)
   const available = ref(false)
   const errorMessage = ref('')
-  const isUnderReview = computed(() => Boolean(status.value?.is_reviewing))
+  // status 保留真实登记值，展示限制只在生产构建生效。
+  const isUnderReview = computed(() => !isDevelopment && Boolean(status.value?.is_reviewing))
+  const shouldRestrictFeatures = computed(() => !isDevelopment && (!ready.value || isUnderReview.value))
 
   let lastSuccessAt = 0
   // PUT 发布时递增，使先前在途 GET 的成功/失败都不能覆盖 PUT 结果。
@@ -94,6 +103,7 @@ export function createMiniReviewStore(source: typeof miniReviewApi = miniReviewA
   return {
     status: readonly(status),
     isUnderReview,
+    shouldRestrictFeatures,
     loading: readonly(loading),
     ready: readonly(ready),
     available: readonly(available),

@@ -64,6 +64,50 @@ afterEach(() => {
   Date.now = realDateNow
 })
 
+describe('miniReview 开发构建', () => {
+  test('开发构建保留真实审核状态，但不限制功能展示', async () => {
+    const stub = createSourceStub()
+    stub.handler = () => Promise.resolve(buildStatus(true))
+    const store = createMiniReviewStore(stub.source, { isDevelopment: true })
+
+    expect(store.shouldRestrictFeatures.value).toBe(false)
+    await store.ensureMiniReviewReady()
+
+    expect(store.status.value?.is_reviewing).toBe(true)
+    expect(store.isUnderReview.value).toBe(false)
+    expect(store.shouldRestrictFeatures.value).toBe(false)
+    store.setMiniReviewStatus(buildStatus(true, '管理员设置审核中'))
+    expect(store.status.value?.status_text).toBe('管理员设置审核中')
+    expect(store.shouldRestrictFeatures.value).toBe(false)
+  })
+
+  test('开发构建查询失败也不限制展示，仍保留错误供诊断', async () => {
+    const stub = createSourceStub()
+    stub.handler = () => Promise.reject(new Error('查询失败'))
+    const store = createMiniReviewStore(stub.source, { isDevelopment: true })
+
+    await store.ensureMiniReviewReady()
+
+    expect(store.isUnderReview.value).toBe(false)
+    expect(store.shouldRestrictFeatures.value).toBe(false)
+    expect(store.available.value).toBe(false)
+    expect(store.errorMessage.value).toBe('查询失败')
+  })
+
+  test('生产构建保留查询前和审核中的展示限制', async () => {
+    const stub = createSourceStub()
+    stub.handler = () => Promise.resolve(buildStatus(true))
+    const store = createMiniReviewStore(stub.source, { isDevelopment: false })
+
+    expect(store.shouldRestrictFeatures.value).toBe(true)
+    await store.ensureMiniReviewReady()
+    expect(store.isUnderReview.value).toBe(true)
+    expect(store.shouldRestrictFeatures.value).toBe(true)
+    store.setMiniReviewStatus(buildStatus(false))
+    expect(store.shouldRestrictFeatures.value).toBe(false)
+  })
+})
+
 describe('miniReview store 加载与缓存', () => {
   test('并发调用合并在途请求', async () => {
     const stub = createSourceStub()

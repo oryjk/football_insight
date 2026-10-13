@@ -49,7 +49,7 @@ Store 只解决真实的跨页状态；页面 loading、弹层开关、筛选和
 - 显式微信登录走 `loginWithMiniWechat()`：认证意图在调用瞬间、获取 code 前建立，code 获取与换 token 在同一操作身份内；被替代后迟到的 code/响应不再发认证请求。微信 code 提供方可通过 `createAppSession(source, { getMiniWechatCode })` 注入（默认 `uni.login`）。
 - 手动退出标记 `fi_manual_logout`（`utils/authStorage.ts` 的 `hasManualLogout/setManualLogout/clearManualLogout`）：`logoutSession` 同步写入，跨冷启动禁止静默恢复；只有显式认证操作（密码/注册/微信/绑定/测试登录）解除；`ensureSessionReady` 与 401 失效不动该标记。
 - `stores/runtimeConfig.ts`：`PublicSystemConfig` 共享（公告、会员规则等）。`ensureRuntimeConfig({ force? })`，成功缓存 60 秒、并发去重；刷新失败保留最后一次成功 config，但 `available`/`errorMessage` 反映本次失败。
-- `stores/miniReview.ts`：`MiniReviewStatus` 共享。审核查询失败返回 null（兼容 `resolveSystemConfigUnderReview(null) === false`），暴露 `ready`（已尝试）与 `available`（已获取）区分状态；管理员 PUT 成功后调 `setMiniReviewStatus` 发布新值并使在途 GET 失效。`utils/systemConfig.ts` 作为兼容入口委托该 store。
+- `stores/miniReview.ts`：`MiniReviewStatus` 共享。审核查询失败返回 null（兼容 `resolveSystemConfigUnderReview(null) === false`），暴露 `ready`（已尝试）与 `available`（已获取）区分状态；管理员 PUT 成功后调 `setMiniReviewStatus` 发布新值并使在途 GET 失效。`status` 保留真实审核登记值，`isUnderReview` 和个人页使用的 `shouldRestrictFeatures` 只在生产构建施加展示限制；`import.meta.env.DEV` 的开发构建始终不限制，包括查询尚未完成时。`utils/systemConfig.ts` 的兼容入口读取该 store 的有效展示限制，避免洞察和余票页重新按原始审核值限制功能。
 
 ### revision 与被替代操作
 

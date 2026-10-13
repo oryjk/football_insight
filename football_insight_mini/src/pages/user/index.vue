@@ -165,8 +165,8 @@ const loading = ref(hasAccessToken.value)
 const runtimeConfig = useRuntimeConfig()
 const publicConfig = runtimeConfig.config
 const miniReview = useMiniReviewStatus()
-// 查询期间保留既有会员展示限制，登录入口和认证表单始终独立。
-const systemConfigUnderReview = computed(() => !miniReview.ready.value || miniReview.isUnderReview.value)
+// 生产构建查询期间保留会员展示限制；开发构建放开，登录和认证始终独立。
+const systemConfigUnderReview = miniReview.shouldRestrictFeatures
 const notificationEmail = ref('')
 const notificationEmailSheetVisible = ref(false)
 const notificationEmailSaving = ref(false)
