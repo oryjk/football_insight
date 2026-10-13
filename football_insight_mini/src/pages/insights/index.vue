@@ -1,4 +1,5 @@
 <template>
+  <page-meta :page-style="navigationPageStyle" />
   <view class="page-root">
     <FiBrandNav />
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
@@ -91,6 +92,7 @@
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, ref, watch } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
@@ -117,6 +119,8 @@ import {
 } from './helpers'
 import { createInsightsSessionSync } from './sessionEffects'
 import { useInsightsData } from './useInsightsData'
+
+const { navigationPageStyle } = useNavigationLayout()
 
 // 登录用户共享自 appSession：读取走会话缓存，401 清理由 session 统一处理。
 const session = useAppSession()

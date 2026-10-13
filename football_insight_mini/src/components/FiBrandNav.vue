@@ -2,7 +2,7 @@
     <view class="fi-brand-nav" :class="{ 'fi-brand-nav--transparent': transparent, 'fi-brand-nav--h5': isH5 }">
         <view class="fi-brand-nav__status-spacer"></view>
         <view class="fi-brand-nav__bar">
-            <view class="fi-brand-nav__brand" :style="brandStyle">
+            <view class="fi-brand-nav__brand">
                 <button v-if="showBack" class="fi-brand-nav__back" aria-label="返回" @tap="emit('back')">
                     <text aria-hidden="true">‹</text>
                 </button>
@@ -21,7 +21,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
 import logo from "../static/app-logo-mark.png";
 
 withDefaults(
@@ -48,55 +47,12 @@ const isH5 =
     // #endif
 ;
 
-// 胶囊指标仅在小程序端可用；初始为 null 时不输出内联样式，交给 CSS 兜底，
-// 避免 H5 上错误地沿用 px 数值导致品牌错位。
-const brandMetrics = ref<{
-    top: number;
-    height: number;
-} | null>(null);
-
-const brandStyle = computed(() => {
-    const metrics = brandMetrics.value;
-    if (!metrics) {
-        return {};
-    }
-
-    return {
-        top: `${metrics.top}px`,
-        height: `${metrics.height}px`,
-    };
-});
-
-// 品牌与微信菜单胶囊垂直居中对齐；H5 没有胶囊，走 CSS 流式布局，不需要同步位置。
-function syncBrandWithMenuCapsule(): void {
-    // #ifdef H5
-    return;
-    // #endif
-
-    try {
-        const menuButton = uni.getMenuButtonBoundingClientRect?.();
-
-        if (!menuButton?.width || !menuButton?.height) {
-            return;
-        }
-
-        brandMetrics.value = {
-            top: menuButton.top,
-            height: menuButton.height,
-        };
-    } catch {
-        // Keep the CSS fallback when the platform does not expose capsule metrics.
-    }
-}
-
-onMounted(() => {
-    syncBrandWithMenuCapsule();
-});
 </script>
 
 <style scoped>
 .fi-brand-nav {
-    --fi-brand-nav-status-height: var(--status-bar-height, 0px);
+    height: var(--fi-brand-nav-height);
+    box-sizing: border-box;
     position: fixed;
     left: 0;
     right: 0;
@@ -131,15 +87,15 @@ onMounted(() => {
 
 .fi-brand-nav__bar {
     position: relative;
-    min-height: var(--fi-brand-nav-bar-height);
-    padding: var(--fi-space-12) var(--fi-space-brand-nav-capsule) var(--fi-space-12) var(--fi-space-24);
+    height: var(--fi-brand-nav-bar-height);
+    box-sizing: border-box;
 }
 
 .fi-brand-nav__brand {
-    position: fixed;
+    position: absolute;
     left: var(--fi-space-24);
     right: var(--fi-space-brand-nav-capsule);
-    top: calc(var(--fi-brand-nav-status-height) + var(--fi-space-12));
+    top: var(--fi-brand-nav-row-offset);
     z-index: 81;
     min-width: 0;
     height: var(--fi-space-brand-nav-row-size);

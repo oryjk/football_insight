@@ -1,4 +1,5 @@
 <template>
+  <page-meta :page-style="navigationPageStyle" />
   <view class="page-root" :class="{ 'page-root--guest': isGuestPage }">
     <FiBrandNav :transparent="isGuestPage" />
     <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
@@ -108,6 +109,7 @@
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, ref, watch } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
@@ -154,6 +156,8 @@ import {
   type MembershipTierGuide,
 } from '../../utils/membershipRules'
 import { resolveUserLoginPresentation } from './loginHelpers'
+
+const { navigationPageStyle } = useNavigationLayout()
 
 const session = useAppSession()
 // 当前用户与登录态共享自 appSession（唯一写入入口），本页只读。

@@ -1,4 +1,5 @@
 <template>
+  <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav :share-disabled="!shareArticle" @back="goBack" @share="copyArticleShareLink" />
   <view class="topic-page-offset">
   <view class="topic-detail">
@@ -30,6 +31,7 @@
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, onScopeDispose, ref } from 'vue'
 import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
 import { topicVisitorId } from '../../utils/topicVisitor'
@@ -47,6 +49,8 @@ import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { buildTopicSharePayload, TOPIC_SHARE_CARD } from './share'
 import { TOPIC_SHARE_CANVAS_ID, useTopicShareCard } from './useTopicShareCard'
+
+const { navigationPageStyle } = useNavigationLayout()
 const item = ref<DailyTopicItem | null>(null)
 const loading = ref(false)
 const errorMessage = ref('')

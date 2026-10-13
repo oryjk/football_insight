@@ -794,12 +794,14 @@ page {
 /* 品牌导航：一级和二级页面共用单行高度与正文顶部占位。 */
 :root,
 page {
-  --fi-primitive-brand-nav-bar-height: 76rpx;
+  --fi-primitive-brand-nav-bar-height: 88rpx;
   --fi-primitive-brand-nav-capsule-space: 196rpx;
   --fi-space-brand-nav-capsule: var(--fi-primitive-brand-nav-capsule-space);
   --fi-brand-nav-bar-height: var(--fi-primitive-brand-nav-bar-height);
-  --fi-brand-nav-height: calc(var(--status-bar-height, 0px) + var(--fi-brand-nav-bar-height));
-  --fi-primitive-brand-nav-row-size: 52rpx;
+  --fi-brand-nav-status-height: var(--status-bar-height, 0px);
+  --fi-brand-nav-height: calc(var(--fi-brand-nav-status-height) + var(--fi-brand-nav-bar-height));
+  --fi-brand-nav-row-offset: var(--fi-space-12);
+  --fi-primitive-brand-nav-row-size: 64rpx;
   --fi-primitive-secondary-nav-action: 72rpx;
   --fi-space-secondary-nav-action: var(--fi-primitive-secondary-nav-action);
   --fi-space-brand-nav-row-size: var(--fi-primitive-brand-nav-row-size);

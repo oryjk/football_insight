@@ -1,4 +1,5 @@
 <template>
+  <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav @back="goBack" @share="copyPageShareLink('/pages/topics/index')" />
   <view class="topic-page-offset">
   <view class="topics-page">
@@ -19,6 +20,7 @@
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { onScopeDispose, ref } from 'vue'
 import { onLoad, onPullDownRefresh, onReachBottom, onShareAppMessage } from '@dcloudio/uni-app'
 import TopicHistoryCard from './components/TopicHistoryCard.vue'
@@ -29,6 +31,8 @@ import { getTopicHistory } from '../../api/dailyTopics'
 import type { DailyTopicItem } from '../../types/dailyTopic'
 import { DAILY_TOPICS_TEAM_ID, mapTopicHistory, mergeTopicHistory, topicDetailUrl } from '../../utils/dailyTopics'
 import { extractApiErrorMessage } from '../../utils/apiError'
+
+const { navigationPageStyle } = useNavigationLayout()
 const items = ref<DailyTopicItem[]>([])
 const nextCursor = ref<string | null>(null)
 const loading = ref(false)

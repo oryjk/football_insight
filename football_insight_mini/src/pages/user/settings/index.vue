@@ -1,4 +1,5 @@
 <template>
+  <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav :shareable="false" @back="goBackFromSecondaryPage('/pages/user/index')" />
   <view class="settings-page">
     <view class="settings-section">
@@ -62,6 +63,7 @@
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../../composables/useNavigationLayout'
 import { ref } from 'vue'
 import FiSecondaryNav from '../../../components/FiSecondaryNav.vue'
 import { goBackFromSecondaryPage } from '../../../utils/secondaryNavigation'
@@ -74,6 +76,8 @@ import type { H5TestLoginUser } from '../../../types/auth'
 // #ifdef H5
 import { listH5TestLoginUsers } from '../../../api/auth'
 import { isSessionSupersededError, useAppSession } from '../../../stores/appSession'
+
+const { navigationPageStyle } = useNavigationLayout()
 
 const h5TestUsers = ref<H5TestLoginUser[]>([])
 

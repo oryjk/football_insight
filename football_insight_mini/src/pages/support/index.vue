@@ -1,4 +1,5 @@
 <template>
+  <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav @back="goBackFromSecondaryPage()" @share="copyPageShareLink(detail ? `/pages/support/index?matchId=${detail.match_id}` : '/pages/home/index')" />
   <view class="page-root">
     <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
@@ -127,6 +128,7 @@
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, ref } from 'vue'
 import { onHide, onLoad, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
@@ -147,6 +149,8 @@ import {
   resolveSupportVoteButtonText,
   resolveSupportWindowLabel,
 } from './helpers'
+
+const { navigationPageStyle } = useNavigationLayout()
 
 const loading = ref(true)
 const errorMessage = ref('')

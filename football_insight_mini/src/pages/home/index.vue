@@ -1,4 +1,5 @@
 <template>
+  <page-meta :page-style="navigationPageStyle" />
   <view class="home-page-shell">
     <FiBrandNav />
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
@@ -102,6 +103,7 @@
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, ref, watch } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
@@ -147,6 +149,8 @@ import { useHomeSupportData } from './useHomeSupportData'
 import { useHomeDailyTopics } from './useHomeDailyTopics'
 import { useDailyTopicAudio } from '../../composables/useDailyTopicAudio'
 import { topicDetailUrl } from './dailyTopics'
+
+const { navigationPageStyle } = useNavigationLayout()
 
 const homeMatchNow = useHomeMatchClock()
 const currentSeason = new Date().getFullYear()

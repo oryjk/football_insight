@@ -1,4 +1,5 @@
 <template>
+  <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav :shareable="false" @back="goBackFromSecondaryPage('/pages/user/index')" />
   <view class="page-root">
     <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
@@ -118,6 +119,7 @@
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { ref, computed, watch } from 'vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
@@ -145,6 +147,8 @@ import {
   isMembershipUpgradePrice,
   normalizeMembershipProductOptions,
 } from './helpers'
+
+const { navigationPageStyle } = useNavigationLayout()
 
 const product = ref<Awaited<ReturnType<typeof getMembershipProduct>> | null>(null)
 // 公共配置共享自 runtimeConfig store（60 秒缓存，失败保留上次成功值）。

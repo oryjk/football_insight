@@ -1,4 +1,5 @@
 <template>
+  <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav @back="goBackToInsights" @share="copyPageShareLink(teamId ? `/pages/team-board/index?teamId=${teamId}` : '/pages/insights/index')" />
   <view class="page-root">
     <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
@@ -237,6 +238,7 @@
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, reactive, ref } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
@@ -258,6 +260,8 @@ import { extractApiErrorMessage } from '../../utils/apiError'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
 import { useAppSession } from '../../stores/appSession'
 import { resolveTeamBoardLoadFailure } from './helpers'
+
+const { navigationPageStyle } = useNavigationLayout()
 
 const teamId = ref<number | null>(null)
 const loading = ref(true)
