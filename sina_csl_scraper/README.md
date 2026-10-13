@@ -4,6 +4,8 @@
 
 ## 今日话题与本地四川话语音
 
+local233 的安装路径、真实 CPU 基准、私有配置加载和手动运行命令见 [local233 今日话题运行说明](docs/topics-local233.md)。已有真实批次可用 `topics refresh-audio` 只刷新四川话音频：所有音频成功后才更新数据库，不再调用 LLM、不改原正文和来源。
+
 `topics/` 是独立的新闻生成链路，不混入赛季同步：`sources` 采集原文，`generation` 调用正文 LLM，`tts` 调用本地 Qwen，`pipeline` 负责缓存与音频发布，`repository` 原子写库，`cli` 提供入口。小程序只请求 Rust 读取接口并播放 MinIO 音频。
 
 准备本地 Qwen 推理程序（复用已下载的 0.6B CustomVoice 权重，Mac 使用 Metal）：
@@ -39,7 +41,7 @@ uv run --no-sync --env-file .env.topics sina-csl-scraper topics generate --confi
 
 LLM最多整理5篇、不强行凑数，引用只允许来自实际输入的source_id，并保留原文标题、机构和发布时间；严格区分一线队中超与希拉谷中乙。文章正文与音频分别用内容哈希缓存。相同材料/模型/日期的重跑复用正文，仅重试未发布语音；音频上传到 `summary/audio/topics/{team_id}/{date}/{article_id}/{audio_hash}.m4a`。语音失败保留文字并标记failed，未上传时pending。ready才提供HTTPS播放URL。空材料/空生成不会替换数据库中上次有效批次。
 
-`--write-db` 要求 Rust agent 先迁移 `f_i_daily_topic_editions`，Python不会自动建表；写库前先检查表存在。数据库须指向隔离测试库，生成命令默认不改库、不部署服务。生成缓存/材料/最新JSON位于 `data/topics/`，同缓存目录使用文件锁防重复任务。API与表结构见根目录 `docs/daily-topics-contract.md`，Rust agent提示词见 `docs/daily-topics-rust-agent-prompt.md`。
+`--write-db` 要求 `f_i_daily_topic_editions` 已由 Rust SQLx 迁移建立，Python不会自动建表；写库前先检查表存在。local233 的新表已在用户明确授权下迁移到 peiqian 共享 `football_data`，只新增/更新本功能批次；生成命令默认不改库、不部署服务。生成缓存/材料/最新JSON位于 `data/topics/`，同缓存目录使用文件锁防重复任务。API与表结构见根目录 `docs/daily-topics-contract.md`，Rust agent提示词见 `docs/daily-topics-rust-agent-prompt.md`。
 
 当前会导出 7 类核心数据：
 

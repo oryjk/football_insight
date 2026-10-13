@@ -14,7 +14,7 @@ import typer
 from ..assets import MinioAssetTarget
 from .generation import TopicGenerator
 from .models import SHANGHAI, parse_timestamp
-from .pipeline import NoTopicsError, generate_edition
+from .pipeline import NoTopicsError, generate_edition, refresh_edition_audio
 from .repository import TopicRepository
 from .sources import collect_sources
 from .storage import SshMinioTarget
@@ -45,8 +45,12 @@ def _tts(cache_dir: Path) -> LocalQwenTts:
     runner = Path(os.getenv('FI_QWEN_RUNNER', str(default_runner))).expanduser().resolve()
     if not runner.is_file():
         raise ValueError('run uv run python scripts/setup_qwen_native.py first, or set FI_QWEN_RUNNER')
+    timeout = int(os.getenv('FI_QWEN_TIMEOUT_SECONDS', '1200'))
+    if timeout <= 0:
+        raise ValueError('FI_QWEN_TIMEOUT_SECONDS must be positive')
     return LocalQwenTts(model_path=discover_model(), runner=runner, cache_dir=cache_dir / 'audio',
                         converter=os.getenv('FI_AUDIO_CONVERTER'),
+                        timeout=timeout,
                         device=os.getenv('FI_QWEN_DEVICE', 'metal' if sys.platform == 'darwin' else 'cpu'),
                         dtype=os.getenv('FI_QWEN_DTYPE', 'bf16'))
 
@@ -155,4 +159,30 @@ def tts_command(text_file: Path = typer.Option(..., exists=True, dir_okay=False)
                               'sha256': audio.sha256, 'voice': 'eric', 'dialect': 'sichuan'}, ensure_ascii=False))
     except Exception as error:
         typer.echo(f'local TTS failed ({type(error).__name__})', err=True)
+        raise typer.Exit(1) from None
+
+
+@app.command('refresh-audio')
+def refresh_audio_command(edition_file: Path = typer.Option(..., exists=True, dir_okay=False),
+                          output_dir: Path = Path('data/topics'), write_db: bool = False) -> None:
+    """Reuse a real edition, refresh each voice, and publish only a complete batch."""
+    database_updated = False
+    try:
+        original = _config(edition_file)
+        database_url = os.getenv('FI_DATABASE_URL') or os.getenv('DATABASE_URL')
+        if write_db and not database_url:
+            raise ValueError('FI_DATABASE_URL is required for --write-db')
+        with _lock(output_dir):
+            if write_db:
+                TopicRepository(database_url).check_schema()
+            refreshed = refresh_edition_audio(original, tts=_tts(output_dir), target=_target())
+            _write(output_dir / 'editions' / f'{refreshed["id"]}.json', refreshed)
+            if write_db:
+                TopicRepository(database_url).save(refreshed)
+                database_updated = True
+            _write(output_dir / 'latest.json', refreshed['payload'])
+        typer.echo(f'refreshed {len(refreshed["payload"]["items"])} independent Sichuan audio files; existing text and edition identity retained')
+    except Exception as error:
+        state = 'database edition updated; local finalization failed' if database_updated else 'previous database edition retained'
+        typer.echo(f'audio refresh failed ({type(error).__name__}); {state}', err=True)
         raise typer.Exit(1) from None

@@ -5,6 +5,7 @@ pub mod app;
 pub mod auth;
 pub mod auth_license;
 pub mod config;
+pub mod daily_topics;
 pub mod health;
 pub mod http_cache;
 pub mod insight;

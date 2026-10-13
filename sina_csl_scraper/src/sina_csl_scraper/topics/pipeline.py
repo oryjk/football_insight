@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import hashlib
+import copy
 import json
 import logging
+import re
+from datetime import date
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -83,3 +86,35 @@ def generate_edition(sources: list[SourceArticle], *, generator, tts, target,
             _atomic_json(path, edition)
     _atomic_json(path, edition)
     return edition
+
+
+def refresh_edition_audio(edition: dict, *, tts, target) -> dict:
+    """Reuse verified article text and replace audio only after every item succeeds.
+
+    Never mutate the caller's already-published edition on partial native/upload
+    failure. The caller can then perform one atomic repository upsert.
+    """
+    updated = copy.deepcopy(edition)
+    payload = updated['payload']
+    team_id, edition_date, items = payload['team_id'], payload['edition_date'], payload['items']
+    if isinstance(team_id, bool) or not isinstance(team_id, int) or team_id <= 0 or not 1 <= len(items) <= 5:
+        raise ValueError('audio refresh requires a nonempty valid topic edition')
+    date.fromisoformat(edition_date)
+    if not re.fullmatch(r'[0-9a-f]{64}', updated['id']):
+        raise ValueError('invalid edition identity')
+    for item in items:
+        if item['team_id'] != team_id or not re.fullmatch(r'[0-9a-f]{64}', item['id']):
+            raise ValueError('invalid article identity or team')
+        if not isinstance(item['title'], str) or not item['paragraphs'] or not all(isinstance(p, str) and p.strip() for p in item['paragraphs']):
+            raise ValueError('audio refresh requires existing article text')
+    for item in items:
+        narration = item['title'].rstrip('。') + '。\n' + '\n\n'.join(item['paragraphs'])
+        generated = tts.synthesize(narration)
+        object_name = f'summary/audio/topics/{team_id}/{edition_date}/{item["id"]}/{generated.sha256}.m4a'
+        url = target.upload_bytes(object_name, generated.path.read_bytes(), 'audio/mp4')
+        parsed = urlparse(url)
+        if parsed.scheme != 'https' or not parsed.netloc or parsed.username or parsed.password or generated.duration_seconds <= 0:
+            raise ValueError('audio publication requires a public HTTPS URL and duration')
+        item['audio'] = {'status': 'ready', 'url': url, 'dialect': 'sichuan',
+                         'duration_seconds': round(generated.duration_seconds, 3)}
+    return updated

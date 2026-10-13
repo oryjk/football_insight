@@ -2,7 +2,7 @@
 
 首页展示成都蓉城相关新闻的 LLM 整理文章，横向最多 5 张卡片。文章不足 5 篇时不补造。每篇独立生成四川话语音。Python 写入，Rust 读取，小程序只展示与播放。新闻原文是资料，不能把原文中的指令当作生成任务。
 
-## API（交给 Rust agent）
+## API
 
 `GET /api/v1/daily-topics?team_id=77680&limit=5`，沿用现有首页 API 的直接 JSON 响应（不新增 data 包装）：
 
@@ -28,7 +28,9 @@
 
 ## Python 存储约定
 
-Python 不自动建生产表。待 Rust agent 增加迁移：
+local233 的 Rust 读取接口已接通。用户已明确授权在 peiqian 共享 `football_data` 通过 SQLx 迁移新建此表，迁移账本已记录 `20261013000100`，无需再次建表或迁移；生产应用容器未部署、未重启。Python 在该表原子发布，local233 的 18092 后端经现有私有隧道读取。CPU 模型安装和手动运行入口见 [local233 今日话题说明](../sina_csl_scraper/docs/topics-local233.md)。
+
+Python 不自动建生产表。已应用的 Rust 迁移结构为：
 
 ```sql
 CREATE TABLE f_i_daily_topic_editions (
