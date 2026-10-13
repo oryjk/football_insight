@@ -31,6 +31,7 @@
         />
 
         <HomeSupportPanel
+          :now="homeMatchNow"
           :has-auth-token="hasAuthToken"
           :loading="supportLoading"
           :profile="supportProfile"
@@ -141,11 +142,13 @@ import {
   type HomeTeamSeasonMatch,
 } from './helpers'
 import { createHomeSessionSync } from './sessionEffects'
+import { useHomeMatchClock } from './useHomeMatchClock'
 import { useHomeSupportData } from './useHomeSupportData'
 import { useHomeDailyTopics } from './useHomeDailyTopics'
 import { useDailyTopicAudio } from '../../composables/useDailyTopicAudio'
 import { topicDetailUrl } from './dailyTopics'
 
+const homeMatchNow = useHomeMatchClock()
 const currentSeason = new Date().getFullYear()
 let homeLoadRevision = 0
 const loading = ref(true)

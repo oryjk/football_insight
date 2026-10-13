@@ -174,6 +174,20 @@ export function resolveHomeSupportNextMatchLabel(
   return match.status === 'finished' ? '比赛已完赛' : '比赛已开始'
 }
 
+/** Compare Beijing calendar dates, not rounded 24-hour durations or the phone timezone. */
+export function resolveHomeSupportMatchDaysRemaining(
+  match: Pick<SupportMatchDetail, 'kickoff_at' | 'status'> | null,
+  now: number = Date.now(),
+): number | null {
+  if (!match || !['scheduled', '1'].includes(match.status) || !Number.isFinite(now)
+    || !/(?:Z|[+-]\d{2}:\d{2})$/.test(match.kickoff_at)) return null
+  const kickoff = Date.parse(match.kickoff_at)
+  if (!Number.isFinite(kickoff) || kickoff <= now) return null
+  const day = 24 * 60 * 60 * 1000
+  const beijingOffset = 8 * 60 * 60 * 1000
+  return Math.floor((kickoff + beijingOffset) / day) - Math.floor((now + beijingOffset) / day)
+}
+
 export function resolveHomeSupportTeamRankLabel(rankNo: number | null | undefined): string {
   return rankNo && rankNo > 0 ? `积分榜第 ${rankNo}` : '排名待同步'
 }

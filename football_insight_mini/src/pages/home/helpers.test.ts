@@ -23,6 +23,7 @@ import {
   resolveHomePulseMatches,
   resolveHomeHasAuthToken,
   resolveHomeSupportNextMatchLabel,
+  resolveHomeSupportMatchDaysRemaining,
   resolveHomeSupportTeamRankLabel,
   resolveHomeSupportMatchWeekdayLabel,
   resolveHomeSupportWindowShortLabel,
@@ -778,4 +779,33 @@ describe('isHomeAuthExpiredError', () => {
     expect(isHomeAuthExpiredError(new Error('请先登录'))).toBe(false)
     expect(isHomeAuthExpiredError(null)).toBe(false)
   })
+})
+
+describe('主队下一场比赛北京时间天数倒计时', () => {
+  const match = { kickoff_at: '2026-10-18T12:00:00Z', status: 'scheduled' }
+  test('距下场比赛按北京时间自然日计算，明天不显示零天', () => {
+    expect(resolveHomeSupportMatchDaysRemaining(match, Date.parse('2026-10-13T04:00:00Z'))).toBe(5)
+    expect(resolveHomeSupportMatchDaysRemaining({ ...match, kickoff_at: '2026-10-14T00:00:00+08:00' }, Date.parse('2026-10-13T23:59:00+08:00'))).toBe(1)
+  })
+  test('跨北京时间午夜自动减一天，比赛当天开球前返回零', () => {
+    expect(resolveHomeSupportMatchDaysRemaining(match, Date.parse('2026-10-13T15:59:59Z'))).toBe(5)
+    expect(resolveHomeSupportMatchDaysRemaining(match, Date.parse('2026-10-13T16:00:00Z'))).toBe(4)
+    expect(resolveHomeSupportMatchDaysRemaining(match, Date.parse('2026-10-18T11:59:59Z'))).toBe(0)
+  })
+  test('已开球、进行中、完赛、缺失或异常时间均不显示未来倒计时', () => {
+    const now = Date.parse('2026-10-18T12:00:00Z')
+    for (const value of [null, match, { ...match, status: 'live' }, { ...match, status: 'finished' }, { ...match, kickoff_at: 'bad-date' }, { ...match, kickoff_at: '2026-10-19T12:00:00' }]) {
+      expect(resolveHomeSupportMatchDaysRemaining(value, now)).toBeNull()
+    }
+    expect(resolveHomeSupportMatchDaysRemaining(match, NaN)).toBeNull()
+  })
+})
+
+test('主队资料接口的新浪数字状态1也显示倒计时，其余非赛前状态隐藏', () => {
+  const match = { kickoff_at: '2026-10-18T12:00:00Z', status: '1' }
+  const now = Date.parse('2026-10-13T04:00:00Z')
+  expect(resolveHomeSupportMatchDaysRemaining(match, now)).toBe(5)
+  for (const status of ['2', '3', '4', 'postponed', 'cancelled']) {
+    expect(resolveHomeSupportMatchDaysRemaining({ ...match, status }, now)).toBeNull()
+  }
 })
