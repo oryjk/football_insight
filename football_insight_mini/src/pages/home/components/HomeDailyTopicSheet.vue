@@ -15,7 +15,7 @@
       <text class="topic-reading__updated">{{ updatedLabel }}</text>
     </view>
     <template #footer>
-      <HomeTopicAudioEntry :ready="audioReady" :playing="audioPlaying" :loading="audioLoading" label="四川话播报" @play="emit('play', item.id)" />
+      <HomeTopicAudioEntry :ready="audioReady" :playing="audioPlaying" :loading="audioLoading" @play="emit('play', item.id)" />
     </template>
   </FiBottomSheet>
 </template>
