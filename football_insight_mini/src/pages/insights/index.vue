@@ -86,7 +86,7 @@
     </view>
     </view>
 
-    <FiLoginFloat v-if="showLoginFloat" @action="goToLogin" />
+    <FiLoginFloat v-if="showLoginFloat" :desc="systemConfigUnderReview ? '登录后，可以关注主队并参与赛前助力。' : undefined" @action="goToLogin" />
   </view>
 </template>
 
@@ -149,7 +149,7 @@ const {
   isUnderReview: () => systemConfigUnderReview.value,
   isMembershipLocked: () => membershipBenefitsLocked.value,
 })
-const showLoginFloat = computed(() => !systemConfigUnderReview.value && !userLoading.value && !currentUser.value)
+const showLoginFloat = computed(() => !userLoading.value && !currentUser.value)
 const shouldLockTicketWatchEntry = computed(() =>
   !userLoading.value && (!currentUser.value || membershipBenefitsLocked.value),
 )

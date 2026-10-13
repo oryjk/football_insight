@@ -5,17 +5,11 @@
     <view class="page-bg-fade"></view>
     <view class="page-scroll">
       <view class="page">
-      <template v-if="systemConfigUnderReview">
-        <view class="hero-card account-hero account-hero--guest">
-          <view class="hero-card__top">
-            <view>
-              <text class="eyebrow">我的</text>
-              <text class="hero-card__title">账号</text>
-            </view>
-          </view>
-          <text class="hero-card__summary">当前版本展示基础内容。</text>
-        </view>
-      </template>
+      <UserBasicAccountPanel
+        v-if="systemConfigUnderReview && currentUser"
+        :user="currentUser"
+        @logout="handleLogout"
+      />
 
       <template v-else>
         <UserAccountHero
@@ -60,20 +54,6 @@
           </view>
         </template>
 
-        <!-- #ifdef H5 -->
-        <UserPasswordLoginSheet
-          v-model:visible="passwordLoginSheetVisible"
-          :submitting="passwordLoginSubmitting"
-          @submit="handlePasswordLogin"
-        />
-        <!-- #endif -->
-
-        <UserWechatBindSheet
-          :bind-state="miniWechatBindState"
-          @close="closeMiniWechatBindSheet"
-          @bind="handleMiniWechatBind"
-        />
-
         <UserNotificationEmailSheet
           v-model:visible="notificationEmailSheetVisible"
           :email="notificationEmail"
@@ -81,6 +61,20 @@
           @save="saveNotificationEmail"
         />
       </template>
+
+      <!-- #ifdef H5 -->
+      <UserPasswordLoginSheet
+        v-model:visible="passwordLoginSheetVisible"
+        :submitting="passwordLoginSubmitting"
+        @submit="handlePasswordLogin"
+      />
+      <!-- #endif -->
+
+      <UserWechatBindSheet
+        :bind-state="miniWechatBindState"
+        @close="closeMiniWechatBindSheet"
+        @bind="handleMiniWechatBind"
+      />
 
       <!-- H5 测试登录入口：仅当后端配置 H5_TEST_LOGIN_USER_IDS 白名单时展示，不受审核模式影响。 -->
       <!-- #ifdef H5 -->
@@ -107,6 +101,7 @@
     <FiLoginFloat
       v-if="showGuestLoginFloat"
       :action-text="loginPresentation.actionText"
+      :desc="systemConfigUnderReview ? '登录后，可以关注主队并参与赛前助力。' : undefined"
       @action="handleLoginAction"
     />
   </view>
@@ -118,6 +113,7 @@ import { onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
 import UserGuestChantWall from './components/UserGuestChantWall.vue'
+import UserBasicAccountPanel from './components/UserBasicAccountPanel.vue'
 import UserSkeleton from './components/UserSkeleton.vue'
 import UserAccountHero from './components/UserAccountHero.vue'
 import UserAccountInfoPanel from './components/UserAccountInfoPanel.vue'
@@ -134,6 +130,7 @@ import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../con
 import { listH5TestLoginUsers } from '../../api/auth'
 import { useAppSession } from '../../stores/appSession'
 import type { H5TestLoginUser, MiniWechatBindingRequiredResponse } from '../../types/auth'
+import { useMiniReviewStatus } from '../../stores/miniReview'
 import { useRuntimeConfig } from '../../stores/runtimeConfig'
 import { reportPageActivity } from '../../utils/userActivity'
 import { createUserAccountEffects } from './accountEffects'
@@ -168,7 +165,9 @@ const loading = ref(hasAccessToken.value)
 // 公共配置共享自 runtimeConfig store（60 秒缓存，失败保留上次成功值）。
 const runtimeConfig = useRuntimeConfig()
 const publicConfig = runtimeConfig.config
-const systemConfigUnderReview = ref(false)
+const miniReview = useMiniReviewStatus()
+// 查询期间保留既有会员展示限制，登录入口和认证表单始终独立。
+const systemConfigUnderReview = computed(() => !miniReview.ready.value || miniReview.isUnderReview.value)
 const notificationEmail = ref('')
 const notificationEmailSheetVisible = ref(false)
 const notificationEmailSaving = ref(false)
@@ -177,11 +176,10 @@ const miniWechatBindState = ref<MiniWechatBindingRequiredResponse | null>(null)
 const passwordLoginSheetVisible = ref(false)
 const passwordLoginSubmitting = ref(false)
 
-// 账号读写（白名单/审核态/邮箱）收口到 effects：内部按 session revision 防护，
+// 账号读写（白名单/邮箱）收口到 effects：内部按 session revision 防护，
 // 旧会话的迟到响应不写状态、不弹 toast。
 const accountEffects = createUserAccountEffects(session, {
   loading,
-  systemConfigUnderReview,
   isReviewController,
   notificationEmail,
   notificationEmailSheetVisible,
@@ -227,7 +225,7 @@ const accountInfoIconMap: Record<UserAccountInfoItem['iconName'], string> = {
   'log-in': logInIcon,
 }
 
-const isGuestPage = computed(() => !systemConfigUnderReview.value && (!hasAccessToken.value || (!loading.value && !currentUser.value)))
+const isGuestPage = computed(() => !hasAccessToken.value || (!loading.value && !currentUser.value))
 const hasOpenSheet = computed(() =>
   passwordLoginSheetVisible.value
   || Boolean(miniWechatBindState.value)
@@ -407,6 +405,7 @@ async function handleH5TestLoginSelect(user: H5TestLoginUser): Promise<void> {
 
 onShow(() => {
   reportPageActivity('user')
+  void miniReview.ensureMiniReviewReady()
   void loadUser()
   void loadH5TestUsers()
   void runtimeConfig.ensureRuntimeConfig()

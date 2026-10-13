@@ -44,6 +44,7 @@ page {
   --fi-primitive-space-30: 30rpx;
   --fi-primitive-space-32: 32rpx;
   --fi-primitive-space-40: 40rpx;
+  --fi-primitive-space-64: 64rpx;
 
   /* ===== Primitive：字号（数字刻度，单位 rpx） ===== */
   --fi-primitive-font-18: 18rpx;
@@ -139,6 +140,7 @@ page {
   --fi-space-30: var(--fi-primitive-space-30);
   --fi-space-32: var(--fi-primitive-space-32);
   --fi-space-40: var(--fi-primitive-space-40);
+  --fi-space-64: var(--fi-primitive-space-64);
 
   --fi-font-18: var(--fi-primitive-font-18);
   --fi-font-20: var(--fi-primitive-font-20);
