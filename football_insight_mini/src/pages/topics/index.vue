@@ -1,5 +1,5 @@
 <template>
-  <FiBrandNav show-back subtitle="全部话题" @back="goBack" />
+  <FiSecondaryNav @back="goBack" @share="copyPageShareLink('/pages/topics/index')" />
   <view class="topic-page-offset">
   <view class="topics-page">
     <view class="topics-heading">
@@ -20,9 +20,10 @@
 
 <script setup lang="ts">
 import { onScopeDispose, ref } from 'vue'
-import { onLoad, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
+import { onLoad, onPullDownRefresh, onReachBottom, onShareAppMessage } from '@dcloudio/uni-app'
 import TopicHistoryCard from './components/TopicHistoryCard.vue'
-import FiBrandNav from '../../components/FiBrandNav.vue'
+import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
+import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { topicHeatValue, syncTopicHeat } from '../../stores/topicHeat'
 import { getTopicHistory } from '../../api/dailyTopics'
 import type { DailyTopicItem } from '../../types/dailyTopic'
@@ -60,9 +61,9 @@ onLoad(() => { void load(true) })
 onReachBottom(() => { if (!errorMessage.value) void load(false) })
 onPullDownRefresh(() => { void load(true) })
 function goBack() {
-  if (getCurrentPages().length <= 1) { uni.switchTab({ url: '/pages/home/index' }); return }
-  uni.navigateBack({ fail: () => uni.switchTab({ url: '/pages/home/index' }) })
+  goBackFromSecondaryPage()
 }
+onShareAppMessage(() => ({ title: '成都蓉城新闻，看看球迷正在关注的话题', path: '/pages/topics/index' }))
 onScopeDispose(() => { revision += 1 })
 </script>
 

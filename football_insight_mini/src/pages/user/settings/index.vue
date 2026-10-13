@@ -1,4 +1,5 @@
 <template>
+  <FiSecondaryNav :shareable="false" @back="goBackFromSecondaryPage('/pages/user/index')" />
   <view class="settings-page">
     <view class="settings-section">
       <view class="settings-item">
@@ -62,6 +63,8 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import FiSecondaryNav from '../../../components/FiSecondaryNav.vue'
+import { goBackFromSecondaryPage } from '../../../utils/secondaryNavigation'
 import { canControlMiniReview, putMiniReviewReviewStatus } from '../../../api/miniReview'
 import { MINI_PROGRAM_VERSION } from '../../../api/system'
 import { useMiniReviewStatus } from '../../../stores/miniReview'
@@ -170,7 +173,7 @@ loadStatus()
 .settings-page {
   min-height: 100vh;
   background: var(--fi-color-page);
-  padding: 24rpx 24rpx 40rpx;
+  padding: calc(var(--fi-brand-nav-height) + var(--fi-space-24)) var(--fi-space-24) var(--fi-space-40);
 }
 
 .settings-section {

@@ -1,5 +1,5 @@
 <template>
-  <FiBrandNav show-back subtitle="话题详情" @back="goBack" />
+  <FiSecondaryNav :share-disabled="!shareArticle" @back="goBack" @share="copyArticleShareLink" />
   <view class="topic-page-offset">
   <view class="topic-detail">
     <view v-if="loading" class="topic-detail__state">正在加载话题…</view>
@@ -23,15 +23,16 @@
     </template>
   </view>
   </view>
+  <canvas :canvas-id="TOPIC_SHARE_CANVAS_ID" class="topic-share-canvas" :style="shareCanvasStyle" />
 </template>
 
 <script setup lang="ts">
 import { computed, onScopeDispose, ref } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
 import { topicVisitorId } from '../../utils/topicVisitor'
 import { topicHeatValue, setTopicHeat, syncTopicHeat } from '../../stores/topicHeat'
 import FiTopicHeat from '../../components/topics/FiTopicHeat.vue'
-import FiBrandNav from '../../components/FiBrandNav.vue'
+import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { getTopicDetail, recordTopicVisit } from '../../api/dailyTopics'
 import { useDailyTopicAudio } from '../../composables/useDailyTopicAudio'
 import FiTopicAudioEntry from '../../components/topics/FiTopicAudioEntry.vue'
@@ -39,16 +40,24 @@ import FiTopicAudioPlayer from '../../components/topics/FiTopicAudioPlayer.vue'
 import type { DailyTopicItem } from '../../types/dailyTopic'
 import { DAILY_TOPICS_TEAM_ID, editionForTopic, isTopicSourceUrl, mapTopicDetail } from '../../utils/dailyTopics'
 import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
+import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
+import { buildTopicSharePayload, TOPIC_SHARE_CARD } from './share'
+import { TOPIC_SHARE_CANVAS_ID, useTopicShareCard } from './useTopicShareCard'
 const item = ref<DailyTopicItem | null>(null)
 const loading = ref(false)
 const errorMessage = ref('')
 const edition = computed(() => editionForTopic(item.value))
 const audio = useDailyTopicAudio(edition)
+const shareCard = useTopicShareCard()
+const shareArticle = computed(() => !loading.value && !errorMessage.value ? item.value : null)
+// 分享图按实际像素绘制，与页面布局的 rpx 无关。
+const shareCanvasStyle = { width: `${TOPIC_SHARE_CARD.width}px`, height: `${TOPIC_SHARE_CARD.height}px` }
 let topicId = ''
 let revision = 0
 async function load() {
   const current = ++revision
   audio.stop()
+  shareCard.reset()
   if (!/^[a-zA-Z0-9_-]{1,128}$/.test(topicId)) { errorMessage.value = '话题不存在或已下线'; return }
   loading.value = true
   errorMessage.value = ''
@@ -58,6 +67,7 @@ async function load() {
     if (current === revision) {
       syncTopicHeat([latest])
       item.value = latest
+      void shareCard.prepare(latest)
       const visitorId = topicVisitorId()
       if (visitorId) void recordTopicVisit(DAILY_TOPICS_TEAM_ID, latest.id, visitorId).then(result => {
         setTopicHeat(latest.id, result.heat)
@@ -74,14 +84,21 @@ function copySource(url: string) {
 }
 onLoad(query => { topicId = typeof query?.id === 'string' ? query.id : ''; void load() })
 function goBack() {
-  if (getCurrentPages().length <= 1) { uni.switchTab({ url: '/pages/home/index' }); return }
-  uni.navigateBack({ fail: () => uni.switchTab({ url: '/pages/home/index' }) })
+  goBackFromSecondaryPage()
 }
+function copyArticleShareLink() { copyPageShareLink(buildTopicSharePayload(shareArticle.value).path) }
+onShareAppMessage(() => {
+  const article = shareArticle.value
+  const fallback = buildTopicSharePayload(article, shareCard.imageUrl.value)
+  if (!article || shareCard.imageUrl.value) return fallback
+  return { ...fallback, promise: shareCard.prepare(article).then(imageUrl => buildTopicSharePayload(article, imageUrl)) }
+})
 onScopeDispose(() => { revision += 1 })
 </script>
 
 <style scoped>
 .topic-page-offset { padding-top: var(--fi-brand-nav-height); }
+.topic-share-canvas { position: fixed; left: -9999rpx; top: 0; pointer-events: none; }
 .topic-detail { padding: var(--fi-space-28) var(--fi-space-28) var(--fi-space-40); background: var(--fi-color-page); }
 .topic-detail__eyebrow { display: block; color: var(--fi-color-primary); font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); }
 .topic-detail__title { display: block; margin-top: var(--fi-space-16); color: var(--fi-color-text-primary); font-size: var(--fi-font-36); font-weight: var(--fi-weight-extrabold); line-height: var(--fi-leading-normal); }

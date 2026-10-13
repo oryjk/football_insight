@@ -1,4 +1,5 @@
 <template>
+  <FiSecondaryNav @back="goBackFromSecondaryPage('/pages/insights/index')" @share="copyPageShareLink('/pages/ticket-watch/index')" />
   <view v-if="pageEntered" class="page-root">
     <image
       class="page-bg-img"
@@ -211,6 +212,8 @@
 
 <script setup lang="ts">
 import { nextTick, watch } from 'vue'
+import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
+import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import {
   onHide,
   onReady,
@@ -542,7 +545,7 @@ onUnload(() => {
   position: relative;
   z-index: 1;
   min-height: 100vh;
-  padding: var(--fi-space-20) var(--fi-space-20) var(--fi-space-36);
+  padding: calc(var(--fi-brand-nav-height) + var(--fi-space-20)) var(--fi-space-20) var(--fi-space-36);
   display: flex;
   flex-direction: column;
   gap: var(--fi-space-18);

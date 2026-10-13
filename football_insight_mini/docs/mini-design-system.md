@@ -46,6 +46,10 @@ component（--fi-component-*）   组件级复合契约（卡片、kicker/标题
 
 品牌导航 `FiBrandNav` 使用 64rpx 透明足球主体图标，副标题位于主标题右侧，两段文字底部对齐，整体文字组合与图标居中。品牌行与返回按钮独立使用 `--fi-space-brand-nav-row-size`（52rpx），避免放大 logo 后撑高布局或改变文字位置。内容区高度由 token `--fi-brand-nav-bar-height`（76rpx）控制，页面顶部占位统一使用 `--fi-brand-nav-height`（状态栏 + 内容区），不要在页面里另写旧高度。小程序品牌行与微信胶囊居中对齐，右侧预留胶囊空间；H5 使用流式布局，长副标题省略尾部，二级页保留返回按钮。
 
+### FiSecondaryNav（二级导航）
+
+二级页面统一使用 `FiSecondaryNav`：中间为「足球洞察」，左侧为圆角返回/分享按钮组，右侧预留微信胶囊空间，内容区仍为 76rpx。设置、账号及支付页面传 `shareable=false`，只保留返回按钮。分享按钮在微信端使用原生 `open-type="share"`，H5 通过 `share` 事件由页面复制公开链接；展示组件不读取业务数据或拼接分享内容。导航图标保留 SVG 源图，运行时使用透明 PNG，避免跨端图片格式差异。
+
 ### FiLoading（token 化示范组件）
 
 加载态卡片，用于各页面数据加载中（如支持页、榜赛、洞察）。

@@ -1,4 +1,5 @@
 <template>
+  <FiSecondaryNav :shareable="false" @back="goBackFromSecondaryPage('/pages/user/index')" />
   <view v-if="systemConfigUnderReview" class="page-root" />
   <view v-else class="page-root">
     <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
@@ -115,6 +116,8 @@
 <script setup lang="ts">
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { ref, computed } from 'vue'
+import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
+import { goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { getMembershipProduct, createMembershipOrder } from '../../api/payment'
 import { useRuntimeConfig } from '../../stores/runtimeConfig'
 import { extractApiErrorMessage } from '../../utils/apiError'
@@ -309,7 +312,7 @@ async function handlePurchase() {
 .page {
   position: relative;
   z-index: 1;
-  padding: 32rpx;
+  padding: calc(var(--fi-brand-nav-height) + var(--fi-space-32)) var(--fi-space-32) var(--fi-space-32);
   box-sizing: border-box;
 }
 
