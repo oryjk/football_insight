@@ -785,3 +785,26 @@ page {
   --fi-color-state-card-error-text-color: var(--fi-primitive-matches-state-card-error-text-color);
   --fi-color-state-card-empty-text-color: var(--fi-primitive-matches-state-card-empty-text-color);
 }
+
+/* 品牌导航：一级和二级页面共享既有视觉值。 */
+:root,
+page {
+  --fi-primitive-brand-nav-logo-size: 64rpx;
+  --fi-space-brand-nav-logo-size: var(--fi-primitive-brand-nav-logo-size);
+  --fi-primitive-brand-nav-bg: rgba(247, 248, 250, 0.82);
+  --fi-primitive-brand-nav-border: rgba(232, 233, 238, 0.72);
+  --fi-primitive-brand-nav-inverse: rgba(255, 255, 255, 0.82);
+  --fi-primitive-brand-nav-logo-border: rgba(255, 255, 255, 0.78);
+  --fi-primitive-brand-nav-text-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.36);
+  --fi-primitive-brand-nav-tagline-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.34);
+  --fi-primitive-brand-nav-logo-inverse-shadow: 0 10rpx 24rpx rgba(0, 0, 0, 0.22);
+  --fi-primitive-brand-nav-logo-shadow: 0 10rpx 22rpx rgba(21, 22, 27, 0.1);
+  --fi-color-brand-nav-bg: var(--fi-primitive-brand-nav-bg);
+  --fi-color-brand-nav-border: var(--fi-primitive-brand-nav-border);
+  --fi-color-brand-nav-inverse: var(--fi-primitive-brand-nav-inverse);
+  --fi-color-brand-nav-logo-border: var(--fi-primitive-brand-nav-logo-border);
+  --fi-shadow-brand-nav-text: var(--fi-primitive-brand-nav-text-shadow);
+  --fi-shadow-brand-nav-tagline: var(--fi-primitive-brand-nav-tagline-shadow);
+  --fi-shadow-brand-nav-logo-inverse: var(--fi-primitive-brand-nav-logo-inverse-shadow);
+  --fi-shadow-brand-nav-logo: var(--fi-primitive-brand-nav-logo-shadow);
+}

@@ -3,6 +3,9 @@
         <view class="fi-brand-nav__status-spacer"></view>
         <view class="fi-brand-nav__bar">
             <view class="fi-brand-nav__brand" :style="brandStyle">
+                <button v-if="showBack" class="fi-brand-nav__back" aria-label="返回" @tap="emit('back')">
+                    <text aria-hidden="true">‹</text>
+                </button>
                 <image
                     :src="logo"
                     mode="aspectFill"
@@ -10,7 +13,7 @@
                 />
                 <view class="fi-brand-nav__copy">
                     <text class="fi-brand-nav__name">足球洞察</text>
-                    <text class="fi-brand-nav__tagline">最懂球迷的工具</text>
+                    <text class="fi-brand-nav__tagline">{{ subtitle }}</text>
                 </view>
             </view>
         </view>
@@ -24,11 +27,17 @@ import logo from "../static/app-logo.jpg";
 withDefaults(
     defineProps<{
         transparent?: boolean;
+        showBack?: boolean;
+        subtitle?: string;
     }>(),
     {
         transparent: false,
+        showBack: false,
+        subtitle: "最懂球迷的工具",
     },
 );
+
+const emit = defineEmits<{ (e: "back"): void }>();
 
 const isH5 =
     // #ifdef H5
@@ -95,8 +104,8 @@ onMounted(() => {
     right: 0;
     top: 0;
     z-index: 80;
-    background: rgba(247, 248, 250, 0.82);
-    border-bottom: 1rpx solid rgba(232, 233, 238, 0.72);
+    background: var(--fi-color-brand-nav-bg);
+    border-bottom: 1rpx solid var(--fi-color-brand-nav-border);
     backdrop-filter: blur(18rpx);
     -webkit-backdrop-filter: blur(18rpx);
 }
@@ -109,18 +118,18 @@ onMounted(() => {
 }
 
 .fi-brand-nav--transparent .fi-brand-nav__name {
-    color: #ffffff;
-    text-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.36);
+    color: var(--fi-color-bg);
+    text-shadow: var(--fi-shadow-brand-nav-text);
 }
 
 .fi-brand-nav--transparent .fi-brand-nav__tagline {
-    color: rgba(255, 255, 255, 0.82);
-    text-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.34);
+    color: var(--fi-color-brand-nav-inverse);
+    text-shadow: var(--fi-shadow-brand-nav-tagline);
 }
 
 .fi-brand-nav--transparent .fi-brand-nav__logo {
-    border-color: rgba(255, 255, 255, 0.82);
-    box-shadow: 0 10rpx 24rpx rgba(0, 0, 0, 0.22);
+    border-color: var(--fi-color-brand-nav-inverse);
+    box-shadow: var(--fi-shadow-brand-nav-logo-inverse);
 }
 
 .fi-brand-nav__status-spacer {
@@ -151,8 +160,8 @@ onMounted(() => {
     width: 64rpx;
     height: 64rpx;
     border-radius: 18rpx;
-    border: 2rpx solid rgba(255, 255, 255, 0.78);
-    box-shadow: 0 10rpx 22rpx rgba(21, 22, 27, 0.1);
+    border: 2rpx solid var(--fi-color-brand-nav-logo-border);
+    box-shadow: var(--fi-shadow-brand-nav-logo);
 }
 
 .fi-brand-nav__copy {
@@ -165,7 +174,7 @@ onMounted(() => {
 }
 
 .fi-brand-nav__name {
-    color: #15161b;
+    color: var(--fi-color-text-primary);
     font-size: 32rpx;
     font-weight: 900;
     line-height: 1;
@@ -175,7 +184,7 @@ onMounted(() => {
 }
 
 .fi-brand-nav__tagline {
-    color: #8f9198;
+    color: var(--fi-color-text-muted);
     font-size: 20rpx;
     font-weight: 500;
     line-height: 1;
@@ -199,4 +208,20 @@ onMounted(() => {
     width: auto;
     max-width: 60%;
 }
+.fi-brand-nav__back {
+    flex-shrink: 0;
+    width: var(--fi-space-44);
+    height: var(--fi-space-brand-nav-logo-size);
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--fi-color-text-primary);
+    font-size: var(--fi-font-48);
+    line-height: var(--fi-leading-none);
+}
+.fi-brand-nav__back::after { border: 0; }
+.fi-brand-nav--transparent .fi-brand-nav__back { color: var(--fi-color-bg); }
 </style>

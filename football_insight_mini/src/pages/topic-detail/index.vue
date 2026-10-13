@@ -1,4 +1,6 @@
 <template>
+  <FiBrandNav show-back subtitle="话题详情" @back="goBack" />
+  <view class="topic-page-offset">
   <view class="topic-detail">
     <view v-if="loading" class="topic-detail__state">正在加载话题…</view>
     <view v-else-if="errorMessage" class="topic-detail__state"><text>{{ errorMessage }}</text><button @tap="load">重新加载</button></view>
@@ -19,11 +21,13 @@
       </view>
     </template>
   </view>
+  </view>
 </template>
 
 <script setup lang="ts">
 import { computed, onScopeDispose, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
+import FiBrandNav from '../../components/FiBrandNav.vue'
 import { getTopicDetail } from '../../api/dailyTopics'
 import { useDailyTopicAudio } from '../../composables/useDailyTopicAudio'
 import FiTopicAudioEntry from '../../components/topics/FiTopicAudioEntry.vue'
@@ -58,10 +62,15 @@ function copySource(url: string) {
   uni.setClipboardData({ data: url, success: () => uni.showToast({ title: '原文链接已复制', icon: 'none' }) })
 }
 onLoad(query => { topicId = typeof query?.id === 'string' ? query.id : ''; void load() })
+function goBack() {
+  if (getCurrentPages().length <= 1) { uni.switchTab({ url: '/pages/home/index' }); return }
+  uni.navigateBack({ fail: () => uni.switchTab({ url: '/pages/home/index' }) })
+}
 onScopeDispose(() => { revision += 1 })
 </script>
 
 <style scoped>
+.topic-page-offset { padding-top: var(--fi-brand-nav-height); }
 .topic-detail { padding: var(--fi-space-28) var(--fi-space-28) var(--fi-space-40); background: var(--fi-color-page); }
 .topic-detail__eyebrow { display: block; color: var(--fi-color-primary); font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); }
 .topic-detail__title { display: block; margin-top: var(--fi-space-16); color: var(--fi-color-text-primary); font-size: var(--fi-font-36); font-weight: var(--fi-weight-extrabold); line-height: var(--fi-leading-normal); }

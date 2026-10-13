@@ -5,6 +5,7 @@ declare module 'bun:test' {
   export const afterEach: (hook: () => void) => void
 
   export interface ExpectMatchers {
+    toThrow(expected?: string | RegExp | Error): void
     toBe: (expected: unknown) => void
     toEqual: (expected: unknown) => void
     toBeNull: () => void

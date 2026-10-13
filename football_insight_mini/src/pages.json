@@ -69,6 +69,7 @@
 			"path": "pages/topics/index",
 			"style": {
 				"navigationBarTitleText": "全部话题",
+				"navigationStyle": "custom",
 				"enablePullDownRefresh": true,
 				"onReachBottomDistance": 100
 			}
@@ -76,7 +77,8 @@
 		{
 			"path": "pages/topic-detail/index",
 			"style": {
-				"navigationBarTitleText": "话题详情"
+				"navigationBarTitleText": "话题详情",
+				"navigationStyle": "custom"
 			}
 		}
 	],

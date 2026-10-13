@@ -1,4 +1,6 @@
 <template>
+  <FiBrandNav show-back subtitle="全部话题" @back="goBack" />
+  <view class="topic-page-offset">
   <view class="topics-page">
     <view class="topics-heading">
       <text class="topics-title">全部话题</text>
@@ -18,11 +20,13 @@
       <text v-else>已显示全部话题</text>
     </view>
   </view>
+  </view>
 </template>
 
 <script setup lang="ts">
 import { onScopeDispose, ref } from 'vue'
 import { onLoad, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
+import FiBrandNav from '../../components/FiBrandNav.vue'
 import { getTopicHistory } from '../../api/dailyTopics'
 import type { DailyTopicItem } from '../../types/dailyTopic'
 import { DAILY_TOPICS_TEAM_ID, mapTopicHistory, mergeTopicHistory, topicDetailUrl } from '../../utils/dailyTopics'
@@ -57,10 +61,15 @@ function openTopic(id: string) { uni.navigateTo({ url: topicDetailUrl(id) }) }
 onLoad(() => { void load(true) })
 onReachBottom(() => { if (!errorMessage.value) void load(false) })
 onPullDownRefresh(() => { void load(true) })
+function goBack() {
+  if (getCurrentPages().length <= 1) { uni.switchTab({ url: '/pages/home/index' }); return }
+  uni.navigateBack({ fail: () => uni.switchTab({ url: '/pages/home/index' }) })
+}
 onScopeDispose(() => { revision += 1 })
 </script>
 
 <style scoped>
+.topic-page-offset { padding-top: var(--fi-brand-nav-height); }
 .topics-page { padding: var(--fi-space-28) var(--fi-space-24) var(--fi-space-40); background: var(--fi-color-page); min-height: 100%; }
 .topics-heading { margin-bottom: var(--fi-space-28); }
 .topics-title { display: block; color: var(--fi-color-text-primary); font-size: var(--fi-font-36); font-weight: var(--fi-weight-extrabold); }
