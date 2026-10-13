@@ -49,6 +49,12 @@ impl TestDatabase {
             .unwrap();
         let migration = include_str!("../migrations/20261013000100_add_daily_topic_editions.sql");
         sqlx::raw_sql(migration).execute(&pool).await.unwrap();
+        sqlx::raw_sql(include_str!(
+            "../migrations/20261013000200_add_daily_topic_metrics.sql"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
         Self {
             admin,
             pool,
@@ -338,5 +344,114 @@ async fn archive_pages_span_dates_and_choose_newest_version_without_repeats() {
             .unwrap()
             .is_none()
     );
+    database.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires explicit disposable PostgreSQL database"]
+async fn heat_preserves_manual_base_deduplicates_concurrent_visits_and_survives_republication() {
+    use football_insight_service_backend_rs::daily_topics::domain::{
+        archive::TopicDetailQuery, heat::TopicVisit,
+    };
+    let database = TestDatabase::new().await;
+    let id = "ad0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    database
+        .insert("batch", 77680, "2026-10-13T08:30:00+08:00", "测试话题")
+        .await;
+    let repository = Arc::new(PostgresDailyTopicsRepository::new(database.pool.clone()));
+    let visit = || {
+        TopicVisit::new(
+            TopicDetailQuery::new(77680, id.into()).unwrap(),
+            "a".repeat(64),
+        )
+        .unwrap()
+    };
+    let first_visit = visit();
+    let second_visit = visit();
+    let (left, right) = tokio::join!(
+        repository.record_visit(&first_visit),
+        repository.record_visit(&second_visit)
+    );
+    assert_eq!(left.unwrap().unwrap().total(), 1);
+    assert_eq!(right.unwrap().unwrap().total(), 1);
+    sqlx::query(
+        "UPDATE f_i_daily_topic_metrics SET base_heat=100 WHERE team_id=77680 AND topic_id=$1",
+    )
+    .bind(id)
+    .execute(&database.pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        repository
+            .record_visit(&visit())
+            .await
+            .unwrap()
+            .unwrap()
+            .total(),
+        101
+    );
+    sqlx::query("UPDATE f_i_daily_topic_visitors SET last_counted_at=clock_timestamp()-INTERVAL '31 minutes'").execute(&database.pool).await.unwrap();
+    assert_eq!(
+        repository
+            .record_visit(&visit())
+            .await
+            .unwrap()
+            .unwrap()
+            .total(),
+        102
+    );
+    let different = TopicVisit::new(
+        TopicDetailQuery::new(77680, id.into()).unwrap(),
+        "b".repeat(64),
+    )
+    .unwrap();
+    assert_eq!(
+        repository
+            .record_visit(&different)
+            .await
+            .unwrap()
+            .unwrap()
+            .total(),
+        103
+    );
+    database
+        .insert("new-batch", 77680, "2026-10-13T09:30:00+08:00", "更新话题")
+        .await;
+    let use_case = GetDailyTopics::new(repository.clone());
+    assert_eq!(
+        use_case
+            .execute(DailyTopicsQuery::new(77680, 5).unwrap())
+            .await
+            .unwrap()
+            .items[0]
+            .heat,
+        103
+    );
+    assert_eq!(
+        use_case
+            .detail(TopicDetailQuery::new(77680, id.into()).unwrap())
+            .await
+            .unwrap()
+            .unwrap()
+            .heat,
+        103
+    );
+    let wrong = TopicVisit::new(
+        TopicDetailQuery::new(999, id.into()).unwrap(),
+        "a".repeat(64),
+    )
+    .unwrap();
+    assert!(repository.record_visit(&wrong).await.unwrap().is_none());
+    let missing = TopicVisit::new(
+        TopicDetailQuery::new(77680, "missing".into()).unwrap(),
+        "a".repeat(64),
+    )
+    .unwrap();
+    assert!(repository.record_visit(&missing).await.unwrap().is_none());
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM f_i_daily_topic_metrics")
+        .fetch_one(&database.pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 1);
     database.close().await;
 }

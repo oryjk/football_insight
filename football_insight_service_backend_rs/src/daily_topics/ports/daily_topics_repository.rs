@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use crate::daily_topics::domain::{
     archive::TopicPosition,
     edition::{DailyTopic, DailyTopicEdition},
+    heat::{TopicHeat, TopicVisit},
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -15,6 +16,21 @@ pub enum DailyTopicsRepositoryError {
 
 #[async_trait]
 pub trait DailyTopicsRepository: Send + Sync {
+    async fn heat_for_topics(
+        &self,
+        _team_id: i64,
+        _ids: &[String],
+    ) -> Result<std::collections::HashMap<String, TopicHeat>, DailyTopicsRepositoryError> {
+        Ok(std::collections::HashMap::new())
+    }
+
+    async fn record_visit(
+        &self,
+        _visit: &TopicVisit,
+    ) -> Result<Option<TopicHeat>, DailyTopicsRepositoryError> {
+        Err(DailyTopicsRepositoryError::Unavailable)
+    }
+
     async fn latest_for_team(
         &self,
         team_id: i64,

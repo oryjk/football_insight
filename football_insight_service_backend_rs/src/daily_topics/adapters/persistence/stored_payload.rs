@@ -49,6 +49,7 @@ enum StoredAudioStatus {
 impl From<StoredTopic> for DailyTopic {
     fn from(value: StoredTopic) -> Self {
         Self {
+            heat: 0,
             id: value.id,
             team_id: value.team_id,
             title: value.title,

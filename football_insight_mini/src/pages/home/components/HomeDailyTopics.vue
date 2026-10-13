@@ -27,7 +27,7 @@
       <swiper class="daily-topics__swiper" :current="activeIndex" :circular="false" :autoplay="false" next-margin="56rpx" @change="onSlideChange">
         <swiper-item v-for="(item, index) in edition.items" :key="item.id">
           <view class="daily-topics__slide">
-            <HomeDailyTopicCard :item="item" :index-label="`${String(index + 1).padStart(2, '0')} / ${String(edition.items.length).padStart(2, '0')}`" :audio-ready="availableAudioIds.includes(item.id)" :audio-playing="activeAudioId === item.id && audioStatus === 'playing'" :audio-loading="activeAudioId === item.id && audioStatus === 'loading'" @read="emit('read', $event)" @play="emit('play', $event)" />
+            <HomeDailyTopicCard :item="item" :heat="topicHeatValue(item.id, item.heat)" :index-label="`${String(index + 1).padStart(2, '0')} / ${String(edition.items.length).padStart(2, '0')}`" :audio-ready="availableAudioIds.includes(item.id)" :audio-playing="activeAudioId === item.id && audioStatus === 'playing'" :audio-loading="activeAudioId === item.id && audioStatus === 'loading'" @read="emit('read', $event)" @play="emit('play', $event)" />
           </view>
         </swiper-item>
         <swiper-item key="more-topics">
@@ -57,6 +57,7 @@
 </template>
 
 <script setup lang="ts">
+import { topicHeatValue } from '../../../stores/topicHeat'
 import { ref, watch } from 'vue'
 import HomeDailyTopicCard from './HomeDailyTopicCard.vue'
 import type { DailyTopicEdition } from '../../../types/dailyTopic'

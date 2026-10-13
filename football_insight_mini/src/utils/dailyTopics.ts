@@ -55,6 +55,7 @@ export function mapDailyTopicItem(value: unknown): DailyTopicItem | null {
     id, teamId: DAILY_TOPICS_TEAM_ID, title, summary, paragraphs, publishedAt,
     publishedLabel: formatTopicTimestamp(publishedAt), sources,
     sourceLabel: `${Array.from(new Set(sources.map(source => source.publisher))).join(' · ')} · ${sources.length} 个来源`,
+    heat: typeof item.heat === 'number' && Number.isSafeInteger(item.heat) && item.heat >= 0 ? item.heat : 0,
     readMinutes: Math.max(1, Math.ceil(paragraphs.join('').length / 350)),
     audio: {
       status: ready ? 'ready' : audio?.status === 'pending' ? 'pending' : 'failed',
@@ -119,4 +120,11 @@ export function topicDetailUrl(id: string): string {
 }
 export function editionForTopic(item: DailyTopicItem | null): DailyTopicEdition {
   return item ? { ...emptyDailyTopicEdition(), updatedAt: item.publishedAt, items: [item] } : emptyDailyTopicEdition()
+}
+
+export function formatTopicHeat(value: number): string {
+  const heat = Number.isSafeInteger(value) && value >= 0 ? value : 0
+  if (heat >= 100000000) return `${Math.floor(heat / 10000000) / 10}亿`
+  if (heat >= 10000) return `${Math.floor(heat / 1000) / 10}万`
+  return String(heat)
 }

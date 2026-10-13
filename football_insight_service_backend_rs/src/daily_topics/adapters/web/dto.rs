@@ -52,6 +52,7 @@ pub(super) struct DailyTopicDto {
     published_at: DateTime<FixedOffset>,
     sources: Vec<DailyTopicSourceDto>,
     audio: DailyTopicAudioDto,
+    heat: u64,
 }
 
 #[derive(Deserialize)]
@@ -180,6 +181,7 @@ impl From<DailyTopic> for DailyTopicDto {
             published_at: value.published_at,
             sources: value.sources.into_iter().map(Into::into).collect(),
             audio: value.audio.into(),
+            heat: value.heat,
         }
     }
 }
@@ -208,4 +210,14 @@ impl From<DailyTopicAudio> for DailyTopicAudioDto {
             duration_seconds: value.duration_seconds,
         }
     }
+}
+
+#[derive(Deserialize)]
+pub(super) struct TopicVisitBody {
+    pub visitor_id: String,
+}
+
+#[derive(Serialize)]
+pub(super) struct TopicVisitResponse {
+    pub heat: u64,
 }

@@ -23,6 +23,7 @@ export interface DailyTopicItem {
   publishedLabel: string
   sources: DailyTopicSource[]
   sourceLabel: string
+  heat: number
   readMinutes: number
   audio: DailyTopicAudio
 }

@@ -78,3 +78,30 @@ fn storage_failure(error: DailyTopicsRepositoryError) -> (StatusCode, &'static s
         "topics are temporarily unavailable",
     )
 }
+
+pub(super) async fn record_topic_visit(
+    State(use_case): State<Arc<GetDailyTopics>>,
+    Path(id): Path<String>,
+    parameters: Result<Query<TopicDetailParameters>, QueryRejection>,
+    body: Result<Json<super::dto::TopicVisitBody>, axum::extract::rejection::JsonRejection>,
+) -> Result<Json<super::dto::TopicVisitResponse>, (StatusCode, &'static str)> {
+    use sha2::{Digest, Sha256};
+    let Query(parameters) = parameters.map_err(|_| invalid_parameters())?;
+    let Json(body) = body.map_err(|_| invalid_parameters())?;
+    let visitor = uuid::Uuid::parse_str(&body.visitor_id).map_err(|_| invalid_parameters())?;
+    if visitor.is_nil() {
+        return Err(invalid_parameters());
+    }
+    let query = parameters
+        .into_query(id)
+        .map_err(|_| invalid_parameters())?;
+    let hash = format!("{:x}", Sha256::digest(visitor.as_bytes()));
+    let visit = crate::daily_topics::domain::heat::TopicVisit::new(query, hash)
+        .map_err(|_| invalid_parameters())?;
+    let heat = use_case
+        .record_visit(visit)
+        .await
+        .map_err(storage_failure)?
+        .ok_or((StatusCode::NOT_FOUND, "topic not found"))?;
+    Ok(Json(super::dto::TopicVisitResponse { heat }))
+}

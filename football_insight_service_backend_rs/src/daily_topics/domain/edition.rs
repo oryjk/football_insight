@@ -26,6 +26,7 @@ pub struct DailyTopic {
     pub published_at: DateTime<FixedOffset>,
     pub sources: Vec<DailyTopicSource>,
     pub audio: DailyTopicAudio,
+    pub heat: u64,
 }
 
 #[derive(Debug, Clone)]

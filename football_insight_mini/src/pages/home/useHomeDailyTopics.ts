@@ -1,4 +1,5 @@
 import { onScopeDispose, ref } from 'vue'
+import { syncTopicHeat } from '../../stores/topicHeat'
 import { getDailyTopics } from '../../api/dailyTopics'
 import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
 import { DAILY_TOPICS_TEAM_ID, emptyDailyTopicEdition, mapDailyTopicEdition } from './dailyTopics'
@@ -16,6 +17,7 @@ export function useHomeDailyTopics() {
       const payload = await getDailyTopics(DAILY_TOPICS_TEAM_ID)
       if (current !== revision) return
       const latest = mapDailyTopicEdition(payload)
+      syncTopicHeat(latest.items)
       edition.value = latest
     } catch (error) {
       if (current !== revision) return

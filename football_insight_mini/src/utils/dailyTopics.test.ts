@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { mapTopicHistory, mapTopicDetail, mergeTopicHistory, topicDetailUrl } from './dailyTopics'
+import { mapTopicHistory, mapTopicDetail, mergeTopicHistory, topicDetailUrl, formatTopicHeat } from './dailyTopics'
 const article = (id: string, time: string) => ({ id, team_id: 77680, title: '新闻标题', summary: '摘要', paragraphs: ['正文'], published_at: time,
   sources: [{ title: '来源', publisher: '新闻', url: 'https://news.example.com/a', published_at: time }], audio: { status: 'pending' } })
 const page = (items: unknown[], next: string | null = null) => ({ team_id: 77680, items, next_cursor: next, has_more: next !== null })
@@ -27,4 +27,17 @@ test('详情保留所有段落、来源和音频，路由编码内容 ID', () =>
   expect(item.paragraphs).toEqual(value.paragraphs)
   expect(item.audio.url).toBe(value.audio.url)
   expect(topicDetailUrl('a&b')).toBe('/pages/topic-detail/index?id=a%26b')
+})
+
+test('热度兼容旧接口并拒绝负值、非数值和不安全整数', () => {
+  const value = article('heat-topic','2026-10-13T08:00:00Z')
+  expect(mapTopicDetail(value).heat).toBe(0)
+  expect(mapTopicDetail({ ...value, heat: 12345 }).heat).toBe(12345)
+  for (const heat of [-1, NaN, Infinity, '12', 1.2, Number.MAX_SAFE_INTEGER + 1]) {
+    expect(mapTopicDetail({ ...value, heat }).heat).toBe(0)
+  }
+})
+
+test('热度显示统一以万、亿简写，小于一万保留整数', () => {
+  expect([0, 99, 9999, 10000, 12345, 100000000].map(formatTopicHeat)).toEqual(['0', '99', '9999', '1万', '1.2万', '1亿'])
 })

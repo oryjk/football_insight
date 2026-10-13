@@ -8,7 +8,7 @@
       <text class="topic-card__title">{{ item.title }}</text>
       <text class="topic-card__summary">{{ item.summary }}</text>
     </view>
-    <text class="topic-card__source">{{ item.sourceLabel }}</text>
+    <view class="topic-card__heat"><FiTopicHeat :value="heat" /></view>
     <view class="topic-card__footer">
       <FiTopicReadEntry @read="emit('read', item.id)" />
       <FiTopicAudioEntry :ready="audioReady" :playing="audioPlaying" :loading="audioLoading" @play="emit('play', item.id)" />
@@ -17,10 +17,11 @@
 </template>
 
 <script setup lang="ts">
+import FiTopicHeat from '../../../components/topics/FiTopicHeat.vue'
 import FiTopicReadEntry from '../../../components/topics/FiTopicReadEntry.vue'
 import FiTopicAudioEntry from '../../../components/topics/FiTopicAudioEntry.vue'
 import type { DailyTopicItem } from '../../../types/dailyTopic'
-defineProps<{ item: DailyTopicItem; indexLabel: string; audioReady: boolean; audioPlaying: boolean; audioLoading: boolean }>()
+defineProps<{ item: DailyTopicItem; heat: number; indexLabel: string; audioReady: boolean; audioPlaying: boolean; audioLoading: boolean }>()
 const emit = defineEmits<{ (e: 'read', id: string): void; (e: 'play', id: string): void }>()
 </script>
 
@@ -33,6 +34,6 @@ const emit = defineEmits<{ (e: 'read', id: string): void; (e: 'play', id: string
 .topic-card__reading--pressed { opacity: 0.75; }
 .topic-card__title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--fi-color-text-primary); font-size: var(--fi-font-32); line-height: var(--fi-leading-normal); font-weight: var(--fi-weight-bold); }
 .topic-card__summary { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: var(--fi-space-20); color: var(--fi-color-text-secondary); font-size: var(--fi-font-28); line-height: var(--fi-leading-relaxed); }
-.topic-card__source { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-top: var(--fi-space-16); color: var(--fi-color-text-caption); font-size: var(--fi-font-20); line-height: var(--fi-leading-normal); }
+.topic-card__heat { margin-top: var(--fi-space-16); }
 .topic-card__footer { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-12); margin-top: var(--fi-space-18); padding-top: var(--fi-space-18); border-top: var(--fi-border-divider); }
 </style>

@@ -6,7 +6,7 @@
       <text class="topics-title">全部话题</text>
       <text class="topics-caption">成都蓉城新闻 · 最新发布在前</text>
     </view>
-    <TopicHistoryCard v-for="item in items" :key="item.id" :item="item" @read="openTopic" />
+    <TopicHistoryCard v-for="item in items" :key="item.id" :item="item" :heat="topicHeatValue(item.id, item.heat)" @read="openTopic" />
     <view class="topics-state">
       <text v-if="loading">正在加载话题…</text>
       <template v-else-if="errorMessage"><text>{{ errorMessage }}</text><button @tap="retry">重新加载</button></template>
@@ -23,6 +23,7 @@ import { onScopeDispose, ref } from 'vue'
 import { onLoad, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import TopicHistoryCard from './components/TopicHistoryCard.vue'
 import FiBrandNav from '../../components/FiBrandNav.vue'
+import { topicHeatValue, syncTopicHeat } from '../../stores/topicHeat'
 import { getTopicHistory } from '../../api/dailyTopics'
 import type { DailyTopicItem } from '../../types/dailyTopic'
 import { DAILY_TOPICS_TEAM_ID, mapTopicHistory, mergeTopicHistory, topicDetailUrl } from '../../utils/dailyTopics'
@@ -44,6 +45,7 @@ async function load(reset: boolean) {
     const page = mapTopicHistory(await getTopicHistory(DAILY_TOPICS_TEAM_ID, cursor))
     if (current !== revision) return
     if (page.nextCursor && page.nextCursor === cursor) throw new Error('话题加载失败，请重试')
+    syncTopicHeat(page.items)
     items.value = mergeTopicHistory(reset ? [] : items.value, page.items)
     nextCursor.value = page.nextCursor
   } catch (error) {

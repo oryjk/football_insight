@@ -6,6 +6,7 @@ use crate::daily_topics::{
     domain::{
         archive::TopicPosition,
         edition::{DailyTopic, DailyTopicEdition},
+        heat::{TopicHeat, TopicVisit},
     },
     ports::daily_topics_repository::{DailyTopicsRepository, DailyTopicsRepositoryError},
 };
@@ -24,6 +25,70 @@ impl PostgresDailyTopicsRepository {
 
 #[async_trait]
 impl DailyTopicsRepository for PostgresDailyTopicsRepository {
+    async fn heat_for_topics(
+        &self,
+        team_id: i64,
+        ids: &[String],
+    ) -> Result<std::collections::HashMap<String, TopicHeat>, DailyTopicsRepositoryError> {
+        let rows = sqlx::query("SELECT topic_id, base_heat, view_count FROM f_i_daily_topic_metrics WHERE team_id=$1 AND topic_id=ANY($2)")
+            .bind(team_id).bind(ids).fetch_all(&self.pool).await.map_err(storage_error)?;
+        rows.into_iter()
+            .map(|row| {
+                Ok((
+                    row.try_get("topic_id").map_err(invalid_row)?,
+                    row_heat(&row)?,
+                ))
+            })
+            .collect()
+    }
+
+    async fn record_visit(
+        &self,
+        visit: &TopicVisit,
+    ) -> Result<Option<TopicHeat>, DailyTopicsRepositoryError> {
+        let team_id = visit.topic.team_id();
+        let id = visit.topic.id();
+        let mut tx = self.pool.begin().await.map_err(storage_error)?;
+        let exists: bool = sqlx::query_scalar(r#"
+            SELECT EXISTS (
+                SELECT 1 FROM f_i_daily_topic_editions e
+                CROSS JOIN LATERAL jsonb_array_elements(
+                    CASE WHEN jsonb_typeof(e.payload->'items')='array' THEN e.payload->'items' ELSE '[]'::jsonb END
+                ) entry(topic)
+                WHERE e.team_id=$1 AND entry.topic->>'id'=$2
+            )
+        "#).bind(team_id).bind(id).fetch_one(&mut *tx).await.map_err(storage_error)?;
+        if !exists {
+            return Ok(None);
+        }
+        sqlx::query("INSERT INTO f_i_daily_topic_metrics(team_id,topic_id) VALUES($1,$2) ON CONFLICT DO NOTHING")
+            .bind(team_id).bind(id).execute(&mut *tx).await.map_err(storage_error)?;
+        // Serialize visits for this topic before deduplication; simultaneous requests count exactly once.
+        sqlx::query(
+            "SELECT 1 FROM f_i_daily_topic_metrics WHERE team_id=$1 AND topic_id=$2 FOR UPDATE",
+        )
+        .bind(team_id)
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(storage_error)?;
+        let counted = sqlx::query(r#"
+            INSERT INTO f_i_daily_topic_visitors(team_id,topic_id,visitor_hash) VALUES($1,$2,$3)
+            ON CONFLICT(team_id,topic_id,visitor_hash) DO UPDATE SET last_counted_at=clock_timestamp()
+            WHERE f_i_daily_topic_visitors.last_counted_at <= clock_timestamp() - INTERVAL '30 minutes'
+            RETURNING 1
+        "#).bind(team_id).bind(id).bind(&visit.visitor_hash).fetch_optional(&mut *tx).await.map_err(storage_error)?.is_some();
+        if counted {
+            sqlx::query("UPDATE f_i_daily_topic_metrics SET view_count=LEAST(view_count+1,9007199254740991),updated_at=clock_timestamp() WHERE team_id=$1 AND topic_id=$2")
+                .bind(team_id).bind(id).execute(&mut *tx).await.map_err(storage_error)?;
+        }
+        let row = sqlx::query("SELECT base_heat,view_count FROM f_i_daily_topic_metrics WHERE team_id=$1 AND topic_id=$2")
+            .bind(team_id).bind(id).fetch_one(&mut *tx).await.map_err(storage_error)?;
+        let heat = row_heat(&row)?;
+        tx.commit().await.map_err(storage_error)?;
+        Ok(Some(heat))
+    }
+
     async fn latest_for_team(
         &self,
         team_id: i64,
@@ -152,4 +217,17 @@ fn storage_error(error: sqlx::Error) -> DailyTopicsRepositoryError {
 fn invalid_row(error: sqlx::Error) -> DailyTopicsRepositoryError {
     tracing::error!(%error, "invalid daily topics database row");
     DailyTopicsRepositoryError::InvalidEdition
+}
+
+fn row_heat(row: &sqlx::postgres::PgRow) -> Result<TopicHeat, DailyTopicsRepositoryError> {
+    let base: i64 = row.try_get("base_heat").map_err(invalid_row)?;
+    let views: i64 = row.try_get("view_count").map_err(invalid_row)?;
+    Ok(TopicHeat {
+        base: base
+            .try_into()
+            .map_err(|_| DailyTopicsRepositoryError::InvalidEdition)?,
+        views: views
+            .try_into()
+            .map_err(|_| DailyTopicsRepositoryError::InvalidEdition)?,
+    })
 }

@@ -20,10 +20,29 @@ use tower::ServiceExt;
 struct Repository {
     edition: Option<DailyTopicEdition>,
     fail: bool,
+    heat_fail: bool,
 }
 
 #[async_trait]
 impl DailyTopicsRepository for Repository {
+    async fn heat_for_topics(
+        &self,
+        _team_id: i64,
+        _ids: &[String],
+    ) -> Result<
+        std::collections::HashMap<
+            String,
+            football_insight_service_backend_rs::daily_topics::domain::heat::TopicHeat,
+        >,
+        DailyTopicsRepositoryError,
+    > {
+        if self.heat_fail {
+            Err(DailyTopicsRepositoryError::Unavailable)
+        } else {
+            Ok(std::collections::HashMap::new())
+        }
+    }
+
     async fn latest_for_team(
         &self,
         team_id: i64,
@@ -42,6 +61,7 @@ fn app(edition: Option<DailyTopicEdition>, fail: bool) -> axum::Router {
     daily_topics_routes(Arc::new(GetDailyTopics::new(Arc::new(Repository {
         edition,
         fail,
+        heat_fail: false,
     }))))
 }
 
@@ -68,6 +88,7 @@ fn edition() -> DailyTopicEdition {
             .map(|index| DailyTopic {
                 id: format!("{index:064x}"),
                 team_id: 77680,
+                heat: 0,
                 title: format!("隔离测试文章 {index}"),
                 summary: "测试摘要".into(),
                 paragraphs: vec!["第一段".into(), "第二段".into()],
@@ -222,7 +243,7 @@ async fn public_contract_preserves_content_sources_and_audio_without_data_wrappe
         body["items"][0],
         json!({
             "id":"0000000000000000000000000000000000000000000000000000000000000000",
-            "team_id":77680,"title":"隔离测试文章 0","summary":"测试摘要",
+            "team_id":77680,"heat":0,"title":"隔离测试文章 0","summary":"测试摘要",
             "paragraphs":["第一段","第二段"],"published_at":"2026-10-13T08:30:00+08:00",
             "sources":[{"title":"测试来源","url":"https://example.com/original","publisher":"测试媒体","published_at":"2026-10-12T20:00:00+08:00"}],
             "audio":{"status":"ready","url":"https://example.com/audio.m4a","dialect":"sichuan","duration_seconds":60.0}
@@ -313,4 +334,65 @@ async fn public_cache_does_not_hide_a_newly_published_edition() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(published["items"].as_array().unwrap().len(), 5);
     assert_eq!(published["items"][0]["audio"]["status"], "ready");
+}
+
+#[tokio::test]
+async fn topics_expose_heat_without_counting_passive_reads() {
+    let app = app(Some(edition()), false);
+    let (_, home) = get(app.clone(), "/api/v1/daily-topics").await;
+    let (_, history) = get(app.clone(), "/api/v1/daily-topics/history").await;
+    let id = home["items"][0]["id"].as_str().unwrap();
+    let (_, detail) = get(app, &format!("/api/v1/daily-topics/{id}")).await;
+    assert_eq!(home["items"][0]["heat"], 0);
+    assert_eq!(history["items"][0]["heat"], 0);
+    assert_eq!(detail["heat"], 0);
+}
+
+#[tokio::test]
+async fn visits_reject_invalid_visitors_and_unpublished_topics() {
+    for (id, visitor, expected) in [
+        ("known", "invalid", StatusCode::BAD_REQUEST),
+        (
+            "missing",
+            "550e8400-e29b-41d4-a716-446655440000",
+            StatusCode::NOT_FOUND,
+        ),
+    ] {
+        let response = app(Some(edition()), false)
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/v1/daily-topics/{id}/visits"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(json!({"visitor_id":visitor}).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), expected);
+    }
+}
+
+#[tokio::test]
+async fn heat_failure_does_not_block_home_history_or_detail_content() {
+    let app = daily_topics_routes(Arc::new(GetDailyTopics::new(Arc::new(Repository {
+        edition: Some(edition()),
+        fail: false,
+        heat_fail: true,
+    }))));
+    for url in [
+        "/api/v1/daily-topics",
+        "/api/v1/daily-topics/history",
+        "/api/v1/daily-topics/0000000000000000000000000000000000000000000000000000000000000000",
+    ] {
+        let (status, body) = get(app.clone(), url).await;
+        assert_eq!(status, StatusCode::OK);
+        let topic = if body.get("items").is_some() {
+            &body["items"][0]
+        } else {
+            &body
+        };
+        assert_eq!(topic["heat"], 0);
+        assert_eq!(topic["paragraphs"][0], "第一段");
+    }
 }

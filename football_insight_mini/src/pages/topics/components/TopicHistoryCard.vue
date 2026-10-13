@@ -7,17 +7,18 @@
     <text class="topic-row__title">{{ item.title }}</text>
     <text class="topic-row__summary">{{ item.summary }}</text>
     <view class="topic-row__footer">
-      <view class="topic-row__meta"><text>{{ item.sources.length }} 个来源</text><text>约 {{ item.readMinutes }} 分钟阅读</text></view>
+      <view class="topic-row__meta"><FiTopicHeat :value="heat" /><text>约 {{ item.readMinutes }} 分钟阅读</text></view>
       <view class="topic-row__read-entry"><FiTopicReadEntry @read="emit('read', item.id)" /></view>
     </view>
   </view>
 </template>
 <script setup lang="ts">
 import { computed } from 'vue'
+import FiTopicHeat from '../../../components/topics/FiTopicHeat.vue'
 import FiTopicReadEntry from '../../../components/topics/FiTopicReadEntry.vue'
 import type { DailyTopicItem } from '../../../types/dailyTopic'
 import { topicCardPresentation } from '../presentation'
-const props = defineProps<{ item: DailyTopicItem }>()
+const props = defineProps<{ item: DailyTopicItem; heat: number }>()
 const emit = defineEmits<{ (e: 'read', id: string): void }>()
 const presentation = computed(() => topicCardPresentation(props.item.title))
 </script>

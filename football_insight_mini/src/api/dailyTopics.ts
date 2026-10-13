@@ -12,3 +12,8 @@ export function getTopicHistory(teamId: number, cursor: string | null = null, li
 export function getTopicDetail(teamId: number, id: string): Promise<unknown> {
   return request<unknown>({ url: `/daily-topics/${encodeURIComponent(id)}?team_id=${teamId}` })
 }
+
+export function recordTopicVisit(teamId: number, id: string, visitorId: string): Promise<{ heat: number }> {
+  return request<{ heat: number }>({ url: `/daily-topics/${encodeURIComponent(id)}/visits?team_id=${teamId}`,
+    method: 'POST', data: { visitor_id: visitorId }, silentNetworkError: true })
+}

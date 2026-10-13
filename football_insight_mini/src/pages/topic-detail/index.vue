@@ -8,6 +8,7 @@
       <text class="topic-detail__eyebrow">成都蓉城</text>
       <text class="topic-detail__title">{{ item.title }}</text>
       <text class="topic-detail__meta">{{ item.publishedLabel }} · 约 {{ item.readMinutes }} 分钟阅读</text>
+      <view class="topic-detail__heat"><FiTopicHeat :value="topicHeatValue(item.id, item.heat)" /></view>
       <view class="topic-detail__audio"><FiTopicAudioEntry :ready="audio.availableIds.value.includes(item.id)" :playing="audio.status.value === 'playing'" :loading="audio.status.value === 'loading'" @play="audio.toggle(item.id)" /></view>
       <FiTopicAudioPlayer v-if="audio.activeId.value" :title="item.title" :status="audio.status.value" :current-time="audio.currentTime.value" :duration="audio.duration.value" :error-message="audio.errorMessage.value" @toggle="audio.toggle(item.id)" @seek="audio.seek" @close="audio.stop" />
       <text v-for="(paragraph, index) in item.paragraphs" :key="index" class="topic-detail__paragraph">{{ paragraph }}</text>
@@ -27,8 +28,11 @@
 <script setup lang="ts">
 import { computed, onScopeDispose, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
+import { topicVisitorId } from '../../utils/topicVisitor'
+import { topicHeatValue, setTopicHeat, syncTopicHeat } from '../../stores/topicHeat'
+import FiTopicHeat from '../../components/topics/FiTopicHeat.vue'
 import FiBrandNav from '../../components/FiBrandNav.vue'
-import { getTopicDetail } from '../../api/dailyTopics'
+import { getTopicDetail, recordTopicVisit } from '../../api/dailyTopics'
 import { useDailyTopicAudio } from '../../composables/useDailyTopicAudio'
 import FiTopicAudioEntry from '../../components/topics/FiTopicAudioEntry.vue'
 import FiTopicAudioPlayer from '../../components/topics/FiTopicAudioPlayer.vue'
@@ -51,7 +55,14 @@ async function load() {
   try {
     const latest = mapTopicDetail(await getTopicDetail(DAILY_TOPICS_TEAM_ID, topicId))
     if (latest.id !== topicId) throw new Error('话题加载失败，请重试')
-    if (current === revision) item.value = latest
+    if (current === revision) {
+      syncTopicHeat([latest])
+      item.value = latest
+      const visitorId = topicVisitorId()
+      if (visitorId) void recordTopicVisit(DAILY_TOPICS_TEAM_ID, latest.id, visitorId).then(result => {
+        setTopicHeat(latest.id, result.heat)
+      }).catch(() => { /* Statistics never block reading or playback. */ })
+    }
   } catch (error) {
     if (current === revision) errorMessage.value = error instanceof ApiRequestError && error.statusCode === 404
       ? '话题不存在或已下线' : extractApiErrorMessage(error, '话题加载失败，请稍后重试')
@@ -75,6 +86,7 @@ onScopeDispose(() => { revision += 1 })
 .topic-detail__eyebrow { display: block; color: var(--fi-color-primary); font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); }
 .topic-detail__title { display: block; margin-top: var(--fi-space-16); color: var(--fi-color-text-primary); font-size: var(--fi-font-36); font-weight: var(--fi-weight-extrabold); line-height: var(--fi-leading-normal); }
 .topic-detail__meta { display: block; margin-top: var(--fi-space-18); color: var(--fi-color-text-caption); font-size: var(--fi-font-22); line-height: var(--fi-leading-normal); }
+.topic-detail__heat { margin-top: var(--fi-space-16); }
 .topic-detail__audio { margin: var(--fi-space-24) 0; }
 .topic-detail__paragraph { display: block; margin-top: var(--fi-space-28); color: var(--fi-color-text-primary); font-size: var(--fi-font-30); line-height: var(--fi-leading-relaxed); white-space: pre-wrap; }
 .topic-detail__sources { margin-top: var(--fi-space-32); padding-top: var(--fi-space-24); border-top: var(--fi-border-divider); }
