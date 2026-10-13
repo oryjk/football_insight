@@ -808,3 +808,24 @@ page {
   --fi-shadow-brand-nav-logo-inverse: var(--fi-primitive-brand-nav-logo-inverse-shadow);
   --fi-shadow-brand-nav-logo: var(--fi-primitive-brand-nav-logo-shadow);
 }
+
+/* 历史话题卡片：柔和底色与可读的主题标识。 */
+:root,
+page {
+  --fi-primitive-topic-history-championship-bg: #fff5f0;
+  --fi-color-topic-history-championship-bg: var(--fi-primitive-topic-history-championship-bg);
+  --fi-primitive-topic-history-championship-accent: #b94b2e;
+  --fi-color-topic-history-championship-accent: var(--fi-primitive-topic-history-championship-accent);
+  --fi-primitive-topic-history-preview-bg: #eef5fc;
+  --fi-color-topic-history-preview-bg: var(--fi-primitive-topic-history-preview-bg);
+  --fi-primitive-topic-history-preview-accent: #356593;
+  --fi-color-topic-history-preview-accent: var(--fi-primitive-topic-history-preview-accent);
+  --fi-primitive-topic-history-analysis-bg: #f5f1fb;
+  --fi-color-topic-history-analysis-bg: var(--fi-primitive-topic-history-analysis-bg);
+  --fi-primitive-topic-history-analysis-accent: #755198;
+  --fi-color-topic-history-analysis-accent: var(--fi-primitive-topic-history-analysis-accent);
+  --fi-primitive-topic-history-news-bg: #f0f7f2;
+  --fi-color-topic-history-news-bg: var(--fi-primitive-topic-history-news-bg);
+  --fi-primitive-topic-history-news-accent: #347953;
+  --fi-color-topic-history-news-accent: var(--fi-primitive-topic-history-news-accent);
+}
