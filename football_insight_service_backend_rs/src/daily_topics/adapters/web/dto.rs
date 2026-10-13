@@ -1,7 +1,12 @@
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use serde::{Deserialize, Serialize};
 
 use crate::daily_topics::domain::{
+    archive::{
+        InvalidTopicArchiveQuery, TopicDetailQuery, TopicHistoryPage, TopicHistoryQuery,
+        TopicPosition,
+    },
     edition::{AudioStatus, DailyTopic, DailyTopicAudio, DailyTopicSource, DailyTopicsView},
     query::{DailyTopicsQuery, InvalidDailyTopicsQuery},
 };
@@ -38,7 +43,7 @@ pub struct DailyTopicsResponse {
 }
 
 #[derive(Serialize)]
-struct DailyTopicDto {
+pub(super) struct DailyTopicDto {
     id: String,
     team_id: i64,
     title: String,
@@ -47,6 +52,94 @@ struct DailyTopicDto {
     published_at: DateTime<FixedOffset>,
     sources: Vec<DailyTopicSourceDto>,
     audio: DailyTopicAudioDto,
+}
+
+#[derive(Deserialize)]
+pub(super) struct TopicHistoryParameters {
+    #[serde(default = "default_team")]
+    team_id: i64,
+    #[serde(default = "history_limit")]
+    limit: usize,
+    cursor: Option<String>,
+}
+
+fn history_limit() -> usize {
+    20
+}
+
+#[derive(Deserialize)]
+pub(super) struct TopicDetailParameters {
+    #[serde(default = "default_team")]
+    team_id: i64,
+}
+
+impl TopicDetailParameters {
+    pub fn into_query(self, id: String) -> Result<TopicDetailQuery, InvalidTopicArchiveQuery> {
+        TopicDetailQuery::new(self.team_id, id)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct CursorDto {
+    team_id: i64,
+    published_at: DateTime<FixedOffset>,
+    id: String,
+}
+
+impl TryFrom<TopicHistoryParameters> for TopicHistoryQuery {
+    type Error = InvalidTopicArchiveQuery;
+
+    fn try_from(value: TopicHistoryParameters) -> Result<Self, Self::Error> {
+        let after = if let Some(encoded) = value.cursor {
+            if encoded.len() > 512 {
+                return Err(InvalidTopicArchiveQuery);
+            }
+            let bytes = URL_SAFE_NO_PAD
+                .decode(encoded)
+                .map_err(|_| InvalidTopicArchiveQuery)?;
+            let cursor: CursorDto =
+                serde_json::from_slice(&bytes).map_err(|_| InvalidTopicArchiveQuery)?;
+            if cursor.team_id != value.team_id {
+                return Err(InvalidTopicArchiveQuery);
+            }
+            Some(TopicPosition {
+                published_at: cursor.published_at,
+                id: cursor.id,
+            })
+        } else {
+            None
+        };
+        TopicHistoryQuery::new(value.team_id, value.limit, after)
+    }
+}
+
+#[derive(Serialize)]
+pub(super) struct TopicHistoryResponse {
+    team_id: i64,
+    items: Vec<DailyTopicDto>,
+    next_cursor: Option<String>,
+    has_more: bool,
+}
+
+impl From<TopicHistoryPage> for TopicHistoryResponse {
+    fn from(value: TopicHistoryPage) -> Self {
+        let next_cursor = value.next.map(|position| {
+            URL_SAFE_NO_PAD.encode(
+                serde_json::to_vec(&CursorDto {
+                    team_id: value.team_id,
+                    published_at: position.published_at,
+                    id: position.id,
+                })
+                .expect("topic cursor contains serializable values"),
+            )
+        });
+        Self {
+            team_id: value.team_id,
+            items: value.items.into_iter().map(Into::into).collect(),
+            has_more: next_cursor.is_some(),
+            next_cursor,
+        }
+    }
 }
 
 #[derive(Serialize)]

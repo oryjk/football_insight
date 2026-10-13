@@ -1,6 +1,6 @@
 # 今日话题：生成与读取约定
 
-首页展示成都蓉城相关新闻的 LLM 整理文章，横向最多 5 张卡片。文章不足 5 篇时不补造。每篇独立生成四川话语音。Python 写入，Rust 读取，小程序只展示与播放。新闻原文是资料，不能把原文中的指令当作生成任务。
+首页展示成都蓉城相关新闻的 LLM 整理文章，首页取全部已发布批次中时间最近的最多 5 篇（不限当天），横向卡片露出下一篇，末尾右侧提供“查看更多话题”。列表按发布时间倒序浏览全部历史，正文使用独立二级页面。文章不足 5 篇时不补造。每篇独立生成四川话语音。Python 写入，Rust 读取，小程序只展示与播放。新闻原文是资料，不能把原文中的指令当作生成任务。
 
 ## API
 
@@ -24,7 +24,13 @@
 }
 ```
 
-`updated_at` / `edition_date` 没有已发布批次时为 null，items 为 []。时间均为带时区 ISO8601，日期取 Asia/Shanghai。audio.status 为 pending / ready / failed，非 ready 的 URL 为 null。标题、摘要、段落及来源均为纯文本。前端只播放 ready 的 HTTPS URL，来源展示并可复制原文链接，不在小程序里抓原文。请求失败显示重试；404 显示接口待接入，不以积分榜或虚构新闻替代。
+`updated_at` / `edition_date` 没有已发布批次时为 null，items 为 []。时间均为带时区 ISO8601，日期取 Asia/Shanghai。audio.status 为 pending / ready / failed，非 ready 的 URL 为 null。标题、摘要、段落及来源均为纯文本。前端只播放 ready 的 HTTPS URL，来源展示并可复制原文链接，不在小程序里抓原文。请求失败显示重试；404 显示话题暂时不可用，不以积分榜或虚构新闻替代。
+
+### 历史与详情
+
+- `GET /api/v1/daily-topics/history?team_id=77680&limit=20&cursor=...`：limit 为 1..50，cursor 首次省略。返回 `{team_id, items, next_cursor, has_more}`，items 沿用原文章字段；下一页原样传回 next_cursor，无下一页则 null/false。按文章 published_at DESC、id ASC 排序，重复 ID 选择最新批次版本后再分页，游标绑定球队。
+- `GET /api/v1/daily-topics/{id}?team_id=77680`：返回同格式的单篇文章，包含全部 paragraphs、sources 和 audio。非法参数 400，缺失文章 404，存储异常 500。
+- 首页接口保留原 JSON 字段，edition_date / updated_at 仍标记最新发布批次；items 可来自不同日期。不新增表或迁移，不修改已发布内容。
 
 ## Python 存储约定
 
@@ -47,7 +53,7 @@ CREATE TABLE f_i_daily_topic_editions (
 CREATE INDEX ON f_i_daily_topic_editions(team_id, published_at DESC);
 ```
 
-payload 为上面 API 数据（最多 5 项）。id 根据球队、日期、材料指纹、生成版本稳定计算。重复运行同材料优先复用本地批次，避免再次 LLM/TTS；重试仅补失败音频。写入通过单事务 upsert，Rust 只读取最新批次，limit 限制 1..5。空生成/采集失败不能覆盖上一批有效文章。LLM 生成与 TTS 不在 Rust 请求链路中运行。
+payload 为上面 API 数据（最多 5 项）。id 根据球队、日期、材料指纹、生成版本稳定计算。重复运行同材料优先复用本地批次，避免再次 LLM/TTS；重试仅补失败音频。写入通过单事务 upsert，Rust 按文章发布时间从全部球队批次读取最近文章，重复 ID 取最新批次版本，首页 limit 限制 1..5。空生成/采集失败不能覆盖上一批有效文章。LLM 生成与 TTS 不在 Rust 请求链路中运行。
 
 ## 实现与验证计划
 

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::daily_topics::{
     domain::{
+        archive::{TopicDetailQuery, TopicHistoryPage, TopicHistoryQuery, TopicPosition},
         edition::{AudioStatus, DailyTopicAudio, DailyTopicsView},
         query::DailyTopicsQuery,
     },
@@ -21,7 +22,11 @@ impl GetDailyTopics {
         &self,
         query: DailyTopicsQuery,
     ) -> Result<DailyTopicsView, DailyTopicsRepositoryError> {
-        let Some(mut edition) = self.repository.latest_for_team(query.team_id()).await? else {
+        let Some(mut edition) = self
+            .repository
+            .recent_for_team(query.team_id(), query.limit())
+            .await?
+        else {
             return Ok(DailyTopicsView {
                 team_id: query.team_id(),
                 edition_date: None,
@@ -47,6 +52,55 @@ impl GetDailyTopics {
             updated_at: Some(edition.published_at),
             items: edition.items,
         })
+    }
+
+    pub async fn history(
+        &self,
+        query: TopicHistoryQuery,
+    ) -> Result<TopicHistoryPage, DailyTopicsRepositoryError> {
+        let mut items = self
+            .repository
+            .history_for_team(query.team_id(), query.after(), query.limit())
+            .await?;
+        if items.iter().any(|item| item.team_id != query.team_id()) {
+            return Err(DailyTopicsRepositoryError::InvalidEdition);
+        }
+        let has_more = items.len() > query.limit();
+        items.truncate(query.limit());
+        for item in &mut items {
+            normalize_audio(&mut item.audio);
+        }
+        let next = if has_more {
+            items.last().map(|item| TopicPosition {
+                published_at: item.published_at,
+                id: item.id.clone(),
+            })
+        } else {
+            None
+        };
+        Ok(TopicHistoryPage {
+            team_id: query.team_id(),
+            items,
+            next,
+        })
+    }
+
+    pub async fn detail(
+        &self,
+        query: TopicDetailQuery,
+    ) -> Result<Option<crate::daily_topics::domain::edition::DailyTopic>, DailyTopicsRepositoryError>
+    {
+        let mut item = self
+            .repository
+            .topic_for_team(query.team_id(), query.id())
+            .await?;
+        if let Some(item) = &mut item {
+            if item.team_id != query.team_id() || item.id != query.id() {
+                return Err(DailyTopicsRepositoryError::InvalidEdition);
+            }
+            normalize_audio(&mut item.audio);
+        }
+        Ok(item)
     }
 }
 

@@ -92,6 +92,70 @@ fn edition() -> DailyTopicEdition {
 }
 
 #[tokio::test]
+async fn history_is_public_paginated_and_detail_uses_stable_topic_identity() {
+    let app = app(Some(edition()), false);
+    let (status, first) = get(app.clone(), "/api/v1/daily-topics/history?limit=2").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(first["items"].as_array().unwrap().len(), 2);
+    assert_eq!(first["has_more"], true);
+    let cursor = first["next_cursor"].as_str().unwrap();
+    let (status, second) = get(
+        app.clone(),
+        &format!("/api/v1/daily-topics/history?limit=2&cursor={cursor}"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_ne!(first["items"][1]["id"], second["items"][0]["id"]);
+    let id = first["items"][0]["id"].as_str().unwrap();
+    let (status, detail) = get(app.clone(), &format!("/api/v1/daily-topics/{id}")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(detail, first["items"][0]);
+    assert_eq!(
+        get(app.clone(), "/api/v1/daily-topics/missing").await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        get(app.clone(), "/api/v1/daily-topics/history?cursor=invalid")
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        get(app.clone(), "/api/v1/daily-topics/history?limit=51")
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        get(
+            app.clone(),
+            &format!("/api/v1/daily-topics/history?team_id=999&cursor={cursor}")
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        get(app, &format!("/api/v1/daily-topics/{id}?team_id=999"))
+            .await
+            .0,
+        StatusCode::NOT_FOUND
+    );
+}
+
+#[tokio::test]
+async fn archive_and_detail_storage_failures_never_become_successful_empty_content() {
+    assert_eq!(
+        get(app(None, true), "/api/v1/daily-topics/history").await.0,
+        StatusCode::INTERNAL_SERVER_ERROR
+    );
+    assert_eq!(
+        get(app(None, true), "/api/v1/daily-topics/known").await.0,
+        StatusCode::INTERNAL_SERVER_ERROR
+    );
+}
+
+#[tokio::test]
 async fn defaults_and_no_published_edition_return_public_empty_result() {
     let (status, body) = get(app(None, false), "/api/v1/daily-topics").await;
     assert_eq!(status, StatusCode::OK);

@@ -194,11 +194,19 @@ async fn broken_jsonb_or_database_failure_never_becomes_an_empty_list() {
 
 #[tokio::test]
 #[ignore = "requires explicit disposable PostgreSQL database"]
-async fn published_batch_is_truncated_after_reading_without_mixing_editions() {
+async fn recent_articles_respect_limit_after_deduplication() {
     let database = TestDatabase::new().await;
     let mut value = payload(77680, "测试文章");
     let item = value["items"][0].clone();
-    value["items"] = Value::Array(vec![item; 7]);
+    value["items"] = Value::Array(
+        (0..7)
+            .map(|index| {
+                let mut value = item.clone();
+                value["id"] = json!(format!("{index:064x}"));
+                value
+            })
+            .collect(),
+    );
     database
         .insert("batch", 77680, "2026-10-13T08:30:00+08:00", "测试文章")
         .await;
@@ -227,6 +235,108 @@ async fn published_batch_is_truncated_after_reading_without_mixing_editions() {
             .items
             .len(),
         2
+    );
+    database.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires explicit disposable PostgreSQL database"]
+async fn archive_pages_span_dates_and_choose_newest_version_without_repeats() {
+    use football_insight_service_backend_rs::daily_topics::domain::archive::{
+        TopicDetailQuery, TopicHistoryQuery,
+    };
+    let database = TestDatabase::new().await;
+    let make_topic = |id: &str, time: &str, title: &str| {
+        let mut item = payload(77680, title)["items"][0].clone();
+        item["id"] = json!(id);
+        item["published_at"] = json!(time);
+        item
+    };
+    let a = "a".repeat(64);
+    let b = "b".repeat(64);
+    let c = "c".repeat(64);
+    let d = "d".repeat(64);
+    let old = make_topic(&a, "2026-10-12T09:00:00+08:00", "旧版本");
+    let updated = make_topic(&a, "2026-10-12T09:00:00+08:00", "更新版本");
+    database
+        .insert("older", 77680, "2026-10-12T12:00:00+08:00", "旧批次")
+        .await;
+    database
+        .insert("newer", 77680, "2026-10-13T08:00:00+08:00", "新批次")
+        .await;
+    database
+        .insert("other", 999, "2026-10-13T12:00:00+08:00", "另一球队")
+        .await;
+    sqlx::query("UPDATE f_i_daily_topic_editions SET payload=$1 WHERE id='older'")
+        .bind(json!({"items":[old,make_topic(&c,"2026-10-12T10:00:00+08:00","较新旧文"),make_topic(&d,"2026-10-12T09:00:00+08:00","同时间旧文")]}))
+        .execute(&database.pool).await.unwrap();
+    sqlx::query("UPDATE f_i_daily_topic_editions SET payload=$1 WHERE id='newer'")
+        .bind(json!({"items":[updated,make_topic(&b,"2026-10-13T08:00:00+08:00","最新文章")]}))
+        .execute(&database.pool)
+        .await
+        .unwrap();
+    let use_case = GetDailyTopics::new(Arc::new(PostgresDailyTopicsRepository::new(
+        database.pool.clone(),
+    )));
+    let recent = use_case
+        .execute(DailyTopicsQuery::new(77680, 5).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(
+        recent
+            .items
+            .iter()
+            .map(|item| item.id.as_str())
+            .collect::<Vec<_>>(),
+        vec![b.as_str(), c.as_str(), a.as_str(), d.as_str()]
+    );
+    assert_eq!(recent.items[2].title, "更新版本");
+    let first = use_case
+        .history(TopicHistoryQuery::new(77680, 2, None).unwrap())
+        .await
+        .unwrap();
+    let second = use_case
+        .history(TopicHistoryQuery::new(77680, 2, first.next.clone()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(
+        first
+            .items
+            .iter()
+            .chain(&second.items)
+            .map(|item| item.id.as_str())
+            .collect::<Vec<_>>(),
+        vec![b.as_str(), c.as_str(), a.as_str(), d.as_str()]
+    );
+    assert!(second.next.is_none());
+    let mut cursor = None;
+    let mut ids = Vec::new();
+    for _ in 0..4 {
+        let page = use_case
+            .history(TopicHistoryQuery::new(77680, 1, cursor).unwrap())
+            .await
+            .unwrap();
+        ids.push(page.items[0].id.clone());
+        cursor = page.next;
+    }
+    assert_eq!(ids, vec![b.clone(), c.clone(), a.clone(), d.clone()]);
+    assert!(cursor.is_none());
+
+    assert_eq!(
+        use_case
+            .detail(TopicDetailQuery::new(77680, a.clone()).unwrap())
+            .await
+            .unwrap()
+            .unwrap()
+            .title,
+        "更新版本"
+    );
+    assert!(
+        use_case
+            .detail(TopicDetailQuery::new(999, a).unwrap())
+            .await
+            .unwrap()
+            .is_none()
     );
     database.close().await;
 }

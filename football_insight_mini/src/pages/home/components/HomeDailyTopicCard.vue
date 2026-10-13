@@ -18,13 +18,13 @@
         </view>
         <text>阅读全文</text>
       </button>
-      <HomeTopicAudioEntry :ready="audioReady" :playing="audioPlaying" :loading="audioLoading" @play="emit('play', item.id)" />
+      <FiTopicAudioEntry :ready="audioReady" :playing="audioPlaying" :loading="audioLoading" @play="emit('play', item.id)" />
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import HomeTopicAudioEntry from './HomeTopicAudioEntry.vue'
+import FiTopicAudioEntry from '../../../components/topics/FiTopicAudioEntry.vue'
 import type { DailyTopicItem } from '../../../types/dailyTopic'
 defineProps<{ item: DailyTopicItem; indexLabel: string; audioReady: boolean; audioPlaying: boolean; audioLoading: boolean }>()
 const emit = defineEmits<{ (e: 'read', id: string): void; (e: 'play', id: string): void }>()

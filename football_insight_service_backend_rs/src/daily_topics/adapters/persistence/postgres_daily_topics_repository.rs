@@ -3,11 +3,14 @@ use chrono::{DateTime, FixedOffset, NaiveDate, Utc};
 use sqlx::{PgPool, Row};
 
 use crate::daily_topics::{
-    domain::edition::DailyTopicEdition,
+    domain::{
+        archive::TopicPosition,
+        edition::{DailyTopic, DailyTopicEdition},
+    },
     ports::daily_topics_repository::{DailyTopicsRepository, DailyTopicsRepositoryError},
 };
 
-use super::stored_payload::StoredPayload;
+use super::stored_payload::{StoredPayload, StoredTopic};
 
 pub struct PostgresDailyTopicsRepository {
     pool: PgPool,
@@ -51,6 +54,99 @@ impl DailyTopicsRepository for PostgresDailyTopicsRepository {
             items: payload.items.into_iter().map(Into::into).collect(),
         }))
     }
+
+    async fn recent_for_team(
+        &self,
+        team_id: i64,
+        limit: usize,
+    ) -> Result<Option<DailyTopicEdition>, DailyTopicsRepositoryError> {
+        let Some(mut edition) = self.latest_for_team(team_id).await? else {
+            return Ok(None);
+        };
+        edition.items = self.history_for_team(team_id, None, limit).await?;
+        edition.items.truncate(limit);
+        Ok(Some(edition))
+    }
+
+    async fn history_for_team(
+        &self,
+        team_id: i64,
+        after: Option<&TopicPosition>,
+        limit: usize,
+    ) -> Result<Vec<DailyTopic>, DailyTopicsRepositoryError> {
+        let rows = sqlx::query(r#"
+            WITH topics AS (
+                SELECT e.published_at AS edition_time, e.id AS edition_id, entry.topic, entry.position
+                FROM f_i_daily_topic_editions AS e
+                CROSS JOIN LATERAL jsonb_array_elements(
+                    CASE WHEN jsonb_typeof(e.payload->'items') = 'array'
+                         THEN e.payload->'items' ELSE '"invalid"'::jsonb END
+                ) WITH ORDINALITY AS entry(topic, position)
+                WHERE e.team_id = $1
+            ), unique_topics AS (
+                SELECT DISTINCT ON (topic->>'id') topic
+                FROM topics ORDER BY topic->>'id', edition_time DESC, edition_id DESC, position ASC
+            )
+            SELECT topic FROM unique_topics
+            WHERE $2::timestamptz IS NULL
+               OR (topic->>'published_at')::timestamptz < $2
+               OR ((topic->>'published_at')::timestamptz = $2 AND topic->>'id' > $3)
+            ORDER BY (topic->>'published_at')::timestamptz DESC, topic->>'id' ASC
+            LIMIT $4
+        "#).bind(team_id)
+            .bind(after.map(|position| position.published_at.with_timezone(&Utc)))
+            .bind(after.map(|position| position.id.as_str()))
+            .bind((limit + 1) as i64)
+            .fetch_all(&self.pool).await.map_err(storage_error)?;
+        rows.into_iter()
+            .map(|row| {
+                let value: serde_json::Value = row.try_get("topic").map_err(invalid_row)?;
+                parse_topic(value)
+            })
+            .collect()
+    }
+
+    async fn topic_for_team(
+        &self,
+        team_id: i64,
+        id: &str,
+    ) -> Result<Option<DailyTopic>, DailyTopicsRepositoryError> {
+        let row = sqlx::query(
+            r#"
+            SELECT entry.topic FROM f_i_daily_topic_editions AS e
+            CROSS JOIN LATERAL jsonb_array_elements(
+                CASE WHEN jsonb_typeof(e.payload->'items') = 'array'
+                     THEN e.payload->'items' ELSE '"invalid"'::jsonb END
+            ) WITH ORDINALITY AS entry(topic, position)
+            WHERE e.team_id = $1 AND entry.topic->>'id' = $2
+            ORDER BY e.published_at DESC, e.id DESC, entry.position ASC LIMIT 1
+        "#,
+        )
+        .bind(team_id)
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?;
+        row.map(|row| {
+            let value: serde_json::Value = row.try_get("topic").map_err(invalid_row)?;
+            parse_topic(value)
+        })
+        .transpose()
+    }
+}
+
+fn parse_topic(value: serde_json::Value) -> Result<DailyTopic, DailyTopicsRepositoryError> {
+    serde_json::from_value::<StoredTopic>(value)
+        .map(Into::into)
+        .map_err(|error| {
+            tracing::error!(%error, "invalid stored topic");
+            DailyTopicsRepositoryError::InvalidEdition
+        })
+}
+
+fn storage_error(error: sqlx::Error) -> DailyTopicsRepositoryError {
+    tracing::error!(%error, "topic archive database query failed");
+    DailyTopicsRepositoryError::Unavailable
 }
 
 fn invalid_row(error: sqlx::Error) -> DailyTopicsRepositoryError {

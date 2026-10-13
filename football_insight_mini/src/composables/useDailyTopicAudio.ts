@@ -1,7 +1,7 @@
 import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { onHide, onUnload } from '@dcloudio/uni-app'
-import type { DailyTopicEdition } from '../../types/dailyTopic'
-import { topicPlaybackSignature } from './dailyTopics'
+import type { DailyTopicEdition } from '../types/dailyTopic'
+import { topicPlaybackSignature } from '../utils/dailyTopics'
 
 export function useDailyTopicAudio(edition: Ref<DailyTopicEdition>) {
   const activeId = ref<string | null>(null)

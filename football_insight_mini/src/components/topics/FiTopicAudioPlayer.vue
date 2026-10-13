@@ -15,7 +15,7 @@
 </template>
 
 <script setup lang="ts">
-import { formatTopicAudioTime } from '../dailyTopics'
+import { formatTopicAudioTime } from '../../utils/dailyTopics'
 defineProps<{ title: string; status: string; currentTime: number; duration: number; errorMessage: string }>()
 const emit = defineEmits<{ (e: 'toggle'): void; (e: 'seek', seconds: number): void; (e: 'close'): void }>()
 function onSeek(event: { detail: { value: number } }) { emit('seek', event.detail.value) }

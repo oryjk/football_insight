@@ -64,6 +64,20 @@
 			"style": {
 				"navigationBarTitleText": "余票看板"
 			}
+		},
+		{
+			"path": "pages/topics/index",
+			"style": {
+				"navigationBarTitleText": "全部话题",
+				"enablePullDownRefresh": true,
+				"onReachBottomDistance": 100
+			}
+		},
+		{
+			"path": "pages/topic-detail/index",
+			"style": {
+				"navigationBarTitleText": "话题详情"
+			}
 		}
 	],
 	"tabBar": {
