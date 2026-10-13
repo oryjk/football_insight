@@ -2,7 +2,6 @@
   <view class="daily-topics">
     <view class="daily-topics__heading">
       <view class="daily-topics__heading-copy">
-        <text class="daily-topics__eyebrow">CHENGDU · DAILY TOPICS</text>
         <view class="daily-topics__title-row">
           <text class="daily-topics__title">今日话题</text>
           <text class="daily-topics__date">{{ edition.dateLabel }}</text>
@@ -73,8 +72,7 @@ watch(() => props.edition.items.length, length => { if (activeIndex.value > leng
 .daily-topics__heading { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-12); margin-bottom: var(--fi-space-16); }
 .daily-topics__refresh-error { color: var(--fi-color-text-secondary); font-size: var(--fi-font-22); margin-bottom: var(--fi-space-16); }
 .daily-topics__heading-copy { min-width: 0; }
-.daily-topics__eyebrow { display: block; color: var(--fi-color-primary); font-size: var(--fi-font-20); font-weight: var(--fi-weight-bold); letter-spacing: var(--fi-space-4); }
-.daily-topics__title-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--fi-space-16); margin-top: var(--fi-space-10); }
+.daily-topics__title-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--fi-space-16); }
 .daily-topics__title { color: var(--fi-color-text-primary); font-size: var(--fi-font-44); font-weight: var(--fi-weight-extrabold); line-height: var(--fi-leading-snug); }
 .daily-topics__date { color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); }
 .daily-topics__swiper { height: calc(var(--fi-space-topic-card-height) + var(--fi-space-12)); }
