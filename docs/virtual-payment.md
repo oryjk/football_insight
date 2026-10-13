@@ -23,6 +23,8 @@
 
 同时沿用 `WECHAT_MINI_APP_ID`、`WECHAT_MINI_APP_SECRET`。虚拟支付回调使用新的配置，公众号 Token/AESKey 不需要修改。只支持现网 `env=0`；本地测试用 fake gateway，不使用生产密钥或真实收费。
 
+回调初始化只要求有效的小程序 AppID、Token 和 EncodingAESKey。即使 `WECHAT_VIRTUAL_PAY_ENABLED=false`，或尚未配置商品，服务器地址签名验证仍可正常完成；购买状态继续返回 `available=false`。因此可以先关闭购买，部署后验证消息推送地址，再配置并发布商品。
+
 商品映射示例：`football_insight_service_backend_rs/config/virtual-payment-products.example.json`。示例值基于代码默认价格，正式配置必须核对数据库当前会员价格、提醒套餐价格和实际队伍 code；不要直接把例子当作已配置的现网商品。
 
 映射 key 规则：
@@ -36,13 +38,23 @@ value 为 `{ "product_id": "后台商品ID", "price_cents": 3900 }`。JSON 放�
 
 ## 部署顺序
 
-1. 本地检查通过后提交/推送代码，生产迁移由 `peiqian` 上的 `cargo run --bin run_migrations` 应用，包含 `20261013000500_add_virtual_payment.sql`。生产迁移和部署在本次任务中尚未执行。
+1. 本地检查通过后提交/推送代码，生产迁移由 `peiqian` 上的 `cargo run --bin run_migrations` 应用，包含 `20261013000500_add_virtual_payment.sql`。
 2. 配置生产后端环境变量，使用 `deploy_peiqian_docker.sh` 部署并重启；现有脚本支持 env-file，无需修改其他 Nginx 路由。
 3. 查询 `/api/v1/payment/virtual/status`，配置完成时返回 `available=true`。它只证明本地配置齐备，后台商品已发布、支付限制是否解除仍需真实验证。
 4. 上传新的小程序。旧客户端没有虚拟支付会话准备，不能继续使用普通支付发起新增数字服务交易。
 5. 用管理员本人测试三条购买链路、会员补差价、重复通知和退款。核对微信订单、本地订单及权益；保存截图供申诉复核。真实付款必须由用户操作。
 
-本次本地验证使用端口 `18093` 和新建的隔离 PostgreSQL，后端已重启；原 `18092` 联调容器及其生产数据库连接未改动。生产迁移、部署、小程序上传和真实付款均未执行。
+本次本地验证使用端口 `18093` 和新建的隔离 PostgreSQL，后端已重启；原 `18092` 联调容器及其生产数据库连接未改动。生产迁移与后端部署已完成，小程序上传和真实付款均未执行。
+
+执行生产迁移时需要显式给迁移进程提供运行时环境文件中的 `DATABASE_URL`；Docker 的 `--env-file` 不会自动把配置带入宿主机的 Cargo 进程。不要在终端输出连接串或密钥。
+
+## 2026-10-13 生产发布记录
+
+- 虚拟支付代码和两次回调修正均已合并并推送到 main。
+- 生产迁移 `20261013000500` 应用成功，两张虚拟支付表与 `_sqlx_migrations` 成功记录已核对。
+- peiqian 生产后端已部署并重启为 `football-insight-service-backend-rs:cac6f89`，容器健康；运行时环境文件与容器均保持 `WECHAT_VIRTUAL_PAY_ENABLED=false`。
+- 通过线上域名验证：普通签名和安全模式 URL 校验返回准确回显，错误签名及错误 AppID 返回 403；购买状态为 `available=false`，原有会员商品和公开配置接口返回 200。
+- AppKey、OfferID、Token 和 AESKey 已配置；商品映射未配置。小程序上传与真实付款均未执行，管理员现在可以回微信后台重新提交服务器地址验证。
 
 ## 订单确认与退款
 
