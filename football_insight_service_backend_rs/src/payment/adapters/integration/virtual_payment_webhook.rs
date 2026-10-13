@@ -15,7 +15,12 @@ pub struct VirtualWebhookCodec {
 }
 impl VirtualWebhookCodec {
     pub fn new(token: String, aes_key: &str, app_id: String) -> anyhow::Result<Self> {
-        let key = STANDARD.decode(format!("{}=", aes_key.trim_end_matches('=')))?;
+        // Match WeChat's key decoding, including the existing official-account adapter.
+        let key = base64::engine::GeneralPurpose::new(
+            &base64::alphabet::STANDARD,
+            base64::engine::GeneralPurposeConfig::new().with_decode_allow_trailing_bits(true),
+        )
+        .decode(format!("{}=", aes_key.trim_end_matches('=')))?;
         anyhow::ensure!(
             key.len() == 32 && !token.is_empty() && !app_id.is_empty(),
             "invalid virtual payment webhook configuration"
@@ -176,6 +181,24 @@ impl VirtualWebhookPort for VirtualWebhookCodec {
 mod tests {
     use super::*;
     use cbc::cipher::BlockEncryptMut;
+
+    #[test]
+    fn wechat_key_with_nonzero_base64_trailing_bits_decrypts_messages() {
+        let codec = VirtualWebhookCodec::new(
+            "token".into(),
+            &format!("{}B", "A".repeat(42)),
+            "app".into(),
+        )
+        .expect("accept the same WeChat key format as the official-account adapter");
+        let (envelope, signature) = encrypted_message(&[0u8; 32], "app", "verification-test");
+        let encrypted: Envelope = serde_json::from_str(&envelope).unwrap();
+        assert_eq!(
+            codec
+                .challenge(&signature, "1", "nonce", &encrypted.encrypted)
+                .unwrap(),
+            "verification-test"
+        );
+    }
 
     fn encrypted_message(key: &[u8; 32], app_id: &str, body: &str) -> (String, String) {
         let mut plain = vec![0u8; 16];

@@ -461,9 +461,13 @@ impl VirtualPaymentConfig {
             && !self.webhook_token.is_empty()
             && {
                 use base64::Engine;
-                base64::engine::general_purpose::STANDARD
-                    .decode(format!("{}=", self.encoding_aes_key.trim_end_matches('=')))
-                    .is_ok_and(|key| key.len() == 32)
+                base64::engine::GeneralPurpose::new(
+                    &base64::alphabet::STANDARD,
+                    base64::engine::GeneralPurposeConfig::new()
+                        .with_decode_allow_trailing_bits(true),
+                )
+                .decode(format!("{}=", self.encoding_aes_key.trim_end_matches('=')))
+                .is_ok_and(|key| key.len() == 32)
             }
             && !self.products.is_empty()
             && self
@@ -476,6 +480,24 @@ impl VirtualPaymentConfig {
 #[cfg(test)]
 mod virtual_config_tests {
     use super::*;
+    #[test]
+    fn wechat_key_with_nonzero_base64_trailing_bits_is_accepted() {
+        let config = VirtualPaymentConfig {
+            enabled: true,
+            offer_id: "123".into(),
+            app_key: "key".into(),
+            webhook_token: "token".into(),
+            encoding_aes_key: format!("{}B", "A".repeat(42)),
+            products: std::collections::HashMap::from([(
+                "membership:V6@3900".into(),
+                crate::payment::domain::virtual_payment::VirtualProduct {
+                    product_id: "v6".into(),
+                    price_cents: 3900,
+                },
+            )]),
+        };
+        assert!(config.available());
+    }
     #[test]
     fn invalid_webhook_key_never_enables_charging() {
         let config = VirtualPaymentConfig {
