@@ -788,9 +788,14 @@ page {
   --fi-color-state-card-empty-text-color: var(--fi-primitive-matches-state-card-empty-text-color);
 }
 
-/* 品牌导航：一级和二级页面共享既有视觉值。 */
+/* 品牌导航：一级和二级页面共用单行高度与正文顶部占位。 */
 :root,
 page {
+  --fi-primitive-brand-nav-bar-height: 88rpx;
+  --fi-primitive-brand-nav-capsule-space: 196rpx;
+  --fi-space-brand-nav-capsule: var(--fi-primitive-brand-nav-capsule-space);
+  --fi-brand-nav-bar-height: var(--fi-primitive-brand-nav-bar-height);
+  --fi-brand-nav-height: calc(var(--status-bar-height, 0px) + var(--fi-brand-nav-bar-height));
   --fi-primitive-brand-nav-logo-size: 64rpx;
   --fi-space-brand-nav-logo-size: var(--fi-primitive-brand-nav-logo-size);
   --fi-primitive-brand-nav-bg: rgba(247, 248, 250, 0.82);

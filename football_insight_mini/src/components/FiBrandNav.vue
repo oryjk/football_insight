@@ -8,7 +8,7 @@
                 </button>
                 <image
                     :src="logo"
-                    mode="aspectFill"
+                    mode="aspectFit"
                     class="fi-brand-nav__logo"
                 />
                 <view class="fi-brand-nav__copy">
@@ -22,7 +22,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import logo from "../static/app-logo.jpg";
+import logo from "../static/app-logo-mark.png";
 
 withDefaults(
     defineProps<{
@@ -62,7 +62,7 @@ const brandStyle = computed(() => {
     }
 
     return {
-        top: metrics.top ? `${metrics.top}px` : "",
+        top: `${metrics.top}px`,
         height: `${metrics.height}px`,
     };
 });
@@ -80,10 +80,9 @@ function syncBrandWithMenuCapsule(): void {
             return;
         }
 
-        const brandHeight = 64;
         brandMetrics.value = {
-            top: menuButton.top + (menuButton.height - brandHeight) / 2,
-            height: brandHeight,
+            top: menuButton.top,
+            height: menuButton.height,
         };
     } catch {
         // Keep the CSS fallback when the platform does not expose capsule metrics.
@@ -97,17 +96,16 @@ onMounted(() => {
 
 <style scoped>
 .fi-brand-nav {
-    --fi-brand-nav-status-height: var(--status-bar-height);
-    --fi-brand-nav-bar-height: 154rpx;
+    --fi-brand-nav-status-height: var(--status-bar-height, 0px);
     position: fixed;
     left: 0;
     right: 0;
     top: 0;
     z-index: 80;
     background: var(--fi-color-brand-nav-bg);
-    border-bottom: 1rpx solid var(--fi-color-brand-nav-border);
-    backdrop-filter: blur(18rpx);
-    -webkit-backdrop-filter: blur(18rpx);
+    border-bottom: var(--fi-border-width) solid var(--fi-color-brand-nav-border);
+    backdrop-filter: blur(var(--fi-space-18));
+    -webkit-backdrop-filter: blur(var(--fi-space-18));
 }
 
 .fi-brand-nav--transparent {
@@ -127,11 +125,6 @@ onMounted(() => {
     text-shadow: var(--fi-shadow-brand-nav-tagline);
 }
 
-.fi-brand-nav--transparent .fi-brand-nav__logo {
-    border-color: var(--fi-color-brand-nav-inverse);
-    box-shadow: var(--fi-shadow-brand-nav-logo-inverse);
-}
-
 .fi-brand-nav__status-spacer {
     height: var(--fi-brand-nav-status-height);
 }
@@ -139,55 +132,53 @@ onMounted(() => {
 .fi-brand-nav__bar {
     position: relative;
     min-height: var(--fi-brand-nav-bar-height);
-    padding: 14rpx 196rpx 48rpx 24rpx;
+    padding: var(--fi-space-12) var(--fi-space-brand-nav-capsule) var(--fi-space-12) var(--fi-space-24);
 }
 
 .fi-brand-nav__brand {
     position: fixed;
-    left: 24rpx;
-    top: calc(var(--fi-brand-nav-status-height) + 14rpx);
+    left: var(--fi-space-24);
+    right: var(--fi-space-brand-nav-capsule);
+    top: calc(var(--fi-brand-nav-status-height) + var(--fi-space-12));
     z-index: 81;
     min-width: 0;
-    width: 360rpx;
-    height: 64rpx;
+    height: var(--fi-space-brand-nav-logo-size);
     display: flex;
     align-items: center;
-    gap: 14rpx;
+    gap: var(--fi-space-14);
 }
 
 .fi-brand-nav__logo {
     flex: 0 0 auto;
-    width: 64rpx;
-    height: 64rpx;
-    border-radius: 18rpx;
-    border: 2rpx solid var(--fi-color-brand-nav-logo-border);
-    box-shadow: var(--fi-shadow-brand-nav-logo);
+    width: var(--fi-space-brand-nav-logo-size);
+    height: var(--fi-space-brand-nav-logo-size);
 }
 
 .fi-brand-nav__copy {
+    flex: 1;
     min-width: 0;
-    height: 64rpx;
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 5rpx;
+    align-items: center;
+    gap: var(--fi-space-12);
 }
 
 .fi-brand-nav__name {
+    flex-shrink: 0;
     color: var(--fi-color-text-primary);
-    font-size: 32rpx;
-    font-weight: 900;
-    line-height: 1;
+    font-size: var(--fi-font-32);
+    font-weight: var(--fi-weight-black);
+    line-height: var(--fi-leading-none);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .fi-brand-nav__tagline {
+    min-width: 0;
     color: var(--fi-color-text-muted);
-    font-size: 20rpx;
-    font-weight: 500;
-    line-height: 1;
+    font-size: var(--fi-font-20);
+    font-weight: var(--fi-weight-medium);
+    line-height: var(--fi-leading-none);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -195,18 +186,17 @@ onMounted(() => {
 
 /* H5 没有右上角胶囊，品牌回到正常流式布局。 */
 .fi-brand-nav--h5 .fi-brand-nav__bar {
-    min-height: auto;
-    padding: 20rpx 24rpx;
+    padding: var(--fi-space-12) var(--fi-space-24);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 24rpx;
+    gap: var(--fi-space-24);
 }
 
 .fi-brand-nav--h5 .fi-brand-nav__brand {
     position: static;
+    flex: 1;
     width: auto;
-    max-width: 60%;
 }
 .fi-brand-nav__back {
     flex-shrink: 0;
