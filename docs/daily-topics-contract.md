@@ -28,7 +28,7 @@
 
 ## Python 存储约定
 
-local233 的 Rust 读取接口已接通。用户已明确授权在 peiqian 共享 `football_data` 通过 SQLx 迁移新建此表，迁移账本已记录 `20261013000100`，无需再次建表或迁移；生产应用容器未部署、未重启。Python 在该表原子发布，local233 的 18092 后端经现有私有隧道读取。CPU 模型安装和手动运行入口见 [local233 今日话题说明](../sina_csl_scraper/docs/topics-local233.md)。
+local233 的 Rust 读取接口已接通。用户已明确授权在 peiqian 共享 `football_data` 通过 SQLx 迁移新建此表，迁移账本已记录 `20261013000100`，无需再次建表或迁移；后续经用户授权已将生产应用部署并重启为 `football-insight-service-backend-rs:1c29576`，线上 GET 已验证真实两篇正文和四川话音频。Python 在该表原子发布，local233 的 18092 后端经现有私有隧道读取。CPU 模型安装和手动运行入口见 [local233 今日话题说明](../sina_csl_scraper/docs/topics-local233.md)。
 
 Python 不自动建生产表。已应用的 Rust 迁移结构为：
 

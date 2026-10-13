@@ -48,3 +48,11 @@ GET /api/v1/system/public-config                             200
 这表示初次验证时接口与数据库已接通、等待 Python 发布真实批次。没有读取 Python 本地 latest.json 或写入测试新闻。微信登录用不可用的诊断 code 验证配置仍返回 `40029 invalid code`，不再出现 invalid appid；没有声称以真实 wx.login code 完成用户登录。
 
 后续真实链路已接通：Python 发布的 2026-10-13 批次包含 2 篇真实 Kimi 整理文章，已在 local233 用 CPU Qwen Eric 四川话重新生成每篇独立音频；数据库与 18092 JSON、limit=1、MinIO HTTP 200 / Range 206 / SHA 均一致。完整运行与 CPU 实测见 [local233 运行说明](../../sina_csl_scraper/docs/topics-local233.md)。该阶段没有再次迁移或重启生产后端。
+
+## 生产发布与小程序真机测试（后续授权）
+
+- 用户明确授权同时部署生产后端和上传小程序。Mac 上传工具不可用，按发布约定使用 peiqian 备用环境；独立干净 main checkout 保留原工作区改动，私钥与 CI 配置仅引用忽略文件。
+- 登记库分配小程序 1.0.66，版本文件先提交推送，再通过统一入口以 robot 2 上传成功。类型检查、依赖边界、组件注册和实际编译包生产 API 校验通过。
+- 执行 `deploy_peiqian_docker.sh` 构建生产镜像 `football-insight-service-backend-rs:1c29576`，于北京时间 2026-10-13 09:58:48 重启 peiqian 生产容器；运行环境变量摘要前后一致，未再次执行迁移。
+- 线上 `https://match.oryjk.cn/api/v1/daily-topics?team_id=77680&limit=5` 为 200，完整 JSON 与 local233 相同，返回 2 篇正文与 ready 四川话音频，limit=1 正常；音频完整读取 200、Range 206 与 SHA256 一致。余票 matches、regions 和 public-config 均为 200。
+- 本地后端继续运行既有验证版本，本次未再次重建或重启本地容器。
