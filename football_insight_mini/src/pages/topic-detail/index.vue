@@ -16,7 +16,7 @@
       </view>
       <text v-for="(paragraph, index) in item.paragraphs" :key="index" class="topic-detail__paragraph">{{ paragraph }}</text>
       <view class="topic-detail__sources">
-        <text class="topic-detail__sources-heading">新闻来源</text>
+        <text class="topic-detail__sources-heading">来源</text>
         <view v-for="(source, index) in item.sources" :key="source.url" class="topic-detail__source">
           <text class="topic-detail__source-title">{{ index + 1 }}. {{ source.title }}</text>
           <text class="topic-detail__meta">{{ source.publisher }} · {{ source.dateLabel }}</text>
