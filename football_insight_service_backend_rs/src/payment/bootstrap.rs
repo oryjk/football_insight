@@ -37,6 +37,22 @@ pub struct PaymentBootstrap {
     pub wechat_pay_port: Arc<dyn WechatPayPort>,
 }
 
+fn build_virtual_webhook(
+    config: &crate::config::VirtualPaymentConfig,
+    app_id: &str,
+) -> Option<Arc<dyn crate::payment::ports::virtual_payment_port::VirtualWebhookPort>> {
+    // URL verification must work before purchases and the product catalog are enabled.
+    VirtualWebhookCodec::new(
+        config.webhook_token.clone(),
+        &config.encoding_aes_key,
+        app_id.into(),
+    )
+    .ok()
+    .map(|codec| {
+        Arc::new(codec) as Arc<dyn crate::payment::ports::virtual_payment_port::VirtualWebhookPort>
+    })
+}
+
 pub fn build_payment(
     pool: PgPool,
     config: &AppConfig,
@@ -65,20 +81,8 @@ pub fn build_payment(
         config.virtual_payment.products.clone(),
     ));
     let wechat_pay_port: Arc<dyn WechatPayPort> = virtual_payment.clone();
-    let virtual_webhook = if config.virtual_payment.available() {
-        VirtualWebhookCodec::new(
-            config.virtual_payment.webhook_token.clone(),
-            &config.virtual_payment.encoding_aes_key,
-            config.wechat_mini_app_id.clone(),
-        )
-        .ok()
-        .map(|codec| {
-            Arc::new(codec)
-                as Arc<dyn crate::payment::ports::virtual_payment_port::VirtualWebhookPort>
-        })
-    } else {
-        None
-    };
+    let virtual_webhook =
+        build_virtual_webhook(&config.virtual_payment, &config.wechat_mini_app_id);
     if virtual_payment.available() {
         let worker = virtual_payment.clone();
         tokio::spawn(async move {
@@ -115,5 +119,49 @@ pub fn build_payment(
         routes: payment_routes(state),
         order_repository,
         wechat_pay_port,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use base64::Engine;
+    use sha1::{Digest, Sha1};
+
+    fn disabled_config() -> crate::config::VirtualPaymentConfig {
+        crate::config::VirtualPaymentConfig {
+            enabled: false,
+            offer_id: String::new(),
+            app_key: String::new(),
+            webhook_token: "token".into(),
+            encoding_aes_key: base64::engine::general_purpose::STANDARD.encode([7u8; 32]),
+            products: Default::default(),
+        }
+    }
+
+    #[test]
+    fn disabled_purchase_without_catalog_still_verifies_webhook_url() {
+        let config = disabled_config();
+        assert!(!config.available());
+        let codec = build_virtual_webhook(&config, "app").expect("webhook must remain available");
+        let mut parts = ["token", "123", "nonce"];
+        parts.sort_unstable();
+        let signature = format!("{:x}", Sha1::digest(parts.join("").as_bytes()));
+        assert_eq!(
+            codec.challenge(&signature, "123", "nonce", "echo").unwrap(),
+            "echo"
+        );
+        assert!(codec.challenge("invalid", "123", "nonce", "echo").is_err());
+    }
+
+    #[test]
+    fn invalid_credentials_do_not_initialize_webhook() {
+        let mut config = disabled_config();
+        config.encoding_aes_key = "invalid".into();
+        assert!(build_virtual_webhook(&config, "app").is_none());
+        config = disabled_config();
+        config.webhook_token.clear();
+        assert!(build_virtual_webhook(&config, "app").is_none());
+        assert!(build_virtual_webhook(&disabled_config(), "").is_none());
     }
 }
