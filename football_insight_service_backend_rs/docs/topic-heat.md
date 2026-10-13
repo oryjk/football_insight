@@ -42,3 +42,10 @@ HTTP 回归覆盖字段兼容及非法访客/话题；数据库验证覆盖并�
 - `cargo check`、小程序类型检查、组件注册、依赖边界、双端构建通过；热度转换/显示及原有音频回归 17 项通过。
 - H5 浏览器验证：列表无来源、详情保留来源，首页/列表/详情均显示热度；模拟 700ms 上报延迟，先返回列表仍更新累计值。
 - 全仓 `cargo clippy -- -D warnings` 有 15 处已有问题（admin/ai/auth/insight/mini_review/payment/system_config/team_board/ticket_watch），本次话题模块未命中。架构扫描的既有 Web 间 DTO 导入、错误文案分支仍存在于其他模块，本次未扩大改动范围。
+
+### 2026-10-13 发布验证
+
+- 本地后端已重建并重启：`football-insight-local-test-backend:topic-heat`，18092 健康，全部原环境配置保留。
+- peiqian 已使用 `cargo run --bin run_migrations` 应用新迁移，`_sqlx_migrations` 中 `20261013000200` 成功；生产后端已部署并重启为 `football-insight-service-backend-rs:4bf1ab8`，运行配置文件中的全部值保留。
+- 线上历史六篇、首页五篇；访问上报成功，同设备重复上报不累加，首页与详情热度一致，来源和 ready 音频保留，余票及公共配置 HTTP 200。
+- 小程序 1.0.66（robot 2）已从干净、已推送的 `4bf1ab8` 构建上传，包大小 1,825,371 字节；未生成预览二维码。
