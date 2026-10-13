@@ -89,6 +89,7 @@ pub struct AppConfig {
     pub redis_url: String,
     pub wechat_pay_mch_id: String,
     pub wechat_pay_api_key: String,
+    pub virtual_payment: VirtualPaymentConfig,
     pub public_base_url: String,
     pub reflux_notification_worker: RefluxNotificationWorkerConfig,
     pub smtp_email: Option<SmtpEmailConfig>,
@@ -223,6 +224,7 @@ impl AppConfig {
             redis_url,
             wechat_pay_mch_id,
             wechat_pay_api_key,
+            virtual_payment: VirtualPaymentConfig::from_env()?,
             public_base_url,
             reflux_notification_worker,
             smtp_email,
@@ -424,5 +426,70 @@ mod tests {
             )
             .is_err()
         );
+    }
+}
+
+// No Debug: app_key and webhook credentials must never appear in logs.
+#[derive(Clone)]
+pub struct VirtualPaymentConfig {
+    pub enabled: bool,
+    pub offer_id: String,
+    pub app_key: String,
+    pub webhook_token: String,
+    pub encoding_aes_key: String,
+}
+impl VirtualPaymentConfig {
+    fn from_env() -> anyhow::Result<Self> {
+        Ok(Self {
+            enabled: parse_bool_env("WECHAT_VIRTUAL_PAY_ENABLED", false),
+            offer_id: std::env::var("WECHAT_VIRTUAL_PAY_OFFER_ID").unwrap_or_default(),
+            app_key: std::env::var("WECHAT_VIRTUAL_PAY_APP_KEY").unwrap_or_default(),
+            webhook_token: std::env::var("WECHAT_VIRTUAL_PAY_WEBHOOK_TOKEN").unwrap_or_default(),
+            encoding_aes_key: std::env::var("WECHAT_VIRTUAL_PAY_ENCODING_AES_KEY")
+                .unwrap_or_default(),
+        })
+    }
+    pub fn available(&self) -> bool {
+        self.enabled
+            && !self.offer_id.is_empty()
+            && !self.app_key.is_empty()
+            && !self.webhook_token.is_empty()
+            && {
+                use base64::Engine;
+                base64::engine::GeneralPurpose::new(
+                    &base64::alphabet::STANDARD,
+                    base64::engine::GeneralPurposeConfig::new()
+                        .with_decode_allow_trailing_bits(true),
+                )
+                .decode(format!("{}=", self.encoding_aes_key.trim_end_matches('=')))
+                .is_ok_and(|key| key.len() == 32)
+            }
+    }
+}
+
+#[cfg(test)]
+mod virtual_config_tests {
+    use super::*;
+    #[test]
+    fn wechat_key_with_nonzero_base64_trailing_bits_is_accepted() {
+        let config = VirtualPaymentConfig {
+            enabled: true,
+            offer_id: "123".into(),
+            app_key: "key".into(),
+            webhook_token: "token".into(),
+            encoding_aes_key: format!("{}B", "A".repeat(42)),
+        };
+        assert!(config.available());
+    }
+    #[test]
+    fn invalid_webhook_key_never_enables_charging() {
+        let config = VirtualPaymentConfig {
+            enabled: true,
+            offer_id: "123".into(),
+            app_key: "key".into(),
+            webhook_token: "token".into(),
+            encoding_aes_key: "invalid".into(),
+        };
+        assert!(!config.available());
     }
 }

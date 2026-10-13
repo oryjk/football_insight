@@ -1,5 +1,5 @@
 <template>
-  <page-meta :page-style="selectedDailyTopic ? 'overflow: hidden;' : ''" />
+  <page-meta :page-style="navigationPageStyle" />
   <view class="home-page-shell">
     <FiBrandNav />
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
@@ -16,9 +16,10 @@
           @read="openDailyTopic"
           @play="topicAudio.toggle"
           @retry="loadDailyTopics"
+          @more="openMoreTopics"
         />
 
-        <HomeTopicAudioPlayer
+        <FiTopicAudioPlayer
           v-if="topicAudio.activeId.value"
           :title="topicAudio.activeTitle.value"
           :status="topicAudio.status.value"
@@ -31,6 +32,7 @@
         />
 
         <HomeSupportPanel
+          :now="homeMatchNow"
           :has-auth-token="hasAuthToken"
           :loading="supportLoading"
           :profile="supportProfile"
@@ -72,18 +74,6 @@
       </view>
     </view>
 
-    <HomeDailyTopicSheet
-      v-if="selectedDailyTopic"
-      :item="selectedDailyTopic"
-      :updated-label="topicEdition.updatedLabel"
-      :audio-ready="topicAudio.availableIds.value.includes(selectedDailyTopic.id)"
-      :audio-playing="topicAudio.activeId.value === selectedDailyTopic.id && topicAudio.status.value === 'playing'"
-      :audio-loading="topicAudio.activeId.value === selectedDailyTopic.id && topicAudio.status.value === 'loading'"
-      @play="topicAudio.toggle"
-      @close="closeDailyTopic"
-      @copy-source="copyTopicSource"
-    />
-
     <HomeTechStatsSheet
       v-if="selectedPulseMatch"
       :match="selectedPulseMatch"
@@ -113,13 +103,13 @@
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, ref, watch } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
 import HomeDailyTopics from './components/HomeDailyTopics.vue'
-import HomeDailyTopicSheet from './components/HomeDailyTopicSheet.vue'
-import HomeTopicAudioPlayer from './components/HomeTopicAudioPlayer.vue'
+import FiTopicAudioPlayer from '../../components/topics/FiTopicAudioPlayer.vue'
 import HomeSupportPanel from './components/HomeSupportPanel.vue'
 import HomeSkeleton from './components/HomeSkeleton.vue'
 import HomeStoryPanel from './components/HomeStoryPanel.vue'
@@ -154,11 +144,15 @@ import {
   type HomeTeamSeasonMatch,
 } from './helpers'
 import { createHomeSessionSync } from './sessionEffects'
+import { useHomeMatchClock } from './useHomeMatchClock'
 import { useHomeSupportData } from './useHomeSupportData'
 import { useHomeDailyTopics } from './useHomeDailyTopics'
-import { useDailyTopicAudio } from './useDailyTopicAudio'
-import { isTopicSourceUrl } from './dailyTopics'
+import { useDailyTopicAudio } from '../../composables/useDailyTopicAudio'
+import { topicDetailUrl } from './dailyTopics'
 
+const { navigationPageStyle } = useNavigationLayout()
+
+const homeMatchNow = useHomeMatchClock()
 const currentSeason = new Date().getFullYear()
 let homeLoadRevision = 0
 const loading = ref(true)
@@ -233,17 +227,12 @@ const {
   edition: topicEdition,
   loading: topicsLoading,
   errorMessage: topicsErrorMessage,
-  selectedItem: selectedDailyTopic,
-  openReading: openDailyTopic,
-  closeReading: closeDailyTopic,
   load: loadDailyTopics,
 } = useHomeDailyTopics()
 const topicAudio = useDailyTopicAudio(topicEdition)
 
-function copyTopicSource(url: string) {
-  if (!isTopicSourceUrl(url) || !selectedDailyTopic.value?.sources.some(source => source.url === url)) return
-  uni.setClipboardData({ data: url, success: () => uni.showToast({ title: '原文链接已复制', icon: 'none' }) })
-}
+function openDailyTopic(id: string) { uni.navigateTo({ url: topicDetailUrl(id) }) }
+function openMoreTopics() { uni.navigateTo({ url: '/pages/topics/index' }) }
 
 function toggleCurrentTopicAudio() {
   if (topicAudio.activeId.value) topicAudio.toggle(topicAudio.activeId.value)

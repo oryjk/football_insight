@@ -516,7 +516,6 @@ describe('revision 监听与认证表单上下文（真实 Vue watcher）', () =
     getStub(fixture).handlers.getCurrentUser = () => Promise.resolve(fixture.session.currentUser.value)
     const state: UserAccountEffectsState = {
       loading: ref(false),
-      systemConfigUnderReview: ref(false),
       isReviewController: ref(false),
       notificationEmail: ref('a@example.com'),
       notificationEmailSheetVisible: ref(false),
@@ -530,7 +529,6 @@ describe('revision 监听与认证表单上下文（真实 Vue watcher）', () =
       canControlMiniReview: () => Promise.resolve({ allowed: false }),
       getNotificationEmail: () => Promise.resolve({ email: null }),
       updateNotificationEmail: () => Promise.resolve({ email: null }),
-      loadSystemConfigUnderReview: () => Promise.resolve(false),
       showToast: () => {},
     })
   }
@@ -684,7 +682,8 @@ describe('revision 监听与认证表单上下文（真实 Vue watcher）', () =
     }
 
     /**
-     * 与 App.vue onLaunch 相同的后台恢复编排：先等审核查询，再按最新审核态 bootstrap。
+     * 模拟配置晚到后才调用 bootstrap 的情况，验证 session 自身的操作替代防护。
+     * 当前 App 已将审核查询与认证恢复并行；迟到调用同样必须安全。
      * 审核 GET 由 deferred 控制，模拟「慢审核」。
      */
     function createLaunchHarness(fixture: FlowFixture) {
@@ -800,7 +799,6 @@ describe('revision 监听与认证表单上下文（watcher 联动）', () => {
   function createEffects(fixture: FlowFixture): UserAccountEffects {
     const state: UserAccountEffectsState = {
       loading: ref(false),
-      systemConfigUnderReview: ref(false),
       isReviewController: ref(false),
       notificationEmail: ref('a@example.com'),
       notificationEmailSheetVisible: ref(false),
@@ -814,7 +812,6 @@ describe('revision 监听与认证表单上下文（watcher 联动）', () => {
       canControlMiniReview: () => Promise.resolve({ allowed: false }),
       getNotificationEmail: () => Promise.resolve({ email: null }),
       updateNotificationEmail: () => Promise.resolve({ email: null }),
-      loadSystemConfigUnderReview: () => Promise.resolve(false),
       showToast: () => {},
     })
   }

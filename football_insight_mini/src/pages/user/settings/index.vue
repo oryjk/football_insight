@@ -1,4 +1,6 @@
 <template>
+  <page-meta :page-style="navigationPageStyle" />
+  <FiSecondaryNav :shareable="false" @back="goBackFromSecondaryPage('/pages/user/index')" />
   <view class="settings-page">
     <view class="settings-section">
       <view class="settings-item">
@@ -61,7 +63,10 @@
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../../composables/useNavigationLayout'
 import { ref } from 'vue'
+import FiSecondaryNav from '../../../components/FiSecondaryNav.vue'
+import { goBackFromSecondaryPage } from '../../../utils/secondaryNavigation'
 import { canControlMiniReview, putMiniReviewReviewStatus } from '../../../api/miniReview'
 import { MINI_PROGRAM_VERSION } from '../../../api/system'
 import { useMiniReviewStatus } from '../../../stores/miniReview'
@@ -71,6 +76,8 @@ import type { H5TestLoginUser } from '../../../types/auth'
 // #ifdef H5
 import { listH5TestLoginUsers } from '../../../api/auth'
 import { isSessionSupersededError, useAppSession } from '../../../stores/appSession'
+
+const { navigationPageStyle } = useNavigationLayout()
 
 const h5TestUsers = ref<H5TestLoginUser[]>([])
 
@@ -170,7 +177,7 @@ loadStatus()
 .settings-page {
   min-height: 100vh;
   background: var(--fi-color-page);
-  padding: 24rpx 24rpx 40rpx;
+  padding: calc(var(--fi-brand-nav-height) + var(--fi-space-24)) var(--fi-space-24) var(--fi-space-40);
 }
 
 .settings-section {

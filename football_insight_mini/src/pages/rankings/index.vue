@@ -1,5 +1,5 @@
 <template>
-  <page-meta :page-style="pageLockStyle" />
+  <page-meta :page-style="navigationPageStyle + pageLockStyle" />
   <view class="page-root" :class="{ 'page-root--locked': pageScrollLocked }">
     <FiBrandNav />
 
@@ -17,11 +17,14 @@
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, nextTick, ref } from 'vue'
 import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import RankingsContent from './RankingsContent.vue'
 import MatchesContent from '../matches/MatchesContent.vue'
+
+const { navigationPageStyle } = useNavigationLayout()
 
 const rankingsContentRef = ref<InstanceType<typeof RankingsContent> | null>(null)
 const pendingSharedPosterSlug = ref<string | null>(null)

@@ -1,3 +1,4 @@
+import { prepareVirtualPayment } from '../../composables/prepareVirtualPayment'
 import {
   createRefluxSubscriptionOrder,
   getRefluxSubscriptionPlans,
@@ -18,6 +19,7 @@ import type { TicketWatchState } from './useTicketWatchState'
 import { waitForPaidOrder, requestTicketWatchPayment } from './paymentActions'
 
 const subscriptionActions = {
+  prepareVirtualPayment,
   createRefluxSubscriptionOrder,
   getRefluxSubscriptionPlans,
   getRefluxSubscriptionStatus,
@@ -37,6 +39,7 @@ export function useTicketWatchSubscription(
     getRefluxSubscriptionStatus,
     waitForPaidOrder,
     requestTicketWatchPayment,
+    prepareVirtualPayment,
   } = actions
   const {
     selectedTeam,
@@ -243,6 +246,8 @@ export function useTicketWatchSubscription(
     refluxSubscriptionSubmitting.value = true
 
     try {
+      await prepareVirtualPayment()
+      if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) return
       const order = await createRefluxSubscriptionOrder({
         plan_code: selectedRefluxSubscriptionPlanCode.value,
         team_code: teamCode,
@@ -260,7 +265,7 @@ export function useTicketWatchSubscription(
       if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) {
         return
       }
-      const paid = await waitForPaidOrder(order.order_no)
+      const paid = await waitForPaidOrder(order.order_no, () => isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode))
       if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) {
         return
       }

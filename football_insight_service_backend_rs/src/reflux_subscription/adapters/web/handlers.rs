@@ -173,6 +173,20 @@ fn authenticate_user(
 }
 
 fn map_reflux_subscription_error(error: anyhow::Error) -> (StatusCode, String) {
+    if let Some(error) =
+        error.downcast_ref::<crate::payment::domain::virtual_payment::VirtualPaymentError>()
+    {
+        use crate::payment::domain::virtual_payment::VirtualPaymentError::*;
+        let status = match error {
+            Unavailable | ProductUnavailable | CatalogUnavailable | Provider => {
+                StatusCode::SERVICE_UNAVAILABLE
+            }
+            IdentityMismatch => StatusCode::FORBIDDEN,
+            SessionExpired | InvalidOrder => StatusCode::BAD_REQUEST,
+        };
+        return (status, error.to_string());
+    }
+
     if let Some(reflux_error) = error.downcast_ref::<RefluxSubscriptionError>() {
         return (StatusCode::BAD_REQUEST, reflux_error.to_string());
     }

@@ -167,10 +167,13 @@ fn matches_excluded_prefix(path: &str) -> bool {
     }
 
     path.starts_with("/api/v1/auth/")
+        || path.starts_with("/api/v1/payment/virtual/")
         || path.starts_with("/api/v1/ticket-watch/")
         || path.starts_with("/api/v1/match-id/")
         || path.starts_with("/api/v1/system")
         || path.starts_with("/api/v1/mini-review/")
+        || path == "/api/v1/daily-topics"
+        || path.starts_with("/api/v1/daily-topics/")
         || path == "/football/wechat/webhook"
         || path == "/api/health"
 }
@@ -372,6 +375,46 @@ mod tests {
             .unwrap();
 
         assert_eq!(hits.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn virtual_payment_availability_is_read_again_after_catalog_edit() {
+        use std::sync::atomic::AtomicBool;
+        let enabled = Arc::new(AtomicBool::new(true));
+        let state = enabled.clone();
+        let app = Router::new()
+            .route(
+                "/api/v1/payment/virtual/status",
+                get(move || {
+                    let state = state.clone();
+                    async move {
+                        axum::Json(serde_json::json!({"available":state.load(Ordering::SeqCst)}))
+                    }
+                }),
+            )
+            .layer(from_fn_with_state(
+                HttpResponseCache::new(Duration::from_secs(600)),
+                cache_get_responses,
+            ));
+        for expected in [true, false, true] {
+            enabled.store(expected, Ordering::SeqCst);
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri("/api/v1/payment/virtual/status")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let body = to_bytes(response.into_body(), 1024).await.unwrap();
+            let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(
+                json["available"], expected,
+                "catalog edits must not wait for HTTP cache expiry"
+            );
+        }
     }
 
     #[tokio::test]

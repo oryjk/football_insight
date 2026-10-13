@@ -28,6 +28,54 @@ class Session:
         return Response(page, url)
 
 
+def test_listing_discovers_matching_full_originals_only():
+    from sina_csl_scraper.topics.sources import collect_sources
+    listing = '<a href="/news/1"><span>成都蓉城训练</span></a>' \
+        '<a href="/news/2">其它球队</a><a href="https://ads.example/news/3">蓉城广告</a>' \
+        '<a href="/video/4">蓉城视频</a><a href="/news/1#share">蓉城训练</a>'
+    original = f'<title>成都蓉城训练</title><meta property="article:published_time" content="2026-10-13T09:00:00+08:00"><article>{BODY}</article>'
+    session = Session({'https://news.example/list': listing, 'https://news.example/news/1': original})
+    result = collect_sources({'listings': [{'url': 'https://news.example/list', 'publisher': '媒体',
+        'allowed_hosts': ['news.example'], 'path_pattern': r'^/news/\d+$', 'keywords': ['蓉城']}]}, NOW, session=session)
+    assert len(result) == 1
+    assert result[0].body == BODY
+    assert session.calls == ['https://news.example/list', 'https://news.example/news/1']
+
+
+def test_daily_collection_distinguishes_outage_from_no_matching_news():
+    from sina_csl_scraper.topics.sources import collect_sources
+    config = {'listings': [{'url': 'https://news.example/list', 'publisher': '媒体',
+        'allowed_hosts': ['news.example'], 'path_pattern': r'^/news/\d+$', 'keywords': ['蓉城']}]}
+    with pytest.raises(ValueError, match='unavailable'):
+        collect_sources(config, NOW, session=Session({'https://news.example/list': requests.RequestException('private')}), require_available=True)
+    assert collect_sources(config, NOW, session=Session({'https://news.example/list': '<a href="/news/1">其它球队</a>'}), require_available=True) == []
+
+
+def test_daily_original_body_outage_is_failure_even_when_listing_works():
+    from sina_csl_scraper.topics.sources import collect_sources
+    config = {'listings': [{'url': 'https://news.example/list', 'publisher': '媒体',
+        'allowed_hosts': ['news.example'], 'path_pattern': r'^/news/\d+$', 'keywords': ['蓉城']}]}
+    session = Session({'https://news.example/list': '<a href="/news/1">成都蓉城训练</a>',
+                       'https://news.example/news/1': requests.ConnectionError('private failure')})
+    with pytest.raises(ValueError, match='original.*unavailable'):
+        collect_sources(config, NOW, session=session, require_available=True)
+
+
+@pytest.mark.parametrize('body,publication', [('成都蓉城', '2026-10-13T09:00:00+08:00'),
+                                            (BODY, '2026-09-01T09:00:00+08:00')])
+def test_strict_collection_rejects_heading_only_body_but_accepts_old_valid_original(body, publication):
+    from sina_csl_scraper.topics.sources import collect_sources
+    url = 'https://news.example/news/1'
+    html = f'<title>成都蓉城训练</title><meta property="article:published_time" content="{publication}"><article>{body}</article>'
+    session = Session({url: html})
+    config = {'articles': [{'url': url, 'publisher': '媒体'}]}
+    if body == '成都蓉城':
+        with pytest.raises(ValueError, match='original.*unavailable'):
+            collect_sources(config, NOW, session=session, require_available=True)
+    else:
+        assert collect_sources(config, NOW, session=session, require_available=True) == []
+
+
 def imported():
     return dict(title='成都蓉城备战', url='https://club.example/news/1', publisher='俱乐部', published_at='2026-10-13T09:00:00+08:00', body=BODY)
 

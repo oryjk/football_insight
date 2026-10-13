@@ -1,4 +1,6 @@
 <template>
+  <page-meta :page-style="navigationPageStyle" />
+  <FiSecondaryNav @back="goBackFromSecondaryPage('/pages/insights/index')" @share="copyPageShareLink('/pages/ticket-watch/index')" />
   <view v-if="pageEntered" class="page-root">
     <image
       class="page-bg-img"
@@ -210,7 +212,10 @@
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { nextTick, watch } from 'vue'
+import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
+import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import {
   onHide,
   onReady,
@@ -246,6 +251,8 @@ import { useTicketWatchPolling } from './useTicketWatchPolling'
 import { useTicketWatchSubscription } from './useTicketWatchSubscription'
 import { useTicketWatchMatchId } from './useTicketWatchMatchId'
 import { createTicketWatchSessionSync } from './sessionSync'
+
+const { navigationPageStyle } = useNavigationLayout()
 
 const state = useTicketWatchState()
 const {
@@ -542,7 +549,7 @@ onUnload(() => {
   position: relative;
   z-index: 1;
   min-height: 100vh;
-  padding: var(--fi-space-20) var(--fi-space-20) var(--fi-space-36);
+  padding: calc(var(--fi-brand-nav-height) + var(--fi-space-20)) var(--fi-space-20) var(--fi-space-36);
   display: flex;
   flex-direction: column;
   gap: var(--fi-space-18);

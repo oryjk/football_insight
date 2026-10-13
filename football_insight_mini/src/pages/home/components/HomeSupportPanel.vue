@@ -3,6 +3,12 @@
     <view class="support-home-panel__header">
       <view class="support-home-panel__heading">
         <text class="support-home-panel__title">我的主队</text>
+        <view v-if="daysRemaining !== null" class="support-home-panel__countdown">
+          <text v-if="daysRemaining === 0">今天比赛</text>
+          <template v-else>
+            <text>距下场</text><text class="support-home-panel__countdown-days">{{ daysRemaining }}</text><text>天</text>
+          </template>
+        </view>
       </view>
 
       <view v-if="!favoriteTeam" class="support-home-panel__context">
@@ -99,12 +105,14 @@ import type { SupportProfile, SupportTeam } from '../../../types/support'
 import {
   resolveHomeSupportMatchWeekdayLabel,
   resolveHomeSupportNextMatchLabel,
+  resolveHomeSupportMatchDaysRemaining,
   resolveHomeSupportTeamRankLabel,
   resolveHomeSupportWindowShortLabel,
   shouldShowHomeSupportLoading,
 } from '../helpers'
 
 const props = defineProps<{
+  now: number
   hasAuthToken: boolean
   loading: boolean
   profile: SupportProfile | null
@@ -119,6 +127,8 @@ const emit = defineEmits<{
 
 const favoriteTeam = computed(() => props.profile?.favorite_team ?? null)
 const nextMatch = computed(() => props.profile?.next_match ?? null)
+const daysRemaining = computed(() => props.hasAuthToken && favoriteTeam.value && !props.errorMessage
+  ? resolveHomeSupportMatchDaysRemaining(nextMatch.value, props.now) : null)
 const showLoading = computed(() =>
   shouldShowHomeSupportLoading({ loading: props.loading, hasCachedProfile: !!props.profile }),
 )
@@ -187,17 +197,37 @@ const awayRankLabel = computed(() => {
 }
 .support-home-panel__header {
   display: grid;
-  gap: 12rpx;
+  gap: var(--fi-space-12);
 }
 .support-home-panel__heading {
-  display: grid;
-  gap: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fi-space-12);
 }
 .support-home-panel__title {
   color: var(--fi-color-text-strong);
-  font-weight: 800;
-  font-size: 36rpx;
-  line-height: 1.12;
+  flex-shrink: 0;
+  font-weight: var(--fi-weight-extrabold);
+  font-size: var(--fi-font-36);
+  line-height: var(--fi-leading-tight);
+}
+.support-home-panel__countdown {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--fi-space-6);
+  padding: var(--fi-space-6) var(--fi-space-12);
+  border-radius: var(--fi-radius-round);
+  color: var(--fi-color-primary);
+  background: var(--fi-color-topic-audio-surface);
+  font-size: var(--fi-font-22);
+  line-height: var(--fi-leading-normal);
+  white-space: nowrap;
+}
+.support-home-panel__countdown-days {
+  font-size: var(--fi-font-30);
+  font-weight: var(--fi-weight-extrabold);
 }
 .support-home-panel__context {
   display: flex;

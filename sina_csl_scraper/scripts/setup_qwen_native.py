@@ -52,16 +52,26 @@ def main() -> None:
             shutil.copytree(Path(directory) / 'any-tts-0.2.0', vendor)
         subprocess.run(['patch', '-p1', '-i', str(template / 'any-tts-0.6b.patch')], cwd=vendor, check=True)
         marker.write_text('0.2.0 + 0.6B text projection / optional code projection\n')
-    command = ['cargo', 'build', '--release', '--locked', '--manifest-path', str(build / 'Cargo.toml')]
+    # Explicitly select a target directory: a user's global Cargo config may
+    # redirect builds elsewhere, which must not break locating the binary.
+    target = args.target_dir.resolve() if args.target_dir else build / 'target'
+    command = ['cargo', 'build', '--release', '--locked', '--manifest-path', str(build / 'Cargo.toml'),
+               '--target-dir', str(target)]
     if args.device != 'cpu':
         command += ['--features', args.device]
-    if args.target_dir:
-        command += ['--target-dir', str(args.target_dir.resolve())]
     subprocess.run(command, check=True)
-    binary = (args.target_dir.resolve() if args.target_dir else build / 'target') / 'release/football-qwen-tts'
+    binary = target / 'release/football-qwen-tts'
     install = build / 'bin/football-qwen-tts'
     install.parent.mkdir(exist_ok=True)
-    shutil.copy2(binary, install)
+    # An active inference process may still be executing the previous inode.
+    # Install via rename rather than truncating a running executable (ETXTBSY).
+    with tempfile.NamedTemporaryFile(dir=install.parent, prefix='.football-qwen-', delete=False) as temporary:
+        staged = Path(temporary.name)
+    try:
+        shutil.copy2(binary, staged)
+        staged.replace(install)
+    finally:
+        staged.unlink(missing_ok=True)
     print(f'FI_QWEN_RUNNER={install}')
 
 

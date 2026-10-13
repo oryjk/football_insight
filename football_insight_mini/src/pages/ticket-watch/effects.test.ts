@@ -207,6 +207,7 @@ describe('ticket watch page effects', () => {
         via: 'purchase',
         effective_tier: 'V1',
       }),
+      prepareVirtualPayment: async () => {},
       requestTicketWatchPayment: () => payment.promise,
       waitForPaidOrder: () => confirmation.promise,
     }, createSessionStub())
@@ -385,6 +386,7 @@ describe('ticket watch subscription revision effects', () => {
       getRefluxSubscriptionPlans: unusedAction(),
       getRefluxSubscriptionStatus: () => statusRequest.promise,
       waitForPaidOrder: unusedAction(),
+      prepareVirtualPayment: async () => {},
       requestTicketWatchPayment: unusedAction(),
     }, session)
 
@@ -422,6 +424,7 @@ describe('ticket watch subscription revision effects', () => {
       getRefluxSubscriptionPlans: () => plansRequest.promise,
       getRefluxSubscriptionStatus: () => statusRequest.promise,
       waitForPaidOrder: unusedAction(),
+      prepareVirtualPayment: async () => {},
       requestTicketWatchPayment: unusedAction(),
     }, session)
 
@@ -481,6 +484,7 @@ describe('ticket watch subscription revision effects', () => {
       getRefluxSubscriptionPlans: unusedAction(),
       getRefluxSubscriptionStatus: unusedAction(),
       waitForPaidOrder: () => confirmation.promise,
+      prepareVirtualPayment: async () => {},
       requestTicketWatchPayment: () => payment.promise,
     }, session)
 
@@ -523,6 +527,7 @@ describe('ticket watch subscription revision effects', () => {
           })
       },
       waitForPaidOrder: unusedAction(),
+      prepareVirtualPayment: async () => {},
       requestTicketWatchPayment: unusedAction(),
     }, session)
     const boards = useTicketWatchBoards(state, async () => {}, { ...source }, session)
@@ -571,6 +576,7 @@ describe('ticket watch subscription revision effects', () => {
         return statusCalls === 1 ? statusA.promise : statusB.promise
       },
       waitForPaidOrder: unusedAction(),
+      prepareVirtualPayment: async () => {},
       requestTicketWatchPayment: unusedAction(),
     }, session)
     const boards = useTicketWatchBoards(state, async () => {}, { ...source }, session)
@@ -623,6 +629,7 @@ describe('ticket watch matchId session reset effects', () => {
         via: 'purchase',
         effective_tier: 'V1',
       }),
+      prepareVirtualPayment: async () => {},
       requestTicketWatchPayment: async () => {},
       waitForPaidOrder: async () => true,
     }, session)
@@ -853,6 +860,7 @@ describe('ticket watch board generation（A→B→A 旧请求防复活）', () =
         params: { timeStamp: string; nonceStr: string; package: string; signType: string; paySign: string }
       }>
       waitForPaidOrder?: () => Promise<boolean>
+      prepareVirtualPayment?: () => Promise<void>
       requestTicketWatchPayment?: () => Promise<void>
     },
   ) {
@@ -861,6 +869,7 @@ describe('ticket watch board generation（A→B→A 旧请求防复活）', () =
       getRefluxSubscriptionPlans: handlers.getRefluxSubscriptionPlans ?? unusedAction(),
       getRefluxSubscriptionStatus: handlers.getRefluxSubscriptionStatus ?? unusedAction(),
       waitForPaidOrder: handlers.waitForPaidOrder ?? unusedAction(),
+      prepareVirtualPayment: handlers.prepareVirtualPayment ?? (async () => {}),
       requestTicketWatchPayment: handlers.requestTicketWatchPayment ?? unusedAction(),
     }, session)
   }
@@ -1068,6 +1077,7 @@ describe('ticket watch board generation（A→B→A 旧请求防复活）', () =
     let paymentCalls = 0
     const subscription = createSubscriptionPair(state, session, {
       createRefluxSubscriptionOrder: () => orderRequest.promise,
+      prepareVirtualPayment: async () => {},
       requestTicketWatchPayment: () => {
         paymentCalls += 1
         return Promise.resolve()
@@ -1118,6 +1128,7 @@ describe('ticket watch board generation（A→B→A 旧请求防复活）', () =
           order_no: 'order-1',
           params: { timeStamp: '', nonceStr: '', package: '', signType: 'RSA', paySign: '' },
         }),
+      prepareVirtualPayment: async () => {},
       requestTicketWatchPayment: () => Promise.resolve(),
       waitForPaidOrder: () => confirmation.promise,
     })
@@ -1165,6 +1176,7 @@ describe('ticket watch board generation（A→B→A 旧请求防复活）', () =
         via: 'purchase',
         effective_tier: 'V1',
       }),
+      prepareVirtualPayment: async () => {},
       requestTicketWatchPayment: () => {
         paymentCalls += 1
         return Promise.resolve()
@@ -2280,6 +2292,7 @@ describe('ticket watch 比赛上下文替换统一复位（自然 rollover 边�
         return statusCalls === 1 ? oldStatus.promise : newStatus.promise
       },
       waitForPaidOrder: unusedAction(),
+      prepareVirtualPayment: async () => {},
       requestTicketWatchPayment: unusedAction(),
     }, session)
     const boards = useTicketWatchBoards(state, subscription.refreshRefluxSubscriptionStatus, {
@@ -2337,6 +2350,7 @@ describe('ticket watch 比赛上下文替换统一复位（自然 rollover 边�
       },
       getRefluxSubscriptionStatus: async () => subscriptionStatus(null, false),
       waitForPaidOrder: unusedAction(),
+      prepareVirtualPayment: async () => {},
       requestTicketWatchPayment: unusedAction(),
     }, session)
     const boards = useTicketWatchBoards(state, subscription.refreshRefluxSubscriptionStatus, {
@@ -2421,6 +2435,7 @@ describe('ticket watch 比赛上下文替换统一复位（自然 rollover 边�
         entitlementCalls += 1
         return { unlocked: true, via: 'purchase', effective_tier: 'V1' }
       },
+      prepareVirtualPayment: async () => {},
       requestTicketWatchPayment: async () => {
         paymentCalls += 1
       },
@@ -2482,6 +2497,7 @@ describe('ticket watch 比赛上下文替换统一复位（自然 rollover 边�
           ? oldEntitlement.promise
           : Promise.resolve({ unlocked: true, via: 'purchase', effective_tier: 'V1' })
       },
+      prepareVirtualPayment: async () => {},
       requestTicketWatchPayment: unusedAction(),
       waitForPaidOrder: unusedAction(),
     }, session)
@@ -2536,6 +2552,7 @@ describe('ticket watch 比赛上下文替换统一复位（自然 rollover 边�
             confirmations += 1
             return true
           },
+          prepareVirtualPayment: async () => {},
           requestTicketWatchPayment: () => payment.promise,
         }, session)
         action = subscription.submitRefluxSubscriptionOrder()
@@ -2547,6 +2564,7 @@ describe('ticket watch 比赛上下文替换统一复位（自然 rollover 边�
             wx_pay_params: { timeStamp: '', nonceStr: '', package: '', signType: 'RSA', paySign: '' },
           }),
           getMatchIdEntitlement: unusedAction(),
+          prepareVirtualPayment: async () => {},
           requestTicketWatchPayment: () => payment.promise,
           waitForPaidOrder: async () => {
             confirmations += 1
@@ -2599,6 +2617,7 @@ describe('ticket watch 比赛上下文替换统一复位（自然 rollover 边�
             ? entitlement.promise
             : Promise.resolve({ unlocked: true, via: 'purchase', effective_tier: 'V1' })
         },
+        prepareVirtualPayment: async () => {},
         requestTicketWatchPayment: async () => {},
         waitForPaidOrder: () => confirmation.promise,
       }, session)
@@ -2611,6 +2630,7 @@ describe('ticket watch 比赛上下文替换统一复位（自然 rollover 边�
       // loading 中点击支付：pay 接管新 owner，旧 GET1 随之失效，order POST 在途。
       const pay = unlock.payForMatchId()
       expect(state.matchIdSheetState.value).toBe('paying')
+      await Promise.resolve() // The new payment-session preparation precedes order creation.
       expect(orders).toBe(1)
 
       // 旧 GET1 迟到：成功不得覆盖 paying/关闭 sheet；失败不得关 sheet/弹旧错误。

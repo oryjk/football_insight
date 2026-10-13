@@ -1,3 +1,4 @@
+import { prepareVirtualPayment } from '../../composables/prepareVirtualPayment'
 import {
   createMatchIdOrder,
   getMatchIdEntitlement,
@@ -16,6 +17,7 @@ import type { TicketWatchState } from './useTicketWatchState'
 import { waitForPaidOrder, requestTicketWatchPayment } from './paymentActions'
 
 const matchIdActions = {
+  prepareVirtualPayment,
   createMatchIdOrder,
   getMatchIdEntitlement,
   waitForPaidOrder,
@@ -33,6 +35,7 @@ export function useTicketWatchMatchId(
     getMatchIdEntitlement,
     waitForPaidOrder,
     requestTicketWatchPayment,
+    prepareVirtualPayment,
   } = actions
   const {
     currentMatch,
@@ -212,6 +215,8 @@ export function useTicketWatchMatchId(
       || !isCurrentMatchContext(requestRevision, requestGeneration)
 
     try {
+      await prepareVirtualPayment()
+      if (isStale()) return
       const order = await createMatchIdOrder(match.match_id)
 
       // 上下文（含 A→B→A 后的同名比赛）已失效的旧订单不得拉起微信支付。
@@ -224,7 +229,7 @@ export function useTicketWatchMatchId(
       if (isStale()) {
         return
       }
-      const paid = await waitForPaidOrder(order.order_no)
+      const paid = await waitForPaidOrder(order.order_no, () => !isStale())
       if (isStale()) {
         return
       }

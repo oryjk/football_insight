@@ -90,6 +90,8 @@ docker run -d \
 
 ## 当前接口
 
+- 今日话题：公开 `GET /api/v1/daily-topics?team_id=77680&limit=5`，Rust 只读取 Python 已发布批次；接口与数据库验证步骤见 [今日话题后端说明](docs/daily-topics.md)。
+
 - 健康检查
   - `/api/health`
 - 系统配置

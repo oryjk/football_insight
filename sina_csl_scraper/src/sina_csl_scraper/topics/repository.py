@@ -1,8 +1,11 @@
 """Only writes the table provisioned by the Rust migration, never creates tables."""
 from __future__ import annotations
 
+from datetime import datetime
+
 import psycopg
 from psycopg.types.json import Jsonb
+from .models import canonical_url, parse_timestamp
 
 
 class TopicRepository:
@@ -29,3 +32,49 @@ class TopicRepository:
                     ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload
                 ''', (edition['id'], payload['team_id'], payload['edition_date'], payload['updated_at'],
                       Jsonb(payload), edition['source_fingerprint'], edition['generator_version']))
+
+    def published_sources(self, team_id: int) -> tuple[set[str], datetime | None]:
+        """Use publication history as the durable deduplication baseline."""
+        with psycopg.connect(self.database_url) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute('''
+                    SELECT DISTINCT source->>'url', source->>'published_at'
+                    FROM f_i_daily_topic_editions
+                    CROSS JOIN LATERAL jsonb_array_elements(payload->'items') AS item
+                    CROSS JOIN LATERAL jsonb_array_elements(item->'sources') AS source
+                    WHERE team_id = %s
+                ''', (team_id,))
+                rows = cursor.fetchall()
+        urls = {canonical_url(url) for url, _ in rows}
+        dates = [parse_timestamp(timestamp) for _, timestamp in rows if timestamp]
+        return urls, max(dates) if dates else None
+
+    def published_items(self, team_id: int) -> list[dict]:
+        with psycopg.connect(self.database_url) as connection:
+            rows = connection.execute('''SELECT payload FROM f_i_daily_topic_editions
+                WHERE team_id = %s ORDER BY published_at DESC, id DESC''', (team_id,)).fetchall()
+        items = {}
+        for (payload,) in rows:
+            for item in payload['items']:
+                items.setdefault(item['id'], item)
+        return list(items.values())
+
+    def patch_images(self, team_id: int, updates: list[dict]) -> int:
+        """Lock current rows and change only images, including historical copies."""
+        by_id = {item['id']: item for item in updates if item.get('images')}
+        changed = 0
+        with psycopg.connect(self.database_url) as connection:
+            rows = connection.execute('''SELECT id, payload FROM f_i_daily_topic_editions
+                WHERE team_id = %s ORDER BY id FOR UPDATE''', (team_id,)).fetchall()
+            for edition_id, payload in rows:
+                dirty = False
+                for item in payload['items']:
+                    update = by_id.get(item['id'])
+                    if update and item['sources'] == update['sources'] and item.get('images') != update['images']:
+                        item['images'] = update['images']
+                        changed += 1
+                        dirty = True
+                if dirty:
+                    connection.execute('UPDATE f_i_daily_topic_editions SET payload = %s WHERE id = %s',
+                                       (Jsonb(payload), edition_id))
+        return changed

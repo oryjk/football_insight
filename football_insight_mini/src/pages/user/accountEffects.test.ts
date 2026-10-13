@@ -84,7 +84,6 @@ function createState(overrides?: Partial<UserAccountEffectsDeps>): StateFixture 
     canControlMiniReview: () => Promise.resolve({ allowed: false }),
     getNotificationEmail: () => emailRequest.promise,
     updateNotificationEmail: () => Promise.reject(new Error('unexpected update call')),
-    loadSystemConfigUnderReview: () => Promise.resolve(false),
     showToast: (title) => {
       toasts.push(title)
     },
@@ -92,7 +91,6 @@ function createState(overrides?: Partial<UserAccountEffectsDeps>): StateFixture 
   }
   return {
     loading: ref(false),
-    systemConfigUnderReview: ref(false),
     isReviewController: ref(false),
     notificationEmail: ref(''),
     notificationEmailSheetVisible: ref(false),
@@ -309,5 +307,26 @@ describe('user 页账号读写 revision 防护', () => {
 
     expect(state.notificationEmail.value).toBe('')
     expect(stub.ensureCalls).toBe(0)
+  })
+})
+
+describe('审核展示不能阻断账号认证', () => {
+  test('审核中仍恢复当前账号', async () => {
+    const stub = createSessionStub()
+    const state = createState({ getNotificationEmail: () => Promise.resolve({ email: null }) })
+    const effects = createUserAccountEffects(stub.session, state, state.deps)
+    await effects.loadUser()
+    expect(stub.ensureCalls).toBe(1)
+  })
+  test('审核中刷新页面保留待完成的微信绑定表单', async () => {
+    const stub = createSessionStub({ hasAccessToken: false })
+    const state = createState()
+    state.miniWechatBindState.value = {
+      status: 'binding_required', bind_token: 'pending-bind', expires_at: '2026-10-14T00:00:00Z',
+      display_name: '球迷', avatar_url: null,
+    }
+    const effects = createUserAccountEffects(stub.session, state, state.deps)
+    await effects.loadUser()
+    expect(state.miniWechatBindState.value?.bind_token).toBe('pending-bind')
   })
 })

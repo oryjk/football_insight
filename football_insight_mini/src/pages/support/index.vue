@@ -1,4 +1,6 @@
 <template>
+  <page-meta :page-style="navigationPageStyle" />
+  <FiSecondaryNav @back="goBackFromSecondaryPage()" @share="copyPageShareLink(detail ? `/pages/support/index?matchId=${detail.match_id}` : '/pages/home/index')" />
   <view class="page-root">
     <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
@@ -126,9 +128,12 @@
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, ref } from 'vue'
 import { onHide, onLoad, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
+import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
+import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { castSupportVote, getMatchSupportDetail } from '../../api/support'
 import type { SupportMatchDetail } from '../../types/support'
@@ -144,6 +149,8 @@ import {
   resolveSupportVoteButtonText,
   resolveSupportWindowLabel,
 } from './helpers'
+
+const { navigationPageStyle } = useNavigationLayout()
 
 const loading = ref(true)
 const errorMessage = ref('')
@@ -579,7 +586,7 @@ function roundRect(
   pointer-events: none;
   z-index: 0;
 }
-.page-scroll { height: 100vh; }
+.page-scroll { height: 100vh; padding-top: var(--fi-brand-nav-height); }
 .page {
   position: relative;
   z-index: 1;

@@ -42,6 +42,14 @@ impl HandleWechatNotifyUseCase {
             .unwrap_or_default();
         let total_fee = notify_data.get("total_fee").cloned().unwrap_or_default();
 
+        if self
+            .order_repository
+            .is_virtual_order(&out_trade_no)
+            .await?
+        {
+            return Ok(NotifyHandleResult::ProtocolFailure);
+        }
+
         let order = self
             .order_repository
             .find_order_by_no(&out_trade_no)
@@ -56,41 +64,42 @@ impl HandleWechatNotifyUseCase {
             return Ok(NotifyHandleResult::AmountMismatch);
         }
 
+        self.settle_verified_order(&order, &transaction_id).await?;
+        Ok(NotifyHandleResult::Success)
+    }
+
+    pub async fn settle_verified_order(
+        &self,
+        order: &crate::payment::domain::order::PaymentOrder,
+        transaction_id: &str,
+    ) -> anyhow::Result<()> {
         if order.status == crate::payment::domain::order::OrderStatus::Paid {
-            return Ok(NotifyHandleResult::Success);
+            return Ok(());
         }
+
+        let out_trade_no = &order.order_no;
 
         if let Some(product) = parse_reflux_subscription_product_type(&order.product_type) {
             self.payment_settlement_port
                 .settle_reflux_subscription_order(
-                    &out_trade_no,
-                    &transaction_id,
+                    out_trade_no,
+                    transaction_id,
                     order.user_id,
                     product,
                 )
                 .await?;
         } else if let Some(match_id) = parse_match_id_unlock_product_type(&order.product_type) {
             self.payment_settlement_port
-                .settle_match_id_unlock_order(
-                    &out_trade_no,
-                    &transaction_id,
-                    order.user_id,
-                    match_id,
-                )
+                .settle_match_id_unlock_order(out_trade_no, transaction_id, order.user_id, match_id)
                 .await?;
         } else {
             let target_tier = membership_tier_from_product_type(&order.product_type);
             self.payment_settlement_port
-                .settle_membership_order(
-                    &out_trade_no,
-                    &transaction_id,
-                    order.user_id,
-                    &target_tier,
-                )
+                .settle_membership_order(out_trade_no, transaction_id, order.user_id, &target_tier)
                 .await?;
         }
 
-        Ok(NotifyHandleResult::Success)
+        Ok(())
     }
 }
 

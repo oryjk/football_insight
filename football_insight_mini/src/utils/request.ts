@@ -38,6 +38,8 @@ interface RequestOptions {
   method?: HttpMethod
   data?: RequestBody
   auth?: boolean
+  /** Background statistics must not interrupt reading with a network dialog. */
+  silentNetworkError?: boolean
 }
 
 function joinUrl(path: string): string {
@@ -110,7 +112,7 @@ export function request<TResponse>(
           }
 
           const message = normalizeNetworkFailureMessage(errMsg)
-          showNetworkUnavailableDialog(message)
+          if (!options.silentNetworkError) showNetworkUnavailableDialog(message)
           reject(new ApiRequestError(message, 0, true))
         },
       })

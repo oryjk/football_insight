@@ -1,3 +1,4 @@
+import type { DigitalPaymentParams } from '../types/payment'
 import { request } from '../utils/request'
 
 export interface MatchIdEntitlement {
@@ -8,13 +9,7 @@ export interface MatchIdEntitlement {
 
 export interface CreateMatchIdOrderResponse {
   order_no: string
-  wx_pay_params: {
-    timeStamp: string
-    nonceStr: string
-    package: string
-    signType: string
-    paySign: string
-  }
+  wx_pay_params: DigitalPaymentParams
 }
 
 export function getMatchIdEntitlement(matchId: number): Promise<MatchIdEntitlement> {

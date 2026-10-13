@@ -15,18 +15,10 @@ const allowSilentWechat =
 
 onLaunch(() => {
   console.log("Football Insight mini launch");
-  // 启动会话恢复在后台进行，不阻塞公开赛果/榜单/首页。
-  // 已确认审核中时不发起新的自动微信探测；审核查询失败按既有策略视为未确认审核中。
-  // 审核查询等待期间用户完成的显式登录/退出（即使其意图已结束）会替代本次启动的
-  // 自动恢复：session 记录该替代关系，迟到的 bootstrap 不再探测微信、不覆盖表单。
-  const session = useAppSession();
-  void (async () => {
-    const miniReview = useMiniReviewStatus();
-    await miniReview.ensureMiniReviewReady();
-    await session
-      .bootstrapSession({ allowSilentWechat: allowSilentWechat && !miniReview.isUnderReview.value })
-      .catch(() => {});
-  })();
+  // 认证恢复与审核展示独立，审核查询慢或失败也不阻塞登录。
+  // 用户主动退出和显式认证仍由 session 的操作身份防护。
+  void useAppSession().bootstrapSession({ allowSilentWechat }).catch(() => {});
+  void useMiniReviewStatus().ensureMiniReviewReady();
   // 公共配置与审核状态后台预加载；失败不阻断首页，页面 onShow 会复用缓存或重试。
   void useRuntimeConfig().ensureRuntimeConfig();
 });
@@ -42,7 +34,6 @@ onHide(() => {
 @import "./uni.css";
 
 page {
-  --fi-brand-nav-height: calc(var(--status-bar-height) + 154rpx);
   min-height: 100%;
   background:
     linear-gradient(180deg, rgba(233, 234, 241, 0.95) 0, rgba(244, 243, 246, 0.6) 180rpx),

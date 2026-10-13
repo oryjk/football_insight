@@ -7,18 +7,23 @@
     <text v-if="errorMessage" class="topic-player__error">{{ errorMessage }}</text>
     <view class="topic-player__controls">
       <button class="topic-player__toggle" @tap="emit('toggle')">{{ status === 'loading' ? '加载中' : status === 'playing' ? '暂停' : status === 'error' ? '重试' : '播放' }}</button>
-      <text class="topic-player__time">{{ formatTopicAudioTime(currentTime) }}</text>
-      <slider class="topic-player__slider" :value="Math.floor(currentTime)" :max="Math.max(1, Math.floor(duration))" :disabled="duration <= 0 || status === 'error'" :block-size="12" @change="onSeek" />
+      <text class="topic-player__time">{{ formatTopicAudioTime(displayTime) }}</text>
+      <slider class="topic-player__slider" :value="Math.floor(displayTime)" :max="Math.max(1, Math.floor(duration))" :disabled="duration <= 0 || status === 'error'" :block-size="12" @changing="onDragging" @change="onSeek" />
       <text class="topic-player__time">{{ formatTopicAudioTime(duration) }}</text>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { formatTopicAudioTime } from '../dailyTopics'
-defineProps<{ title: string; status: string; currentTime: number; duration: number; errorMessage: string }>()
+import { computed, ref, watch } from 'vue'
+import { formatTopicAudioTime } from '../../utils/dailyTopics'
+const props = defineProps<{ title: string; status: string; currentTime: number; duration: number; errorMessage: string }>()
 const emit = defineEmits<{ (e: 'toggle'): void; (e: 'seek', seconds: number): void; (e: 'close'): void }>()
-function onSeek(event: { detail: { value: number } }) { emit('seek', event.detail.value) }
+const dragTime = ref<number | null>(null)
+const displayTime = computed(() => dragTime.value ?? props.currentTime)
+function onDragging(event: { detail: { value: number } }) { dragTime.value = event.detail.value }
+function onSeek(event: { detail: { value: number } }) { dragTime.value = null; emit('seek', event.detail.value) }
+watch(() => props.title, () => { dragTime.value = null })
 </script>
 
 <style scoped>

@@ -6,13 +6,13 @@
       <view class="audio-entry__bar audio-entry__bar--medium" />
       <view class="audio-entry__bar" />
     </view>
-    <text>{{ !ready ? '四川话准备中' : loading ? '加载中' : playing ? '暂停播报' : label }}</text>
+    <text>{{ !ready ? '语音准备中' : loading ? '加载中' : playing ? '暂停播报' : label }}</text>
   </button>
 </template>
 
 <script setup lang="ts">
 withDefaults(defineProps<{ ready: boolean; label?: string; playing?: boolean; loading?: boolean }>(), {
-  label: '四川话播报', playing: false, loading: false,
+  label: '播报', playing: false, loading: false,
 })
 const emit = defineEmits<{ (e: 'play'): void }>()
 </script>

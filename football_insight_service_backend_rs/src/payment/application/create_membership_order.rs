@@ -215,6 +215,7 @@ mod tests {
                 .expect("wechat amounts")
                 .push(amount_cents);
             Ok(WxPayParams {
+                virtual_payment: None,
                 time_stamp: "1".to_string(),
                 nonce_str: "nonce".to_string(),
                 package: "prepay_id=test".to_string(),

@@ -13,11 +13,16 @@ import typer
 
 from ..assets import MinioAssetTarget
 from .generation import TopicGenerator
+from .daily import DailyFinalizationError, run_daily_update
 from .models import SHANGHAI, parse_timestamp
-from .pipeline import NoTopicsError, generate_edition
+from .pipeline import NoTopicsError, generate_edition, refresh_edition_audio
+from .pipeline import _atomic_json
 from .repository import TopicRepository
 from .sources import collect_sources
 from .storage import SshMinioTarget
+from .images import TopicImagePublisher
+from .sources import _fetch_text, _extract_original
+import requests
 from .tts import LocalQwenTts, discover_model
 
 app = typer.Typer(no_args_is_help=True, help='采集成都蓉城新闻、生成今日话题和本地四川话播报。')
@@ -45,8 +50,12 @@ def _tts(cache_dir: Path) -> LocalQwenTts:
     runner = Path(os.getenv('FI_QWEN_RUNNER', str(default_runner))).expanduser().resolve()
     if not runner.is_file():
         raise ValueError('run uv run python scripts/setup_qwen_native.py first, or set FI_QWEN_RUNNER')
+    timeout = int(os.getenv('FI_QWEN_TIMEOUT_SECONDS', '1200'))
+    if timeout <= 0:
+        raise ValueError('FI_QWEN_TIMEOUT_SECONDS must be positive')
     return LocalQwenTts(model_path=discover_model(), runner=runner, cache_dir=cache_dir / 'audio',
                         converter=os.getenv('FI_AUDIO_CONVERTER'),
+                        timeout=timeout,
                         device=os.getenv('FI_QWEN_DEVICE', 'metal' if sys.platform == 'darwin' else 'cpu'),
                         dtype=os.getenv('FI_QWEN_DTYPE', 'bf16'))
 
@@ -66,6 +75,10 @@ def _target() -> MinioAssetTarget | SshMinioTarget:
         region=os.getenv('FI_MINIO_REGION', 'us-east-1'), public_base_url=os.getenv('FI_MINIO_PUBLIC_BASE_URL'))
 
 
+class TopicJobBusy(ValueError):
+    """Another process owns the cache and its status files."""
+
+
 @contextmanager
 def _lock(cache_dir: Path):
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -73,7 +86,7 @@ def _lock(cache_dir: Path):
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise ValueError('another topic generation is using this cache') from None
+            raise TopicJobBusy('another topic generation is using this cache') from None
         yield
 
 
@@ -84,7 +97,7 @@ def collect(config: Path = typer.Option(..., exists=True, dir_okay=False),
     """Fetch recent original article bodies; an empty result is reported honestly."""
     try:
         sources = collect_sources(_config(config), _now(at), max_age_hours)
-        _write(output, {'imports': [dict(source.as_source(), body=source.body) for source in sources]})
+        _write(output, {'imports': [source.as_material() for source in sources]})
         typer.echo(f'collected {len(sources)} verified original articles -> {output}')
     except Exception as error:
         typer.echo(f'collection failed ({type(error).__name__})', err=True)
@@ -110,7 +123,7 @@ def generate(config: Path = typer.Option(..., exists=True, dir_okay=False),
             sources = collect_sources(_config(config), now, max_age_hours)
             if not sources:
                 raise NoTopicsError('no recent verified originals; previous edition retained')
-            _write(output_dir / 'materials.json', {'imports': [dict(source.as_source(), body=source.body) for source in sources]})
+            _write(output_dir / 'materials.json', {'imports': [source.as_material() for source in sources]})
             target, tts, tts_unavailable = None, None, False
             if upload_audio:
                 try:
@@ -144,6 +157,65 @@ def generate(config: Path = typer.Option(..., exists=True, dir_okay=False),
         raise typer.Exit(1) from None
 
 
+@app.command('daily-update')
+def daily_update(config: Path = typer.Option(..., exists=True, dir_okay=False),
+                 output_dir: Path = Path('data/topics'), team_id: int = typer.Option(77680, min=1),
+                 limit: int = typer.Option(5, min=1, max=5), max_age_hours: int = typer.Option(72, min=1, max=168),
+                 write_db: bool = False, at: str | None = None) -> None:
+    """Publish fresh news only after every article has verified uploaded audio."""
+    failure = None
+
+    def failed_result(error):
+        return {'status': 'failed', 'error_type': type(error).__name__,
+                'previous_retained': not isinstance(error, DailyFinalizationError),
+                'finished_at': datetime.now(SHANGHAI).isoformat()}
+
+    try:
+        if not write_db:
+            raise ValueError('daily-update requires explicit --write-db')
+        database_url = os.getenv('FI_DATABASE_URL') or os.getenv('DATABASE_URL')
+        if not database_url:
+            raise ValueError('FI_DATABASE_URL is required')
+        now = _now(at)
+
+        def generator():
+            base_url, model = os.getenv('FI_TOPIC_LLM_BASE_URL'), os.getenv('FI_TOPIC_LLM_MODEL')
+            if not base_url or not model:
+                raise ValueError('article LLM configuration is missing')
+            return TopicGenerator(base_url=base_url, model=model, api_key=os.getenv('FI_TOPIC_LLM_API_KEY'))
+
+        with _lock(output_dir):
+            try:
+                repository = TopicRepository(database_url)
+                repository.check_schema()
+                _atomic_json(output_dir / 'daily-status.json', {'status': 'running', 'started_at': now.isoformat()})
+                sources = collect_sources(_config(config), now, max_age_hours, require_available=True)
+                result = run_daily_update(sources, repository=repository, generator_factory=generator,
+                    tts_factory=lambda: _tts(output_dir), target_factory=_target,
+                    cache_dir=output_dir, now=now, team_id=team_id, limit=limit, max_age_hours=max_age_hours)
+                result.update(finished_at=datetime.now(SHANGHAI).isoformat(),
+                              previous_retained=result['status'] != 'published')
+                try:
+                    _atomic_json(output_dir / 'daily-status.json', result)
+                except OSError as error:
+                    if result['status'] == 'published':
+                        raise DailyFinalizationError('database published; status checkpoint failed') from error
+                    raise
+            except Exception as error:
+                failure = failed_result(error)
+                try:
+                    _atomic_json(output_dir / 'daily-status.json', failure)
+                except OSError:
+                    pass
+                raise
+        typer.echo(json.dumps(result, ensure_ascii=False))
+    except TopicJobBusy:
+        typer.echo(json.dumps({'status': 'already_running', 'previous_retained': True}), err=True)
+    except Exception as error:
+        typer.echo(json.dumps(failure or failed_result(error), ensure_ascii=False), err=True)
+        raise typer.Exit(1) from None
+
+
 @app.command('tts')
 def tts_command(text_file: Path = typer.Option(..., exists=True, dir_okay=False),
                 output_dir: Path = Path('data/topics')) -> None:
@@ -155,4 +227,74 @@ def tts_command(text_file: Path = typer.Option(..., exists=True, dir_okay=False)
                               'sha256': audio.sha256, 'voice': 'eric', 'dialect': 'sichuan'}, ensure_ascii=False))
     except Exception as error:
         typer.echo(f'local TTS failed ({type(error).__name__})', err=True)
+        raise typer.Exit(1) from None
+
+
+@app.command('refresh-images')
+def refresh_images_command(output_dir: Path = Path('data/topics'),
+                           team_id: int = typer.Option(77680, min=1), write_db: bool = False) -> None:
+    """Backfill cited original photographs without regenerating text or voice."""
+    try:
+        database_url = os.getenv('FI_DATABASE_URL') or os.getenv('DATABASE_URL')
+        if not write_db or not database_url:
+            raise ValueError('refresh-images requires a database URL and explicit --write-db')
+        with _lock(output_dir):
+            repository = TopicRepository(database_url)
+            repository.check_schema()
+            items = repository.published_items(team_id)
+            originals, seen = [], set()
+            with requests.Session() as session:
+                for item in items:
+                    for source in item['sources']:
+                        if source['url'] in seen:
+                            continue
+                        seen.add(source['url'])
+                        try:
+                            html, resolved = _fetch_text(session, source['url'])
+                            original = _extract_original(html, {**source, 'url': resolved}, _now(None))
+                            # A redirected article must not silently become another source.
+                            if original.url == source['url']:
+                                originals.append(original)
+                        except Exception as error:
+                            typer.echo(f'original photo discovery skipped ({type(error).__name__})', err=True)
+            TopicImagePublisher(target=_target(), cache_dir=output_dir).enrich(items, originals)
+            changed = repository.patch_images(team_id, items)
+            # Retain photos if a cached edition is later reused for an audio retry.
+            by_id = {item['id']: item for item in items if item.get('images')}
+            for path in (output_dir / 'editions').glob('*.json'):
+                edition = _config(path)
+                for item in edition['payload']['items']:
+                    update = by_id.get(item['id'])
+                    if item['team_id'] == team_id and update and item['sources'] == update['sources']:
+                        item['images'] = update['images']
+                _atomic_json(path, edition)
+        typer.echo(json.dumps({'updated_copies': changed, 'topics_with_images': len(by_id), 'topics': len(items)}))
+    except Exception as error:
+        typer.echo(f'image refresh failed ({type(error).__name__}); existing articles retained', err=True)
+        raise typer.Exit(1) from None
+
+
+@app.command('refresh-audio')
+def refresh_audio_command(edition_file: Path = typer.Option(..., exists=True, dir_okay=False),
+                          output_dir: Path = Path('data/topics'), write_db: bool = False) -> None:
+    """Reuse a real edition, refresh each voice, and publish only a complete batch."""
+    database_updated = False
+    try:
+        original = _config(edition_file)
+        database_url = os.getenv('FI_DATABASE_URL') or os.getenv('DATABASE_URL')
+        if write_db and not database_url:
+            raise ValueError('FI_DATABASE_URL is required for --write-db')
+        with _lock(output_dir):
+            if write_db:
+                TopicRepository(database_url).check_schema()
+            refreshed = refresh_edition_audio(original, tts=_tts(output_dir), target=_target())
+            _write(output_dir / 'editions' / f'{refreshed["id"]}.json', refreshed)
+            if write_db:
+                TopicRepository(database_url).save(refreshed)
+                database_updated = True
+            _write(output_dir / 'latest.json', refreshed['payload'])
+        typer.echo(f'refreshed {len(refreshed["payload"]["items"])} independent Sichuan audio files; existing text and edition identity retained')
+    except Exception as error:
+        state = 'database edition updated; local finalization failed' if database_updated else 'previous database edition retained'
+        typer.echo(f'audio refresh failed ({type(error).__name__}); {state}', err=True)
         raise typer.Exit(1) from None

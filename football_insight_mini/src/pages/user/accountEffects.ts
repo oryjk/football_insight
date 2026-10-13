@@ -4,12 +4,10 @@ import { canControlMiniReview } from '../../api/miniReview'
 import { useAppSession, type AppSession } from '../../stores/appSession'
 import type { MiniWechatBindingRequiredResponse, NotificationEmailResponse } from '../../types/auth'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
 
 /** user 页会话私有状态（全部以 ref 注入，页面持有所有权）。 */
 export interface UserAccountEffectsState {
   loading: Ref<boolean>
-  systemConfigUnderReview: Ref<boolean>
   isReviewController: Ref<boolean>
   notificationEmail: Ref<string>
   notificationEmailSheetVisible: Ref<boolean>
@@ -23,7 +21,6 @@ export interface UserAccountEffectsDeps {
   canControlMiniReview: () => Promise<{ allowed: boolean }>
   getNotificationEmail: () => Promise<NotificationEmailResponse>
   updateNotificationEmail: (email: string) => Promise<NotificationEmailResponse>
-  loadSystemConfigUnderReview: () => Promise<boolean>
   showToast: (title: string, icon: 'success' | 'none') => void
 }
 
@@ -31,7 +28,6 @@ const defaultDeps: UserAccountEffectsDeps = {
   canControlMiniReview,
   getNotificationEmail,
   updateNotificationEmail,
-  loadSystemConfigUnderReview,
   showToast: (title, icon) => uni.showToast({ title, icon }),
 }
 
@@ -72,7 +68,7 @@ export function createUserAccountEffects(
     state.loading.value = session.hasAccessToken.value
 
     // 设置入口的显隐不依赖审核模式：管理员在审核期间也需要进设置切换审核状态，
-    // 因此只要有登录 token 就先判一次白名单，再走审核模式的提前返回。
+    // 因此只要有登录 token 就判一次白名单，认证流程不依赖审核展示状态。
     if (session.hasAccessToken.value) {
       try {
         const allowed = (await deps.canControlMiniReview()).allowed
@@ -88,21 +84,9 @@ export function createUserAccountEffects(
       state.isReviewController.value = false
     }
 
-    // 公共配置共享自 miniReview store，非会话私有，不做 revision 防护。
-    state.systemConfigUnderReview.value = await deps.loadSystemConfigUnderReview()
-
-    if (state.systemConfigUnderReview.value) {
-      if (isCurrent()) {
-        state.miniWechatBindState.value = null
-        state.loading.value = false
-      }
-      return
-    }
-
     if (!session.hasAccessToken.value) {
       if (isCurrent()) {
         state.notificationEmail.value = ''
-        state.miniWechatBindState.value = null
         state.loading.value = false
       }
       return

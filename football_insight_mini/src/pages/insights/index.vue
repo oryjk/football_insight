@@ -1,4 +1,5 @@
 <template>
+  <page-meta :page-style="navigationPageStyle" />
   <view class="page-root">
     <FiBrandNav />
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
@@ -86,11 +87,12 @@
     </view>
     </view>
 
-    <FiLoginFloat v-if="showLoginFloat" @action="goToLogin" />
+    <FiLoginFloat v-if="showLoginFloat" :desc="systemConfigUnderReview ? '登录后，可以关注主队并参与赛前助力。' : undefined" @action="goToLogin" />
   </view>
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, ref, watch } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
@@ -117,6 +119,8 @@ import {
 } from './helpers'
 import { createInsightsSessionSync } from './sessionEffects'
 import { useInsightsData } from './useInsightsData'
+
+const { navigationPageStyle } = useNavigationLayout()
 
 // 登录用户共享自 appSession：读取走会话缓存，401 清理由 session 统一处理。
 const session = useAppSession()
@@ -149,7 +153,7 @@ const {
   isUnderReview: () => systemConfigUnderReview.value,
   isMembershipLocked: () => membershipBenefitsLocked.value,
 })
-const showLoginFloat = computed(() => !systemConfigUnderReview.value && !userLoading.value && !currentUser.value)
+const showLoginFloat = computed(() => !userLoading.value && !currentUser.value)
 const shouldLockTicketWatchEntry = computed(() =>
   !userLoading.value && (!currentUser.value || membershipBenefitsLocked.value),
 )

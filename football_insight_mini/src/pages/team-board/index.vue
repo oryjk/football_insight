@@ -1,4 +1,6 @@
 <template>
+  <page-meta :page-style="navigationPageStyle" />
+  <FiSecondaryNav @back="goBackToInsights" @share="copyPageShareLink(teamId ? `/pages/team-board/index?teamId=${teamId}` : '/pages/insights/index')" />
   <view class="page-root">
     <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
@@ -236,9 +238,12 @@
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, reactive, ref } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
+import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
+import { copyPageShareLink } from '../../utils/secondaryNavigation'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import {
   addTeamBoardComment,
@@ -255,6 +260,8 @@ import { extractApiErrorMessage } from '../../utils/apiError'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
 import { useAppSession } from '../../stores/appSession'
 import { resolveTeamBoardLoadFailure } from './helpers'
+
+const { navigationPageStyle } = useNavigationLayout()
 
 const teamId = ref<number | null>(null)
 const loading = ref(true)
@@ -477,7 +484,7 @@ onShow(() => {
   pointer-events: none;
   z-index: 0;
 }
-.page-scroll { height: 100vh; }
+.page-scroll { height: 100vh; padding-top: var(--fi-brand-nav-height); }
 .page { position: relative; z-index: 1; padding: 28rpx 24rpx 40rpx; display: flex; flex-direction: column; gap: 24rpx; }
 .hero-card, .panel, .state-card, .team-board-composer__dialog {
   background: rgba(255,255,255,0.94);

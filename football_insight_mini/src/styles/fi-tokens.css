@@ -26,6 +26,7 @@ page {
   --fi-primitive-surface-frosted: rgba(255, 255, 255, 0.92);
   --fi-primitive-topic-audio-surface: #fef2f2;
   --fi-primitive-topic-card-height: 480rpx;
+  --fi-primitive-topic-gallery-height: 440rpx;
   --fi-primitive-ink-rgb: 21, 22, 27;
 
   /* ===== Primitive：间距（数字刻度，单位 rpx） ===== */
@@ -44,6 +45,7 @@ page {
   --fi-primitive-space-30: 30rpx;
   --fi-primitive-space-32: 32rpx;
   --fi-primitive-space-40: 40rpx;
+  --fi-primitive-space-64: 64rpx;
 
   /* ===== Primitive：字号（数字刻度，单位 rpx） ===== */
   --fi-primitive-font-18: 18rpx;
@@ -116,6 +118,7 @@ page {
   --fi-color-surface-frosted: var(--fi-primitive-surface-frosted);
   --fi-color-topic-audio-surface: var(--fi-primitive-topic-audio-surface);
   --fi-space-topic-card-height: var(--fi-primitive-topic-card-height);
+  --fi-space-topic-gallery-height: var(--fi-primitive-topic-gallery-height);
   --fi-color-overlay: rgba(var(--fi-primitive-ink-rgb), 0.46);
   --fi-color-success-accent: var(--fi-primitive-green);
   --fi-color-divider: var(--fi-primitive-divider);
@@ -139,6 +142,7 @@ page {
   --fi-space-30: var(--fi-primitive-space-30);
   --fi-space-32: var(--fi-primitive-space-32);
   --fi-space-40: var(--fi-primitive-space-40);
+  --fi-space-64: var(--fi-primitive-space-64);
 
   --fi-font-18: var(--fi-primitive-font-18);
   --fi-font-20: var(--fi-primitive-font-20);
@@ -187,6 +191,7 @@ page {
   --fi-component-card-radius: var(--fi-radius-xl);
   --fi-component-card-border: var(--fi-border-card);
   --fi-component-card-shadow: var(--fi-shadow-card);
+  --fi-component-topic-gallery-height: var(--fi-space-topic-gallery-height);
   --fi-component-muted-text: var(--fi-color-text-muted);
   --fi-component-kicker-text: var(--fi-color-text-muted);
   --fi-component-kicker-size: var(--fi-font-22);
@@ -784,4 +789,59 @@ page {
   --fi-shadow-meta-note-before-box-shadow: var(--fi-primitive-matches-meta-note-before-box-shadow);
   --fi-color-state-card-error-text-color: var(--fi-primitive-matches-state-card-error-text-color);
   --fi-color-state-card-empty-text-color: var(--fi-primitive-matches-state-card-empty-text-color);
+}
+
+/* 品牌导航：一级和二级页面共用单行高度与正文顶部占位。 */
+:root,
+page {
+  --fi-primitive-brand-nav-bar-height: 88rpx;
+  --fi-primitive-brand-nav-capsule-space: 196rpx;
+  --fi-space-brand-nav-capsule: var(--fi-primitive-brand-nav-capsule-space);
+  --fi-brand-nav-bar-height: var(--fi-primitive-brand-nav-bar-height);
+  --fi-brand-nav-status-height: var(--status-bar-height, 0px);
+  --fi-brand-nav-height: calc(var(--fi-brand-nav-status-height) + var(--fi-brand-nav-bar-height));
+  --fi-brand-nav-row-offset: var(--fi-space-12);
+  --fi-primitive-brand-nav-row-size: 64rpx;
+  --fi-primitive-secondary-nav-action: 72rpx;
+  --fi-space-secondary-nav-action: var(--fi-primitive-secondary-nav-action);
+  --fi-space-brand-nav-row-size: var(--fi-primitive-brand-nav-row-size);
+  --fi-primitive-brand-nav-logo-size: 64rpx;
+  --fi-space-brand-nav-logo-size: var(--fi-primitive-brand-nav-logo-size);
+  --fi-primitive-brand-nav-bg: rgba(247, 248, 250, 0.82);
+  --fi-primitive-brand-nav-border: rgba(232, 233, 238, 0.72);
+  --fi-primitive-brand-nav-inverse: rgba(255, 255, 255, 0.82);
+  --fi-primitive-brand-nav-logo-border: rgba(255, 255, 255, 0.78);
+  --fi-primitive-brand-nav-text-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.36);
+  --fi-primitive-brand-nav-tagline-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.34);
+  --fi-primitive-brand-nav-logo-inverse-shadow: 0 10rpx 24rpx rgba(0, 0, 0, 0.22);
+  --fi-primitive-brand-nav-logo-shadow: 0 10rpx 22rpx rgba(21, 22, 27, 0.1);
+  --fi-color-brand-nav-bg: var(--fi-primitive-brand-nav-bg);
+  --fi-color-brand-nav-border: var(--fi-primitive-brand-nav-border);
+  --fi-color-brand-nav-inverse: var(--fi-primitive-brand-nav-inverse);
+  --fi-color-brand-nav-logo-border: var(--fi-primitive-brand-nav-logo-border);
+  --fi-shadow-brand-nav-text: var(--fi-primitive-brand-nav-text-shadow);
+  --fi-shadow-brand-nav-tagline: var(--fi-primitive-brand-nav-tagline-shadow);
+  --fi-shadow-brand-nav-logo-inverse: var(--fi-primitive-brand-nav-logo-inverse-shadow);
+  --fi-shadow-brand-nav-logo: var(--fi-primitive-brand-nav-logo-shadow);
+}
+
+/* 历史话题卡片：柔和底色与可读的主题标识。 */
+:root,
+page {
+  --fi-primitive-topic-history-championship-bg: #fff5f0;
+  --fi-color-topic-history-championship-bg: var(--fi-primitive-topic-history-championship-bg);
+  --fi-primitive-topic-history-championship-accent: #b94b2e;
+  --fi-color-topic-history-championship-accent: var(--fi-primitive-topic-history-championship-accent);
+  --fi-primitive-topic-history-preview-bg: #eef5fc;
+  --fi-color-topic-history-preview-bg: var(--fi-primitive-topic-history-preview-bg);
+  --fi-primitive-topic-history-preview-accent: #356593;
+  --fi-color-topic-history-preview-accent: var(--fi-primitive-topic-history-preview-accent);
+  --fi-primitive-topic-history-analysis-bg: #f5f1fb;
+  --fi-color-topic-history-analysis-bg: var(--fi-primitive-topic-history-analysis-bg);
+  --fi-primitive-topic-history-analysis-accent: #755198;
+  --fi-color-topic-history-analysis-accent: var(--fi-primitive-topic-history-analysis-accent);
+  --fi-primitive-topic-history-news-bg: #f0f7f2;
+  --fi-color-topic-history-news-bg: var(--fi-primitive-topic-history-news-bg);
+  --fi-primitive-topic-history-news-accent: #347953;
+  --fi-color-topic-history-news-accent: var(--fi-primitive-topic-history-news-accent);
 }

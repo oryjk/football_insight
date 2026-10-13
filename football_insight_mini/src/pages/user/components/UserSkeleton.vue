@@ -58,11 +58,6 @@
       </view>
     </view>
 
-    <view class="panel skeleton-panel">
-      <view class="skeleton-line skeleton-line--section" />
-      <view class="skeleton-line skeleton-line--body" />
-      <view class="skeleton-line skeleton-line--body skeleton-line--body-short" />
-    </view>
   </view>
 </template>
 
@@ -153,16 +148,6 @@
 .skeleton-line--label {
   width: 112rpx;
   height: 22rpx;
-}
-
-.skeleton-line--body {
-  width: 90%;
-  height: 26rpx;
-  margin-top: 20rpx;
-}
-
-.skeleton-line--body-short {
-  width: 62%;
 }
 
 .skeleton-pill {

@@ -1,4 +1,5 @@
 import { request } from '../utils/request'
+import type { DigitalPaymentParams } from '../types/payment'
 
 export interface MembershipProduct {
   price_cents: number
@@ -21,13 +22,13 @@ export interface MembershipProductOption {
 
 export interface CreateOrderResponse {
   order_no: string
-  params: {
-    timeStamp: string
-    nonceStr: string
-    package: string
-    signType: string
-    paySign: string
-  }
+  params: DigitalPaymentParams
+}
+export function getVirtualPaymentStatus(): Promise<{ available: boolean; message: string }> {
+  return request({ url: '/payment/virtual/status' })
+}
+export function prepareVirtualPaymentSession(code: string): Promise<{ ready: boolean }> {
+  return request({ url: '/payment/virtual/session', method: 'POST', auth: true, data: { code } })
 }
 
 export interface OrderStatusResponse {

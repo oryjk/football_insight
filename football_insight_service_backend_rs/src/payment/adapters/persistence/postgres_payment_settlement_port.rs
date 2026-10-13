@@ -38,8 +38,8 @@ fn resolve_membership_settlement(
     let paid_tier_rank = membership_tier_rank(paid_tier);
     let current_effective_tier_rank = membership_tier_rank(&current_effective_tier);
     let is_paid_membership_tier = paid_tier_rank >= membership_tier_rank("V6");
-    let should_apply_paid_tier =
-        is_paid_membership_tier && paid_tier_rank > current_effective_tier_rank;
+    let should_apply_paid_tier = (is_paid_membership_tier || paid_tier == "V3")
+        && paid_tier_rank > current_effective_tier_rank;
     let should_refresh_paid_expiration =
         is_paid_membership_tier && paid_tier_rank >= current_effective_tier_rank;
     let effective_tier = if should_apply_paid_tier {
@@ -123,8 +123,12 @@ impl PaymentSettlementPort for PostgresPaymentSettlementPort {
             return Ok(());
         }
 
+        super::postgres_virtual_order_repository::snapshot_membership(
+            &mut tx, order_no, user_id, true,
+        )
+        .await?;
         let current_user = sqlx::query(
-            "SELECT membership_tier, membership_expires_at FROM f_i_users WHERE id = $1 LIMIT 1",
+            "SELECT membership_tier, membership_expires_at FROM f_i_users WHERE id = $1 LIMIT 1 FOR UPDATE",
         )
         .bind(user_id)
         .fetch_optional(&mut *tx)
@@ -158,6 +162,10 @@ impl PaymentSettlementPort for PostgresPaymentSettlementPort {
         .execute(&mut *tx)
         .await?;
 
+        super::postgres_virtual_order_repository::snapshot_membership(
+            &mut tx, order_no, user_id, false,
+        )
+        .await?;
         tx.commit().await?;
         Ok(())
     }

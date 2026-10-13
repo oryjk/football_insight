@@ -93,7 +93,10 @@ src/pages/<domain>/
 
 ## 生命周期与刷新约定
 
-- `App.vue` 以后台方式执行启动恢复（`bootstrapSession`，仅 MP 允许微信静默探测，已确认审核中时不探测）和公共配置/审核态预加载；公开页面不等待会话恢复，无 token 的 H5 不自动登录。
+二级页的返回/分享按钮由 `FiSecondaryNav` 展示，页面通过 `secondaryNavigation.ts` 处理返回与 H5 公开链接复制；设置与支付页仅保留返回。话题详情的 `onShareAppMessage` 使用当前文章 ID 的详情路径，`share.ts` 从全文段落生成节选并负责按 Unicode 换行，`useTopicShareCard.ts` 在正文加载后预生成 5:4 Canvas 图片，`shareCardPhoto.ts` 限时下载第一张配图到本地，`shareCardDrawing.ts` 完整显示首图并与全文节选并排绘制，无图或加载失败使用文字卡片；首图变化也会使分享缓存失效；未完成时通过微信分享回调的 `promise` 等待生成。旧文章、错误页及销毁后的绘制结果按 revision 丢弃，同一 canvas 的任务串行执行，避免分享到旧正文。分享卡片不使用摘要替代全文，也不携带认证数据。
+
+- `App.vue` 以后台方式执行启动恢复（`bootstrapSession`，仅 MP 允许微信静默探测，认证恢复不依赖审核状态）和公共配置/审核态预加载；公开页面不等待会话恢复，审核查询也不阻塞认证；无 token 的 H5 不自动登录。
+- 审核展示与登录独立：「我的」页始终保留登录/首次绑定/退出，审核中登录后展示基础账号，会员内容仍按审核状态隐藏；首次审核查询完成前也不提前展示会员内容。
 - 页面 `onShow` 走共享 store 入口（`ensureSessionReady` / `ensureRuntimeConfig` / `ensureMiniReviewReady`），不各自缓存 currentUser/config。
 - 后台恢复/登录发布 `currentUser` 后，已在前台的页面通过 watch 会话状态刷新私有区，无需再次切 Tab：`user` 页经 `accountEffects.handleSessionRevisionChange`（同 revision 并发加载合并），首页助力面板经 `home/sessionEffects`，洞察页经 `insights/sessionEffects`（审核中不拉会员数据），余票页经 `ticket-watch/sessionSync`（恢复只重载数据，不自动开启监控/轮询，隐藏页面不启动轮询）。
 - 余票当前看板有生命周期 generation（`useTicketWatchState.currentBoardGeneration`，单调递增不归零）：reset/切换球队/比赛上下文替换时递增；订阅状态、套餐加载、下单、支付确认及比赛 ID 解锁捕获 generation + session revision + 球队/比赛快照，每个异步阶段校验；同一 generation 内重叠操作以请求 owner 序号判定谁清 loading。同一比赛的普通库存轮询不递增 generation。

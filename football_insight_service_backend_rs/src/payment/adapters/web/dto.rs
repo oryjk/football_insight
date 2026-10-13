@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::payment::domain::order::{
-    MembershipProduct, MembershipProductOption, WxPayParams, calculate_membership_checkout_price,
+    MembershipProduct, MembershipProductOption, calculate_membership_checkout_price,
 };
 
 #[derive(Debug, Serialize)]
@@ -90,27 +90,7 @@ pub struct CreateOrderResponse {
     pub params: WxPayParamsDto,
 }
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WxPayParamsDto {
-    pub time_stamp: String,
-    pub nonce_str: String,
-    pub package: String,
-    pub sign_type: String,
-    pub pay_sign: String,
-}
-
-impl From<WxPayParams> for WxPayParamsDto {
-    fn from(value: WxPayParams) -> Self {
-        Self {
-            time_stamp: value.time_stamp,
-            nonce_str: value.nonce_str,
-            package: value.package,
-            sign_type: value.sign_type,
-            pay_sign: value.pay_sign,
-        }
-    }
-}
+pub use crate::payment::adapters::payment_params::PaymentParams as WxPayParamsDto;
 
 #[derive(Debug, Serialize)]
 pub struct OrderStatusResponse {
@@ -137,6 +117,7 @@ mod tests {
     #[test]
     fn wx_pay_params_dto_serializes_camel_case_fields() {
         let dto = WxPayParamsDto::from(WxPayParams {
+            virtual_payment: None,
             time_stamp: "1710000000".to_string(),
             nonce_str: "nonce".to_string(),
             package: "prepay_id=wx123".to_string(),

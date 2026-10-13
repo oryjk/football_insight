@@ -53,6 +53,13 @@ async fn wechat_webhook_verification_returns_plaintext_echo() {
             ticket_monitor_base_url: None,
             redis_url: "redis://127.0.0.1:6379".to_string(),
             wechat_pay_mch_id: String::new(),
+            virtual_payment: football_insight_service_backend_rs::config::VirtualPaymentConfig {
+                enabled: false,
+                offer_id: String::new(),
+                app_key: String::new(),
+                webhook_token: String::new(),
+                encoding_aes_key: String::new(),
+            },
             wechat_pay_api_key: String::new(),
             public_base_url: "http://127.0.0.1:8080".to_string(),
             reflux_notification_worker: RefluxNotificationWorkerConfig {

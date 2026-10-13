@@ -81,6 +81,7 @@ pub struct MembershipCheckoutPrice {
 
 #[derive(Debug, Clone)]
 pub struct WxPayParams {
+    pub virtual_payment: Option<super::virtual_payment::VirtualPayParams>,
     pub time_stamp: String,
     pub nonce_str: String,
     pub package: String,
@@ -210,7 +211,7 @@ pub fn membership_tier_from_product_type(product_type: &str) -> String {
         .trim()
         .strip_prefix("membership:")
         .map(|tier| tier.trim().to_uppercase())
-        .filter(|tier| matches!(tier.as_str(), "V6" | "V7" | "V8" | "V9"))
+        .filter(|tier| matches!(tier.as_str(), "V3" | "V6" | "V7" | "V8" | "V9"))
         .unwrap_or_else(|| "V9".to_string())
 }
 

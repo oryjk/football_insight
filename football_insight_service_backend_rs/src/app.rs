@@ -7,8 +7,8 @@ use crate::{
     activity::bootstrap::build_activity_routes, admin::bootstrap::build_admin_routes,
     ai::bootstrap::build_ai_routes, auth::bootstrap::build_auth,
     auth_license::bootstrap::build_auth_license_routes, config::AppConfig,
-    health::bootstrap::build_health_routes, insight::bootstrap::build_insight,
-    match_id_unlock::bootstrap::build_match_id_unlock_routes,
+    daily_topics::bootstrap::build_daily_topics_routes, health::bootstrap::build_health_routes,
+    insight::bootstrap::build_insight, match_id_unlock::bootstrap::build_match_id_unlock_routes,
     mini_review::bootstrap::build_mini_review_routes, payment::bootstrap::build_payment,
     push_notification::bootstrap::build_push_notification_routes,
     reflux_subscription::bootstrap::build_reflux_subscription_routes,
@@ -21,6 +21,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
     let insight = build_insight(pool.clone());
     let admin_routes = build_admin_routes(pool.clone(), config);
     let health_routes = build_health_routes(pool.clone());
+    let daily_topics_routes = build_daily_topics_routes(pool.clone());
     let system_config = build_system_config_routes(pool.clone(), insight.repository.clone());
 
     let auth = build_auth(
@@ -87,6 +88,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
     Router::new()
         .route("/", get(|| async { "football insight service" }))
         .merge(health_routes)
+        .merge(daily_topics_routes)
         .merge(mini_review_routes)
         .merge(admin_routes)
         .merge(system_config.routes)

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode, header::AUTHORIZATION},
     response::IntoResponse,
 };
@@ -25,6 +25,9 @@ use crate::{
 
 #[derive(Clone)]
 pub struct PaymentWebState {
+    pub virtual_payment: Arc<crate::payment::application::virtual_payment::VirtualPaymentService>,
+    pub virtual_webhook:
+        Option<Arc<dyn crate::payment::ports::virtual_payment_port::VirtualWebhookPort>>,
     pub create_membership_order_use_case: Arc<CreateMembershipOrderUseCase>,
     pub get_membership_product_use_case: Arc<GetMembershipProductUseCase>,
     pub get_order_status_use_case: Arc<GetOrderStatusUseCase>,
@@ -63,9 +66,10 @@ pub async fn get_membership_product_handler(
     State(state): State<Arc<PaymentWebState>>,
     headers: HeaderMap,
 ) -> Result<Json<MembershipProductResponse>, (StatusCode, String)> {
+    let user_id = try_authenticate_user(&headers, state.token_port.as_ref());
     let product = state
         .get_membership_product_use_case
-        .execute()
+        .execute_for_user(user_id)
         .await
         .map_err(|error| {
             tracing::error!(error = %error, "failed to get membership product");
@@ -74,7 +78,7 @@ pub async fn get_membership_product_handler(
                 "获取会员信息失败".to_string(),
             )
         })?;
-    let current_tier = match try_authenticate_user(&headers, state.token_port.as_ref()) {
+    let current_tier = match user_id {
         Some(user_id) => state
             .user_membership_port
             .get_user_membership_tier(user_id)
@@ -109,7 +113,7 @@ pub async fn create_membership_order_handler(
 
     let catalog = state
         .get_membership_product_use_case
-        .execute()
+        .execute_for_user(Some(user_id))
         .await
         .map_err(|error| {
             tracing::error!(error = %error, "failed to get membership product for order");
@@ -131,6 +135,11 @@ pub async fn create_membership_order_handler(
         })
         .await
         .map_err(|error| {
+            if let Some(error) =
+                error.downcast_ref::<crate::payment::domain::virtual_payment::VirtualPaymentError>()
+            {
+                return virtual_error(error);
+            }
             let msg = format!("{}", error);
             if msg.contains("高于当前等级") || msg.contains("请先绑定微信") {
                 return (StatusCode::BAD_REQUEST, msg);
@@ -154,6 +163,21 @@ pub async fn get_order_status_handler(
     Path(order_no): Path<String>,
 ) -> Result<Json<OrderStatusResponse>, (StatusCode, String)> {
     let user_id = authenticate_user(&headers, state.token_port.as_ref())?;
+
+    if state.virtual_payment.available()
+        && let Err(error) = state
+            .virtual_payment
+            .reconcile(&order_no, Some(user_id))
+            .await
+    {
+        if matches!(
+            error.downcast_ref::<crate::payment::domain::virtual_payment::VirtualPaymentError>(),
+            Some(crate::payment::domain::virtual_payment::VirtualPaymentError::IdentityMismatch)
+        ) {
+            return Err((StatusCode::FORBIDDEN, "无权查看此订单".into()));
+        }
+        tracing::warn!(order_no=%order_no,"virtual payment reconciliation deferred");
+    }
 
     let order = state
         .get_order_status_use_case
@@ -181,6 +205,138 @@ pub async fn get_order_status_handler(
         amount_cents: order.amount_cents,
         paid_at: order.paid_at.map(|dt| dt.to_rfc3339()),
     }))
+}
+
+pub(crate) fn virtual_error(
+    error: &crate::payment::domain::virtual_payment::VirtualPaymentError,
+) -> (StatusCode, String) {
+    use crate::payment::domain::virtual_payment::VirtualPaymentError::*;
+    let status = match error {
+        Unavailable | ProductUnavailable | CatalogUnavailable | Provider => {
+            StatusCode::SERVICE_UNAVAILABLE
+        }
+        IdentityMismatch => StatusCode::FORBIDDEN,
+        SessionExpired | InvalidOrder => StatusCode::BAD_REQUEST,
+    };
+    (status, error.to_string())
+}
+
+#[derive(serde::Deserialize)]
+pub struct PrepareVirtualSession {
+    code: String,
+}
+pub async fn prepare_virtual_session(
+    State(state): State<Arc<PaymentWebState>>,
+    headers: HeaderMap,
+    Json(input): Json<PrepareVirtualSession>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let user_id = authenticate_user(&headers, state.token_port.as_ref())?;
+    state
+        .virtual_payment
+        .prepare_session(user_id, &input.code)
+        .await
+        .map_err(|e| {
+            e.downcast_ref::<crate::payment::domain::virtual_payment::VirtualPaymentError>()
+                .map(virtual_error)
+                .unwrap_or((StatusCode::INTERNAL_SERVER_ERROR, "支付会话准备失败".into()))
+        })?;
+    Ok(Json(serde_json::json!({"ready":true})))
+}
+pub async fn virtual_payment_status(
+    State(state): State<Arc<PaymentWebState>>,
+) -> Json<serde_json::Value> {
+    let available = state
+        .virtual_payment
+        .purchase_available()
+        .await
+        .unwrap_or(false);
+    Json(
+        serde_json::json!({"available":available,"message":if available{""}else{"购买服务暂未开放，请稍后再试"}}),
+    )
+}
+
+#[derive(serde::Deserialize)]
+pub struct VirtualWebhookQuery {
+    #[serde(default)]
+    signature: String,
+    #[serde(default)]
+    msg_signature: String,
+    timestamp: String,
+    nonce: String,
+    #[serde(default)]
+    echostr: String,
+}
+pub async fn virtual_webhook_challenge(
+    State(state): State<Arc<PaymentWebState>>,
+    Query(query): Query<VirtualWebhookQuery>,
+) -> Result<String, StatusCode> {
+    let codec = state
+        .virtual_webhook
+        .as_ref()
+        .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+    let signature = if query.msg_signature.is_empty() {
+        &query.signature
+    } else {
+        &query.msg_signature
+    };
+    codec
+        .challenge(signature, &query.timestamp, &query.nonce, &query.echostr)
+        .map_err(|_| StatusCode::FORBIDDEN)
+}
+pub async fn virtual_webhook_notify(
+    State(state): State<Arc<PaymentWebState>>,
+    Query(query): Query<VirtualWebhookQuery>,
+    body: String,
+) -> impl IntoResponse {
+    use crate::payment::domain::virtual_payment::VirtualEvent;
+    let xml = body.trim_start().starts_with('<');
+    let result = async {
+        let codec = state
+            .virtual_webhook
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("virtual payment disabled"))?;
+        let event = codec.decode(&query.msg_signature, &query.timestamp, &query.nonce, &body)?;
+        match event {
+            VirtualEvent::Delivery(delivery) => {
+                state.virtual_payment.deliver_callback(delivery).await?
+            }
+            VirtualEvent::Refund(refund) => state.virtual_payment.refund(&refund).await?,
+            VirtualEvent::RefundQuery => {
+                return Err::<(), anyhow::Error>(anyhow::anyhow!(
+                    "refund decision requires evidence; leave decision to Apple"
+                ));
+            }
+            VirtualEvent::Ignored => {}
+        }
+        Ok(())
+    }
+    .await;
+    let code = match result {
+        Ok(()) => 0,
+        Err(error) => {
+            tracing::warn!(error=%error,"virtual payment notification rejected");
+            1
+        }
+    };
+    let response = if xml {
+        format!(
+            "<xml><ErrCode>{code}</ErrCode><ErrMsg>{}</ErrMsg></xml>",
+            if code == 0 { "success" } else { "retry" }
+        )
+    } else {
+        serde_json::json!({"ErrCode":code,"ErrMsg":if code==0{"success"}else{"retry"}}).to_string()
+    };
+    (
+        [(
+            axum::http::header::CONTENT_TYPE,
+            if xml {
+                "application/xml"
+            } else {
+                "application/json"
+            },
+        )],
+        response,
+    )
 }
 
 pub async fn wechat_notify_handler(

@@ -81,6 +81,8 @@ describe('filterMembershipProductOptionsForUpgrade', () => {
 describe('formatMembershipPrice', () => {
   test('formats cents as yuan without redundant decimals', () => {
     expect(formatMembershipPrice(3900)).toBe('39')
+    expect(formatMembershipPrice(1)).toBe('0.01')
+    expect(formatMembershipPrice(10)).toBe('0.10')
     expect(formatMembershipPrice(undefined)).toBe('--')
   })
 })

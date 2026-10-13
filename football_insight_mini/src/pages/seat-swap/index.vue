@@ -1,5 +1,5 @@
 <template>
-  <page-meta :page-style="pageLockStyle" />
+  <page-meta :page-style="navigationPageStyle + pageLockStyle" />
   <view class="page-root">
     <FiBrandNav />
     <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
@@ -93,6 +93,7 @@
 </template>
 
 <script setup lang="ts">
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, nextTick, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
@@ -132,6 +133,8 @@ import {
   statusLabel,
   type SeatSwapFormState,
 } from './helpers'
+
+const { navigationPageStyle } = useNavigationLayout()
 
 const USE_SEAT_SWAP_MOCK_LARGE_DATA =
   import.meta.env.DEV && String(import.meta.env.VITE_SEAT_SWAP_MOCK_LARGE_DATA || '').trim() === '1'

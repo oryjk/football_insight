@@ -13,6 +13,19 @@ use super::handlers::{
 pub fn payment_routes(state: Arc<PaymentWebState>) -> Router {
     Router::new()
         .route(
+            "/api/v1/payment/virtual/status",
+            get(super::handlers::virtual_payment_status),
+        )
+        .route(
+            "/api/v1/payment/virtual/session",
+            post(super::handlers::prepare_virtual_session),
+        )
+        .route(
+            "/api/v1/payment/virtual/notify",
+            get(super::handlers::virtual_webhook_challenge)
+                .post(super::handlers::virtual_webhook_notify),
+        )
+        .route(
             "/api/v1/payment/membership-product",
             get(get_membership_product_handler),
         )

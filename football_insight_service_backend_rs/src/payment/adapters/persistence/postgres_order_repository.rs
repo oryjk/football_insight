@@ -17,6 +17,14 @@ impl PostgresOrderRepository {
 
 #[async_trait::async_trait]
 impl OrderRepository for PostgresOrderRepository {
+    async fn is_virtual_order(&self, order_no: &str) -> anyhow::Result<bool> {
+        Ok(sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM f_i_virtual_payment_orders WHERE order_no = $1)",
+        )
+        .bind(order_no)
+        .fetch_one(&self.pool)
+        .await?)
+    }
     async fn create_order(&self, order: NewPaymentOrder) -> anyhow::Result<PaymentOrder> {
         let row = sqlx::query(
             r#"

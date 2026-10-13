@@ -38,37 +38,58 @@
 		{
 			"path": "pages/user/settings/index",
 			"style": {
-				"navigationBarTitleText": "设置"
+				"navigationBarTitleText": "设置",
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/membership-purchase/index",
 			"style": {
-				"navigationBarTitleText": "开通会员"
+				"navigationBarTitleText": "开通会员",
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/team-board/index",
 			"style": {
-				"navigationBarTitleText": "球队战术板"
+				"navigationBarTitleText": "球队战术板",
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/support/index",
 			"style": {
-				"navigationBarTitleText": "赛前助力"
+				"navigationBarTitleText": "赛前助力",
+				"navigationStyle": "custom"
 			}
 		},
 		{
 			"path": "pages/ticket-watch/index",
 			"style": {
-				"navigationBarTitleText": "余票看板"
+				"navigationBarTitleText": "余票看板",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/topics/index",
+			"style": {
+				"navigationBarTitleText": "全部话题",
+				"navigationStyle": "custom",
+				"enablePullDownRefresh": true,
+				"onReachBottomDistance": 100
+			}
+		},
+		{
+			"path": "pages/topic-detail/index",
+			"style": {
+				"navigationBarTitleText": "话题详情",
+				"navigationStyle": "custom"
 			}
 		}
 	],
 	"tabBar": {
 		"color": "#8c8f99",
-		"selectedColor": "#15161b",
+		"selectedColor": "#eb3f41",
 		"backgroundColor": "#ffffff",
 		"borderStyle": "black",
 		"list": [
