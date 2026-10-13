@@ -211,7 +211,9 @@ pub(crate) fn virtual_error(
 ) -> (StatusCode, String) {
     use crate::payment::domain::virtual_payment::VirtualPaymentError::*;
     let status = match error {
-        Unavailable | ProductUnavailable | Provider => StatusCode::SERVICE_UNAVAILABLE,
+        Unavailable | ProductUnavailable | CatalogUnavailable | Provider => {
+            StatusCode::SERVICE_UNAVAILABLE
+        }
         IdentityMismatch => StatusCode::FORBIDDEN,
         SessionExpired | InvalidOrder => StatusCode::BAD_REQUEST,
     };
@@ -242,8 +244,13 @@ pub async fn prepare_virtual_session(
 pub async fn virtual_payment_status(
     State(state): State<Arc<PaymentWebState>>,
 ) -> Json<serde_json::Value> {
+    let available = state
+        .virtual_payment
+        .purchase_available()
+        .await
+        .unwrap_or(false);
     Json(
-        serde_json::json!({"available":state.virtual_payment.available(),"message":if state.virtual_payment.available(){""}else{"购买服务暂未开放，请稍后再试"}}),
+        serde_json::json!({"available":available,"message":if available{""}else{"购买服务暂未开放，请稍后再试"}}),
     )
 }
 

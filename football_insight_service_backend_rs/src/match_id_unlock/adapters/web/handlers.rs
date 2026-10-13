@@ -89,7 +89,9 @@ fn map_match_id_unlock_error(error: anyhow::Error) -> (StatusCode, String) {
     {
         use crate::payment::domain::virtual_payment::VirtualPaymentError::*;
         let status = match error {
-            Unavailable | ProductUnavailable | Provider => StatusCode::SERVICE_UNAVAILABLE,
+            Unavailable | ProductUnavailable | CatalogUnavailable | Provider => {
+                StatusCode::SERVICE_UNAVAILABLE
+            }
             IdentityMismatch => StatusCode::FORBIDDEN,
             SessionExpired | InvalidOrder => StatusCode::BAD_REQUEST,
         };

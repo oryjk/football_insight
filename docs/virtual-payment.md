@@ -19,27 +19,60 @@
 | `WECHAT_VIRTUAL_PAY_APP_KEY` | 现网 AppKey，仅服务端 |
 | `WECHAT_VIRTUAL_PAY_WEBHOOK_TOKEN` | 与小程序消息推送 Token 一致 |
 | `WECHAT_VIRTUAL_PAY_ENCODING_AES_KEY` | 与安全模式 EncodingAESKey 一致 |
-| `WECHAT_VIRTUAL_PAY_PRODUCTS` | 单行 JSON 商品映射，见示例文件 |
 
 同时沿用 `WECHAT_MINI_APP_ID`、`WECHAT_MINI_APP_SECRET`。虚拟支付回调使用新的配置，公众号 Token/AESKey 不需要修改。只支持现网 `env=0`；本地测试用 fake gateway，不使用生产密钥或真实收费。
 
 回调初始化只要求有效的小程序 AppID、Token 和 EncodingAESKey。即使 `WECHAT_VIRTUAL_PAY_ENABLED=false`，或尚未配置商品，服务器地址签名验证仍可正常完成；购买状态继续返回 `available=false`。因此可以先关闭购买，部署后验证消息推送地址，再配置并发布商品。
 
-商品映射示例：`football_insight_service_backend_rs/config/virtual-payment-products.example.json`。示例值基于代码默认价格，正式配置必须核对数据库当前会员价格、提醒套餐价格和实际队伍 code；不要直接把例子当作已配置的现网商品。
+## 数据库商品配置
+
+商品映射唯一来源是 `f_i_virtual_payment_products`，不再读取 `WECHAT_VIRTUAL_PAY_PRODUCTS`。迁移 `20261013220000_add_virtual_payment_products.sql` 初始化已发布的 V6 年会员：`membership:V6@3900 → fi_v6_year_39`，3900 分，启用。其他商品需先在微信后台发布，再添加数据库记录。
+
+| 字段 | 用途 |
+| --- | --- |
+| `product_key` | 主键，业务规格 + `@` + 实付金额（分） |
+| `name` | 商品名称，供配置管理使用；微信收银台名称/图片仍需在微信后台修改 |
+| `product_id` | 微信后台已发布的道具 ID |
+| `price_cents` | 道具价格（分），必须与 key、业务结算价及微信后台一致 |
+| `enabled` | 是否允许新增购买；默认 false |
+| `remark` | 内部备注 |
+| `created_at` / `updated_at` | 创建/修改时间，更新时自动刷新 |
 
 映射 key 规则：
 
 - `membership:V6@3900`：V6 年会员，3900 分。
-- `membership:V7@3500`：按现有补差价规则计算的 V7 升级，3500 分。不同档位/补差价的固定价格商品分别配置；V9 续费复用 V9 完整价格商品。
-- `match_id_unlock@500`：单场比赛 ID 解锁，500 分；具体比赛由本地订单绑定。
-- `reflux_subscription:single_match:chengdurongcheng@500`：对应队伍的提醒套餐；具体场次由订单绑定。队伍变化时添加对应 key。
+- `membership:V7@3500`：V7 补差价升级，3500 分。不同档位/补差价的固定价格道具分别添加；V9 续费复用 V9 完整价格道具。
+- `match_id_unlock@500`：单场比赛 ID 解锁，500 分；具体比赛由订单绑定。
+- `reflux_subscription:single_match:chengdurongcheng@500`：对应队伍的提醒套餐；具体场次由订单绑定，新增队伍需增加相应 key。
 
-value 为 `{ "product_id": "后台商品ID", "price_cents": 3900 }`。JSON 放进 Docker env-file 时不要加额外的外围引号，必须是单行合法 JSON。缺失商品或金额不一致时，下单失败且不会拉起收银台。
+查询与更新示例（用数据库管理工具连接生产库执行，不在聊天中发送连接串）：
+
+```sql
+SELECT product_key, name, product_id, price_cents, enabled, remark, updated_at
+FROM f_i_virtual_payment_products ORDER BY product_key;
+
+-- 修改微信道具 ID：应先确认新道具已发布，价格相同。
+UPDATE f_i_virtual_payment_products
+SET product_id = '微信后台新的已发布道具ID', name = 'V6 年会员'
+WHERE product_key = 'membership:V6@3900';
+
+-- 暂停/恢复新增购买，无需重启后端。
+UPDATE f_i_virtual_payment_products SET enabled = FALSE
+WHERE product_key = 'membership:V6@3900';
+UPDATE f_i_virtual_payment_products SET enabled = TRUE
+WHERE product_key = 'membership:V6@3900';
+```
+
+添加其他商品参考 `football_insight_service_backend_rs/config/virtual-payment-products.example.sql`；示例中未发布商品保持停用。商品表只保存道具映射，不覆盖原有会员套餐定价和提醒套餐定价。修改售价时需同步现有数据库业务定价、微信后台道具价格，以及商品表的 `product_key` / `price_cents`；金额不一致或映射缺失时拒绝支付，不回退普通支付。
+
+每次准备支付会话/下单实时读库，无进程内缓存。公开购买状态接口也实时检查启用商品，排除 HTTP 响应缓存；数据库读取失败时关闭购买。历史订单保存购买时的微信商品 ID 与金额，修改或停用商品不会改变其查单、发货或退款。密钥、OfferID 和购买总开关继续使用环境变量。
+
+本次仅增加数据库表和支付读库逻辑；商品管理页面未包含在此次改动中。
 
 ## 部署顺序
 
-1. 本地检查通过后提交/推送代码，生产迁移由 `peiqian` 上的 `cargo run --bin run_migrations` 应用，包含 `20261013000500_add_virtual_payment.sql`。
-2. 配置生产后端环境变量，使用 `deploy_peiqian_docker.sh` 部署并重启；现有脚本支持 env-file，无需修改其他 Nginx 路由。
+1. 本地检查通过后提交/推送代码，生产迁移由 `peiqian` 上的 `cargo run --bin run_migrations` 应用，包含 `20261013000500_add_virtual_payment.sql` 和 `20261013220000_add_virtual_payment_products.sql`。
+2. 确认商品表记录与当前已发布商品一致；备份环境文件并移除旧 `WECHAT_VIRTUAL_PAY_PRODUCTS`，保留密钥和购买开关，使用 `deploy_peiqian_docker.sh` 部署并重启；现有脚本支持 env-file，无需修改其他 Nginx 路由。
 3. 查询 `/api/v1/payment/virtual/status`，配置完成时返回 `available=true`。它只证明本地配置齐备，后台商品已发布、支付限制是否解除仍需真实验证。
 4. 上传新的小程序。旧客户端没有虚拟支付会话准备，不能继续使用普通支付发起新增数字服务交易。
 5. 用管理员本人测试三条购买链路、会员补差价、重复通知和退款。核对微信订单、本地订单及权益；保存截图供申诉复核。真实付款必须由用户操作。
@@ -54,7 +87,7 @@ value 为 `{ "product_id": "后台商品ID", "price_cents": 3900 }`。JSON 放�
 - 生产迁移 `20261013000500` 应用成功，两张虚拟支付表与 `_sqlx_migrations` 成功记录已核对。
 - peiqian 生产后端已部署并重启为 `football-insight-service-backend-rs:cac6f89`，容器健康；运行时环境文件与容器均保持 `WECHAT_VIRTUAL_PAY_ENABLED=false`。
 - 通过线上域名验证：普通签名和安全模式 URL 校验返回准确回显，错误签名及错误 AppID 返回 403；购买状态为 `available=false`，原有会员商品和公开配置接口返回 200。
-- AppKey、OfferID、Token 和 AESKey 已配置；商品映射未配置。小程序上传与真实付款均未执行，管理员现在可以回微信后台重新提交服务器地址验证。
+- AppKey、OfferID、Token 和 AESKey 已配置；商品映射未配置（当时仍使用环境变量）。小程序上传与真实付款均未执行，管理员现在可以回微信后台重新提交服务器地址验证。
 
 ## 2026-10-13 V6 真实支付测试准备
 

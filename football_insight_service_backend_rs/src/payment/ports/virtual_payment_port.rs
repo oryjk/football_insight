@@ -4,6 +4,12 @@ use crate::payment::domain::virtual_payment::{
 use async_trait::async_trait;
 
 #[async_trait]
+pub trait VirtualProductRepository: Send + Sync {
+    async fn find_enabled(&self, key: &str) -> Result<Option<VirtualProduct>, VirtualPaymentError>;
+    async fn has_enabled(&self) -> Result<bool, VirtualPaymentError>;
+}
+
+#[async_trait]
 pub trait VirtualPaymentGateway: Send + Sync {
     fn available(&self) -> bool;
     async fn prepare_session(

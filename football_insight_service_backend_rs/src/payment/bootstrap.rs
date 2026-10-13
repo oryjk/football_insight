@@ -16,6 +16,7 @@ use crate::{
                 postgres_order_repository::PostgresOrderRepository,
                 postgres_payment_settlement_port::PostgresPaymentSettlementPort,
                 postgres_virtual_order_repository::PostgresVirtualOrderRepository,
+                postgres_virtual_product_repository::PostgresVirtualProductRepository,
             },
             web::{handlers::PaymentWebState, routes::payment_routes},
         },
@@ -75,10 +76,10 @@ pub fn build_payment(
     let virtual_payment = Arc::new(VirtualPaymentService::new(
         gateway,
         order_repository.clone(),
-        Arc::new(PostgresVirtualOrderRepository::new(pool)),
+        Arc::new(PostgresVirtualOrderRepository::new(pool.clone())),
         user_membership_port.clone(),
         settlement.clone(),
-        config.virtual_payment.products.clone(),
+        Arc::new(PostgresVirtualProductRepository::new(pool)),
     ));
     let wechat_pay_port: Arc<dyn WechatPayPort> = virtual_payment.clone();
     let virtual_webhook =
@@ -135,7 +136,6 @@ mod tests {
             app_key: String::new(),
             webhook_token: "token".into(),
             encoding_aes_key: base64::engine::general_purpose::STANDARD.encode([7u8; 32]),
-            products: Default::default(),
         }
     }
 

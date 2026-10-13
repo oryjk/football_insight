@@ -6,6 +6,8 @@ pub enum VirtualPaymentError {
     Unavailable,
     #[error("该商品暂不可购买，请稍后再试")]
     ProductUnavailable,
+    #[error("商品配置暂不可用，请稍后再试")]
+    CatalogUnavailable,
     #[error("请刷新微信支付会话后重试")]
     SessionExpired,
     #[error("当前微信身份与登录账号不一致，请重新登录")]

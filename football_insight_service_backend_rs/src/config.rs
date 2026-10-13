@@ -437,12 +437,9 @@ pub struct VirtualPaymentConfig {
     pub app_key: String,
     pub webhook_token: String,
     pub encoding_aes_key: String,
-    pub products:
-        std::collections::HashMap<String, crate::payment::domain::virtual_payment::VirtualProduct>,
 }
 impl VirtualPaymentConfig {
     fn from_env() -> anyhow::Result<Self> {
-        let products = std::env::var("WECHAT_VIRTUAL_PAY_PRODUCTS").unwrap_or_else(|_| "{}".into());
         Ok(Self {
             enabled: parse_bool_env("WECHAT_VIRTUAL_PAY_ENABLED", false),
             offer_id: std::env::var("WECHAT_VIRTUAL_PAY_OFFER_ID").unwrap_or_default(),
@@ -450,8 +447,6 @@ impl VirtualPaymentConfig {
             webhook_token: std::env::var("WECHAT_VIRTUAL_PAY_WEBHOOK_TOKEN").unwrap_or_default(),
             encoding_aes_key: std::env::var("WECHAT_VIRTUAL_PAY_ENCODING_AES_KEY")
                 .unwrap_or_default(),
-            products: serde_json::from_str(&products)
-                .context("WECHAT_VIRTUAL_PAY_PRODUCTS must be a valid product mapping")?,
         })
     }
     pub fn available(&self) -> bool {
@@ -469,11 +464,6 @@ impl VirtualPaymentConfig {
                 .decode(format!("{}=", self.encoding_aes_key.trim_end_matches('=')))
                 .is_ok_and(|key| key.len() == 32)
             }
-            && !self.products.is_empty()
-            && self
-                .products
-                .values()
-                .all(|p| !p.product_id.is_empty() && p.price_cents > 0)
     }
 }
 
@@ -488,13 +478,6 @@ mod virtual_config_tests {
             app_key: "key".into(),
             webhook_token: "token".into(),
             encoding_aes_key: format!("{}B", "A".repeat(42)),
-            products: std::collections::HashMap::from([(
-                "membership:V6@3900".into(),
-                crate::payment::domain::virtual_payment::VirtualProduct {
-                    product_id: "v6".into(),
-                    price_cents: 3900,
-                },
-            )]),
         };
         assert!(config.available());
     }
@@ -506,13 +489,6 @@ mod virtual_config_tests {
             app_key: "key".into(),
             webhook_token: "token".into(),
             encoding_aes_key: "invalid".into(),
-            products: std::collections::HashMap::from([(
-                "membership:V6@3900".into(),
-                crate::payment::domain::virtual_payment::VirtualProduct {
-                    product_id: "v6".into(),
-                    price_cents: 3900,
-                },
-            )]),
         };
         assert!(!config.available());
     }

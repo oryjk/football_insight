@@ -59,7 +59,6 @@ async fn wechat_webhook_verification_returns_plaintext_echo() {
                 app_key: String::new(),
                 webhook_token: String::new(),
                 encoding_aes_key: String::new(),
-                products: Default::default(),
             },
             wechat_pay_api_key: String::new(),
             public_base_url: "http://127.0.0.1:8080".to_string(),

@@ -5,18 +5,19 @@ use crate::{
         domain::{
             order::{OrderStatus, WxPayParams},
             virtual_payment::{
-                Delivery, Refund, VirtualPaymentError, VirtualProduct, product_key,
-                validate_delivery,
+                Delivery, Refund, VirtualPaymentError, product_key, validate_delivery,
             },
         },
         ports::{
             order_repository::OrderRepository,
-            virtual_payment_port::{VirtualOrderRepository, VirtualPaymentGateway},
+            virtual_payment_port::{
+                VirtualOrderRepository, VirtualPaymentGateway, VirtualProductRepository,
+            },
             wechat_pay_port::WechatPayPort,
         },
     },
 };
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use uuid::Uuid;
 
 pub struct VirtualPaymentService {
@@ -25,7 +26,7 @@ pub struct VirtualPaymentService {
     virtual_orders: Arc<dyn VirtualOrderRepository>,
     users: Arc<dyn UserMembershipPort>,
     settlement: Arc<HandleWechatNotifyUseCase>,
-    products: HashMap<String, VirtualProduct>,
+    products: Arc<dyn VirtualProductRepository>,
 }
 
 impl VirtualPaymentService {
@@ -35,7 +36,7 @@ impl VirtualPaymentService {
         virtual_orders: Arc<dyn VirtualOrderRepository>,
         users: Arc<dyn UserMembershipPort>,
         settlement: Arc<HandleWechatNotifyUseCase>,
-        products: HashMap<String, VirtualProduct>,
+        products: Arc<dyn VirtualProductRepository>,
     ) -> Self {
         Self {
             gateway,
@@ -47,10 +48,16 @@ impl VirtualPaymentService {
         }
     }
     pub fn available(&self) -> bool {
-        self.gateway.available() && !self.products.is_empty()
+        self.gateway.available()
+    }
+    pub async fn purchase_available(&self) -> Result<bool, VirtualPaymentError> {
+        if !self.available() {
+            return Ok(false);
+        }
+        self.products.has_enabled().await
     }
     pub async fn prepare_session(&self, user_id: Uuid, code: &str) -> anyhow::Result<()> {
-        if !self.available() {
+        if !self.purchase_available().await? {
             return Err(VirtualPaymentError::Unavailable.into());
         }
         let open_id = self
@@ -191,14 +198,15 @@ impl WechatPayPort for VirtualPaymentService {
         let key = product_key(&order.product_type, amount_cents)?;
         let product = self
             .products
-            .get(&key)
+            .find_enabled(&key)
+            .await?
             .ok_or(VirtualPaymentError::ProductUnavailable)?;
         if product.price_cents != amount_cents {
             return Err(VirtualPaymentError::ProductUnavailable.into());
         }
         let params = self
             .gateway
-            .payment_params(order_no, openid, product)
+            .payment_params(order_no, openid, &product)
             .await?;
         self.virtual_orders
             .record(crate::payment::domain::virtual_payment::VirtualOrder {

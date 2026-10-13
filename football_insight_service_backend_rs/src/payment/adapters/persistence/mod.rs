@@ -1,3 +1,4 @@
 pub mod postgres_order_repository;
 pub mod postgres_payment_settlement_port;
 pub mod postgres_virtual_order_repository;
+pub mod postgres_virtual_product_repository;

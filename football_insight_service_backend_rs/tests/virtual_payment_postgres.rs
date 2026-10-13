@@ -12,6 +12,16 @@ use football_insight_service_backend_rs::payment::{
     },
     ports::{order_repository::OrderRepository, virtual_payment_port::VirtualOrderRepository},
 };
+use football_insight_service_backend_rs::{
+    auth::adapters::persistence::postgres_auth_repository::PostgresAuthRepository,
+    payment::{
+        application::virtual_payment::VirtualPaymentService,
+        domain::virtual_payment::{
+            VirtualPayParams, VirtualPaymentError, VirtualProduct, build_sign_data,
+        },
+        ports::{virtual_payment_port::VirtualPaymentGateway, wechat_pay_port::WechatPayPort},
+    },
+};
 use sqlx::{
     PgPool, Row,
     postgres::{PgConnectOptions, PgPoolOptions},
@@ -19,11 +29,225 @@ use sqlx::{
 use std::sync::Arc;
 use uuid::Uuid;
 
+// Only the external WeChat network is replaced; orders, catalog, grants and refunds use PostgreSQL.
+struct CatalogTestGateway;
+#[async_trait::async_trait]
+impl VirtualPaymentGateway for CatalogTestGateway {
+    fn available(&self) -> bool {
+        true
+    }
+    async fn prepare_session(&self, _: &str, _: &str) -> Result<(), VirtualPaymentError> {
+        Ok(())
+    }
+    async fn payment_params(
+        &self,
+        no: &str,
+        _: &str,
+        product: &VirtualProduct,
+    ) -> Result<VirtualPayParams, VirtualPaymentError> {
+        Ok(VirtualPayParams {
+            mode: "short_series_goods".into(),
+            sign_data: build_sign_data("test-offer", no, product)?,
+            pay_sig: "test-signature".into(),
+            signature: "test-session-signature".into(),
+        })
+    }
+    async fn query_order(
+        &self,
+        order: &VirtualOrder,
+    ) -> Result<Option<Delivery>, VirtualPaymentError> {
+        Ok(Some(Delivery {
+            order_no: order.order_no.clone(),
+            open_id: order.open_id.clone(),
+            product_id: order.product_id.clone(),
+            amount_cents: order.amount_cents,
+            original_price_cents: order.amount_cents,
+            quantity: 1,
+            env: 0,
+            wx_order_id: format!("WX{}", order.order_no),
+        }))
+    }
+    async fn confirm_delivery(&self, _: &VirtualOrder) -> Result<(), VirtualPaymentError> {
+        Ok(())
+    }
+}
+
+fn catalog_service(db: &Database) -> VirtualPaymentService {
+    let (orders, virtual_orders, settlement) = db.repos();
+    VirtualPaymentService::new(Arc::new(CatalogTestGateway), orders, virtual_orders,
+        Arc::new(PostgresAuthRepository::new(db.pool.clone())), Arc::new(settlement),
+        Arc::new(football_insight_service_backend_rs::payment::adapters::persistence::postgres_virtual_product_repository::PostgresVirtualProductRepository::new(db.pool.clone())))
+}
+
+async fn catalog_checkout(
+    db: &Database,
+    service: &VirtualPaymentService,
+    no: &str,
+    kind: &str,
+    price: i32,
+) -> anyhow::Result<serde_json::Value> {
+    db.repos()
+        .0
+        .create_order(NewPaymentOrder {
+            order_no: no.into(),
+            user_id: db.user,
+            amount_cents: price,
+            product_type: kind.into(),
+        })
+        .await?;
+    let params = service
+        .unified_order(no, "test product", price, "buyer")
+        .await?;
+    Ok(serde_json::from_str(
+        &params.virtual_payment.unwrap().sign_data,
+    )?)
+}
+
+#[tokio::test]
+#[ignore = "requires an explicit disposable database"]
+async fn catalog_edits_affect_new_orders_without_rebuilding_service_and_preserve_existing_orders() {
+    let db = Database::new().await;
+    let service = catalog_service(&db);
+    assert!(service.purchase_available().await.unwrap());
+    let before = catalog_checkout(&db, &service, "catalogbefore", "membership:V6", 3900)
+        .await
+        .unwrap();
+    assert_eq!(before["productId"], "fi_v6_year_39");
+    sqlx::query("UPDATE f_i_virtual_payment_products SET product_id='v6_republished', name='新版年会员' WHERE product_key='membership:V6@3900'")
+        .execute(&db.pool).await.unwrap();
+    let after = catalog_checkout(&db, &service, "catalogafter", "membership:V6", 3900)
+        .await
+        .unwrap();
+    assert_eq!(after["productId"], "v6_republished");
+    let snapshot = db.repos().1.find("catalogbefore").await.unwrap().unwrap();
+    assert_eq!(snapshot.product_id, "fi_v6_year_39");
+    assert_eq!(snapshot.amount_cents, 3900);
+    // Disable everything; the original paid order must still reconcile and grant its purchased entitlement.
+    sqlx::query("UPDATE f_i_virtual_payment_products SET enabled=FALSE")
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    assert!(!service.purchase_available().await.unwrap());
+    let error = catalog_checkout(&db, &service, "catalogblocked", "membership:V6", 3900)
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        error.downcast_ref::<VirtualPaymentError>(),
+        Some(VirtualPaymentError::ProductUnavailable)
+    ));
+    assert!(db.repos().1.find("catalogblocked").await.unwrap().is_none());
+    service.reconcile_pending().await.unwrap();
+    assert_eq!(db.membership().await["tier"], "V6");
+    let status: String =
+        sqlx::query_scalar("SELECT status FROM f_i_payment_orders WHERE order_no='catalogbefore'")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    assert_eq!(status, "paid");
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires an explicit disposable database"]
+async fn catalog_matches_upgrade_match_unlock_and_reflux_at_exact_checkout_price() {
+    let db = Database::new().await;
+    let service = catalog_service(&db);
+    sqlx::query("DELETE FROM f_i_virtual_payment_products")
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    assert!(!service.purchase_available().await.unwrap());
+    sqlx::query("INSERT INTO f_i_virtual_payment_products(product_key,name,product_id,price_cents,enabled) VALUES ('membership:V7@3500','V7 升级','v7_upgrade',3500,TRUE),('match_id_unlock@500','比赛 ID','match_unlock',500,TRUE),('reflux_subscription:single_match:chengdu@500','回流提醒','reflux',500,TRUE)")
+        .execute(&db.pool).await.unwrap();
+    assert!(service.purchase_available().await.unwrap());
+    for (no, kind, price, id) in [
+        ("catalogupgrade", "membership:V7", 3500, "v7_upgrade"),
+        ("catalogmatch", "match_id_unlock:571", 500, "match_unlock"),
+        (
+            "catalogreflux",
+            "reflux_subscription:single_match:chengdu:571",
+            500,
+            "reflux",
+        ),
+    ] {
+        let params = catalog_checkout(&db, &service, no, kind, price)
+            .await
+            .unwrap();
+        assert_eq!(params["productId"], id);
+        assert_eq!(params["goodsPrice"], price);
+    }
+    let error = catalog_checkout(&db, &service, "catalogwrongprice", "membership:V7", 5900)
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        error.downcast_ref::<VirtualPaymentError>(),
+        Some(VirtualPaymentError::ProductUnavailable)
+    ));
+    let mismatch = sqlx::query("UPDATE f_i_virtual_payment_products SET price_cents=100 WHERE product_key='membership:V7@3500'").execute(&db.pool).await;
+    assert!(
+        mismatch.is_err(),
+        "catalog key and price must remain consistent"
+    );
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires an explicit disposable database"]
+async fn unreadable_catalog_rejects_purchase_without_creating_virtual_order() {
+    let db = Database::new().await;
+    let service = catalog_service(&db);
+    sqlx::query("DROP TABLE f_i_virtual_payment_products")
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    assert!(matches!(
+        service.purchase_available().await,
+        Err(VirtualPaymentError::CatalogUnavailable)
+    ));
+    let error = catalog_checkout(&db, &service, "catalogdbfailed", "membership:V6", 3900)
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        error.downcast_ref::<VirtualPaymentError>(),
+        Some(VirtualPaymentError::CatalogUnavailable)
+    ));
+    assert!(
+        db.repos()
+            .1
+            .find("catalogdbfailed")
+            .await
+            .unwrap()
+            .is_none()
+    );
+    db.close().await;
+}
+
 struct Database {
     admin: PgPool,
     pool: PgPool,
     schema: String,
     user: Uuid,
+}
+
+#[tokio::test]
+#[ignore = "requires an explicit disposable database"]
+async fn product_catalog_migration_seeds_published_v6() {
+    let db = Database::new().await;
+    let table: Option<String> =
+        sqlx::query_scalar("SELECT to_regclass('f_i_virtual_payment_products')::text")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+    assert!(
+        table.is_some(),
+        "virtual payment products must live in a database table"
+    );
+    let row = sqlx::query("SELECT product_id, price_cents, enabled FROM f_i_virtual_payment_products WHERE product_key='membership:V6@3900'")
+        .fetch_one(&db.pool).await.unwrap();
+    assert_eq!(row.get::<String, _>("product_id"), "fi_v6_year_39");
+    assert_eq!(row.get::<i32, _>("price_cents"), 3900);
+    assert!(row.get::<bool, _>("enabled"));
+    db.close().await;
 }
 impl Database {
     async fn new() -> Self {
@@ -59,6 +283,7 @@ impl Database {
             include_str!("../migrations/20260518170000_add_reflux_email_subscriptions.sql"),
             include_str!("../migrations/20260826140000_add_match_id_unlocks.sql"),
             include_str!("../migrations/20261013000500_add_virtual_payment.sql"),
+            include_str!("../migrations/20261013220000_add_virtual_payment_products.sql"),
         ] {
             sqlx::raw_sql(migration).execute(&pool).await.unwrap();
         }
