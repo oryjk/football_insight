@@ -44,7 +44,7 @@ component（--fi-component-*）   组件级复合契约（卡片、kicker/标题
 - 展示组件只通过 `props` 接收数据、`emits` 发出意图，不 import api / session / 认证存储（边界检查机器强制）。
 - 新增页面/组件后执行 `bun run build:mp-weixin`；构建尾部的组件注册检查报 `Unregistered mini-program components` 时先核对 `.vue` 直接导入。
 
-品牌导航 `FiBrandNav` 使用 52rpx 透明足球主体图标，副标题位于主标题右侧，两段文字底部对齐，整体文字组合与图标居中。内容区高度由 token `--fi-brand-nav-bar-height`（76rpx）控制，页面顶部占位统一使用 `--fi-brand-nav-height`（状态栏 + 内容区），不要在页面里另写旧高度。小程序品牌行与微信胶囊居中对齐，右侧预留胶囊空间；H5 使用流式布局，长副标题省略尾部，二级页保留返回按钮。
+品牌导航 `FiBrandNav` 使用 64rpx 透明足球主体图标，副标题位于主标题右侧，两段文字底部对齐，整体文字组合与图标居中。品牌行与返回按钮独立使用 `--fi-space-brand-nav-row-size`（52rpx），避免放大 logo 后撑高布局或改变文字位置。内容区高度由 token `--fi-brand-nav-bar-height`（76rpx）控制，页面顶部占位统一使用 `--fi-brand-nav-height`（状态栏 + 内容区），不要在页面里另写旧高度。小程序品牌行与微信胶囊居中对齐，右侧预留胶囊空间；H5 使用流式布局，长副标题省略尾部，二级页保留返回按钮。
 
 ### FiLoading（token 化示范组件）
 

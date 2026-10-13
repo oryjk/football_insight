@@ -142,7 +142,7 @@ onMounted(() => {
     top: calc(var(--fi-brand-nav-status-height) + var(--fi-space-12));
     z-index: 81;
     min-width: 0;
-    height: var(--fi-space-brand-nav-logo-size);
+    height: var(--fi-space-brand-nav-row-size);
     display: flex;
     align-items: center;
     gap: var(--fi-space-14);
@@ -201,7 +201,7 @@ onMounted(() => {
 .fi-brand-nav__back {
     flex-shrink: 0;
     width: var(--fi-space-44);
-    height: var(--fi-space-brand-nav-logo-size);
+    height: var(--fi-space-brand-nav-row-size);
     display: flex;
     align-items: center;
     justify-content: flex-start;

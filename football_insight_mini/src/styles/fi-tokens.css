@@ -796,7 +796,9 @@ page {
   --fi-space-brand-nav-capsule: var(--fi-primitive-brand-nav-capsule-space);
   --fi-brand-nav-bar-height: var(--fi-primitive-brand-nav-bar-height);
   --fi-brand-nav-height: calc(var(--status-bar-height, 0px) + var(--fi-brand-nav-bar-height));
-  --fi-primitive-brand-nav-logo-size: 52rpx;
+  --fi-primitive-brand-nav-row-size: 52rpx;
+  --fi-space-brand-nav-row-size: var(--fi-primitive-brand-nav-row-size);
+  --fi-primitive-brand-nav-logo-size: 64rpx;
   --fi-space-brand-nav-logo-size: var(--fi-primitive-brand-nav-logo-size);
   --fi-primitive-brand-nav-bg: rgba(247, 248, 250, 0.82);
   --fi-primitive-brand-nav-border: rgba(232, 233, 238, 0.72);
