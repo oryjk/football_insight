@@ -193,10 +193,10 @@ impl AppConfig {
         if admin_jwt_secret.trim().len() < 32 {
             anyhow::bail!("ADMIN_JWT_SECRET must be at least 32 characters");
         }
-        let admin_owner_username =
-            std::env::var("ADMIN_OWNER_USERNAME").context("ADMIN_OWNER_USERNAME is required")?;
-        let admin_owner_password =
-            std::env::var("ADMIN_OWNER_PASSWORD").context("ADMIN_OWNER_PASSWORD is required")?;
+        let (admin_owner_username, admin_owner_password) = admin_bootstrap_values(
+            std::env::var("ADMIN_OWNER_USERNAME").ok(),
+            std::env::var("ADMIN_OWNER_PASSWORD").ok(),
+        );
         let admin_owner_display_name = std::env::var("ADMIN_OWNER_DISPLAY_NAME")
             .unwrap_or_else(|_| "Football Insight Owner".to_string());
         let mini_review_api_key = std::env::var("MINI_REVIEW_API_KEY")
@@ -369,6 +369,15 @@ fn parse_bool_env(key: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
+fn admin_bootstrap_values(username: Option<String>, password: Option<String>) -> (String, String) {
+    (
+        username
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| "superadmin".into()),
+        password.unwrap_or_default(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::DatabasePoolConfig;
@@ -491,5 +500,25 @@ mod virtual_config_tests {
             encoding_aes_key: "invalid".into(),
         };
         assert!(!config.available());
+    }
+}
+
+#[cfg(test)]
+mod admin_bootstrap_tests {
+    use super::*;
+    #[test]
+    fn missing_initial_credentials_use_superadmin_without_preset_password() {
+        let (username, password) = admin_bootstrap_values(None, None);
+        assert_eq!(username, "superadmin");
+        assert!(password.is_empty());
+    }
+    #[test]
+    fn explicit_initial_credentials_preserve_exact_legacy_password() {
+        let (username, password) = admin_bootstrap_values(
+            Some("legacy_owner".into()),
+            Some("  exact password  ".into()),
+        );
+        assert_eq!(username, "legacy_owner");
+        assert_eq!(password, "  exact password  ");
     }
 }

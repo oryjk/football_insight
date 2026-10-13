@@ -11,7 +11,9 @@ impl AdminAuthorizationPort for RoleBasedAdminAuthorization {
             "owner" => true,
             "admin" => matches!(
                 permission,
-                AdminPermission::ManageUsers | AdminPermission::ViewAuditLogs
+                AdminPermission::ManageUsers
+                    | AdminPermission::ManageProducts
+                    | AdminPermission::ViewAuditLogs
             ),
             _ => false,
         }
@@ -21,6 +23,14 @@ impl AdminAuthorizationPort for RoleBasedAdminAuthorization {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn product_management_is_granted_only_to_owner_and_admin() {
+        let authorization = RoleBasedAdminAuthorization;
+        assert!(authorization.is_allowed("owner", AdminPermission::ManageProducts));
+        assert!(authorization.is_allowed("admin", AdminPermission::ManageProducts));
+        assert!(!authorization.is_allowed("viewer", AdminPermission::ManageProducts));
+    }
 
     #[test]
     fn unknown_roles_have_no_permissions() {

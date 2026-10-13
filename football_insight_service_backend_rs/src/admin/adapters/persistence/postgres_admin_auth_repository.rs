@@ -4,8 +4,13 @@ use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
 use crate::admin::{
-    domain::admin_auth::{AdminAccount, AdminBootstrapOwner, AdminSession},
-    ports::admin_auth_repository::AdminAuthRepository,
+    domain::{
+        admin_auth::{AdminAccount, AdminBootstrapOwner, AdminSession},
+        admin_setup::AdminSetupError,
+    },
+    ports::{
+        admin_auth_repository::AdminAuthRepository, admin_setup_repository::AdminSetupRepository,
+    },
 };
 
 #[derive(Clone)]
@@ -80,6 +85,24 @@ impl AdminAuthRepository for PostgresAdminAuthRepository {
         Ok(())
     }
 
+    async fn create_session_if_current(
+        &self,
+        session: AdminSession,
+        expected_username: &str,
+        expected_password_hash: &str,
+    ) -> anyhow::Result<bool> {
+        let mut tx = self.pool.begin().await?;
+        let current=sqlx::query_scalar::<_,Uuid>("SELECT id FROM f_i_admin_users WHERE id=$1 AND username=$2 AND password_hash=$3 AND status='active' AND $4::timestamptz>clock_timestamp() FOR UPDATE")
+            .bind(session.admin_user_id).bind(expected_username).bind(expected_password_hash).bind(session.expires_at).fetch_optional(&mut *tx).await?;
+        if current.is_none() {
+            return Ok(false);
+        }
+        sqlx::query("INSERT INTO f_i_admin_sessions(id,admin_user_id,expires_at,revoked_at,created_at,last_seen_at) VALUES($1,$2,$3,$4,$5,$5)")
+            .bind(session.id).bind(session.admin_user_id).bind(session.expires_at).bind(session.revoked_at).bind(session.created_at).execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(true)
+    }
+
     async fn find_active_account_for_session(
         &self,
         admin_id: Uuid,
@@ -149,31 +172,63 @@ impl AdminAuthRepository for PostgresAdminAuthRepository {
     async fn ensure_owner(&self, owner: AdminBootstrapOwner) -> anyhow::Result<AdminAccount> {
         let mut tx = self.pool.begin().await?;
         sqlx::query(
-            r#"
-            INSERT INTO f_i_admin_users (
-                id, username, password_hash, display_name, role, status
-            ) VALUES ($1, $2, $3, $4, 'owner', 'active')
-            ON CONFLICT (username) DO NOTHING
-            "#,
+            "SELECT pg_advisory_xact_lock(hashtext('football_insight_admin_owner_bootstrap'))",
         )
-        .bind(Uuid::new_v4())
-        .bind(&owner.username)
-        .bind(&owner.password_hash)
-        .bind(&owner.display_name)
         .execute(&mut *tx)
         .await?;
-
-        let row = sqlx::query_as::<_, AdminAccountRow>(
-            r#"
-            SELECT id, username, password_hash, display_name, role, status, created_at, updated_at
-              FROM f_i_admin_users
-             WHERE username = $1
-            "#,
-        )
-        .bind(owner.username)
-        .fetch_one(&mut *tx)
-        .await?;
+        let existing=sqlx::query_as::<_,AdminAccountRow>("SELECT id,username,password_hash,display_name,role,status,created_at,updated_at FROM f_i_admin_users ORDER BY (role='owner') DESC,created_at,id LIMIT 1 FOR UPDATE").fetch_optional(&mut *tx).await?;
+        if let Some(existing) = existing {
+            tx.commit().await?;
+            return Ok(existing.into());
+        }
+        sqlx::query("INSERT INTO f_i_admin_users(id,username,password_hash,display_name,role,status) VALUES($1,$2,$3,$4,'owner','active') ON CONFLICT(username) DO NOTHING")
+            .bind(Uuid::new_v4()).bind(&owner.username).bind(&owner.password_hash).bind(&owner.display_name).execute(&mut *tx).await?;
+        let row=sqlx::query_as::<_,AdminAccountRow>("SELECT id,username,password_hash,display_name,role,status,created_at,updated_at FROM f_i_admin_users WHERE username=$1").bind(&owner.username).fetch_one(&mut *tx).await?;
+        if row.role != "owner" {
+            anyhow::bail!("bootstrap username belongs to a non-owner account");
+        }
         tx.commit().await?;
         Ok(row.into())
     }
+}
+
+#[async_trait]
+impl AdminSetupRepository for PostgresAdminAuthRepository {
+    async fn has_any_admin(&self) -> Result<bool, AdminSetupError> {
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM f_i_admin_users)")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(map_setup_error)
+    }
+    async fn initialize_superadmin(&self, password_hash: String) -> Result<(), AdminSetupError> {
+        let mut tx = self.pool.begin().await.map_err(map_setup_error)?;
+        sqlx::query(
+            "SELECT pg_advisory_xact_lock(hashtext('football_insight_admin_owner_bootstrap'))",
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(map_setup_error)?;
+        let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM f_i_admin_users)")
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(map_setup_error)?;
+        if exists {
+            return Err(AdminSetupError::AlreadyInitialized);
+        }
+        let id = Uuid::new_v4();
+        sqlx::query("INSERT INTO f_i_admin_users(id,username,password_hash,display_name,role,status) VALUES($1,'superadmin',$2,'Super Admin','owner','active')").bind(id).bind(password_hash).execute(&mut *tx).await.map_err(map_setup_error)?;
+        sqlx::query("INSERT INTO f_i_admin_audit_logs(id,admin_user_id,action,target_type,target_id,after_json) VALUES($1,$2,'admin.initialize','admin_account',$3,$4)").bind(Uuid::new_v4()).bind(id).bind(id.to_string()).bind(serde_json::json!({"username":"superadmin"})).execute(&mut *tx).await.map_err(map_setup_error)?;
+        tx.commit().await.map_err(map_setup_error)?;
+        Ok(())
+    }
+}
+fn map_setup_error(error: sqlx::Error) -> AdminSetupError {
+    if error
+        .as_database_error()
+        .is_some_and(|error| error.is_unique_violation())
+    {
+        return AdminSetupError::AlreadyInitialized;
+    }
+    tracing::error!("admin initialization persistence failed");
+    AdminSetupError::Internal
 }

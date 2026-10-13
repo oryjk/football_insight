@@ -24,6 +24,7 @@ pub struct MembershipProductOptionResponse {
     pub subtitle: String,
     pub description: String,
     pub membership_duration_months: Option<i32>,
+    pub is_private_offer: bool,
 }
 
 impl MembershipProductResponse {
@@ -56,14 +57,14 @@ impl MembershipProductOptionResponse {
         products: &[MembershipProductOption],
         current_tier: Option<&str>,
     ) -> Self {
-        let original_price_cents = value.price_cents;
+        let original_price_cents = value.private_price_cents.unwrap_or(value.price_cents);
         let price = current_tier.and_then(|tier| {
             calculate_membership_checkout_price(products, tier, &value.target_tier).ok()
         });
 
         Self {
             target_tier: value.target_tier,
-            price_cents: value.price_cents,
+            price_cents: original_price_cents,
             original_price_cents,
             pay_price_cents: price
                 .as_ref()
@@ -77,6 +78,7 @@ impl MembershipProductOptionResponse {
             subtitle: value.subtitle,
             description: value.description,
             membership_duration_months: value.membership_duration_months,
+            is_private_offer: value.private_price_cents.is_some(),
         }
     }
 }

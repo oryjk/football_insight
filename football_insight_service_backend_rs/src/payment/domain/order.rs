@@ -72,6 +72,9 @@ pub struct MembershipProductOption {
     pub description: String,
     #[serde(default)]
     pub membership_duration_months: Option<i32>,
+    /// Server-selected account offer; never accepted from public/system-config JSON.
+    #[serde(skip)]
+    pub private_price_cents: Option<i32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,6 +103,7 @@ pub fn default_membership_product_options() -> Vec<MembershipProductOption> {
             subtitle: "查看 30 分钟内".to_string(),
             description: "购买后立即升级为 V6 会员，可查看最近 30 分钟内的回流区域。".to_string(),
             membership_duration_months: None,
+            private_price_cents: None,
         },
         MembershipProductOption {
             target_tier: "V7".to_string(),
@@ -108,6 +112,7 @@ pub fn default_membership_product_options() -> Vec<MembershipProductOption> {
             subtitle: "查看 10 分钟内".to_string(),
             description: "购买后立即升级为 V7 会员，可查看最近 10 分钟内的回流区域。".to_string(),
             membership_duration_months: None,
+            private_price_cents: None,
         },
         MembershipProductOption {
             target_tier: "V8".to_string(),
@@ -116,6 +121,7 @@ pub fn default_membership_product_options() -> Vec<MembershipProductOption> {
             subtitle: "查看 3 分钟内".to_string(),
             description: "购买后立即升级为 V8 会员，可查看最近 3 分钟内的回流区域。".to_string(),
             membership_duration_months: None,
+            private_price_cents: None,
         },
         MembershipProductOption {
             target_tier: "V9".to_string(),
@@ -124,6 +130,7 @@ pub fn default_membership_product_options() -> Vec<MembershipProductOption> {
             subtitle: "同 V8 速览权限".to_string(),
             description: "购买后立即升级为 V9 会员，最近回流速览权限与 V8 一致。".to_string(),
             membership_duration_months: None,
+            private_price_cents: None,
         },
     ]
 }
@@ -247,6 +254,16 @@ pub fn calculate_membership_checkout_price(
         })
         .ok_or_else(|| anyhow::anyhow!("请选择有效的会员档位"))?;
 
+    if let Some(price_cents) = target_product.private_price_cents {
+        if price_cents <= 0 {
+            return Err(super::virtual_payment::VirtualPaymentError::InvalidOrder.into());
+        }
+        return Ok(MembershipCheckoutPrice {
+            original_price_cents: price_cents,
+            pay_price_cents: price_cents,
+            upgrade_fee_cents: 0,
+        });
+    }
     let original_price_cents = target_product.price_cents;
     let current_product = match current_tier.as_str() {
         "V6" | "V7" | "V8" => products.iter().find(|product| {
@@ -281,6 +298,36 @@ mod tests {
         match_id_unlock_product_type, parse_match_id_unlock_product_type,
         parse_reflux_subscription_product_type, reflux_subscription_product_type,
     };
+
+    #[test]
+    fn selected_private_target_uses_direct_price_without_upgrade_fee() {
+        let mut products = default_membership_product_options();
+        products
+            .iter_mut()
+            .find(|p| p.target_tier == "V7")
+            .unwrap()
+            .private_price_cents = Some(55);
+        let price = calculate_membership_checkout_price(&products, "V6", "V7").unwrap();
+        assert_eq!(price.original_price_cents, 55);
+        assert_eq!(price.pay_price_cents, 55);
+        assert_eq!(price.upgrade_fee_cents, 0);
+    }
+    #[test]
+    fn private_current_tier_does_not_change_standard_upgrade_credit() {
+        let mut products = default_membership_product_options();
+        products
+            .iter_mut()
+            .find(|p| p.target_tier == "V6")
+            .unwrap()
+            .private_price_cents = Some(1);
+        let price = calculate_membership_checkout_price(&products, "V6", "V8").unwrap();
+        assert_eq!(price.pay_price_cents, 5500);
+    }
+    #[test]
+    fn system_config_cannot_mark_an_offer_as_private() {
+        let option:super::MembershipProductOption=serde_json::from_value(serde_json::json!({"target_tier":"V7","price_cents":5900,"title":"","subtitle":"","description":"","private_price_cents":1})).unwrap();
+        assert!(option.private_price_cents.is_none());
+    }
 
     #[test]
     fn calculate_membership_checkout_price_charges_difference_plus_upgrade_fee() {

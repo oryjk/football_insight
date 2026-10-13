@@ -58,7 +58,7 @@ impl VirtualProductRepository for PostgresVirtualProductRepository {
         user_id: uuid::Uuid,
     ) -> Result<Vec<PrivateMembershipProduct>, VirtualPaymentError> {
         let rows = sqlx::query_as::<_, (String, String, i32, i32)>(
-            "SELECT split_part(product_key,'@',1),name,price_cents,membership_duration_months FROM f_i_virtual_payment_products WHERE product_key LIKE 'membership:V3@%' AND enabled AND $1=ANY(allowed_user_ids) ORDER BY price_cents,product_key",
+            "SELECT split_part(product_key,'@',1),name,price_cents,membership_duration_months FROM f_i_virtual_payment_products WHERE product_key ~ '^membership:V(3|[6-9])@[1-9][0-9]*$' AND enabled AND cardinality(allowed_user_ids)>0 AND $1=ANY(allowed_user_ids) ORDER BY price_cents,product_key",
         ).bind(user_id).fetch_all(&self.pool).await.map_err(catalog_error)?;
         Ok(rows
             .into_iter()

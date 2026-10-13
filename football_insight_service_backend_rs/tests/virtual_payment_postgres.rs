@@ -970,3 +970,296 @@ async fn unfulfilled_partial_refund_can_finish_and_never_grants_membership() {
     assert_eq!(db.membership().await["tier"], "V1");
     db.close().await;
 }
+
+fn membership_catalog(db:&Database)->football_insight_service_backend_rs::payment::application::get_membership_product::GetMembershipProductUseCase{
+    football_insight_service_backend_rs::payment::application::get_membership_product::GetMembershipProductUseCase::new(Arc::new(football_insight_service_backend_rs::system_config::adapters::persistence::postgres_system_config_port::PostgresSystemConfigPort::new(db.pool.clone())),Arc::new(football_insight_service_backend_rs::payment::adapters::persistence::postgres_virtual_product_repository::PostgresVirtualProductRepository::new(db.pool.clone())))
+}
+#[tokio::test]
+#[ignore = "requires an explicit disposable database"]
+async fn private_membership_offers_cover_all_tiers_and_refresh_reassignment_and_enablement() {
+    use football_insight_service_backend_rs::payment::adapters::web::dto::MembershipProductResponse;
+    use football_insight_service_backend_rs::payment::ports::virtual_payment_port::VirtualProductRepository;
+    let db = Database::new().await;
+    let catalog = membership_catalog(&db);
+    let repo=football_insight_service_backend_rs::payment::adapters::persistence::postgres_virtual_product_repository::PostgresVirtualProductRepository::new(db.pool.clone());
+    let other = Uuid::new_v4();
+    sqlx::query("INSERT INTO f_i_users(id,wx_open_id,account_identifier,display_name,password_hash) VALUES($1,'other','other','Other','unused')").bind(other).execute(&db.pool).await.unwrap();
+    for tier in ["V3", "V6", "V7", "V8", "V9"] {
+        sqlx::query("INSERT INTO f_i_virtual_payment_products(product_key,name,product_id,price_cents,enabled,allowed_user_ids,membership_duration_months) VALUES($1,$2,$3,55,TRUE,$4,2)").bind(format!("membership:{tier}@55")).bind(format!("Private {tier}")).bind(format!("private_{tier}")).bind(vec![db.user]).execute(&db.pool).await.unwrap();
+    }
+    // Same tier supports multiple mapped amounts; the lowest eligible direct offer is selected.
+    sqlx::query("INSERT INTO f_i_virtual_payment_products(product_key,name,product_id,price_cents,enabled,allowed_user_ids,membership_duration_months) VALUES('membership:V7@99','More expensive V7','private_v7_99',99,TRUE,$1,12)").bind(vec![db.user]).execute(&db.pool).await.unwrap();
+    let allowed = repo.private_membership_products(db.user).await.unwrap();
+    assert_eq!(allowed.len(), 6);
+    let view = catalog
+        .with_duration_for_tier(
+            catalog.execute_for_user(Some(db.user)).await.unwrap(),
+            Some("V1"),
+            Some(db.user),
+        )
+        .await
+        .unwrap();
+    let response = serde_json::to_value(MembershipProductResponse::from_product_for_tier(
+        view,
+        Some("V1"),
+    ))
+    .unwrap();
+    for tier in ["V3", "V6", "V7", "V8", "V9"] {
+        let option = response["products"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["target_tier"] == tier)
+            .unwrap();
+        assert_eq!(option["pay_price_cents"], 55);
+        assert_eq!(option["price_cents"], 55);
+        assert_eq!(option["membership_duration_months"], 2);
+        assert_eq!(option["is_private_offer"], true);
+        assert!(
+            repo.find_enabled(&format!("membership:{tier}@55"), other)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+    assert!(catalog.execute().await.unwrap().find_option("V3").is_none());
+    let ordinary = serde_json::to_value(MembershipProductResponse::from_product_for_tier(
+        catalog.execute_for_user(Some(other)).await.unwrap(),
+        Some("V1"),
+    ))
+    .unwrap();
+    assert!(
+        ordinary["products"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|p| p["is_private_offer"] == false)
+    );
+    assert_eq!(ordinary["products"][1]["pay_price_cents"], 5900);
+    sqlx::query("UPDATE f_i_virtual_payment_products SET enabled=FALSE WHERE product_key='membership:V7@55'").execute(&db.pool).await.unwrap();
+    let fallback = catalog.execute_for_user(Some(db.user)).await.unwrap();
+    assert_eq!(
+        fallback.find_option("V7").unwrap().private_price_cents,
+        Some(99)
+    );
+    let fallback = catalog
+        .with_duration_for_tier(fallback, Some("V6"), Some(db.user))
+        .await
+        .unwrap();
+    assert_eq!(
+        fallback
+            .find_option("V7")
+            .unwrap()
+            .membership_duration_months,
+        Some(12)
+    );
+    sqlx::query(
+        "UPDATE f_i_virtual_payment_products SET enabled=TRUE WHERE product_key='membership:V7@55'",
+    )
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    // Reassignment edits the actual data source; old user loses the offer immediately.
+    sqlx::query("UPDATE f_i_virtual_payment_products SET allowed_user_ids=$1 WHERE product_key LIKE 'membership:%@55' OR product_key='membership:V7@99'").bind(vec![other]).execute(&db.pool).await.unwrap();
+    assert!(
+        repo.private_membership_products(db.user)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        repo.private_membership_products(other).await.unwrap().len(),
+        6
+    );
+    assert!(
+        catalog
+            .execute_for_user(Some(db.user))
+            .await
+            .unwrap()
+            .find_option("V7")
+            .unwrap()
+            .private_price_cents
+            .is_none()
+    );
+    assert_eq!(
+        catalog
+            .execute_for_user(Some(other))
+            .await
+            .unwrap()
+            .find_option("V7")
+            .unwrap()
+            .private_price_cents,
+        Some(55)
+    );
+    let service = catalog_service(&db);
+    assert!(
+        catalog_checkout(&db, &service, "old_private_buyer", "membership:V7", 55)
+            .await
+            .is_err()
+    );
+    db.repos()
+        .0
+        .create_order(NewPaymentOrder {
+            order_no: "new_private_buyer".into(),
+            user_id: other,
+            amount_cents: 55,
+            product_type: "membership:V7".into(),
+        })
+        .await
+        .unwrap();
+    let params = service
+        .unified_order("new_private_buyer", "test", 55, "other")
+        .await
+        .unwrap();
+    let sign: serde_json::Value =
+        serde_json::from_str(&params.virtual_payment.unwrap().sign_data).unwrap();
+    assert_eq!(sign["productId"], "private_V7");
+    sqlx::query("UPDATE f_i_virtual_payment_products SET enabled=FALSE WHERE cardinality(allowed_user_ids)>0").execute(&db.pool).await.unwrap();
+    assert!(
+        repo.private_membership_products(other)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        catalog
+            .execute_for_user(Some(other))
+            .await
+            .unwrap()
+            .find_option("V7")
+            .unwrap()
+            .private_price_cents
+            .is_none()
+    );
+    db.close().await;
+}
+#[tokio::test]
+#[ignore = "requires an explicit disposable database"]
+async fn private_upgrade_display_and_created_order_use_the_same_direct_amount_and_key() {
+    use football_insight_service_backend_rs::payment::{
+        adapters::web::dto::MembershipProductResponse,
+        application::create_membership_order::{
+            CreateMembershipOrderInput, CreateMembershipOrderUseCase,
+        },
+    };
+    let db = Database::new().await;
+    sqlx::query("UPDATE f_i_users SET membership_tier='V6' WHERE id=$1")
+        .bind(db.user)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO f_i_virtual_payment_products(product_key,name,product_id,price_cents,enabled,allowed_user_ids,membership_duration_months) VALUES('membership:V7@55','Assigned V7','assigned_v7',55,TRUE,$1,1)").bind(vec![db.user]).execute(&db.pool).await.unwrap();
+    let catalog = membership_catalog(&db);
+    let products = catalog.execute_for_user(Some(db.user)).await.unwrap();
+    let view = catalog
+        .with_duration_for_tier(products.clone(), Some("V6"), Some(db.user))
+        .await
+        .unwrap();
+    let response = MembershipProductResponse::from_product_for_tier(view, Some("V6"));
+    let option = response
+        .products
+        .iter()
+        .find(|p| p.target_tier == "V7")
+        .unwrap();
+    assert_eq!(option.pay_price_cents, 55);
+    assert_eq!(option.upgrade_fee_cents, 0);
+    assert_eq!(option.membership_duration_months, Some(1));
+    let use_case = CreateMembershipOrderUseCase::new(
+        db.repos().0,
+        Arc::new(PostgresAuthRepository::new(db.pool.clone())),
+        Arc::new(catalog_service(&db)),
+    );
+    let output = use_case
+        .execute(CreateMembershipOrderInput {
+            user_id: db.user,
+            target_tier: "V7".into(),
+            products: products.products,
+        })
+        .await
+        .unwrap();
+    let order = db
+        .repos()
+        .0
+        .find_order_by_no(&output.order_no)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(order.amount_cents, 55);
+    assert_eq!(order.product_type, "membership:V7");
+    let snapshot = db.repos().1.find(&output.order_no).await.unwrap().unwrap();
+    assert_eq!(snapshot.product_id, "assigned_v7");
+    assert_eq!(snapshot.membership_duration_months, 1);
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires an explicit disposable database"]
+async fn restricting_standard_sku_does_not_leak_private_metadata_or_allow_unassigned_purchase() {
+    use football_insight_service_backend_rs::payment::adapters::web::dto::MembershipProductResponse;
+    use football_insight_service_backend_rs::payment::ports::virtual_payment_port::VirtualProductRepository;
+    let db = Database::new().await;
+    let other = Uuid::new_v4();
+    sqlx::query("INSERT INTO f_i_users(id,wx_open_id,account_identifier,display_name,password_hash) VALUES($1,'unassigned','unassigned','Unassigned','unused')").bind(other).execute(&db.pool).await.unwrap();
+    sqlx::query("UPDATE f_i_virtual_payment_products SET name='Private standard-price offer',allowed_user_ids=$1 WHERE product_key='membership:V6@3900'").bind(vec![db.user]).execute(&db.pool).await.unwrap();
+    let catalog = membership_catalog(&db);
+    for user in [None, Some(other)] {
+        let view = catalog
+            .with_duration_for_tier(
+                catalog.execute_for_user(user).await.unwrap(),
+                Some("V1"),
+                user,
+            )
+            .await
+            .unwrap();
+        let response = serde_json::to_value(MembershipProductResponse::from_product_for_tier(
+            view,
+            Some("V1"),
+        ))
+        .unwrap();
+        let serialized = response.to_string();
+        assert!(!serialized.contains("Private standard-price offer"));
+        assert!(!serialized.contains(&db.user.to_string()));
+        assert!(
+            response["products"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|p| p["is_private_offer"] == false)
+        );
+        assert!(response["products"][0]["membership_duration_months"].is_null());
+    }
+    let repo=football_insight_service_backend_rs::payment::adapters::persistence::postgres_virtual_product_repository::PostgresVirtualProductRepository::new(db.pool.clone());
+    assert!(
+        repo.find_enabled("membership:V6@3900", other)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    db.repos()
+        .0
+        .create_order(NewPaymentOrder {
+            order_no: "unassigned_standard_sku".into(),
+            user_id: other,
+            amount_cents: 3900,
+            product_type: "membership:V6".into(),
+        })
+        .await
+        .unwrap();
+    let failure = catalog_service(&db)
+        .unified_order("unassigned_standard_sku", "test", 3900, "unassigned")
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        failure.downcast_ref::<VirtualPaymentError>(),
+        Some(VirtualPaymentError::ProductUnavailable)
+    ));
+    assert!(
+        db.repos()
+            .1
+            .find("unassigned_standard_sku")
+            .await
+            .unwrap()
+            .is_none()
+    );
+    db.close().await;
+}

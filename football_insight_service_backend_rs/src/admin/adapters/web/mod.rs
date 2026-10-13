@@ -1,3 +1,10 @@
+pub mod credentials_handlers;
+pub mod credentials_routes;
 pub mod dto;
 pub mod handlers;
+pub mod product_dto;
+pub mod product_handlers;
+pub mod product_routes;
 pub mod routes;
+pub mod setup_handlers;
+pub mod setup_routes;

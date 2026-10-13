@@ -51,6 +51,7 @@ pub struct AdminTokenClaims {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AdminPermission {
     ManageUsers,
+    ManageProducts,
     ViewAuditLogs,
 }
 

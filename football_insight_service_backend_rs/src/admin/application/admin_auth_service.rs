@@ -40,6 +40,16 @@ pub struct AdminLoginResult {
     pub admin: AdminIdentity,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum AdminAuthorizationError {
+    #[error("admin login required")]
+    Unauthorized,
+    #[error("admin permission denied")]
+    Forbidden,
+    #[error("admin authentication failed")]
+    Internal,
+}
+
 pub struct AdminAuthService {
     repository: Arc<dyn AdminAuthRepository>,
     password_port: Arc<dyn PasswordPort>,
@@ -88,15 +98,23 @@ impl AdminAuthService {
         let now = (self.clock)();
         let expires_at = now + self.session_duration;
         let session_id = Uuid::new_v4();
-        self.repository
-            .create_session(AdminSession {
-                id: session_id,
-                admin_user_id: account.id,
-                expires_at,
-                revoked_at: None,
-                created_at: now,
-            })
+        let created = self
+            .repository
+            .create_session_if_current(
+                AdminSession {
+                    id: session_id,
+                    admin_user_id: account.id,
+                    expires_at,
+                    revoked_at: None,
+                    created_at: now,
+                },
+                &account.username,
+                &account.password_hash,
+            )
             .await?;
+        if !created {
+            anyhow::bail!("invalid admin credentials");
+        }
         let access_token = self.token_port.issue_token(
             account.id,
             session_id,
@@ -143,6 +161,54 @@ impl AdminAuthService {
             .is_allowed(&principal.role, permission)
         {
             anyhow::bail!("admin permission denied");
+        }
+        Ok(principal)
+    }
+
+    /// Typed authentication for Admin surfaces; requires a live JWT and persisted session.
+    pub async fn authenticate_checked(
+        &self,
+        token: &str,
+    ) -> Result<AdminPrincipal, AdminAuthorizationError> {
+        let claims = self
+            .token_port
+            .verify_token(token)
+            .map_err(|_| AdminAuthorizationError::Unauthorized)?;
+        let now = (self.clock)();
+        if claims.expires_at <= now {
+            return Err(AdminAuthorizationError::Unauthorized);
+        }
+        let account = self
+            .repository
+            .find_active_account_for_session(claims.admin_id, claims.session_id, now)
+            .await
+            .map_err(|_| {
+                tracing::error!("admin authentication persistence failed");
+                AdminAuthorizationError::Internal
+            })?
+            .filter(|account| account.status == "active")
+            .ok_or(AdminAuthorizationError::Unauthorized)?;
+        Ok(AdminPrincipal {
+            admin_id: account.id,
+            session_id: claims.session_id,
+            username: account.username,
+            display_name: account.display_name,
+            role: account.role,
+            expires_at: claims.expires_at,
+        })
+    }
+    /// Typed authorization checks the current persisted role, rather than trusting a JWT role snapshot.
+    pub async fn authorize_checked(
+        &self,
+        token: &str,
+        permission: AdminPermission,
+    ) -> Result<AdminPrincipal, AdminAuthorizationError> {
+        let principal = self.authenticate_checked(token).await?;
+        if !self
+            .authorization_port
+            .is_allowed(&principal.role, permission)
+        {
+            return Err(AdminAuthorizationError::Forbidden);
         }
         Ok(principal)
     }

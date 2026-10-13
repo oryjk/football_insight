@@ -147,23 +147,49 @@ impl GetMembershipProductUseCase {
             .products
             .retain(|p| !p.target_tier.trim().eq_ignore_ascii_case("V3"));
         if let Some(user_id) = user_id {
-            for private in self.products.private_membership_products(user_id).await? {
-                let tier = crate::payment::domain::order::membership_tier_from_product_type(
-                    &private.product_type,
-                );
-                if product.find_option(&tier).is_some() {
+            let mut private_products = self.products.private_membership_products(user_id).await?;
+            // The API selects one offer per tier. Prefer the cheapest eligible direct offer,
+            // while retaining system-config prices as the credit basis for other upgrades.
+            private_products.sort_by(|a, b| {
+                a.price_cents
+                    .cmp(&b.price_cents)
+                    .then_with(|| a.product_type.cmp(&b.product_type))
+            });
+            let mut selected = std::collections::HashSet::new();
+            for private in private_products {
+                let Some(tier) = private
+                    .product_type
+                    .strip_prefix("membership:")
+                    .filter(|tier| matches!(*tier, "V3" | "V6" | "V7" | "V8" | "V9"))
+                else {
+                    continue;
+                };
+                if !selected.insert(tier.to_owned()) {
                     continue;
                 }
-                product
+                if let Some(option) = product
                     .products
-                    .push(crate::payment::domain::order::MembershipProductOption {
-                        target_tier: tier.clone(),
-                        price_cents: private.price_cents,
-                        title: private.name,
-                        subtitle: "仅限指定账号".into(),
-                        description: format!("支付确认后开通 {tier}，权益按现有等级规则执行。"),
-                        membership_duration_months: Some(private.membership_duration_months),
-                    });
+                    .iter_mut()
+                    .find(|p| p.target_tier.trim().eq_ignore_ascii_case(tier))
+                {
+                    option.private_price_cents = Some(private.price_cents);
+                    option.title = private.name;
+                    option.subtitle = "仅限指定账号".into();
+                    option.description = format!("支付确认后开通 {tier}，权益按现有等级规则执行。");
+                    option.membership_duration_months = Some(private.membership_duration_months);
+                } else {
+                    product
+                        .products
+                        .push(crate::payment::domain::order::MembershipProductOption {
+                            target_tier: tier.to_owned(),
+                            price_cents: private.price_cents,
+                            title: private.name,
+                            subtitle: "仅限指定账号".into(),
+                            description: format!("支付确认后开通 {tier}，权益按现有等级规则执行。"),
+                            membership_duration_months: Some(private.membership_duration_months),
+                            private_price_cents: Some(private.price_cents),
+                        });
+                }
             }
         }
         Ok(product)
@@ -187,7 +213,7 @@ impl GetMembershipProductUseCase {
                     .ok()
                 })
                 .map(|price| price.pay_price_cents)
-                .unwrap_or(option.price_cents);
+                .unwrap_or(option.private_price_cents.unwrap_or(option.price_cents));
             option.membership_duration_months = None;
             let Ok(key) = crate::payment::domain::virtual_payment::product_key(
                 &crate::payment::domain::order::membership_product_type_for_tier(

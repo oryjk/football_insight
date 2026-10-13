@@ -166,7 +166,8 @@ fn matches_excluded_prefix(path: &str) -> bool {
         return false;
     }
 
-    path.starts_with("/api/v1/auth/")
+    path.starts_with("/api/v1/admin/")
+        || path.starts_with("/api/v1/auth/")
         || path.starts_with("/api/v1/payment/")
         || path.starts_with("/api/v1/ticket-watch/")
         || path.starts_with("/api/v1/match-id/")
@@ -223,6 +224,29 @@ mod tests {
     use tower::ServiceExt;
 
     use super::{HttpResponseCache, MAX_CACHEABLE_BODY_SIZE, cache_get_responses};
+
+    #[tokio::test]
+    async fn does_not_cache_public_admin_setup_after_initialization() {
+        let initialized = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let state = initialized.clone();
+        let app=Router::new().route("/api/v1/admin/auth/setup",get(move ||{let state=state.clone();async move{axum::Json(serde_json::json!({"needs_setup":!state.load(Ordering::SeqCst),"username":"superadmin"}))}})).layer(from_fn_with_state(HttpResponseCache::new(Duration::from_secs(600)),cache_get_responses));
+        for expected in [true, false] {
+            initialized.store(!expected, Ordering::SeqCst);
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri("/api/v1/admin/auth/setup")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let body = to_bytes(response.into_body(), 1024).await.unwrap();
+            let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(value["needs_setup"], expected);
+        }
+    }
 
     #[tokio::test]
     async fn caches_safe_get_requests_for_ttl_window() {

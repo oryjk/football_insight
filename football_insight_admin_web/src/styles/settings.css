@@ -1,0 +1,37 @@
+.settings-workspace {
+  display: grid;
+  gap: var(--page-section-gap);
+}
+.settings-account-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0;
+}
+.settings-account-summary dt {
+  color: var(--muted);
+}
+.settings-account-summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.settings-credentials-form {
+  display: grid;
+  gap: var(--space-4);
+  width: min(100%, var(--settings-form-width));
+}
+.settings-session-notice {
+  color: var(--warning);
+  background: var(--warning-bg);
+  border: var(--space-px) solid var(--warning-border);
+  border-radius: var(--radius-control);
+  padding: var(--space-3);
+  line-height: var(--leading-relaxed);
+}
+.settings-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}

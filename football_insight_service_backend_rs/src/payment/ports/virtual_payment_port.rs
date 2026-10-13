@@ -12,6 +12,7 @@ pub trait VirtualProductRepository: Send + Sync {
         user_id: uuid::Uuid,
     ) -> Result<Option<VirtualProduct>, VirtualPaymentError>;
     async fn has_enabled(&self) -> Result<bool, VirtualPaymentError>;
+    /// Enabled membership offers explicitly assigned to this user, across all supported tiers.
     async fn private_membership_products(
         &self,
         user_id: uuid::Uuid,
