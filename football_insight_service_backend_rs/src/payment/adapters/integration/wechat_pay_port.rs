@@ -102,6 +102,7 @@ impl WechatPayPort for HttpWechatPayPort {
         let pay_sign = md5_sign(&pay_params, &self.api_key);
 
         Ok(WxPayParams {
+            virtual_payment: None,
             time_stamp,
             nonce_str,
             package,

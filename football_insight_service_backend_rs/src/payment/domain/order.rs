@@ -81,6 +81,7 @@ pub struct MembershipCheckoutPrice {
 
 #[derive(Debug, Clone)]
 pub struct WxPayParams {
+    pub virtual_payment: Option<super::virtual_payment::VirtualPayParams>,
     pub time_stamp: String,
     pub nonce_str: String,
     pub package: String,

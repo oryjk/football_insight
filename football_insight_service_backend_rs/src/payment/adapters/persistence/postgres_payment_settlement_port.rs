@@ -123,8 +123,12 @@ impl PaymentSettlementPort for PostgresPaymentSettlementPort {
             return Ok(());
         }
 
+        super::postgres_virtual_order_repository::snapshot_membership(
+            &mut tx, order_no, user_id, true,
+        )
+        .await?;
         let current_user = sqlx::query(
-            "SELECT membership_tier, membership_expires_at FROM f_i_users WHERE id = $1 LIMIT 1",
+            "SELECT membership_tier, membership_expires_at FROM f_i_users WHERE id = $1 LIMIT 1 FOR UPDATE",
         )
         .bind(user_id)
         .fetch_optional(&mut *tx)
@@ -158,6 +162,10 @@ impl PaymentSettlementPort for PostgresPaymentSettlementPort {
         .execute(&mut *tx)
         .await?;
 
+        super::postgres_virtual_order_repository::snapshot_membership(
+            &mut tx, order_no, user_id, false,
+        )
+        .await?;
         tx.commit().await?;
         Ok(())
     }

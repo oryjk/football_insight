@@ -1,3 +1,4 @@
+import type { DigitalPaymentParams } from './payment'
 export interface TicketWatchMatchSummary {
   match_id: number
   external_match_id: string
@@ -113,11 +114,5 @@ export interface RefluxSubscriptionStatusResponse {
 
 export interface CreateRefluxSubscriptionOrderResponse {
   order_no: string
-  params: {
-    timeStamp: string
-    nonceStr: string
-    package: string
-    signType: string
-    paySign: string
-  }
+  params: DigitalPaymentParams
 }

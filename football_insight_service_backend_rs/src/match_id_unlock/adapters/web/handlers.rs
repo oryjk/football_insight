@@ -84,6 +84,18 @@ fn authenticate_user(
 }
 
 fn map_match_id_unlock_error(error: anyhow::Error) -> (StatusCode, String) {
+    if let Some(error) =
+        error.downcast_ref::<crate::payment::domain::virtual_payment::VirtualPaymentError>()
+    {
+        use crate::payment::domain::virtual_payment::VirtualPaymentError::*;
+        let status = match error {
+            Unavailable | ProductUnavailable | Provider => StatusCode::SERVICE_UNAVAILABLE,
+            IdentityMismatch => StatusCode::FORBIDDEN,
+            SessionExpired | InvalidOrder => StatusCode::BAD_REQUEST,
+        };
+        return (status, error.to_string());
+    }
+
     if let Some(unlock_error) = error.downcast_ref::<MatchIdUnlockError>() {
         let status = match unlock_error {
             MatchIdUnlockError::MatchNotFound => StatusCode::NOT_FOUND,

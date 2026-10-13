@@ -6,4 +6,7 @@ use crate::payment::domain::order::{NewPaymentOrder, PaymentOrder};
 pub trait OrderRepository: Send + Sync {
     async fn create_order(&self, order: NewPaymentOrder) -> anyhow::Result<PaymentOrder>;
     async fn find_order_by_no(&self, order_no: &str) -> anyhow::Result<Option<PaymentOrder>>;
+    async fn is_virtual_order(&self, _order_no: &str) -> anyhow::Result<bool> {
+        Ok(false)
+    }
 }

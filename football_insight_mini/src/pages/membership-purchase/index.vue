@@ -1,7 +1,6 @@
 <template>
   <FiSecondaryNav :shareable="false" @back="goBackFromSecondaryPage('/pages/user/index')" />
-  <view v-if="systemConfigUnderReview" class="page-root" />
-  <view v-else class="page-root">
+  <view class="page-root">
     <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
     <view class="page">
@@ -9,6 +8,11 @@
         <text class="purchase-hero__eyebrow">会员充值</text>
         <text class="purchase-hero__title">选择回流看板会员档位</text>
         <text class="purchase-hero__summary">V6 起解锁最近回流速览，支付成功后立即生效。</text>
+      </view>
+
+      <view v-if="!paymentAvailable" class="purchase-empty-card">
+        <text class="purchase-empty-card__title">会员购买暂未开放</text>
+        <text class="purchase-empty-card__body">{{ paymentUnavailableMessage }}</text>
       </view>
 
       <view v-if="productOptions.length" class="product-grid">
@@ -102,7 +106,7 @@
         <button
           class="purchase-btn"
           :class="{ 'purchase-btn--loading': loading }"
-          :disabled="loading || !agreementAccepted || !selectedProduct"
+          :disabled="loading || !paymentAvailable || !agreementAccepted || !selectedProduct"
           @click="handlePurchase"
         >
           <text v-if="loading">处理中...</text>
@@ -115,13 +119,15 @@
 
 <script setup lang="ts">
 import { onLoad, onShow } from '@dcloudio/uni-app'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
-import { getMembershipProduct, createMembershipOrder } from '../../api/payment'
+import { getMembershipProduct, createMembershipOrder, getVirtualPaymentStatus } from '../../api/payment'
+import { prepareVirtualPayment } from '../../composables/prepareVirtualPayment'
+import { waitForPaidOrder } from '../../composables/confirmPaidOrder'
+import { canUseVirtualPayment, requestDigitalPayment } from '../../utils/virtualPayment'
 import { useRuntimeConfig } from '../../stores/runtimeConfig'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
 import { reportPageActivity } from '../../utils/userActivity'
@@ -151,7 +157,8 @@ const loading = ref(false)
 const selectedTier = ref('')
 const agreementAccepted = ref(false)
 const agreementPoints = MEMBERSHIP_PURCHASE_AGREEMENT_POINTS
-const systemConfigUnderReview = ref(false)
+const paymentAvailable = ref(false)
+const paymentUnavailableMessage = ref('请稍后再试。')
 
 const allProductOptions = computed(() => normalizeMembershipProductOptions(product.value))
 const productOptions = computed(() =>
@@ -194,19 +201,25 @@ const displayPrice = computed(() => {
 const selectedUpgradeNote = computed(() => formatMembershipUpgradeNote(selectedProduct.value))
 
 onLoad(() => {
-  loadPurchaseData()
+  void loadPurchaseData()
 })
 
 onShow(() => {
   reportPageActivity('membership_purchase')
+  void loadPurchaseData()
 })
 
 async function loadPurchaseData() {
-  systemConfigUnderReview.value = await loadSystemConfigUnderReview()
-  if (systemConfigUnderReview.value) {
-    product.value = null
-    selectedTier.value = ''
-    return
+  const revision = session.revision.value
+  paymentAvailable.value = false
+  try {
+    const status = await getVirtualPaymentStatus()
+    if (session.revision.value !== revision) return
+    paymentAvailable.value = status.available && canUseVirtualPayment()
+    paymentUnavailableMessage.value = !status.available ? '购买服务暂未开放，请稍后再试。' : '请使用支持该支付功能的最新版微信小程序。'
+  } catch {
+    if (session.revision.value !== revision) return
+    paymentUnavailableMessage.value = '购买服务暂不可用，请稍后重试。'
   }
 
   const [productResult] = await Promise.allSettled([
@@ -215,6 +228,7 @@ async function loadPurchaseData() {
     session.ensureSessionReady(),
   ])
 
+  if (session.revision.value !== revision) return
   if (productResult.status === 'fulfilled') {
     product.value = productResult.value
   } else {
@@ -228,56 +242,48 @@ function selectTier(targetTier: string): void {
   selectedTier.value = targetTier
 }
 
+watch(session.revision, () => {
+  product.value = null
+  selectedTier.value = ''
+  paymentAvailable.value = false
+  void loadPurchaseData()
+})
+
 async function handlePurchase() {
-  if (loading.value) return
-  if (!selectedProduct.value) {
-    uni.showToast({ title: '请选择会员档位', icon: 'none' })
-    return
-  }
-  if (!agreementAccepted.value) {
-    uni.showToast({ title: '请先确认会员服务声明', icon: 'none' })
-    return
-  }
-
+  if (loading.value || !paymentAvailable.value) return
+  if (!selectedProduct.value || !agreementAccepted.value) return
+  const revision = session.revision.value
+  const targetTier = selectedProduct.value.target_tier
+  const isCurrent = () => session.revision.value === revision
   loading.value = true
-
+  let paymentCompleted = false
   try {
-    const order = await createMembershipOrder(selectedProduct.value.target_tier)
-
-    uni.requestPayment({
-      provider: 'wxpay',
-      timeStamp: order.params.timeStamp,
-      nonceStr: order.params.nonceStr,
-      package: order.params.package,
-      signType: order.params.signType,
-      paySign: order.params.paySign,
-      success: async () => {
-        uni.showToast({ title: '支付成功', icon: 'success' })
-        try {
-          // 支付完成后强制刷新会话，让新会员等级立刻共享给洞察/余票页面。
-          await session.ensureSessionReady({ force: true })
-        } catch {
-          // 刷新失败不阻断返回；后端付费记录仍为权威，下次 onShow 会重试。
-        }
-        setTimeout(() => {
-          uni.navigateBack()
-        }, 1200)
-      },
-      fail: (err: any) => {
-        const msg = err?.errMsg || '支付取消'
-        if (msg.includes('cancel') || msg.includes('关闭') || msg.includes('fail')) {
-          uni.showToast({ title: '支付已取消', icon: 'none' })
-        } else {
-          uni.showToast({ title: '支付失败', icon: 'none' })
-        }
-      },
-    })
+    await prepareVirtualPayment()
+    if (!isCurrent()) return
+    const order = await createMembershipOrder(targetTier)
+    if (!isCurrent()) return
+    await requestDigitalPayment(order.params)
+    paymentCompleted = true
+    if (!isCurrent()) return
+    const confirmed = await waitForPaidOrder(order.order_no, isCurrent)
+    if (!isCurrent()) return
+    if (!confirmed) {
+      uni.showToast({ title: '支付已完成，会员确认中，请稍后刷新', icon: 'none' })
+      return
+    }
+    await session.ensureSessionReady({ force: true })
+    if (!isCurrent()) return
+    uni.showToast({ title: '会员已生效', icon: 'success' })
+    await loadPurchaseData()
   } catch (error) {
-    uni.showToast({ title: extractApiErrorMessage(error, '下单失败'), icon: 'none' })
+    if (!isCurrent()) return
+    uni.showToast({ title: paymentCompleted ? '支付已完成，请稍后刷新会员状态' : extractApiErrorMessage(error, '购买未完成，请重试'), icon: 'none' })
   } finally {
+    // This flag belongs to the outstanding native payment, even if the account changed.
     loading.value = false
   }
 }
+
 </script>
 
 <style scoped>

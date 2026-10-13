@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     match_id_unlock::domain::match_id_unlock::MatchIdUnlockSource,
-    payment::adapters::web::dto::WxPayParamsDto,
+    payment::adapters::payment_params::PaymentParams as WxPayParamsDto,
 };
 
 #[derive(Debug, Deserialize)]
