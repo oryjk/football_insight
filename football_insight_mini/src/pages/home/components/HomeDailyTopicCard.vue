@@ -24,7 +24,7 @@ const emit = defineEmits<{ (e: 'read', id: string): void; (e: 'play', id: string
 </script>
 
 <style scoped>
-.topic-card { box-sizing: border-box; height: var(--fi-space-topic-card-height); margin: 0 var(--fi-space-14) var(--fi-space-12) 0; padding: var(--fi-space-28); border-radius: var(--fi-radius-lg); background: var(--fi-color-bg); border: var(--fi-border-card); box-shadow: var(--fi-shadow-soft); display: flex; flex-direction: column; }
+.topic-card { box-sizing: border-box; height: var(--fi-space-topic-card-height); padding: var(--fi-space-28); border-radius: var(--fi-radius-lg); background: var(--fi-color-bg); border: var(--fi-border-card); box-shadow: var(--fi-shadow-soft); display: flex; flex-direction: column; }
 .topic-card__top { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-12); }
 .topic-card__category { padding: var(--fi-space-4) var(--fi-space-12); border-radius: var(--fi-radius-round); background: var(--fi-color-topic-audio-surface); color: var(--fi-color-primary); font-size: var(--fi-font-24); font-weight: var(--fi-weight-bold); }
 .topic-card__number { color: var(--fi-color-text-caption); font-size: var(--fi-font-22); }
