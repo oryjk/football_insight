@@ -1,0 +1,80 @@
+--- a/src/models/qwen3_tts/talker.rs
++++ b/src/models/qwen3_tts/talker.rs
+@@ -111,11 +111,11 @@
+         // Text projection MLP — weights under `talker.text_projection.*`
+         let text_proj_fc1 = candle_nn::linear(
+             config.text_hidden_size,
+-            config.hidden_size,
++            config.text_hidden_size,
+             vb.pp("text_projection.linear_fc1"),
+         )?;
+         let text_proj_fc2 = candle_nn::linear(
+-            config.hidden_size,
++            config.text_hidden_size,
+             config.hidden_size,
+             vb.pp("text_projection.linear_fc2"),
+         )?;
+--- a/src/models/qwen3_tts/code_predictor.rs
++++ b/src/models/qwen3_tts/code_predictor.rs
+@@ -23,7 +23,7 @@
+ /// The Code Predictor sub-model.
+ pub struct CodePredictor {
+     /// Project from Talker hidden size to Code Predictor hidden size.
+-    input_proj: Linear,
++    input_proj: Option<Linear>,
+     /// Per-group codec embeddings: group_embeds[g] for groups 1..N-1.
+     group_embeds: Vec<Embedding>,
+     /// Transformer layers (smaller than the Talker).
+@@ -43,6 +43,13 @@
+ }
+ 
+ impl CodePredictor {
++    fn project(&self, input: &Tensor) -> Result<Tensor> {
++        match &self.input_proj {
++            Some(projection) => projection.forward(input),
++            None => Ok(input.clone()),
++        }
++    }
++
+     /// Load the Code Predictor from a VarBuilder.
+     pub fn load(
+         config: &CodePredictorConfig,
+@@ -66,11 +73,15 @@
+ 
+         // Projection from Talker hidden → Code Predictor hidden
+         // Actual name: talker.code_predictor.small_to_mtp_projection.{weight,bias}
+-        let input_proj = candle_nn::linear(
+-            talker_hidden_size,
+-            config.hidden_size,
+-            vb.pp("small_to_mtp_projection"),
+-        )?;
++        let input_proj = if talker_hidden_size == config.hidden_size {
++            None
++        } else {
++            Some(candle_nn::linear(
++                talker_hidden_size,
++                config.hidden_size,
++                vb.pp("small_to_mtp_projection"),
++            )?)
++        };
+ 
+         // Per-group embeddings (for groups 1..N-1)
+         // Actual name: talker.code_predictor.model.codec_embedding.N.weight
+@@ -175,7 +186,7 @@
+         let prefill = Tensor::cat(&[&past_hidden_3d, g0_embed], 1)?; // (1, 2, H)
+ 
+         // Project to CP hidden size
+-        let prefill = self.input_proj.forward(&prefill)?; // (1, 2, cp_hidden)
++        let prefill = self.project(&prefill)?; // (1, 2, cp_hidden)
+ 
+         let mut hidden = prefill;
+ 
+@@ -220,7 +231,7 @@
+             let prev_embed = self.group_embeds[embed_idx].forward(&prev_tok_tensor)?;
+ 
+             // Project and run one step with real RoPE
+-            let step_input = self.input_proj.forward(&prev_embed)?;
++            let step_input = self.project(&prev_embed)?;
+             let mut h = step_input;
+             for layer in &mut self.layers {
+                 h = layer.forward(&h, &self.rope_cos, &self.rope_sin, pos, None)?;

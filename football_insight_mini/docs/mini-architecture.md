@@ -82,6 +82,15 @@ src/pages/<domain>/
 
 已按此模式拆分的页面：`user`、`seat-swap`、`home`、`rankings`、`ticket-watch`、`matches`（`MatchesContent.vue` 与独立入口共享 `useMatchesPage.ts` / `presentation.ts` / `components/`）。`home`、`ticket-watch`、`matches` 可作为页面编排参考。
 
+### 首页今日话题
+
+- `home/index.vue` 编排原有 overview / 赛果、支持面板及话题事件，话题独立加载，复制原文链接由页面执行。
+- `api/dailyTopics.ts` 是唯一话题 HTTP 入口，读取 `/daily-topics?team_id=77680&limit=5`；`home/useHomeDailyTopics.ts` 管理独立请求、revision、错误与阅读选择，404 明确显示接口待接入。
+- `home/dailyTopics.ts` 纯函数验证球队、内容 ID、文章与来源、真实日期；去重且最多五篇。不使用积分榜生成新闻或空列表的伪内容。
+- `home/useDailyTopicAudio.ts` 管理 `uni.createInnerAudioContext` 生命周期，只播放对应文章的 ready HTTPS 四川话音频。批次、正文、链接或音频状态改变停止旧播放，隐藏暂停、退出销毁。
+- `HomeDailyTopics`、`HomeDailyTopicCard`、`HomeDailyTopicSheet`、`HomeTopicAudioEntry`、`HomeTopicAudioPlayer` 均使用 props / emits，无业务请求。来源详情随文章展示标题、发布机构和日期，不新增未注册 web-view 路由。
+- `types/dailyTopic.ts` 定义页面展示模型；`home/dailyTopics.test.ts` 验证条数上限、去重、空内容、来源、音频校验与播放签名失效。
+
 ## 生命周期与刷新约定
 
 - `App.vue` 以后台方式执行启动恢复（`bootstrapSession`，仅 MP 允许微信静默探测，已确认审核中时不探测）和公共配置/审核态预加载；公开页面不等待会话恢复，无 token 的 H5 不自动登录。

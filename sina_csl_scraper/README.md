@@ -2,6 +2,45 @@
 
 基于新浪体育移动端 JSON 接口抓取中超数据的 Python 项目，使用 `uv` 管理。
 
+## 今日话题与本地四川话语音
+
+`topics/` 是独立的新闻生成链路，不混入赛季同步：`sources` 采集原文，`generation` 调用正文 LLM，`tts` 调用本地 Qwen，`pipeline` 负责缓存与音频发布，`repository` 原子写库，`cli` 提供入口。小程序只请求 Rust 读取接口并播放 MinIO 音频。
+
+准备本地 Qwen 推理程序（复用已下载的 0.6B CustomVoice 权重，Mac 使用 Metal）：
+
+```bash
+uv run python scripts/setup_qwen_native.py
+uv run sina-csl-scraper topics tts --text-file /absolute/path/to/narration.txt
+```
+
+推理的薄原生 helper 位于 `tools/qwen-native`，仅负责模型计算，业务编排全部在 Python。构建产物与隔离后的 any-tts 0.2.0 放在被忽略的 `data/native-qwen`；安装器校验依赖归档 SHA256，并应用仓库内 0.6B 兼容补丁，不改共享 Cargo 缓存。Eric 为四川话音色，使用 `sichuan_dialect`；逐段生成24kHz单声道PCM，检查非静音与削波，再用 ffmpeg 或macOS afconvert 转AAC/m4a。Linux可用 `--device cpu` / `--device cuda` 构建并设置FI_QWEN_DEVICE；权重路径用FI_QWEN_MODEL_PATH覆盖。
+
+正文 LLM 与语音模型是两个模型。将 `.env.topics.example` 复制为本地 `.env.topics`，配置 `FI_TOPIC_LLM_BASE_URL`、`FI_TOPIC_LLM_MODEL` 和密钥；密钥不提交。本项目当前按用户指定使用 Kimi Code API `https://api.kimi.com/coding/v1`、`k3-256k`，使用low推理档位、JSON输出，最多8192输出token；接口兼容 `/chat/completions`。K3始终启用思考，不发送GLM的thinking开关和temperature参数；请求使用真实 `FootballInsight/1.0` 客户端标识。Kimi Code Key 与开放平台 Key 属于不同服务：开放平台地址是 `https://api.moonshot.cn/v1`、对应K3模型标识为 `kimi-k3`，不要混用。HTTP错误仅显示状态/数字错误码，不回显供应商原始报错或密钥。首次运行默认只生成本地文件，上传与入库通过显式开关开启：
+
+```bash
+set -a
+source .env.topics
+set +a
+uv run sina-csl-scraper topics collect --config config/topics.example.json
+uv run sina-csl-scraper topics generate --config config/topics.example.json
+uv run sina-csl-scraper topics generate --config config/topics.example.json --upload-audio --write-db
+```
+
+配置支持 `feeds:[{url,publisher}]` 的RSS/Atom、`articles:[{url,publisher,published_at?}]` 的原文URL，以及 `imports:[{title,url,publisher,published_at,body}]` 的已采集完整正文。`config/rongcheng-news.json` 保存首批核验过的原文地址，覆盖体坛周报、中国新闻网、上观新闻、青岛红狮官方微博和新浪转载封面新闻；这是一次完整链路的材料清单，后续需要更新文章地址或配置持续更新的RSS源。微信原文若返回验证页或拿不到正文会跳过，不绕过验证码，也不会将搜索摘要当作完整新闻。缺失时间、未来文章、超过默认72小时、正文过短、非蓉城内容都跳过；失败源不影响其它来源。`--max-age-hours` 可调整1..168小时。
+
+运行这批新闻的采集与生成：
+
+```bash
+uv run --no-sync --env-file .env.topics sina-csl-scraper topics collect --config config/rongcheng-news.json
+uv run --no-sync --env-file .env.topics sina-csl-scraper topics generate --config config/rongcheng-news.json --upload-audio
+```
+
+本地没有MinIO密钥时，可在 `.env.topics` 设置 `FI_TOPIC_MINIO_SSH_HOST=local233` 和 `FI_TOPIC_MINIO_REMOTE_PROJECT=/home/betalpha/projects/football_insight/sina_csl_scraper`。上传器通过SSH将音频传给服务器，复用服务器 `.env.sync` 和现有头像上传的 `MinioAssetTarget`；密钥留在服务器。每次生成的入库文件为 `data/topics/editions/<edition_id>.json`，包含批次id、来源指纹、生成器版本和完整payload；`data/topics/latest.json` 只包含给前端读取的payload。原始全文保存在 `materials.json`，音频及校验信息在 `audio/`。这些运行产物均不提交Git。
+
+LLM最多整理5篇、不强行凑数，引用只允许来自实际输入的source_id，并保留原文标题、机构和发布时间；严格区分一线队中超与希拉谷中乙。文章正文与音频分别用内容哈希缓存。相同材料/模型/日期的重跑复用正文，仅重试未发布语音；音频上传到 `summary/audio/topics/{team_id}/{date}/{article_id}/{audio_hash}.m4a`。语音失败保留文字并标记failed，未上传时pending。ready才提供HTTPS播放URL。空材料/空生成不会替换数据库中上次有效批次。
+
+`--write-db` 要求 Rust agent 先迁移 `f_i_daily_topic_editions`，Python不会自动建表；写库前先检查表存在。数据库须指向隔离测试库，生成命令默认不改库、不部署服务。生成缓存/材料/最新JSON位于 `data/topics/`，同缓存目录使用文件锁防重复任务。API与表结构见根目录 `docs/daily-topics-contract.md`，Rust agent提示词见 `docs/daily-topics-rust-agent-prompt.md`。
+
 当前会导出 7 类核心数据：
 
 - 每场比赛结果

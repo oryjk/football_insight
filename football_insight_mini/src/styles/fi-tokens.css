@@ -24,6 +24,8 @@ page {
   --fi-primitive-canvas: #f6f7fb;
   --fi-primitive-canvas-soft: #f7f8fa;
   --fi-primitive-surface-frosted: rgba(255, 255, 255, 0.92);
+  --fi-primitive-topic-audio-surface: #fef2f2;
+  --fi-primitive-topic-card-height: 480rpx;
   --fi-primitive-ink-rgb: 21, 22, 27;
 
   /* ===== Primitive：间距（数字刻度，单位 rpx） ===== */
@@ -112,6 +114,8 @@ page {
   --fi-color-page: var(--fi-primitive-canvas);
   --fi-color-page-soft: var(--fi-primitive-canvas-soft);
   --fi-color-surface-frosted: var(--fi-primitive-surface-frosted);
+  --fi-color-topic-audio-surface: var(--fi-primitive-topic-audio-surface);
+  --fi-space-topic-card-height: var(--fi-primitive-topic-card-height);
   --fi-color-overlay: rgba(var(--fi-primitive-ink-rgb), 0.46);
   --fi-color-success-accent: var(--fi-primitive-green);
   --fi-color-divider: var(--fi-primitive-divider);

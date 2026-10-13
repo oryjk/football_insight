@@ -1,16 +1,33 @@
 <template>
+  <page-meta :page-style="selectedDailyTopic ? 'overflow: hidden;' : ''" />
   <view class="home-page-shell">
     <FiBrandNav />
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
     <view class="page-scroll">
       <view class="page">
-        <HomeHeroBriefing
-          :hero-guide="heroGuide"
-          :hero-guide-note="heroGuideNote"
-          :is-briefing-ready="isBriefingReady"
-          :briefing-items="briefingItems"
-          :briefing-marquee-rows="briefingMarqueeRows"
+        <HomeDailyTopics
+          :edition="topicEdition"
+          :loading="topicsLoading"
+          :error-message="topicsErrorMessage"
+          :available-audio-ids="topicAudio.availableIds.value"
+          :active-audio-id="topicAudio.activeId.value"
+          :audio-status="topicAudio.status.value"
+          @read="openDailyTopic"
+          @play="topicAudio.toggle"
+          @retry="loadDailyTopics"
+        />
+
+        <HomeTopicAudioPlayer
+          v-if="topicAudio.activeId.value"
+          :title="topicAudio.activeTitle.value"
+          :status="topicAudio.status.value"
+          :current-time="topicAudio.currentTime.value"
+          :duration="topicAudio.duration.value"
+          :error-message="topicAudio.errorMessage.value"
+          @toggle="toggleCurrentTopicAudio"
+          @seek="topicAudio.seek"
+          @close="topicAudio.stop"
         />
 
         <HomeSupportPanel
@@ -55,6 +72,18 @@
       </view>
     </view>
 
+    <HomeDailyTopicSheet
+      v-if="selectedDailyTopic"
+      :item="selectedDailyTopic"
+      :updated-label="topicEdition.updatedLabel"
+      :audio-ready="topicAudio.availableIds.value.includes(selectedDailyTopic.id)"
+      :audio-playing="topicAudio.activeId.value === selectedDailyTopic.id && topicAudio.status.value === 'playing'"
+      :audio-loading="topicAudio.activeId.value === selectedDailyTopic.id && topicAudio.status.value === 'loading'"
+      @play="topicAudio.toggle"
+      @close="closeDailyTopic"
+      @copy-source="copyTopicSource"
+    />
+
     <HomeTechStatsSheet
       v-if="selectedPulseMatch"
       :match="selectedPulseMatch"
@@ -88,7 +117,9 @@ import { computed, ref, watch } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
-import HomeHeroBriefing from './components/HomeHeroBriefing.vue'
+import HomeDailyTopics from './components/HomeDailyTopics.vue'
+import HomeDailyTopicSheet from './components/HomeDailyTopicSheet.vue'
+import HomeTopicAudioPlayer from './components/HomeTopicAudioPlayer.vue'
 import HomeSupportPanel from './components/HomeSupportPanel.vue'
 import HomeSkeleton from './components/HomeSkeleton.vue'
 import HomeStoryPanel from './components/HomeStoryPanel.vue'
@@ -96,32 +127,24 @@ import HomeRankingPanel from './components/HomeRankingPanel.vue'
 import HomeTechStatsSheet from './components/HomeTechStatsSheet.vue'
 import HomeTeamSeasonSheet from './components/HomeTeamSeasonSheet.vue'
 import HomeFavoriteTeamSheet from './components/HomeFavoriteTeamSheet.vue'
-import { getAvailableRounds, getMatches, getOverview, getRankings } from '../../api/insight'
+import { getAvailableRounds, getMatches, getOverview } from '../../api/insight'
 import type {
   InsightOverviewResponse,
   MatchCard,
   OverviewPlayer,
   OverviewStanding,
-  PlayerRankingCategory,
-  RankingsViewResponse,
   RoundReference,
 } from '../../types/insight'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
 import { useRuntimeConfig } from '../../stores/runtimeConfig'
-import { buildHomeBriefingMarqueeMap, splitBriefingMarqueeRows } from '../../utils/homeBriefingMarquees'
 import { buildHeadlineTitleParts } from '../../utils/homeViewText'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
 import { reportPageActivity } from '../../utils/userActivity'
 import {
-  buildHomeBriefingItems,
   buildHomeHeadlineBody,
-  buildHomeHeroGuide,
   buildHomeWatchPoints,
-  resolveHomeGuideLeaders,
-  resolveHomeGuideNote,
-  resolveHomeGuideReferenceRoundNumber,
   resolveHomeLoadPlan,
   resolveHomePulseLeadMatch,
   resolveHomePulseMatches,
@@ -132,18 +155,19 @@ import {
 } from './helpers'
 import { createHomeSessionSync } from './sessionEffects'
 import { useHomeSupportData } from './useHomeSupportData'
+import { useHomeDailyTopics } from './useHomeDailyTopics'
+import { useDailyTopicAudio } from './useDailyTopicAudio'
+import { isTopicSourceUrl } from './dailyTopics'
 
 const currentSeason = new Date().getFullYear()
+let homeLoadRevision = 0
 const loading = ref(true)
 const errorMessage = ref('')
 const overview = ref<InsightOverviewResponse | null>(null)
 const liveMatches = ref<MatchCard[]>([])
 const rounds = ref<RoundReference[]>([])
-const rankings = ref<{ player_categories: PlayerRankingCategory[] } | null>(null)
-const guideRankings = ref<RankingsViewResponse | null>(null)
 // 公共配置共享自 runtimeConfig store（失败保留上次成功值）。
 const runtimeConfig = useRuntimeConfig()
-const publicConfig = runtimeConfig.config
 const selectedPulseMatch = ref<HomePulseLeadMatch | null>(null)
 const selectedStandingsTeam = ref<OverviewStanding | null>(null)
 const allSeasonMatches = ref<MatchCard[] | null>(null)
@@ -204,42 +228,26 @@ const selectedStandingsTeamMatches = computed<HomeTeamSeasonMatch[]>(() => {
 })
 const topTeam = computed<OverviewStanding | null>(() => standings.value[0] ?? null)
 const topScorer = computed<OverviewPlayer | null>(() => scorers.value[0] ?? null)
-const guideLeaders = computed(() => resolveHomeGuideLeaders({
-  rounds: rounds.value,
-  liveStandings: standings.value,
-  liveScorers: scorers.value,
-  referenceRankings: guideRankings.value,
-}))
-const assistCategory = computed<PlayerRankingCategory | null>(() =>
-  rankings.value?.player_categories.find((item) => item.slug === 'assists') ?? null,
-)
-const topAssist = computed(() => assistCategory.value?.entries[0] ?? null)
-const isBriefingReady = computed(() => !loading.value && !errorMessage.value && !!overview.value)
 const supportFavoriteTeam = computed(() => supportProfile.value?.favorite_team ?? null)
+const {
+  edition: topicEdition,
+  loading: topicsLoading,
+  errorMessage: topicsErrorMessage,
+  selectedItem: selectedDailyTopic,
+  openReading: openDailyTopic,
+  closeReading: closeDailyTopic,
+  load: loadDailyTopics,
+} = useHomeDailyTopics()
+const topicAudio = useDailyTopicAudio(topicEdition)
 
-const leadingTeams = computed(() => {
-  if (!topTeam.value) {
-    return []
-  }
+function copyTopicSource(url: string) {
+  if (!isTopicSourceUrl(url) || !selectedDailyTopic.value?.sources.some(source => source.url === url)) return
+  uni.setClipboardData({ data: url, success: () => uni.showToast({ title: '原文链接已复制', icon: 'none' }) })
+}
 
-  return standings.value.filter((team) => team.points === topTeam.value?.points)
-})
-
-const leadingScorers = computed(() => {
-  if (!topScorer.value) {
-    return []
-  }
-
-  return scorers.value.filter((player) => player.score_value === topScorer.value?.score_value)
-})
-
-const leadingAssists = computed(() => {
-  if (!topAssist.value || !assistCategory.value) {
-    return []
-  }
-
-  return assistCategory.value.entries.filter((player) => player.score_value === topAssist.value?.score_value)
-})
+function toggleCurrentTopicAudio() {
+  if (topicAudio.activeId.value) topicAudio.toggle(topicAudio.activeId.value)
+}
 
 const updatedAtLabel = computed(() => {
   if (!overview.value?.latest_scrape_finished_at) {
@@ -271,32 +279,6 @@ const headlineBody = computed(() =>
     topScorer: topScorer.value,
   }),
 )
-
-const heroGuide = computed(() =>
-  buildHomeHeroGuide({ guideLeaders: guideLeaders.value, leadMatch: leadMatch.value }),
-)
-
-const heroGuideNote = computed(() => resolveHomeGuideNote(guideLeaders.value.source))
-
-const briefingItems = computed(() =>
-  buildHomeBriefingItems({
-    topTeam: topTeam.value,
-    leadingTeams: leadingTeams.value,
-    topScorer: topScorer.value,
-    leadingScorers: leadingScorers.value,
-    topAssist: topAssist.value,
-    leadingAssists: leadingAssists.value,
-  }),
-)
-
-const briefingMarqueeRows = computed(() => {
-  const map = buildHomeBriefingMarqueeMap(publicConfig.value?.home_briefing_marquees)
-  return {
-    leader: splitBriefingMarqueeRows(map.leader ?? []),
-    scorer: splitBriefingMarqueeRows(map.scorer ?? []),
-    assist: splitBriefingMarqueeRows(map.assist ?? []),
-  }
-})
 
 const watchPoints = computed(() =>
   buildHomeWatchPoints({
@@ -337,7 +319,7 @@ const scorersRows = computed(() =>
 onShareAppMessage(() => ({
   title: supportFavoriteTeam.value
     ? `${supportFavoriteTeam.value.team_name} 下一场先为谁站队？`
-    : '足球洞察：这一轮之后，谁在改变联赛格局',
+    : '足球洞察：今日话题，关注成都蓉城',
   path: '/pages/home/index',
 }))
 
@@ -405,6 +387,7 @@ function closeStandingsTeamSheet() {
 }
 
 async function loadPage() {
+  const revision = ++homeLoadRevision
   loading.value = true
   errorMessage.value = ''
 
@@ -414,35 +397,32 @@ async function loadPage() {
       throw new Error('首页首屏加载计划缺少 overview')
     }
 
-    overview.value = await getOverview({ mode: 'live', season: currentSeason, roundNumber: null })
-    void loadDeferredHomeData()
+    const response = await getOverview({ mode: 'live', season: currentSeason, roundNumber: null })
+    if (revision !== homeLoadRevision) return
+    liveMatches.value = []
+    overview.value = response
+    void loadDeferredHomeData(revision)
   } catch (error) {
-    errorMessage.value = extractApiErrorMessage(error, '首页数据加载失败，请稍后重试。')
+    if (revision === homeLoadRevision) errorMessage.value = extractApiErrorMessage(error, '首页数据加载失败，请稍后重试。')
   } finally {
-    loading.value = false
+    if (revision === homeLoadRevision) loading.value = false
   }
 }
 
-async function loadDeferredHomeData() {
+async function loadDeferredHomeData(revision: number) {
   try {
-    const [rankingsResponse, liveMatchesResponse, roundsResponse] = await Promise.all([
-      getRankings({ mode: 'live', season: currentSeason, roundNumber: null }),
+    const [liveMatchesResponse, roundsResponse] = await Promise.all([
       getMatches({ mode: 'live', season: currentSeason, roundNumber: null }),
       getAvailableRounds(currentSeason),
       // 公共配置走共享 store（60 秒缓存/失败保留上次成功值），结果由 store 发布。
       runtimeConfig.ensureRuntimeConfig(),
     ])
 
-    rankings.value = rankingsResponse
+    if (revision !== homeLoadRevision) return
     liveMatches.value = liveMatchesResponse.matches
     rounds.value = roundsResponse
-
-    const guideReferenceRoundNumber = resolveHomeGuideReferenceRoundNumber(roundsResponse)
-    guideRankings.value = guideReferenceRoundNumber === null
-      ? null
-      : await getRankings({ mode: 'round', season: currentSeason, roundNumber: guideReferenceRoundNumber })
   } catch (error) {
-    console.warn('[home] deferred data load failed', error)
+    if (revision === homeLoadRevision) console.warn('[home] deferred data load failed', error)
   }
 }
 
@@ -503,6 +483,7 @@ function openSupportMatch() {
 onShow(() => {
   reportPageActivity('home')
   void loadPage()
+  void loadDailyTopics()
   void loadSupportData()
 })
 </script>
@@ -521,23 +502,23 @@ onShow(() => {
 }
 
 .page {
-  padding: 24rpx 16rpx 40rpx;
+  padding: var(--fi-space-24) var(--fi-space-16) var(--fi-space-40);
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
 }
 
 .state-card {
-  background: rgba(255, 255, 255, 0.94);
-  border-radius: 36rpx;
-  border: 2rpx solid rgba(236, 236, 241, 0.95);
-  box-shadow: 0 20rpx 48rpx rgba(26, 28, 36, 0.06);
-  padding: 20rpx;
+  background: var(--fi-color-surface-frosted);
+  border-radius: var(--fi-radius-xl);
+  border: var(--fi-border-card);
+  box-shadow: var(--fi-shadow-card);
+  padding: var(--fi-space-20);
 }
 
 .state-card--error text {
-  font-size: 28rpx;
-  color: #c03a2b;
+  font-size: var(--fi-font-28);
+  color: var(--fi-color-error);
 }
 
 .page-bg-img {

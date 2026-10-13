@@ -144,7 +144,7 @@ bun run build:mp-weixin
 
 小程序不走 Vite 代理，请求地址规则是：
 
-- 开发环境默认请求本地后端：`http://127.0.0.1:8092/api/v1`
+- 开发环境默认请求 local233 测试后端：`http://172.16.60.233:18092/api/v1`（需能访问该内网）
 - 生产环境默认请求线上 API：`https://match.oryjk.cn/api/v1`
 
 如需切换，可通过环境变量覆盖：
@@ -165,7 +165,7 @@ bun run build:mp-weixin
 
 API 地址默认值：
 
-- `bun run dev:mp-weixin` 默认连本地 `8092`
+- `bun run dev:mp-weixin` 默认连 local233 `18092`；需要改回本机时设置 `VITE_API_BASE_URL=http://127.0.0.1:8092/api/v1`
 - `bun run build:mp-weixin` 默认连线上 `match.oryjk.cn`
 
 如果微信开发者工具没有及时吃到最新产物，重新编译或重新打开项目后再看 `/dist/dev/mp-weixin`。
@@ -176,6 +176,16 @@ API 地址默认值：
 
 - `WECHAT_MINI_APP_ID`
 - `WECHAT_MINI_APP_SECRET`
+
+## 首页今日话题
+
+首页独立读取 `GET /api/v1/daily-topics?team_id=77680&limit=5`，展示成都蓉城相关新闻的 AI 整理文章，横向最多五张卡片。文章不足五篇时不补造；话题请求失败不影响助力、赛果与榜单面板。404 显示“后端接口待接入”，成功空列表显示“暂无已发布话题”，其它失败提供重试。
+
+Python 负责采集新闻全文、LLM 整理、逐篇四川话 TTS 和上传，Rust 只读取预生成批次。详情展示整理正文及每条原文的标题、发布机构、日期，可复制原文链接。日期来自发布批次，时间按北京时间显示。
+
+每篇文章仅播放自己的 `audio.status=ready`、`dialect=sichuan` 的 HTTPS 音频，按不可变文章 ID 关联，不使用旧积分榜语音配置或示例音频。批次、文章正文或音频链接变化以及资源撤下均停止旧播放；隐藏页面暂停，退出页面销毁。未就绪时显示“四川话准备中”。真机播放仍需在微信后台配置实际音频域名。
+
+接口数据与生成端约定见 [今日话题契约](../docs/daily-topics-contract.md)。
 
 ## 相关项目
 

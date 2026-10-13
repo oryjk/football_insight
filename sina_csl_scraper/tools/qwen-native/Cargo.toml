@@ -1,0 +1,12 @@
+[package]
+name = "football-qwen-tts"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+any-tts = { path = "vendor/any-tts", default-features = false, features = ["qwen3-tts", "download"] }
+serde_json = "1"
+
+[features]
+metal = ["any-tts/metal"]
+cuda = ["any-tts/cuda"]

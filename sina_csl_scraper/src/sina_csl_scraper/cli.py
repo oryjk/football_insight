@@ -24,8 +24,10 @@ from .models import MatchResult
 from .postgres_repository import PostgresInsightSyncRepository
 from .schedule import fetch_reconciled_schedule
 from .sync import InsightSyncService, SyncPayload
+from .topics.cli import app as topics_app
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
+app.add_typer(topics_app, name='topics')
 
 
 def _write_json(path: Path, payload: dict[str, Any] | list[dict[str, Any]]) -> None:

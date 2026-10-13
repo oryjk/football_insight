@@ -1,4 +1,4 @@
-const LOCAL_API_BASE_URL = 'http://127.0.0.1:8092/api/v1'
+const DEVELOPMENT_API_BASE_URL = 'http://172.16.60.233:18092/api/v1'
 const PRODUCTION_API_BASE_URL = 'https://match.oryjk.cn/api/v1'
 
 function normalizeBaseUrl(value: unknown): string | null {
@@ -19,7 +19,7 @@ function resolveApiBaseUrl(): string {
   }
 
   if (!envBaseUrl || envBaseUrl === PRODUCTION_API_BASE_URL) {
-    return LOCAL_API_BASE_URL
+    return DEVELOPMENT_API_BASE_URL
   }
 
   return envBaseUrl

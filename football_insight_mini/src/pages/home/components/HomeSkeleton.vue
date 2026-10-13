@@ -1,33 +1,5 @@
 <template>
   <view class="skeleton-stack">
-    <view class="skeleton-hero-card skeleton-panel">
-      <view class="skeleton-copy-group">
-        <view class="skeleton-line skeleton-line--kicker" />
-        <view class="skeleton-line skeleton-line--hero-title" />
-      </view>
-      <view class="skeleton-hero-guide">
-        <view class="skeleton-line skeleton-line--guide-title" />
-        <view class="skeleton-line skeleton-line--body" />
-        <view class="skeleton-line skeleton-line--body skeleton-line--body-short" />
-      </view>
-    </view>
-
-    <view class="skeleton-briefing-card skeleton-panel">
-      <view class="skeleton-line skeleton-line--kicker" />
-      <view class="skeleton-briefing-row">
-        <view class="skeleton-line skeleton-line--briefing-value" />
-        <view class="skeleton-line skeleton-line--briefing-metric" />
-      </view>
-      <view class="skeleton-briefing-row">
-        <view class="skeleton-line skeleton-line--briefing-value" />
-        <view class="skeleton-line skeleton-line--briefing-metric" />
-      </view>
-      <view class="skeleton-briefing-row">
-        <view class="skeleton-line skeleton-line--briefing-value" />
-        <view class="skeleton-line skeleton-line--briefing-metric" />
-      </view>
-    </view>
-
     <view class="skeleton-panel-card skeleton-panel">
       <view class="skeleton-heading">
         <view class="skeleton-copy-group">
