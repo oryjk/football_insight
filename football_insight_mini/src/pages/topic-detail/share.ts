@@ -37,5 +37,18 @@ export function wrapShareCardText(
 }
 
 export function topicShareSignature(item: DailyTopicItem): string {
-  return JSON.stringify([item.id, item.title, item.publishedLabel, item.paragraphs])
+  const firstPhoto = item.images?.[0]
+  return JSON.stringify([item.id, item.title, item.publishedLabel, item.paragraphs,
+    firstPhoto ? [firstPhoto.url, firstPhoto.width, firstPhoto.height] : null])
+}
+
+export interface SharePhotoRect { x: number; y: number; width: number; height: number }
+
+export function containSharePhoto(width: number, height: number, area: SharePhotoRect): SharePhotoRect | null {
+  if (![width, height, area.width, area.height].every(value => Number.isFinite(value) && value > 0)
+    || !Number.isFinite(area.x) || !Number.isFinite(area.y)) return null
+  const scale = Math.min(area.width / width, area.height / height)
+  const displayWidth = width * scale, displayHeight = height * scale
+  return { x: area.x + (area.width - displayWidth) / 2, y: area.y + (area.height - displayHeight) / 2,
+    width: displayWidth, height: displayHeight }
 }
