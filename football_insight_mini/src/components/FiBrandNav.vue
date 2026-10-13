@@ -158,7 +158,7 @@ onMounted(() => {
     flex: 1;
     min-width: 0;
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     gap: var(--fi-space-12);
 }
 
