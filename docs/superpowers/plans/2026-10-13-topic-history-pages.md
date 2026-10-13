@@ -22,9 +22,9 @@
 
 ## Tasks
 
-- [ ] Add HTTP and disposable PostgreSQL regression cases for cross-edition recent topics, history order/duplicates/cursors, team isolation, detail fields and errors. Implement typed read queries, repository adapters and web mapping, then verify Rust boundaries/tests.
-- [ ] Add shared topic/history/detail mappers, native navigation and paginated list/detail pages. Restore partial next-card preview and trailing more card. Verify mapper tests, type-check, import boundaries and both platform builds.
-- [ ] Review, commit/push task changes, rebuild/restart local backend, deploy peiqian using the existing flow, verify public APIs/audio and upload robot2 mini-program for device testing.
+- [x] Add HTTP and disposable PostgreSQL regression cases for cross-edition recent topics, history order/duplicates/cursors, team isolation, detail fields and errors. Implement typed read queries, repository adapters and web mapping, then verify Rust boundaries/tests.
+- [x] Add shared topic/history/detail mappers, native navigation and paginated list/detail pages. Restore partial next-card preview and trailing more card. Verify mapper tests, type-check, import boundaries and both platform builds.
+- [x] Review, commit/push task changes, rebuild/restart local backend, deploy peiqian using the existing flow, verify public APIs/audio and upload robot2 mini-program for device testing.
 
 ## Review Focus
 
@@ -33,3 +33,12 @@
 - Failed next-page requests must retain already displayed articles and cursor.
 - Detail navigation/unload must preserve audio lifecycle and destroy stale contexts.
 - Neither new pages nor history failures should alter unrelated home/account behavior.
+
+## Verification and Release
+
+- Rust: 358 unit/HTTP tests passed; 6 disposable PostgreSQL tests passed, including equal-time cursor pagination and newest-version deduplication. Test container removed.
+- Mini: type-check, boundary check, 10 focused mapper tests, H5 and MP builds passed; all custom components registered.
+- H5 browser check with real local APIs: next card visible at 390-wide viewport, home -> detail and More -> history -> detail worked with complete paragraphs.
+- Local Docker rebuilt/restarted with original environment; production peiqian Docker deployed/restarted as 5827a95, identical environment and source digest. No migration executed.
+- Production latest/history/detail returned200 and matched local article payloads; pagination had no duplicates, audio Range returned206; public-config and ticket-watch matches/regions returned200.
+- Clean main checkout robot2 upload completed: version1.0.66, main package1,809,302bytes. No preview QR requested/generated.

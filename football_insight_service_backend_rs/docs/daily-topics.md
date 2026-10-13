@@ -8,7 +8,7 @@ Python 负责新闻采集、文章整理、四川话音频生成和 MinIO 上传
 GET /api/v1/daily-topics?team_id=77680&limit=5
 ```
 
-默认 `team_id=77680`、`limit=5`。球队 ID 必须为正整数，数量必须为 1–5；非法参数返回 400。按球队精确筛选，读取 `published_at` 最新的一整个批次，再截断文章数量。顶层直接返回 `team_id`、`edition_date`、`updated_at`、`items`，不增加 `data` 包装。
+默认 `team_id=77680`、`limit=5`。球队 ID 必须为正整数，数量必须为 1–5；非法参数返回 400。按球队精确筛选，跨全部已发布批次读取文章，重复 id 选择最新批次版本后按文章 `published_at DESC, id ASC` 排序取最近 1–5 篇，不限当天。顶层直接返回 `team_id`、`edition_date`、`updated_at`、`items`，不增加 `data` 包装。
 
 无已发布批次返回：
 
@@ -19,6 +19,12 @@ GET /api/v1/daily-topics?team_id=77680&limit=5
 数据库不可用或批次损坏返回 500，不伪装成空列表。接口跳过公共响应缓存，以便 Python 同批次音频从 pending 更新为 ready 后立即可读。时间使用带时区的 ISO8601，顶层发布时间输出 Asia/Shanghai 偏移；批次日期由 Python 按 Asia/Shanghai 写入 DATE。正文只以纯文本字段返回，每篇保留 id、标题、摘要、段落、发布时间和原文来源。
 
 音频包含 `status/url/dialect/duration_seconds`。pending/failed 的 URL 一律为 null；ready 只返回无 userinfo 的 HTTPS URL。非法 ready URL 降级为 failed，不影响文章正文。小程序直接播放公共 MinIO URL，后端不读取或返回供应商密钥。
+
+## 历史与详情
+
+`GET /api/v1/daily-topics/history?team_id=77680&limit=20&cursor=...` 返回 `team_id/items/next_cursor/has_more`，limit 为 1–50；首次省略 cursor。使用时间和文章 ID 游标分页，游标绑定球队，非法参数 400。历史排序与首页一致，去重先于分页，文章内容沿用原格式。
+
+`GET /api/v1/daily-topics/{id}?team_id=77680` 返回单篇完整文章，缺失返回 404，非法 ID/球队返回 400。三类话题接口均跳过公共响应缓存；历史及详情查询失败返回 500，无新增表或迁移。
 
 ## 数据表与 Python 写入
 

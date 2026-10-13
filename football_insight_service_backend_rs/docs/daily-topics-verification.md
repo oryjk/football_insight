@@ -56,3 +56,13 @@ GET /api/v1/system/public-config                             200
 - 执行 `deploy_peiqian_docker.sh` 构建生产镜像 `football-insight-service-backend-rs:1c29576`，于北京时间 2026-10-13 09:58:48 重启 peiqian 生产容器；运行环境变量摘要前后一致，未再次执行迁移。
 - 线上 `https://match.oryjk.cn/api/v1/daily-topics?team_id=77680&limit=5` 为 200，完整 JSON 与 local233 相同，返回 2 篇正文与 ready 四川话音频，limit=1 正常；音频完整读取 200、Range 206 与 SHA256 一致。余票 matches、regions 和 public-config 均为 200。
 - 本地后端继续运行既有验证版本，本次未再次重建或重启本地容器。
+
+## 历史话题与二级详情页（2026-10-13 后续发布）
+
+- 实现提交 `5827a95`：首页跨批次取最近五篇，重复文章 ID 采用最新版本；历史接口按文章时间倒序/id正序游标分页，详情公开读取全文、来源和音频，无新增表或迁移。
+- Rust `cargo test` 358 passed、6 ignored；6 个 disposable PostgreSQL 用例独立运行全部通过，包含跨日期、重复版本、相同发布时间的分页边界及球队隔离。临时数据库容器已删除。
+- 小程序类型/边界检查、10 个话题转换测试、H5/MP 构建和组件注册通过；H5 390 宽页面实测下一卡片露出，首页和历史列表均打开二级详情页，正文完整。
+- 本地容器重建并于北京时间 11:25:59 重启，镜像 `sha256:fe0d58df1585e6cc4fc31486a2112ef56f0f91d8adb9f790e2ba8267115f87a6`；运行环境保持一致。生产按既有 peiqian 构建流程部署 `football-insight-service-backend-rs:5827a95`，11:31:06 重启，容器 healthy，生产运行环境摘要前后一致。
+- 两地 backend 源码摘要均为 `b2daaf22b555a7e80ebd41e97663cf00c8ddfffc6481613d1e9068909fba3a55`。真实首页/历史/详情 200，完整 payload 本地线上一致；两页 limit=1 不重复，详情与列表内容一致，音频 Range 206。原 public-config、余票 matches（48场）、regions（71区域）仍为200。
+- 干净 main checkout 统一发布入口上传小程序1.0.66、robot2成功，主包1,809,302bytes，API地址校验为正式域名；未生成预览二维码。
+- local233 自动新闻任务现为北京时间每天07:00–22:30每半小时执行，23:00截止自动生成；无新文章保留已有内容，新闻和音频齐备后原子发布。

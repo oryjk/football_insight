@@ -36,7 +36,7 @@
 
 每日更新运行在 local233，由用户 crontab 每天北京时间 07:00–22:30 每半小时执行 `sina_csl_scraper/update_daily_topics.sh --scheduled`，23:00 截止自动运行，自动来源为 `config/rongcheng-news-auto.json`。`topics daily-update` 比较已发布来源历史与最新原文时间，只为新材料生成正文和语音；全部 ready 后才原子发布。无新文章、空生成或生成/语音/上传/数据库失败均保留原有批次；跨天重试复用已有正文与音频。普通手动 `generate` 仍支持 pending/failed，日常自动发布使用更严格的完整音频条件。
 
-local233 的 Rust 读取接口已接通。用户已明确授权在 peiqian 共享 `football_data` 通过 SQLx 迁移新建此表，迁移账本已记录 `20261013000100`，无需再次建表或迁移；后续经用户授权已将生产应用部署并重启为 `football-insight-service-backend-rs:1c29576`，线上 GET 已验证真实两篇正文和四川话音频。Python 在该表原子发布，local233 的 18092 后端经现有私有隧道读取。CPU 模型安装和手动运行入口见 [local233 今日话题说明](../sina_csl_scraper/docs/topics-local233.md)。
+local233 的 Rust 读取接口已接通。用户已明确授权在 peiqian 共享 `football_data` 通过 SQLx 迁移新建此表，迁移账本已记录 `20261013000100`，无需再次建表或迁移；后续经用户授权已将生产应用部署并重启为 `football-insight-service-backend-rs:5827a95`，线上 GET 已验证真实两篇正文和四川话音频。Python 在该表原子发布，local233 的 18092 后端经现有私有隧道读取。CPU 模型安装和手动运行入口见 [local233 今日话题说明](../sina_csl_scraper/docs/topics-local233.md)。
 
 Python 不自动建生产表。已应用的 Rust 迁移结构为：
 
