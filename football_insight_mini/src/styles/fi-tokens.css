@@ -26,6 +26,7 @@ page {
   --fi-primitive-surface-frosted: rgba(255, 255, 255, 0.92);
   --fi-primitive-topic-audio-surface: #fef2f2;
   --fi-primitive-topic-card-height: 480rpx;
+  --fi-primitive-topic-gallery-height: 440rpx;
   --fi-primitive-ink-rgb: 21, 22, 27;
 
   /* ===== Primitive：间距（数字刻度，单位 rpx） ===== */
@@ -117,6 +118,7 @@ page {
   --fi-color-surface-frosted: var(--fi-primitive-surface-frosted);
   --fi-color-topic-audio-surface: var(--fi-primitive-topic-audio-surface);
   --fi-space-topic-card-height: var(--fi-primitive-topic-card-height);
+  --fi-space-topic-gallery-height: var(--fi-primitive-topic-gallery-height);
   --fi-color-overlay: rgba(var(--fi-primitive-ink-rgb), 0.46);
   --fi-color-success-accent: var(--fi-primitive-green);
   --fi-color-divider: var(--fi-primitive-divider);
@@ -189,6 +191,7 @@ page {
   --fi-component-card-radius: var(--fi-radius-xl);
   --fi-component-card-border: var(--fi-border-card);
   --fi-component-card-shadow: var(--fi-shadow-card);
+  --fi-component-topic-gallery-height: var(--fi-space-topic-gallery-height);
   --fi-component-muted-text: var(--fi-color-text-muted);
   --fi-component-kicker-text: var(--fi-color-text-muted);
   --fi-component-kicker-size: var(--fi-font-22);

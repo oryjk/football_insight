@@ -35,9 +35,9 @@
 {"url":"https://oryjk.cn:82/minio/football-insight/summary/images/topics/77680/content-hash.jpg","width":640,"height":444,"source_url":"https://example.com/article","publisher":"来源名称","after_paragraph":1}
 ```
 
-`after_paragraph` 为从 1 开始的正文段落序号。每篇最多四张图片，仅采用该话题实际引用原文的正文配图，不采集导航、作者头像和侧栏图片；来源链接与机构必须匹配 `sources`。Python 校验文件大小（最多 8 MiB）、真实格式（JPEG/PNG/WebP）、完整解码与尺寸，下载固定使用检查后的公网 IP，保留原 Host/TLS 校验并重新验证重定向目标；原图以内容哈希保存到 Git 忽略的 `data/topics/images/` 并上传公共 `summary/images/topics/` 路径。不存在可用图片或图片处理失败时保留正文、语音与旧图。
+`after_paragraph` 为兼容旧接口保留的段落序号，当前小程序不依赖它排版图片。每篇最多四张图片，仅采用该话题实际引用原文的正文配图，不采集导航、作者头像和侧栏图片；来源链接与机构必须匹配 `sources`。Python 校验文件大小（最多 8 MiB）、真实格式（JPEG/PNG/WebP）、完整解码与尺寸，下载固定使用检查后的公网 IP，保留原 Host/TLS 校验并重新验证重定向目标；原图以内容哈希保存到 Git 忽略的 `data/topics/images/` 并上传公共 `summary/images/topics/` 路径。不存在可用图片或图片处理失败时保留正文、语音与旧图。
 
-图片元数据存入现有 JSONB，不新增表或迁移、不参与文章 ID/来源指纹计算。Rust 独立过滤异常可选图片记录，首页/历史/详情使用一致字段；小程序在段落后展示配图，标注图片来源并支持点击预览。`refresh-images --write-db` 仅对已发布文章补图，行锁内更新图片，保留并发音频更新、发布时间、正文和独立热度统计。
+图片元数据存入现有 JSONB，不新增表或迁移、不参与文章 ID/来源指纹计算。Rust 独立过滤异常可选图片记录，首页/历史/详情使用一致字段；小程序在正文前集中轮播话题配图，不自动轮播，不显示图片出处，支持左右滑动与点击预览；文末新闻来源继续保留。`refresh-images --write-db` 仅对已发布文章补图，行锁内更新图片，保留并发音频更新、发布时间、正文和独立热度统计。
 
 ### 历史与详情
 

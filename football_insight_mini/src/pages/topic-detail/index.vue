@@ -11,10 +11,10 @@
       <view class="topic-detail__heat"><FiTopicHeat :value="topicHeatValue(item.id, item.heat)" /></view>
       <view class="topic-detail__audio"><FiTopicAudioEntry :ready="audio.availableIds.value.includes(item.id)" :playing="audio.status.value === 'playing'" :loading="audio.status.value === 'loading'" @play="audio.toggle(item.id)" /></view>
       <FiTopicAudioPlayer v-if="audio.activeId.value" :title="item.title" :status="audio.status.value" :current-time="audio.currentTime.value" :duration="audio.duration.value" :error-message="audio.errorMessage.value" @toggle="audio.toggle(item.id)" @seek="audio.seek" @close="audio.stop" />
-      <view v-for="(block, index) in readingBlocks" :key="index">
-        <text class="topic-detail__paragraph">{{ block.text }}</text>
-        <TopicArticleImage v-for="image in block.images" :key="image.url" :image="image" @preview="previewPhoto" />
+      <view v-if="item.images?.length" class="topic-detail__gallery">
+        <TopicImageGallery :key="item.id" :images="item.images" @preview="previewPhoto" />
       </view>
+      <text v-for="(paragraph, index) in item.paragraphs" :key="index" class="topic-detail__paragraph">{{ paragraph }}</text>
       <view class="topic-detail__sources">
         <text class="topic-detail__sources-heading">新闻来源</text>
         <view v-for="(source, index) in item.sources" :key="source.url" class="topic-detail__source">
@@ -40,8 +40,7 @@ import { getTopicDetail, recordTopicVisit } from '../../api/dailyTopics'
 import { useDailyTopicAudio } from '../../composables/useDailyTopicAudio'
 import FiTopicAudioEntry from '../../components/topics/FiTopicAudioEntry.vue'
 import FiTopicAudioPlayer from '../../components/topics/FiTopicAudioPlayer.vue'
-import TopicArticleImage from './components/TopicArticleImage.vue'
-import { topicReadingBlocks } from '../../utils/topicImages'
+import TopicImageGallery from './components/TopicImageGallery.vue'
 import type { DailyTopicItem } from '../../types/dailyTopic'
 import { DAILY_TOPICS_TEAM_ID, editionForTopic, isTopicSourceUrl, mapTopicDetail } from '../../utils/dailyTopics'
 import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
@@ -52,7 +51,6 @@ const item = ref<DailyTopicItem | null>(null)
 const loading = ref(false)
 const errorMessage = ref('')
 const edition = computed(() => editionForTopic(item.value))
-const readingBlocks = computed(() => item.value ? topicReadingBlocks(item.value) : [])
 const audio = useDailyTopicAudio(edition)
 const shareCard = useTopicShareCard()
 const shareArticle = computed(() => !loading.value && !errorMessage.value ? item.value : null)
@@ -88,9 +86,11 @@ function copySource(url: string) {
   if (!isTopicSourceUrl(url) || !item.value?.sources.some(source => source.url === url)) return
   uni.setClipboardData({ data: url, success: () => uni.showToast({ title: '原文链接已复制', icon: 'none' }) })
 }
-function previewPhoto(url: string) {
-  const urls = (item.value?.images ?? []).map(image => image.url)
-  if (urls.includes(url)) uni.previewImage({ current: url, urls })
+function previewPhoto(url: string, urls: string[]) {
+  const allowedUrls = (item.value?.images ?? []).map(image => image.url)
+  if (urls.includes(url) && urls.every(imageUrl => allowedUrls.includes(imageUrl))) {
+    uni.previewImage({ current: url, urls })
+  }
 }
 onLoad(query => { topicId = typeof query?.id === 'string' ? query.id : ''; void load() })
 function goBack() {
@@ -115,6 +115,7 @@ onScopeDispose(() => { revision += 1 })
 .topic-detail__meta { display: block; margin-top: var(--fi-space-18); color: var(--fi-color-text-caption); font-size: var(--fi-font-22); line-height: var(--fi-leading-normal); }
 .topic-detail__heat { margin-top: var(--fi-space-16); }
 .topic-detail__audio { margin: var(--fi-space-24) 0; }
+.topic-detail__gallery { margin-top: var(--fi-space-24); }
 .topic-detail__paragraph { display: block; margin-top: var(--fi-space-28); color: var(--fi-color-text-primary); font-size: var(--fi-font-30); line-height: var(--fi-leading-relaxed); white-space: pre-wrap; }
 .topic-detail__sources { margin-top: var(--fi-space-32); padding-top: var(--fi-space-24); border-top: var(--fi-border-divider); }
 .topic-detail__sources-heading { display: block; color: var(--fi-color-text-primary); font-size: var(--fi-font-26); font-weight: var(--fi-weight-bold); }
