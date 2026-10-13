@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 from .generation import GENERATOR_VERSION
 from .models import SHANGHAI, SourceArticle, source_fingerprint
+from .images import TopicImagePublisher
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,12 @@ def generate_edition(sources: list[SourceArticle], *, generator, tts, target,
                                'updated_at': now.isoformat(), 'items': items}}
     # Persist the validated text before long-running TTS so interruption can resume.
     _atomic_json(path, edition)
+    if target is not None and any(source.images for source in sources):
+        try:
+            TopicImagePublisher(target=target, cache_dir=cache_dir).enrich(edition['payload']['items'], sources)
+            _atomic_json(path, edition)
+        except Exception as error:
+            logger.warning('Photo publication unavailable (%s); text and audio retained', type(error).__name__)
     for item in edition['payload']['items']:
         audio = item['audio']
         if audio['status'] == 'ready':

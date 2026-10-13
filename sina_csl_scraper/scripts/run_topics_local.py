@@ -42,8 +42,8 @@ def main() -> None:
     loaded = arguments[:1] == ['--env-loaded']
     if loaded:
         arguments = arguments[1:]
-    if not arguments or arguments[0] not in {'collect', 'generate', 'tts', 'refresh-audio', 'daily-update'}:
-        print('Usage: uv run --no-sync python scripts/run_topics_local.py {collect|generate|tts|refresh-audio|daily-update} [topic options]')
+    if not arguments or arguments[0] not in {'collect', 'generate', 'tts', 'refresh-audio', 'refresh-images', 'daily-update'}:
+        print('Usage: uv run --no-sync python scripts/run_topics_local.py {collect|generate|tts|refresh-audio|refresh-images|daily-update} [topic options]')
         raise SystemExit(0 if arguments[:1] in [['--help'], ['-h']] else 2)
     if not loaded:
         files = [root / '.env.topics', root / '.env.sync']

@@ -20,6 +20,9 @@ from .pipeline import _atomic_json
 from .repository import TopicRepository
 from .sources import collect_sources
 from .storage import SshMinioTarget
+from .images import TopicImagePublisher
+from .sources import _fetch_text, _extract_original
+import requests
 from .tts import LocalQwenTts, discover_model
 
 app = typer.Typer(no_args_is_help=True, help='采集成都蓉城新闻、生成今日话题和本地四川话播报。')
@@ -94,7 +97,7 @@ def collect(config: Path = typer.Option(..., exists=True, dir_okay=False),
     """Fetch recent original article bodies; an empty result is reported honestly."""
     try:
         sources = collect_sources(_config(config), _now(at), max_age_hours)
-        _write(output, {'imports': [dict(source.as_source(), body=source.body) for source in sources]})
+        _write(output, {'imports': [source.as_material() for source in sources]})
         typer.echo(f'collected {len(sources)} verified original articles -> {output}')
     except Exception as error:
         typer.echo(f'collection failed ({type(error).__name__})', err=True)
@@ -120,7 +123,7 @@ def generate(config: Path = typer.Option(..., exists=True, dir_okay=False),
             sources = collect_sources(_config(config), now, max_age_hours)
             if not sources:
                 raise NoTopicsError('no recent verified originals; previous edition retained')
-            _write(output_dir / 'materials.json', {'imports': [dict(source.as_source(), body=source.body) for source in sources]})
+            _write(output_dir / 'materials.json', {'imports': [source.as_material() for source in sources]})
             target, tts, tts_unavailable = None, None, False
             if upload_audio:
                 try:
@@ -224,6 +227,50 @@ def tts_command(text_file: Path = typer.Option(..., exists=True, dir_okay=False)
                               'sha256': audio.sha256, 'voice': 'eric', 'dialect': 'sichuan'}, ensure_ascii=False))
     except Exception as error:
         typer.echo(f'local TTS failed ({type(error).__name__})', err=True)
+        raise typer.Exit(1) from None
+
+
+@app.command('refresh-images')
+def refresh_images_command(output_dir: Path = Path('data/topics'),
+                           team_id: int = typer.Option(77680, min=1), write_db: bool = False) -> None:
+    """Backfill cited original photographs without regenerating text or voice."""
+    try:
+        database_url = os.getenv('FI_DATABASE_URL') or os.getenv('DATABASE_URL')
+        if not write_db or not database_url:
+            raise ValueError('refresh-images requires a database URL and explicit --write-db')
+        with _lock(output_dir):
+            repository = TopicRepository(database_url)
+            repository.check_schema()
+            items = repository.published_items(team_id)
+            originals, seen = [], set()
+            with requests.Session() as session:
+                for item in items:
+                    for source in item['sources']:
+                        if source['url'] in seen:
+                            continue
+                        seen.add(source['url'])
+                        try:
+                            html, resolved = _fetch_text(session, source['url'])
+                            original = _extract_original(html, {**source, 'url': resolved}, _now(None))
+                            # A redirected article must not silently become another source.
+                            if original.url == source['url']:
+                                originals.append(original)
+                        except Exception as error:
+                            typer.echo(f'original photo discovery skipped ({type(error).__name__})', err=True)
+            TopicImagePublisher(target=_target(), cache_dir=output_dir).enrich(items, originals)
+            changed = repository.patch_images(team_id, items)
+            # Retain photos if a cached edition is later reused for an audio retry.
+            by_id = {item['id']: item for item in items if item.get('images')}
+            for path in (output_dir / 'editions').glob('*.json'):
+                edition = _config(path)
+                for item in edition['payload']['items']:
+                    update = by_id.get(item['id'])
+                    if item['team_id'] == team_id and update and item['sources'] == update['sources']:
+                        item['images'] = update['images']
+                _atomic_json(path, edition)
+        typer.echo(json.dumps({'updated_copies': changed, 'topics_with_images': len(by_id), 'topics': len(items)}))
+    except Exception as error:
+        typer.echo(f'image refresh failed ({type(error).__name__}); existing articles retained', err=True)
         raise typer.Exit(1) from None
 
 

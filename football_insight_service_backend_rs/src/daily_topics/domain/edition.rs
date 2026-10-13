@@ -25,8 +25,19 @@ pub struct DailyTopic {
     pub paragraphs: Vec<String>,
     pub published_at: DateTime<FixedOffset>,
     pub sources: Vec<DailyTopicSource>,
+    pub images: Vec<DailyTopicImage>,
     pub audio: DailyTopicAudio,
     pub heat: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct DailyTopicImage {
+    pub url: String,
+    pub width: u32,
+    pub height: u32,
+    pub source_url: String,
+    pub publisher: String,
+    pub after_paragraph: usize,
 }
 
 #[derive(Debug, Clone)]

@@ -41,3 +41,16 @@ test('热度兼容旧接口并拒绝负值、非数值和不安全整数', () =>
 test('热度显示统一以万、亿简写，小于一万保留整数', () => {
   expect([0, 99, 9999, 10000, 12345, 100000000].map(formatTopicHeat)).toEqual(['0', '99', '9999', '1万', '1.2万', '1亿'])
 })
+
+test('正文配图兼容旧话题并过滤未引用来源和错误图片', () => {
+  const value = article('photo-topic', '2026-10-13T08:00:00Z')
+  const photo = { url: 'https://media.example.com/photo.jpg', width: 640, height: 444,
+    source_url: 'https://news.example.com/a', publisher: '新闻', after_paragraph: 1 }
+  expect(mapTopicDetail(value).images).toEqual([])
+  const item = mapTopicDetail({ ...value, images: [photo, { ...photo, url: 'http://media.example.com/x' },
+    { ...photo, source_url: 'https://news.example.com/uncited' }, { ...photo, width: -1 },
+    { ...photo, after_paragraph: 99 }, null] })
+  expect(item.images).toEqual([{ url: photo.url, width: 640, height: 444,
+    sourceUrl: photo.source_url, publisher: '新闻', afterParagraph: 1 }])
+  expect(item.paragraphs).toEqual(['正文'])
+})

@@ -1,4 +1,4 @@
-import type { DailyTopicEdition, DailyTopicItem, DailyTopicSource } from '../types/dailyTopic'
+import type { DailyTopicEdition, DailyTopicImage, DailyTopicItem, DailyTopicSource } from '../types/dailyTopic'
 
 export const DAILY_TOPICS_TEAM_ID = 77680
 export const DAILY_TOPICS_LIMIT = 5
@@ -42,6 +42,23 @@ function mapSource(value: unknown): DailyTopicSource | null {
   if (!title || !publisher || !publishedAt || !isTopicSourceUrl(source.url)) return null
   return { title, publisher, publishedAt, url: source.url, dateLabel: formatTopicTimestamp(publishedAt) }
 }
+function mapImages(value: unknown, sources: DailyTopicSource[], paragraphs: number): DailyTopicImage[] {
+  if (!Array.isArray(value)) return []
+  const images: DailyTopicImage[] = [], seen = new Set<string>()
+  for (const candidate of value) {
+    const image = record(candidate)
+    if (!image || !isAudioUrl(image.url) || seen.has(image.url)
+      || !sources.some(source => source.url === image.source_url && source.publisher === image.publisher)
+      || ![image.width, image.height, image.after_paragraph].every(n => typeof n === 'number' && Number.isSafeInteger(n) && n > 0)
+      || (image.width as number) * (image.height as number) > 40000000
+      || (image.after_paragraph as number) > paragraphs) continue
+    seen.add(image.url)
+    images.push({ url: image.url, width: image.width as number, height: image.height as number,
+      sourceUrl: image.source_url as string, publisher: image.publisher as string, afterParagraph: image.after_paragraph as number })
+    if (images.length === 4) break
+  }
+  return images
+}
 export function mapDailyTopicItem(value: unknown): DailyTopicItem | null {
   const item = record(value)
   if (!item || item.team_id !== DAILY_TOPICS_TEAM_ID) return null
@@ -54,6 +71,7 @@ export function mapDailyTopicItem(value: unknown): DailyTopicItem | null {
   return {
     id, teamId: DAILY_TOPICS_TEAM_ID, title, summary, paragraphs, publishedAt,
     publishedLabel: formatTopicTimestamp(publishedAt), sources,
+    images: mapImages(item.images, sources, paragraphs.length),
     sourceLabel: `${Array.from(new Set(sources.map(source => source.publisher))).join(' · ')} · ${sources.length} 个来源`,
     heat: typeof item.heat === 'number' && Number.isSafeInteger(item.heat) && item.heat >= 0 ? item.heat : 0,
     readMinutes: Math.max(1, Math.ceil(paragraphs.join('').length / 350)),

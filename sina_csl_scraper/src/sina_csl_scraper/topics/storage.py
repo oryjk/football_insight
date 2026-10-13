@@ -31,8 +31,8 @@ class SshMinioTarget:
         self.host, self.project, self.run = host, project, run
 
     def upload_bytes(self, object_name: str, content: bytes, content_type: str) -> str:
-        if not object_name.startswith('summary/audio/topics/') or '..' in PurePosixPath(object_name).parts:
-            raise ValueError('topic audio must use the public summary/audio/topics prefix')
+        if not object_name.startswith(('summary/audio/topics/', 'summary/images/topics/')) or '..' in PurePosixPath(object_name).parts:
+            raise ValueError('topic assets must use public summary/audio/topics or summary/images/topics prefixes')
         command = (f'cd {shlex.quote(self.project)} && set -a && . ./.env.sync && set +a && '
                    f'uv run --no-sync python -c {shlex.quote(_REMOTE_UPLOAD)} '
                    f'{shlex.quote(object_name)} {shlex.quote(content_type)}')

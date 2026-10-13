@@ -44,7 +44,7 @@ def run_daily_update(sources: list[SourceArticle], *, repository, generator_fact
     pending = state['pending']
     if pending:
         originals = [SourceArticle(item['title'], item['url'], item['publisher'],
-                                   parse_timestamp(item['published_at'], now), item['body'])
+                                   parse_timestamp(item['published_at'], now), item['body'], tuple(item.get('images') or []))
                      for item in pending['sources']]
         if not originals or any(item.published_at < cutoff for item in originals) or all(item.url in known_urls for item in originals):
             state['pending'] = pending = None
@@ -57,7 +57,7 @@ def run_daily_update(sources: list[SourceArticle], *, repository, generator_fact
             _atomic_json(path, state)
             return {'status': 'no_new', 'collected': len(sources), 'published': 0}
         pending = {'now': now.isoformat(), 'limit': limit,
-                   'sources': [dict(item.as_source(), body=item.body) for item in fresh]}
+                   'sources': [item.as_material() for item in fresh]}
         state['pending'] = pending
         _atomic_json(path, state)
     else:

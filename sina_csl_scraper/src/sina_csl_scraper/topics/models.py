@@ -52,6 +52,7 @@ class SourceArticle:
     publisher: str
     published_at: datetime
     body: str
+    images: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         for value in (self.title, self.publisher, self.body):
@@ -61,6 +62,7 @@ class SourceArticle:
             raise ValueError("Source publication time must be timezone-aware")
         object.__setattr__(self, "url", canonical_url(self.url))
         object.__setattr__(self, "published_at", self.published_at.astimezone(SHANGHAI))
+        object.__setattr__(self, "images", tuple(dict.fromkeys(canonical_url(value) for value in self.images))[:8])
 
     @property
     def source_id(self) -> str:
@@ -68,6 +70,9 @@ class SourceArticle:
 
     def as_source(self) -> dict:
         return {"title": self.title, "url": self.url, "publisher": self.publisher, "published_at": self.published_at.isoformat()}
+
+    def as_material(self) -> dict:
+        return {**self.as_source(), "body": self.body, "images": list(self.images)}
 
 
 def source_fingerprint(sources: list[SourceArticle]) -> str:

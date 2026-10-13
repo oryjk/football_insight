@@ -89,6 +89,7 @@ fn edition() -> DailyTopicEdition {
                 id: format!("{index:064x}"),
                 team_id: 77680,
                 heat: 0,
+                images: Vec::new(),
                 title: format!("隔离测试文章 {index}"),
                 summary: "测试摘要".into(),
                 paragraphs: vec!["第一段".into(), "第二段".into()],
@@ -110,6 +111,15 @@ fn edition() -> DailyTopicEdition {
             })
             .collect(),
     }
+}
+
+#[tokio::test]
+async fn legacy_topics_expose_empty_images_without_changing_text_or_audio() {
+    let (status, body) = get(app(Some(edition()), false), "/api/v1/daily-topics").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["items"][0]["images"], json!([]));
+    assert_eq!(body["items"][0]["paragraphs"], json!(["第一段", "第二段"]));
+    assert_eq!(body["items"][0]["audio"]["status"], "ready");
 }
 
 #[tokio::test]
@@ -243,7 +253,7 @@ async fn public_contract_preserves_content_sources_and_audio_without_data_wrappe
         body["items"][0],
         json!({
             "id":"0000000000000000000000000000000000000000000000000000000000000000",
-            "team_id":77680,"heat":0,"title":"隔离测试文章 0","summary":"测试摘要",
+            "team_id":77680,"heat":0,"images":[],"title":"隔离测试文章 0","summary":"测试摘要",
             "paragraphs":["第一段","第二段"],"published_at":"2026-10-13T08:30:00+08:00",
             "sources":[{"title":"测试来源","url":"https://example.com/original","publisher":"测试媒体","published_at":"2026-10-12T20:00:00+08:00"}],
             "audio":{"status":"ready","url":"https://example.com/audio.m4a","dialect":"sichuan","duration_seconds":60.0}
@@ -394,5 +404,52 @@ async fn heat_failure_does_not_block_home_history_or_detail_content() {
         };
         assert_eq!(topic["heat"], 0);
         assert_eq!(topic["paragraphs"][0], "第一段");
+    }
+}
+
+#[tokio::test]
+async fn image_provenance_applies_to_home_history_and_detail() {
+    use football_insight_service_backend_rs::daily_topics::domain::edition::DailyTopicImage;
+    let mut edition = edition();
+    let valid = DailyTopicImage {
+        url: "https://example.com/photo.jpg".into(),
+        width: 640,
+        height: 444,
+        source_url: "https://example.com/original".into(),
+        publisher: "测试媒体".into(),
+        after_paragraph: 1,
+    };
+    edition.items[0].images = vec![
+        valid.clone(),
+        DailyTopicImage {
+            url: "http://example.com/insecure.jpg".into(),
+            ..valid.clone()
+        },
+        DailyTopicImage {
+            source_url: "https://example.com/uncited".into(),
+            ..valid.clone()
+        },
+        DailyTopicImage {
+            after_paragraph: 99,
+            ..valid.clone()
+        },
+        valid,
+    ];
+    let app = app(Some(edition), false);
+    for route in [
+        "/api/v1/daily-topics".to_string(),
+        "/api/v1/daily-topics/history".to_string(),
+        format!("/api/v1/daily-topics/{:064x}", 0),
+    ] {
+        let (status, response) = get(app.clone(), &route).await;
+        assert_eq!(status, StatusCode::OK);
+        let topic = if route.contains("history") || route.ends_with("daily-topics") {
+            &response["items"][0]
+        } else {
+            &response
+        };
+        assert_eq!(topic["images"].as_array().unwrap().len(), 1);
+        assert_eq!(topic["images"][0]["width"], 640);
+        assert_eq!(topic["audio"]["status"], "ready");
     }
 }

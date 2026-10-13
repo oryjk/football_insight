@@ -36,6 +36,7 @@ class _ArticleHTML(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.stack: list[tuple[str, bool, bool]] = []
         self.body_parts: list[str] = []
+        self.images: list[str] = []
         self.title_parts: list[str] = []
         self.heading_parts: list[str] = []
         self.meta_title = ""
@@ -67,6 +68,7 @@ class _ArticleHTML(HTMLParser):
         if explicit and not self.explicit_body_found:
             self.explicit_body_found = True
             self.body_parts = []
+            self.images = []
             # A precise publisher root replaces a broader main/article shell.
             self.stack = [(name, False, ignored) for name, _, ignored in self.stack]
             capture = True
@@ -76,6 +78,10 @@ class _ArticleHTML(HTMLParser):
             if semantic:
                 self.semantic_body_found = True
         ignored = parent_ignore or tag in self._ignored
+        if capture and not ignored and tag == 'img':
+            image = attributes.get('data-src') or attributes.get('data-original') or attributes.get('src')
+            if image and len(self.images) < 8:
+                self.images.append(image)
         if capture and not ignored and tag in {"p", "div", "br", "h1", "h2", "li"}:
             self.body_parts.append("\n")
         if tag not in self._void:
@@ -148,7 +154,13 @@ def _extract_original(text: str, item: dict, now: datetime) -> SourceArticle:
     if not dates:
         raise ValueError("missing_publication_time")
     publication = parse_timestamp(normalize_publication_time(dates[0], item['url']), now=now)
-    return SourceArticle(parser.title or item.get("title", ""), item["url"], item["publisher"], publication, parser.body)
+    images = []
+    for value in parser.images:
+        try:
+            images.append(canonical_url(urljoin(item['url'], value)))
+        except ValueError:
+            continue
+    return SourceArticle(parser.title or item.get("title", ""), item["url"], item["publisher"], publication, parser.body, tuple(images))
 
 
 def _fetch_text(session, url: str) -> tuple[str, str]:
@@ -215,7 +227,7 @@ def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, ses
 
     for item in config.get("imports", [])[:MAX_DOWNLOADS]:
         try:
-            accept(SourceArticle(item["title"], item["url"], item["publisher"], parse_timestamp(item["published_at"], now), item["body"]))
+            accept(SourceArticle(item["title"], item["url"], item["publisher"], parse_timestamp(item["published_at"], now), item["body"], tuple(item.get('images') or [])))
         except (ValueError, TypeError, KeyError):
             logger.warning("Skipped imported news: invalid original or publication metadata")
         if len(accepted) >= MAX_SOURCES:

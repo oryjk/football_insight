@@ -7,7 +7,10 @@ use crate::daily_topics::domain::{
         InvalidTopicArchiveQuery, TopicDetailQuery, TopicHistoryPage, TopicHistoryQuery,
         TopicPosition,
     },
-    edition::{AudioStatus, DailyTopic, DailyTopicAudio, DailyTopicSource, DailyTopicsView},
+    edition::{
+        AudioStatus, DailyTopic, DailyTopicAudio, DailyTopicImage, DailyTopicSource,
+        DailyTopicsView,
+    },
     query::{DailyTopicsQuery, InvalidDailyTopicsQuery},
 };
 
@@ -51,8 +54,32 @@ pub(super) struct DailyTopicDto {
     paragraphs: Vec<String>,
     published_at: DateTime<FixedOffset>,
     sources: Vec<DailyTopicSourceDto>,
+    images: Vec<DailyTopicImageDto>,
     audio: DailyTopicAudioDto,
     heat: u64,
+}
+
+#[derive(Serialize)]
+struct DailyTopicImageDto {
+    url: String,
+    width: u32,
+    height: u32,
+    source_url: String,
+    publisher: String,
+    after_paragraph: usize,
+}
+
+impl From<DailyTopicImage> for DailyTopicImageDto {
+    fn from(value: DailyTopicImage) -> Self {
+        Self {
+            url: value.url,
+            width: value.width,
+            height: value.height,
+            source_url: value.source_url,
+            publisher: value.publisher,
+            after_paragraph: value.after_paragraph,
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -180,6 +207,7 @@ impl From<DailyTopic> for DailyTopicDto {
             paragraphs: value.paragraphs,
             published_at: value.published_at,
             sources: value.sources.into_iter().map(Into::into).collect(),
+            images: value.images.into_iter().map(Into::into).collect(),
             audio: value.audio.into(),
             heat: value.heat,
         }

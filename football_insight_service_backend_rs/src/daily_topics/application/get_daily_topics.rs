@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::daily_topics::{
     domain::{
         archive::{TopicDetailQuery, TopicHistoryPage, TopicHistoryQuery, TopicPosition},
-        edition::{AudioStatus, DailyTopicAudio, DailyTopicsView},
+        edition::{AudioStatus, DailyTopic, DailyTopicAudio, DailyTopicsView},
         heat::TopicVisit,
         query::DailyTopicsQuery,
     },
@@ -46,6 +46,7 @@ impl GetDailyTopics {
         edition.items.truncate(query.limit());
         for item in &mut edition.items {
             normalize_audio(&mut item.audio);
+            normalize_images(item);
         }
         self.attach_heat(query.team_id(), &mut edition.items).await;
         Ok(DailyTopicsView {
@@ -71,6 +72,7 @@ impl GetDailyTopics {
         items.truncate(query.limit());
         for item in &mut items {
             normalize_audio(&mut item.audio);
+            normalize_images(item);
         }
         self.attach_heat(query.team_id(), &mut items).await;
         let next = if has_more {
@@ -102,6 +104,7 @@ impl GetDailyTopics {
                 return Err(DailyTopicsRepositoryError::InvalidEdition);
             }
             normalize_audio(&mut item.audio);
+            normalize_images(item);
             self.attach_heat(query.team_id(), std::slice::from_mut(item))
                 .await;
         }
@@ -149,6 +152,30 @@ impl GetDailyTopics {
             .await?
             .map(|heat| heat.total()))
     }
+}
+
+fn normalize_images(item: &mut DailyTopic) {
+    let mut seen = std::collections::HashSet::new();
+    item.images.retain(|image| {
+        let valid_url = url::Url::parse(&image.url).ok().is_some_and(|url| {
+            url.scheme() == "https"
+                && url.host_str().is_some()
+                && url.username().is_empty()
+                && url.password().is_none()
+        });
+        valid_url
+            && image.width > 0
+            && image.height > 0
+            && u64::from(image.width) * u64::from(image.height) <= 40_000_000
+            && image.after_paragraph > 0
+            && image.after_paragraph <= item.paragraphs.len()
+            && item
+                .sources
+                .iter()
+                .any(|source| source.url == image.source_url && source.publisher == image.publisher)
+            && seen.insert(image.url.clone())
+    });
+    item.images.truncate(4);
 }
 
 fn normalize_audio(audio: &mut DailyTopicAudio) {

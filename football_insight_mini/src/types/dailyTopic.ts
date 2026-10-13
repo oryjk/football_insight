@@ -22,10 +22,20 @@ export interface DailyTopicItem {
   publishedAt: string
   publishedLabel: string
   sources: DailyTopicSource[]
+  images?: DailyTopicImage[]
   sourceLabel: string
   heat: number
   readMinutes: number
   audio: DailyTopicAudio
+}
+
+export interface DailyTopicImage {
+  url: string
+  width: number
+  height: number
+  sourceUrl: string
+  publisher: string
+  afterParagraph: number
 }
 
 export interface DailyTopicEdition {
