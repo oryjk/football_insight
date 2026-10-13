@@ -22,4 +22,4 @@
 
 - [x] Add first-photo cache identity and bounded asset loading; separate canvas drawing/layout from the existing serial workflow.
 - [x] Verify cache/dimensions/loading regressions, Bun tests/typecheck and H5/MP builds; inspect actual generated cards with image, without image and failed image.
-- [ ] Readonly review, update memory, commit/push and upload the mini experience version without preview QR.
+- [x] Readonly review, update memory, commit/push and upload the mini experience version without preview QR.
