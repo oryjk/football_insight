@@ -1,5 +1,5 @@
 <template>
-  <FiBottomSheet :visible="true" title="今日话题" eyebrow="成都蓉城 · AI 整理" @close="emit('close')">
+  <FiBottomSheet :visible="true" title="今日话题" eyebrow="成都蓉城" @close="emit('close')">
     <view class="topic-reading">
       <text class="topic-reading__title">{{ item.title }}</text>
       <text class="topic-reading__meta">{{ item.publishedLabel }} · 约 {{ item.readMinutes }} 分钟阅读</text>
