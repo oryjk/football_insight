@@ -1,12 +1,21 @@
 use crate::payment::domain::virtual_payment::{
-    Delivery, Refund, VirtualOrder, VirtualPayParams, VirtualPaymentError, VirtualProduct,
+    Delivery, PrivateMembershipProduct, Refund, VirtualOrder, VirtualPayParams,
+    VirtualPaymentError, VirtualProduct,
 };
 use async_trait::async_trait;
 
 #[async_trait]
 pub trait VirtualProductRepository: Send + Sync {
-    async fn find_enabled(&self, key: &str) -> Result<Option<VirtualProduct>, VirtualPaymentError>;
+    async fn find_enabled(
+        &self,
+        key: &str,
+        user_id: uuid::Uuid,
+    ) -> Result<Option<VirtualProduct>, VirtualPaymentError>;
     async fn has_enabled(&self) -> Result<bool, VirtualPaymentError>;
+    async fn private_membership_products(
+        &self,
+        user_id: uuid::Uuid,
+    ) -> Result<Vec<PrivateMembershipProduct>, VirtualPaymentError>;
 }
 
 #[async_trait]

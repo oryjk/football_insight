@@ -39,7 +39,7 @@ export function formatMembershipPrice(priceCents: number | undefined): string {
     return '--'
   }
 
-  return (priceCents / 100).toFixed(0)
+  return (priceCents / 100).toFixed(2).replace(/\.00$/, '')
 }
 
 export function getMembershipPayPriceCents(option: MembershipProductOption | null | undefined): number | undefined {

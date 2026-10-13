@@ -73,13 +73,14 @@ pub fn build_payment(
         config.wechat_mini_app_id.clone(),
         config.wechat_mini_app_secret.clone(),
     ));
+    let virtual_products = Arc::new(PostgresVirtualProductRepository::new(pool.clone()));
     let virtual_payment = Arc::new(VirtualPaymentService::new(
         gateway,
         order_repository.clone(),
         Arc::new(PostgresVirtualOrderRepository::new(pool.clone())),
         user_membership_port.clone(),
         settlement.clone(),
-        Arc::new(PostgresVirtualProductRepository::new(pool)),
+        virtual_products.clone(),
     ));
     let wechat_pay_port: Arc<dyn WechatPayPort> = virtual_payment.clone();
     let virtual_webhook =
@@ -106,6 +107,7 @@ pub fn build_payment(
         )),
         get_membership_product_use_case: Arc::new(GetMembershipProductUseCase::new(
             system_config_port,
+            virtual_products,
         )),
         get_order_status_use_case: Arc::new(GetOrderStatusUseCase::new(order_repository.clone())),
         handle_wechat_notify_use_case: settlement,

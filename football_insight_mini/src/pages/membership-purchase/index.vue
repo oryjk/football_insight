@@ -25,7 +25,7 @@
           @tap="selectTier(option.target_tier)"
         >
           <view class="product-card__top">
-            <text class="product-card__tier">{{ option.target_tier }}</text>
+            <text class="product-card__tier">{{ option.target_tier === 'V3' ? 'VIP3' : option.target_tier }}</text>
             <text class="product-card__tag">{{ option.subtitle }}</text>
           </view>
           <view class="product-card__price-row">
@@ -100,7 +100,7 @@
 
       <view class="purchase-actions">
         <view class="purchase-actions__summary">
-          <text class="purchase-actions__tier">{{ selectedProduct?.target_tier || '--' }}</text>
+          <text class="purchase-actions__tier">{{ selectedProduct?.target_tier === 'V3' ? 'VIP3' : selectedProduct?.target_tier || '--' }}</text>
           <text class="purchase-actions__price">¥{{ displayPrice }}</text>
           <text v-if="selectedUpgradeNote" class="purchase-actions__note">{{ selectedUpgradeNote }}</text>
         </view>
@@ -160,7 +160,9 @@ const currentUser = session.currentUser
 const loading = ref(false)
 const selectedTier = ref('')
 const agreementAccepted = ref(false)
-const agreementPoints = MEMBERSHIP_PURCHASE_AGREEMENT_POINTS
+const agreementPoints = computed(() => selectedProduct.value?.target_tier === 'V3'
+  ? ['本商品开通项目现有 V3 等级，等级及权益按当前会员规则执行。', ...MEMBERSHIP_PURCHASE_AGREEMENT_POINTS.slice(1)]
+  : MEMBERSHIP_PURCHASE_AGREEMENT_POINTS)
 const paymentAvailable = ref(false)
 const paymentUnavailableMessage = ref('请稍后再试。')
 

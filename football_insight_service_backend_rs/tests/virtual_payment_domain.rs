@@ -4,6 +4,7 @@ use football_insight_service_backend_rs::payment::domain::virtual_payment::{
 
 #[test]
 fn catalog_preserves_upgrade_amount_and_removes_match_specific_id() {
+    assert_eq!(product_key("membership:V3", 1).unwrap(), "membership:V3@1");
     assert_eq!(
         product_key("membership:V7", 3500).unwrap(),
         "membership:V7@3500"

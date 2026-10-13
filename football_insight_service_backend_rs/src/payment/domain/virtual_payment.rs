@@ -25,6 +25,13 @@ pub struct VirtualProduct {
     pub price_cents: i32,
 }
 
+#[derive(Debug, Clone)]
+pub struct PrivateMembershipProduct {
+    pub product_type: String,
+    pub name: String,
+    pub price_cents: i32,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VirtualPayParams {
@@ -76,7 +83,7 @@ pub fn product_key(product_type: &str, amount_cents: i32) -> Result<String, Virt
     }
     let parts: Vec<_> = product_type.split(':').collect();
     let key = match parts.as_slice() {
-        ["membership", tier] if matches!(*tier, "V6" | "V7" | "V8" | "V9") => {
+        ["membership", tier] if matches!(*tier, "V3" | "V6" | "V7" | "V8" | "V9") => {
             format!("membership:{tier}")
         }
         ["match_id_unlock", id] if id.parse::<i64>().is_ok_and(|v| v > 0) => {

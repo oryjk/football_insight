@@ -66,9 +66,10 @@ pub async fn get_membership_product_handler(
     State(state): State<Arc<PaymentWebState>>,
     headers: HeaderMap,
 ) -> Result<Json<MembershipProductResponse>, (StatusCode, String)> {
+    let user_id = try_authenticate_user(&headers, state.token_port.as_ref());
     let product = state
         .get_membership_product_use_case
-        .execute()
+        .execute_for_user(user_id)
         .await
         .map_err(|error| {
             tracing::error!(error = %error, "failed to get membership product");
@@ -77,7 +78,7 @@ pub async fn get_membership_product_handler(
                 "获取会员信息失败".to_string(),
             )
         })?;
-    let current_tier = match try_authenticate_user(&headers, state.token_port.as_ref()) {
+    let current_tier = match user_id {
         Some(user_id) => state
             .user_membership_port
             .get_user_membership_tier(user_id)
@@ -112,7 +113,7 @@ pub async fn create_membership_order_handler(
 
     let catalog = state
         .get_membership_product_use_case
-        .execute()
+        .execute_for_user(Some(user_id))
         .await
         .map_err(|error| {
             tracing::error!(error = %error, "failed to get membership product for order");

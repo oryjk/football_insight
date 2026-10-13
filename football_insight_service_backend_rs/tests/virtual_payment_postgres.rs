@@ -231,6 +231,93 @@ struct Database {
 
 #[tokio::test]
 #[ignore = "requires an explicit disposable database"]
+async fn restricted_v3_product_only_allows_its_buyer_and_grants_v3_after_payment() {
+    let db = Database::new().await;
+    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='f_i_virtual_payment_products' AND column_name='allowed_user_ids')").fetch_one(&db.pool).await.unwrap();
+    assert!(
+        exists,
+        "product-level buyer restrictions must be stored in the catalog"
+    );
+    sqlx::query("INSERT INTO f_i_virtual_payment_products(product_key,name,product_id,price_cents,enabled,allowed_user_ids) VALUES('membership:V3@1','VIP3 测试会员','test',1,TRUE,ARRAY[$1]::uuid[])").bind(db.user).execute(&db.pool).await.unwrap();
+    let service = catalog_service(&db);
+    let params = catalog_checkout(&db, &service, "restrictedv3buyer", "membership:V3", 1)
+        .await
+        .unwrap();
+    assert_eq!(params["productId"], "test");
+    assert_eq!(params["goodsPrice"], 1);
+    let other = Uuid::new_v4();
+    sqlx::query("INSERT INTO f_i_users(id,account_identifier) VALUES($1,'other')")
+        .bind(other)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    let catalog = football_insight_service_backend_rs::payment::application::get_membership_product::GetMembershipProductUseCase::new(
+        Arc::new(football_insight_service_backend_rs::system_config::adapters::persistence::postgres_system_config_port::PostgresSystemConfigPort::new(db.pool.clone())),
+        Arc::new(football_insight_service_backend_rs::payment::adapters::persistence::postgres_virtual_product_repository::PostgresVirtualProductRepository::new(db.pool.clone())),
+    );
+    let buyer_catalog = catalog.execute_for_user(Some(db.user)).await.unwrap();
+    assert_eq!(
+        buyer_catalog
+            .find_option("V3")
+            .expect("authorized buyer sees VIP3")
+            .price_cents,
+        1
+    );
+    assert!(
+        catalog
+            .execute_for_user(Some(other))
+            .await
+            .unwrap()
+            .find_option("V3")
+            .is_none()
+    );
+    assert!(catalog.execute().await.unwrap().find_option("V3").is_none());
+    db.repos()
+        .0
+        .create_order(NewPaymentOrder {
+            order_no: "restrictedv3other".into(),
+            user_id: other,
+            amount_cents: 1,
+            product_type: "membership:V3".into(),
+        })
+        .await
+        .unwrap();
+    let error = service
+        .unified_order("restrictedv3other", "test", 1, "other")
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        error.downcast_ref::<VirtualPaymentError>(),
+        Some(VirtualPaymentError::ProductUnavailable)
+    ));
+    assert!(
+        db.repos()
+            .1
+            .find("restrictedv3other")
+            .await
+            .unwrap()
+            .is_none()
+    );
+    let invalid_public_v3 = sqlx::query("UPDATE f_i_virtual_payment_products SET allowed_user_ids='{}' WHERE product_key='membership:V3@1'").execute(&db.pool).await;
+    assert!(
+        invalid_public_v3.is_err(),
+        "V3 must never accidentally become a public paid tier"
+    );
+    service.reconcile_pending().await.unwrap();
+    assert_eq!(db.membership().await["tier"], "V3");
+    assert!(
+        db.membership().await["expires_at"].is_null(),
+        "existing V3 uses ordinary membership rules"
+    );
+    db.refund("restrictedv3buyer", "restrictedv3refund", 1)
+        .await
+        .unwrap();
+    assert_eq!(db.membership().await["tier"], "V1");
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires an explicit disposable database"]
 async fn product_catalog_migration_seeds_published_v6() {
     let db = Database::new().await;
     let table: Option<String> =
@@ -284,6 +371,7 @@ impl Database {
             include_str!("../migrations/20260826140000_add_match_id_unlocks.sql"),
             include_str!("../migrations/20261013000500_add_virtual_payment.sql"),
             include_str!("../migrations/20261013220000_add_virtual_payment_products.sql"),
+            include_str!("../migrations/20261013223000_add_restricted_virtual_products.sql"),
         ] {
             sqlx::raw_sql(migration).execute(&pool).await.unwrap();
         }

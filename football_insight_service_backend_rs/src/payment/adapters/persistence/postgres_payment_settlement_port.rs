@@ -38,8 +38,8 @@ fn resolve_membership_settlement(
     let paid_tier_rank = membership_tier_rank(paid_tier);
     let current_effective_tier_rank = membership_tier_rank(&current_effective_tier);
     let is_paid_membership_tier = paid_tier_rank >= membership_tier_rank("V6");
-    let should_apply_paid_tier =
-        is_paid_membership_tier && paid_tier_rank > current_effective_tier_rank;
+    let should_apply_paid_tier = (is_paid_membership_tier || paid_tier == "V3")
+        && paid_tier_rank > current_effective_tier_rank;
     let should_refresh_paid_expiration =
         is_paid_membership_tier && paid_tier_rank >= current_effective_tier_rank;
     let effective_tier = if should_apply_paid_tier {

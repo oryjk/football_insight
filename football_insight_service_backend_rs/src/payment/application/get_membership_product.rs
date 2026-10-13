@@ -4,11 +4,12 @@ use crate::payment::domain::order::MembershipProduct;
 
 pub struct GetMembershipProductUseCase {
     system_config_port: Arc<dyn crate::system_config::ports::system_config_port::SystemConfigPort>,
+    products: Arc<dyn crate::payment::ports::virtual_payment_port::VirtualProductRepository>,
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
+    use std::sync::{Arc, Mutex};
 
     use async_trait::async_trait;
 
@@ -20,6 +21,37 @@ mod tests {
 
     struct FakeSystemConfigPort {
         value: Mutex<Option<String>>,
+    }
+
+    struct EmptyProductRepository;
+    #[async_trait]
+    impl crate::payment::ports::virtual_payment_port::VirtualProductRepository
+        for EmptyProductRepository
+    {
+        async fn find_enabled(
+            &self,
+            _: &str,
+            _: uuid::Uuid,
+        ) -> Result<
+            Option<crate::payment::domain::virtual_payment::VirtualProduct>,
+            crate::payment::domain::virtual_payment::VirtualPaymentError,
+        > {
+            Ok(None)
+        }
+        async fn has_enabled(
+            &self,
+        ) -> Result<bool, crate::payment::domain::virtual_payment::VirtualPaymentError> {
+            Ok(false)
+        }
+        async fn private_membership_products(
+            &self,
+            _: uuid::Uuid,
+        ) -> Result<
+            Vec<crate::payment::domain::virtual_payment::PrivateMembershipProduct>,
+            crate::payment::domain::virtual_payment::VirtualPaymentError,
+        > {
+            Ok(vec![])
+        }
     }
 
     #[async_trait]
@@ -38,11 +70,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn legacy_padded_v3_option_is_not_visible_in_public_catalog() {
+        let use_case = GetMembershipProductUseCase::new(
+            Arc::new(FakeSystemConfigPort { value: Mutex::new(Some(serde_json::json!({
+                "price_cents":1,"title":"member","subtitle":"","description":"",
+                "products":[{"target_tier":" v3 ","price_cents":1,"title":"private","subtitle":"","description":""}]
+            }).to_string())) }),
+            Arc::new(EmptyProductRepository),
+        );
+        assert!(
+            use_case
+                .execute()
+                .await
+                .unwrap()
+                .find_option("V3")
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
     async fn execute_returns_v6_to_v9_membership_products_by_default() {
-        let use_case =
-            GetMembershipProductUseCase::new(std::sync::Arc::new(FakeSystemConfigPort {
+        let use_case = GetMembershipProductUseCase::new(
+            std::sync::Arc::new(FakeSystemConfigPort {
                 value: Mutex::new(None),
-            }));
+            }),
+            Arc::new(EmptyProductRepository),
+        );
 
         let catalog = use_case.execute().await.expect("catalog");
 
@@ -62,11 +115,22 @@ impl GetMembershipProductUseCase {
         system_config_port: Arc<
             dyn crate::system_config::ports::system_config_port::SystemConfigPort,
         >,
+        products: Arc<dyn crate::payment::ports::virtual_payment_port::VirtualProductRepository>,
     ) -> Self {
-        Self { system_config_port }
+        Self {
+            system_config_port,
+            products,
+        }
     }
 
     pub async fn execute(&self) -> anyhow::Result<MembershipProduct> {
+        self.execute_for_user(None).await
+    }
+
+    pub async fn execute_for_user(
+        &self,
+        user_id: Option<uuid::Uuid>,
+    ) -> anyhow::Result<MembershipProduct> {
         let config_value = self
             .system_config_port
             .get_config_value("membership_product")
@@ -77,7 +141,31 @@ impl GetMembershipProductUseCase {
             None => Self::default_product(),
         };
 
-        Ok(product.normalized())
+        let mut product = product.normalized();
+        // V3 is never a public paid option, even if an old system-config catalog contains it.
+        product
+            .products
+            .retain(|p| !p.target_tier.trim().eq_ignore_ascii_case("V3"));
+        if let Some(user_id) = user_id {
+            for private in self.products.private_membership_products(user_id).await? {
+                let tier = crate::payment::domain::order::membership_tier_from_product_type(
+                    &private.product_type,
+                );
+                if product.find_option(&tier).is_some() {
+                    continue;
+                }
+                product
+                    .products
+                    .push(crate::payment::domain::order::MembershipProductOption {
+                        target_tier: tier.clone(),
+                        price_cents: private.price_cents,
+                        title: private.name,
+                        subtitle: "仅限指定账号".into(),
+                        description: format!("支付确认后开通 {tier}，权益按现有等级规则执行。"),
+                    });
+            }
+        }
+        Ok(product)
     }
 
     fn default_product() -> MembershipProduct {

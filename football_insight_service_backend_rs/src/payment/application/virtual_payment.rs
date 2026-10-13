@@ -198,7 +198,7 @@ impl WechatPayPort for VirtualPaymentService {
         let key = product_key(&order.product_type, amount_cents)?;
         let product = self
             .products
-            .find_enabled(&key)
+            .find_enabled(&key, order.user_id)
             .await?
             .ok_or(VirtualPaymentError::ProductUnavailable)?;
         if product.price_cents != amount_cents {
