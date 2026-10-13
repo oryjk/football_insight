@@ -279,8 +279,15 @@ async function handlePurchase() {
     }
     await session.ensureSessionReady({ force: true })
     if (!isCurrent()) return
-    uni.showToast({ title: '会员已生效', icon: 'success' })
-    await loadPurchaseData()
+    uni.switchTab({
+      url: '/pages/user/index',
+      success: () => {
+        if (isCurrent()) uni.showToast({ title: '会员已生效', icon: 'success' })
+      },
+      fail: () => {
+        if (isCurrent()) uni.showToast({ title: '会员已生效，请返回「我的」查看', icon: 'none' })
+      },
+    })
   } catch (error) {
     if (!isCurrent()) return
     uni.showToast({ title: paymentCompleted ? '支付已完成，请稍后刷新会员状态' : extractApiErrorMessage(error, '购买未完成，请重试'), icon: 'none' })
