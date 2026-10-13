@@ -42,8 +42,6 @@
             :code="currentMembershipMeta.code"
             :tone-class="currentMembershipGuide.toneClass"
             :benefit-items="membershipBenefitItems"
-            :upgrade-steps="upgradeSteps"
-            :rule-summary="membershipRuleSummary"
           />
 
           <view class="account-actions">
@@ -140,7 +138,6 @@ import { createUserLoginFlow, type MiniWechatBindForm } from './loginFlow'
 import {
   buildUserAccountInfoItems,
   buildUserBenefitItems,
-  buildUserUpgradeSteps,
   canShowMembershipPurchaseEntry,
   formatMembershipExpiryLabel,
   formatNotificationEmailLabel,
@@ -148,10 +145,8 @@ import {
   resolveUserMembershipMeta,
   type UserAccountInfoItem,
   type UserBenefitItem,
-  type UserUpgradeStep,
 } from './helpers'
 import {
-  buildMembershipTierGuides,
   resolveMembershipTierGuide,
   type MembershipTierGuide,
 } from '../../utils/membershipRules'
@@ -270,18 +265,6 @@ const canRenewCurrentV9Membership = computed(() =>
   currentMembershipMeta.value.code === 'V9'
   && Boolean(currentUser.value?.membership_expires_at?.trim()),
 )
-const membershipTierGuides = computed<MembershipTierGuide[]>(() =>
-  buildMembershipTierGuides(publicConfig.value?.membership_tier_rules),
-)
-const membershipRuleSummary = computed(() => {
-  const codes = membershipTierGuides.value.map((item) => item.code).join('、')
-
-  if (!codes) {
-    return '会员升级条件和对应刷新速度以后端当前配置为准。'
-  }
-
-  return `当前开放 ${codes}。现阶段会员权益只影响余票监控刷新频率，升级条件和对应刷新速度以后端当前配置为准。`
-})
 const currentMembershipGuide = computed<MembershipTierGuide>(() =>
   resolveMembershipTierGuide(
     currentMembershipMeta.value.code,
@@ -309,9 +292,6 @@ const membershipBenefitItems = computed<UserBenefitItem[]>(() =>
     membershipCode: currentMembershipMeta.value.code,
     refreshLabel: currentMembershipGuide.value.refreshLabel,
   }),
-)
-const upgradeSteps = computed<UserUpgradeStep[]>(() =>
-  buildUserUpgradeSteps(membershipTierGuides.value, currentMembershipMeta.value.code),
 )
 
 function openSettingsPage() {
