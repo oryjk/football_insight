@@ -23,4 +23,4 @@
 
 - [x] Replace TopicArticleImage with page-local TopicImageGallery and restore independent paragraph rendering; remove obsolete reading-block helpers.
 - [x] Run Bun tests, typecheck and H5/MP builds; inspect 320/390/430 widths and swipe/preview/error behavior with real images.
-- [ ] Readonly review, update project memory, commit/push task changes and upload the mini experience version without QR generation.
+- [x] Readonly review, update project memory, commit/push task changes and upload the mini experience version without QR generation.
