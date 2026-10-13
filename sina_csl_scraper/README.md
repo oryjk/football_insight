@@ -369,3 +369,15 @@ uv run sina-csl-scraper scrape --season 2026 --upload-avatars
 ```bash
 uv run pytest
 ```
+
+## 今日话题原文配图
+
+自动更新会提取实际引用原文的正文图片，验证下载后缓存并上传现有 MinIO，话题详情按段落展示并支持点击放大。图片保存在 Git 忽略的 `data/topics/images/`，每篇最多四张；失败不阻断文章或语音发布，不改变文章 ID、来源指纹或时间。
+
+已有话题可在 local233 补图，复用私有 `.env.topics` / `.env.sync` 与现有数据库隧道，不调用 Kimi/TTS、不新建表：
+
+```bash
+uv run --no-sync python scripts/run_topics_local.py refresh-images --write-db
+```
+
+补图命令与生成任务共用文件锁，在数据库行锁内只修改 images；原文、音频、独立热度和并发修改保留。

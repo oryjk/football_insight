@@ -56,4 +56,4 @@
 - [x] Verify old/new payload mapping, malformed-image fallback and reading order.
 - [x] Display full-width photos with publisher attribution; image failures leave readable text.
 - [x] Run Bun tests/typecheck/H5/MP builds and verify rendered real image dimensions.
-- [ ] Review, update project memory, commit/push task-only changes, deploy production backend and upload robot 2 without preview QR.
+- [x] Review, update project memory, commit/push task-only changes, deploy production backend and upload robot 2 without preview QR.
