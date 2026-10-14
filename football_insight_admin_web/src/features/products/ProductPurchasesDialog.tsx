@@ -155,219 +155,233 @@ export function ProductPurchasesDialog({
         <DialogHeader>
           <DialogTitle>购买记录</DialogTitle>
           <DialogDescription>
-            <span>{product.name} · </span>
+            <span
+              className="purchase-history-product-name"
+              title={product.name}
+            >
+              {product.name}
+            </span>
             <span className="technical-text">{product.product_key}</span>
           </DialogDescription>
         </DialogHeader>
         <MembershipOriginFilters origins={origins} onChange={setOrigins} />
-        {hasPurchase && (
-          <Collapsible
-            open={ordersOpen}
-            onOpenChange={setOrdersOpen}
-            className="purchase-order-details"
-          >
-            <CollapsibleTrigger asChild>
-              <Button variant="secondary" className="purchase-order-toggle">
-                支付订单明细
-                <ChevronDown />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="purchase-order-content">
-              <>
-                <div className="purchase-history-toolbar">
-                  <p className="field-hint">
-                    统计成功支付的订单，包含已退款记录；金额为原支付金额，未扣除退款。
-                  </p>
-                  <Button
-                    variant="secondary"
-                    disabled={loading}
-                    onClick={() => setRevision((current) => current + 1)}
-                    aria-label="刷新购买记录"
-                  >
-                    <RefreshCw />
-                    刷新
-                  </Button>
-                </div>
-                {loading && (
-                  <p className="empty-state" role="status">
-                    正在加载购买记录…
-                  </p>
-                )}
-                {error && (
-                  <div className="operation-error" role="alert">
-                    <span>{error}</span>
+        <div className="purchase-history-body">
+          {hasPurchase && (
+            <Collapsible
+              open={ordersOpen}
+              onOpenChange={setOrdersOpen}
+              className="purchase-order-details"
+            >
+              <CollapsibleTrigger asChild>
+                <Button variant="secondary" className="purchase-order-toggle">
+                  支付订单明细
+                  <ChevronDown />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="purchase-order-content">
+                <>
+                  <div className="purchase-history-toolbar">
+                    <p className="field-hint">
+                      统计成功支付的订单，包含已退款记录；金额为原支付金额，未扣除退款。
+                    </p>
                     <Button
                       variant="secondary"
-                      onClick={
-                        identityChanged
-                          ? onReloadProduct
-                          : () => setRevision((current) => current + 1)
-                      }
+                      disabled={loading}
+                      onClick={() => setRevision((current) => current + 1)}
+                      aria-label="刷新购买记录"
                     >
-                      {identityChanged ? "返回并刷新商品列表" : "重试购买记录"}
+                      <RefreshCw />
+                      刷新
                     </Button>
                   </div>
-                )}
-                {data && summary && (
-                  <div className="purchase-history-content">
-                    <dl className="purchase-summary" aria-label="商品购买汇总">
-                      <div>
-                        <dt>购买人数</dt>
-                        <dd>{summary.users}</dd>
-                      </div>
-                      <div>
-                        <dt>支付订单</dt>
-                        <dd>{summary.orders}</dd>
-                      </div>
-                      <div>
-                        <dt>退款订单</dt>
-                        <dd>{summary.refunded}</dd>
-                      </div>
-                      <div>
-                        <dt>累计支付金额（退款前）</dt>
-                        <dd>{summary.amount}</dd>
-                      </div>
-                    </dl>
-                    <Table
-                      className="purchase-history-table"
-                      aria-label="商品购买订单"
-                    >
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>购买用户</TableHead>
-                          <TableHead>购买时间（北京时间）</TableHead>
-                          <TableHead>到期时间（北京时间）</TableHead>
-                          <TableHead>实付金额</TableHead>
-                          <TableHead>订单状态</TableHead>
-                          <TableHead>订单号</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {data.items.map((item) => {
-                          const expiry = purchaseExpiry(item);
-                          return (
-                            <TableRow key={item.order_no}>
-                              <TableCell>
-                                <div className="purchase-user">
-                                  <PurchaseAvatar url={item.user_avatar_url} />
-                                  <div className="purchase-user-identity">
-                                    <strong>
-                                      {item.user_nickname || "未命名用户"}
-                                    </strong>
-                                    <MembershipOriginBadge
-                                      origin={item.membership_origin}
+                  {loading && (
+                    <p className="empty-state" role="status">
+                      正在加载购买记录…
+                    </p>
+                  )}
+                  {error && (
+                    <div className="operation-error" role="alert">
+                      <span>{error}</span>
+                      <Button
+                        variant="secondary"
+                        onClick={
+                          identityChanged
+                            ? onReloadProduct
+                            : () => setRevision((current) => current + 1)
+                        }
+                      >
+                        {identityChanged
+                          ? "返回并刷新商品列表"
+                          : "重试购买记录"}
+                      </Button>
+                    </div>
+                  )}
+                  {data && summary && (
+                    <div className="purchase-history-content">
+                      <dl
+                        className="purchase-summary"
+                        aria-label="商品购买汇总"
+                      >
+                        <div>
+                          <dt>购买人数</dt>
+                          <dd>{summary.users}</dd>
+                        </div>
+                        <div>
+                          <dt>支付订单</dt>
+                          <dd>{summary.orders}</dd>
+                        </div>
+                        <div>
+                          <dt>退款订单</dt>
+                          <dd>{summary.refunded}</dd>
+                        </div>
+                        <div>
+                          <dt>累计支付金额（退款前）</dt>
+                          <dd>{summary.amount}</dd>
+                        </div>
+                      </dl>
+                      <Table
+                        className="purchase-history-table"
+                        aria-label="商品购买订单"
+                      >
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>购买用户</TableHead>
+                            <TableHead>购买时间（北京时间）</TableHead>
+                            <TableHead>到期时间（北京时间）</TableHead>
+                            <TableHead>实付金额</TableHead>
+                            <TableHead>订单状态</TableHead>
+                            <TableHead>订单号</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {data.items.map((item) => {
+                            const expiry = purchaseExpiry(item);
+                            return (
+                              <TableRow key={item.order_no}>
+                                <TableCell>
+                                  <div className="purchase-user">
+                                    <PurchaseAvatar
+                                      url={item.user_avatar_url}
                                     />
-                                    <small className="technical-text">
-                                      {item.user_id}
-                                    </small>
+                                    <div className="purchase-user-identity">
+                                      <strong>
+                                        {item.user_nickname || "未命名用户"}
+                                      </strong>
+                                      <MembershipOriginBadge
+                                        origin={item.membership_origin}
+                                      />
+                                      <small className="technical-text">
+                                        {item.user_id}
+                                      </small>
+                                    </div>
                                   </div>
-                                </div>
-                              </TableCell>
-                              <TableCell className="purchase-date-cell">
-                                {purchaseDate(item.paid_at)}
-                              </TableCell>
-                              <TableCell className="purchase-date-cell">
-                                <span>{expiry.text}</span>
-                                {expiry.hint && (
-                                  <span
-                                    className="purchase-expiry-hint"
-                                    title="历史订单按原一年规则估算，不代表账号当前会员到期时间"
+                                </TableCell>
+                                <TableCell className="purchase-date-cell">
+                                  {purchaseDate(item.paid_at)}
+                                </TableCell>
+                                <TableCell className="purchase-date-cell">
+                                  <span>{expiry.text}</span>
+                                  {expiry.hint && (
+                                    <span
+                                      className="purchase-expiry-hint"
+                                      title="历史订单按原一年规则估算，不代表账号当前会员到期时间"
+                                    >
+                                      {expiry.hint}
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="amount-cell">
+                                  {purchaseAmount(item.amount_cents)}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    data-tone={
+                                      item.status === "refunded"
+                                        ? "warning"
+                                        : "success"
+                                    }
                                   >
-                                    {expiry.hint}
-                                  </span>
-                                )}
-                              </TableCell>
-                              <TableCell className="amount-cell">
-                                {purchaseAmount(item.amount_cents)}
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  data-tone={
-                                    item.status === "refunded"
-                                      ? "warning"
-                                      : "success"
-                                  }
-                                >
-                                  {item.status === "refunded"
-                                    ? "已退款"
-                                    : "已支付"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="purchase-order-number technical-text">
-                                {item.order_no}
+                                    {item.status === "refunded"
+                                      ? "已退款"
+                                      : "已支付"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="purchase-order-number technical-text">
+                                  {item.order_no}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                          {!data.items.length && (
+                            <TableRow>
+                              <TableCell colSpan={6}>
+                                <p className="empty-state">
+                                  该商品暂无成功支付的购买记录。
+                                </p>
                               </TableCell>
                             </TableRow>
-                          );
-                        })}
-                        {!data.items.length && (
-                          <TableRow>
-                            <TableCell colSpan={6}>
-                              <p className="empty-state">
-                                该商品暂无成功支付的购买记录。
-                              </p>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                    <div className="product-pagination">
-                      <span>
-                        共 {data.total} 条 · 第 {data.page} / {pages} 页
-                      </span>
-                      <div className="pagination-actions">
-                        <Label htmlFor="purchase-page-size">每页</Label>
-                        <Select
-                          value={String(pageSize)}
-                          onValueChange={(value) => {
-                            setPageSize(Number(value));
-                            setPage(1);
-                          }}
-                        >
-                          <SelectTrigger id="purchase-page-size">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[10, 20, 50, 100].map((size) => (
-                              <SelectItem key={size} value={String(size)}>
-                                {size} 条
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          aria-label="购买记录上一页"
-                          disabled={loading || page <= 1}
-                          onClick={() => setPage((current) => current - 1)}
-                        >
-                          <ChevronLeft />
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="icon"
-                          aria-label="购买记录下一页"
-                          disabled={loading || page >= pages}
-                          onClick={() => setPage((current) => current + 1)}
-                        >
-                          <ChevronRight />
-                        </Button>
+                          )}
+                        </TableBody>
+                      </Table>
+                      <div className="product-pagination">
+                        <span>
+                          共 {data.total} 条 · 第 {data.page} / {pages} 页
+                        </span>
+                        <div className="pagination-actions">
+                          <Label htmlFor="purchase-page-size">每页</Label>
+                          <Select
+                            value={String(pageSize)}
+                            onValueChange={(value) => {
+                              setPageSize(Number(value));
+                              setPage(1);
+                            }}
+                          >
+                            <SelectTrigger id="purchase-page-size">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {[10, 20, 50, 100].map((size) => (
+                                <SelectItem key={size} value={String(size)}>
+                                  {size} 条
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            aria-label="购买记录上一页"
+                            disabled={loading || page <= 1}
+                            onClick={() => setPage((current) => current - 1)}
+                          >
+                            <ChevronLeft />
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            aria-label="购买记录下一页"
+                            disabled={loading || page >= pages}
+                            onClick={() => setPage((current) => current + 1)}
+                          >
+                            <ChevronRight />
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
-        <ProductMembers
-          key={origins.slice().sort().join(",")}
-          api={api}
-          token={token}
-          product={product}
-          origins={origins}
-          onReloadProduct={onReloadProduct}
-        />
+                  )}
+                </>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+          <ProductMembers
+            key={origins.slice().sort().join(",")}
+            api={api}
+            token={token}
+            product={product}
+            origins={origins}
+            onReloadProduct={onReloadProduct}
+          />
+        </div>
         <DialogFooter>
           <Button variant="secondary" onClick={onClose}>
             关闭购买记录

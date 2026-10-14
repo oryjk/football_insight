@@ -225,6 +225,10 @@
   transition-property: none;
   width: min(var(--purchase-dialog-width), calc(100vw - var(--space-8)));
   max-width: var(--purchase-dialog-width);
+  height: min(780px, calc(100dvh - var(--space-8)));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .purchase-history-toolbar {
   display: flex;
@@ -406,4 +410,53 @@
 }
 .purchase-order-toggle[aria-expanded="true"] svg {
   transform: rotate(180deg);
+}
+
+.purchase-history-dialog > [data-slot="dialog-header"],
+.purchase-history-dialog > .membership-origin-filters,
+.purchase-history-dialog > [data-slot="dialog-footer"] {
+  flex-shrink: 0;
+}
+.purchase-history-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+}
+.purchase-history-product-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+@media (max-height: 480px) {
+  .purchase-history-dialog[data-slot="dialog-content"] {
+    padding: var(--space-4);
+    gap: var(--space-3);
+    /* Preserve reachable content/close controls even when browser zoom leaves little height. */
+    overflow-y: auto;
+  }
+  .purchase-history-body {
+    min-height: 96px;
+  }
+}
+.purchase-member-results {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  animation: purchase-results-appear 160ms ease-out;
+}
+@keyframes purchase-results-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }

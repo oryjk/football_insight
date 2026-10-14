@@ -136,7 +136,7 @@ export function ProductMembers({
         </div>
       )}
       {data && (
-        <>
+        <div className="purchase-member-results">
           <p className="field-hint">
             当前筛选的 {data.membership_tier} 会员共 {data.total}{" "}
             人；推荐升级及未知来源账号不计入购买人数和订单金额。
@@ -210,7 +210,7 @@ export function ProductMembers({
               </Button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
