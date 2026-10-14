@@ -6,17 +6,15 @@
     <view class="page-bg-fade"></view>
     <scroll-view scroll-y class="page-scroll">
       <view class="page">
-      <view class="hero-card support-hero">
-        <view class="hero-card__top">
-          <view>
-            <text class="eyebrow">赛前助力</text>
-            <text class="hero-card__title">{{ heroTitle }}</text>
-          </view>
-          <text class="hero-card__badge">{{ heroBadge }}</text>
-        </view>
+      <FiPanel>
+        <FiSectionHeading kicker="赛前助力" :title="heroTitle" size="xl">
+          <template #meta>
+            <text class="meta-pill">{{ heroBadge }}</text>
+          </template>
+        </FiSectionHeading>
 
-        <text class="hero-card__summary">{{ heroSummary }}</text>
-      </view>
+        <text class="hero-summary">{{ heroSummary }}</text>
+      </FiPanel>
 
       <FiLoading
         v-if="loading"
@@ -24,12 +22,12 @@
         caption="正在整理这场比赛的双方热度对抗。"
       />
 
-      <view v-else-if="errorMessage" class="state-card state-card--error">
-        <text>{{ errorMessage }}</text>
-      </view>
+      <FiPanel v-else-if="errorMessage">
+        <text class="state-error">{{ errorMessage }}</text>
+      </FiPanel>
 
       <template v-else-if="detail">
-        <view class="panel support-scoreboard">
+        <FiPanel>
           <view class="support-scoreboard__meta">
             <text>第 {{ detail.round_number }} 轮</text>
             <text>{{ detail.match_date }} {{ detail.match_time }}</text>
@@ -71,16 +69,14 @@
             <text>总助力值 {{ formatSupportCount(detail.total_support_count) }}</text>
             <text>{{ countdownLabel }}</text>
           </view>
-        </view>
+        </FiPanel>
 
-        <view class="panel support-state-card">
-          <view class="section-heading section-heading--compact">
-            <view>
-              <text class="section-kicker">站队状态</text>
-              <text class="section-title">{{ stanceTitle }}</text>
-            </view>
-            <text class="meta-pill">{{ stanceBadge }}</text>
-          </view>
+        <FiPanel>
+          <FiSectionHeading kicker="站队状态" :title="stanceTitle">
+            <template #meta>
+              <text class="meta-pill">{{ stanceBadge }}</text>
+            </template>
+          </FiSectionHeading>
 
           <view class="support-state-card__notes">
             <text>{{ stanceDescription }}</text>
@@ -109,19 +105,14 @@
           <text class="support-state-card__rule">
             规则：主客队任选，开球前可点击已助力取消并重新选择；同一时间只能保留一队的助力，比赛开始后自动截止。
           </text>
-        </view>
+        </FiPanel>
 
-        <view v-if="posterImagePath" class="panel poster-panel">
-          <view class="section-heading section-heading--compact">
-            <view>
-              <text class="section-kicker">拉票海报</text>
-              <text class="section-title">已生成本地海报</text>
-            </view>
-          </view>
+        <FiPanel v-if="posterImagePath">
+          <FiSectionHeading kicker="拉票海报" title="已生成本地海报" />
 
           <image :src="posterImagePath" mode="widthFix" class="poster-panel__image" />
           <button class="primary-action poster-panel__save" @click="savePosterImage">保存到相册</button>
-        </view>
+        </FiPanel>
       </template>
 
       <canvas canvas-id="supportPosterCanvas" class="support-poster-canvas" />
@@ -135,6 +126,8 @@ import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, ref } from 'vue'
 import { onHide, onLoad, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
+import FiPanel from '../../components/FiPanel.vue'
+import FiSectionHeading from '../../components/FiSectionHeading.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
@@ -390,18 +383,6 @@ function formatSupportCount(value: number): string {
   flex-direction: column;
   gap: var(--fi-space-card-gap);
 }
-.hero-card,
-.panel,
-.state-card {
-  background: rgba(255,255,255,0.94);
-  border-radius: 36rpx;
-  padding: var(--fi-space-28);
-  border: 2rpx solid rgba(236, 236, 241, 0.95);
-  box-shadow: 0 28rpx 60rpx rgba(26,28,36,0.08);
-}
-.support-hero { background: rgba(255,255,255,0.94); }
-.hero-card__top,
-.section-heading,
 .support-scoreboard__meta,
 .support-scoreboard__footer,
 .support-actions {
@@ -409,29 +390,6 @@ function formatSupportCount(value: number): string {
   align-items: center;
   justify-content: space-between;
 }
-.hero-card__top,
-.section-heading {
-  align-items: flex-start;
-  gap: var(--fi-space-16);
-}
-.eyebrow,
-.section-kicker {
-  color: #131313;
-  font-size: 24rpx;
-  font-weight: 700;
-  letter-spacing: 2rpx;
-}
-.hero-card__title,
-.section-title {
-  display: block;
-  margin-top: var(--fi-space-10);
-  color: #121212;
-  font-size: 56rpx;
-  line-height: 1.08;
-  font-weight: 800;
-}
-.section-title { font-size: 40rpx; }
-.hero-card__badge,
 .meta-pill {
   display: inline-flex;
   align-items: center;
@@ -444,7 +402,7 @@ function formatSupportCount(value: number): string {
   font-size: 24rpx;
   white-space: nowrap;
 }
-.hero-card__summary,
+.hero-summary,
 .support-state-card__notes text,
 .support-state-card__rule {
   display: block;
@@ -574,7 +532,7 @@ function formatSupportCount(value: number): string {
 .poster-panel__save {
   margin-top: var(--fi-space-18);
 }
-.state-card--error text {
+.state-error {
   color: #c03a2b;
   font-size: 28rpx;
 }

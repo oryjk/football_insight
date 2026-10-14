@@ -1,65 +1,68 @@
 <template>
-  <view class="panel insights-locked">
-    <!-- mode=guest：未登录时的模糊预览 -->
-    <view v-if="mode === 'guest'" class="insights-locked__preview">
-      <view class="insights-locked__chips">
-        <text v-for="name in previewTeams" :key="name">{{ name }}</text>
-      </view>
-
-      <view class="insights-locked__summary">
-        <view class="insights-locked__metric">
-          <text>总进球</text>
-          <text class="insights-locked__metric-value">14</text>
-          <text>赛季累计打进</text>
+  <FiPanel flush clip>
+    <view class="insights-locked">
+      <!-- mode=guest：未登录时的模糊预览 -->
+      <view v-if="mode === 'guest'" class="insights-locked__preview">
+        <view class="insights-locked__chips">
+          <text v-for="name in previewTeams" :key="name">{{ name }}</text>
         </view>
-        <view class="insights-locked__metric">
-          <text>总失球</text>
-          <text class="insights-locked__metric-value">5</text>
-          <text>赛季累计丢失</text>
-        </view>
-      </view>
 
-      <view class="insights-locked__rows">
-        <view v-for="section in previewSections" :key="section.title" class="insights-locked__section">
-          <text class="insights-locked__section-title">{{ section.title }}</text>
-          <view v-for="row in section.rows" :key="row.name" class="insights-locked__row">
-            <text>{{ row.name }}</text>
-            <view><view :style="{ width: row.width }" /></view>
+        <view class="insights-locked__summary">
+          <view class="insights-locked__metric">
+            <text>总进球</text>
+            <text class="insights-locked__metric-value">14</text>
+            <text>赛季累计打进</text>
+          </view>
+          <view class="insights-locked__metric">
+            <text>总失球</text>
+            <text class="insights-locked__metric-value">5</text>
+            <text>赛季累计丢失</text>
+          </view>
+        </view>
+
+        <view class="insights-locked__rows">
+          <view v-for="section in previewSections" :key="section.title" class="insights-locked__section">
+            <text class="insights-locked__section-title">{{ section.title }}</text>
+            <view v-for="row in section.rows" :key="row.name" class="insights-locked__row">
+              <text>{{ row.name }}</text>
+              <view><view :style="{ width: row.width }" /></view>
+            </view>
           </view>
         </view>
       </view>
-    </view>
 
-    <!-- mode=membership：会员权益暂停时的提示预览 -->
-    <view v-else class="insights-locked__preview">
-      <view class="insights-locked__summary">
-        <view class="insights-locked__metric">
-          <text>洞察权限</text>
-          <text class="insights-locked__metric-value">暂停</text>
-          <text>取关后自动冻结</text>
+      <!-- mode=membership：会员权益暂停时的提示预览 -->
+      <view v-else class="insights-locked__preview">
+        <view class="insights-locked__summary">
+          <view class="insights-locked__metric">
+            <text>洞察权限</text>
+            <text class="insights-locked__metric-value">暂停</text>
+            <text>取关后自动冻结</text>
+          </view>
+          <view class="insights-locked__metric">
+            <text>恢复方式</text>
+            <text class="insights-locked__metric-value">重新关注</text>
+            <text>返回这里刷新即可</text>
+          </view>
         </view>
-        <view class="insights-locked__metric">
-          <text>恢复方式</text>
-          <text class="insights-locked__metric-value">重新关注</text>
-          <text>返回这里刷新即可</text>
+      </view>
+
+      <view class="insights-lock-overlay">
+        <view v-if="mode === 'membership'" class="insights-lock-overlay__card">
+          <text class="section-kicker">会员权益已暂停</text>
+          <text class="insights-lock-overlay__title">当前账号已取关公众号</text>
+          <text class="insights-lock-overlay__copy">
+            洞察页和回流看板属于会员权益。重新关注公众号后，回到小程序刷新即可恢复；会员等级和你已推荐的人不会受影响。
+          </text>
+          <button class="insights-lock-overlay__action" @click="emit('action')">去我的页查看</button>
         </view>
       </view>
     </view>
-
-    <view class="insights-lock-overlay">
-      <view v-if="mode === 'membership'" class="insights-lock-overlay__card">
-        <text class="section-kicker">会员权益已暂停</text>
-        <text class="insights-lock-overlay__title">当前账号已取关公众号</text>
-        <text class="insights-lock-overlay__copy">
-          洞察页和回流看板属于会员权益。重新关注公众号后，回到小程序刷新即可恢复；会员等级和你已推荐的人不会受影响。
-        </text>
-        <button class="insights-lock-overlay__action" @click="emit('action')">去我的页查看</button>
-      </view>
-    </view>
-  </view>
+  </FiPanel>
 </template>
 
 <script setup lang="ts">
+import FiPanel from '../../../components/FiPanel.vue'
 import { computed } from 'vue'
 import {
   INSIGHTS_PREVIEW_ASSIST_ROWS,
@@ -88,19 +91,9 @@ const previewSections = computed(() => [
 </script>
 
 <style scoped lang="css">
-.panel {
-  position: relative;
-  background: rgba(255, 255, 255, 0.94);
-  border-radius: var(--fi-radius-xl);
-  border: var(--fi-border-card);
-  box-shadow: var(--fi-shadow-card);
-}
-
 .insights-locked {
   position: relative;
-  overflow: hidden;
   min-height: 820rpx;
-  padding: 0;
 }
 
 .insights-locked__preview {

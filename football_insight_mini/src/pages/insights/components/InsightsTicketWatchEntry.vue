@@ -1,16 +1,19 @@
 <template>
-  <view class="panel" :class="{ 'ticket-watch-entry--locked': locked }" @click="emit('open')">
-    <view class="section-heading">
-      <view>
-        <text class="section-kicker">Ticket Watch</text>
-        <text class="section-title">回流看板</text>
-      </view>
-      <text class="meta-pill">{{ locked ? '登录后' : '打开' }}</text>
+  <FiPanel flush clip>
+    <view class="ticket-watch-entry" :class="{ 'ticket-watch-entry--locked': locked }" @click="emit('open')">
+      <FiSectionHeading kicker="Ticket Watch" title="回流看板">
+        <template #meta>
+          <text class="meta-pill">{{ locked ? '登录后' : '打开' }}</text>
+        </template>
+      </FiSectionHeading>
     </view>
-  </view>
+    <view v-if="locked" class="ticket-watch-entry__veil" />
+  </FiPanel>
 </template>
 
 <script setup lang="ts">
+import FiPanel from '../../../components/FiPanel.vue'
+import FiSectionHeading from '../../../components/FiSectionHeading.vue'
 defineProps<{
   locked: boolean
 }>()
@@ -21,56 +24,22 @@ const emit = defineEmits<{
 </script>
 
 <style scoped lang="css">
-.panel {
-  position: relative;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.94);
-  border-radius: var(--fi-radius-xl);
-  border: var(--fi-border-card);
-  box-shadow: var(--fi-shadow-card);
-  padding: var(--fi-space-20);
+.ticket-watch-entry {
+  padding: var(--fi-component-panel-padding);
 }
 
 .ticket-watch-entry--locked {
   pointer-events: none;
-}
-
-.ticket-watch-entry--locked .section-heading {
   filter: blur(5rpx);
   opacity: 0.56;
 }
 
-.ticket-watch-entry--locked::after {
-  content: '';
+/* 锁定态白色薄罩覆盖整张卡（含内边距），由 FiPanel clip 裁剪到圆角内。 */
+.ticket-watch-entry__veil {
   position: absolute;
   inset: 0;
-  border-radius: inherit;
   background: rgba(255, 255, 255, 0.26);
   pointer-events: none;
-}
-
-.section-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--fi-space-12);
-}
-
-.section-kicker {
-  margin: 0;
-  color: var(--fi-component-kicker-text);
-  font-size: var(--fi-component-kicker-size);
-  font-weight: var(--fi-weight-bold);
-  letter-spacing: 3rpx;
-}
-
-.section-title {
-  display: block;
-  margin-top: var(--fi-space-10);
-  color: var(--fi-color-text-strong);
-  font-size: var(--fi-component-title-size);
-  line-height: 1.08;
-  font-weight: var(--fi-weight-extrabold);
 }
 
 .meta-pill {

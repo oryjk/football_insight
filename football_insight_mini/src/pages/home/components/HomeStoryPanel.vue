@@ -1,19 +1,18 @@
 <template>
-  <HomePanelCard>
-    <template #heading>
-      <view>
+  <FiPanel>
+    <FiSectionHeading>
+      <template #heading>
         <text class="section-kicker">实时脉冲</text>
         <view class="story-headline">
           <text>{{ headlineParts.leading }}</text>
           <text v-if="headlineParts.highlighted" class="inline-highlight">{{ headlineParts.highlighted }}</text>
           <text>{{ headlineParts.trailing }}</text>
         </view>
-      </view>
-    </template>
-
-    <template #meta>
-      <text class="meta-note">更新于 {{ updatedAtLabel }}</text>
-    </template>
+      </template>
+      <template #meta>
+        <text class="meta-note">更新于 {{ updatedAtLabel }}</text>
+      </template>
+    </FiSectionHeading>
 
     <text class="story-copy">{{ body }}</text>
 
@@ -55,11 +54,12 @@
         <text>{{ item }}</text>
       </view>
     </view>
-  </HomePanelCard>
+  </FiPanel>
 </template>
 
 <script setup lang="ts">
-import HomePanelCard from './HomePanelCard.vue'
+import FiPanel from '../../../components/FiPanel.vue'
+import FiSectionHeading from '../../../components/FiSectionHeading.vue'
 import pulseMatchCornerImage from '../../../static/home/pulse-match-corner.png'
 import { resolveHomePulseTechStats, type HomePulseLeadMatch } from '../helpers'
 

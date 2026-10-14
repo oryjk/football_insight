@@ -1,5 +1,5 @@
 <template>
-  <view class="panel support-home-panel">
+  <FiPanel>
     <view class="support-home-panel__header">
       <view class="support-home-panel__heading">
         <text class="support-home-panel__title">我的主队</text>
@@ -109,10 +109,11 @@
       </text>
       <button class="support-home-panel__action support-home-panel__action--ghost" @click="emit('select-team')">切换主队</button>
     </template>
-  </view>
+  </FiPanel>
 </template>
 
 <script setup lang="ts">
+import FiPanel from '../../../components/FiPanel.vue'
 import { computed } from 'vue'
 import FiLoading from '../../../components/FiLoading.vue'
 import HomeSupportVoteButton from './HomeSupportVoteButton.vue'
@@ -203,14 +204,6 @@ const awayRankLabel = computed(() => {
 </script>
 
 <style scoped lang="css">
-.panel {
-  background: rgba(255, 255, 255, 0.94);
-  border-radius: 36rpx;
-  border: 2rpx solid rgba(236, 236, 241, 0.95);
-  box-shadow: 0 20rpx 48rpx rgba(26, 28, 36, 0.06);
-  padding: 20rpx;
-}
-
 .state-card--error text {
   font-size: 28rpx;
   color: #c03a2b;

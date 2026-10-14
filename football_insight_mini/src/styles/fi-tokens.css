@@ -37,6 +37,7 @@ page {
   --fi-primitive-canvas: #f6f7fb;
   --fi-primitive-canvas-soft: #f7f8fa;
   --fi-primitive-surface-frosted: rgba(255, 255, 255, 0.92);
+  --fi-primitive-surface-panel: rgba(255, 255, 255, 0.94);
   --fi-primitive-topic-audio-surface: #fef2f2;
   --fi-primitive-topic-card-height: 480rpx;
   --fi-primitive-topic-gallery-height: 440rpx;
@@ -71,10 +72,12 @@ page {
   --fi-primitive-font-32: 32rpx;
   --fi-primitive-font-36: 36rpx;
   --fi-primitive-font-44: 44rpx;
+  --fi-primitive-font-50: 50rpx;
   --fi-primitive-font-48: 48rpx;
 
   /* ===== Primitive：行高 ===== */
   --fi-primitive-leading-none: 1;
+  --fi-primitive-leading-heading: 1.08;
   --fi-primitive-leading-tight: 1.1;
   --fi-primitive-leading-snug: 1.2;
   --fi-primitive-leading-normal: 1.5;
@@ -141,6 +144,7 @@ page {
   --fi-color-page: var(--fi-primitive-canvas);
   --fi-color-page-soft: var(--fi-primitive-canvas-soft);
   --fi-color-surface-frosted: var(--fi-primitive-surface-frosted);
+  --fi-color-surface-panel: var(--fi-primitive-surface-panel);
   --fi-color-topic-audio-surface: var(--fi-primitive-topic-audio-surface);
   --fi-space-topic-card-height: var(--fi-primitive-topic-card-height);
   --fi-space-topic-gallery-height: var(--fi-primitive-topic-gallery-height);
@@ -183,10 +187,12 @@ page {
   --fi-font-32: var(--fi-primitive-font-32);
   --fi-font-36: var(--fi-primitive-font-36);
   --fi-font-44: var(--fi-primitive-font-44);
+  --fi-font-50: var(--fi-primitive-font-50);
   --fi-font-48: var(--fi-primitive-font-48);
 
   /* ===== Semantic：行高 / 圆角 / 边框 / 阴影 / 字重 ===== */
   --fi-leading-none: var(--fi-primitive-leading-none);
+  --fi-leading-heading: var(--fi-primitive-leading-heading);
   --fi-leading-tight: var(--fi-primitive-leading-tight);
   --fi-leading-snug: var(--fi-primitive-leading-snug);
   --fi-leading-normal: var(--fi-primitive-leading-normal);
@@ -229,6 +235,20 @@ page {
   --fi-component-close-bg: var(--fi-color-page);
   --fi-component-close-text: var(--fi-color-text-secondary);
   --fi-component-close-size: var(--fi-font-24);
+  /* FiPanel / FiSectionHeading 卡片与标题区契约（统一自洞察/首页面板的主流写法） */
+  --fi-component-panel-bg: var(--fi-color-surface-panel);
+  --fi-component-panel-radius: var(--fi-radius-xl);
+  --fi-component-panel-border: var(--fi-border-card);
+  --fi-component-panel-shadow: var(--fi-shadow-card);
+  --fi-component-panel-padding: var(--fi-space-20);
+  --fi-component-heading-gap: var(--fi-space-12);
+  --fi-component-kicker-weight: var(--fi-weight-bold);
+  --fi-component-kicker-tracking: 3rpx;
+  --fi-component-title-gap: var(--fi-space-10);
+  --fi-component-title-leading: var(--fi-leading-heading);
+  --fi-component-title-weight: var(--fi-weight-extrabold);
+  --fi-component-title-size-lg: var(--fi-font-50);
+  --fi-component-title-size-xl: var(--fi-font-56);
   /* FiLoading 加载卡契约（值提取自组件原实现，视觉不变） */
   --fi-component-loading-bg: var(--fi-color-surface-frosted);
   --fi-component-loading-radius: var(--fi-radius-lg);

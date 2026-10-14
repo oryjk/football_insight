@@ -52,6 +52,24 @@ component（--fi-component-*）   组件级复合契约（卡片、kicker/标题
 
 二级页面统一使用 `FiSecondaryNav`：中间为「足球洞察」，左侧为圆角返回/分享按钮组，右侧预留微信胶囊空间，内容区仍为 76rpx。设置、账号及支付页面传 `shareable=false`，只保留返回按钮。分享按钮在微信端使用原生 `open-type="share"`，H5 通过 `share` 事件由页面复制公开链接；展示组件不读取业务数据或拼接分享内容。导航图标保留 SVG 源图，运行时使用透明 PNG，避免跨端图片格式差异。
 
+### FiPanel / FiSectionHeading（内容卡片与区块标题）
+
+内容卡片与区块标题统一用这两个组件，不再在页面/局部组件里重复定义 `.panel`、`.section-heading`、`.section-kicker`、`.section-title`。
+
+```vue
+<FiPanel>
+  <FiSectionHeading kicker="站队状态" :title="stanceTitle">
+    <template #meta><text class="meta-pill">已助力</text></template>
+  </FiSectionHeading>
+  <!-- 卡片内容 -->
+</FiPanel>
+```
+
+- `FiPanel` 只管卡片外观（`--fi-component-panel-*`：背景、圆角 36rpx、卡片边框/阴影、内边距 20rpx）；`flush` 去内边距，`clip` 裁剪溢出（卡内绝对定位遮罩）。
+- `FiSectionHeading` 管标题区（`--fi-component-kicker-*` / `--fi-component-title-*`）：kicker 22rpx 加粗灰色，主标题 `size` 三档 `md` 44rpx（默认）/ `lg` 50rpx / `xl` 56rpx（页面 hero）；`align="center"` 用于带关闭按钮的标题行；`meta` 插槽放徽标/按钮，富文本标题用 `heading` 插槽整体替换。
+- 小程序组件样式隔离：父级 scoped 样式到不了组件内部，也不要给组件标签挂布局/修饰 class。需要定制的内容（遮罩、模糊、点击区域）放进插槽——插槽内容由父组件编译，父级样式生效。
+- 已迁移：洞察页 6 个面板、首页面板（原 `HomePanelCard` 已删除）与主队助力面板、助力页。其余页面的 `.panel` / `.section-*` 按「触碰哪个文件就顺手迁移」增量替换，迁移即统一到上述标准外观。
+
 ### FiLoading（token 化示范组件）
 
 加载态卡片，用于各页面数据加载中（如支持页、榜赛、洞察）。

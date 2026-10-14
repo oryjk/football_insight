@@ -1,11 +1,6 @@
 <template>
-  <view class="panel">
-    <view class="section-heading">
-      <view>
-        <text class="section-kicker">{{ kicker }}</text>
-        <text class="section-title">{{ title }}</text>
-      </view>
-    </view>
+  <FiPanel>
+    <FiSectionHeading :kicker="kicker" :title="title" />
 
     <view class="contribution-list">
       <view v-for="row in visibleRows" :key="row.instanceKey" class="contribution-row">
@@ -37,10 +32,12 @@
     <button v-if="rows.length > 3" class="contribution-toggle" @click="emit('toggle')">
       {{ expanded ? '收起' : '更多' }}
     </button>
-  </view>
+  </FiPanel>
 </template>
 
 <script setup lang="ts">
+import FiPanel from '../../../components/FiPanel.vue'
+import FiSectionHeading from '../../../components/FiSectionHeading.vue'
 import { computed } from 'vue'
 import {
   formatInsightShare,
@@ -72,39 +69,6 @@ function barWidth(value: number): string {
 </script>
 
 <style scoped lang="css">
-.panel {
-  position: relative;
-  background: rgba(255, 255, 255, 0.94);
-  border-radius: var(--fi-radius-xl);
-  border: var(--fi-border-card);
-  box-shadow: var(--fi-shadow-card);
-  padding: var(--fi-space-20);
-}
-
-.section-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--fi-space-12);
-}
-
-.section-kicker {
-  margin: 0;
-  color: var(--fi-component-kicker-text);
-  font-size: var(--fi-component-kicker-size);
-  font-weight: var(--fi-weight-bold);
-  letter-spacing: 3rpx;
-}
-
-.section-title {
-  display: block;
-  margin-top: var(--fi-space-10);
-  color: var(--fi-color-text-strong);
-  font-size: var(--fi-component-title-size);
-  line-height: 1.08;
-  font-weight: var(--fi-weight-extrabold);
-}
-
 .contribution-list {
   margin-top: var(--fi-space-14);
   display: grid;

@@ -1,11 +1,13 @@
 <template>
-  <HomePanelCard :kicker="kicker" :title="title">
+  <FiPanel>
+    <FiSectionHeading :kicker="kicker" :title="title" />
     <FiPlayerGoalsTable :players="players" @select-match="(name, match) => emit('select-match', name, match)" />
-  </HomePanelCard>
+  </FiPanel>
 </template>
 
 <script setup lang="ts">
-import HomePanelCard from './HomePanelCard.vue'
+import FiPanel from '../../../components/FiPanel.vue'
+import FiSectionHeading from '../../../components/FiSectionHeading.vue'
 import FiPlayerGoalsTable from '../../../components/FiPlayerGoalsTable.vue'
 import type { PlayerGoalEntry } from '../../../utils/playerGoals'
 import type { PlayerMatchGoals } from '../../../types/insight'

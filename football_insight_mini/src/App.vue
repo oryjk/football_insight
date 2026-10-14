@@ -3,6 +3,9 @@ import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
 import { useAppSession } from "./stores/appSession";
 import { useRuntimeConfig } from "./stores/runtimeConfig";
 import { useMiniReviewStatus } from "./stores/miniReview";
+// #ifdef MP-WEIXIN
+import { setupMiniProgramUpdatePrompt } from "./utils/miniProgramUpdate";
+// #endif
 
 // 仅微信小程序允许静默微信探测；H5 保持显式登录，不调用 uni.login。
 const allowSilentWechat =
@@ -15,6 +18,10 @@ const allowSilentWechat =
 
 onLaunch(() => {
   console.log("Football Insight mini launch");
+  // #ifdef MP-WEIXIN
+  // 冷启动检查到新版本并下载完成后，询问是否立即重启到新版本。
+  setupMiniProgramUpdatePrompt();
+  // #endif
   // 认证恢复与审核展示独立，审核查询慢或失败也不阻塞登录。
   // 用户主动退出和显式认证仍由 session 的操作身份防护。
   void useAppSession().bootstrapSession({ allowSilentWechat }).catch(() => {});
@@ -71,6 +78,7 @@ button:active {
 
 .hero-card,
 .panel,
+.fi-panel,
 .state-card,
 .briefing-card,
 .standings-launcher-card,

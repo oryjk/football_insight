@@ -1,12 +1,10 @@
 <template>
-  <view class="panel">
-    <view class="section-heading">
-      <view>
-        <text class="section-kicker">球队列表</text>
-        <text class="section-title">先选一个球队</text>
-      </view>
-      <text class="meta-note">{{ teams.length }} 支球队</text>
-    </view>
+  <FiPanel>
+    <FiSectionHeading kicker="球队列表" title="先选一个球队">
+      <template #meta>
+        <text class="meta-note">{{ teams.length }} 支球队</text>
+      </template>
+    </FiSectionHeading>
 
     <scroll-view
       scroll-x
@@ -36,10 +34,12 @@
         </button>
       </view>
     </scroll-view>
-  </view>
+  </FiPanel>
 </template>
 
 <script setup lang="ts">
+import FiPanel from '../../../components/FiPanel.vue'
+import FiSectionHeading from '../../../components/FiSectionHeading.vue'
 import { getCurrentInstance, nextTick, ref, watch } from 'vue'
 import type { TeamInsightTeam } from '../../../types/insight'
 
@@ -104,39 +104,6 @@ async function centerSelectedChip(): Promise<void> {
 </script>
 
 <style scoped lang="css">
-.panel {
-  position: relative;
-  background: rgba(255, 255, 255, 0.94);
-  border-radius: var(--fi-radius-xl);
-  border: var(--fi-border-card);
-  box-shadow: var(--fi-shadow-card);
-  padding: var(--fi-space-20);
-}
-
-.section-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--fi-space-12);
-}
-
-.section-kicker {
-  margin: 0;
-  color: var(--fi-component-kicker-text);
-  font-size: var(--fi-component-kicker-size);
-  font-weight: var(--fi-weight-bold);
-  letter-spacing: 3rpx;
-}
-
-.section-title {
-  display: block;
-  margin-top: var(--fi-space-10);
-  color: var(--fi-color-text-strong);
-  font-size: var(--fi-component-title-size);
-  line-height: 1.08;
-  font-weight: var(--fi-weight-extrabold);
-}
-
 .meta-note {
   display: inline-flex;
   align-items: center;
