@@ -225,7 +225,7 @@
   transition-property: none;
   width: min(var(--purchase-dialog-width), calc(100vw - var(--space-8)));
   max-width: var(--purchase-dialog-width);
-  height: min(780px, calc(100dvh - var(--space-8)));
+  height: min(var(--purchase-dialog-height), calc(100dvh - var(--space-8)));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -443,14 +443,15 @@
     overflow-y: auto;
   }
   .purchase-history-body {
-    min-height: 96px;
+    min-height: var(--purchase-body-short-min-height);
   }
 }
 .purchase-member-results {
   display: grid;
   gap: var(--space-4);
   min-width: 0;
-  animation: purchase-results-appear 160ms ease-out;
+  animation: purchase-results-appear var(--purchase-result-fade-duration)
+    ease-out;
 }
 @keyframes purchase-results-appear {
   from {
