@@ -1,5 +1,5 @@
 <template>
-  <page-meta :page-style="navigationPageStyle" />
+  <page-meta :page-style="pageStyle" />
   <view class="home-page-shell">
     <FiBrandNav />
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
@@ -73,6 +73,13 @@
       </view>
     </view>
 
+    <HomeGoalMatchSheet
+      v-if="selectedScorerMatch"
+      :player-name="selectedScorerMatch.playerName"
+      :match="selectedScorerMatch.match"
+      @close="selectedScorerMatch = null"
+    />
+
     <HomeTechStatsSheet
       v-if="selectedPulseMatch"
       :match="selectedPulseMatch"
@@ -113,6 +120,7 @@ import HomeSupportPanel from './components/HomeSupportPanel.vue'
 import HomeSkeleton from './components/HomeSkeleton.vue'
 import HomeStoryPanel from './components/HomeStoryPanel.vue'
 import HomeRankingPanel from './components/HomeRankingPanel.vue'
+import HomeGoalMatchSheet from './components/HomeGoalMatchSheet.vue'
 import HomeStandingsPanel from './components/HomeStandingsPanel.vue'
 import HomeTechStatsSheet from './components/HomeTechStatsSheet.vue'
 import HomeTeamSeasonSheet from './components/HomeTeamSeasonSheet.vue'
@@ -127,7 +135,6 @@ import type {
   RoundReference,
 } from '../../types/insight'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { buildGoalMatchDetail } from '../../utils/playerGoals'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
 import { useRuntimeConfig } from '../../stores/runtimeConfig'
@@ -165,6 +172,10 @@ const rounds = ref<RoundReference[]>([])
 // 公共配置共享自 runtimeConfig store（失败保留上次成功值）。
 const runtimeConfig = useRuntimeConfig()
 const selectedPulseMatch = ref<HomePulseLeadMatch | null>(null)
+const selectedScorerMatch = ref<{ playerName: string; match: PlayerMatchGoals } | null>(null)
+const pageStyle = computed(() =>
+  `${navigationPageStyle.value}overflow: ${selectedScorerMatch.value ? 'hidden' : 'visible'};`,
+)
 const selectedStandingsTeam = ref<OverviewStanding | null>(null)
 const allSeasonMatches = ref<MatchCard[] | null>(null)
 const teamSeasonMatchesLoading = ref(false)
@@ -282,7 +293,7 @@ const watchPoints = computed(() =>
 )
 
 function showScorerMatch(playerName: string, match: PlayerMatchGoals) {
-  uni.showModal({ ...buildGoalMatchDetail(playerName, match), showCancel: false, confirmText: '知道了' })
+  selectedScorerMatch.value = { playerName, match }
 }
 
 onShareAppMessage(() => ({
