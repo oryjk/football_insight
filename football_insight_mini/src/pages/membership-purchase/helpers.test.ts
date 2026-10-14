@@ -11,6 +11,7 @@ import {
   normalizeMembershipProductOptions,
   formatMembershipDuration,
   buildMembershipPurchaseAgreement,
+  formatMembershipTierLabel,
 } from './helpers'
 
 const backendProductOptions = [
@@ -141,5 +142,17 @@ describe('MEMBERSHIP_PURCHASE_AGREEMENT_POINTS', () => {
 
     expect(content.includes('虚拟服务')).toBe(true)
     expect(content.includes('支付后不支持退款')).toBe(true)
+  })
+})
+
+describe('formatMembershipTierLabel', () => {
+  test('V3 对外展示为 VIP3，其余档位原样展示', () => {
+    expect(formatMembershipTierLabel('V3')).toBe('VIP3')
+    expect(formatMembershipTierLabel('V6')).toBe('V6')
+  })
+
+  test('缺失档位展示占位符', () => {
+    expect(formatMembershipTierLabel(undefined)).toBe('--')
+    expect(formatMembershipTierLabel('')).toBe('--')
   })
 })

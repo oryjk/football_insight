@@ -1,120 +1,60 @@
 <template>
-  <page-meta :page-style="navigationPageStyle" />
+  <page-meta :page-style="navigationPageStyle + pageLockStyle" />
   <FiSecondaryNav :shareable="false" @back="goBackFromSecondaryPage('/pages/user/index')" />
   <view class="page-root">
     <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
     <view class="page">
-      <view class="purchase-hero">
-        <text class="purchase-hero__eyebrow">会员充值</text>
-        <text class="purchase-hero__title">选择回流看板会员档位</text>
-        <text class="purchase-hero__summary">V6 起解锁最近回流速览，支付成功后立即生效。</text>
-      </view>
+      <FiPanel v-if="!paymentAvailable">
+        <text class="notice-title">会员购买暂未开放</text>
+        <text class="notice-body">{{ paymentUnavailableMessage }}</text>
+      </FiPanel>
 
-      <view v-if="!paymentAvailable" class="purchase-empty-card">
-        <text class="purchase-empty-card__title">会员购买暂未开放</text>
-        <text class="purchase-empty-card__body">{{ paymentUnavailableMessage }}</text>
-      </view>
-
-      <view v-if="productOptions.length" class="product-grid">
-        <view
-          v-for="option in productOptions"
-          :key="option.target_tier"
-          class="product-card"
-          :class="{ 'product-card--active': selectedTier === option.target_tier }"
-          @tap="selectTier(option.target_tier)"
-        >
-          <view class="product-card__top">
-            <text class="product-card__tier">{{ option.target_tier === 'V3' ? 'VIP3' : option.target_tier }}</text>
-            <text class="product-card__tag">{{ option.subtitle }}</text>
-          </view>
-          <view class="product-card__price-row">
-            <text class="product-card__currency">¥</text>
-            <text class="product-card__price">{{ formatMembershipPrice(getMembershipPayPriceCents(option)) }}</text>
-            <text v-if="isMembershipUpgradePrice(option)" class="product-card__original-price">
-              ¥{{ formatMembershipPrice(getMembershipOriginalPriceCents(option)) }}
-            </text>
-          </view>
-          <text v-if="isMembershipUpgradePrice(option)" class="product-card__upgrade-note">
-            {{ formatMembershipUpgradeNote(option) }}
-          </text>
-          <text class="product-card__description">{{ option.description }}</text>
-          <text class="product-card__description">有效期：{{ formatMembershipDuration(option.membership_duration_months) }}</text>
-        </view>
-      </view>
-      <view v-else class="purchase-empty-card">
-        <text class="purchase-empty-card__title">{{ emptyProductTitle }}</text>
-        <text class="purchase-empty-card__body">{{ emptyProductBody }}</text>
-      </view>
-
-      <view
-        v-if="selectedBenefits"
-        class="membership-benefits"
-      >
-        <MembershipBenefitsPanel
-          :code="selectedBenefits.code === 'V3' ? 'VIP3' : selectedBenefits.code"
-          :tone-class="selectedBenefits.toneClass"
-          :benefit-items="selectedBenefits.items"
+      <FiPanel>
+        <FiSectionHeading kicker="选择回流看板会员档位" />
+        <MembershipTierList
+          v-if="productOptions.length"
+          :options="productOptions"
+          :selected-tier="selectedProduct?.target_tier ?? ''"
+          :summaries="tierSummaries"
+          @select="selectTier"
         />
+        <view v-else class="tier-empty">
+          <text class="notice-title">{{ emptyProductTitle }}</text>
+          <text class="notice-body">{{ emptyProductBody }}</text>
+        </view>
+      </FiPanel>
+
+      <MembershipBenefitsPanel
+        v-if="selectedBenefits"
+        :code="formatMembershipTierLabel(selectedBenefits.code)"
+        :benefit-items="selectedBenefits.items"
+      />
+
+      <FiPanel flush>
+        <view class="link-row" @tap="rulesSheetVisible = true">
+          <text class="link-row__label">会员等级与邀请升级规则</text>
+          <text class="link-row__arrow">›</text>
+        </view>
+      </FiPanel>
+    </view>
+
+    <view class="purchase-bar">
+      <view class="agreement-line" @tap="agreementAccepted = !agreementAccepted">
+        <view class="agreement-line__box" :class="{ 'agreement-line__box--checked': agreementAccepted }">
+          <text v-if="agreementAccepted">✓</text>
+        </view>
+        <text class="agreement-line__text">我已阅读并同意</text>
+        <text class="agreement-line__link" @tap.stop="agreementSheetVisible = true">《会员服务声明》</text>
       </view>
 
-      <view class="membership-guide-card">
-        <view class="membership-guide-card__title-row">
-          <view class="membership-guide-card__info-icon">i</view>
-          <text class="membership-guide-card__title">升级说明</text>
-        </view>
-        <text class="membership-guide-card__body">{{ membershipRuleSummary }}</text>
-
-        <view v-if="membershipTierGuides.length" class="membership-guide-list">
-          <view
-            v-for="guide in membershipTierGuides"
-            :key="guide.code"
-            class="membership-guide-item"
-            :class="[guide.toneClass, { 'membership-guide-item--selected': guide.code === selectedTier }]"
-          >
-            <view class="membership-guide-item__main">
-              <view class="membership-guide-item__title-row">
-                <text class="membership-guide-item__code">{{ guide.code }}</text>
-                <text class="membership-guide-item__name">{{ guide.name }}</text>
-              </view>
-              <text class="membership-guide-item__condition">{{ guide.condition }}</text>
-            </view>
-            <view class="membership-guide-item__aside">
-              <text class="membership-guide-item__refresh">{{ guide.refreshLabel }}</text>
-              <text v-if="guide.code === selectedTier" class="membership-guide-item__selected">已选择</text>
-            </view>
+      <view class="purchase-bar__main">
+        <view class="purchase-bar__summary">
+          <view class="purchase-bar__price-line">
+            <text class="purchase-bar__currency">¥</text>
+            <text class="purchase-bar__price">{{ displayPrice }}</text>
           </view>
-        </view>
-      </view>
-
-      <view class="agreement-card">
-        <view class="agreement-card__header">
-          <text class="agreement-card__title">会员服务声明</text>
-          <text class="agreement-card__badge">支付前确认</text>
-        </view>
-        <view class="agreement-list">
-          <view
-            v-for="(point, index) in agreementPoints"
-            :key="`agreement-${index}`"
-            class="agreement-list__item"
-          >
-            <text class="agreement-list__index">{{ index + 1 }}</text>
-            <text class="agreement-list__text">{{ point }}</text>
-          </view>
-        </view>
-        <view class="agreement-check" @tap="agreementAccepted = !agreementAccepted">
-          <view class="agreement-check__box" :class="{ 'agreement-check__box--checked': agreementAccepted }">
-            <text v-if="agreementAccepted">✓</text>
-          </view>
-          <text class="agreement-check__text">我已阅读并同意以上会员服务声明</text>
-        </view>
-      </view>
-
-      <view class="purchase-actions">
-        <view class="purchase-actions__summary">
-          <text class="purchase-actions__tier">{{ selectedProduct?.target_tier === 'V3' ? 'VIP3' : selectedProduct?.target_tier || '--' }}</text>
-          <text class="purchase-actions__price">¥{{ displayPrice }}</text>
-          <text v-if="selectedUpgradeNote" class="purchase-actions__note">{{ selectedUpgradeNote }}</text>
+          <text class="purchase-bar__caption">{{ purchaseCaption }}</text>
         </view>
         <button
           class="purchase-btn"
@@ -122,11 +62,22 @@
           :disabled="loading || !paymentAvailable || !agreementAccepted || !selectedProduct"
           @click="handlePurchase"
         >
-          <text v-if="loading">处理中...</text>
-          <text v-else>确认开通</text>
+          {{ loading ? '处理中...' : '确认开通' }}
         </button>
       </view>
     </view>
+
+    <MembershipRulesSheet
+      v-model:visible="rulesSheetVisible"
+      :summary="membershipRuleSummary"
+      :guides="membershipTierGuides"
+      :selected-tier="selectedProduct?.target_tier ?? ''"
+    />
+    <MembershipAgreementSheet
+      v-model:visible="agreementSheetVisible"
+      :points="agreementPoints"
+      @accept="acceptAgreement"
+    />
   </view>
 </template>
 
@@ -135,8 +86,13 @@ import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { ref, computed, watch } from 'vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
+import FiPanel from '../../components/FiPanel.vue'
+import FiSectionHeading from '../../components/FiSectionHeading.vue'
+import MembershipAgreementSheet from './components/MembershipAgreementSheet.vue'
 import MembershipBenefitsPanel from './components/MembershipBenefitsPanel.vue'
-import { buildMembershipBenefitPreview } from '../../utils/membershipBenefits'
+import MembershipRulesSheet from './components/MembershipRulesSheet.vue'
+import MembershipTierList from './components/MembershipTierList.vue'
+import { buildMembershipBenefitPreview, buildMembershipTierSummary } from '../../utils/membershipBenefits'
 import { goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { getMembershipProduct, createMembershipOrder, getVirtualPaymentStatus } from '../../api/payment'
 import { prepareVirtualPayment } from '../../composables/prepareVirtualPayment'
@@ -153,13 +109,12 @@ import {
 } from '../../utils/membershipRules'
 import {
   buildMembershipPurchaseAgreement,
-  formatMembershipDuration,
   filterMembershipProductOptionsForUpgrade,
-  formatMembershipUpgradeNote,
+  formatMembershipDuration,
   formatMembershipPrice,
-  getMembershipOriginalPriceCents,
+  formatMembershipTierLabel,
+  formatMembershipUpgradeNote,
   getMembershipPayPriceCents,
-  isMembershipUpgradePrice,
   normalizeMembershipProductOptions,
 } from './helpers'
 
@@ -175,6 +130,10 @@ const currentUser = session.currentUser
 const loading = ref(false)
 const selectedTier = ref('')
 const agreementAccepted = ref(false)
+const rulesSheetVisible = ref(false)
+const agreementSheetVisible = ref(false)
+// 弹层打开时锁住页面滚动（小程序需由页面 page-meta 承担）。
+const pageLockStyle = computed(() => rulesSheetVisible.value || agreementSheetVisible.value ? 'overflow: hidden;' : '')
 const agreementPoints = computed(() => buildMembershipPurchaseAgreement(selectedProduct.value?.membership_duration_months))
 const paymentAvailable = ref(false)
 const paymentUnavailableMessage = ref('请稍后再试。')
@@ -214,6 +173,13 @@ const selectedProduct = computed(() =>
   ?? null,
 )
 
+const tierSummaries = computed<Record<string, string>>(() => Object.fromEntries(
+  productOptions.value.map(option => [
+    option.target_tier,
+    buildMembershipTierSummary(option.target_tier, publicConfig.value?.membership_tier_rules, option.subtitle),
+  ]),
+))
+
 const selectedBenefits = computed(() => buildMembershipBenefitPreview(
   selectedProduct.value?.target_tier,
   publicConfig.value?.membership_tier_rules,
@@ -223,6 +189,12 @@ const displayPrice = computed(() => {
   return formatMembershipPrice(getMembershipPayPriceCents(selectedProduct.value))
 })
 const selectedUpgradeNote = computed(() => formatMembershipUpgradeNote(selectedProduct.value))
+// 价格下方的小字说明：档位 · 有效期，升级补差价时附上补差说明。
+const purchaseCaption = computed(() => {
+  if (!selectedProduct.value) return '请选择会员档位'
+  const base = `${formatMembershipTierLabel(selectedProduct.value.target_tier)} · ${formatMembershipDuration(selectedProduct.value.membership_duration_months)}`
+  return selectedUpgradeNote.value ? `${base} · ${selectedUpgradeNote.value}` : base
+})
 
 onLoad(() => {
   void loadPurchaseData()
@@ -264,6 +236,11 @@ async function loadPurchaseData() {
 
 function selectTier(targetTier: string): void {
   selectedTier.value = targetTier
+}
+
+function acceptAgreement(): void {
+  agreementAccepted.value = true
+  agreementSheetVisible.value = false
 }
 
 watch(session.revision, () => {
@@ -347,473 +324,155 @@ async function handlePurchase() {
 }
 
 .page {
-  gap: var(--fi-space-card-gap);
-  flex-direction: column;
-  display: flex;
   position: relative;
   z-index: 1;
-  padding: calc(var(--fi-brand-nav-height) + var(--fi-space-32)) var(--fi-space-32) var(--fi-space-32);
-  box-sizing: border-box;
-}
-
-.purchase-hero {
-  background-color: #ffffff;
-  border-radius: 24rpx;
-  padding: var(--fi-space-40);
-
-  box-shadow: 0 2rpx 16rpx rgba(0, 0, 0, 0.04);
-}
-
-.purchase-hero__eyebrow {
-  display: block;
-  font-size: 22rpx;
-  font-weight: 700;
-  color: #b91c1c;
-  margin-bottom: var(--fi-space-12);
-}
-
-.purchase-hero__title {
-  display: block;
-  font-size: 40rpx;
-  font-weight: 700;
-  color: #15161b;
-  margin-bottom: var(--fi-space-12);
-}
-
-.purchase-hero__summary {
-  display: block;
-  font-size: 28rpx;
-  color: #6b7280;
-  line-height: 1.45;
-}
-
-.product-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: var(--fi-space-card-gap);
-}
-
-.product-card {
-  min-width: 0;
-  border-radius: 22rpx;
-  padding: 26rpx var(--fi-space-24);
-  background: linear-gradient(180deg, #ffffff, #fff7f7);
-  border: 2rpx solid rgba(226, 220, 207, 0.9);
-  box-shadow: 0 10rpx 26rpx rgba(43, 37, 26, 0.04);
-}
-
-.product-card--active {
-  border-color: rgba(220, 38, 38, 0.42);
-  background: linear-gradient(180deg, #fff5f5, #ffffff);
-  box-shadow: 0 16rpx 34rpx rgba(220, 38, 38, 0.12);
-}
-
-.product-card__top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--fi-space-12);
-}
-
-.product-card__tier {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #15161b;
-  line-height: 1;
-}
-
-.product-card__tag {
-  max-width: 150rpx;
-  color: #991b1b;
-  font-size: 20rpx;
-  line-height: 1.25;
-  text-align: right;
-}
-
-.product-card__price-row {
-  display: flex;
-  align-items: baseline;
-  gap: var(--fi-space-10);
-  margin-top: var(--fi-space-24);
-  margin-bottom: var(--fi-space-10);
-}
-
-.product-card__currency {
-  font-size: 30rpx;
-  font-weight: 700;
-  color: #cb544d;
-  margin-right: var(--fi-space-6);
-}
-
-.product-card__price {
-  font-size: 58rpx;
-  font-weight: 800;
-  color: #cb544d;
-  line-height: 1;
-}
-
-.product-card__original-price {
-  color: #a5a09a;
-  font-size: 22rpx;
-  font-weight: 700;
-  text-decoration: line-through;
-}
-
-.product-card__upgrade-note {
-  display: inline-flex;
-  align-items: center;
-  max-width: 100%;
-  margin-bottom: var(--fi-space-14);
-  padding: 7rpx var(--fi-space-12);
-  border-radius: 999rpx;
-  background: rgba(203, 84, 77, 0.1);
-  color: #b53f38;
-  font-size: 19rpx;
-  font-weight: 800;
-  line-height: 1.1;
+  /* 底部留出固定操作栏的高度 */
+  padding: calc(var(--fi-brand-nav-height) + var(--fi-space-24)) var(--fi-space-24) calc(240rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
 
-.product-card__description {
+.notice-title {
   display: block;
-  font-size: 23rpx;
-  color: #4b5563;
-  line-height: 1.45;
+  color: var(--fi-color-text-strong);
+  font-size: var(--fi-font-28);
+  font-weight: var(--fi-weight-bold);
 }
 
-.purchase-empty-card {
-  padding: var(--fi-space-34) var(--fi-space-30);
-  border-radius: 24rpx;
-  background: #ffffff;
-  border: 2rpx solid rgba(226, 220, 207, 0.9);
-}
-
-.purchase-empty-card__title {
+.notice-body {
   display: block;
-  color: #15161b;
-  font-size: 30rpx;
-  font-weight: 800;
+  margin-top: var(--fi-space-8);
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-24);
+  line-height: var(--fi-leading-normal);
 }
 
-.purchase-empty-card__body {
-  display: block;
-  margin-top: var(--fi-space-12);
-  color: #6b7280;
-  font-size: 25rpx;
-  line-height: 1.5;
+.tier-empty {
+  margin-top: var(--fi-space-16);
 }
 
-.membership-guide-card {
-  padding: var(--fi-space-30);
-  border-radius: 24rpx;
-  background: #ffffff;
-  border: 2rpx solid rgba(226, 220, 207, 0.9);
-}
-
-.membership-guide-card__title-row {
+.link-row {
   display: flex;
   align-items: center;
-  gap: var(--fi-space-12);
-  margin-bottom: var(--fi-space-18);
-}
-
-.membership-guide-card__info-icon {
-  width: 32rpx;
-  height: 32rpx;
-  line-height: 32rpx;
-  border-radius: 50%;
-  border: 2rpx solid rgba(220, 38, 38, 0.28);
-  color: #b91c1c;
-  font-size: 22rpx;
-  font-weight: 800;
-  text-align: center;
-}
-
-.membership-guide-card__title {
-  color: #15161b;
-  font-size: 30rpx;
-  font-weight: 800;
-}
-
-.membership-guide-card__body {
-  display: block;
-  color: #6b6559;
-  font-size: 25rpx;
-  line-height: 1.65;
-}
-
-.membership-guide-list {
-  display: grid;
-  gap: var(--fi-space-14);
-  margin-top: var(--fi-space-24);
-}
-
-.membership-guide-item {
-  --guide-accent: #8b98aa;
-  --guide-bg: rgba(246, 248, 251, 0.96);
-  --guide-border: rgba(216, 223, 234, 0.94);
-  display: flex;
-  align-items: flex-start;
   justify-content: space-between;
-  gap: var(--fi-space-18);
-  padding: var(--fi-space-22) var(--fi-space-20);
-  border-radius: 18rpx;
-  background: var(--guide-bg);
-  border: 2rpx solid var(--guide-border);
+  padding: var(--fi-space-24) var(--fi-component-panel-padding);
 }
 
-.membership-guide-item.tier-tone--v1 {
-  --guide-accent: #66799a;
-  --guide-bg: rgba(242, 246, 252, 0.96);
-  --guide-border: rgba(205, 216, 236, 0.95);
+.link-row__label {
+  color: var(--fi-color-text-primary);
+  font-size: var(--fi-font-26);
+  font-weight: var(--fi-weight-medium);
 }
 
-.membership-guide-item.tier-tone--v2,
-.membership-guide-item.tier-tone--v6 {
-  --guide-accent: #2f8b65;
-  --guide-bg: rgba(240, 253, 246, 0.96);
-  --guide-border: rgba(189, 228, 207, 0.95);
+.link-row__arrow {
+  color: var(--fi-color-text-caption);
+  font-size: var(--fi-font-32);
+  line-height: var(--fi-leading-none);
 }
 
-.membership-guide-item.tier-tone--v3,
-.membership-guide-item.tier-tone--v9 {
-  --guide-accent: #b91c1c;
-  --guide-bg: rgba(255, 241, 242, 0.96);
-  --guide-border: rgba(254, 205, 211, 0.95);
+.purchase-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  padding: var(--fi-space-16) var(--fi-space-24) calc(var(--fi-space-16) + env(safe-area-inset-bottom));
+  background: var(--fi-color-surface);
+  border-top: var(--fi-border-divider);
+  box-shadow: 0 -12rpx 32rpx rgba(var(--fi-primitive-ink-rgb), 0.04);
 }
 
-.membership-guide-item.tier-tone--v4,
-.membership-guide-item.tier-tone--v8 {
-  --guide-accent: #af5843;
-  --guide-bg: rgba(255, 243, 239, 0.96);
-  --guide-border: rgba(239, 200, 187, 0.95);
-}
-
-.membership-guide-item.tier-tone--v5 {
-  --guide-accent: #7c58b2;
-  --guide-bg: rgba(247, 242, 255, 0.96);
-  --guide-border: rgba(217, 203, 240, 0.95);
-}
-
-.membership-guide-item.tier-tone--v7 {
-  --guide-accent: #3a69b2;
-  --guide-bg: rgba(240, 247, 255, 0.96);
-  --guide-border: rgba(193, 214, 243, 0.95);
-}
-
-.membership-guide-item--selected {
-  box-shadow: 0 12rpx 24rpx rgba(220, 38, 38, 0.12);
-}
-
-.membership-guide-item__main {
-  min-width: 0;
-}
-
-.membership-guide-item__title-row {
+.agreement-line {
   display: flex;
   align-items: center;
   gap: var(--fi-space-8);
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-22);
 }
 
-.membership-guide-item__code {
-  color: #171a20;
-  font-size: 30rpx;
-  font-weight: 900;
-  line-height: 1.1;
-}
-
-.membership-guide-item__name {
-  color: #69717c;
-  font-size: 22rpx;
-  font-weight: 800;
-}
-
-.membership-guide-item__condition {
-  display: block;
-  margin-top: var(--fi-space-12);
-  color: #2f3640;
-  font-size: 23rpx;
-  line-height: 1.45;
-}
-
-.membership-guide-item__aside {
-  flex-shrink: 0;
+.agreement-line__box {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: var(--fi-radius-round);
+  border: 2rpx solid var(--fi-color-divider);
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--fi-space-10);
-}
-
-.membership-guide-item__refresh,
-.membership-guide-item__selected {
-  display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 112rpx;
-  padding: var(--fi-space-10) var(--fi-space-16);
-  border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.86);
-  border: 2rpx solid rgba(224, 214, 194, 0.86);
-  color: #7c6949;
-  font-size: 22rpx;
-  font-weight: 800;
-  line-height: 1;
+  box-sizing: border-box;
+  color: var(--fi-color-surface);
+  font-size: var(--fi-font-18);
 }
 
-.membership-guide-item__selected {
-  min-width: 88rpx;
-  background: rgba(255, 255, 255, 0.7);
-  color: var(--guide-accent);
+.agreement-line__box--checked {
+  border-color: var(--fi-color-primary);
+  background: var(--fi-color-primary);
 }
 
-.agreement-card {
-  padding: var(--fi-space-30);
-  border-radius: 24rpx;
-  background: #ffffff;
-  border: 2rpx solid rgba(226, 220, 207, 0.9);
+.agreement-line__link {
+  color: var(--fi-color-text-primary);
 }
 
-.agreement-card__header {
+.purchase-bar__main {
+  margin-top: var(--fi-space-14);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--fi-space-16);
-  margin-bottom: var(--fi-space-20);
+  gap: var(--fi-space-20);
 }
 
-.agreement-card__title {
-  font-size: 30rpx;
-  font-weight: 800;
-  color: #15161b;
-}
-
-.agreement-card__badge {
-  padding: var(--fi-space-8) var(--fi-space-16);
-  border-radius: 999rpx;
-  background: rgba(220, 38, 38, 0.1);
-  color: #991b1b;
-  font-size: 22rpx;
-  font-weight: 700;
-}
-
-.agreement-list {
-  display: grid;
-  gap: var(--fi-space-16);
-}
-
-.agreement-list__item {
-  display: flex;
-  gap: var(--fi-space-14);
-  align-items: flex-start;
-}
-
-.agreement-list__index {
-  flex: 0 0 34rpx;
-  height: 34rpx;
-  line-height: 34rpx;
-  border-radius: 50%;
-  background: #fee2e2;
-  color: #991b1b;
-  font-size: 20rpx;
-  font-weight: 800;
-  text-align: center;
-}
-
-.agreement-list__text {
-  flex: 1;
+.purchase-bar__summary {
   min-width: 0;
-  color: #4b5563;
-  font-size: 24rpx;
-  line-height: 1.55;
-}
-
-.agreement-check {
   display: flex;
-  align-items: center;
-  gap: var(--fi-space-14);
-  margin-top: 26rpx;
-  padding-top: var(--fi-space-24);
-  border-top: 2rpx solid #f0eee9;
+  flex-direction: column;
+  gap: var(--fi-space-4);
 }
 
-.agreement-check__box {
-  width: 34rpx;
-  height: 34rpx;
-  border-radius: 8rpx;
-  border: 2rpx solid #c9bda5;
-  color: #ffffff;
-  font-size: 22rpx;
-  line-height: 34rpx;
-  text-align: center;
-}
-
-.agreement-check__box--checked {
-  background: #dc2626;
-  border-color: #dc2626;
-}
-
-.agreement-check__text {
-  color: #30343b;
-  font-size: 25rpx;
-  font-weight: 700;
-}
-
-.purchase-actions {
+.purchase-bar__price-line {
   display: flex;
-  align-items: center;
-  gap: var(--fi-space-18);
+  align-items: baseline;
+  gap: var(--fi-space-2);
+  color: var(--fi-color-primary);
+  font-weight: var(--fi-weight-extrabold);
+  line-height: var(--fi-leading-none);
 }
 
-.purchase-actions__summary {
-  flex: 0 0 210rpx;
-  min-width: 0;
+.purchase-bar__currency {
+  font-size: var(--fi-font-26);
 }
 
-.purchase-actions__tier {
-  display: block;
-  color: #6b7280;
-  font-size: 22rpx;
+.purchase-bar__price {
+  font-size: var(--fi-font-44);
 }
 
-.purchase-actions__price {
-  display: block;
-  color: #cb544d;
-  font-size: 36rpx;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.purchase-actions__note {
-  display: block;
-  margin-top: var(--fi-space-4);
-  color: #991b1b;
-  font-size: 18rpx;
-  font-weight: 700;
-  line-height: 1.15;
+.purchase-bar__caption {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-22);
 }
 
 .purchase-btn {
-  flex: 1;
-  height: 96rpx;
-  line-height: 96rpx;
-  background: linear-gradient(135deg, #cb544d 0%, #b53f38 100%);
-  color: #ffffff;
-  font-size: 32rpx;
-  font-weight: 600;
-  border-radius: 48rpx;
-  border: none;
-  text-align: center;
-}
-
-.purchase-btn::after {
-  border: none;
-}
-
-.purchase-btn--loading {
-  opacity: 0.7;
+  flex-shrink: 0;
+  margin: 0;
+  width: 300rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-primary);
+  color: var(--fi-color-surface);
+  font-size: var(--fi-font-30);
+  font-weight: var(--fi-weight-bold);
 }
 
 .purchase-btn[disabled] {
-  opacity: 0.6;
+  background: rgba(var(--fi-primitive-red-rgb), 0.36);
+  color: var(--fi-color-surface);
+}
+
+.purchase-btn--loading {
+  opacity: 0.72;
 }
 </style>

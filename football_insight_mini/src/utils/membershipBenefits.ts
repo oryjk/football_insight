@@ -77,6 +77,23 @@ function resolveRecentRefluxBenefitCaption(tierNumber: number): string {
   return 'V6 起开放'
 }
 
+/**
+ * 购买页档位行的一句话描述：与权益面板同源（回流时间窗 + 公共配置的刷新速度），
+ * 保证各档位格式一致；该档位没有后端规则时退回商品副标题，不臆造刷新速度。
+ */
+export function buildMembershipTierSummary(
+  tier: string,
+  rules: MembershipTierRule[] | null | undefined,
+  fallbackSubtitle: string,
+): string {
+  const guide = resolveMembershipTierGuide(tier, rules)
+  const hasConfiguredRule = rules?.some(rule => rule.code.trim().toUpperCase() === guide.code)
+  if (!hasConfiguredRule) return fallbackSubtitle
+
+  const window = resolveRecentRefluxBenefitCaption(parseMembershipTierNumber(guide.code))
+  return `最近回流 ${window} · ${guide.refreshLabel}`
+}
+
 export interface MembershipBenefitPreview {
   code: string
   toneClass: string

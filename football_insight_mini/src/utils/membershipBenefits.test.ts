@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { resolveMembershipBenefitsLocked, buildMembershipBenefitItems, buildMembershipBenefitPreview } from './membershipBenefits'
+import { resolveMembershipBenefitsLocked, buildMembershipBenefitItems, buildMembershipBenefitPreview, buildMembershipTierSummary } from './membershipBenefits'
 
 describe('resolveMembershipBenefitsLocked', () => {
   test('keeps benefits unlocked when the backend field is missing', () => {
@@ -79,5 +79,27 @@ describe('buildMembershipBenefitPreview', () => {
     const preview = buildMembershipBenefitPreview('v9')
     expect(preview?.code).toBe('V9')
     expect(preview?.items[0].caption).toBe('以后端配置为准')
+  })
+})
+
+describe('buildMembershipTierSummary', () => {
+  const rules = [
+    { code: 'V6', kind: 'referral', min_referrals: 20, ticket_watch_poll_interval_seconds: 15 },
+    { code: 'V8', kind: 'referral', min_referrals: 50, ticket_watch_poll_interval_seconds: 3 },
+    { code: 'V9', kind: 'referral', min_referrals: 80, ticket_watch_poll_interval_seconds: 1 },
+  ]
+
+  test('各档位按同一格式展示回流时间窗与刷新速度', () => {
+    expect(buildMembershipTierSummary('V6', rules, '查看 30 分钟内')).toBe('最近回流 30 分钟内 · 15 秒刷新')
+    expect(buildMembershipTierSummary('V8', rules, '查看 3 分钟内')).toBe('最近回流 3 分钟内 · 3 秒刷新')
+  })
+
+  test('V9 与 V8 时间窗相同时，用刷新速度体现差异', () => {
+    expect(buildMembershipTierSummary('V9', rules, '同 V8 速览权限')).toBe('最近回流 3 分钟内 · 1 秒刷新')
+  })
+
+  test('缺少该档位规则时退回后端副标题，不臆造刷新速度', () => {
+    expect(buildMembershipTierSummary('V7', rules, '查看 10 分钟内')).toBe('查看 10 分钟内')
+    expect(buildMembershipTierSummary('V7', null, '查看 10 分钟内')).toBe('查看 10 分钟内')
   })
 })

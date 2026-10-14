@@ -1,4 +1,4 @@
-import type { MembershipProduct, MembershipProductOption } from '../../api/payment'
+import type { MembershipProduct, MembershipProductOption } from '../../types/payment'
 
 export const MEMBERSHIP_PURCHASE_AGREEMENT_POINTS = [
   '会员服务自支付成功并完成系统确认之时起生效；在服务器正常运营、相关服务未因不可抗力或监管要求中止的情况下，有效期为一年。',
@@ -7,6 +7,12 @@ export const MEMBERSHIP_PURCHASE_AGREEMENT_POINTS = [
   '如遇服务器维护、升级、故障排查或第三方服务异常，部分功能可能短时不可用；平台会在合理范围内尽快恢复服务。',
   '本会员属于虚拟服务，支付成功后将即时开通对应会员权益。请在支付前确认所选档位、价格及账号信息；除因平台原因导致服务无法开通或法律法规另有规定外，支付后不支持退款。',
 ]
+
+/** 档位对外展示名：V3 历史上叫 VIP3，其余档位原样展示。 */
+export function formatMembershipTierLabel(tier: string | null | undefined): string {
+  if (!tier) return '--'
+  return tier === 'V3' ? 'VIP3' : tier
+}
 
 export function formatMembershipDuration(months: number | null | undefined): string {
   const duration = typeof months === 'number' && Number.isInteger(months) && months > 0 ? months : 12
