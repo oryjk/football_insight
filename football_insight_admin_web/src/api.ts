@@ -87,11 +87,12 @@ export interface ProductPurchasePage {
   page: number;
   page_size: number;
 }
+export type MembershipOrigin = "purchase" | "referral" | "unknown";
 export interface ProductMember {
   user_id: string;
   user_nickname: string;
   user_avatar_url: string | null;
-  membership_origin: "purchase" | "referral" | "unknown";
+  membership_origin: MembershipOrigin;
   expires_at: string | null;
   expired: boolean;
 }
@@ -225,9 +226,10 @@ export function createApi(client: ApiClient) {
       key: string,
       page = 1,
       signal?: AbortSignal,
+      origins?: MembershipOrigin[],
     ) =>
       client.request<ProductMemberPage>(
-        `${productPath(key)}/members?${new URLSearchParams({ page: String(page), page_size: "20" })}`,
+        `${productPath(key)}/members?${new URLSearchParams({ page: String(page), page_size: "20", ...(origins === undefined ? {} : { origins: origins.join(",") }) })}`,
         token,
         { signal },
       ),

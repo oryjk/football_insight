@@ -961,6 +961,40 @@ async fn same_tier_members_endpoint_includes_unknown_without_inventing_orders() 
     let result = body(response).await;
     assert_eq!(result["total"], 3);
     assert_eq!(result["membership_tier"], "V6");
+    for (origins, count) in [
+        ("unknown", 1),
+        ("purchase,referral", 2),
+        ("referral,unknown", 2),
+        ("purchase,referral,unknown", 3),
+        ("", 0),
+    ] {
+        let filtered = body(
+            request(
+                &app,
+                "GET",
+                &format!("{path}?origins={origins}"),
+                Some(&token),
+                None,
+            )
+            .await,
+        )
+        .await;
+        assert_eq!(filtered["total"], count);
+        assert_eq!(filtered["items"].as_array().unwrap().len(), count as usize);
+    }
+    assert_eq!(
+        request(
+            &app,
+            "GET",
+            &format!("{path}?origins=bogus"),
+            Some(&token),
+            None
+        )
+        .await
+        .status(),
+        StatusCode::BAD_REQUEST
+    );
+
     assert!(
         result["items"]
             .as_array()

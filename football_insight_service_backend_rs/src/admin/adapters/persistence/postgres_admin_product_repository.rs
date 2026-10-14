@@ -59,6 +59,7 @@ impl AdminProductRepository for PostgresAdminProductRepository {
         key: &str,
         page: u32,
         page_size: u32,
+        origins: Vec<String>,
     ) -> Result<crate::admin::domain::admin_product_purchase::ProductMemberPage, AdminProductError>
     {
         use crate::admin::domain::admin_product_purchase::{ProductMember, ProductMemberPage};
@@ -70,14 +71,15 @@ impl AdminProductRepository for PostgresAdminProductRepository {
         let (id, tier) = sqlx::query_as::<_, (Uuid, String)>(&format!("SELECT id,split_part(split_part(product_key,'@',1),':',2) FROM f_i_virtual_payment_products WHERE product_key=$1 AND {SCOPE}"))
             .bind(key).fetch_optional(&mut *tx).await.map_err(map_error)?.ok_or(AdminProductError::NotFound)?;
         let total = sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM f_i_users WHERE membership_tier=$1 AND status='active'",
+            "SELECT COUNT(*) FROM f_i_users WHERE membership_tier=$1 AND status='active' AND membership_origin=ANY($2)",
         )
         .bind(&tier)
+        .bind(&origins)
         .fetch_one(&mut *tx)
         .await
         .map_err(map_error)?;
-        let rows = sqlx::query_as::<_, (Uuid, String, Option<String>, String, Option<DateTime<Utc>>, bool)>("SELECT id,COALESCE(NULLIF(display_name,''),'未命名用户'),avatar_url,membership_origin,membership_expires_at,COALESCE(membership_expires_at<=NOW(),FALSE) FROM f_i_users WHERE membership_tier=$1 AND status='active' ORDER BY created_at DESC,id ASC LIMIT $2 OFFSET $3")
-            .bind(&tier).bind(i64::from(page_size)).bind(i64::from(page-1)*i64::from(page_size)).fetch_all(&mut *tx).await.map_err(map_error)?;
+        let rows = sqlx::query_as::<_, (Uuid, String, Option<String>, String, Option<DateTime<Utc>>, bool)>("SELECT id,COALESCE(NULLIF(display_name,''),'未命名用户'),avatar_url,membership_origin,membership_expires_at,COALESCE(membership_expires_at<=NOW(),FALSE) FROM f_i_users WHERE membership_tier=$1 AND status='active' AND membership_origin=ANY($2) ORDER BY created_at DESC,id ASC LIMIT $3 OFFSET $4")
+            .bind(&tier).bind(&origins).bind(i64::from(page_size)).bind(i64::from(page-1)*i64::from(page_size)).fetch_all(&mut *tx).await.map_err(map_error)?;
         tx.commit().await.map_err(map_error)?;
         Ok(ProductMemberPage {
             catalog_product_id: id,

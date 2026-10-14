@@ -121,6 +121,12 @@ pub struct AdminPurchaseQuery {
     pub page: Option<u32>,
     pub page_size: Option<u32>,
 }
+#[derive(Debug, Deserialize, Default)]
+pub struct AdminMemberQuery {
+    pub page: Option<u32>,
+    pub page_size: Option<u32>,
+    pub origins: Option<String>,
+}
 #[derive(Debug, Serialize)]
 pub struct ProductPurchaseSummaryDto {
     pub purchased_user_count: i64,

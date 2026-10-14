@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
-import type { AdminApi, Product, ProductMemberPage } from "../../api";
+import type {
+  AdminApi,
+  Product,
+  ProductMemberPage,
+  MembershipOrigin,
+} from "../../api";
 import { errorMessage } from "../../apiClient";
 import { Button } from "../../components/ui/button";
 import {
@@ -25,11 +30,13 @@ export function ProductMembers({
   token,
   product,
   onReloadProduct,
+  origins,
 }: {
   api: AdminApi;
   token: string;
   product: Pick<Product, "product_key" | "name" | "catalog_product_id">;
   onReloadProduct: () => void;
+  origins: MembershipOrigin[];
 }) {
   const [page, setPage] = useState(1);
   const [revision, setRevision] = useState(0);
@@ -43,8 +50,18 @@ export function ProductMembers({
     setData(null);
     setError("");
     setIdentityChanged(false);
+    if (!origins.length) {
+      setLoading(false);
+      return () => controller.abort();
+    }
     api
-      .productMembers(token, product.product_key, page, controller.signal)
+      .productMembers(
+        token,
+        product.product_key,
+        page,
+        controller.signal,
+        origins,
+      )
       .then((value) => {
         if (controller.signal.aborted) return;
         assertPurchaseIdentity(
@@ -75,10 +92,12 @@ export function ProductMembers({
     product.catalog_product_id,
     page,
     revision,
+    origins,
   ]);
   const pages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
   return (
     <div className="purchase-history-content">
+      <h3>会员列表</h3>
       <div className="purchase-history-toolbar">
         <p className="field-hint">
           显示该等级的会员账号（含已到期），不代表购买了当前道具。来源依据当前会员授予记录；无法确认的显示未知来源。
@@ -93,6 +112,9 @@ export function ProductMembers({
           刷新
         </Button>
       </div>
+      {!origins.length && (
+        <p className="empty-state">请至少选择一种会员来源。</p>
+      )}
       {loading && (
         <p role="status" className="empty-state">
           正在加载会员…
@@ -116,7 +138,7 @@ export function ProductMembers({
       {data && (
         <>
           <p className="field-hint">
-            {data.membership_tier} 会员账号共 {data.total}{" "}
+            当前筛选的 {data.membership_tier} 会员共 {data.total}{" "}
             人；推荐升级及未知来源账号不计入购买人数和订单金额。
           </p>
           <Table className="purchase-members-table" aria-label="同等级会员">
@@ -157,7 +179,7 @@ export function ProductMembers({
               {!data.items.length && (
                 <TableRow>
                   <TableCell colSpan={3}>
-                    <p className="empty-state">暂无同等级会员。</p>
+                    <p className="empty-state">当前来源筛选下暂无会员。</p>
                   </TableCell>
                 </TableRow>
               )}

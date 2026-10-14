@@ -16,6 +16,7 @@ impl AdminProductService {
         key: &str,
         page: u32,
         page_size: u32,
+        origins: Option<Vec<String>>,
     ) -> Result<crate::admin::domain::admin_product_purchase::ProductMemberPage, AdminProductError>
     {
         validate_product_key(key)?;
@@ -25,8 +26,20 @@ impl AdminProductService {
             ..Default::default()
         }
         .validate()?;
+        let mut origins =
+            origins.unwrap_or_else(|| vec!["purchase".into(), "referral".into(), "unknown".into()]);
+        if origins
+            .iter()
+            .any(|origin| !matches!(origin.as_str(), "purchase" | "referral" | "unknown"))
+        {
+            return Err(AdminProductError::InvalidInput(
+                "invalid membership origins".into(),
+            ));
+        }
+        origins.sort();
+        origins.dedup();
         self.repository
-            .members(key, query.page, query.page_size)
+            .members(key, query.page, query.page_size, origins)
             .await
     }
     pub fn new(repository: Arc<dyn AdminProductRepository>) -> Self {

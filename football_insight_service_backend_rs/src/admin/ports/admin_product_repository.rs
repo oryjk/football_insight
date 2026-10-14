@@ -16,6 +16,7 @@ pub trait AdminProductRepository: Send + Sync {
         key: &str,
         page: u32,
         page_size: u32,
+        origins: Vec<String>,
     ) -> Result<crate::admin::domain::admin_product_purchase::ProductMemberPage, AdminProductError>;
     async fn purchases(
         &self,

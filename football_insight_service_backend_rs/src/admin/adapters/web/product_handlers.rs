@@ -170,7 +170,7 @@ pub async fn product_members(
     State(state): State<AdminProductWebState>,
     headers: HeaderMap,
     Path(key): Path<String>,
-    query: Result<Query<super::product_dto::AdminPurchaseQuery>, QueryRejection>,
+    query: Result<Query<super::product_dto::AdminMemberQuery>, QueryRejection>,
 ) -> Result<Json<super::product_dto::ProductMemberPageDto>, HttpError> {
     authorize(&state, &headers).await?;
     let Query(query) =
@@ -178,7 +178,20 @@ pub async fn product_members(
     Ok(Json(
         state
             .service
-            .members(&key, query.page.unwrap_or(1), query.page_size.unwrap_or(20))
+            .members(
+                &key,
+                query.page.unwrap_or(1),
+                query.page_size.unwrap_or(20),
+                query.origins.map(|raw| {
+                    if raw.is_empty() {
+                        vec![]
+                    } else {
+                        raw.split(',')
+                            .map(|origin| origin.trim().to_owned())
+                            .collect()
+                    }
+                }),
+            )
             .await
             .map_err(map_product_error)?
             .into(),
