@@ -83,11 +83,52 @@ def test_no_new_across_dates_keeps_original_without_llm_or_tts(tmp_path):
     old = source()
     repo = Repository([old.url], old.published_at)
     def forbidden(): raise AssertionError('no-new must not initialize providers')
-    result = run_daily_update([old, source(2, old.published_at - timedelta(hours=1))], repository=repo,
+    result = run_daily_update([old], repository=repo,
         generator_factory=forbidden, tts_factory=forbidden, target_factory=forbidden,
         cache_dir=tmp_path, now=NOW + timedelta(days=1))
     assert result['status'] == 'no_new'
     assert repo.writes == []
+
+
+def test_unseen_recent_news_is_not_blocked_by_query_snapshot_watermark(tmp_path):
+    generator, audio, target = setup(tmp_path)
+    repo = Repository(watermark=NOW)
+    result = run([source(2, NOW - timedelta(days=1))], repo, tmp_path, generator, audio, target)
+    assert result['status'] == 'published'
+    assert repo.writes[0]['payload']['items'][0]['sources'][0]['url'] == 'https://news.example/2'
+
+
+def test_pending_outside_current_dynamic_scope_is_abandoned_without_publishing(tmp_path):
+    from sina_csl_scraper.topics.daily import run_daily_update
+    from sina_csl_scraper.topics.scope import TeamTag
+    generator, audio, target = setup(tmp_path)
+    repo = Repository()
+    audio.fail = True
+    with pytest.raises(Exception): run([source()],repo,tmp_path,generator,audio,target)
+    audio.fail = False
+    result = run_daily_update([],repository=repo,generator_factory=lambda:generator,tts_factory=lambda:audio,
+        target_factory=lambda:target,cache_dir=tmp_path,now=NOW,selected_teams=[TeamTag(136,'北京国安')])
+    assert result['status'] == 'no_new'
+    assert repo.writes == []
+    assert json.loads((tmp_path/'daily-state.json').read_text())['pending'] is None
+
+
+def test_changed_scope_does_not_reuse_a_cached_topic_about_previous_selected_club(tmp_path):
+    from sina_csl_scraper.topics.pipeline import generate_edition
+    generator, _, _ = setup(tmp_path)
+    generator.selected_team_ids, generator.cache_scope = {136}, [136]
+    base = generator.generate
+    def scoped(sources, team_id, now, limit):
+        items = base(sources,team_id,now,limit)
+        items[0]['team_tags'] = [{'team_id': next(iter(generator.selected_team_ids)), 'name': '当前关注球队'}]
+        return items
+    generator.generate = scoped
+    first = generate_edition([source()],generator=generator,tts=None,target=None,cache_dir=tmp_path,now=NOW)
+    generator.selected_team_ids, generator.cache_scope = {148}, [148]
+    second = generate_edition([source()],generator=generator,tts=None,target=None,cache_dir=tmp_path,now=NOW)
+    assert first['id'] != second['id']
+    assert second['payload']['items'][0]['team_tags'][0]['team_id'] == 148
+    assert generator.calls == 2
 
 
 @pytest.mark.parametrize('failure', ['tts', 'upload', 'database'])

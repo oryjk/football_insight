@@ -11,7 +11,7 @@ export function drawTopicShareCard(context: UniApp.CanvasContext, item: DailyTop
   context.fillRect(28, 28, width - 56, height - 56)
   context.setFillStyle('#eb3f41')
   context.setFontSize(28)
-  context.fillText('足球洞察 · 成都蓉城', 64, 84)
+  context.fillText('足球洞察 · 足球新闻', 64, 84)
   context.setFillStyle('#15161b')
   context.setFontSize(52)
   const titleLines = wrapShareCardText(item.title, text => context.measureText(text).width, width - 128, 2)
@@ -44,5 +44,5 @@ export function drawTopicShareCard(context: UniApp.CanvasContext, item: DailyTop
   context.fillText('打开阅读全文', 64, height - 64)
   context.setFillStyle('#8c8f99')
   context.setFontSize(24)
-  context.fillText('成都蓉城新闻', width - 228, height - 64)
+  context.fillText('足球新闻', width - 228, height - 64)
 }

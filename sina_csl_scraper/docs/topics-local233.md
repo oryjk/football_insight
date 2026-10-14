@@ -18,12 +18,22 @@ local233 已配置 betalpha 用户 crontab：每天北京时间 **07:00–22:30�
 
 自动来源配置为 `config/rongcheng-news-auto.json`：从[体坛周报中国足球频道](https://www.ttplus.cn/innerfb.html)和首页发现蓉城文章，并读取[中新网体育 RSS](https://www.chinanews.com.cn/rss/sports.xml)。列表只用于找原文地址，发布材料必须再读取完整原文与真实发布时间；不把列表摘要当正文。默认采集最近 72 小时，最多生成 5 篇，不足不补造。
 
-每日入口 `topics daily-update` 读取数据库已发布来源历史与最新来源时间。相同 URL、早于或等于最新已发布来源时间的旧新闻不重新生成，也不改发布日期；扩充采集范围不会让较旧报道覆盖当前内容。
+每日入口 `topics daily-update` 每次读取中超/中甲完整积分榜，动态选中超前三/后三、中甲前二。列表宽召回、完整正文筛选；相同已发布 URL 不重新生成。未使用且仍在最近 72 小时内的原文不受全局时间水位限制，比赛查询快照时间不再影响判断。新文章作为独立批次追加，原有文章与发布日期保留。实际名单保存在 `data/topics/news-scope.json`。
 
 - 有新材料：Kimi 整理正文，Qwen CPU 逐篇合成 AAC，MinIO 上传成功，所有文章音频都为 ready 后才原子发布。
 - 无新材料或没有可发布话题：正常结束，数据库内容、文章 ID、发布时间和音频 URL 保留。
 - 采集源/正文全部不可用、生成、语音、上传或数据库写入失败：记录失败，保留原已发布内容。部分来源失败可继续使用其它已验证原文。
-- 未完成批次记入 `data/topics/daily-state.json`；重试复用正文和已完成音频，即使跨天也不重新请求已生成正文。原材料超过 72 小时则放弃该待处理批次，等待新新闻。
+- 未完成批次记入 `data/topics/daily-state.json`；重试复用正文和已完成音频，即使跨天也不重新请求已生成正文。材料超过 72 小时或不再涉及当前关注队则丢弃；关注名单变化时正文缓存重新校验范围。
+
+文章 `team_tags` 支持多球队，包括未关注的对手。选队 ID 用于采集/生成范围，标签 ID 用于永久历史关联；不能根据批次 `team_id` 推断文章主题。生产补标签前先只读预览：
+
+```bash
+uv run --no-sync python scripts/run_topics_local.py refresh-tags --config config/rongcheng-news-auto.json
+# 核对标题和标签后，显式补写：
+uv run --no-sync python scripts/run_topics_local.py refresh-tags --config config/rongcheng-news-auto.json --write-db
+```
+
+补写只修改历史标签，不调用 LLM/TTS，不改变正文、来源、图片、音频、ID、发布日期或热度。新后端接口需先发布，再启用新采集代码和小程序标签/时间线界面；沿用已有 cron 时间及锁。无需表迁移。2026-10-14 的实现先在隔离工作区及测试数据库验证，不能把代码验证等同于生产已启用。
 
 运行路径仍为 `/home/betalpha/projects/football_insight/sina_csl_scraper`。锁防止并发执行，整体任务最长 6 小时，自动任务同时以当天 23:00 为截止时间。截止中断时保留待处理材料与已完成缓存，下一工作时段重试。凭据自动加载既有 `.env.topics` / `.env.sync`，数据库连接复用当前本地后端的生产库隧道；不自动建表或执行迁移。
 

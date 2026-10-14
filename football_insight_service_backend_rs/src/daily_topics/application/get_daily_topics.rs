@@ -14,7 +14,81 @@ pub struct GetDailyTopics {
     repository: Arc<dyn DailyTopicsRepository>,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum TopicTimelineError {
+    #[error(transparent)]
+    Storage(#[from] DailyTopicsRepositoryError),
+    #[error("topic not found")]
+    AnchorNotFound,
+    #[error("club tag does not belong to the anchor topic")]
+    UnrelatedTag,
+}
+
 impl GetDailyTopics {
+    pub async fn timeline(
+        &self,
+        query: crate::daily_topics::domain::timeline::TopicTimelineQuery,
+    ) -> Result<crate::daily_topics::domain::timeline::TopicTimelinePage, TopicTimelineError> {
+        use crate::daily_topics::domain::timeline::TopicTimelinePage;
+        let anchor = self
+            .detail(query.anchor.clone())
+            .await?
+            .ok_or(TopicTimelineError::AnchorNotFound)?;
+        let tag = anchor
+            .team_tags
+            .iter()
+            .find(|tag| tag.team_id == query.tag_team_id)
+            .cloned()
+            .ok_or(TopicTimelineError::UnrelatedTag)?;
+        let before = TopicPosition {
+            published_at: anchor.published_at,
+            id: anchor.id.clone(),
+        };
+        let mut items = self
+            .repository
+            .timeline_for_tag(
+                query.anchor.team_id(),
+                query.tag_team_id,
+                &before,
+                query.after.as_ref(),
+                query.limit,
+            )
+            .await?;
+        if items.iter().any(|item| {
+            item.team_id != query.anchor.team_id()
+                || item.published_at >= anchor.published_at
+                || !item
+                    .team_tags
+                    .iter()
+                    .any(|tag| tag.team_id == query.tag_team_id)
+        }) {
+            return Err(DailyTopicsRepositoryError::InvalidEdition.into());
+        }
+        let has_more = items.len() > query.limit;
+        items.truncate(query.limit);
+        for item in &mut items {
+            normalize_audio(&mut item.audio);
+            normalize_images(item);
+            normalize_tags(item);
+        }
+        self.attach_heat(query.anchor.team_id(), &mut items).await;
+        let next = if has_more {
+            items.last().map(|item| TopicPosition {
+                published_at: item.published_at,
+                id: item.id.clone(),
+            })
+        } else {
+            None
+        };
+        Ok(TopicTimelinePage {
+            team_id: query.anchor.team_id(),
+            anchor_id: anchor.id,
+            tag,
+            items,
+            next,
+        })
+    }
+
     pub fn new(repository: Arc<dyn DailyTopicsRepository>) -> Self {
         Self { repository }
     }
@@ -47,6 +121,7 @@ impl GetDailyTopics {
         for item in &mut edition.items {
             normalize_audio(&mut item.audio);
             normalize_images(item);
+            normalize_tags(item);
         }
         self.attach_heat(query.team_id(), &mut edition.items).await;
         Ok(DailyTopicsView {
@@ -73,6 +148,7 @@ impl GetDailyTopics {
         for item in &mut items {
             normalize_audio(&mut item.audio);
             normalize_images(item);
+            normalize_tags(item);
         }
         self.attach_heat(query.team_id(), &mut items).await;
         let next = if has_more {
@@ -105,6 +181,7 @@ impl GetDailyTopics {
             }
             normalize_audio(&mut item.audio);
             normalize_images(item);
+            normalize_tags(item);
             self.attach_heat(query.team_id(), std::slice::from_mut(item))
                 .await;
         }
@@ -176,6 +253,17 @@ fn normalize_images(item: &mut DailyTopic) {
             && seen.insert(image.url.clone())
     });
     item.images.truncate(4);
+}
+
+fn normalize_tags(item: &mut DailyTopic) {
+    let mut seen = std::collections::HashSet::new();
+    item.team_tags.retain(|tag| {
+        tag.team_id > 0
+            && !tag.name.trim().is_empty()
+            && tag.name.chars().count() <= 80
+            && !tag.name.contains(['<', '>'])
+            && seen.insert(tag.team_id)
+    });
 }
 
 fn normalize_audio(audio: &mut DailyTopicAudio) {

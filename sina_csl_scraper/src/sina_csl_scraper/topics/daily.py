@@ -32,30 +32,35 @@ def _complete_audio(edition: dict) -> bool:
 
 def run_daily_update(sources: list[SourceArticle], *, repository, generator_factory,
                      tts_factory, target_factory, cache_dir: Path, now: datetime,
-                     team_id: int = 77680, limit: int = 5, max_age_hours: int = 72) -> dict:
+                     team_id: int = 77680, limit: int = 5, max_age_hours: int = 72, selected_teams=None) -> dict:
     if now.tzinfo is None or max_age_hours <= 0 or not 1 <= limit <= 5 or team_id <= 0:
         raise ValueError('invalid daily topic parameters')
     path = cache_dir / 'daily-state.json'
     state = json.loads(path.read_text()) if path.exists() else {'version': 1, 'team_id': team_id, 'pending': None}
     if state.get('version') != 1 or state.get('team_id') != team_id:
         raise ValueError('daily state is incompatible with this team')
-    known_urls, watermark = repository.published_sources(team_id)
+    known_urls, _ = repository.published_sources(team_id)
     cutoff = now - timedelta(hours=max_age_hours)
+    diagnostics = [{**item.as_source(), 'decision': 'already_used' if item.url in known_urls else
+                   'outside_window' if not cutoff <= item.published_at <= now else 'eligible'} for item in sources]
     pending = state['pending']
+    from .scope import tags_for_text
+    in_scope = lambda item: selected_teams is None or bool(tags_for_text(item.title + '\n' + item.body, selected_teams))
     if pending:
         originals = [SourceArticle(item['title'], item['url'], item['publisher'],
                                    parse_timestamp(item['published_at'], now), item['body'], tuple(item.get('images') or []))
                      for item in pending['sources']]
+        originals = [item for item in originals if in_scope(item)]
+        pending['sources'] = [item.as_material() for item in originals]
         if not originals or any(item.published_at < cutoff for item in originals) or all(item.url in known_urls for item in originals):
             state['pending'] = pending = None
     if not pending:
         fresh = sorted((item for item in sources if item.url not in known_urls
-                        and cutoff <= item.published_at <= now
-                        and (watermark is None or item.published_at > watermark)),
+                        and cutoff <= item.published_at <= now and in_scope(item)),
                        key=lambda item: (item.published_at, item.url), reverse=True)[:30]
         if not fresh:
             _atomic_json(path, state)
-            return {'status': 'no_new', 'collected': len(sources), 'published': 0}
+            return {'status': 'no_new', 'collected': len(sources), 'published': 0, 'sources': diagnostics}
         pending = {'now': now.isoformat(), 'limit': limit,
                    'sources': [item.as_material() for item in fresh]}
         state['pending'] = pending
@@ -69,7 +74,7 @@ def run_daily_update(sources: list[SourceArticle], *, repository, generator_fact
     except NoTopicsError:
         state['pending'] = None
         _atomic_json(path, state)
-        return {'status': 'no_topics', 'collected': len(sources), 'published': 0}
+        return {'status': 'no_topics', 'collected': len(sources), 'published': 0, 'sources': diagnostics}
     if not _complete_audio(edition):
         raise ValueError('new edition audio is incomplete; previous published edition retained')
     repository.save(edition)
@@ -80,4 +85,4 @@ def run_daily_update(sources: list[SourceArticle], *, repository, generator_fact
     except OSError as error:
         raise DailyFinalizationError('database published; local finalization failed') from error
     return {'status': 'published', 'collected': len(sources),
-            'published': len(edition['payload']['items']), 'edition_id': edition['id']}
+            'published': len(edition['payload']['items']), 'edition_id': edition['id'], 'sources': diagnostics}

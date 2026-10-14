@@ -2,7 +2,7 @@ use chrono::{DateTime, FixedOffset};
 use serde::Deserialize;
 
 use crate::daily_topics::domain::edition::{
-    AudioStatus, DailyTopic, DailyTopicAudio, DailyTopicImage, DailyTopicSource,
+    AudioStatus, DailyTopic, DailyTopicAudio, DailyTopicImage, DailyTopicSource, DailyTopicTag,
 };
 
 #[derive(Deserialize)]
@@ -14,6 +14,8 @@ pub(super) struct StoredPayload {
 pub(super) struct StoredTopic {
     id: String,
     team_id: i64,
+    #[serde(default)]
+    team_tags: serde_json::Value,
     title: String,
     summary: String,
     paragraphs: Vec<String>,
@@ -32,6 +34,12 @@ struct StoredImage {
     source_url: String,
     publisher: String,
     after_paragraph: usize,
+}
+
+#[derive(Deserialize)]
+struct StoredTag {
+    team_id: i64,
+    name: String,
 }
 
 #[derive(Deserialize)]
@@ -62,6 +70,23 @@ impl From<StoredTopic> for DailyTopic {
     fn from(value: StoredTopic) -> Self {
         Self {
             heat: 0,
+            team_tags: value
+                .team_tags
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|tag| serde_json::from_value::<StoredTag>(tag.clone()).ok())
+                .filter(|tag| {
+                    tag.team_id > 0
+                        && !tag.name.trim().is_empty()
+                        && tag.name.chars().count() <= 80
+                        && !tag.name.contains(['<', '>'])
+                })
+                .map(|tag| DailyTopicTag {
+                    team_id: tag.team_id,
+                    name: tag.name.trim().to_owned(),
+                })
+                .collect(),
             images: value
                 .images
                 .as_array()

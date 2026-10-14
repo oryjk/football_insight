@@ -5,7 +5,7 @@ from datetime import datetime
 
 import psycopg
 from psycopg.types.json import Jsonb
-from .models import canonical_url, parse_timestamp
+from .models import canonical_url
 
 
 class TopicRepository:
@@ -46,8 +46,9 @@ class TopicRepository:
                 ''', (team_id,))
                 rows = cursor.fetchall()
         urls = {canonical_url(url) for url, _ in rows}
-        dates = [parse_timestamp(timestamp) for _, timestamp in rows if timestamp]
-        return urls, max(dates) if dates else None
+        # Keep the tuple contract for older callers, but never derive a news
+        # watermark from publication-history clocks (which may be query snapshots).
+        return urls, None
 
     def published_items(self, team_id: int) -> list[dict]:
         with psycopg.connect(self.database_url) as connection:
@@ -77,4 +78,22 @@ class TopicRepository:
                 if dirty:
                     connection.execute('UPDATE f_i_daily_topic_editions SET payload = %s WHERE id = %s',
                                        (Jsonb(payload), edition_id))
+        return changed
+
+    def patch_tags(self, team_id: int, updates: list[dict]) -> int:
+        """Patch only tags under row locks; retain concurrent audio/images and metrics."""
+        by_id = {item['id']: item for item in updates}
+        changed = 0
+        with psycopg.connect(self.database_url) as connection:
+            rows = connection.execute('SELECT id, payload FROM f_i_daily_topic_editions WHERE team_id=%s ORDER BY id FOR UPDATE', (team_id,)).fetchall()
+            for edition_id, payload in rows:
+                dirty = False
+                for item in payload['items']:
+                    update = by_id.get(item['id'])
+                    if update and all(item.get(key) == update.get(key) for key in ('title', 'summary', 'paragraphs')) and item.get('team_tags') != update['team_tags']:
+                        item['team_tags'] = update['team_tags']
+                        changed += 1
+                        dirty = True
+                if dirty:
+                    connection.execute('UPDATE f_i_daily_topic_editions SET payload=%s WHERE id=%s', (Jsonb(payload), edition_id))
         return changed

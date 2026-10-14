@@ -5,7 +5,7 @@
   <view class="topics-page">
     <view class="topics-heading">
       <text class="topics-title">全部话题</text>
-      <text class="topics-caption">成都蓉城新闻 · 最新发布在前</text>
+      <text class="topics-caption">足球新闻 · 最新发布在前</text>
     </view>
     <view v-if="items.length" class="topics-list">
       <TopicHistoryCard v-for="item in items" :key="item.id" :item="item" :heat="topicHeatValue(item.id, item.heat)" @read="openTopic" />
@@ -69,7 +69,7 @@ onPullDownRefresh(() => { void load(true) })
 function goBack() {
   goBackFromSecondaryPage()
 }
-onShareAppMessage(() => ({ title: '成都蓉城新闻，看看球迷正在关注的话题', path: '/pages/topics/index' }))
+onShareAppMessage(() => ({ title: '足球新闻，看看球迷正在关注的话题', path: '/pages/topics/index' }))
 onScopeDispose(() => { revision += 1 })
 </script>
 

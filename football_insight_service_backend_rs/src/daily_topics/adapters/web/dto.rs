@@ -49,6 +49,7 @@ pub struct DailyTopicsResponse {
 pub(super) struct DailyTopicDto {
     id: String,
     team_id: i64,
+    team_tags: Vec<TopicTagDto>,
     title: String,
     summary: String,
     paragraphs: Vec<String>,
@@ -57,6 +58,113 @@ pub(super) struct DailyTopicDto {
     images: Vec<DailyTopicImageDto>,
     audio: DailyTopicAudioDto,
     heat: u64,
+}
+
+#[derive(Serialize)]
+pub(super) struct TopicTagDto {
+    team_id: i64,
+    name: String,
+}
+
+impl From<crate::daily_topics::domain::edition::DailyTopicTag> for TopicTagDto {
+    fn from(tag: crate::daily_topics::domain::edition::DailyTopicTag) -> Self {
+        Self {
+            team_id: tag.team_id,
+            name: tag.name,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub(super) struct TopicTimelineParameters {
+    #[serde(default = "default_team")]
+    team_id: i64,
+    tag_team_id: i64,
+    #[serde(default = "history_limit")]
+    limit: usize,
+    cursor: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TimelineCursor {
+    team_id: i64,
+    tag_team_id: i64,
+    anchor_id: String,
+    published_at: DateTime<FixedOffset>,
+    id: String,
+}
+
+impl TopicTimelineParameters {
+    pub fn into_query(
+        self,
+        anchor_id: String,
+    ) -> Result<crate::daily_topics::domain::timeline::TopicTimelineQuery, InvalidTopicArchiveQuery>
+    {
+        let after = if let Some(encoded) = self.cursor {
+            if encoded.len() > 1024 {
+                return Err(InvalidTopicArchiveQuery);
+            }
+            let cursor: TimelineCursor = serde_json::from_slice(
+                &URL_SAFE_NO_PAD
+                    .decode(encoded)
+                    .map_err(|_| InvalidTopicArchiveQuery)?,
+            )
+            .map_err(|_| InvalidTopicArchiveQuery)?;
+            if cursor.team_id != self.team_id
+                || cursor.tag_team_id != self.tag_team_id
+                || cursor.anchor_id != anchor_id
+            {
+                return Err(InvalidTopicArchiveQuery);
+            }
+            Some(TopicPosition {
+                published_at: cursor.published_at,
+                id: cursor.id,
+            })
+        } else {
+            None
+        };
+        crate::daily_topics::domain::timeline::TopicTimelineQuery::new(
+            TopicDetailQuery::new(self.team_id, anchor_id)?,
+            self.tag_team_id,
+            self.limit,
+            after,
+        )
+    }
+}
+
+#[derive(Serialize)]
+pub(super) struct TopicTimelineResponse {
+    team_id: i64,
+    anchor_id: String,
+    tag: TopicTagDto,
+    items: Vec<DailyTopicDto>,
+    next_cursor: Option<String>,
+    has_more: bool,
+}
+
+impl From<crate::daily_topics::domain::timeline::TopicTimelinePage> for TopicTimelineResponse {
+    fn from(page: crate::daily_topics::domain::timeline::TopicTimelinePage) -> Self {
+        let next_cursor = page.next.map(|p| {
+            URL_SAFE_NO_PAD.encode(
+                serde_json::to_vec(&TimelineCursor {
+                    team_id: page.team_id,
+                    tag_team_id: page.tag.team_id,
+                    anchor_id: page.anchor_id.clone(),
+                    published_at: p.published_at,
+                    id: p.id,
+                })
+                .expect("timeline cursor is serializable"),
+            )
+        });
+        Self {
+            team_id: page.team_id,
+            anchor_id: page.anchor_id,
+            tag: page.tag.into(),
+            items: page.items.into_iter().map(Into::into).collect(),
+            has_more: next_cursor.is_some(),
+            next_cursor,
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -203,6 +311,7 @@ impl From<DailyTopic> for DailyTopicDto {
             id: value.id,
             team_id: value.team_id,
             title: value.title,
+            team_tags: value.team_tags.into_iter().map(Into::into).collect(),
             summary: value.summary,
             paragraphs: value.paragraphs,
             published_at: value.published_at,

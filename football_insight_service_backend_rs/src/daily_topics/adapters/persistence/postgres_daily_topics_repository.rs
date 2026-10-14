@@ -25,6 +25,42 @@ impl PostgresDailyTopicsRepository {
 
 #[async_trait]
 impl DailyTopicsRepository for PostgresDailyTopicsRepository {
+    async fn timeline_for_tag(
+        &self,
+        team_id: i64,
+        tag_team_id: i64,
+        before: &TopicPosition,
+        after: Option<&TopicPosition>,
+        limit: usize,
+    ) -> Result<Vec<DailyTopic>, DailyTopicsRepositoryError> {
+        let rows = sqlx::query(r#"
+            WITH topics AS (
+                SELECT e.published_at AS edition_time, e.id AS edition_id, entry.topic, entry.position
+                FROM f_i_daily_topic_editions e
+                CROSS JOIN LATERAL jsonb_array_elements(e.payload->'items') WITH ORDINALITY entry(topic, position)
+                WHERE e.team_id = $1
+            ), unique_topics AS (
+                SELECT DISTINCT ON (topic->>'id') topic FROM topics
+                ORDER BY topic->>'id', edition_time DESC, edition_id DESC, position ASC
+            )
+            SELECT topic FROM unique_topics
+            WHERE EXISTS (
+                SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(topic->'team_tags')='array'
+                    THEN topic->'team_tags' ELSE '[]'::jsonb END) tag
+                WHERE tag->'team_id' = to_jsonb($2::bigint)
+            )
+            AND (topic->>'published_at')::timestamptz < $3
+            AND ($4::timestamptz IS NULL OR (topic->>'published_at')::timestamptz < $4
+                OR ((topic->>'published_at')::timestamptz = $4 AND topic->>'id' > $5))
+            ORDER BY (topic->>'published_at')::timestamptz DESC, topic->>'id' ASC LIMIT $6
+        "#).bind(team_id).bind(tag_team_id).bind(before.published_at.with_timezone(&Utc))
+            .bind(after.map(|p| p.published_at.with_timezone(&Utc))).bind(after.map(|p| p.id.as_str()))
+            .bind((limit + 1) as i64).fetch_all(&self.pool).await.map_err(storage_error)?;
+        rows.into_iter()
+            .map(|row| parse_topic(row.try_get("topic").map_err(invalid_row)?))
+            .collect()
+    }
+
     async fn heat_for_topics(
         &self,
         team_id: i64,

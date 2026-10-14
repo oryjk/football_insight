@@ -24,6 +24,7 @@ from .images import TopicImagePublisher
 from .sources import _fetch_text, _extract_original
 import requests
 from .tts import LocalQwenTts, discover_model
+from .scope import resolve_news_scope, tag_existing_items
 
 app = typer.Typer(no_args_is_help=True, help='采集成都蓉城新闻、生成今日话题和本地四川话播报。')
 
@@ -38,6 +39,16 @@ def _config(path: Path) -> dict:
     if not isinstance(value, dict):
         raise ValueError('source config must be a JSON object')
     return value
+
+
+def _collection_scope(config: dict, now: datetime):
+    if not config.get('league_selections'):
+        return config, None
+    scope = resolve_news_scope(config, now)
+    return {**config, 'team_keywords': [alias for team in scope.selected for alias in team.aliases],
+        'team_catalog': [team.as_tag() for team in scope.selected],
+        'feeds': [{**feed,'keywords':[]} for feed in config.get('feeds',[])],
+        'listings': [{**listing,'keywords':[]} for listing in config.get('listings',[])]}, scope
 
 
 def _write(path: Path, data: dict) -> None:
@@ -96,7 +107,9 @@ def collect(config: Path = typer.Option(..., exists=True, dir_okay=False),
             at: str | None = None) -> None:
     """Fetch recent original article bodies; an empty result is reported honestly."""
     try:
-        sources = collect_sources(_config(config), _now(at), max_age_hours)
+        now = _now(at)
+        source_config, _ = _collection_scope(_config(config), now)
+        sources = collect_sources(source_config, now, max_age_hours)
         _write(output, {'imports': [source.as_material() for source in sources]})
         typer.echo(f'collected {len(sources)} verified original articles -> {output}')
     except Exception as error:
@@ -120,7 +133,8 @@ def generate(config: Path = typer.Option(..., exists=True, dir_okay=False),
             raise ValueError('FI_DATABASE_URL is required for --write-db')
         now = _now(at)
         with _lock(output_dir):
-            sources = collect_sources(_config(config), now, max_age_hours)
+            source_config, scope = _collection_scope(_config(config), now)
+            sources = collect_sources(source_config, now, max_age_hours)
             if not sources:
                 raise NoTopicsError('no recent verified originals; previous edition retained')
             _write(output_dir / 'materials.json', {'imports': [source.as_material() for source in sources]})
@@ -136,7 +150,9 @@ def generate(config: Path = typer.Option(..., exists=True, dir_okay=False),
                 except Exception as error:
                     tts_unavailable = True
                     typer.echo(f'local TTS unavailable ({type(error).__name__}); text will be retained', err=True)
-            generator = TopicGenerator(base_url=base_url, model=model, api_key=os.getenv('FI_TOPIC_LLM_API_KEY'))
+            generator = TopicGenerator(base_url=base_url, model=model, api_key=os.getenv('FI_TOPIC_LLM_API_KEY'),
+                team_catalog=list(scope.catalog) if scope else None,
+                selected_team_ids=[team.team_id for team in scope.selected] if scope else None)
             if write_db:
                 TopicRepository(database_url).check_schema()
             edition = generate_edition(sources, generator=generator, tts=tts, target=target,
@@ -178,23 +194,35 @@ def daily_update(config: Path = typer.Option(..., exists=True, dir_okay=False),
             raise ValueError('FI_DATABASE_URL is required')
         now = _now(at)
 
+        source_config = _config(config)
+        scope = None
+
         def generator():
             base_url, model = os.getenv('FI_TOPIC_LLM_BASE_URL'), os.getenv('FI_TOPIC_LLM_MODEL')
             if not base_url or not model:
                 raise ValueError('article LLM configuration is missing')
-            return TopicGenerator(base_url=base_url, model=model, api_key=os.getenv('FI_TOPIC_LLM_API_KEY'))
+            return TopicGenerator(base_url=base_url, model=model, api_key=os.getenv('FI_TOPIC_LLM_API_KEY'),
+                                  team_catalog=list(scope.catalog) if scope else None,
+                                  selected_team_ids=[team.team_id for team in scope.selected] if scope else None)
 
         with _lock(output_dir):
             try:
                 repository = TopicRepository(database_url)
                 repository.check_schema()
                 _atomic_json(output_dir / 'daily-status.json', {'status': 'running', 'started_at': now.isoformat()})
-                sources = collect_sources(_config(config), now, max_age_hours, require_available=True)
+                source_config, scope = _collection_scope(source_config, now)
+                if scope:
+                    _atomic_json(output_dir / 'news-scope.json', {'checked_at': now.isoformat(),
+                        'selected': [team.as_tag() for team in scope.selected], 'catalog': [team.as_tag() for team in scope.catalog]})
+                sources = collect_sources(source_config, now, max_age_hours, require_available=True)
                 result = run_daily_update(sources, repository=repository, generator_factory=generator,
                     tts_factory=lambda: _tts(output_dir), target_factory=_target,
-                    cache_dir=output_dir, now=now, team_id=team_id, limit=limit, max_age_hours=max_age_hours)
+                    cache_dir=output_dir, now=now, team_id=team_id, limit=limit, max_age_hours=max_age_hours,
+                    selected_teams=list(scope.selected) if scope else None)
                 result.update(finished_at=datetime.now(SHANGHAI).isoformat(),
                               previous_retained=result['status'] != 'published')
+                if scope:
+                    result['selected_teams'] = [team.as_tag() for team in scope.selected]
                 try:
                     _atomic_json(output_dir / 'daily-status.json', result)
                 except OSError as error:
@@ -213,6 +241,26 @@ def daily_update(config: Path = typer.Option(..., exists=True, dir_okay=False),
         typer.echo(json.dumps({'status': 'already_running', 'previous_retained': True}), err=True)
     except Exception as error:
         typer.echo(json.dumps(failure or failed_result(error), ensure_ascii=False), err=True)
+        raise typer.Exit(1) from None
+
+
+@app.command('refresh-tags')
+def refresh_tags(config: Path = typer.Option(..., exists=True, dir_okay=False),
+                 team_id: int = typer.Option(77680, min=1), write_db: bool = False) -> None:
+    """Preview or patch historical club tags; never regenerate articles or audio."""
+    try:
+        database_url = os.getenv('FI_DATABASE_URL') or os.getenv('DATABASE_URL')
+        if not database_url:
+            raise ValueError('FI_DATABASE_URL is required for reading published topics')
+        scope = resolve_news_scope(_config(config), _now(None))
+        repository = TopicRepository(database_url)
+        items = tag_existing_items(repository.published_items(team_id), scope.catalog)
+        if write_db:
+            repository.patch_tags(team_id, items)
+        typer.echo(json.dumps({'written': write_db, 'items': [{'id': item['id'], 'title': item['title'],
+            'team_tags': item['team_tags']} for item in items]}, ensure_ascii=False))
+    except Exception as error:
+        typer.echo(f'tag refresh failed ({type(error).__name__})', err=True)
         raise typer.Exit(1) from None
 
 

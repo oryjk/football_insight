@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { mapTopicHistory, mapTopicDetail, mergeTopicHistory, topicDetailUrl, formatTopicHeat } from './dailyTopics'
+import { mapTopicHistory, mapTopicDetail, mapTopicTimeline, mergeTopicHistory, topicDetailUrl, formatTopicHeat } from './dailyTopics'
 const article = (id: string, time: string) => ({ id, team_id: 77680, title: '新闻标题', summary: '摘要', paragraphs: ['正文'], published_at: time,
   sources: [{ title: '来源', publisher: '新闻', url: 'https://news.example.com/a', published_at: time }], audio: { status: 'pending' } })
 const page = (items: unknown[], next: string | null = null) => ({ team_id: 77680, items, next_cursor: next, has_more: next !== null })
@@ -53,4 +53,24 @@ test('正文配图兼容旧话题并过滤未引用来源和错误图片', () =>
   expect(item.images).toEqual([{ url: photo.url, width: 640, height: 444,
     sourceUrl: photo.source_url, publisher: '新闻', afterParagraph: 1 }])
   expect(item.paragraphs).toEqual(['正文'])
+})
+
+test('球队标签按稳定 ID 去重，旧数据兼容空标签', () => {
+  const value = article('tags', '2026-10-14T08:00:00+08:00')
+  expect(mapTopicDetail(value).teamTags).toEqual([])
+  expect(mapTopicDetail({ ...value, team_tags: [{ team_id: 77680, name: '成都蓉城' }, { team_id: 148, name: '天津津门虎' },
+    { team_id: 148, name: '重复' }, { team_id: -1, name: '错误' }, { team_id: 136, name: '<script>' }, null] }).teamTags)
+    .toEqual([{ teamId: 77680, name: '成都蓉城' }, { teamId: 148, name: '天津津门虎' }])
+})
+
+test('时间线核对当前话题、球队和历史时间，拒绝串线响应', () => {
+  const tag = { team_id: 148, name: '天津津门虎' }
+  const anchor = mapTopicDetail({ ...article('current', '2026-10-14T08:00:00+08:00'), team_tags: [tag] })
+  const older = { ...article('older', '2026-10-13T08:00:00+08:00'), team_tags: [tag] }
+  const response = { ...page([older]), anchor_id: 'current', tag }
+  expect(mapTopicTimeline(response, anchor, 148).items.map(i => i.id)).toEqual(['older'])
+  for (const wrong of [{ ...response, anchor_id: 'other' }, { ...response, tag: { team_id: 136, name: '北京国安' } },
+    { ...response, items: [{ ...older, team_tags: [] }] }, { ...response, items: [{ ...older, published_at: anchor.publishedAt }] }]) {
+    expect(() => mapTopicTimeline(wrong, anchor, 148)).toThrow()
+  }
 })

@@ -6,6 +6,7 @@ from html.parser import HTMLParser
 import hashlib
 import json
 import logging
+from itertools import zip_longest
 import re
 from urllib.parse import urljoin
 import xml.etree.ElementTree as ET
@@ -217,8 +218,14 @@ def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, ses
     def accept(article):
         if not cutoff <= article.published_at <= now:
             return
-        if not _valid_original_body(article) or "蓉城" not in article.title + article.body:
+        keywords = config.get('team_keywords', ['蓉城'])
+        if not _valid_original_body(article) or not any(word in article.title + article.body for word in keywords):
             return
+        if config.get('team_catalog'):
+            from .scope import TeamTag, tags_for_text
+            catalog = [TeamTag(**tag) for tag in config['team_catalog']]
+            if not tags_for_text(article.title + '\n' + article.body, catalog):
+                return
         body_hash = hashlib.sha256(" ".join(article.body.split()).encode()).hexdigest()
         if article.url not in seen_urls and body_hash not in seen_bodies:
             seen_urls.add(article.url)
@@ -234,13 +241,16 @@ def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, ses
             return accepted
 
     candidates = list(config.get("articles", [])[:MAX_DOWNLOADS])
+    candidate_groups = [candidates] if candidates else []
     available = 0
     for feed in config.get("feeds", [])[:20]:
         try:
             text, _ = _fetch_text(session, feed["url"])
             entries = list(_feed_entries(text, feed))[:MAX_DOWNLOADS]
             keywords = feed.get('keywords')
-            candidates.extend(item for item in entries if not keywords or any(word in item.get('title', '') for word in keywords))
+            group = [item for item in entries if not keywords or any(word in item.get('title', '') for word in keywords)]
+            candidates.extend(group)
+            candidate_groups.append(group)
             available += 1
         except (requests.RequestException, ValueError, TypeError, KeyError, ET.ParseError):
             logger.warning("Skipped news feed: unavailable or invalid feed")
@@ -248,12 +258,18 @@ def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, ses
     for listing in config.get('listings', [])[:20]:
         try:
             text, resolved = _fetch_text(session, listing['url'])
-            candidates.extend(listing_entries(text, {**listing, 'url': resolved}))
+            group = listing_entries(text, {**listing, 'url': resolved})
+            candidates.extend(group)
+            candidate_groups.append(group)
             available += 1
         except (requests.RequestException, ValueError, TypeError, KeyError, re.error):
             logger.warning('Skipped news listing: unavailable or unrecognized publisher list')
     if require_available and (config.get('listings') or config.get('feeds')) and not available:
         raise ValueError('all configured news discovery sources unavailable')
+
+    if config.get('team_catalog'):
+        # Give every discovery source a chance before hitting the global budget.
+        candidates = [item for row in zip_longest(*candidate_groups) for item in row if item is not None]
 
     original_attempts = original_successes = 0
     for item in candidates:
@@ -264,6 +280,9 @@ def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, ses
             if url in attempted_urls or url in seen_urls:
                 continue
             attempted_urls.add(url)
+            route_date = re.search(r'/publish/app/data/(\d{4})/(\d{2})/(\d{2})/', url)
+            if route_date and datetime.strptime('-'.join(route_date.groups()), '%Y-%m-%d').date() < cutoff.date():
+                continue
             if item.get("published_at") and parse_timestamp(item["published_at"], now) < cutoff:
                 continue
             original_attempts += 1

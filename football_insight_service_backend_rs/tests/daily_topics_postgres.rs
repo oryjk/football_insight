@@ -22,6 +22,99 @@ struct TestDatabase {
     schema: String,
 }
 
+#[tokio::test]
+#[ignore = "requires explicit disposable PostgreSQL database"]
+async fn timeline_reads_tags_from_jsonb_deduplicates_versions_and_excludes_later_or_legacy_articles()
+ {
+    use football_insight_service_backend_rs::daily_topics::domain::archive::TopicPosition;
+    let database = TestDatabase::new().await;
+    for (edition_id, owner, topic_id, time, tags) in [
+        (
+            "a",
+            77680,
+            "older-a",
+            "2026-10-12T08:00:00+08:00",
+            json!([{ "team_id": 148, "name": "天津津门虎" }]),
+        ),
+        (
+            "b",
+            77680,
+            "older-b",
+            "2026-10-11T08:00:00+08:00",
+            json!([{ "team_id": 148, "name": "天津津门虎" }, {"team_id":77680,"name":"成都蓉城"}]),
+        ),
+        (
+            "newer-copy",
+            77680,
+            "older-a",
+            "2026-10-12T08:00:00+08:00",
+            json!([{ "team_id": 148, "name": "天津津门虎" }]),
+        ),
+        (
+            "future",
+            77680,
+            "future",
+            "2026-10-15T08:00:00+08:00",
+            json!([{ "team_id": 148, "name": "天津津门虎" }]),
+        ),
+        (
+            "legacy",
+            77680,
+            "legacy",
+            "2026-10-10T08:00:00+08:00",
+            Value::Null,
+        ),
+        (
+            "other-owner",
+            999,
+            "other-owner",
+            "2026-10-10T08:00:00+08:00",
+            json!([{ "team_id": 148, "name": "天津津门虎" }]),
+        ),
+    ] {
+        let mut value = payload(owner, edition_id);
+        value["items"][0]["id"] = json!(topic_id);
+        value["items"][0]["published_at"] = json!(time);
+        value["items"][0]["team_tags"] = tags;
+        sqlx::query("INSERT INTO f_i_daily_topic_editions(id,team_id,edition_date,published_at,payload,source_fingerprint,generator_version) VALUES($1,$2,'2026-10-14',$3,$4,'test','test')")
+            .bind(edition_id).bind(owner).bind(DateTime::parse_from_rfc3339("2026-10-14T08:00:00+08:00").unwrap()).bind(value).execute(&database.pool).await.unwrap();
+    }
+    let repository = PostgresDailyTopicsRepository::new(database.pool.clone());
+    let before = TopicPosition {
+        id: "anchor".into(),
+        published_at: DateTime::parse_from_rfc3339("2026-10-14T08:00:00+08:00").unwrap(),
+    };
+    let result = repository
+        .timeline_for_tag(77680, 148, &before, None, 1)
+        .await
+        .unwrap();
+    assert_eq!(
+        result
+            .iter()
+            .map(|item| item.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["older-a", "older-b"]
+    );
+    assert_eq!(result[0].title, "newer-copy");
+    assert_eq!(result[0].team_tags[0].name, "天津津门虎");
+    let cursor = TopicPosition {
+        id: result[0].id.clone(),
+        published_at: result[0].published_at,
+    };
+    let second = repository
+        .timeline_for_tag(77680, 148, &before, Some(&cursor), 1)
+        .await
+        .unwrap();
+    assert_eq!(
+        second
+            .iter()
+            .map(|item| item.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["older-b"]
+    );
+    database.close().await;
+}
+
 impl TestDatabase {
     async fn new() -> Self {
         let database_url = std::env::var("DAILY_TOPICS_TEST_DATABASE_URL")

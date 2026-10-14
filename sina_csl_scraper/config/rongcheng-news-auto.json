@@ -1,9 +1,13 @@
 {
+  "league_selections": [
+    {"league_id": 213, "top": 3, "bottom": 3},
+    {"league_id": 214, "top": 2, "bottom": 0}
+  ],
   "feeds": [
     {
       "url": "https://www.chinanews.com.cn/rss/sports.xml",
       "publisher": "中国新闻网",
-      "keywords": ["蓉城"]
+      "keywords": []
     }
   ],
   "listings": [
@@ -12,14 +16,14 @@
       "publisher": "体坛周报／体坛+",
       "allowed_hosts": ["www.ttplus.cn", "ttplus.cn"],
       "path_pattern": "^/publish/app/data/\\d{4}/\\d{2}/\\d{2}/\\d+/os_news\\.html$",
-      "keywords": ["蓉城"]
+      "keywords": []
     },
     {
       "url": "https://www.ttplus.cn/",
       "publisher": "体坛周报／体坛+",
       "allowed_hosts": ["www.ttplus.cn", "ttplus.cn"],
       "path_pattern": "^/publish/app/data/\\d{4}/\\d{2}/\\d{2}/\\d+/os_news\\.html$",
-      "keywords": ["蓉城"]
+      "keywords": []
     }
   ]
 }

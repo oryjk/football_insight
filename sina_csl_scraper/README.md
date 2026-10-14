@@ -4,7 +4,7 @@
 
 ## 今日话题与本地四川话语音
 
-local233 的安装路径、真实 CPU 基准、私有配置加载和手动运行命令见 [local233 今日话题运行说明](docs/topics-local233.md)。已有真实批次可用 `topics refresh-audio` 只刷新四川话音频：所有音频成功后才更新数据库，不再调用 LLM、不改原正文和来源。
+local233 的安装路径、真实 CPU 基准、私有配置加载和手动运行命令见 [local233 今日话题运行说明](docs/topics-local233.md)。当前采集代码每次从积分榜动态选取中超前三/后三与中甲前二，读取全文后筛选；文章支持多个球队标签，供详情页话题时间线使用。代码验证与实际生产启用状态见项目 FEATURES.md。已有真实批次可用 `topics refresh-audio` 只刷新四川话音频：所有音频成功后才更新数据库，不再调用 LLM、不改原正文和来源。
 
 local233 现已在每天北京时间 **07:00–22:30，每半小时** 检查并更新今日话题，入口为 `./update_daily_topics.sh`，使用 `config/rongcheng-news-auto.json` 持续发现体坛周报与中新网的新原文。每日命令 `topics daily-update --write-db` 只处理比已发布来源更新、且未发布过的材料；正文和每篇音频全部成功后才原子发布，无新文章或失败时保留现有内容。日志在 `data/topics/daily.log`，运行状态在 `data/topics/daily-status.json`，cron 模板在 `deploy/topics-daily.cron.example`。
 

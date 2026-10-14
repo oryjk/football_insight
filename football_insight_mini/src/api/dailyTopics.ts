@@ -13,6 +13,11 @@ export function getTopicDetail(teamId: number, id: string): Promise<unknown> {
   return request<unknown>({ url: `/daily-topics/${encodeURIComponent(id)}?team_id=${teamId}` })
 }
 
+export function getTopicTimeline(teamId: number, anchorId: string, tagTeamId: number, cursor: string | null = null, limit = 10): Promise<unknown> {
+  const after = cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''
+  return request<unknown>({ url: `/daily-topics/${encodeURIComponent(anchorId)}/timeline?team_id=${teamId}&tag_team_id=${tagTeamId}&limit=${limit}${after}`, silentNetworkError: true })
+}
+
 export function recordTopicVisit(teamId: number, id: string, visitorId: string): Promise<{ heat: number }> {
   return request<{ heat: number }>({ url: `/daily-topics/${encodeURIComponent(id)}/visits?team_id=${teamId}`,
     method: 'POST', data: { visitor_id: visitorId }, silentNetworkError: true })

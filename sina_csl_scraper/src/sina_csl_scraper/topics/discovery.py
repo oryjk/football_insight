@@ -45,7 +45,8 @@ class _NewsLinks(HTMLParser):
             return
         self.eligible += 1
         title = ' '.join(''.join(self.parts).split())
-        if not any(word in title for word in self.listing.get('keywords', ['蓉城'])):
+        keywords = self.listing.get('keywords', ['蓉城'])
+        if keywords and not any(word in title for word in keywords):
             return
         if url not in self.seen and len(self.entries) < 90:
             self.seen.add(url)

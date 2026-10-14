@@ -71,6 +71,32 @@ fn invalid_parameters() -> (StatusCode, &'static str) {
     (StatusCode::BAD_REQUEST, "invalid topic archive parameters")
 }
 
+pub(super) async fn get_topic_timeline(
+    State(use_case): State<Arc<GetDailyTopics>>,
+    Path(id): Path<String>,
+    parameters: Result<Query<super::dto::TopicTimelineParameters>, QueryRejection>,
+) -> Result<Json<super::dto::TopicTimelineResponse>, (StatusCode, &'static str)> {
+    use crate::daily_topics::application::get_daily_topics::TopicTimelineError;
+    let Query(parameters) = parameters.map_err(|_| invalid_parameters())?;
+    let query = parameters
+        .into_query(id)
+        .map_err(|_| invalid_parameters())?;
+    Ok(Json(
+        use_case
+            .timeline(query)
+            .await
+            .map_err(|error| match error {
+                TopicTimelineError::AnchorNotFound => (StatusCode::NOT_FOUND, "topic not found"),
+                TopicTimelineError::UnrelatedTag => (
+                    StatusCode::BAD_REQUEST,
+                    "club tag does not belong to this topic",
+                ),
+                TopicTimelineError::Storage(error) => storage_failure(error),
+            })?
+            .into(),
+    ))
+}
+
 fn storage_failure(error: DailyTopicsRepositoryError) -> (StatusCode, &'static str) {
     tracing::error!(%error, "topic archive request failed");
     (

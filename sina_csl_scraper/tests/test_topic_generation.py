@@ -171,3 +171,39 @@ def test_k3_256k_uses_code_endpoint_without_glm_specific_sampling_options():
     assert 'thinking' not in options['json']
     assert options['headers']['User-Agent'] == 'FootballInsight/1.0'
     assert items[0]['sources'][0]['url'] == 'https://club.example/a'
+
+
+def test_multi_team_topic_has_grounded_tags_without_duplicate_articles():
+    from sina_csl_scraper.topics.scope import TeamTag
+    from sina_csl_scraper.topics.models import SourceArticle
+    from sina_csl_scraper.topics.generation import TopicGenerator
+    originals = [SourceArticle('赛后采访', 'https://club.example/match', '媒体', NOW,
+        '北京国安与天津津门虎在中超比赛中战平，主帅评价了比赛。' * 4)]
+    data = topic(originals[0].source_id, title='国安与津门虎战平', summary='中超比赛战平。',
+                 paragraphs=['北京国安与天津津门虎在中超比赛中战平。'])
+    generator = TopicGenerator('https://llm.example', 'm', session=Session(json.dumps({'topics': [data]})),
+        team_catalog=[TeamTag(136, '北京国安'), TeamTag(148, '天津津门虎'), TeamTag(77680, '成都蓉城')])
+    result = generator.generate(originals, 77680, NOW)
+    assert len(result) == 1
+    assert result[0]['team_tags'] == [{'team_id': 136, 'name': '北京国安'}, {'team_id': 148, 'name': '天津津门虎'}]
+    invented = {**data, 'paragraphs': ['北京国安与天津津门虎战平，成都蓉城参加了比赛。']}
+    generator.session = Session(json.dumps({'topics': [invented]}))
+    with pytest.raises(ValueError, match='team'):
+        generator.generate(originals, 77680, NOW)
+    generator.session = Session(json.dumps({'topics': [{**data,'team_ids':[136,148]}]}))
+    assert generator.generate(originals,77680,NOW)[0]['team_tags'] == [{'team_id':136,'name':'北京国安'},{'team_id':148,'name':'天津津门虎'}]
+    generator.session = Session(json.dumps({'topics': [{**data,'team_ids':[77680]}]}))
+    with pytest.raises(ValueError,match='team'):
+        generator.generate(originals,77680,NOW)
+
+
+def test_roundup_cannot_generate_a_topic_only_about_an_unselected_club():
+    from sina_csl_scraper.topics.scope import TeamTag
+    from sina_csl_scraper.topics.models import SourceArticle
+    from sina_csl_scraper.topics.generation import TopicGenerator
+    original = SourceArticle('中超综述', 'https://news.example/roundup', '媒体', NOW,
+        '北京国安与天津津门虎均开展中超恢复训练。' * 5)
+    data = topic(original.source_id, title='津门虎训练', summary='津门虎开展训练。', paragraphs=['天津津门虎开展中超恢复训练。'])
+    generator = TopicGenerator('https://llm.example','m',session=Session(json.dumps({'topics':[data]})),
+        team_catalog=[TeamTag(136,'北京国安'),TeamTag(148,'天津津门虎')], selected_team_ids=[136])
+    assert generator.generate([original],77680,NOW) == []

@@ -42,8 +42,8 @@ def main() -> None:
     loaded = arguments[:1] == ['--env-loaded']
     if loaded:
         arguments = arguments[1:]
-    if not arguments or arguments[0] not in {'collect', 'generate', 'tts', 'refresh-audio', 'refresh-images', 'daily-update'}:
-        print('Usage: uv run --no-sync python scripts/run_topics_local.py {collect|generate|tts|refresh-audio|refresh-images|daily-update} [topic options]')
+    if not arguments or arguments[0] not in {'collect', 'generate', 'tts', 'refresh-audio', 'refresh-images', 'refresh-tags', 'daily-update'}:
+        print('Usage: uv run --no-sync python scripts/run_topics_local.py {collect|generate|tts|refresh-audio|refresh-images|refresh-tags|daily-update} [topic options]')
         raise SystemExit(0 if arguments[:1] in [['--help'], ['-h']] else 2)
     if not loaded:
         files = [root / '.env.topics', root / '.env.sync']
@@ -58,7 +58,7 @@ def main() -> None:
     # This is local233 itself: upload through MinioAssetTarget, never SSH to self.
     os.environ.pop('FI_TOPIC_MINIO_SSH_HOST', None)
     os.environ.pop('FI_TOPIC_MINIO_REMOTE_PROJECT', None)
-    if '--write-db' in arguments:
+    if '--write-db' in arguments or arguments[0] == 'refresh-tags':
         try:
             os.environ['FI_DATABASE_URL'] = backend_database_url()
         except (ValueError, TypeError, KeyError):

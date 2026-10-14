@@ -20,6 +20,7 @@ pub struct DailyTopicsView {
 pub struct DailyTopic {
     pub id: String,
     pub team_id: i64,
+    pub team_tags: Vec<DailyTopicTag>,
     pub title: String,
     pub summary: String,
     pub paragraphs: Vec<String>,
@@ -28,6 +29,12 @@ pub struct DailyTopic {
     pub images: Vec<DailyTopicImage>,
     pub audio: DailyTopicAudio,
     pub heat: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct DailyTopicTag {
+    pub team_id: i64,
+    pub name: String,
 }
 
 #[derive(Debug, Clone)]

@@ -16,6 +16,27 @@ pub enum DailyTopicsRepositoryError {
 
 #[async_trait]
 pub trait DailyTopicsRepository: Send + Sync {
+    async fn timeline_for_tag(
+        &self,
+        team_id: i64,
+        tag_team_id: i64,
+        before: &TopicPosition,
+        after: Option<&TopicPosition>,
+        limit: usize,
+    ) -> Result<Vec<DailyTopic>, DailyTopicsRepositoryError> {
+        let Some(mut edition) = self.latest_for_team(team_id).await? else {
+            return Ok(Vec::new());
+        };
+        sort_topics(&mut edition.items);
+        edition.items.retain(|item| {
+            item.published_at < before.published_at
+                && item.team_tags.iter().any(|tag| tag.team_id == tag_team_id)
+                && after.is_none_or(|position| position.follows(item))
+        });
+        edition.items.truncate(limit + 1);
+        Ok(edition.items)
+    }
+
     async fn heat_for_topics(
         &self,
         _team_id: i64,

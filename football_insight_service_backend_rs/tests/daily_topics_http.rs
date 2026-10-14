@@ -86,6 +86,7 @@ fn edition() -> DailyTopicEdition {
         published_at,
         items: (0..7)
             .map(|index| DailyTopic {
+                team_tags: vec![],
                 id: format!("{index:064x}"),
                 team_id: 77680,
                 heat: 0,
@@ -120,6 +121,90 @@ async fn legacy_topics_expose_empty_images_without_changing_text_or_audio() {
     assert_eq!(body["items"][0]["images"], json!([]));
     assert_eq!(body["items"][0]["paragraphs"], json!(["第一段", "第二段"]));
     assert_eq!(body["items"][0]["audio"]["status"], "ready");
+    assert_eq!(body["items"][0]["team_tags"], json!([]));
+}
+
+#[tokio::test]
+async fn timeline_validates_club_and_missing_anchor_instead_of_returning_a_detail() {
+    let app = app(Some(edition()), false);
+    assert_eq!(
+        get(
+            app.clone(),
+            "/api/v1/daily-topics/missing/timeline?tag_team_id=136"
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    for parameters in ["", "tag_team_id=0", "tag_team_id=-1", "tag_team_id=x"] {
+        assert_eq!(
+            get(
+                app.clone(),
+                &format!("/api/v1/daily-topics/known/timeline?{parameters}")
+            )
+            .await
+            .0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+}
+
+#[tokio::test]
+async fn timeline_filters_before_anchor_and_binds_pagination_to_club_and_topic() {
+    use football_insight_service_backend_rs::daily_topics::domain::edition::DailyTopicTag;
+    let mut value = edition();
+    for (index, item) in value.items.iter_mut().enumerate() {
+        item.published_at =
+            DateTime::parse_from_rfc3339(&format!("2026-10-{:02}T08:00:00+08:00", 14 - index))
+                .unwrap();
+        item.team_tags = vec![DailyTopicTag {
+            team_id: 77680,
+            name: "成都蓉城".into(),
+        }];
+        if index % 2 == 0 {
+            item.team_tags.push(DailyTopicTag {
+                team_id: 148,
+                name: "天津津门虎".into(),
+            });
+        }
+    }
+    let app = app(Some(value), false);
+    let anchor = format!("{:064x}", 0);
+    let url = format!("/api/v1/daily-topics/{anchor}/timeline?tag_team_id=77680&limit=2");
+    let (status, first) = get(app.clone(), &url).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(first["items"][0]["id"], format!("{:064x}", 1));
+    assert_eq!(first["items"][1]["id"], format!("{:064x}", 2));
+    let cursor = first["next_cursor"].as_str().unwrap();
+    let (_, second) = get(app.clone(), &format!("{url}&cursor={cursor}")).await;
+    assert_eq!(second["items"][0]["id"], format!("{:064x}", 3));
+    let (status, opponents) = get(
+        app.clone(),
+        &format!("/api/v1/daily-topics/{anchor}/timeline?tag_team_id=148"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(opponents["items"].as_array().unwrap().len(), 3);
+    for wrong_url in [
+        format!("/api/v1/daily-topics/{anchor}/timeline?tag_team_id=148&cursor={cursor}"),
+        format!(
+            "/api/v1/daily-topics/{:064x}/timeline?tag_team_id=77680&cursor={cursor}",
+            1
+        ),
+        format!("/api/v1/daily-topics/{anchor}/timeline?tag_team_id=999"),
+    ] {
+        assert_eq!(
+            get(app.clone(), &wrong_url).await.0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+    let (_, oldest) = get(
+        app,
+        &format!("/api/v1/daily-topics/{:064x}/timeline?tag_team_id=77680", 6),
+    )
+    .await;
+    assert_eq!(oldest["items"], json!([]));
+    assert_eq!(oldest["has_more"], false);
 }
 
 #[tokio::test]
@@ -253,7 +338,7 @@ async fn public_contract_preserves_content_sources_and_audio_without_data_wrappe
         body["items"][0],
         json!({
             "id":"0000000000000000000000000000000000000000000000000000000000000000",
-            "team_id":77680,"heat":0,"images":[],"title":"隔离测试文章 0","summary":"测试摘要",
+            "team_id":77680,"team_tags":[],"heat":0,"images":[],"title":"隔离测试文章 0","summary":"测试摘要",
             "paragraphs":["第一段","第二段"],"published_at":"2026-10-13T08:30:00+08:00",
             "sources":[{"title":"测试来源","url":"https://example.com/original","publisher":"测试媒体","published_at":"2026-10-12T20:00:00+08:00"}],
             "audio":{"status":"ready","url":"https://example.com/audio.m4a","dialect":"sichuan","duration_seconds":60.0}

@@ -39,7 +39,7 @@ def generate_edition(sources: list[SourceArticle], *, generator, tts, target,
     fingerprint = source_fingerprint(sources)
     date = now.astimezone(SHANGHAI).date().isoformat()
     identity = [team_id, date, fingerprint, GENERATOR_VERSION, generator.model,
-                getattr(generator, 'base_url', ''), limit]
+                getattr(generator, 'base_url', ''), limit, getattr(generator, 'cache_scope', [])]
     edition_id = hashlib.sha256(json.dumps(identity, ensure_ascii=False).encode()).hexdigest()
     path = cache_dir / 'editions' / f'{edition_id}.json'
     if path.exists():
@@ -55,6 +55,9 @@ def generate_edition(sources: list[SourceArticle], *, generator, tts, target,
                    'payload': {'team_id': team_id, 'edition_date': date,
                                'updated_at': now.isoformat(), 'items': items}}
     # Persist the validated text before long-running TTS so interruption can resume.
+    selected = getattr(generator, 'selected_team_ids', set())
+    if selected and any(not any(tag.get('team_id') in selected for tag in item.get('team_tags', [])) for item in edition['payload']['items']):
+        raise ValueError('cached topic does not match the current news scope')
     _atomic_json(path, edition)
     if target is not None and any(source.images for source in sources):
         try:

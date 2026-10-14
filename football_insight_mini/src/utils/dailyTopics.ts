@@ -1,4 +1,4 @@
-import type { DailyTopicEdition, DailyTopicImage, DailyTopicItem, DailyTopicSource } from '../types/dailyTopic'
+import type { DailyTopicEdition, DailyTopicImage, DailyTopicItem, DailyTopicSource, DailyTopicTag } from '../types/dailyTopic'
 
 export const DAILY_TOPICS_TEAM_ID = 77680
 export const DAILY_TOPICS_LIMIT = 5
@@ -59,6 +59,19 @@ function mapImages(value: unknown, sources: DailyTopicSource[], paragraphs: numb
   }
   return images
 }
+
+function mapTeamTags(value: unknown): DailyTopicTag[] {
+  if (!Array.isArray(value)) return []
+  const tags: DailyTopicTag[] = [], seen = new Set<number>()
+  for (const candidate of value) {
+    const tag = record(candidate)
+    if (!tag || typeof tag.team_id !== 'number' || !Number.isSafeInteger(tag.team_id) || tag.team_id <= 0
+      || !text(tag.name) || text(tag.name).length > 80 || /[<>\x00-\x1f]/.test(text(tag.name)) || seen.has(tag.team_id)) continue
+    seen.add(tag.team_id)
+    tags.push({ teamId: tag.team_id, name: text(tag.name) })
+  }
+  return tags
+}
 export function mapDailyTopicItem(value: unknown): DailyTopicItem | null {
   const item = record(value)
   if (!item || item.team_id !== DAILY_TOPICS_TEAM_ID) return null
@@ -72,6 +85,7 @@ export function mapDailyTopicItem(value: unknown): DailyTopicItem | null {
     id, teamId: DAILY_TOPICS_TEAM_ID, title, summary, paragraphs, publishedAt,
     publishedLabel: formatTopicTimestamp(publishedAt), sources,
     images: mapImages(item.images, sources, paragraphs.length),
+    teamTags: mapTeamTags(item.team_tags),
     sourceLabel: `${Array.from(new Set(sources.map(source => source.publisher))).join(' · ')} · ${sources.length} 个来源`,
     heat: typeof item.heat === 'number' && Number.isSafeInteger(item.heat) && item.heat >= 0 ? item.heat : 0,
     readMinutes: Math.max(1, Math.ceil(paragraphs.join('').length / 350)),
@@ -122,6 +136,17 @@ export function mapTopicHistory(value: unknown): TopicHistoryPage {
   if (items.some(item => !item)) throw new Error('话题内容暂时不可用，请重试')
   if (payload.has_more && !items.length) throw new Error('话题加载失败，请重试')
   return { items: mergeTopicHistory([], items as DailyTopicItem[]), nextCursor: payload.next_cursor as string | null }
+}
+
+export function mapTopicTimeline(value: unknown, anchor: DailyTopicItem, tagTeamId: number): TopicHistoryPage {
+  const payload = record(value)
+  const tag = record(payload?.tag)
+  if (!payload || payload.anchor_id !== anchor.id || tag?.team_id !== tagTeamId
+    || !anchor.teamTags?.some(team => team.teamId === tagTeamId)) throw new Error('话题追踪数据异常，请重试')
+  const page = mapTopicHistory(value)
+  if (page.items.some(item => item.id === anchor.id || Date.parse(item.publishedAt) >= Date.parse(anchor.publishedAt)
+    || !item.teamTags?.some(team => team.teamId === tagTeamId))) throw new Error('话题追踪数据异常，请重试')
+  return page
 }
 export function mergeTopicHistory(previous: DailyTopicItem[], next: DailyTopicItem[]): DailyTopicItem[] {
   const items = new Map(previous.map(item => [item.id, item]))

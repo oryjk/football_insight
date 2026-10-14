@@ -6,7 +6,7 @@
     <view v-if="loading" class="topic-detail__state">正在加载话题…</view>
     <view v-else-if="errorMessage" class="topic-detail__state"><text>{{ errorMessage }}</text><button @tap="load">重新加载</button></view>
     <template v-else-if="item">
-      <text class="topic-detail__eyebrow">成都蓉城</text>
+      <FiTopicTeamTags v-if="timeline.tags.value.length" :tags="timeline.tags.value" :selected-team-id="timeline.selectedTeamId.value" @select="selectTimelineTeam" />
       <text class="topic-detail__title">{{ item.title }}</text>
       <text class="topic-detail__meta">{{ item.publishedLabel }} · 约 {{ item.readMinutes }} 分钟阅读</text>
       <view class="topic-detail__heat"><FiTopicHeat :value="topicHeatValue(item.id, item.heat)" /></view>
@@ -23,6 +23,11 @@
           <text class="topic-detail__meta">{{ source.publisher }} · {{ source.dateLabel }}</text>
           <button class="topic-detail__copy" @tap="copySource(source.url)">复制原文链接</button>
         </view>
+      </view>
+      <view v-if="timeline.tags.value.length" id="topic-timeline" class="topic-detail__timeline">
+        <TopicTimeline :anchor="item" :tags="timeline.tags.value" :selected-team-id="timeline.selectedTeamId.value" :items="timeline.items.value"
+          :loading="timeline.loading.value" :error-message="timeline.errorMessage.value" :has-more="!!timeline.nextCursor.value"
+          @select="timeline.selectTeam" @read="openTimelineTopic" @more="timeline.loadMore" @retry="timeline.retry" />
       </view>
     </template>
   </view>
@@ -43,8 +48,11 @@ import { useDailyTopicAudio } from '../../composables/useDailyTopicAudio'
 import FiTopicAudioEntry from '../../components/topics/FiTopicAudioEntry.vue'
 import FiTopicAudioPlayer from '../../components/topics/FiTopicAudioPlayer.vue'
 import TopicImageGallery from './components/TopicImageGallery.vue'
+import TopicTimeline from './components/TopicTimeline.vue'
+import FiTopicTeamTags from '../../components/topics/FiTopicTeamTags.vue'
+import { useTopicTimeline } from './useTopicTimeline'
 import type { DailyTopicItem } from '../../types/dailyTopic'
-import { DAILY_TOPICS_TEAM_ID, editionForTopic, isTopicSourceUrl, mapTopicDetail } from '../../utils/dailyTopics'
+import { DAILY_TOPICS_TEAM_ID, editionForTopic, isTopicSourceUrl, mapTopicDetail, topicDetailUrl } from '../../utils/dailyTopics'
 import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { buildTopicSharePayload, TOPIC_SHARE_CARD } from './share'
@@ -52,6 +60,7 @@ import { TOPIC_SHARE_CANVAS_ID, useTopicShareCard } from './useTopicShareCard'
 
 const { navigationPageStyle } = useNavigationLayout()
 const item = ref<DailyTopicItem | null>(null)
+const timeline = useTopicTimeline(item)
 const loading = ref(false)
 const errorMessage = ref('')
 const edition = computed(() => editionForTopic(item.value))
@@ -90,6 +99,11 @@ function copySource(url: string) {
   if (!isTopicSourceUrl(url) || !item.value?.sources.some(source => source.url === url)) return
   uni.setClipboardData({ data: url, success: () => uni.showToast({ title: '原文链接已复制', icon: 'none' }) })
 }
+function selectTimelineTeam(teamId: number) {
+  timeline.selectTeam(teamId)
+  uni.pageScrollTo({ selector: '#topic-timeline', duration: 200 })
+}
+function openTimelineTopic(id: string) { audio.stop(); uni.navigateTo({ url: topicDetailUrl(id) }) }
 function previewPhoto(url: string, urls: string[]) {
   const allowedUrls = (item.value?.images ?? []).map(image => image.url)
   if (urls.includes(url) && urls.every(imageUrl => allowedUrls.includes(imageUrl))) {
@@ -114,7 +128,7 @@ onScopeDispose(() => { revision += 1 })
 .topic-page-offset { padding-top: var(--fi-brand-nav-height); }
 .topic-share-canvas { position: fixed; left: -9999rpx; top: 0; pointer-events: none; }
 .topic-detail { padding: var(--fi-space-28) var(--fi-space-28) var(--fi-space-40); background: var(--fi-color-page); }
-.topic-detail__eyebrow { display: block; color: var(--fi-color-primary); font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); }
+.topic-detail__timeline { margin-top: var(--fi-space-32); }
 .topic-detail__title { display: block; margin-top: var(--fi-space-16); color: var(--fi-color-text-primary); font-size: var(--fi-font-36); font-weight: var(--fi-weight-extrabold); line-height: var(--fi-leading-normal); }
 .topic-detail__meta { display: block; margin-top: var(--fi-space-18); color: var(--fi-color-text-caption); font-size: var(--fi-font-22); line-height: var(--fi-leading-normal); }
 .topic-detail__heat { margin-top: var(--fi-space-16); }

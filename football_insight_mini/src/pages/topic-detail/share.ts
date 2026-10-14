@@ -5,7 +5,7 @@ export const TOPIC_SHARE_CARD = { width: 1000, height: 800 } as const
 
 export function buildTopicSharePayload(item: DailyTopicItem | null, imageUrl?: string) {
   if (!item || !/^[a-zA-Z0-9_-]{1,128}$/.test(item.id)) {
-    return { title: '足球洞察 · 成都蓉城新闻', path: '/pages/topics/index' }
+    return { title: '足球洞察 · 足球新闻', path: '/pages/topics/index' }
   }
   return { title: item.title, path: topicDetailUrl(item.id), ...(imageUrl ? { imageUrl } : {}) }
 }
