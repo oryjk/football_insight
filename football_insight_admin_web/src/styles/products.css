@@ -223,6 +223,7 @@
 .purchase-history-dialog[data-slot="dialog-content"] {
   /* Dialog entry/exit keyframes own motion; viewport geometry must reflow immediately. */
   transition-property: none;
+  animation-duration: var(--purchase-dialog-fade-duration) !important;
   width: min(var(--purchase-dialog-width), calc(100vw - var(--space-8)));
   max-width: var(--purchase-dialog-width);
   height: min(var(--purchase-dialog-height), calc(100dvh - var(--space-8)));
@@ -452,6 +453,10 @@
   min-width: 0;
   animation: purchase-results-appear var(--purchase-result-fade-duration)
     ease-out;
+}
+.purchase-history-dialog .purchase-member-results {
+  /* This dialog's fade remains enabled regardless of the system motion preference. */
+  animation-duration: var(--purchase-result-fade-duration) !important;
 }
 @keyframes purchase-results-appear {
   from {

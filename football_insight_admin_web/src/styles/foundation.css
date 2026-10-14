@@ -667,6 +667,7 @@ h2 {
 :root {
   --purchase-dialog-width: 1080px;
   --purchase-dialog-height: 780px;
+  --purchase-dialog-fade-duration: 200ms;
   --purchase-body-short-min-height: 96px;
   --purchase-result-fade-duration: 160ms;
   --purchase-table-min-width: 980px;
