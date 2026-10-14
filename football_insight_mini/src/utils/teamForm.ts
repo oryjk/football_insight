@@ -1,9 +1,9 @@
-import type { MatchOutcome } from '../../types/insight'
+import type { MatchOutcome } from '../types/insight'
 
 const labels: Record<MatchOutcome, string> = { win: '胜', draw: '平', loss: '负' }
 const levels: Record<MatchOutcome, number> = { win: 20, draw: 50, loss: 80 }
 
-export function buildHomeTeamForm(input: readonly unknown[] | undefined) {
+export function buildTeamForm(input: readonly unknown[] | undefined) {
   const results = (input ?? [])
     .filter((value): value is MatchOutcome => value === 'win' || value === 'draw' || value === 'loss')
     .slice(-10)

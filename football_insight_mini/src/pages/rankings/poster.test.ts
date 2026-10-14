@@ -1,3 +1,4 @@
+import { buildStandingsTeams } from './helpers'
 import { describe, expect, test } from 'bun:test'
 import type { StandingsTable, StandingsTableEntry } from '../../types/insight'
 import {
@@ -162,5 +163,24 @@ describe('buildStandingsPosterTeamLayout', () => {
       logoSize: 0,
       nameX: 200,
     })
+  })
+})
+
+describe('standings teams for the shared table', () => {
+  test('switches order and points while keeping each team’s recent form', () => {
+    const penalized = { ...baseEntry, team_id: 10, rank_no: 2, points: 2, points_without_penalty: 7, recent_form: ['loss', 'draw', 'win'] as const }
+    const leader = { ...baseEntry, team_id: 11, rank_no: 1, points: 6, points_without_penalty: 6, recent_form: ['win'] as const }
+    const tables: StandingsTable[] = [
+      { ...createTable('standings_with_penalty'), entries: [{ ...leader, recent_form: [...leader.recent_form] }, { ...penalized, recent_form: [...penalized.recent_form] }] },
+      { ...createTable('standings_without_penalty'), entries: [{ ...penalized, rank_no: 1, recent_form: [...penalized.recent_form] }, { ...leader, rank_no: 2, recent_form: [...leader.recent_form] }] },
+    ]
+    const actual = buildStandingsTeams(tables, 'with_penalty')
+    const theoretical = buildStandingsTeams(tables, 'without_penalty')
+    expect(actual.map(team => [team.team_id, team.rank_no, team.points])).toEqual([[11, 1, 6], [10, 2, 2]])
+    expect(theoretical.map(team => [team.team_id, team.rank_no, team.points])).toEqual([[10, 1, 7], [11, 2, 6]])
+    expect(actual.find(team => team.team_id === 10)?.recent_form).toEqual(['loss', 'draw', 'win'])
+    expect(theoretical.find(team => team.team_id === 10)?.recent_form).toEqual(['loss', 'draw', 'win'])
+    expect(buildStandingsTeams([], 'with_penalty')).toEqual([])
+    expect(buildStandingsTeams([createTable('standings_with_penalty')], 'with_penalty')[0]?.recent_form).toBe(undefined)
   })
 })

@@ -128,6 +128,8 @@ export interface StandingsTableEntry {
   points_without_penalty: number
   points_adjustment: number
   avatar_storage_url: string | null
+  /** Oldest to newest; optional for older API versions. */
+  recent_form?: MatchOutcome[]
 }
 
 export interface StandingsTable {

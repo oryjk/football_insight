@@ -160,6 +160,7 @@ pub struct StandingsTableEntryDto {
     pub points_without_penalty: i32,
     pub points_adjustment: i32,
     pub avatar_storage_url: Option<String>,
+    pub recent_form: Vec<MatchOutcomeDto>,
 }
 
 #[derive(Debug, Serialize)]
@@ -429,6 +430,7 @@ impl From<StandingsTableEntry> for StandingsTableEntryDto {
             points_without_penalty: value.points_without_penalty,
             points_adjustment: value.points_adjustment,
             avatar_storage_url: value.avatar_storage_url,
+            recent_form: value.recent_form.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -681,6 +683,35 @@ mod tests {
             team_id: 10,
             team_name: "球队".to_string(),
             points: 20,
+            avatar_storage_url: None,
+            recent_form: vec![MatchOutcome::Loss, MatchOutcome::Draw, MatchOutcome::Win],
+        });
+        let json = serde_json::to_value(dto).unwrap();
+        assert_eq!(
+            json["recent_form"],
+            serde_json::json!(["loss", "draw", "win"])
+        );
+    }
+
+    #[test]
+    fn standings_dto_exposes_recent_form_in_chronological_order() {
+        use super::StandingsTableEntryDto;
+        use crate::insight::domain::overview::MatchOutcome;
+        use crate::insight::domain::rankings::StandingsTableEntry;
+        let dto = StandingsTableEntryDto::from(StandingsTableEntry {
+            rank_no: 1,
+            team_id: 10,
+            team_name: "球队".to_string(),
+            played: 0,
+            wins: 0,
+            draws: 0,
+            losses: 0,
+            goals_for: 0,
+            goals_against: 0,
+            goal_difference: 0,
+            points: 0,
+            points_without_penalty: 0,
+            points_adjustment: 0,
             avatar_storage_url: None,
             recent_form: vec![MatchOutcome::Loss, MatchOutcome::Draw, MatchOutcome::Win],
         });

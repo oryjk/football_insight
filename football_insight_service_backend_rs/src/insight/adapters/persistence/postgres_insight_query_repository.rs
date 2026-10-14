@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
 use sqlx::{PgPool, types::Json};
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 use super::recent_player_goals::fetch_recent_player_goals;
 use super::recent_team_form::fetch_recent_team_form;
@@ -10,7 +10,9 @@ use crate::insight::{
     domain::{
         insight_summary::{RankingMovement, generate_insight_summary},
         match_list::{MatchCard, MatchListView, MatchTechnicalStat},
-        overview::{InsightOverview, OverviewMatch, OverviewPlayer, OverviewStanding},
+        overview::{
+            InsightOverview, MatchOutcome, OverviewMatch, OverviewPlayer, OverviewStanding,
+        },
         rankings::{
             PlayerRankingCategory, PlayerRankingEntry, RankingsView, StandingsTable,
             StandingsTableEntry, TeamRankingCategory, TeamRankingEntry,
@@ -428,7 +430,10 @@ impl PostgresInsightQueryRepository {
         team_categories
     }
 
-    fn build_standings_tables(rows: &[StandingsTableRow]) -> Vec<StandingsTable> {
+    fn build_standings_tables(
+        rows: &[StandingsTableRow],
+        recent_forms: &HashMap<i64, Vec<MatchOutcome>>,
+    ) -> Vec<StandingsTable> {
         if rows.is_empty() {
             return Vec::new();
         }
@@ -448,6 +453,7 @@ impl PostgresInsightQueryRepository {
             points_without_penalty: row.wins * 3 + row.draws,
             points_adjustment: row.points - (row.wins * 3 + row.draws),
             avatar_storage_url: row.avatar_storage_url.clone(),
+            recent_form: recent_forms.get(&row.team_id).cloned().unwrap_or_default(),
         };
 
         let with_penalty_entries = rows.iter().map(to_entry).collect();
@@ -693,11 +699,21 @@ impl PostgresInsightQueryRepository {
             }
         }
 
+        let team_ids: Vec<_> = standings_table_rows.iter().map(|row| row.team_id).collect();
+        let recent_forms = fetch_recent_team_form(
+            &self.pool,
+            season,
+            &team_ids,
+            round_number,
+            minimum_snapshot_at,
+        )
+        .await?;
+
         Ok(RankingsView {
             view_kind: view_kind.to_string(),
             round_number,
             current_season: season,
-            standings_tables: Self::build_standings_tables(&standings_table_rows),
+            standings_tables: Self::build_standings_tables(&standings_table_rows, &recent_forms),
             team_categories,
             player_categories,
         })
@@ -1611,13 +1627,30 @@ mod tests {
 
     #[test]
     fn build_standings_tables_splits_no_penalty_and_actual_rankings() {
+        use crate::insight::domain::overview::MatchOutcome;
+        use std::collections::HashMap;
         let rows = vec![
             standings_table_row(1, 11, 2, 0, 2, 5, 3, 6),
             standings_table_row(2, 12, 1, 2, 1, 4, 3, 5),
             standings_table_row(3, 10, 2, 1, 1, 8, 4, 2),
         ];
 
-        let tables = PostgresInsightQueryRepository::build_standings_tables(&rows);
+        let forms = HashMap::from([
+            (
+                10,
+                vec![MatchOutcome::Loss, MatchOutcome::Draw, MatchOutcome::Win],
+            ),
+            (11, vec![MatchOutcome::Win]),
+        ]);
+        let tables = PostgresInsightQueryRepository::build_standings_tables(&rows, &forms);
+        for table in &tables {
+            for entry in &table.entries {
+                assert_eq!(
+                    entry.recent_form,
+                    forms.get(&entry.team_id).cloned().unwrap_or_default()
+                );
+            }
+        }
 
         assert_eq!(tables.len(), 2);
         assert_eq!(tables[0].slug, "standings_without_penalty");

@@ -1,4 +1,5 @@
-import type { StandingsTable } from '../../types/insight'
+import type { OverviewStanding, StandingsTable } from '../../types/insight'
+import { buildStandingsRankingEntries, type StandingsRankingMode } from './poster'
 
 export function resolveStandingsTablePriority(slug: string): number {
   if (slug === 'standings_with_penalty') {
@@ -41,4 +42,15 @@ export function buildStandingsPosterSubtitle(options: {
 
 export function truncateStandingsPosterTeamName(name: string): string {
   return name.length > 10 ? name.slice(0, 9) + '…' : name
+}
+
+export function buildStandingsTeams(tables: StandingsTable[], mode: StandingsRankingMode): OverviewStanding[] {
+  return buildStandingsRankingEntries(tables, mode).map((entry) => ({
+    rank_no: entry.rank_no,
+    team_id: entry.team_id,
+    team_name: entry.team_name,
+    avatar_storage_url: entry.avatar_storage_url,
+    points: Number(entry.score_value),
+    recent_form: entry.recent_form,
+  }))
 }

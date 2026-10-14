@@ -29,11 +29,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { MatchOutcome } from '../../../types/insight'
-import { buildHomeTeamForm } from '../teamForm'
+import type { MatchOutcome } from '../types/insight'
+import { buildTeamForm } from '../utils/teamForm'
 
 const props = defineProps<{ outcomes?: MatchOutcome[] }>()
-const form = computed(() => buildHomeTeamForm(props.outcomes))
+const form = computed(() => buildTeamForm(props.outcomes))
 </script>
 
 <style scoped>

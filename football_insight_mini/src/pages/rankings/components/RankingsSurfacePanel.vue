@@ -37,7 +37,7 @@
     </view>
 
     <view v-if="scope === 'team' && activeTeamCategory" class="ranking-list">
-      <view class="section-heading">
+      <view class="section-heading" :class="{ 'section-heading--standings': isStandingsTeamCategory }">
         <view>
           <text class="section-kicker">{{ teamKicker }}</text>
           <text class="section-title">{{ activeTeamCategory.label }}</text>
@@ -60,29 +60,36 @@
         </view>
       </view>
 
-      <view
-        v-for="entry in teamEntries"
-        :key="`${activeTeamCategory.slug}-${standingsRankingMode}-${entry.team_id}`"
-        class="ranking-row ranking-row--interactive ranking-row--team"
-        :class="resolveRankRowClass(entry.rank_no)"
-        hover-class="ranking-row--pressed"
-        hover-stay-time="100"
-        @click="emit('open-team', entry)"
-      >
-        <view class="ranking-row__rank-wrap">
-          <text class="ranking-row__rank" :class="resolveRankBadgeClass(entry.rank_no)">{{ formatRankLabel(entry.rank_no) }}</text>
+      <FiStandingsTable
+        v-if="isStandingsTeamCategory"
+        :teams="standingsTeams"
+        @select="openStandingsTeam"
+      />
+      <template v-else>
+        <view
+          v-for="entry in teamEntries"
+          :key="`${activeTeamCategory.slug}-${standingsRankingMode}-${entry.team_id}`"
+          class="ranking-row ranking-row--interactive ranking-row--team"
+          :class="resolveRankRowClass(entry.rank_no)"
+          hover-class="ranking-row--pressed"
+          hover-stay-time="100"
+          @click="emit('open-team', entry)"
+        >
+          <view class="ranking-row__rank-wrap">
+            <text class="ranking-row__rank" :class="resolveRankBadgeClass(entry.rank_no)">{{ formatRankLabel(entry.rank_no) }}</text>
+          </view>
+          <image :src="entry.avatar_storage_url || ''" mode="aspectFit" class="ranking-row__avatar" />
+          <view class="ranking-row__body">
+            <text class="ranking-row__name">{{ entry.team_name }}</text>
+            <text class="ranking-row__note">点击查看球队信息和赛程</text>
+          </view>
+          <TeamAbilityHexagon :values="resolveTeamAbilityValues(entry.team_id)" />
+          <view class="ranking-row__metric">
+            <text class="ranking-row__metric-value">{{ entry.score_value }}</text>
+            <text class="ranking-row__metric-note">{{ teamMetricLabel }}</text>
+          </view>
         </view>
-        <image :src="entry.avatar_storage_url || ''" mode="aspectFit" class="ranking-row__avatar" />
-        <view class="ranking-row__body">
-          <text class="ranking-row__name">{{ entry.team_name }}</text>
-          <text class="ranking-row__note">点击查看球队信息和赛程</text>
-        </view>
-        <TeamAbilityHexagon :values="resolveTeamAbilityValues(entry.team_id)" />
-        <view class="ranking-row__metric">
-          <text class="ranking-row__metric-value">{{ entry.score_value }}</text>
-          <text class="ranking-row__metric-note">{{ teamMetricLabel }}</text>
-        </view>
-      </view>
+      </template>
     </view>
 
     <view v-if="scope === 'player' && activePlayerCategory" class="ranking-list">
@@ -133,6 +140,8 @@ import type {
 import { buildStandingsRankingEntries, type StandingsRankingMode } from '../poster'
 import { buildPlayerAbilityValues, buildTeamAbilityValues, TEAM_ABILITY_FALLBACK } from '../ability'
 import TeamAbilityHexagon from './TeamAbilityHexagon.vue'
+import FiStandingsTable from '../../../components/FiStandingsTable.vue'
+import { buildStandingsTeams } from '../helpers'
 
 const props = defineProps<{
   rankings: RankingsViewResponse
@@ -178,6 +187,13 @@ const teamEntries = computed<TeamRankingEntry[]>(() => {
 
   return buildStandingsRankingEntries(standingsTables.value, props.standingsRankingMode)
 })
+const standingsTeams = computed(() => buildStandingsTeams(standingsTables.value, props.standingsRankingMode))
+
+function openStandingsTeam(row: { key: number }): void {
+  const entry = teamEntries.value.find((item) => item.team_id === row.key)
+  if (entry) emit('open-team', entry)
+}
+
 const teamKicker = computed(() =>
   isStandingsTeamCategory.value ? '实时球队排名' : '实时球队累计榜',
 )
@@ -317,6 +333,19 @@ async function centerActiveCategory(): Promise<void> {
   font-size: 50rpx;
   line-height: 1.08;
   font-weight: var(--fi-weight-extrabold);
+}
+
+.section-heading--standings .section-kicker {
+  font-size: var(--fi-font-22);
+  font-weight: var(--fi-weight-medium);
+  color: var(--fi-color-primary);
+  letter-spacing: var(--fi-space-2);
+}
+
+.section-heading--standings .section-title {
+  font-size: var(--fi-font-40);
+  font-weight: var(--fi-weight-bold);
+  line-height: var(--fi-leading-snug);
 }
 
 .rankings-controls {

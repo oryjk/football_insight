@@ -207,6 +207,7 @@ mod tests {
                         points_without_penalty: 16,
                         points_adjustment: 0,
                         avatar_storage_url: None,
+                        recent_form: vec![],
                     },
                     StandingsTableEntry {
                         rank_no: 2,
@@ -223,6 +224,7 @@ mod tests {
                         points_without_penalty: 15,
                         points_adjustment: 0,
                         avatar_storage_url: None,
+                        recent_form: vec![],
                     },
                     StandingsTableEntry {
                         rank_no: 3,
@@ -239,6 +241,7 @@ mod tests {
                         points_without_penalty: 14,
                         points_adjustment: 0,
                         avatar_storage_url: None,
+                        recent_form: vec![],
                     },
                 ],
             }],

@@ -1,3 +1,5 @@
+use super::overview::MatchOutcome;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RankingsView {
     pub view_kind: String,
@@ -32,6 +34,7 @@ pub struct StandingsTableEntry {
     pub points_without_penalty: i32,
     pub points_adjustment: i32,
     pub avatar_storage_url: Option<String>,
+    pub recent_form: Vec<MatchOutcome>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

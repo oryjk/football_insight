@@ -1,4 +1,4 @@
-import type { StandingsTable, StandingsTableEntry } from '../../types/insight'
+import type { MatchOutcome, StandingsTable, StandingsTableEntry } from '../../types/insight'
 
 export type StandingsRankingMode = 'with_penalty' | 'without_penalty'
 
@@ -8,6 +8,7 @@ export interface StandingsRankingEntry {
   team_name: string
   score_value: string
   avatar_storage_url: string | null
+  recent_form?: MatchOutcome[]
 }
 
 export interface StandingsPosterColumn {
@@ -57,6 +58,7 @@ export function buildStandingsRankingEntries(
     team_name: entry.team_name,
     score_value: String(getDisplayedPoints(table, entry)),
     avatar_storage_url: entry.avatar_storage_url,
+    recent_form: entry.recent_form,
   }))
 }
 
