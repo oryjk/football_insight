@@ -95,11 +95,11 @@ const hasTechStats = computed(() => hasMatchTechStats(props.match))
 .match-card__team {
   display: flex;
   align-items: center;
-  gap: var(--fi-space-10);
+  gap: var(--fi-space-8);
 }
 .match-card__team-logo {
-  width: var(--fi-space-56);
-  height: var(--fi-space-56);
+  width: var(--fi-space-44);
+  height: var(--fi-space-44);
   flex-shrink: 0;
 }
 .match-card__team-name {
