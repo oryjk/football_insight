@@ -257,6 +257,16 @@ ADMIN_PRODUCTS_TEST_DATABASE_URL='postgresql://test_user:<test_password>@127.0.0
 cargo test --test admin_products_postgres -- --ignored
 ```
 
+## Admin 商品购买记录
+
+`GET /api/v1/admin/products/{product_key}/purchases?page=1&page_size=20`，路径业务键需编码；要求 Admin JWT 与 `ManageProducts`，响应 `no-store`。
+
+- 商品响应和购买页均含 `catalog_product_id`。前端固定打开时的 UUID，每页校验，避免同业务键删除重建后显示替代商品记录；该字段不进入商品 POST/PUT 输入。
+- 购买页返回 `summary`（去重购买人数、成功支付订单数、退款订单数、原付款金额）与 `items/total/page/page_size`。统计 paid/refunded 且 `paid_at` 非空的记录，包含后来退款的购买历史，金额没有扣退款。
+- 明细包含 `order_no/user_id/user_nickname/user_avatar_url/paid_at/expires_at/expiry_source/amount_cents/status`。到期来源为 snapshot、legacy_year、unrecorded；历史一年估算需标明，不能替换为账号当前会员期限。
+- 商品 UUID 不随业务键、金额、微信道具 ID 改变；新订单关联与虚拟支付快照原子保存。删除后同键重建不会继承旧订单。历史回填仅使用唯一、明确的等级和金额匹配，微信订单额外校验道具 ID；旧通用 `membership` 订单不推测归属。
+- 上线前停止共享该数据库的旧支付写入实例，应用 `20261014093000_add_virtual_product_purchase_identity.sql` 后再启动新版本，避免切换期间写入无关联订单。迁移与备份步骤见根目录验证记录。
+
 ## System Config 审核配置接口
 
 `GET /api/v1/system_config?version={version}`
