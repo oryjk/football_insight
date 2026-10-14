@@ -26,6 +26,8 @@ page {
   --fi-primitive-team-form-pressed: rgba(220, 38, 38, 0.04);
   --fi-primitive-space-72: 72rpx;
   --fi-primitive-shadow-team-form-latest: 0 0 0 6rpx var(--fi-primitive-team-form-halo);
+  --fi-primitive-shadow-team-form-latest-draw: 0 0 0 6rpx rgba(168, 175, 185, 0.14);
+  --fi-primitive-shadow-team-form-latest-loss: 0 0 0 6rpx rgba(38, 162, 105, 0.10);
   --fi-primitive-canvas: #f6f7fb;
   --fi-primitive-canvas-soft: #f7f8fa;
   --fi-primitive-surface-frosted: rgba(255, 255, 255, 0.92);
@@ -120,6 +122,8 @@ page {
   --fi-color-team-form-pressed: var(--fi-primitive-team-form-pressed);
   --fi-color-surface: var(--fi-primitive-white);
   --fi-shadow-team-form-latest: var(--fi-primitive-shadow-team-form-latest);
+  --fi-shadow-team-form-latest-draw: var(--fi-primitive-shadow-team-form-latest-draw);
+  --fi-shadow-team-form-latest-loss: var(--fi-primitive-shadow-team-form-latest-loss);
   --fi-color-primary-deep: var(--fi-primitive-red-deep);
   --fi-color-primary-darker: var(--fi-primitive-red-darker);
   --fi-color-page: var(--fi-primitive-canvas);

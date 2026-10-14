@@ -5,7 +5,7 @@ use sqlx::PgPool;
 
 use crate::insight::domain::overview::MatchOutcome;
 
-/// Fetch only the requested teams' six latest valid, completed matches.
+/// Fetch only the requested teams' ten latest valid, completed matches.
 /// Dates take precedence over round numbers so postponed games stay chronological.
 pub(super) async fn fetch_recent_team_form(
     pool: &PgPool,
@@ -38,7 +38,7 @@ pub(super) async fn fetch_recent_team_form(
                       ((m.match_date::timestamp + m.match_time::time + INTERVAL '120 minutes')
                           AT TIME ZONE 'Asia/Shanghai') <= $4)
                ORDER BY m.match_date DESC, m.match_time DESC, m.match_id DESC
-               LIMIT 6
+               LIMIT 10
           ) recent
          ORDER BY teams.team_id, recent.match_date, recent.match_time, recent.match_id
         "#,
@@ -111,7 +111,11 @@ mod tests {
                 (11,9,'2026-09-09',10,20,'0','0'),
                 (12,9,'2026-09-09',10,20,'0','0'),
                 (13,9,'2026-09-09',10,20,'-1','0'),
-                (14,9,'2026-09-09',10,20,'9999999999999','0');
+                (14,9,'2026-09-09',10,20,'9999999999999','0'),
+                (20,9,'2026-09-09',10,20,'0','0'),
+                (21,10,'2026-09-10',20,10,'1','0'),
+                (22,11,'2026-09-11',10,20,'2','1'),
+                (23,12,'2026-09-12',20,10,'2','1');
             UPDATE f_i_matches SET status='2' WHERE match_id=10;
             UPDATE f_i_matches SET source_active=FALSE WHERE match_id=11;
             UPDATE f_i_matches SET season=2025 WHERE match_id=12;
@@ -125,14 +129,20 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "requires TEAM_FORM_TEST_DATABASE_URL pointing to disposable localhost _test DB"]
-    async fn latest_six_follow_match_dates_and_each_teams_home_away_perspective() {
+    async fn latest_ten_follow_match_dates_and_each_teams_home_away_perspective() {
         use MatchOutcome::{Draw, Loss, Win};
         let pool = fixture().await;
         let forms = fetch_recent_team_form(&pool, 2026, &[10, 20, 999], None, None)
             .await
             .unwrap();
-        assert_eq!(forms[&10], vec![Win, Win, Win, Loss, Draw, Win]);
-        assert_eq!(forms[&20], vec![Loss, Loss, Loss, Win, Draw, Loss]);
+        assert_eq!(
+            forms[&10],
+            vec![Win, Win, Win, Loss, Draw, Win, Draw, Loss, Win, Loss]
+        );
+        assert_eq!(
+            forms[&20],
+            vec![Loss, Loss, Loss, Win, Draw, Loss, Draw, Win, Loss, Win]
+        );
         assert!(!forms.contains_key(&999));
         pool.close().await;
     }

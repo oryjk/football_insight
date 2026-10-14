@@ -26,7 +26,7 @@ pub struct OverviewStanding {
     pub team_name: String,
     pub points: i32,
     pub avatar_storage_url: Option<String>,
-    /// Completed league matches, oldest first, at most six results.
+    /// Completed league matches, oldest first, at most ten results.
     pub recent_form: Vec<MatchOutcome>,
 }
 

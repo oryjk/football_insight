@@ -10,9 +10,11 @@ describe('home team form', () => {
     expect(form.description).toBe('近6场，从旧到新：负、平、胜、胜、平、负')
   })
 
-  test('keeps only the newest six valid results without manufacturing matches', () => {
-    const form = buildHomeTeamForm(['loss', 'loss', 'win', null, 'draw', 'live', 'win', 'draw', 'win'])
-    expect(form.points.map(point => point.result)).toEqual(['loss', 'win', 'draw', 'win', 'draw', 'win'])
+  test('keeps the newest ten valid results without manufacturing matches', () => {
+    const form = buildHomeTeamForm(['loss', 'loss', 'win', null, 'draw', 'live', 'win', 'draw', 'win', 'loss', 'draw', 'win', 'draw', 'win'])
+    expect(form.points.map(point => point.result)).toEqual(['win', 'draw', 'win', 'draw', 'win', 'loss', 'draw', 'win', 'draw', 'win'])
+    expect(form.points[0]?.left).toBe(0)
+    expect(form.points[9]?.left).toBe(100)
     expect(form.latestLabel).toBe('胜')
   })
 

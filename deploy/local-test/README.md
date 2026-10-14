@@ -1,54 +1,62 @@
-# Local Admin Environment
+# Local233 Cargo Development Environment
 
-该环境的后端和 Redis 运行在 local233，但通过 SSH 隧道直接连接生产 `football_data` 数据库：
+local233 后端统一直接通过 `cargo run --bin football_insight_service_backend_rs` 启动，监听 `18092`。小程序、独立 H5、Web 后台均使用 `http://172.16.60.233:18092`；线上 peiqian 后端继续使用 Docker。
 
-- API：`http://172.16.60.233:18092/`
-- PostgreSQL：`peiqian` 本机 PostgreSQL，经 local233 私有 SSH 隧道访问
-- Redis：`127.0.0.1:56379`
-- 管理员：已有账号保持不变；管理员表为空时，在 Web 后台初始化固定账号 `superadmin`
-- 管理员密码：无内置默认值，由管理员初始化时设置，随后在「设置」中修改
+- 后端：用户级 `football-insight-local-backend.service` 托管 `cargo run`，支持重启与开机恢复。
+- Redis：Docker 容器 `football-insight-local-test-redis`，主机端口 `127.0.0.1:56379`。
+- 数据库：经 `football-insight-db-tunnel.service` 访问 `127.0.0.1:55433`，连接生产 `football_data`。真实商品、会员与用户写操作会直接生效。
+- 开发启动不自动运行数据库迁移；迁移按 [生产部署说明](../../DEPLOYMENT.md) 单独执行。
 
-> 警告：该环境读取的是真实生产用户。会员调整、禁用/恢复和其他写操作会直接修改生产数据库。
+## 本地运行配置
 
-启动：
+后端项目目录下的 `.env` 被 Git 忽略，权限必须为 `0600`。现有 local233 配置已从原本地容器安全迁移，保留 JWT、管理员及微信小程序登录配置；不要将配置值写进提交或日志。
+
+首次配置其它开发目录时，复制 `football_insight_service_backend_rs/.env.example` 为 `.env`，填写实际配置，并设置：
+
+```dotenv
+PORT=18092
+# DATABASE_URL 使用本机 127.0.0.1:55433 的私有隧道
+REDIS_URL=redis://127.0.0.1:56379
+TICKET_MONITOR_BASE_URL=http://127.0.0.1:4000
+PUBLIC_BASE_URL=http://172.16.60.233:18092
+FI_REFLUX_NOTIFICATION_WORKER_ENABLED=false
+```
+
+## 后台启动或重启
+
+仓库根目录执行：
 
 ```bash
 ./deploy/local-test/up.sh
+journalctl --user -u football-insight-local-backend.service -f
 ```
 
-从其他可 SSH 访问 local233 的开发机发布已提交并 push 的代码：
+脚本先编译，再启动数据库隧道、Redis，并重启 Cargo 后端。旧本地 Docker 后端会停止并取消自动重启，不再构建后端镜像。编译失败不会中断当前后端。
 
-```bash
-./deploy_local233.sh
-```
-
-脚本根据自身位置定位本地 monorepo，不依赖开发机上的绝对路径。它会要求本地和
-local233 工作区均无未提交改动，确认当前分支 HEAD 已 push，然后在 local233 上执行
-`git pull --ff-only`、`deploy/local-test/up.sh` 以及接口验证。可按需覆盖：
-
-```bash
-DEPLOY_HOST=local233 \
-DEPLOY_REPO_DIR=/home/betalpha/projects/football_insight \
-DEPLOY_BRANCH=main \
-./deploy_local233.sh
-```
-
-也可以直接登录 local233，在部署工作区执行同一个命令：
-
-```bash
-cd /home/betalpha/projects/football_insight
-./deploy_local233.sh
-```
-
-脚本检测到自身位于 `DEPLOY_REPO_DIR` 后会进入本机模式：允许当前分支落后于 origin，
-直接拉取 `origin/<当前分支>` 并部署，不会再 SSH 回 local233。
-
-停止：
+停止后端与 Redis：
 
 ```bash
 ./deploy/local-test/down.sh
 ```
 
-启动脚本会从 `peiqian` 上正在运行的生产后端容器读取 `DATABASE_URL`，但不会打印或写入文件；随后建立仅 local233 本机和 Docker bridge 可访问的 SSH 隧道，执行 migration，再启动本地后端。停止脚本会关闭后端、Redis 和 SSH 隧道。
+共享数据库隧道由独立服务管理，停止开发环境不会关闭隧道。
 
-旧隔离测试库的数据卷 `football-insight-local-test-pgdata` 会保留，但当前环境不再挂载或读取它。
+## 前台直接运行
+
+依赖服务启动后，可停止后台实例，再在后端目录直接运行（读取同一份 `.env`）：
+
+```bash
+systemctl --user stop football-insight-local-backend.service
+cd football_insight_service_backend_rs
+cargo run --bin football_insight_service_backend_rs
+```
+
+修改 Rust 代码后重启该进程；不要在旧实例上验证。结束前台调试后，回仓库根目录执行 `./deploy/local-test/up.sh` 恢复常驻实例。
+
+## 从其它开发机更新 local233
+
+```bash
+./deploy_local233.sh
+```
+
+该脚本要求本地和远端工作区干净，当前业务提交已 push；在 local233 本机执行时直接拉取当前分支。可设置 `DEPLOY_HOST`、`DEPLOY_REPO_DIR`、`DEPLOY_BRANCH`。更新后调用上述 Cargo 启动脚本，并核对用户服务和 API；端口固定为 18092。

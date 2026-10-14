@@ -6,7 +6,7 @@ REPO_ROOT="$SCRIPT_DIR"
 
 usage() {
     cat <<'EOF'
-Deploy the pushed Football Insight Git commit to the local233 test backend.
+Deploy the pushed Football Insight Git commit to the local233 Cargo backend.
 
 Usage:
   ./deploy_local233.sh
@@ -17,9 +17,6 @@ Environment overrides:
   DEPLOY_REPO_DIR      Remote monorepo directory
                        (default: /home/betalpha/projects/football_insight)
   DEPLOY_BRANCH        Branch to deploy (default: current local branch)
-  DEPLOY_PORT          Remote published backend port (default: 18092)
-  DEPLOY_CONTAINER     Backend container name
-                       (default: football-insight-local-test-backend)
   SSH_CONNECT_TIMEOUT  SSH connection timeout in seconds (default: 10)
 
 The local and remote working trees must be clean. From a development machine,
@@ -41,8 +38,7 @@ fi
 
 DEPLOY_HOST=${DEPLOY_HOST:-local233}
 DEPLOY_REPO_DIR=${DEPLOY_REPO_DIR:-/home/betalpha/projects/football_insight}
-DEPLOY_PORT=${DEPLOY_PORT:-18092}
-DEPLOY_CONTAINER=${DEPLOY_CONTAINER:-football-insight-local-test-backend}
+DEPLOY_PORT=18092
 SSH_CONNECT_TIMEOUT=${SSH_CONNECT_TIMEOUT:-10}
 
 if ! command -v git >/dev/null 2>&1; then
@@ -112,12 +108,11 @@ if [[ "$run_on_deploy_host" == true ]]; then
     expected_head=$origin_head
 fi
 
-printf -v remote_command 'bash -s -- %q %q %q %q %q' \
+printf -v remote_command 'bash -s -- %q %q %q %q' \
     "$DEPLOY_REPO_DIR" \
     "$DEPLOY_BRANCH" \
     "$expected_head" \
-    "$DEPLOY_PORT" \
-    "$DEPLOY_CONTAINER"
+    "$DEPLOY_PORT"
 
 if [[ "$run_on_deploy_host" == true ]]; then
     echo "Deploying $DEPLOY_BRANCH@$expected_head directly in $DEPLOY_REPO_DIR..."
@@ -127,7 +122,6 @@ if [[ "$run_on_deploy_host" == true ]]; then
         "$DEPLOY_BRANCH"
         "$expected_head"
         "$DEPLOY_PORT"
-        "$DEPLOY_CONTAINER"
     )
 else
     echo "Deploying $DEPLOY_BRANCH@$expected_head to $DEPLOY_HOST:$DEPLOY_REPO_DIR..."
@@ -147,9 +141,8 @@ deploy_repo_dir=$1
 deploy_branch=$2
 expected_head=$3
 deploy_port=$4
-deploy_container=$5
 
-for command_name in git docker curl; do
+for command_name in git docker curl cargo systemctl; do
     if ! command -v "$command_name" >/dev/null 2>&1; then
         echo "required remote command not found: $command_name" >&2
         exit 1
@@ -187,10 +180,7 @@ fi
 cd "$deploy_repo_dir"
 ./deploy/local-test/up.sh
 
-docker ps \
-    --filter "name=^/${deploy_container}$" \
-    --filter status=running \
-    --format 'name={{.Names}} status={{.Status}} ports={{.Ports}}'
+systemctl --user is-active football-insight-local-backend.service
 
 api_base_url="http://127.0.0.1:${deploy_port}"
 for endpoint in \

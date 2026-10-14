@@ -10,7 +10,7 @@ export class ApiRequestError extends Error {
   }
 }
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://172.16.60.233:8092/api/v1').replace(/\/$/, '')
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://172.16.60.233:18092/api/v1').replace(/\/$/, '')
 
 interface RequestOptions {
   url: string

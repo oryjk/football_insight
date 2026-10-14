@@ -6,12 +6,12 @@ const levels: Record<MatchOutcome, number> = { win: 20, draw: 50, loss: 80 }
 export function buildHomeTeamForm(input: readonly unknown[] | undefined) {
   const results = (input ?? [])
     .filter((value): value is MatchOutcome => value === 'win' || value === 'draw' || value === 'loss')
-    .slice(-6)
-  // Keep short records on the right, with the same spacing as a full six-game record.
+    .slice(-10)
+  // Keep short records on the right, with the same spacing as a full ten-game record.
   const points = results.map((result, index) => ({
     result,
     top: levels[result],
-    left: ((6 - results.length + index) / 5) * 100,
+    left: ((10 - results.length + index) / 9) * 100,
     latest: index === results.length - 1,
   }))
   const segments = points.slice(1).map((point, index) => {
@@ -22,6 +22,7 @@ export function buildHomeTeamForm(input: readonly unknown[] | undefined) {
       top: Math.min(point.top, previous.top),
       height: Math.abs(point.top - previous.top),
       direction: point.top === previous.top ? 'flat' : point.top < previous.top ? 'up' : 'down',
+      result: point.result,
       latest: point.latest,
     }
   })

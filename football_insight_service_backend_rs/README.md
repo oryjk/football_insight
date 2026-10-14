@@ -14,8 +14,12 @@ Football Insight 的后端服务，采用 Rust + Axum + SQLx + PostgreSQL。
 cd football_insight_service_backend_rs
 
 cargo check
-DATABASE_URL='postgresql://football_app:***@117.72.164.211:5432/football_data?sslmode=disable' cargo run --bin football_insight_service_backend_rs
+cargo run --bin football_insight_service_backend_rs
 ```
+
+local233 统一使用 `18092`。配置由项目目录下被 Git 忽略、权限为 0600 的 `.env` 读取；数据库经本机 55433 隧道访问，Redis 经本机 56379 访问。前台调试前先 `systemctl --user stop football-insight-local-backend.service` 释放端口。
+
+常驻开发实例也执行上述 `cargo run` 命令，由用户级 `football-insight-local-backend.service` 管理。仓库根目录运行 `./deploy/local-test/up.sh` 会先编译，再重启该实例；`journalctl --user -u football-insight-local-backend.service -f` 查看日志。启动不运行数据库迁移。完整启停及首次配置见 [本地联调说明](../deploy/local-test/README.md)。
 
 ## 环境变量
 
@@ -95,6 +99,7 @@ docker run -d \
   --name football-insight-service \
   --restart unless-stopped \
   --env-file .env \
+  -e PORT=8092 \
   -p 8092:8092 \
   football-insight-service:latest
 ```
@@ -103,7 +108,7 @@ docker run -d \
 
 - 今日话题：公开 `GET /api/v1/daily-topics?team_id=77680&limit=5`，Rust 只读取 Python 已发布批次；接口与数据库验证步骤见 [今日话题后端说明](docs/daily-topics.md)。
 
-- 首页走势：overview 的 `standings_top[].recent_form` 返回每队最近最多 6 场赛果（`win` / `draw` / `loss`），按实际比赛日期、时间、比赛 ID 从旧到新排列。仅纳入当前赛季、有效来源、已完赛且双方比分有效的比赛，主客场均换算到该队视角；历史轮次排除较晚轮次及结算时尚未完赛的补赛，完赛时间沿用开球加 120 分钟的估计口径。无赛果返回空数组，无数据库迁移。
+- 首页走势：overview 的 `standings_top[].recent_form` 返回每队本赛季最近最多 10 场赛果（`win` / `draw` / `loss`），按实际比赛日期、时间、比赛 ID 从旧到新排列。仅纳入当前赛季、有效来源、已完赛且双方比分有效的比赛，主客场均换算到该队视角；历史轮次排除较晚轮次及结算时尚未完赛的补赛，完赛时间沿用开球加 120 分钟的估计口径。无赛果返回空数组，无数据库迁移。
 
 - 健康检查
   - `/api/health`

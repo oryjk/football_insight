@@ -52,8 +52,9 @@
           <view class="skeleton-line skeleton-line--avatar" />
           <view class="skeleton-ranking-body">
             <view class="skeleton-line skeleton-line--name" />
-            <view class="skeleton-line skeleton-line--note" />
+            <view v-if="list !== 1" class="skeleton-line skeleton-line--note" />
           </view>
+          <view v-if="list === 1" class="skeleton-line skeleton-line--form" />
           <view class="skeleton-line skeleton-line--points" />
         </view>
       </view>
@@ -274,17 +275,29 @@
 }
 
 .skeleton-standings .skeleton-ranking-row {
-  padding-top: var(--fi-space-20);
-  padding-bottom: var(--fi-space-16);
+  display: grid;
+  grid-template-columns: var(--fi-space-32) var(--fi-space-44) minmax(0, calc(var(--fi-font-28) * 4.5)) minmax(0, 1fr) var(--fi-space-56);
+  gap: var(--fi-space-8);
+  padding: var(--fi-space-20) 0 var(--fi-space-16);
 }
 
-.skeleton-standings .skeleton-ranking-body {
-  gap: var(--fi-space-18);
+.skeleton-standings .skeleton-line--rank {
+  width: var(--fi-space-32);
 }
 
-.skeleton-standings .skeleton-line--note {
+.skeleton-standings .skeleton-line--avatar {
+  width: var(--fi-space-44);
+  height: var(--fi-space-44);
+}
+
+.skeleton-standings .skeleton-line--name,
+.skeleton-standings .skeleton-line--points {
   width: 100%;
-  height: var(--fi-space-56);
+}
+
+.skeleton-line--form {
+  width: 100%;
+  height: var(--fi-space-44);
 }
 
 .skeleton-line--rank {

@@ -97,7 +97,7 @@ bun run build
 local233 内网入口已发布为 `http://172.16.60.233/football-admin/`，前端共享静态根目录为
 `/home/betalpha/.local/share/betalpha-admin-downloads`，`football-admin` 链接指向独立版本目录。
 发布命令：`bash deploy/deploy-admin-web-local233.sh`。API 仅在 `/football-admin/api/v1/admin/`
-范围反代到本机 Docker 后端 18092，保留网关现有 Mesh `/api/v1/` 和其他服务路由。
+范围反代到本机 Cargo 后端 18092，保留网关现有 Mesh `/api/v1/` 和其他服务路由。
 该后端连接现有生产库，商品变更会直接落库；本次没有更新 peiqian 生产后端。
 Nginx 配置文件位于 `/home/betalpha/services/betalpha-internal-gateway/nginx.conf`；
 路由片段见 `deploy/nginx/local233-admin-web.conf`。变更前备份，`nginx -t` 通过后重启网关容器。
@@ -287,7 +287,7 @@ local233 无法发布时可使用 peiqian 已配置私钥、`.env.ci.local` 与 
 
 ## local233 联调后端部署
 
-根目录 `deploy_local233.sh` 把已提交并 push 的代码部署到 local233 的联调测试后端（默认容器 `football-insight-local-test-backend`，对外端口 `18092`）：
+根目录 `deploy_local233.sh` 把已提交并 push 的代码部署到 local233 的 Cargo 联调后端（统一端口 `18092`）：
 
 ```bash
 ./deploy_local233.sh
@@ -295,8 +295,8 @@ local233 无法发布时可使用 peiqian 已配置私钥、`.env.ci.local` 与 
 
 - 要求本地和远端工作区都干净；从开发机执行时本地 HEAD 必须已 push 到 `origin`
 - 也可以直接登录 local233，在 `/home/betalpha/projects/football_insight` 里执行同一命令（脚本检测到自身位于部署工作区后进入本机模式，直接从 origin 拉当前分支）
-- 内部调用 `deploy/local-test/up.sh` 起容器，完成后自动校验 `/api/health` 等接口
-- 可用 `DEPLOY_HOST` / `DEPLOY_REPO_DIR` / `DEPLOY_BRANCH` / `DEPLOY_PORT` / `DEPLOY_CONTAINER` 环境变量覆盖默认值
+- 内部调用 `deploy/local-test/up.sh` 编译并重启用户级 `football-insight-local-backend.service`，该服务执行 `cargo run --bin football_insight_service_backend_rs`；完成后校验服务与 `/api/health` 等接口，启动不运行迁移
+- 可用 `DEPLOY_HOST` / `DEPLOY_REPO_DIR` / `DEPLOY_BRANCH` 环境变量覆盖目标；端口固定 18092，不再部署本地后端容器
 - 详细说明见 `deploy/local-test/README.md`
 
 ## local233 生产库 SSH 隧道
@@ -305,7 +305,7 @@ local233 管理联调后端经 SSH 隧道连接 peiqian 上的生产 `football_d
 
 - 隧道由 systemd 用户服务 `football-insight-db-tunnel.service` 常驻托管（unit 位于 `~/.config/systemd/user/`，运行用户 `betalpha`，已 enable + linger）
 - `Restart=always` 自愈，机器重启后自动拉起，不再依赖 `up.sh` 手工建隧道
-- 服务保持 master-socket 形态（`/tmp/football-insight-admin-db-tunnel-1000.sock`），`deploy/local-test/up.sh` 的 `-O check` 探测可直接识别，仓库脚本无需改动
+- 服务保留 master-socket（`/tmp/football-insight-admin-db-tunnel-1000.sock`）；`deploy/local-test/up.sh` 通过 `systemctl --user start football-insight-db-tunnel.service` 确保隧道已启动，开发环境停止时保留该共享隧道
 - 排查命令：`systemctl --user status football-insight-db-tunnel`（在 local233 上以 betalpha 执行）
 
 ## 风险点

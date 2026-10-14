@@ -8,7 +8,7 @@
 [足球洞察管理后台](http://172.16.60.233/football-admin/)，也可从机器首页导航进入。
 使用现有管理员账号和密码；发布不会重置已有账号密码。
 
-- Nginx 直接服务构建后的静态文件，API `/football-admin/api/v1/admin/**` 转到本机 Docker 后端 `18092` 的 `/api/v1/admin/**`。
+- Nginx 直接服务构建后的静态文件，API `/football-admin/api/v1/admin/**` 转到本机 Cargo 后端 `18092` 的 `/api/v1/admin/**`。
 - 全局 `/api/v1/` 保留 Betalpha Mesh 路由，未改为足球后端。
 - 当前后端通过既有 SSH 隧道连接生产 `football_data`；保存、停用和删除商品会立即影响真实后续购买。
 - 前后端发布与 peiqian 生产更新记录见 `../docs/admin-web-validation.md`。
@@ -28,7 +28,7 @@ bun install
 bun run dev
 ```
 
-默认开发端口 `5176`，代理 `/api` 到 `http://127.0.0.1:18093`。
+默认开发端口 `5176`，代理 `/api` 到 `http://172.16.60.233:18092`；后端在 local233 用 `cargo run` 启动。
 若联调隔离测试后端（例如 `18094`）：
 
 ```bash

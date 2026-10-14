@@ -64,6 +64,8 @@ cargo run --bin football_insight_service_backend_rs
 
 重要约定：
 
+- local233 统一通过 `cargo run --bin football_insight_service_backend_rs` 启动，端口固定 `18092`；常驻开发实例由用户级 `football-insight-local-backend.service` 托管同一命令。用仓库根目录 `./deploy/local-test/up.sh` 编译并重启；前台运行先停止该用户服务。生产 peiqian 继续 Docker 部署。
+- local233 的运行配置保存在项目 `.env`（0600、Git 忽略），数据库隧道端点 `127.0.0.1:55433`，Redis `127.0.0.1:56379`。开发启动不自动执行迁移，不再创建临时 18095 实例作为默认验证服务。
 - 只要修改了后端代码，本地接口验证前必须重启本地后端进程
 - 不要在旧的 `cargo run --bin football_insight_service_backend_rs` / 已存在的 8092 进程上验证新代码
 - 遇到“代码已经改了但接口仍是旧行为”，先检查并重启本地后端，再继续排查

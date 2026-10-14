@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       proxy: {
         "/api": {
-          target: env.ADMIN_API_PROXY_TARGET || "http://127.0.0.1:18093",
+          target: env.ADMIN_API_PROXY_TARGET || "http://172.16.60.233:18092",
           changeOrigin: true,
         },
       },

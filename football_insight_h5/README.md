@@ -24,7 +24,7 @@ bun run preview      # 预览构建产物
 
 ## 配置
 
-后端 API 基地址通过 `.env` 的 `VITE_API_BASE_URL` 配置（参考 `.env.example`，本地开发默认连本机 8092 的后端）。
+后端 API 基地址通过 `.env` 的 `VITE_API_BASE_URL` 配置（参考 `.env.example`，本地开发默认连 local233 的 Cargo 后端 `http://172.16.60.233:18092/api/v1`）。
 
 ## 鉴权
 

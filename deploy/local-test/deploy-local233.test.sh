@@ -109,6 +109,15 @@ if [[ "${1:-}" == "ps" ]]; then
 fi
 EOF
 
+for tool in cargo systemctl; do
+    cat >"$FAKE_BIN/$tool" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s %s\n' "${0##*/}" "$*" >>"$COMMAND_LOG"
+EOF
+    chmod +x "$FAKE_BIN/$tool"
+done
+
 cat >"$REMOTE_REPO/deploy/local-test/up.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -148,6 +157,11 @@ grep -q "git\[$REMOTE_REPO\] pull --ff-only origin feature/test" "$COMMAND_LOG"
 grep -q "curl -fsS http://127.0.0.1:18092/api/health" "$COMMAND_LOG"
 grep -q "curl -fsS http://127.0.0.1:18092/api/v1/ticket-watch/regions" "$COMMAND_LOG"
 grep -q "curl -fsS http://127.0.0.1:18092/api/v1/seat-swap/current" "$COMMAND_LOG"
+grep -q 'systemctl --user is-active football-insight-local-backend.service' "$COMMAND_LOG"
+if grep -q '^docker ps' "$COMMAND_LOG"; then
+    echo 'local233 deployment must verify the Cargo service, not a backend container' >&2
+    exit 1
+fi
 
 rm -f "$DEPLOY_MARKER" "$PULL_MARKER"
 ssh_count_before=$(grep -c '^ssh\[' "$COMMAND_LOG" || true)

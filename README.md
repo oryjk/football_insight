@@ -110,7 +110,7 @@ football_insight/
 ./deploy/local-test/up.sh
 ```
 
-本地后端运行在 local233（API `http://172.16.60.233:18092/`），经私有 SSH 隧道连接 `peiqian` 上的生产 `football_data`，启动时自动执行 migration。生产 PostgreSQL 运行在 `peiqian` 的 Docker 容器内，不开放公网端口，不要尝试直连公网 IP。详见 [deploy/local-test/README.md](deploy/local-test/README.md)。
+本地后端在 local233 直接通过 `cargo run` 启动，统一 API `http://172.16.60.233:18092/`，常驻实例由用户级服务托管；Redis 继续使用 Docker。后端经私有 SSH 隧道连接 `peiqian` 上的生产 `football_data`，开发启动不自动执行迁移。生产 PostgreSQL 不开放公网端口。详见 [deploy/local-test/README.md](deploy/local-test/README.md)。
 
 注意：该环境读写的是真实生产用户数据。
 
@@ -161,7 +161,7 @@ ANDROID_HOME=/home/betalpha/Android/Sdk ./gradlew testDebugUnitTest lintDebug as
 ./deploy/local-test/up.sh
 ```
 
-后端和 Redis 运行在 local233，后端通过私有 SSH 隧道直接连接 `peiqian` 上的生产 `football_data`，并在启动时自动执行 migration。已有管理员账号与密码保留；管理员表为空且未配置初始密码时，先在 Web 后台初始化固定账号 `superadmin`，密码由管理员自行设置，没有内置默认密码。账号和密码随后可在「设置」中修改。会员调整、禁用/恢复等写操作会直接修改生产用户数据。
+后端和 Redis 运行在 local233，后端用 `cargo run` 监听 18092，通过私有 SSH 隧道连接 `peiqian` 上的生产 `football_data`，启动不自动执行迁移。已有管理员账号与密码保留；管理员表为空且未配置初始密码时，先在 Web 后台初始化固定账号 `superadmin`，密码由管理员自行设置，没有内置默认密码。账号和密码随后可在「设置」中修改。会员调整、禁用/恢复等写操作会直接修改生产用户数据。
 
 ### 6. 启动 Web 管理后台
 
@@ -171,7 +171,7 @@ bun install
 bun run dev
 ```
 
-开发地址为 `http://localhost:5176/`，默认将 `/api` 代理到本地后端 `http://127.0.0.1:18093`。
+开发地址为 `http://localhost:5176/`，默认将 `/api` 代理到 local233 Cargo 后端 `http://172.16.60.233:18092`。
 目标后端必须运行包含商品管理 API 的新代码；使用其他后端端口时，设置
 `ADMIN_API_PROXY_TARGET=http://127.0.0.1:<端口> bun run dev`。
 使用现有独立管理员账号登录。前端只调用 Admin API，不持有数据库或微信密钥。
