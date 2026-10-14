@@ -11,6 +11,12 @@ pub struct ProductAudit {
 /// Every mutation and its before/after audit must commit or roll back together.
 #[async_trait]
 pub trait AdminProductRepository: Send + Sync {
+    async fn purchases(
+        &self,
+        key: &str,
+        page: u32,
+        page_size: u32,
+    ) -> Result<crate::admin::domain::admin_product_purchase::ProductPurchasePage, AdminProductError>;
     async fn list(&self, query: AdminProductQuery) -> Result<AdminProductPage, AdminProductError>;
     async fn get(&self, key: &str) -> Result<AdminProduct, AdminProductError>;
     async fn create_with_audit(

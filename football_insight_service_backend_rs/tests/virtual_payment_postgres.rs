@@ -588,6 +588,9 @@ impl Database {
         Self::with_duration(true).await
     }
     async fn with_duration(include_duration: bool) -> Self {
+        Self::with_migrations(include_duration, true).await
+    }
+    async fn with_migrations(include_duration: bool, include_identity: bool) -> Self {
         let url = std::env::var("VIRTUAL_PAYMENT_TEST_DATABASE_URL")
             .expect("explicit disposable database required");
         assert!(
@@ -639,6 +642,14 @@ impl Database {
             .await
             .unwrap();
         }
+        if include_identity {
+            sqlx::raw_sql(include_str!(
+                "../migrations/20261014093000_add_virtual_product_purchase_identity.sql"
+            ))
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
         let user = Uuid::new_v4();
         sqlx::query("INSERT INTO f_i_users(id,wx_open_id,account_identifier,display_name,password_hash) VALUES($1,'buyer','buyer','Buyer','unused')").bind(user).execute(&pool).await.unwrap();
         Self {
@@ -676,6 +687,7 @@ impl Database {
             .unwrap();
         virtual_orders
             .record(VirtualOrder {
+                catalog_product_id: None,
                 order_no: no.into(),
                 open_id: "buyer".into(),
                 product_id: product.into(),
@@ -1261,5 +1273,160 @@ async fn restricting_standard_sku_does_not_leak_private_metadata_or_allow_unassi
             .unwrap()
             .is_none()
     );
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires an explicit disposable database"]
+async fn catalog_uuid_is_saved_atomically_with_virtual_order_and_never_reassigned() {
+    let db = Database::new().await;
+    let id: Uuid = sqlx::query_scalar(
+        "SELECT id FROM f_i_virtual_payment_products WHERE product_key='membership:V6@3900'",
+    )
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    let service = catalog_service(&db);
+    catalog_checkout(&db, &service, "identity_order", "membership:V6", 3900)
+        .await
+        .unwrap();
+    assert_eq!(
+        sqlx::query_scalar::<_, Option<Uuid>>(
+            "SELECT catalog_product_id FROM f_i_payment_orders WHERE order_no='identity_order'"
+        )
+        .fetch_one(&db.pool)
+        .await
+        .unwrap(),
+        Some(id)
+    );
+    assert_eq!(
+        db.repos()
+            .1
+            .find("identity_order")
+            .await
+            .unwrap()
+            .unwrap()
+            .catalog_product_id,
+        Some(id)
+    );
+    db.repos()
+        .0
+        .create_order(NewPaymentOrder {
+            order_no: "identity_rollback".into(),
+            user_id: db.user,
+            amount_cents: 3900,
+            product_type: "membership:V6".into(),
+        })
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO f_i_virtual_payment_orders(order_no,open_id,product_id,amount_cents) VALUES('identity_rollback','buyer','existing_snapshot',3900)").execute(&db.pool).await.unwrap();
+    let error = db
+        .repos()
+        .1
+        .record(VirtualOrder {
+            catalog_product_id: Some(id),
+            order_no: "identity_rollback".into(),
+            open_id: "buyer".into(),
+            product_id: "different_snapshot".into(),
+            amount_cents: 3900,
+            membership_duration_months: 12,
+            wx_order_id: None,
+        })
+        .await;
+    assert!(error.is_err());
+    assert!(
+        sqlx::query_scalar::<_, Option<Uuid>>(
+            "SELECT catalog_product_id FROM f_i_payment_orders WHERE order_no='identity_rollback'"
+        )
+        .fetch_one(&db.pool)
+        .await
+        .unwrap()
+        .is_none()
+    );
+    let error = db
+        .repos()
+        .1
+        .record(VirtualOrder {
+            catalog_product_id: Some(Uuid::new_v4()),
+            order_no: "identity_order".into(),
+            open_id: "buyer".into(),
+            product_id: "different_snapshot".into(),
+            amount_cents: 3900,
+            membership_duration_months: 12,
+            wx_order_id: None,
+        })
+        .await;
+    assert!(error.is_err());
+    assert_eq!(
+        sqlx::query_scalar::<_, Option<Uuid>>(
+            "SELECT catalog_product_id FROM f_i_payment_orders WHERE order_no='identity_order'"
+        )
+        .fetch_one(&db.pool)
+        .await
+        .unwrap(),
+        Some(id)
+    );
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires an explicit disposable database"]
+async fn purchase_identity_backfill_requires_unique_typed_amount_and_matching_virtual_snapshot() {
+    let db = Database::with_migrations(true, false).await;
+    sqlx::query("INSERT INTO f_i_virtual_payment_products(product_key,name,product_id,price_cents) VALUES('membership:V7@5900','V7','wechat_v7',5900),('membership:V8@7900','V8','wechat_v8',7900)").execute(&db.pool).await.unwrap();
+    sqlx::query("ALTER TABLE f_i_virtual_payment_products DROP CONSTRAINT virtual_product_key_matches_price").execute(&db.pool).await.unwrap();
+    sqlx::query("INSERT INTO f_i_virtual_payment_products(product_key,name,product_id,price_cents) VALUES('membership:V8@07900','ambiguous V8','wechat_v8_duplicate',7900)").execute(&db.pool).await.unwrap();
+    for (no, kind, amount) in [
+        ("backfill_typed", "membership:V6", 3900),
+        ("backfill_virtual", "membership:V7", 5900),
+        ("backfill_wrong_id", "membership:V7", 5900),
+        ("backfill_wrong_amount", "membership:V6", 3900),
+        ("backfill_generic", "membership", 3900),
+        ("backfill_missing", "membership:V9", 9900),
+        ("backfill_ambiguous", "membership:V8", 7900),
+    ] {
+        db.repos()
+            .0
+            .create_order(NewPaymentOrder {
+                order_no: no.into(),
+                user_id: db.user,
+                amount_cents: amount,
+                product_type: kind.into(),
+            })
+            .await
+            .unwrap();
+    }
+    sqlx::query("INSERT INTO f_i_virtual_payment_orders(order_no,open_id,product_id,amount_cents) VALUES('backfill_virtual','buyer','wechat_v7',5900),('backfill_wrong_id','buyer','wrong_wechat_id',5900),('backfill_wrong_amount','buyer','fi_v6_year_39',3901)").execute(&db.pool).await.unwrap();
+    sqlx::raw_sql(include_str!(
+        "../migrations/20261014093000_add_virtual_product_purchase_identity.sql"
+    ))
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    for (no, key) in [
+        ("backfill_typed", "membership:V6@3900"),
+        ("backfill_virtual", "membership:V7@5900"),
+    ] {
+        let matching:bool=sqlx::query_scalar("SELECT p.catalog_product_id=c.id FROM f_i_payment_orders p CROSS JOIN f_i_virtual_payment_products c WHERE p.order_no=$1 AND c.product_key=$2").bind(no).bind(key).fetch_one(&db.pool).await.unwrap();
+        assert!(matching);
+    }
+    for no in [
+        "backfill_wrong_id",
+        "backfill_wrong_amount",
+        "backfill_generic",
+        "backfill_missing",
+        "backfill_ambiguous",
+    ] {
+        assert!(
+            sqlx::query_scalar::<_, Option<Uuid>>(
+                "SELECT catalog_product_id FROM f_i_payment_orders WHERE order_no=$1"
+            )
+            .bind(no)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap()
+            .is_none()
+        );
+    }
     db.close().await;
 }

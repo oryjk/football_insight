@@ -24,6 +24,7 @@ fn catalog_preserves_upgrade_amount_and_removes_match_specific_id() {
 #[test]
 fn payment_data_contains_exact_price_and_no_secrets() {
     let product = VirtualProduct {
+        catalog_product_id: None,
         product_id: "v7_upgrade".into(),
         price_cents: 3500,
         membership_duration_months: 12,
@@ -40,6 +41,7 @@ fn payment_data_contains_exact_price_and_no_secrets() {
 
 fn order() -> VirtualOrder {
     VirtualOrder {
+        catalog_product_id: None,
         order_no: "ORDER123".into(),
         open_id: "buyer".into(),
         product_id: "v6".into(),

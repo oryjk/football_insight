@@ -21,6 +21,8 @@ pub enum VirtualPaymentError {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct VirtualProduct {
+    #[serde(skip)]
+    pub catalog_product_id: Option<uuid::Uuid>,
     pub product_id: String,
     pub price_cents: i32,
     pub membership_duration_months: i32,
@@ -45,6 +47,7 @@ pub struct VirtualPayParams {
 
 #[derive(Debug, Clone)]
 pub struct VirtualOrder {
+    pub catalog_product_id: Option<uuid::Uuid>,
     pub order_no: String,
     pub open_id: String,
     pub product_id: String,

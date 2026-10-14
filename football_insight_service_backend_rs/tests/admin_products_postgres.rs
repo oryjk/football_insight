@@ -52,12 +52,19 @@ impl Database {
             sqlx::raw_sql(migration).execute(&pool).await.unwrap();
         }
         // The duration migration also targets order snapshots; these tests only exercise catalog CRUD.
-        sqlx::raw_sql("CREATE TABLE f_i_virtual_payment_orders (order_no TEXT PRIMARY KEY)")
+        sqlx::raw_sql("CREATE TABLE f_i_virtual_payment_orders (order_no TEXT PRIMARY KEY,product_id TEXT,amount_cents INTEGER,grant_after JSONB)")
             .execute(&pool)
             .await
             .unwrap();
         sqlx::raw_sql(include_str!(
             "../migrations/20261013230000_add_membership_duration.sql"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::raw_sql("CREATE TABLE f_i_users(id UUID PRIMARY KEY,display_name TEXT,avatar_url TEXT); CREATE TABLE f_i_payment_orders(order_no TEXT PRIMARY KEY,user_id UUID NOT NULL,product_type TEXT NOT NULL,amount_cents INTEGER NOT NULL,status TEXT NOT NULL,paid_at TIMESTAMPTZ);").execute(&pool).await.unwrap();
+        sqlx::raw_sql(include_str!(
+            "../migrations/20261014093000_add_virtual_product_purchase_identity.sql"
         ))
         .execute(&pool)
         .await
@@ -373,7 +380,13 @@ async fn http_crud_matches_contract_and_returns_safe_errors() {
     assert_eq!(created["product_key"], "membership:V7@3500");
     assert_eq!(created["membership_tier"], "V7");
     assert!(created["created_at"].is_string());
-    assert_eq!(created.as_object().unwrap().len(), 11);
+    assert_eq!(created.as_object().unwrap().len(), 12);
+    assert!(
+        created["catalog_product_id"]
+            .as_str()
+            .and_then(|value| Uuid::parse_str(value).ok())
+            .is_some()
+    );
     assert_eq!(created["membership_duration_months"], 12);
     let r = request(
         &app,
@@ -709,5 +722,213 @@ async fn http_duration_defaults_for_old_clients_validates_and_survives_toggle() 
     let response = request(&app, "PUT", key, Some(&token), Some(payload())).await;
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(body(response).await["membership_duration_months"], 12);
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires an explicit disposable localhost PostgreSQL database"]
+async fn product_purchases_summarize_history_and_preserve_identity_across_edits() {
+    use chrono::{DateTime, Utc};
+    use football_insight_service_backend_rs::admin::domain::admin_product_purchase::PurchaseExpirySource;
+    let db = Database::new().await;
+    let service = db.service();
+    let id: Uuid = sqlx::query_scalar(
+        "SELECT id FROM f_i_virtual_payment_products WHERE product_key='membership:V6@3900'",
+    )
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    let first = Uuid::new_v4();
+    let second = Uuid::new_v4();
+    sqlx::query("INSERT INTO f_i_users(id,display_name,avatar_url) VALUES($1,'Buyer One','https://example.test/avatar.png'),($2,'Buyer Two',NULL)").bind(first).bind(second).execute(&db.pool).await.unwrap();
+    for (no, user, status, paid, amount) in [
+        (
+            "snapshot",
+            first,
+            "paid",
+            Some("2025-04-01T00:00:00Z"),
+            3900,
+        ),
+        ("legacy", first, "paid", Some("2024-02-29T00:00:00Z"), 3900),
+        (
+            "refunded",
+            second,
+            "refunded",
+            Some("2025-03-01T00:00:00Z"),
+            3900,
+        ),
+        (
+            "pending",
+            second,
+            "pending",
+            Some("2025-05-01T00:00:00Z"),
+            3900,
+        ),
+        (
+            "failed",
+            second,
+            "failed",
+            Some("2025-06-01T00:00:00Z"),
+            3900,
+        ),
+        ("unpaid", second, "paid", None, 3900),
+    ] {
+        sqlx::query("INSERT INTO f_i_payment_orders(order_no,user_id,product_type,amount_cents,status,paid_at,catalog_product_id) VALUES($1,$2,'membership:V6',$3,$4,$5::text::timestamptz,$6)").bind(no).bind(user).bind(amount).bind(status).bind(paid).bind(id).execute(&db.pool).await.unwrap();
+    }
+    sqlx::query("INSERT INTO f_i_virtual_payment_orders(order_no,product_id,amount_cents,grant_after) VALUES('snapshot','fi_v6_year_39',3900,$1),('refunded','fi_v6_year_39',3900,NULL)").bind(json!({"expires_at":"2025-05-01T00:00:00Z"})).execute(&db.pool).await.unwrap();
+    let page = service.purchases("membership:V6@3900", 1, 1).await.unwrap();
+    assert_eq!(page.total, 3);
+    assert_eq!(page.summary.purchased_user_count, 2);
+    assert_eq!(page.summary.purchased_order_count, 3);
+    assert_eq!(page.summary.refunded_order_count, 1);
+    assert_eq!(page.summary.total_amount_cents, 11700);
+    assert_eq!(page.items[0].order_no, "snapshot");
+    assert_eq!(page.items[0].user_nickname, "Buyer One");
+    assert_eq!(
+        page.items[0].user_avatar_url.as_deref(),
+        Some("https://example.test/avatar.png")
+    );
+    assert_eq!(
+        page.items[0].expires_at.unwrap(),
+        DateTime::parse_from_rfc3339("2025-05-01T00:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc)
+    );
+    assert_eq!(page.items[0].expiry_source, PurchaseExpirySource::Snapshot);
+    let page2 = service.purchases("membership:V6@3900", 2, 1).await.unwrap();
+    assert_eq!(page2.summary, page.summary);
+    assert_eq!(page2.items[0].order_no, "refunded");
+    assert!(page2.items[0].user_avatar_url.is_none());
+    assert_eq!(
+        page2.items[0].expiry_source,
+        PurchaseExpirySource::Unrecorded
+    );
+    assert!(page2.items[0].expires_at.is_none());
+    let page3 = service.purchases("membership:V6@3900", 3, 1).await.unwrap();
+    assert_eq!(page3.items[0].order_no, "legacy");
+    assert_eq!(
+        page3.items[0].expiry_source,
+        PurchaseExpirySource::LegacyYear
+    );
+    assert_eq!(
+        page3.items[0].expires_at.unwrap(),
+        DateTime::parse_from_rfc3339("2025-02-28T00:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc)
+    );
+    let mut changed = input("V7", 5900);
+    changed.product_id = "different_wechat_id".into();
+    service
+        .update("membership:V6@3900", changed, db.actor)
+        .await
+        .unwrap();
+    assert_eq!(
+        service
+            .purchases("membership:V7@5900", 1, 20)
+            .await
+            .unwrap()
+            .summary,
+        page.summary
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM f_i_virtual_payment_products WHERE product_key='membership:V7@5900'"
+        )
+        .fetch_one(&db.pool)
+        .await
+        .unwrap(),
+        id
+    );
+    assert!(sqlx::query("UPDATE f_i_virtual_payment_products SET id=gen_random_uuid() WHERE product_key='membership:V7@5900'").execute(&db.pool).await.is_err());
+    service
+        .delete("membership:V7@5900", db.actor)
+        .await
+        .unwrap();
+    service.create(input("V7", 5900), db.actor).await.unwrap();
+    assert_eq!(
+        service
+            .purchases("membership:V7@5900", 1, 20)
+            .await
+            .unwrap()
+            .summary
+            .purchased_order_count,
+        0
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT count(*) FROM f_i_payment_orders WHERE catalog_product_id=$1"
+        )
+        .bind(id)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap(),
+        6
+    );
+    db.close().await;
+}
+#[tokio::test]
+#[ignore = "requires an explicit disposable localhost PostgreSQL database"]
+async fn product_purchases_http_requires_permission_validates_and_disables_cache() {
+    let db = Database::new().await;
+    let app = http_app(&db);
+    let (token, _) = token(&db).await;
+    let path = "/api/v1/admin/products/membership%3AV6%403900/purchases";
+    assert_eq!(
+        request(&app, "GET", path, None, None).await.status(),
+        StatusCode::UNAUTHORIZED
+    );
+    let response = request(&app, "GET", path, Some(&token), None).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    let result = body(response).await;
+    let id: Uuid = sqlx::query_scalar(
+        "SELECT id FROM f_i_virtual_payment_products WHERE product_key='membership:V6@3900'",
+    )
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    assert_eq!(result["catalog_product_id"], json!(id));
+    assert_eq!(result["summary"]["purchased_user_count"], 0);
+    assert_eq!(result["total"], 0);
+    assert_eq!(result["page"], 1);
+    assert_eq!(result["page_size"], 20);
+    for path in [
+        "/api/v1/admin/products/membership%3AV6%403900/purchases?page=0",
+        "/api/v1/admin/products/membership%3AV6%403900/purchases?page_size=101",
+        "/api/v1/admin/products/malformed/purchases",
+    ] {
+        assert_eq!(
+            request(&app, "GET", path, Some(&token), None)
+                .await
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+    }
+    assert_eq!(
+        request(
+            &app,
+            "GET",
+            "/api/v1/admin/products/membership%3AV7%405900/purchases",
+            Some(&token),
+            None
+        )
+        .await
+        .status(),
+        StatusCode::NOT_FOUND
+    );
+    sqlx::query("ALTER TABLE f_i_admin_users DROP CONSTRAINT chk_f_i_admin_users_role")
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE f_i_admin_users SET role='viewer'")
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        request(&app, "GET", path, Some(&token), None)
+            .await
+            .status(),
+        StatusCode::FORBIDDEN
+    );
     db.close().await;
 }

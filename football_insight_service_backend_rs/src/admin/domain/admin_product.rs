@@ -40,6 +40,7 @@ pub struct ValidatedAdminProduct {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AdminProduct {
+    pub catalog_product_id: Uuid,
     pub product_key: String,
     pub membership_tier: String,
     pub name: String,

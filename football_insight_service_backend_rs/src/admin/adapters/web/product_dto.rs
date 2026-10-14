@@ -33,6 +33,7 @@ impl From<AdminProductRequestDto> for AdminProductInput {
 }
 #[derive(Debug, Serialize)]
 pub struct AdminProductDto {
+    pub catalog_product_id: Uuid,
     pub product_key: String,
     pub membership_tier: String,
     pub name: String,
@@ -48,6 +49,7 @@ pub struct AdminProductDto {
 impl From<AdminProduct> for AdminProductDto {
     fn from(v: AdminProduct) -> Self {
         Self {
+            catalog_product_id: v.catalog_product_id,
             product_key: v.product_key,
             membership_tier: v.membership_tier,
             name: v.name,
@@ -112,4 +114,76 @@ impl TryFrom<AdminProductListQuery> for AdminProductQuery {
 
 fn default_membership_duration_months() -> i32 {
     12
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct AdminPurchaseQuery {
+    pub page: Option<u32>,
+    pub page_size: Option<u32>,
+}
+#[derive(Debug, Serialize)]
+pub struct ProductPurchaseSummaryDto {
+    pub purchased_user_count: i64,
+    pub purchased_order_count: i64,
+    pub refunded_order_count: i64,
+    pub total_amount_cents: i64,
+}
+#[derive(Debug, Serialize)]
+pub struct ProductPurchaseDto {
+    pub order_no: String,
+    pub user_id: Uuid,
+    pub user_nickname: String,
+    pub user_avatar_url: Option<String>,
+    pub paid_at: DateTime<Utc>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub expiry_source: &'static str,
+    pub amount_cents: i32,
+    pub status: String,
+}
+#[derive(Debug, Serialize)]
+pub struct ProductPurchasePageDto {
+    pub catalog_product_id: Uuid,
+    pub summary: ProductPurchaseSummaryDto,
+    pub items: Vec<ProductPurchaseDto>,
+    pub total: i64,
+    pub page: u32,
+    pub page_size: u32,
+}
+impl From<crate::admin::domain::admin_product_purchase::ProductPurchasePage>
+    for ProductPurchasePageDto
+{
+    fn from(page: crate::admin::domain::admin_product_purchase::ProductPurchasePage) -> Self {
+        use crate::admin::domain::admin_product_purchase::PurchaseExpirySource;
+        Self {
+            catalog_product_id: page.catalog_product_id,
+            summary: ProductPurchaseSummaryDto {
+                purchased_user_count: page.summary.purchased_user_count,
+                purchased_order_count: page.summary.purchased_order_count,
+                refunded_order_count: page.summary.refunded_order_count,
+                total_amount_cents: page.summary.total_amount_cents,
+            },
+            items: page
+                .items
+                .into_iter()
+                .map(|p| ProductPurchaseDto {
+                    order_no: p.order_no,
+                    user_id: p.user_id,
+                    user_nickname: p.user_nickname,
+                    user_avatar_url: p.user_avatar_url,
+                    paid_at: p.paid_at,
+                    expires_at: p.expires_at,
+                    expiry_source: match p.expiry_source {
+                        PurchaseExpirySource::Snapshot => "snapshot",
+                        PurchaseExpirySource::LegacyYear => "legacy_year",
+                        PurchaseExpirySource::Unrecorded => "unrecorded",
+                    },
+                    amount_cents: p.amount_cents,
+                    status: p.status,
+                })
+                .collect(),
+            total: page.total,
+            page: page.page,
+            page_size: page.page_size,
+        }
+    }
 }

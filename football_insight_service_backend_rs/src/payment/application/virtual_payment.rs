@@ -210,6 +210,7 @@ impl WechatPayPort for VirtualPaymentService {
             .await?;
         self.virtual_orders
             .record(crate::payment::domain::virtual_payment::VirtualOrder {
+                catalog_product_id: product.catalog_product_id,
                 order_no: order_no.into(),
                 open_id: openid.into(),
                 product_id: product.product_id.clone(),

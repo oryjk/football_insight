@@ -27,8 +27,8 @@ impl VirtualProductRepository for PostgresVirtualProductRepository {
         user_id: uuid::Uuid,
     ) -> Result<Option<VirtualProduct>, VirtualPaymentError> {
         // Do not cache: edits/disablement must affect the next purchase without a restart.
-        let row = sqlx::query_as::<_, (String, i32, i32)>(
-            "SELECT product_id, price_cents, membership_duration_months FROM f_i_virtual_payment_products WHERE product_key=$1 AND enabled AND (cardinality(allowed_user_ids)=0 OR $2=ANY(allowed_user_ids))",
+        let row = sqlx::query_as::<_, (uuid::Uuid,String, i32, i32)>(
+            "SELECT id, product_id, price_cents, membership_duration_months FROM f_i_virtual_payment_products WHERE product_key=$1 AND enabled AND (cardinality(allowed_user_ids)=0 OR $2=ANY(allowed_user_ids))",
         )
         .bind(key)
         .bind(user_id)
@@ -36,7 +36,8 @@ impl VirtualProductRepository for PostgresVirtualProductRepository {
         .await
         .map_err(catalog_error)?;
         Ok(row.map(
-            |(product_id, price_cents, membership_duration_months)| VirtualProduct {
+            |(catalog_id, product_id, price_cents, membership_duration_months)| VirtualProduct {
+                catalog_product_id: Some(catalog_id),
                 product_id,
                 price_cents,
                 membership_duration_months,

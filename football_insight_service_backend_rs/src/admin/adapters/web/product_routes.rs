@@ -1,6 +1,6 @@
 use super::product_handlers::{
     AdminProductWebState, create_product, delete_product, get_product, list_products,
-    update_product,
+    product_no_store, product_purchases, update_product,
 };
 use crate::admin::application::{
     admin_auth_service::AdminAuthService, admin_product_service::AdminProductService,
@@ -20,8 +20,13 @@ pub fn admin_product_routes(
             "/api/v1/admin/products/{product_key}",
             get(get_product).put(update_product).delete(delete_product),
         )
+        .route(
+            "/api/v1/admin/products/{product_key}/purchases",
+            get(product_purchases),
+        )
         .with_state(AdminProductWebState {
             service,
             auth_service,
         })
+        .layer(axum::middleware::map_response(product_no_store))
 }

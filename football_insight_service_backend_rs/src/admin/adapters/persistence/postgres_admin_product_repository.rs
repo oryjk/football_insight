@@ -9,10 +9,11 @@ use chrono::{DateTime, Utc};
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-const COLUMNS: &str = "product_key, split_part(split_part(product_key, '@', 1), ':', 2) AS membership_tier, name, product_id, price_cents, membership_duration_months, enabled, remark, allowed_user_ids, created_at, updated_at";
+const COLUMNS: &str = "id AS catalog_product_id, product_key, split_part(split_part(product_key, '@', 1), ':', 2) AS membership_tier, name, product_id, price_cents, membership_duration_months, enabled, remark, allowed_user_ids, created_at, updated_at";
 const SCOPE: &str = "product_key ~ '^membership:V(3|[6-9])@[1-9][0-9]*$'";
 #[derive(sqlx::FromRow)]
 struct ProductRow {
+    catalog_product_id: Uuid,
     product_key: String,
     membership_tier: String,
     name: String,
@@ -28,6 +29,7 @@ struct ProductRow {
 impl From<ProductRow> for AdminProduct {
     fn from(v: ProductRow) -> Self {
         Self {
+            catalog_product_id: v.catalog_product_id,
             product_key: v.product_key,
             membership_tier: v.membership_tier,
             name: v.name,
@@ -52,6 +54,48 @@ impl PostgresAdminProductRepository {
 }
 #[async_trait]
 impl AdminProductRepository for PostgresAdminProductRepository {
+    async fn purchases(
+        &self,
+        key: &str,
+        page: u32,
+        page_size: u32,
+    ) -> Result<crate::admin::domain::admin_product_purchase::ProductPurchasePage, AdminProductError>
+    {
+        use crate::admin::domain::admin_product_purchase::{
+            ProductPurchasePage, ProductPurchaseSummary,
+        };
+        let mut tx = self.pool.begin().await.map_err(map_error)?;
+        sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+            .execute(&mut *tx)
+            .await
+            .map_err(map_error)?;
+        let id = sqlx::query_scalar::<_, Uuid>(&format!(
+            "SELECT id FROM f_i_virtual_payment_products WHERE product_key=$1 AND {SCOPE}"
+        ))
+        .bind(key)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(map_error)?
+        .ok_or(AdminProductError::NotFound)?;
+        let counts=sqlx::query_as::<_,(i64,i64,i64,i64)>("SELECT COUNT(DISTINCT user_id),COUNT(*),COUNT(*) FILTER(WHERE status='refunded'),COALESCE(SUM(amount_cents),0)::bigint FROM f_i_payment_orders WHERE catalog_product_id=$1 AND paid_at IS NOT NULL AND status IN ('paid','refunded')")
+            .bind(id).fetch_one(&mut *tx).await.map_err(map_error)?;
+        let rows=sqlx::query_as::<_,PurchaseRow>("SELECT p.order_no,p.user_id,COALESCE(NULLIF(u.display_name,''),'未命名用户') AS user_nickname,u.avatar_url AS user_avatar_url,p.paid_at,p.amount_cents,p.status,(v.order_no IS NOT NULL) AS has_virtual,v.grant_after FROM f_i_payment_orders p LEFT JOIN f_i_users u ON u.id=p.user_id LEFT JOIN f_i_virtual_payment_orders v ON v.order_no=p.order_no WHERE p.catalog_product_id=$1 AND p.paid_at IS NOT NULL AND p.status IN ('paid','refunded') ORDER BY p.paid_at DESC,p.order_no ASC LIMIT $2 OFFSET $3")
+            .bind(id).bind(i64::from(page_size)).bind(i64::from(page-1)*i64::from(page_size)).fetch_all(&mut *tx).await.map_err(map_error)?;
+        tx.commit().await.map_err(map_error)?;
+        Ok(ProductPurchasePage {
+            catalog_product_id: id,
+            summary: ProductPurchaseSummary {
+                purchased_user_count: counts.0,
+                purchased_order_count: counts.1,
+                refunded_order_count: counts.2,
+                total_amount_cents: counts.3,
+            },
+            items: rows.into_iter().map(Into::into).collect(),
+            total: counts.1,
+            page,
+            page_size,
+        })
+    }
     async fn list(&self, query: AdminProductQuery) -> Result<AdminProductPage, AdminProductError> {
         let search = query.query.as_ref().map(|v| {
             format!(
@@ -170,7 +214,7 @@ async fn insert_audit(
     Ok(())
 }
 fn snapshot(v: &AdminProduct) -> serde_json::Value {
-    serde_json::json!({"product_key":v.product_key,"membership_tier":v.membership_tier,"name":v.name,"product_id":v.product_id,"price_cents":v.price_cents,"membership_duration_months":v.membership_duration_months,"enabled":v.enabled,"remark":v.remark,"allowed_user_ids":v.allowed_user_ids,"created_at":v.created_at,"updated_at":v.updated_at})
+    serde_json::json!({"catalog_product_id":v.catalog_product_id,"product_key":v.product_key,"membership_tier":v.membership_tier,"name":v.name,"product_id":v.product_id,"price_cents":v.price_cents,"membership_duration_months":v.membership_duration_months,"enabled":v.enabled,"remark":v.remark,"allowed_user_ids":v.allowed_user_ids,"created_at":v.created_at,"updated_at":v.updated_at})
 }
 fn map_error(error: sqlx::Error) -> AdminProductError {
     if error
@@ -181,4 +225,49 @@ fn map_error(error: sqlx::Error) -> AdminProductError {
     }
     tracing::error!(error=%error,"admin product persistence failed");
     AdminProductError::Internal
+}
+
+#[derive(sqlx::FromRow)]
+struct PurchaseRow {
+    order_no: String,
+    user_id: Uuid,
+    user_nickname: String,
+    user_avatar_url: Option<String>,
+    paid_at: DateTime<Utc>,
+    amount_cents: i32,
+    status: String,
+    has_virtual: bool,
+    grant_after: Option<serde_json::Value>,
+}
+impl From<PurchaseRow> for crate::admin::domain::admin_product_purchase::ProductPurchase {
+    fn from(row: PurchaseRow) -> Self {
+        let snapshot = row
+            .grant_after
+            .as_ref()
+            .and_then(|value| value.get("expires_at"))
+            .and_then(|value| match value {
+                serde_json::Value::Null => Some(None),
+                serde_json::Value::String(value) => DateTime::parse_from_rfc3339(value)
+                    .ok()
+                    .map(|value| Some(value.with_timezone(&Utc))),
+                _ => None,
+            });
+        let (expires_at, expiry_source) =
+            crate::admin::domain::admin_product_purchase::resolve_purchase_expiry(
+                row.paid_at,
+                row.has_virtual,
+                snapshot,
+            );
+        Self {
+            order_no: row.order_no,
+            user_id: row.user_id,
+            user_nickname: row.user_nickname,
+            user_avatar_url: row.user_avatar_url,
+            paid_at: row.paid_at,
+            expires_at,
+            expiry_source,
+            amount_cents: row.amount_cents,
+            status: row.status,
+        }
+    }
 }

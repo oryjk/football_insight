@@ -20,6 +20,24 @@ impl AdminProductService {
     ) -> Result<AdminProductPage, AdminProductError> {
         self.repository.list(query.validate()?).await
     }
+    pub async fn purchases(
+        &self,
+        key: &str,
+        page: u32,
+        page_size: u32,
+    ) -> Result<crate::admin::domain::admin_product_purchase::ProductPurchasePage, AdminProductError>
+    {
+        validate_product_key(key)?;
+        let query = AdminProductQuery {
+            page,
+            page_size,
+            ..Default::default()
+        }
+        .validate()?;
+        self.repository
+            .purchases(key, query.page, query.page_size)
+            .await
+    }
     pub async fn get(&self, key: &str) -> Result<AdminProduct, AdminProductError> {
         validate_product_key(key)?;
         self.repository.get(key).await

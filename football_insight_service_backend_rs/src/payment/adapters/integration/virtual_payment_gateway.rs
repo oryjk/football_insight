@@ -265,6 +265,7 @@ mod tests {
     #[test]
     fn query_requires_production_paid_price_and_matching_order() {
         let order = VirtualOrder {
+            catalog_product_id: None,
             order_no: "ORDER123".into(),
             open_id: "buyer".into(),
             product_id: "v6".into(),
