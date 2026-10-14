@@ -73,7 +73,7 @@
       </view>
     </view>
 
-    <HomeGoalMatchSheet
+    <HomeGoalMatchDialog
       v-if="selectedScorerMatch"
       :player-name="selectedScorerMatch.playerName"
       :match="selectedScorerMatch.match"
@@ -120,7 +120,7 @@ import HomeSupportPanel from './components/HomeSupportPanel.vue'
 import HomeSkeleton from './components/HomeSkeleton.vue'
 import HomeStoryPanel from './components/HomeStoryPanel.vue'
 import HomeRankingPanel from './components/HomeRankingPanel.vue'
-import HomeGoalMatchSheet from './components/HomeGoalMatchSheet.vue'
+import HomeGoalMatchDialog from './components/HomeGoalMatchDialog.vue'
 import HomeStandingsPanel from './components/HomeStandingsPanel.vue'
 import HomeTechStatsSheet from './components/HomeTechStatsSheet.vue'
 import HomeTeamSeasonSheet from './components/HomeTeamSeasonSheet.vue'
