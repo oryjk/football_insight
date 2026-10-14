@@ -279,9 +279,9 @@ ssh peiqian 'journalctl -u football-insight.service -n 100 --no-pager'
 
 ### 小程序改动
 
-默认在本地 Mac 从干净 main 执行 `bun run mp:release -- --robot 2 --desc "本次变更说明"`，统一完成生产构建、审核版本登记和测试上传。上传前先提交推送全部业务改动；版本文件若因登记发生变化，也需提交推送后重跑。
+默认在 local233 的 `/home/betalpha/projects/football_insight/football_insight_mini` 从干净 main 执行 `bun run mp:release -- --robot 2 --desc "本次变更说明"`，统一完成生产构建、审核版本登记和测试上传。local233 已配置上传私钥和 `.env.ci.local`（0600 权限，Git 忽略），登记地址为 `https://match.oryjk.cn/api/v1`；开发、构建与上传在同一台 Ubuntu 机器完成，无需连接 Mac。上传前先提交推送全部业务改动；版本文件若因登记发生变化，也需提交推送后重跑。
 
-Mac 不可用时可使用 peiqian 已配置私钥、`.env.ci.local` 与 Bun 的备用环境；先通过既有 clash 代理更新干净 main，再执行同一发布入口。robot 2 上传不代替微信公众平台提审和正式发布。
+local233 无法发布时可使用 peiqian 已配置私钥、`.env.ci.local` 与 Bun 的备用环境；先通过既有 clash 代理更新干净 main，再执行同一发布入口。robot 2 上传不代替微信公众平台提审和正式发布。
 
 审核版本号由后端 `f_i_mini_review_statuses` 统一分配，不手动修改 manifest。指定版本用 `MINI_PROGRAM_VERSION=x.y.z`，离线构建用 `MINI_REVIEW_SKIP=1`；正式上传不会跳过登记。完整步骤见 `football_insight_mini/README.md` 的「微信小程序发布」一节。
 

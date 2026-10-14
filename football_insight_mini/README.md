@@ -224,15 +224,15 @@ bun run mp:preview -- --desc "预览说明"               # 只传预览版，�
 - 项目根 `private.<appid>.key`：微信公众平台「开发管理 → 开发设置 → 小程序代码上传」下载的私钥（已 git-ignore）；可用 `MINI_CI_PRIVATE_KEY_PATH` 覆盖路径。
 - `.env.ci.local` 配置 `MINI_REVIEW_API_KEY`（git-ignore；与后端环境变量 `MINI_REVIEW_API_KEY` 保持一致）。纯本地离线构建可设 `MINI_REVIEW_SKIP=1` 跳过登记。
 
-**默认在本地 Mac 构建并上传**：先提交、推送全部业务改动，确认工作区干净，再从小程序目录执行。本地上传私钥与 `.env.ci.local` 已配置；版本登记接口仍走 `match.oryjk.cn`，不需要 SSH 到 peiqian 构建。
+**默认在 local233（Ubuntu）直接构建并上传**：先提交、推送全部业务改动，确认 main 工作区干净，再从小程序目录执行。local233 已从 peiqian 安全复制上传私钥与 `.env.ci.local`，两者均为 0600 权限且被 Git 忽略；版本登记地址已改为 `https://match.oryjk.cn/api/v1`，不使用 peiqian 的 `127.0.0.1:8092` 地址。开发、构建与微信上传在 local233 完成，无需连接 Mac 或 peiqian。
 
 ```bash
-cd /Users/carlwang/projects/football_insight/football_insight_mini
+cd /home/betalpha/projects/football_insight/football_insight_mini
 bun install --frozen-lockfile
 bun run mp:release -- --robot 2 --desc "本次变更说明"
 ```
 
-新机器需重新配置上述私钥与 `.env.ci.local`，二者都不能提交到 Git。默认不要设置 `MINI_PROGRAM_VERSION`，让登记库自动分配；测试上传使用 robot=2，日常开发上传使用 robot=1。peiqian 仅作为本地无法发布时的备用构建环境。
+新机器需重新配置上述私钥与 `.env.ci.local`（`chmod 600`），二者都不能提交到 Git；跨机器复制配置时需将登记地址改为生产域名。默认不要设置 `MINI_PROGRAM_VERSION`，让登记库自动分配；测试上传使用 robot=2，日常开发上传使用 robot=1。peiqian 仅作为 local233 无法发布时的备用构建环境。
 
 上传后的收尾：
 
