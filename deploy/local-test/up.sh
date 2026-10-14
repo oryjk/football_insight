@@ -70,6 +70,6 @@ curl -fsS http://127.0.0.1:18092/api/health
 echo
 echo "Local admin API: http://172.16.60.233:18092/"
 echo "Database: production football_data through a private SSH tunnel"
-echo "Admin username: admin"
-echo "Admin password: admin123"
+echo "Admin account: existing database account, or initialize superadmin in the Web admin when no administrator exists"
+echo "Initial password: no built-in default; set it during initialization"
 trap - EXIT

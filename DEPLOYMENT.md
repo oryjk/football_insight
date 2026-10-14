@@ -67,6 +67,33 @@ curl -I https://match.oryjk.cn/football/
 - 榜单页是否能正常拉数据
 - 我的页面是否能正常读取系统配置
 
+### Web 管理后台静态构建
+
+`football_insight_admin_web` 独立产出静态文件，不包含服务端。
+
+```bash
+cd football_insight_admin_web
+bun install --frozen-lockfile
+bun run test
+bun run build
+```
+
+输出目录为 `football_insight_admin_web/dist/`。根路径开发使用同源 `/api/v1/admin/**`；
+子路径部署使用 `<部署路径>/api/v1/admin/**`，Nginx 移除部署路径后转到足球后端。
+需要先部署包含商品 CRUD 的后端，再发布前端。子路径构建可用
+`ADMIN_WEB_BASE_PATH=/football-admin/ bun run build`，路径必须与实际静态托管配置一致。
+local233 内网入口已发布为 `http://172.16.60.233/football-admin/`，前端共享静态根目录为
+`/home/betalpha/.local/share/betalpha-admin-downloads`，`football-admin` 链接指向独立版本目录。
+发布命令：`bash deploy/deploy-admin-web-local233.sh`。API 仅在 `/football-admin/api/v1/admin/`
+范围反代到本机 Docker 后端 18092，保留网关现有 Mesh `/api/v1/` 和其他服务路由。
+该后端连接现有生产库，商品变更会直接落库；本次没有更新 peiqian 生产后端。
+Nginx 配置文件位于 `/home/betalpha/services/betalpha-internal-gateway/nginx.conf`；
+路由片段见 `deploy/nginx/local233-admin-web.conf`。变更前备份，`nginx -t` 通过后重启网关容器。
+不要把后台构建输出覆盖现有小程序 H5 的 `/football/`。
+
+管理员初始化不需要默认密码：未配置 `ADMIN_OWNER_PASSWORD` 且管理员表为空时，后台页面会要求为固定账号 `superadmin` 设置密码；已有管理员保持原账号和密码。登录后在「设置」修改当前账号或密码，保存后全部会话退出。共享同一数据库的所有后端都要升级账号初始化逻辑，之后才开放账号改名；旧版本 bootstrap 可能在重启时重建配置中的旧账号。不要在部署日志或文档中记录密码。
+新增 Nginx 路由时继续遵守本文件的 football 路径和冲突处理约定。
+
 ## 后端部署
 
 当前后端同时保留两种部署方式：

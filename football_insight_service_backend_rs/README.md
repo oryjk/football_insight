@@ -161,6 +161,102 @@ docker run -d \
   - `/api/v1/team-boards/posts/{post_id}/comments`
   - `/api/v1/team-boards/posts/{post_id}/likes`
 
+## 指定账号会员商品的展示与下单
+
+会员道具的购买范围来自 `f_i_virtual_payment_products.allowed_user_ids`，覆盖 V3、V6–V9，
+不绑定某个固定道具或账号；停用和账号名单修改由下一次查询/新购买立即读取。
+V3 仍须指定账号且不进入公开会员目录。
+
+当前会员目录每个等级展示一个选项：同一账号可购买多个同等级私有道具时，按道具金额升序、
+业务键升序稳定选择最低金额的启用映射。该账号的响应标记 `is_private_offer=true`，
+展示选中道具的名称、金额和时长；非指定账号不会看到其名称、折扣或允许账号 UUID。
+私有目标按该道具金额直接付款，不另计算升级补差/手续费；其他公开档位的升级抵扣仍依据
+`f_i_system_configs.membership_product` 的公开标准价，不因当前档位有私有优惠而改变。
+公开标准价对应的道具若被限制购买，未指定账号也不能购买该映射。
+
+目录显示金额、时长查询、订单金额和最终微信道具业务键使用同一计价规则。
+支付参数生成前再次读取道具的启用状态和账号名单，后台把允许账号从 A 改成 B 后，
+A 的新购买会被拒绝，B 取得该账号商品；历史订单继续使用创建时快照。
+
+## 首次管理员初始化
+
+未配置初始密码的新部署通过 Web 设置首个管理员的密码，账号固定为 `superadmin`。
+
+- 公开 `GET /api/v1/admin/auth/setup` 返回 `{needs_setup:boolean,username:"superadmin"}`。
+- 公开 `POST /api/v1/admin/auth/setup` 请求 `{password:string}`，要求 8–128 个 Unicode 字符，
+  密码保留空白。创建 owner 后返回无正文的 204，不自动登录；随后通过原有登录接口登录。
+- 无效密码返回 400；存在任意管理员（包括禁用账号）时返回 409，不重置密码、不创建第二个账号。
+- 账号创建与安全审计同事务；并发初始化及兼容的预设 bootstrap 使用同一个 advisory lock，
+  仅允许一个请求成功。初始化审计不保存密码或哈希。
+- GET/POST 及其错误响应带 `Cache-Control: no-store`；`/api/v1/admin/` 整体排除进程内 GET 缓存，
+  初始化完成后下一次 GET 会立即返回 `needs_setup=false`。
+- `.env.example` 中 `ADMIN_OWNER_PASSWORD` 留空，不提供固定初始密码。
+  使用显式旧预设配置时仅在完全没有管理员的情况下执行 bootstrap；已有账号（包括改名后的账号）不会被重建或覆盖。
+
+## 当前管理员账号设置
+
+`PUT /api/v1/admin/auth/credentials` 要求有效的 Admin Bearer JWT，只修改当前账号的用户名和密码。
+请求为 `{username,current_password,new_password?}`；`new_password` 可省略或传 null，仅修改用户名。
+成功返回无正文的 HTTP 204，并撤销此账号的全部会话（含当前会话），需要使用新凭据重新登录。
+
+- 用户名去除两端空白并转小写，要求 3–64 个 ASCII 字母、数字、点、短横线或下划线。
+- 当前密码必填且必须正确；新密码如提供，要求 8–128 个 Unicode 字符，密码保留空白。
+- 规范化后的用户名相同且密码没有变化时返回 400，不生成审计或撤销会话。
+- 错误状态：无效输入 400，失效会话 401，当前密码错误 403，用户名已占用 409，内部故障 500。
+  错误正文为安全文本，响应、审计和日志均不包含密码或密码哈希。
+- 修改保留账号 UUID、角色和显示名称；修改、撤销所有会话与 `admin.credentials.update` 审计
+  使用同一事务。审计记录变更前后的用户名，以及 `password_changed` 布尔值。
+- 保存时锁定账号，重新检查旧用户名/密码哈希和当前会话；登录创建会话也锁定账号并检查
+  已验证的凭据快照，阻止并发改密后使用旧凭据创建有效会话。
+- owner 初始化在事务/advisory lock 下复用已有 owner；账号改名后重启不会按旧环境变量
+  创建另一个 owner，也不会覆盖已有 owner 的用户名或密码。
+
+隔离数据库测试与商品测试一样，只允许显式配置本机、名称以 `_test` 结尾的测试库：
+
+```bash
+ADMIN_CREDENTIALS_TEST_DATABASE_URL='postgresql://test_user:<test_password>@127.0.0.1:<test_port>/football_admin_web_test' \
+cargo test --test admin_credentials_postgres -- --ignored
+```
+
+## Admin 商品 API
+
+所有商品接口要求 `Authorization: Bearer <admin_access_token>`；复用 Admin 登录、me 和 logout，
+`ManageProducts` 权限仅授予 owner/admin，并检查数据库中的当前角色及未撤销会话。
+商品表为 `f_i_virtual_payment_products`，仅管理 `membership:V3/V6/V7/V8/V9` 映射，
+不会修改公开会员标价或历史订单快照。
+
+列表参数为 `query`、`membership_tier`、`enabled=true|false`、`page`、`page_size`。
+空筛选参数视为未筛选；默认第 1 页、每页 20 条，page_size 范围为 1–100。
+关键词按业务键、名称、道具 ID 和备注进行大小写无关的字面匹配。
+响应为 `{items,total,page,page_size}`。
+
+商品响应字段：`product_key,membership_tier,name,product_id,price_cents,membership_duration_months,enabled,remark,
+allowed_user_ids,created_at,updated_at`。时间使用 RFC 3339，价格为整数分。
+POST/PUT 必填请求字段与商品响应一致，但不传 `product_key,created_at,updated_at`；
+成功返回 HTTP 200 和商品对象，DELETE 成功返回无正文的 204。
+`membership_duration_months` 为有效期月数；旧客户端省略此请求字段时默认为 12，响应始终包含该字段。
+
+- 支持会员等级 V3、V6–V9；金额必须在 1–2147483647 分范围内；有效期必须为 1–1200 个月的整数。
+  更新/启停须发送当前有效期；商品修改不改变历史订单已保存的有效期快照。
+- 名称和道具 ID 去除两端空白后不能为空，最长 200 字符；道具 ID 不允许空白字符。
+- 备注去除两端空白，最长 4000 字符。
+- `allowed_user_ids` 最多 100 项，必须为标准 UUID（不允许 nil UUID），去除两端空白并去重。
+  V3 至少指定一个购买账号；其他等级空数组表示公开商品。
+- 业务键由服务端生成 `membership:<tier>@<price_cents>`；PUT 路径使用旧键（客户端 URL 编码），
+  改价或改等级会原子更新业务键并返回新键，重复键返回 409。
+- 每次创建、更新、删除与 `f_i_admin_audit_logs` 中的 `product.create/update/delete`
+  审计使用同一个数据库事务，`target_type=product`，记录管理员与完整 before/after 快照。
+- 输入无效返回 400，缺失/失效 Admin 会话返回 401，无权限返回 403，不存在返回 404，
+  重复键返回 409。内部故障返回安全文字正文的 500，数据库错误只写日志。
+
+隔离 PostgreSQL/API 测试必须显式设置本机、数据库名以 `_test` 结尾的测试 URL；
+测试会建立独立 schema，不读取 `.env`、不连接生产库：
+
+```bash
+ADMIN_PRODUCTS_TEST_DATABASE_URL='postgresql://test_user:<test_password>@127.0.0.1:<test_port>/football_admin_web_test' \
+cargo test --test admin_products_postgres -- --ignored
+```
+
 ## System Config 审核配置接口
 
 `GET /api/v1/system_config?version={version}`
