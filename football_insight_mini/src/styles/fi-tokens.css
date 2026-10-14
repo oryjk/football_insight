@@ -21,6 +21,11 @@ page {
   --fi-primitive-grey-text: #8f9198;
   --fi-primitive-grey-text-deep: #6d7280;
   --fi-primitive-grey-text-soft: #7a7f8b;
+  --fi-primitive-team-form-line: #a8afb9;
+  --fi-primitive-team-form-halo: rgba(220, 38, 38, 0.10);
+  --fi-primitive-team-form-pressed: rgba(220, 38, 38, 0.04);
+  --fi-primitive-space-72: 72rpx;
+  --fi-primitive-shadow-team-form-latest: 0 0 0 6rpx var(--fi-primitive-team-form-halo);
   --fi-primitive-canvas: #f6f7fb;
   --fi-primitive-canvas-soft: #f7f8fa;
   --fi-primitive-surface-frosted: rgba(255, 255, 255, 0.92);
@@ -111,6 +116,10 @@ page {
   --fi-color-text-secondary: var(--fi-primitive-grey-text-deep);
   --fi-color-text-muted: var(--fi-primitive-grey-text);
   --fi-color-text-caption: var(--fi-primitive-grey-text-soft);
+  --fi-color-team-form-line: var(--fi-primitive-team-form-line);
+  --fi-color-team-form-pressed: var(--fi-primitive-team-form-pressed);
+  --fi-color-surface: var(--fi-primitive-white);
+  --fi-shadow-team-form-latest: var(--fi-primitive-shadow-team-form-latest);
   --fi-color-primary-deep: var(--fi-primitive-red-deep);
   --fi-color-primary-darker: var(--fi-primitive-red-darker);
   --fi-color-page: var(--fi-primitive-canvas);
@@ -128,6 +137,7 @@ page {
 
   /* ===== Semantic：间距 / 字号（数字刻度直通） ===== */
   --fi-space-4: var(--fi-primitive-space-4);
+  --fi-space-72: var(--fi-primitive-space-72);
   --fi-space-6: var(--fi-primitive-space-6);
   --fi-space-8: var(--fi-primitive-space-8);
   --fi-space-10: var(--fi-primitive-space-10);

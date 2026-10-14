@@ -103,6 +103,8 @@ docker run -d \
 
 - 今日话题：公开 `GET /api/v1/daily-topics?team_id=77680&limit=5`，Rust 只读取 Python 已发布批次；接口与数据库验证步骤见 [今日话题后端说明](docs/daily-topics.md)。
 
+- 首页走势：overview 的 `standings_top[].recent_form` 返回每队最近最多 6 场赛果（`win` / `draw` / `loss`），按实际比赛日期、时间、比赛 ID 从旧到新排列。仅纳入当前赛季、有效来源、已完赛且双方比分有效的比赛，主客场均换算到该队视角；历史轮次排除较晚轮次及结算时尚未完赛的补赛，完赛时间沿用开球加 120 分钟的估计口径。无赛果返回空数组，无数据库迁移。
+
 - 健康检查
   - `/api/health`
 - 系统配置

@@ -3,7 +3,7 @@ use serde::Serialize;
 use crate::insight::domain::{
     insight_summary::InsightSummary,
     match_list::{MatchCard, MatchListView},
-    overview::{InsightOverview, OverviewMatch, OverviewPlayer, OverviewStanding},
+    overview::{InsightOverview, MatchOutcome, OverviewMatch, OverviewPlayer, OverviewStanding},
     rankings::{
         PlayerRankingCategory, PlayerRankingEntry, RankingsView, StandingsTable,
         StandingsTableEntry, TeamRankingCategory, TeamRankingEntry,
@@ -39,6 +39,25 @@ pub struct OverviewStandingDto {
     pub team_name: String,
     pub points: i32,
     pub avatar_storage_url: Option<String>,
+    pub recent_form: Vec<MatchOutcomeDto>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MatchOutcomeDto {
+    Win,
+    Draw,
+    Loss,
+}
+
+impl From<MatchOutcome> for MatchOutcomeDto {
+    fn from(value: MatchOutcome) -> Self {
+        match value {
+            MatchOutcome::Win => Self::Win,
+            MatchOutcome::Draw => Self::Draw,
+            MatchOutcome::Loss => Self::Loss,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -284,6 +303,7 @@ impl From<OverviewStanding> for OverviewStandingDto {
             team_name: value.team_name,
             points: value.points,
             avatar_storage_url: value.avatar_storage_url,
+            recent_form: value.recent_form.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -585,6 +605,25 @@ impl From<InsightSummary> for InsightSummaryDto {
 mod tests {
     use super::MatchCardDto;
     use crate::insight::domain::match_list::{MatchCard, MatchTechnicalStat};
+
+    #[test]
+    fn overview_dto_exposes_recent_form_in_chronological_order() {
+        use super::OverviewStandingDto;
+        use crate::insight::domain::overview::{MatchOutcome, OverviewStanding};
+        let dto = OverviewStandingDto::from(OverviewStanding {
+            rank_no: 1,
+            team_id: 10,
+            team_name: "球队".to_string(),
+            points: 20,
+            avatar_storage_url: None,
+            recent_form: vec![MatchOutcome::Loss, MatchOutcome::Draw, MatchOutcome::Win],
+        });
+        let json = serde_json::to_value(dto).unwrap();
+        assert_eq!(
+            json["recent_form"],
+            serde_json::json!(["loss", "draw", "win"])
+        );
+    }
 
     #[test]
     fn match_card_dto_includes_corner_fields() {

@@ -26,6 +26,27 @@ pub struct OverviewStanding {
     pub team_name: String,
     pub points: i32,
     pub avatar_storage_url: Option<String>,
+    /// Completed league matches, oldest first, at most six results.
+    pub recent_form: Vec<MatchOutcome>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MatchOutcome {
+    Win,
+    Draw,
+    Loss,
+}
+
+impl MatchOutcome {
+    pub fn from_scores(goals_for: &str, goals_against: &str) -> Option<Self> {
+        let goals_for = goals_for.trim().parse::<u32>().ok()?;
+        let goals_against = goals_against.trim().parse::<u32>().ok()?;
+        Some(match goals_for.cmp(&goals_against) {
+            std::cmp::Ordering::Greater => Self::Win,
+            std::cmp::Ordering::Equal => Self::Draw,
+            std::cmp::Ordering::Less => Self::Loss,
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -51,4 +72,33 @@ pub struct OverviewPlayer {
     pub team_name: String,
     pub score_value: String,
     pub avatar_storage_url: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MatchOutcome;
+
+    #[test]
+    fn team_form_compares_numeric_scores_from_the_teams_perspective() {
+        assert_eq!(
+            MatchOutcome::from_scores("10", "2"),
+            Some(MatchOutcome::Win)
+        );
+        assert_eq!(
+            MatchOutcome::from_scores("0", "0"),
+            Some(MatchOutcome::Draw)
+        );
+        assert_eq!(
+            MatchOutcome::from_scores("1", "3"),
+            Some(MatchOutcome::Loss)
+        );
+    }
+
+    #[test]
+    fn team_form_does_not_turn_missing_or_invalid_scores_into_draws() {
+        for score in ["", "-", "-1", "1.5", "abc", "99999999999999999999"] {
+            assert_eq!(MatchOutcome::from_scores(score, "0"), None);
+            assert_eq!(MatchOutcome::from_scores("0", score), None);
+        }
+    }
 }

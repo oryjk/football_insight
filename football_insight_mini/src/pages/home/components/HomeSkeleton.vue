@@ -39,7 +39,7 @@
       </view>
     </view>
 
-    <view v-for="list in 2" :key="`skeleton-ranking-panel-${list}`" class="skeleton-panel-card skeleton-panel">
+    <view v-for="list in 2" :key="`skeleton-ranking-panel-${list}`" class="skeleton-panel-card skeleton-panel" :class="{ 'skeleton-standings': list === 1 }">
       <view class="skeleton-heading">
         <view class="skeleton-copy-group">
           <view class="skeleton-line skeleton-line--kicker" />
@@ -271,6 +271,20 @@
   align-items: center;
   padding: var(--fi-space-12) var(--fi-space-10);
   display: flex;
+}
+
+.skeleton-standings .skeleton-ranking-row {
+  padding-top: var(--fi-space-20);
+  padding-bottom: var(--fi-space-16);
+}
+
+.skeleton-standings .skeleton-ranking-body {
+  gap: var(--fi-space-18);
+}
+
+.skeleton-standings .skeleton-line--note {
+  width: 100%;
+  height: var(--fi-space-56);
 }
 
 .skeleton-line--rank {

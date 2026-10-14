@@ -56,6 +56,7 @@ mod tests {
                     team_name: "成都蓉城".to_string(),
                     points: 18,
                     avatar_storage_url: Some("https://cdn.example.com/teams/77680.png".to_string()),
+                    recent_form: vec![],
                 }],
                 recent_matches: vec![OverviewMatch {
                     match_id: 1,

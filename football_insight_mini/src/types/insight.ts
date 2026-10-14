@@ -9,12 +9,16 @@ export interface RoundReference {
   completed_matches: number
 }
 
+export type MatchOutcome = 'win' | 'draw' | 'loss'
+
 export interface OverviewStanding {
   rank_no: number
   team_id: number
   team_name: string
   points: number
   avatar_storage_url: string | null
+  /** Oldest to newest; optional while older API versions are still deployed. */
+  recent_form?: MatchOutcome[]
 }
 
 export interface OverviewMatch {

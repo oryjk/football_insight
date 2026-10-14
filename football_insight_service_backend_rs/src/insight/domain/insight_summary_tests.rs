@@ -23,6 +23,7 @@ mod tests {
                     team_name: "成都蓉城".to_string(),
                     points: 10,
                     avatar_storage_url: None,
+                    recent_form: vec![],
                 },
                 OverviewStanding {
                     rank_no: 2,
@@ -30,6 +31,7 @@ mod tests {
                     team_name: "云南玉昆".to_string(),
                     points: 9,
                     avatar_storage_url: None,
+                    recent_form: vec![],
                 },
             ],
             recent_matches: vec![OverviewMatch {

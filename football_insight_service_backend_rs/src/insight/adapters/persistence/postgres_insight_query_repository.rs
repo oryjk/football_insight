@@ -3,6 +3,8 @@ use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
 use sqlx::{PgPool, types::Json};
 use std::time::Instant;
 
+use super::recent_team_form::fetch_recent_team_form;
+
 use crate::insight::{
     domain::{
         insight_summary::{RankingMovement, generate_insight_summary},
@@ -211,6 +213,16 @@ impl PostgresInsightQueryRepository {
             "overview base queries completed"
         );
 
+        let team_ids: Vec<_> = standings_top_rows.iter().map(|row| row.team_id).collect();
+        let mut recent_forms = fetch_recent_team_form(
+            &self.pool,
+            season,
+            &team_ids,
+            round_number,
+            round_number.and(latest_scrape_finished_at),
+        )
+        .await?;
+
         let standings_top = standings_top_rows
             .into_iter()
             .map(|row| OverviewStanding {
@@ -219,6 +231,7 @@ impl PostgresInsightQueryRepository {
                 team_name: row.team_name,
                 points: row.points,
                 avatar_storage_url: row.avatar_storage_url,
+                recent_form: recent_forms.remove(&row.team_id).unwrap_or_default(),
             })
             .collect();
 

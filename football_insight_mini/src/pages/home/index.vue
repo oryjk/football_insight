@@ -58,10 +58,8 @@
             @open-tech-stats="openPulseMatchTechStats"
           />
 
-          <HomeRankingPanel
-            kicker="积分榜头部"
-            title="先看联赛头部格局"
-            :rows="standingsRows"
+          <HomeStandingsPanel
+            :teams="standings"
             @select="openStandingsRowSheet"
           />
 
@@ -114,6 +112,7 @@ import HomeSupportPanel from './components/HomeSupportPanel.vue'
 import HomeSkeleton from './components/HomeSkeleton.vue'
 import HomeStoryPanel from './components/HomeStoryPanel.vue'
 import HomeRankingPanel from './components/HomeRankingPanel.vue'
+import HomeStandingsPanel from './components/HomeStandingsPanel.vue'
 import HomeTechStatsSheet from './components/HomeTechStatsSheet.vue'
 import HomeTeamSeasonSheet from './components/HomeTeamSeasonSheet.vue'
 import HomeFavoriteTeamSheet from './components/HomeFavoriteTeamSheet.vue'
@@ -277,19 +276,6 @@ const watchPoints = computed(() =>
     topScorer: topScorer.value,
     secondScorer: scorers.value[1] ?? null,
   }),
-)
-
-const standingsRows = computed(() =>
-  standings.value.map(team => ({
-    key: team.team_id,
-    rankNo: team.rank_no,
-    avatar: team.avatar_storage_url,
-    name: team.team_name,
-    note: '点击查看赛季战绩',
-    metricValue: team.points,
-    metricNote: '积分',
-    interactive: true,
-  })),
 )
 
 const scorersRows = computed(() =>
