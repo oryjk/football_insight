@@ -268,10 +268,11 @@
 }
 
 .skeleton-ranking-row {
-  gap: var(--fi-space-16);
+  display: grid;
+  grid-template-columns: var(--fi-space-32) var(--fi-space-44) minmax(0, 1fr) var(--fi-space-72);
+  gap: var(--fi-space-8);
   align-items: center;
-  padding: var(--fi-space-12) var(--fi-space-10);
-  display: flex;
+  padding: var(--fi-space-8) 0;
 }
 
 .skeleton-standings .skeleton-ranking-row {
@@ -301,14 +302,14 @@
 }
 
 .skeleton-line--rank {
-  width: 72rpx;
-  height: 24rpx;
+  width: var(--fi-space-32);
+  height: var(--fi-font-24);
 }
 
 .skeleton-line--avatar {
-  width: 68rpx;
-  height: 68rpx;
-  border-radius: 999rpx;
+  width: var(--fi-space-44);
+  height: var(--fi-space-44);
+  border-radius: var(--fi-radius-round);
 }
 
 .skeleton-ranking-body {
@@ -320,17 +321,19 @@
 
 .skeleton-line--name {
   width: 240rpx;
-  height: 30rpx;
+  max-width: 100%;
+  height: var(--fi-font-28);
 }
 
 .skeleton-line--note {
   width: 160rpx;
-  height: 22rpx;
+  max-width: 100%;
+  height: var(--fi-font-22);
 }
 
 .skeleton-line--points {
-  width: 72rpx;
-  height: 36rpx;
+  width: var(--fi-space-72);
+  height: var(--fi-font-36);
   justify-self: end;
 }
 

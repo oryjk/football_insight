@@ -16,6 +16,9 @@ page {
   --fi-primitive-red-deep: #b91c1c;
   --fi-primitive-red-darker: #991b1b;
   --fi-primitive-green: #26a269;
+  --fi-primitive-ranking-second: #2563eb;
+  --fi-primitive-ranking-third: #16a34a;
+  --fi-primitive-ranking-pressed: rgba(220, 38, 38, 0.08);
   --fi-primitive-ink: #15161b;
   --fi-primitive-ink-deep: #121212;
   --fi-primitive-grey-text: #8f9198;
@@ -103,6 +106,9 @@ page {
   /* ===== Semantic：颜色 ===== */
   /* 兼容 uni.css 时代的既有语义名（值保持不变） */
   --fi-color-primary: var(--fi-primitive-red);
+  --fi-color-ranking-second: var(--fi-primitive-ranking-second);
+  --fi-color-ranking-third: var(--fi-primitive-ranking-third);
+  --fi-color-ranking-pressed: var(--fi-primitive-ranking-pressed);
   --fi-color-success: #4cd964;
   --fi-color-warning: #f0ad4e;
   --fi-color-error: #dd524d;

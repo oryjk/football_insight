@@ -58,34 +58,33 @@ const emit = defineEmits<{
 
 <style scoped lang="css">
 .ranking-list {
-  margin-top: 12rpx;
+  margin-top: var(--fi-space-12);
   display: grid;
-  gap: 10rpx;
+  gap: var(--fi-space-10);
 }
 
 .ranking-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--fi-space-32) var(--fi-space-44) minmax(0, 1fr) max-content;
   align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
+  column-gap: var(--fi-space-8);
+  padding: var(--fi-space-8) 0;
 }
 
 .ranking-row--interactive {
-  padding: 10rpx 8rpx;
-  border-radius: 24rpx;
+  border-radius: var(--fi-radius-md);
   transition: transform 180ms ease, background-color 180ms ease;
 }
 
 .ranking-row--pressed {
   transform: scale(0.992);
-  background: rgba(var(--fi-primitive-red-rgb), 0.08);
+  background: var(--fi-color-ranking-pressed);
 }
 
 .ranking-row__rank {
-  width: 72rpx;
   color: var(--fi-color-text-muted);
-  font-size: 24rpx;
-  font-weight: 700;
+  font-size: var(--fi-font-24);
+  font-weight: var(--fi-weight-bold);
 }
 
 .ranking-row__rank--1 {
@@ -93,18 +92,18 @@ const emit = defineEmits<{
 }
 
 .ranking-row__rank--2 {
-  color: #2563eb;
+  color: var(--fi-color-ranking-second);
 }
 
 .ranking-row__rank--3 {
-  color: #16a34a;
+  color: var(--fi-color-ranking-third);
 }
 
 .ranking-row__avatar {
-  width: 68rpx;
-  height: 68rpx;
-  border-radius: 999rpx;
-  background: #f5f6fa;
+  width: var(--fi-space-44);
+  height: var(--fi-space-44);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-page);
 }
 
 .ranking-row__avatar--player {
@@ -117,7 +116,6 @@ const emit = defineEmits<{
 }
 
 .ranking-row__body {
-  flex: 1;
   min-width: 0;
 }
 
@@ -127,19 +125,26 @@ const emit = defineEmits<{
 
 .ranking-row__name {
   color: var(--fi-color-text-strong);
-  font-size: 30rpx;
-  font-weight: 700;
+  font-size: var(--fi-font-28);
+  font-weight: var(--fi-weight-bold);
 }
 
 .ranking-row__note,
 .ranking-row__metric-note {
   color: var(--fi-color-text-muted);
-  font-size: 22rpx;
+  font-size: var(--fi-font-22);
+}
+
+.ranking-row__name,
+.ranking-row__note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ranking-row__metric-value {
   color: var(--fi-color-text-strong);
-  font-size: 36rpx;
-  font-weight: 800;
+  font-size: var(--fi-font-36);
+  font-weight: var(--fi-weight-extrabold);
 }
 </style>
