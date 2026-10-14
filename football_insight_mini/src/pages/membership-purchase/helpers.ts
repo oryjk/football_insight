@@ -14,6 +14,15 @@ export function formatMembershipTierLabel(tier: string | null | undefined): stri
   return tier === 'V3' ? 'VIP3' : tier
 }
 
+/** 刷新数据后的选中档位：保留用户已选且仍可购买的档位，否则回到第一个可购买档位。 */
+export function resolveSelectedTier(
+  current: string,
+  options: Pick<MembershipProductOption, 'target_tier'>[],
+): string {
+  if (options.some(option => option.target_tier === current)) return current
+  return options[0]?.target_tier ?? ''
+}
+
 export function formatMembershipDuration(months: number | null | undefined): string {
   const duration = typeof months === 'number' && Number.isInteger(months) && months > 0 ? months : 12
   if (duration === 12) return '一年'

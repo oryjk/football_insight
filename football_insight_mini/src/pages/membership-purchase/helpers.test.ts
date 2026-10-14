@@ -12,6 +12,7 @@ import {
   formatMembershipDuration,
   buildMembershipPurchaseAgreement,
   formatMembershipTierLabel,
+  resolveSelectedTier,
 } from './helpers'
 
 const backendProductOptions = [
@@ -154,5 +155,25 @@ describe('formatMembershipTierLabel', () => {
   test('缺失档位展示占位符', () => {
     expect(formatMembershipTierLabel(undefined)).toBe('--')
     expect(formatMembershipTierLabel('')).toBe('--')
+  })
+})
+
+describe('resolveSelectedTier', () => {
+  const options = [{ target_tier: 'V6' }, { target_tier: 'V7' }, { target_tier: 'V9' }] as never[]
+
+  test('刷新后保留用户已选档位', () => {
+    expect(resolveSelectedTier('V9', options)).toBe('V9')
+  })
+
+  test('没有选择过时默认第一个档位', () => {
+    expect(resolveSelectedTier('', options)).toBe('V6')
+  })
+
+  test('已选档位不再可购买（如已升级）时回到第一个档位', () => {
+    expect(resolveSelectedTier('V8', options)).toBe('V6')
+  })
+
+  test('没有可购买档位时为空', () => {
+    expect(resolveSelectedTier('V6', [])).toBe('')
   })
 })

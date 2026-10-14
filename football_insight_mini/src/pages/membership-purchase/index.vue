@@ -5,7 +5,7 @@
     <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
     <view class="page">
-      <FiPanel v-if="!paymentAvailable">
+      <FiPanel v-if="paymentChecked && !paymentAvailable">
         <text class="notice-title">会员购买暂未开放</text>
         <text class="notice-body">{{ paymentUnavailableMessage }}</text>
       </FiPanel>
@@ -116,6 +116,7 @@ import {
   formatMembershipUpgradeNote,
   getMembershipPayPriceCents,
   normalizeMembershipProductOptions,
+  resolveSelectedTier,
 } from './helpers'
 
 const { navigationPageStyle } = useNavigationLayout()
@@ -136,6 +137,8 @@ const agreementSheetVisible = ref(false)
 const pageLockStyle = computed(() => rulesSheetVisible.value || agreementSheetVisible.value ? 'overflow: hidden;' : '')
 const agreementPoints = computed(() => buildMembershipPurchaseAgreement(selectedProduct.value?.membership_duration_months))
 const paymentAvailable = ref(false)
+// 首次检查完成前不展示「暂未开放」；之后的刷新沿用上次结果，避免卡片闪现导致页面抖动。
+const paymentChecked = ref(false)
 const paymentUnavailableMessage = ref('请稍后再试。')
 
 const allProductOptions = computed(() => normalizeMembershipProductOptions(product.value))
@@ -207,15 +210,17 @@ onShow(() => {
 
 async function loadPurchaseData() {
   const revision = session.revision.value
-  paymentAvailable.value = false
   try {
     const status = await getVirtualPaymentStatus()
     if (session.revision.value !== revision) return
     paymentAvailable.value = status.available && canUseVirtualPayment()
     paymentUnavailableMessage.value = !status.available ? '购买服务暂未开放，请稍后再试。' : '请使用支持该支付功能的最新版微信小程序。'
+    paymentChecked.value = true
   } catch {
     if (session.revision.value !== revision) return
+    paymentAvailable.value = false
     paymentUnavailableMessage.value = '购买服务暂不可用，请稍后重试。'
+    paymentChecked.value = true
   }
 
   const [productResult] = await Promise.allSettled([
@@ -231,7 +236,7 @@ async function loadPurchaseData() {
     uni.showToast({ title: extractApiErrorMessage(productResult.reason, '会员信息加载失败'), icon: 'none' })
   }
 
-  selectedTier.value = productOptions.value[0]?.target_tier ?? ''
+  selectedTier.value = resolveSelectedTier(selectedTier.value, productOptions.value)
 }
 
 function selectTier(targetTier: string): void {
@@ -247,6 +252,7 @@ watch(session.revision, () => {
   product.value = null
   selectedTier.value = ''
   paymentAvailable.value = false
+  paymentChecked.value = false
   void loadPurchaseData()
 })
 
