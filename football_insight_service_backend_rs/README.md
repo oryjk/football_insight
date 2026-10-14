@@ -790,3 +790,11 @@ curl 'http://127.0.0.1:8092/api/v1/ai/chat' \
   [football_insight_mini/README.md](../football_insight_mini/README.md)
 - Python 抓取器：
   [sina_csl_scraper/README.md](../sina_csl_scraper/README.md)
+
+### Admin 会员来源与同等级会员
+
+`GET /api/v1/admin/products/{product_key}/members?page=1&page_size=20` 要求 Admin JWT / ManageProducts，返回 no-store。响应 `{catalog_product_id,membership_tier,items,total,page,page_size}`；每位会员包含 `{user_id,user_nickname,user_avatar_url,membership_origin,expires_at,expired}`。会员来源为 purchase/referral/unknown。
+
+查询该商品等级对应的活跃账号，包含已到期账号；这不是当前 SKU 的购买证明，不影响原购买人数和金额统计。支付订单响应另含固定 `membership_origin:"purchase"`，表示这笔历史交易来源，不能当作用户当前会员来源。
+
+来源迁移 `20261014110000` 只以精确支付权益证据回填历史购买，无法确定的保留 unknown；不以没有订单或推荐人数推断来源。未来支付及推荐实际授予在同事务设置来源，其他权益变更由触发器归为 unknown，昵称修改不改变来源。退款额外保存前后来源，权益与来源都一致才撤销，恢复前一来源；旧快照来源保守回填，避免覆盖后续人工调整。
