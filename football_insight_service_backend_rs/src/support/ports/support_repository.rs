@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+use crate::support::application::cancel_match_support_vote::CancelSupportVoteError;
 use crate::support::domain::support::{SupportMatchDetail, SupportTeamSummary, SupportUserContext};
 
 #[async_trait]
@@ -36,4 +37,6 @@ pub trait SupportRepository: Send + Sync {
         match_id: i64,
         supported_team_id: i64,
     ) -> anyhow::Result<()>;
+    async fn remove_vote(&self, user_id: Uuid, match_id: i64)
+    -> Result<(), CancelSupportVoteError>;
 }

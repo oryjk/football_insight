@@ -438,4 +438,19 @@ impl SupportRepository for PostgresSupportRepository {
             Err(error) => Err(error.into()),
         }
     }
+
+    async fn remove_vote(
+        &self,
+        user_id: Uuid,
+        match_id: i64,
+    ) -> Result<(), crate::support::application::cancel_match_support_vote::CancelSupportVoteError>
+    {
+        sqlx::query("DELETE FROM f_i_match_support_votes WHERE user_id = $1 AND match_id = $2")
+            .bind(user_id)
+            .bind(match_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|_| crate::support::application::cancel_match_support_vote::CancelSupportVoteError::RepositoryUnavailable)?;
+        Ok(())
+    }
 }

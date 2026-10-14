@@ -3,7 +3,7 @@
     class="home-support-vote"
     :class="{ 'home-support-vote--supported': supported, 'home-support-vote--disabled': disabled && !supported }"
     :disabled="disabled"
-    :aria-label="`${team.team_name}，${label}，${team.support_count} 次助力`"
+    :aria-label="`${team.team_name}，${label}，${team.support_count} 次助力${supported && !disabled ? '，点击取消助力' : ''}`"
     hover-class="home-support-vote--pressed"
     @click.stop="emit('vote', team.team_id)"
   >

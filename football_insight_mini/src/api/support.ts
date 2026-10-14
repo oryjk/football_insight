@@ -47,3 +47,11 @@ export function castSupportVote(
     data: payload,
   })
 }
+
+export function cancelSupportVote(matchId: number): Promise<SupportMatchDetail> {
+  return request<SupportMatchDetail>({
+    url: `/support/matches/${matchId}/votes`,
+    method: 'DELETE',
+    auth: true,
+  })
+}

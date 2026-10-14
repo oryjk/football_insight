@@ -6,8 +6,9 @@ use axum::{
 };
 
 use crate::support::adapters::web::handlers::{
-    SupportWebState, cast_support_vote_handler, get_match_support_detail_handler,
-    get_support_profile_handler, list_support_teams_handler, set_favorite_team_handler,
+    SupportWebState, cancel_support_vote_handler, cast_support_vote_handler,
+    get_match_support_detail_handler, get_support_profile_handler, list_support_teams_handler,
+    set_favorite_team_handler,
 };
 
 pub fn support_routes(state: Arc<SupportWebState>) -> Router {
@@ -24,7 +25,7 @@ pub fn support_routes(state: Arc<SupportWebState>) -> Router {
         )
         .route(
             "/api/v1/support/matches/{match_id}/votes",
-            post(cast_support_vote_handler),
+            post(cast_support_vote_handler).delete(cancel_support_vote_handler),
         )
         .with_state(state)
 }

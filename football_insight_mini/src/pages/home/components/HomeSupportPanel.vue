@@ -97,7 +97,7 @@
           <view class="support-home-match-card__bar-away" :style="{ width: `${nextMatch.away_team.support_share_pct}%` }" />
         </view>
         <view class="support-home-match-card__footer">
-          <text>{{ nextMatch.viewer.has_supported ? '本场已助力' : '任选一队，每场助力一次' }}</text>
+          <text>{{ voteHint }}</text>
           <text class="support-home-match-card__action">进入助力页</text>
         </view>
       </view>
@@ -185,6 +185,11 @@ const homeVoteState = computed(() => resolveHomeSupportVoteState(
 const awayVoteState = computed(() => resolveHomeSupportVoteState(
   nextMatch.value, nextMatch.value?.away_team.team_id ?? 0, props.voteSubmittingTeamId, props.now, props.favoriteSubmitting,
 ))
+const voteHint = computed(() => {
+  const match = nextMatch.value
+  if (!match || match.support_window_status !== 'open' || Date.parse(match.kickoff_at) <= props.now) return '助力已截止'
+  return match.viewer.has_supported ? '点击已助力可取消' : '任选一队，每场保留一份助力'
+})
 const weekdayLabel = computed(() => resolveHomeSupportMatchWeekdayLabel(nextMatch.value?.match_date))
 const teamRankMap = computed(() => new Map(props.teams.map((team) => [team.team_id, team.rank_no])))
 const homeRankLabel = computed(() => {

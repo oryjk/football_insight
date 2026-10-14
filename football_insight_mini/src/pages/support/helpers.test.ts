@@ -24,7 +24,7 @@ describe('support page voting window copy', () => {
     expect(resolveSupportHeroBadge(detail)).toBe('助力进行中')
     expect(resolveSupportHeroSummary(detail)).toBe('任选主队或客队助力，并把页面转发给朋友继续拉票。')
     expect(resolveSupportWindowLabel(detail)).toBe('助力开放')
-    expect(resolveSupportStanceDescription(detail as never, { team_name: '成都蓉城' })).toBe('主队和客队均可助力，每场比赛只能选择一队投一次。')
+    expect(resolveSupportStanceDescription(detail as never, { team_name: '成都蓉城' })).toBe('主队和客队均可助力，开球前可取消，每场同一时间只能保留一队的助力。')
     expect(resolveSupportVoteButtonText(detail as never, { team_name: '成都蓉城' }, true)).toBe('为 成都蓉城 助力')
     expect(resolveSupportCountdownLabel(detail)).toBe('距开赛 46 小时 16 分 0 秒')
   })

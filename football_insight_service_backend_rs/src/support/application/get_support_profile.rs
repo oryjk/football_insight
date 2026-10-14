@@ -136,6 +136,16 @@ mod tests {
         ) -> anyhow::Result<()> {
             unreachable!()
         }
+        async fn remove_vote(
+            &self,
+            _user_id: Uuid,
+            _match_id: i64,
+        ) -> Result<
+            (),
+            crate::support::application::cancel_match_support_vote::CancelSupportVoteError,
+        > {
+            unreachable!()
+        }
     }
 
     #[tokio::test]

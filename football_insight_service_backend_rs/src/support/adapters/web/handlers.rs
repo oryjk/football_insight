@@ -15,10 +15,12 @@ use crate::{
             SupportProfileDto, SupportTeamDto,
         },
         application::{
+            cancel_match_support_vote::{CancelMatchSupportVoteUseCase, CancelSupportVoteError},
             cast_match_support_vote::CastMatchSupportVoteUseCase,
             get_match_support_detail::GetMatchSupportDetailUseCase,
             get_support_profile::GetSupportProfileUseCase,
-            list_support_teams::ListSupportTeamsUseCase, set_favorite_team::SetFavoriteTeamUseCase,
+            list_support_teams::ListSupportTeamsUseCase,
+            set_favorite_team::SetFavoriteTeamUseCase,
         },
     },
 };
@@ -30,6 +32,7 @@ pub struct SupportWebState {
     pub set_favorite_team_use_case: Arc<SetFavoriteTeamUseCase>,
     pub get_match_support_detail_use_case: Arc<GetMatchSupportDetailUseCase>,
     pub cast_match_support_vote_use_case: Arc<CastMatchSupportVoteUseCase>,
+    pub cancel_match_support_vote_use_case: Arc<CancelMatchSupportVoteUseCase>,
     pub token_port: Arc<dyn TokenPort>,
 }
 
@@ -117,6 +120,31 @@ fn authenticate_user(
         .verify_token(token)
         .map(|claims| claims.sub)
         .map_err(|_| (StatusCode::UNAUTHORIZED, "请先登录".to_string()))
+}
+
+pub async fn cancel_support_vote_handler(
+    State(state): State<Arc<SupportWebState>>,
+    headers: HeaderMap,
+    Path(match_id): Path<i64>,
+) -> Result<Json<SupportMatchDetailDto>, (StatusCode, String)> {
+    let user_id = authenticate_user(&headers, state.token_port.as_ref())?;
+    let detail = state
+        .cancel_match_support_vote_use_case
+        .execute(user_id, match_id)
+        .await
+        .map_err(|error| match error {
+            CancelSupportVoteError::MatchNotFound => {
+                (StatusCode::NOT_FOUND, "未找到对应比赛".to_string())
+            }
+            CancelSupportVoteError::WindowClosed => {
+                (StatusCode::BAD_REQUEST, "助力已截止，不能取消".to_string())
+            }
+            CancelSupportVoteError::RepositoryUnavailable => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "取消助力失败，请稍后重试".to_string(),
+            ),
+        })?;
+    Ok(Json(detail.into()))
 }
 
 fn authenticate_user_optional(headers: &HeaderMap, token_port: &dyn TokenPort) -> Option<Uuid> {

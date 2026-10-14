@@ -174,26 +174,7 @@ export function resolveHomeSupportNextMatchLabel(
   return match.status === 'finished' ? '比赛已完赛' : '比赛已开始'
 }
 
-export function resolveHomeSupportVoteState(
-  match: SupportMatchDetail | null,
-  teamId: number,
-  submittingTeamId: number | null,
-  now: number,
-  changingFavorite = false,
-): { label: string; disabled: boolean; supported: boolean } {
-  const supported = !!match?.viewer.has_supported && match.viewer.supported_team_id === teamId
-  if (supported) return { label: '已助力', disabled: true, supported: true }
-  if (submittingTeamId === teamId) return { label: '提交中', disabled: true, supported: false }
-  const kickoff = Date.parse(match?.kickoff_at ?? '')
-  const open = !!match && match.support_window_status === 'open'
-    && Number.isFinite(kickoff) && kickoff > now
-  return {
-    label: !open && match?.support_window_status !== 'locked' ? '已结束' : '助力',
-    disabled: !open || !match?.viewer.can_support || match.viewer.has_supported
-      || submittingTeamId !== null || changingFavorite,
-    supported: false,
-  }
-}
+export { resolveSupportVoteState as resolveHomeSupportVoteState } from '../../utils/supportVoteState'
 
 /** Compare Beijing calendar dates, not rounded 24-hour durations or the phone timezone. */
 export function resolveHomeSupportMatchDaysRemaining(

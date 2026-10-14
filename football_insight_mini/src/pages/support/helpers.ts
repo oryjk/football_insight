@@ -74,14 +74,16 @@ export function resolveSupportStanceDescription(
   }
 
   if (detail.viewer.has_supported) {
-    return '这场比赛你已经完成一次助力，接下来更适合转发拉票。'
+    return detail.support_window_status === 'closed'
+      ? '助力已截止，可以转发本场助力结果。'
+      : '已助力，开球前可点击对应按钮取消，并重新选择球队。'
   }
 
   if (detail.support_window_status === 'closed') {
     return '比赛已经开始，当前只能查看这场比赛的最终助力结果。'
   }
 
-  return '主队和客队均可助力，每场比赛只能选择一队投一次。'
+  return '主队和客队均可助力，开球前可取消，每场同一时间只能保留一队的助力。'
 }
 
 export function resolveSupportedTeam(

@@ -1,5 +1,5 @@
 import { ref, type Ref } from 'vue'
-import { castSupportVote, getSupportProfile, listSupportTeams, setFavoriteTeam } from '../../api/support'
+import { cancelSupportVote, castSupportVote, getSupportProfile, listSupportTeams, setFavoriteTeam } from '../../api/support'
 import type { CastSupportVotePayload, SetFavoriteTeamPayload, SupportMatchDetail, SupportProfile, SupportTeam } from '../../types/support'
 import type { AppSession } from '../../stores/appSession'
 import { extractApiErrorMessage } from '../../utils/apiError'
@@ -13,6 +13,7 @@ export interface HomeSupportDataDeps {
   /** 测试注入可控的写操作；默认走真实 api 层。 */
   setFavoriteTeam?: (payload: SetFavoriteTeamPayload) => Promise<SupportTeam>
   castSupportVote?: (matchId: number, payload: CastSupportVotePayload) => Promise<SupportMatchDetail>
+  cancelSupportVote?: (matchId: number) => Promise<SupportMatchDetail>
 }
 
 export interface HomeSupportData {
@@ -27,7 +28,7 @@ export interface HomeSupportData {
   /** 设置主队写操作是否提交中（会话作用域，跨账号同步复位）。 */
   favoriteSubmitting: Ref<boolean>
   voteSubmittingTeamId: Ref<number | null>
-  /** 直接助力；重复点击或旧会话的迟到结果返回 false，不发布到当前页面。 */
+  /** 提交助力，或点击当前已助力球队取消；重复点击和旧会话的迟到结果返回 false。 */
   submitSupportVote: (teamId: number) => Promise<boolean>
   /**
    * 设置主队写操作（带操作身份）。返回 true 表示写成功且调用方仍属于原会话，
@@ -68,6 +69,7 @@ export function useHomeSupportData(deps: HomeSupportDataDeps): HomeSupportData {
   const fetchSupportTeams = deps.listSupportTeams ?? listSupportTeams
   const writeFavoriteTeam = deps.setFavoriteTeam ?? setFavoriteTeam
   const writeSupportVote = deps.castSupportVote ?? castSupportVote
+  const removeSupportVote = deps.cancelSupportVote ?? cancelSupportVote
 
   const supportLoading = ref(true)
   const supportErrorMessage = ref('')
@@ -253,12 +255,13 @@ export function useHomeSupportData(deps: HomeSupportDataDeps): HomeSupportData {
     if (teamId !== match.home_team.team_id && teamId !== match.away_team.team_id) {
       throw new Error('请选择本场比赛的球队')
     }
-    if (match.viewer.has_supported) throw new Error('本场比赛已经助力过了')
+    const canceling = match.viewer.has_supported && match.viewer.supported_team_id === teamId
+    if (match.viewer.has_supported && !canceling) throw new Error('本场比赛已经助力过了，请先取消当前助力')
     const kickoff = Date.parse(match.kickoff_at)
     if (match.support_window_status !== 'open' || !Number.isFinite(kickoff) || kickoff <= Date.now()) {
       throw new Error('本场助力已关闭')
     }
-    if (!match.viewer.can_support) throw new Error('本场暂时不能助力，请刷新后重试')
+    if (!canceling && !match.viewer.can_support) throw new Error('本场暂时不能助力，请刷新后重试')
 
     const requestRevision = session.revision.value
     const favoriteTeamId = profile.favorite_team?.team_id
@@ -276,7 +279,9 @@ export function useHomeSupportData(deps: HomeSupportDataDeps): HomeSupportData {
     // 助力前的 profile 快照迟到时不能覆盖 POST 返回的票数与已助力状态。
     invalidateReads()
     try {
-      const updatedMatch = await writeSupportVote(match.match_id, { supported_team_id: teamId })
+      const updatedMatch = canceling
+        ? await removeSupportVote(match.match_id)
+        : await writeSupportVote(match.match_id, { supported_team_id: teamId })
       if (!isCurrent()) return false
       if (updatedMatch.match_id !== match.match_id) throw new Error('助力结果与当前比赛不一致，请刷新后重试')
       invalidateReads()

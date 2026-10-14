@@ -467,11 +467,12 @@ function openSupportMatch() {
 }
 
 async function handleHomeSupportVote(teamId: number) {
+  const canceling = supportProfile.value?.next_match?.viewer.supported_team_id === teamId
   try {
     const completed = await submitSupportVote(teamId)
-    if (completed) uni.showToast({ title: '助力成功', icon: 'success' })
+    if (completed) uni.showToast({ title: canceling ? '已取消助力' : '助力成功', icon: 'success' })
   } catch (error) {
-    uni.showToast({ title: extractApiErrorMessage(error, '助力失败，请稍后重试'), icon: 'none' })
+    uni.showToast({ title: extractApiErrorMessage(error, canceling ? '取消失败，请稍后重试' : '助力失败，请稍后重试'), icon: 'none' })
   }
 }
 

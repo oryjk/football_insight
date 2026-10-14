@@ -11,6 +11,7 @@ use crate::{
             web::{handlers::SupportWebState, routes::support_routes},
         },
         application::{
+            cancel_match_support_vote::CancelMatchSupportVoteUseCase,
             cast_match_support_vote::CastMatchSupportVoteUseCase,
             get_match_support_detail::GetMatchSupportDetailUseCase,
             get_support_profile::GetSupportProfileUseCase,
@@ -28,7 +29,12 @@ pub fn build_support_routes(pool: PgPool, token_port: Arc<dyn TokenPort>) -> Rou
         get_match_support_detail_use_case: Arc::new(GetMatchSupportDetailUseCase::new(
             repository.clone(),
         )),
-        cast_match_support_vote_use_case: Arc::new(CastMatchSupportVoteUseCase::new(repository)),
+        cast_match_support_vote_use_case: Arc::new(CastMatchSupportVoteUseCase::new(
+            repository.clone(),
+        )),
+        cancel_match_support_vote_use_case: Arc::new(CancelMatchSupportVoteUseCase::new(
+            repository,
+        )),
         token_port,
     });
 

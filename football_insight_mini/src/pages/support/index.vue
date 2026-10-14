@@ -92,22 +92,22 @@
               v-for="team in matchTeams"
               :key="team.team_id"
               class="primary-action support-actions__primary"
-              :class="{ 'primary-action--disabled': !canCastVote || voteSubmittingTeamId !== null }"
-              :disabled="!canCastVote || voteSubmittingTeamId !== null"
+              :class="{ 'primary-action--disabled': !canTakeVoteAction(team.team_id) }"
+              :disabled="!canTakeVoteAction(team.team_id)"
               @click="handleVote(team.team_id)"
             >
-              {{ voteSubmittingTeamId === team.team_id ? '提交中' : resolveSupportVoteButtonText(detail, team, session.hasAccessToken.value) }}
+              {{ voteButtonLabel(team) }}
             </button>
             <button class="secondary-action" open-type="share">
               转发拉票
             </button>
-            <button class="secondary-action" @click="generatePoster">
-              生成拉票海报
+            <button class="secondary-action" :disabled="posterGenerating" @click="generatePoster">
+              {{ posterGenerating ? '生成中' : '生成拉票海报' }}
             </button>
           </view>
 
           <text class="support-state-card__rule">
-            规则：主队和客队均可助力，每个用户每场比赛只能选择一队助力 1 次，比赛开始后自动关闭。
+            规则：主客队任选，开球前可点击已助力取消并重新选择；同一时间只能保留一队的助力，比赛开始后自动截止。
           </text>
         </view>
 
@@ -138,8 +138,9 @@ import FiLoading from '../../components/FiLoading.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
-import { castSupportVote, getMatchSupportDetail } from '../../api/support'
-import type { SupportMatchDetail } from '../../types/support'
+import { cancelSupportVote, castSupportVote, getMatchSupportDetail } from '../../api/support'
+import { resolveSupportVoteState } from '../../utils/supportVoteState'
+import type { SupportMatchDetail, SupportMatchTeam } from '../../types/support'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { setPostLoginRedirectTarget } from '../../utils/authStorage'
 import { useAppSession } from '../../stores/appSession'
@@ -149,7 +150,6 @@ import {
   resolveSupportHeroBadge,
   resolveSupportHeroSummary,
   resolveSupportStanceDescription,
-  resolveSupportVoteButtonText,
   resolveSupportWindowLabel,
   resolveSupportedTeam,
 } from './helpers'
@@ -165,6 +165,8 @@ const supportedTeam = computed(() => resolveSupportedTeam(detail.value))
 const matchTeams = computed(() => detail.value ? [detail.value.home_team, detail.value.away_team] : [])
 const matchId = ref<number | null>(null)
 const posterImagePath = ref('')
+const posterGenerating = ref(false)
+let posterRevision = 0
 const liveCountdownSeconds = ref(0)
 let countdownTimer: ReturnType<typeof setInterval> | null = null
 // 登录标记共享自 appSession，退出/换号后自动更新。
@@ -265,17 +267,20 @@ const rankingNote = computed(() => {
     : `${favoriteTeam.value.team_name} 当前赛季助力排名还在形成中。`
 })
 
-const canCastVote = computed(() => {
-  if (!detail.value) {
-    return false
-  }
+function voteState(teamId: number) {
+  return resolveSupportVoteState(detail.value, teamId, voteSubmittingTeamId.value, Date.now())
+}
 
-  if (!session.hasAccessToken.value) {
-    return true
-  }
+function canTakeVoteAction(teamId: number) {
+  return voteSubmittingTeamId.value === null && (!session.hasAccessToken.value || !voteState(teamId).disabled)
+}
 
-  return detail.value.viewer.can_support
-})
+function voteButtonLabel(team: SupportMatchTeam) {
+  if (!session.hasAccessToken.value) return '登录后助力'
+  const state = voteState(team.team_id)
+  if (state.supported && !state.disabled) return '已助力（点击取消）'
+  return state.label === '助力' ? `为 ${team.team_name} 助力` : state.label
+}
 
 onLoad((options) => {
   const rawMatchId = typeof options?.matchId === 'string' ? Number(options.matchId) : Number.NaN
@@ -313,6 +318,7 @@ onShareAppMessage(() => {
 })
 
 async function loadPage(): Promise<void> {
+  invalidatePoster()
   voteOwner = null
   voteSubmittingTeamId.value = null
   if (!matchId.value) {
@@ -360,7 +366,8 @@ async function handleVote(teamId: number): Promise<void> {
     return
   }
 
-  if (!detail.value.viewer.can_support) {
+  const canceling = detail.value.viewer.has_supported && detail.value.viewer.supported_team_id === teamId
+  if (voteState(teamId).disabled) {
     uni.showToast({ title: '本场已助力或助力已截止', icon: 'none' })
     return
   }
@@ -372,16 +379,16 @@ async function handleVote(teamId: number): Promise<void> {
   voteSubmittingTeamId.value = teamId
   const isCurrent = () => voteOwner === owner && session.revision.value === revision && matchId.value === selectedMatchId
   try {
-    const updated = await castSupportVote(selectedMatchId, {
-      supported_team_id: teamId,
-    })
+    const updated = canceling ? await cancelSupportVote(selectedMatchId)
+      : await castSupportVote(selectedMatchId, { supported_team_id: teamId })
     if (!isCurrent()) return
+    invalidatePoster()
     detail.value = updated
     syncCountdownState()
-    uni.showToast({ title: '助力成功', icon: 'success' })
+    uni.showToast({ title: canceling ? '已取消助力' : '助力成功', icon: 'success' })
   } catch (error) {
     if (!isCurrent()) return
-    uni.showToast({ title: extractApiErrorMessage(error, '助力失败'), icon: 'none' })
+    uni.showToast({ title: extractApiErrorMessage(error, canceling ? '取消失败' : '助力失败'), icon: 'none' })
   } finally {
     if (voteOwner === owner) {
       voteOwner = null
@@ -445,10 +452,15 @@ function formatSupportCount(value: number): string {
 }
 
 async function generatePoster(): Promise<void> {
-  if (!detail.value) {
+  if (!detail.value || posterGenerating.value) {
     return
   }
 
+  const generation = ++posterRevision
+  const revision = session.revision.value
+  const selectedMatchId = detail.value.match_id
+  const isCurrent = () => posterRevision === generation && session.revision.value === revision && detail.value?.match_id === selectedMatchId
+  posterGenerating.value = true
   try {
     const canvasId = 'supportPosterCanvas'
     const width = 960
@@ -492,13 +504,14 @@ async function generatePoster(): Promise<void> {
     context.setFillStyle('#6b707b')
     context.setFontSize(28)
     context.fillText('打开小程序，进入这场比赛继续站队助力。', 96, 1004)
-    context.fillText('主客队任选，每人每场只能助力一次。', 96, 1050)
+    context.fillText('主客队任选，开球前可取消重新选择。', 96, 1050)
 
     await new Promise<void>((resolve) => {
       context.draw(false, () => resolve())
     })
+    if (!isCurrent()) return
 
-    posterImagePath.value = await new Promise<string>((resolve, reject) => {
+    const imagePath = await new Promise<string>((resolve, reject) => {
       uni.canvasToTempFilePath({
         canvasId,
         width,
@@ -510,10 +523,20 @@ async function generatePoster(): Promise<void> {
       })
     })
 
+    if (!isCurrent()) return
+    posterImagePath.value = imagePath
     uni.showToast({ title: '海报已生成', icon: 'success' })
   } catch (error) {
+    if (!isCurrent()) return
     uni.showToast({ title: extractApiErrorMessage(error, '海报生成失败'), icon: 'none' })
+  } finally {
+    posterGenerating.value = false
   }
+}
+
+function invalidatePoster(): void {
+  posterRevision += 1
+  posterImagePath.value = ''
 }
 
 function buildPosterHeadline(): string {

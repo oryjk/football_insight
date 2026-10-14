@@ -158,6 +158,27 @@ mod tests {
             detail.total_support_count += 1;
             Ok(())
         }
+
+        async fn remove_vote(
+            &self,
+            _user_id: Uuid,
+            _match_id: i64,
+        ) -> Result<
+            (),
+            crate::support::application::cancel_match_support_vote::CancelSupportVoteError,
+        > {
+            let mut detail = self.detail.lock().unwrap();
+            if let Some(team_id) = detail.viewer.supported_team_id.take() {
+                if team_id == detail.home_team.team_id {
+                    detail.home_team.support_count -= 1
+                } else {
+                    detail.away_team.support_count -= 1
+                }
+                detail.total_support_count -= 1;
+                detail.viewer.has_supported = false;
+            }
+            Ok(())
+        }
     }
 
     #[tokio::test]
@@ -317,6 +338,64 @@ mod tests {
         detail.viewer.user_id = None;
         crate::support::domain::support::refresh_match_detail(&mut detail, now);
         assert!(!detail.viewer.can_support);
+    }
+
+    #[tokio::test]
+    async fn cancellation_removes_support_and_allows_selecting_the_other_team() {
+        use crate::support::application::cancel_match_support_vote::CancelMatchSupportVoteUseCase;
+        let user_id = Uuid::new_v4();
+        let now = Utc
+            .with_ymd_and_hms(2026, 4, 11, 12, 0, 0)
+            .single()
+            .unwrap();
+        let repository = Arc::new(FakeRepository {
+            favorite_team: None,
+            detail: Mutex::new(build_detail(true)),
+        });
+        let cancel = CancelMatchSupportVoteUseCase::new(repository.clone());
+        let canceled = cancel
+            .execute_at(user_id, 1, now)
+            .await
+            .expect("cancel should succeed");
+        assert!(!canceled.viewer.has_supported);
+        assert!(canceled.viewer.can_support);
+        assert_eq!(canceled.viewer.supported_team_id, None);
+        assert_eq!(canceled.home_team.support_count, 79);
+        assert_eq!(canceled.total_support_count, 119);
+        let repeated = cancel
+            .execute_at(user_id, 1, now)
+            .await
+            .expect("cancel is idempotent");
+        assert_eq!(repeated.total_support_count, 119);
+        let vote = CastMatchSupportVoteUseCase::new(repository);
+        let switched = vote
+            .execute_at(user_id, 1, 22, now)
+            .await
+            .expect("can support other team");
+        assert_eq!(switched.viewer.supported_team_id, Some(22));
+        assert_eq!(switched.away_team.support_count, 41);
+    }
+
+    #[tokio::test]
+    async fn cancellation_is_rejected_at_kickoff_without_removing_vote() {
+        use crate::support::application::cancel_match_support_vote::{
+            CancelMatchSupportVoteUseCase, CancelSupportVoteError,
+        };
+        let repository = Arc::new(FakeRepository {
+            favorite_team: None,
+            detail: Mutex::new(build_detail(true)),
+        });
+        let cancel = CancelMatchSupportVoteUseCase::new(repository.clone());
+        let kickoff = Utc
+            .with_ymd_and_hms(2026, 4, 12, 11, 35, 0)
+            .single()
+            .unwrap();
+        let error = cancel
+            .execute_at(Uuid::new_v4(), 1, kickoff)
+            .await
+            .unwrap_err();
+        assert!(matches!(error, CancelSupportVoteError::WindowClosed));
+        assert!(repository.detail.lock().unwrap().viewer.has_supported);
     }
 
     fn build_detail(has_supported: bool) -> SupportMatchDetail {

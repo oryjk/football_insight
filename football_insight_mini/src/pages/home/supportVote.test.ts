@@ -44,6 +44,7 @@ function fixture() {
   const hasAccessToken = ref(true)
   const writes: Array<{ matchId: number; teamId: number; request: ReturnType<typeof deferred<SupportMatchDetail>> }> = []
   const reads: Array<ReturnType<typeof deferred<SupportProfile>>> = []
+  const cancellations: Array<{ matchId: number; request: ReturnType<typeof deferred<SupportMatchDetail>> }> = []
   const session = { revision, hasAccessToken, currentUser: ref({ id: 'fixture' }),
     ensureSessionReady: async () => ({ id: 'fixture' }),
     invalidateSession: (expected: number) => { if (revision.value === expected) { revision.value++; hasAccessToken.value = false } },
@@ -55,9 +56,14 @@ function fixture() {
       writes.push({ matchId, teamId: payload.supported_team_id, request })
       return request.promise
     },
+    cancelSupportVote: (matchId) => {
+      const request = deferred<SupportMatchDetail>()
+      cancellations.push({ matchId, request })
+      return request.promise
+    },
   })
   support.supportProfile.value = profile()
-  return { support, revision, hasAccessToken, writes, reads }
+  return { support, revision, hasAccessToken, writes, reads, cancellations }
 }
 
 test('首页一键助力传递当前比赛和球队，使用 POST 结果更新票数与已助力状态', async () => {
@@ -104,7 +110,7 @@ test('未登录、已助力、比赛关闭或球队不属于本场时，不发 P
   await expectFailure(support.submitSupportVote(2), '暂时不能助力')
   support.supportProfile.value!.next_match!.viewer.can_support = true
   support.supportProfile.value!.next_match!.viewer.has_supported = true
-  await expectFailure(support.submitSupportVote(2), '已经助力')
+  await expectFailure(support.submitSupportVote(1), '已经助力')
   support.supportProfile.value!.next_match!.viewer.has_supported = false
   support.supportProfile.value!.next_match!.kickoff_at = '2020-01-01T00:00:00Z'
   await expectFailure(support.submitSupportVote(2), '关闭')
@@ -120,8 +126,43 @@ test('双方按钮均可助力，按提交状态、已助力和开球时刻判�
   expect(resolveHomeSupportVoteState(match, 2, null, now)).toEqual({ label: '助力', disabled: false, supported: false })
   expect(resolveHomeSupportVoteState(match, 2, 2, now)).toEqual({ label: '提交中', disabled: true, supported: false })
   expect(resolveHomeSupportVoteState(match, 2, null, now, true).disabled).toBe(true)
-  expect(resolveHomeSupportVoteState(voted(), 2, null, now)).toEqual({ label: '已助力', disabled: true, supported: true })
+  expect(resolveHomeSupportVoteState(voted(), 2, null, now)).toEqual({ label: '已助力', disabled: false, supported: true })
+  expect(resolveHomeSupportVoteState(voted(), 2, 2, now)).toEqual({ label: '取消中', disabled: true, supported: true })
+  expect(resolveHomeSupportVoteState(voted(), 2, null, Date.parse(match.kickoff_at)).disabled).toBe(true)
   expect(resolveHomeSupportVoteState(match, 2, null, Date.parse(match.kickoff_at))).toEqual({ label: '已结束', disabled: true, supported: false })
+})
+
+test('点击已助力取消，更新票数并允许重新选择另一队', async () => {
+  const { support, cancellations, writes } = fixture()
+  support.supportProfile.value!.next_match = voted()
+  const cancel = support.submitSupportVote(2)
+  expect(cancellations[0].matchId).toBe(10)
+  expect(await support.submitSupportVote(2)).toBe(false)
+  cancellations[0].request.resolve(profile().next_match!)
+  expect(await cancel).toBe(true)
+  expect(support.supportProfile.value?.next_match?.viewer.has_supported).toBe(false)
+  expect(support.supportProfile.value?.next_match?.total_support_count).toBe(0)
+  const revote = support.submitSupportVote(1)
+  expect(writes[0].teamId).toBe(1)
+  writes[0].request.resolve({ ...voted(), viewer: { ...voted().viewer, supported_team_id: 1 } })
+  expect(await revote).toBe(true)
+})
+
+test('取消失败保留已助力和票数，跨账号迟到的取消结果不发布', async () => {
+  const { support, cancellations, revision } = fixture()
+  support.supportProfile.value!.next_match = voted()
+  const failed = support.submitSupportVote(2)
+  cancellations[0].request.reject(new Error('取消失败'))
+  await expectFailure(failed, '取消失败')
+  expect(support.supportProfile.value?.next_match?.total_support_count).toBe(1)
+  expect(support.voteSubmittingTeamId.value).toBeNull()
+  const oldCancel = support.submitSupportVote(2)
+  revision.value++
+  support.resetSessionScopedState()
+  support.supportProfile.value = { ...profile(), next_match: voted() }
+  cancellations[1].request.resolve(profile().next_match!)
+  expect(await oldCancel).toBe(false)
+  expect(support.supportProfile.value.next_match?.total_support_count).toBe(1)
 })
 
 test('允许选择另一队，提交后不改变关注球队', async () => {
