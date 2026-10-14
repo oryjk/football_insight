@@ -64,6 +64,7 @@ test("显式公开提交空数组，暂存选择便于切回，保留已有数�
 });
 test("从服务端回填指定账号，不丢失未解析或已删除的UUID", () => {
   const product = {
+    catalog_product_id: "11111111-1111-4111-8111-111111111111",
     ...formToPayload({
       ...valid(),
       purchaseScope: "specified",

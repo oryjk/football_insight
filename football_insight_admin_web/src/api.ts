@@ -37,6 +37,7 @@ export interface CustomerAccountPage {
   page_size: number;
 }
 export interface Product {
+  catalog_product_id: string;
   product_key: string;
   membership_tier: string;
   name: string;
@@ -60,6 +61,31 @@ export type ProductPayload = Pick<
   | "remark"
   | "allowed_user_ids"
 >;
+export interface ProductPurchaseSummary {
+  purchased_user_count: number;
+  purchased_order_count: number;
+  refunded_order_count: number;
+  total_amount_cents: number;
+}
+export interface ProductPurchase {
+  order_no: string;
+  user_id: string;
+  user_nickname: string;
+  user_avatar_url: string | null;
+  paid_at: string;
+  expires_at: string | null;
+  expiry_source: "snapshot" | "legacy_year" | "unrecorded";
+  amount_cents: number;
+  status: "paid" | "refunded";
+}
+export interface ProductPurchasePage {
+  catalog_product_id: string;
+  summary: ProductPurchaseSummary;
+  items: ProductPurchase[];
+  total: number;
+  page: number;
+  page_size: number;
+}
 export interface ProductPage {
   items: Product[];
   total: number;
@@ -160,6 +186,23 @@ export function createApi(client: ApiClient) {
     },
     product: (token: string, key: string, signal?: AbortSignal) =>
       client.request<Product>(productPath(key), token, { signal }),
+    productPurchases: (
+      token: string,
+      key: string,
+      page = 1,
+      pageSize = 20,
+      signal?: AbortSignal,
+    ) => {
+      const query = new URLSearchParams({
+        page: String(page),
+        page_size: String(pageSize),
+      });
+      return client.request<ProductPurchasePage>(
+        `${productPath(key)}/purchases?${query}`,
+        token,
+        { signal },
+      );
+    },
     save: (
       token: string,
       payload: ProductPayload,

@@ -7,6 +7,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  ReceiptText,
   Trash2,
 } from "lucide-react";
 import type { AdminApi, Product, ProductFilters, ProductPage } from "../../api";
@@ -57,6 +58,7 @@ import {
   newProductForm,
   productToForm,
 } from "./productsModel";
+import { ProductPurchasesDialog } from "./ProductPurchasesDialog";
 import { ProductFields } from "./ProductFields";
 type DialogMode = "create" | "edit" | "detail" | "toggle" | "delete";
 interface ActiveDialog {
@@ -88,6 +90,10 @@ export function ProductsPage({
   const [revision, setRevision] = useState(0);
   const [dialog, setDialog] = useState<ActiveDialog | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
+  const [purchaseProduct, setPurchaseProduct] = useState<Pick<
+    Product,
+    "product_key" | "name" | "catalog_product_id"
+  > | null>(null);
   const [form, setForm] = useState(newProductForm);
   const [detailLoading, setDetailLoading] = useState(false);
   const [dialogError, setDialogError] = useState("");
@@ -419,6 +425,18 @@ export function ProductsPage({
                   <TableCell className="product-actions-cell">
                     <div className="row-actions">
                       <Button
+                        variant="secondary"
+                        size="icon"
+                        aria-label={`购买记录 ${item.name}`}
+                        title="购买记录"
+                        onClick={() => {
+                          if (!saveLock.current && !dialog)
+                            setPurchaseProduct(item);
+                        }}
+                      >
+                        <ReceiptText />
+                      </Button>
+                      <Button
                         variant="ghost"
                         size="icon"
                         aria-label={`查看 ${item.name}`}
@@ -533,6 +551,21 @@ export function ProductsPage({
             </div>
           </div>
         </>
+      )}
+      {purchaseProduct && (
+        <ProductPurchasesDialog
+          key={
+            purchaseProduct.catalog_product_id || purchaseProduct.product_key
+          }
+          api={api}
+          token={token}
+          product={purchaseProduct}
+          onClose={() => setPurchaseProduct(null)}
+          onReloadProduct={() => {
+            setPurchaseProduct(null);
+            refresh();
+          }}
+        />
       )}
       <Dialog
         open={normalOpen}

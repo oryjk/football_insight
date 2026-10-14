@@ -663,3 +663,31 @@ h2 {
   opacity: var(--button-disabled-opacity);
   cursor: not-allowed;
 }
+
+:root {
+  --purchase-dialog-width: 1080px;
+  --purchase-table-min-width: 980px;
+}
+[data-slot="avatar"] {
+  width: var(--control-height);
+  height: var(--control-height);
+  border-radius: var(--radius-full);
+}
+[data-slot="avatar-image"] {
+  object-fit: cover;
+}
+[data-slot="avatar-fallback"] {
+  background: var(--surface-inset);
+  border: var(--space-px) solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  color: var(--muted);
+}
+[data-slot="avatar-fallback"] svg {
+  width: var(--control-icon-size);
+  height: var(--control-icon-size);
+}
+[data-slot="badge"][data-tone="warning"] {
+  color: var(--warning);
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+}

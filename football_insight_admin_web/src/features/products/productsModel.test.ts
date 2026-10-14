@@ -128,6 +128,7 @@ test("会员有效期默认12月，整数范围1..1200，转换为数值payload"
 });
 test("编辑回填会员有效期，兼容旧记录默认12月", () => {
   const legacy = {
+    catalog_product_id: "11111111-1111-4111-8111-111111111111",
     product_key: "membership:V6@3900",
     membership_tier: "V6",
     name: "会员",
