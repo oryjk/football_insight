@@ -650,6 +650,12 @@ impl Database {
             .await
             .unwrap();
         }
+        sqlx::raw_sql(include_str!(
+            "../migrations/20261014110000_add_membership_origin.sql"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
         let user = Uuid::new_v4();
         sqlx::query("INSERT INTO f_i_users(id,wx_open_id,account_identifier,display_name,password_hash) VALUES($1,'buyer','buyer','Buyer','unused')").bind(user).execute(&pool).await.unwrap();
         Self {
@@ -1428,5 +1434,159 @@ async fn purchase_identity_backfill_requires_unique_typed_amount_and_matching_vi
             .is_none()
         );
     }
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires an isolated PostgreSQL database"]
+async fn membership_origin_follows_actual_grants_and_refund_preserves_referral_origin() {
+    let db = Database::new().await;
+    let mut tx = db.pool.begin().await.unwrap();
+    sqlx::query("SELECT set_config('football.membership_origin','referral',true)")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE f_i_users SET membership_tier='V6',membership_expires_at=NOW()+INTERVAL '1 year' WHERE id=$1").bind(db.user).execute(&mut *tx).await.unwrap();
+    tx.commit().await.unwrap();
+    async fn origin(db: &Database) -> String {
+        sqlx::query_scalar("SELECT membership_origin FROM f_i_users WHERE id=$1")
+            .bind(db.user)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap()
+    }
+    assert_eq!(origin(&db).await, "referral");
+    db.order("SOURCE001", "membership:V7", 5900).await;
+    db.pay("SOURCE001").await;
+    assert_eq!(origin(&db).await, "purchase");
+    db.refund("SOURCE001", "SOURCE_REFUND", 5900).await.unwrap();
+    assert_eq!(origin(&db).await, "referral");
+    sqlx::query("UPDATE f_i_users SET display_name='new name' WHERE id=$1")
+        .bind(db.user)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    assert_eq!(origin(&db).await, "referral");
+    sqlx::query("UPDATE f_i_users SET membership_tier='V9' WHERE id=$1")
+        .bind(db.user)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    assert_eq!(origin(&db).await, "unknown");
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires an isolated PostgreSQL database"]
+async fn historical_origin_backfill_requires_exact_grant_and_keeps_uncertain_members_unknown() {
+    let db = Database::new().await;
+    sqlx::raw_sql("DROP TRIGGER f_i_users_membership_origin ON f_i_users; DROP FUNCTION f_i_track_membership_origin(); ALTER TABLE f_i_users DROP COLUMN membership_origin; ALTER TABLE f_i_virtual_payment_orders DROP COLUMN grant_before_origin,DROP COLUMN grant_after_origin;").execute(&db.pool).await.unwrap();
+    let uncertain = Uuid::new_v4();
+    sqlx::query("INSERT INTO f_i_users(id,membership_tier,membership_expires_at) VALUES($1,'V9','2030-01-01T00:00:00Z')").bind(uncertain).execute(&db.pool).await.unwrap();
+    sqlx::query("UPDATE f_i_users SET membership_tier='V6',membership_expires_at='2027-10-14T01:00:00Z' WHERE id=$1").bind(db.user).execute(&db.pool).await.unwrap();
+    sqlx::query("INSERT INTO f_i_payment_orders(order_no,user_id,product_type,amount_cents,status,paid_at) VALUES('HISTORY_EXACT',$1,'membership:V6',3900,'paid','2026-10-14T01:00:00Z'),('HISTORY_UNCERTAIN',$2,'membership:V9',9900,'paid','2026-10-14T01:00:00Z')").bind(db.user).bind(uncertain).execute(&db.pool).await.unwrap();
+    sqlx::raw_sql(include_str!(
+        "../migrations/20261014110000_add_membership_origin.sql"
+    ))
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        sqlx::query_scalar::<_, String>("SELECT membership_origin FROM f_i_users WHERE id=$1")
+            .bind(db.user)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap(),
+        "purchase"
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, String>("SELECT membership_origin FROM f_i_users WHERE id=$1")
+            .bind(uncertain)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap(),
+        "unknown"
+    );
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires an isolated PostgreSQL database"]
+async fn refund_preserves_later_unknown_origin_even_when_admin_restores_same_tier_and_expiry() {
+    let db = Database::new().await;
+    db.order("ORIGIN_ADMIN", "membership:V6", 3900).await;
+    db.pay("ORIGIN_ADMIN").await;
+    let granted = db.membership().await;
+    sqlx::query("UPDATE f_i_users SET membership_expires_at=membership_expires_at+INTERVAL '1 day' WHERE id=$1").bind(db.user).execute(&db.pool).await.unwrap();
+    sqlx::query("UPDATE f_i_users SET membership_expires_at=$2::text::timestamptz WHERE id=$1")
+        .bind(db.user)
+        .bind(granted["expires_at"].as_str())
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    db.refund("ORIGIN_ADMIN", "ORIGIN_ADMIN_REFUND", 3900)
+        .await
+        .unwrap();
+    assert_eq!(db.membership().await, granted);
+    assert_eq!(
+        sqlx::query_scalar::<_, String>("SELECT membership_origin FROM f_i_users WHERE id=$1")
+            .bind(db.user)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap(),
+        "unknown"
+    );
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires an isolated PostgreSQL database"]
+async fn real_referral_registration_records_origin_and_successive_refunds_restore_it() {
+    use football_insight_service_backend_rs::auth::ports::auth_repository::AuthRepository;
+    let db = Database::new().await;
+    sqlx::raw_sql("ALTER TABLE f_i_system_configs ALTER COLUMN config_value TYPE TEXT USING config_value::text; ALTER TABLE f_i_users ADD COLUMN avatar_url TEXT, ADD COLUMN official_wechat_open_id TEXT; CREATE TABLE f_i_invite_codes(code TEXT PRIMARY KEY,is_active BOOLEAN DEFAULT TRUE,used_by_user_id UUID,used_at TIMESTAMPTZ,issued_for_wechat_open_id TEXT); CREATE TABLE f_i_wechat_followers(open_id TEXT PRIMARY KEY,unsubscribed_at TIMESTAMPTZ);").execute(&db.pool).await.unwrap();
+    sqlx::raw_sql(include_str!(
+        "../migrations/20260411103000_add_user_referrals.sql"
+    ))
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO f_i_invite_codes(code,used_by_user_id,issued_for_wechat_open_id) VALUES('ORIGIN_REFERRER',$1,'referrer_follower'),('ORIGIN_INVITE',NULL,'new_follower')").bind(db.user).execute(&db.pool).await.unwrap();
+    sqlx::query("INSERT INTO f_i_system_configs(config_key,config_value) VALUES('membership_tier_rules',$1)").bind(serde_json::json!([{"code":"V6","kind":"referral","min_referrals":1,"ticket_watch_poll_interval_seconds":15}]).to_string()).execute(&db.pool).await.unwrap();
+    PostgresAuthRepository::new(db.pool.clone())
+        .create_user_with_invite_with_referral(
+            "ORIGIN_INVITE",
+            Some("ORIGIN_REFERRER"),
+            "origin_registered",
+            "unused",
+        )
+        .await
+        .unwrap();
+    let origin: String = sqlx::query_scalar("SELECT membership_origin FROM f_i_users WHERE id=$1")
+        .bind(db.user)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+    assert_eq!(origin, "referral");
+    let before = db.membership().await;
+    db.order("REFERRAL_A", "membership:V7", 5900).await;
+    db.pay("REFERRAL_A").await;
+    db.order("REFERRAL_B", "membership:V8", 7900).await;
+    db.pay("REFERRAL_B").await;
+    db.refund("REFERRAL_A", "REFERRAL_A_REFUND", 5900)
+        .await
+        .unwrap();
+    db.refund("REFERRAL_B", "REFERRAL_B_REFUND", 7900)
+        .await
+        .unwrap();
+    assert_eq!(db.membership().await, before);
+    assert_eq!(
+        sqlx::query_scalar::<_, String>("SELECT membership_origin FROM f_i_users WHERE id=$1")
+            .bind(db.user)
+            .fetch_one(&db.pool)
+            .await
+            .unwrap(),
+        "referral"
+    );
     db.close().await;
 }

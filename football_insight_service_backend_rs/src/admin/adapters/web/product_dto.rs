@@ -130,6 +130,7 @@ pub struct ProductPurchaseSummaryDto {
 }
 #[derive(Debug, Serialize)]
 pub struct ProductPurchaseDto {
+    pub membership_origin: &'static str,
     pub order_no: String,
     pub user_id: Uuid,
     pub user_nickname: String,
@@ -166,6 +167,7 @@ impl From<crate::admin::domain::admin_product_purchase::ProductPurchasePage>
                 .items
                 .into_iter()
                 .map(|p| ProductPurchaseDto {
+                    membership_origin: "purchase",
                     order_no: p.order_no,
                     user_id: p.user_id,
                     user_nickname: p.user_nickname,
@@ -184,6 +186,50 @@ impl From<crate::admin::domain::admin_product_purchase::ProductPurchasePage>
             total: page.total,
             page: page.page,
             page_size: page.page_size,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct ProductMemberDto {
+    pub user_id: Uuid,
+    pub user_nickname: String,
+    pub user_avatar_url: Option<String>,
+    pub membership_origin: String,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub expired: bool,
+}
+#[derive(Debug, Serialize)]
+pub struct ProductMemberPageDto {
+    pub catalog_product_id: Uuid,
+    pub membership_tier: String,
+    pub items: Vec<ProductMemberDto>,
+    pub total: i64,
+    pub page: u32,
+    pub page_size: u32,
+}
+impl From<crate::admin::domain::admin_product_purchase::ProductMemberPage>
+    for ProductMemberPageDto
+{
+    fn from(page: crate::admin::domain::admin_product_purchase::ProductMemberPage) -> Self {
+        Self {
+            catalog_product_id: page.catalog_product_id,
+            membership_tier: page.membership_tier,
+            total: page.total,
+            page: page.page,
+            page_size: page.page_size,
+            items: page
+                .items
+                .into_iter()
+                .map(|member| ProductMemberDto {
+                    user_id: member.user_id,
+                    user_nickname: member.user_nickname,
+                    user_avatar_url: member.user_avatar_url,
+                    membership_origin: member.membership_origin,
+                    expires_at: member.expires_at,
+                    expired: member.expired,
+                })
+                .collect(),
         }
     }
 }

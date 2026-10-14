@@ -68,6 +68,7 @@ export interface ProductPurchaseSummary {
   total_amount_cents: number;
 }
 export interface ProductPurchase {
+  membership_origin?: "purchase";
   order_no: string;
   user_id: string;
   user_nickname: string;
@@ -82,6 +83,22 @@ export interface ProductPurchasePage {
   catalog_product_id: string;
   summary: ProductPurchaseSummary;
   items: ProductPurchase[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+export interface ProductMember {
+  user_id: string;
+  user_nickname: string;
+  user_avatar_url: string | null;
+  membership_origin: "purchase" | "referral" | "unknown";
+  expires_at: string | null;
+  expired: boolean;
+}
+export interface ProductMemberPage {
+  catalog_product_id: string;
+  membership_tier: string;
+  items: ProductMember[];
   total: number;
   page: number;
   page_size: number;
@@ -203,6 +220,17 @@ export function createApi(client: ApiClient) {
         { signal },
       );
     },
+    productMembers: (
+      token: string,
+      key: string,
+      page = 1,
+      signal?: AbortSignal,
+    ) =>
+      client.request<ProductMemberPage>(
+        `${productPath(key)}/members?${new URLSearchParams({ page: String(page), page_size: "20" })}`,
+        token,
+        { signal },
+      ),
     save: (
       token: string,
       payload: ProductPayload,

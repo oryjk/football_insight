@@ -166,3 +166,21 @@ pub async fn product_no_store(mut response: axum::response::Response) -> axum::r
     );
     response
 }
+pub async fn product_members(
+    State(state): State<AdminProductWebState>,
+    headers: HeaderMap,
+    Path(key): Path<String>,
+    query: Result<Query<super::product_dto::AdminPurchaseQuery>, QueryRejection>,
+) -> Result<Json<super::product_dto::ProductMemberPageDto>, HttpError> {
+    authorize(&state, &headers).await?;
+    let Query(query) =
+        query.map_err(|_| (StatusCode::BAD_REQUEST, "invalid members query".into()))?;
+    Ok(Json(
+        state
+            .service
+            .members(&key, query.page.unwrap_or(1), query.page_size.unwrap_or(20))
+            .await
+            .map_err(map_product_error)?
+            .into(),
+    ))
+}

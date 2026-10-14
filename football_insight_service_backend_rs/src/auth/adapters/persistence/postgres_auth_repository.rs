@@ -243,6 +243,9 @@ impl PostgresAuthRepository {
         if upgrade.should_upgrade
             && Self::is_referral_tier(&upgrade.next_tier, &membership_tier_rules)
         {
+            sqlx::query("SELECT set_config('football.membership_origin','referral',true)")
+                .execute(&mut **tx)
+                .await?;
             sqlx::query(
                 r#"
                 UPDATE f_i_users
@@ -256,6 +259,9 @@ impl PostgresAuthRepository {
             .bind(&upgrade.next_tier)
             .execute(&mut **tx)
             .await?;
+            sqlx::query("SELECT set_config('football.membership_origin','',true)")
+                .execute(&mut **tx)
+                .await?;
         }
 
         Ok(())

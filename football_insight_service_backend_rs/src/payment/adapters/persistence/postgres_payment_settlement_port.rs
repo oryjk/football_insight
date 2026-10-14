@@ -160,6 +160,10 @@ impl PaymentSettlementPort for PostgresPaymentSettlementPort {
         // Only historical ordinary payment orders have no virtual duration snapshot.
         let duration_months = duration.unwrap_or(12);
 
+        sqlx::query("SELECT set_config('football.membership_origin','purchase',true)")
+            .execute(&mut *tx)
+            .await?;
+
         sqlx::query(
             r#"
             UPDATE f_i_users
@@ -178,6 +182,10 @@ impl PaymentSettlementPort for PostgresPaymentSettlementPort {
         .bind(duration_months)
         .execute(&mut *tx)
         .await?;
+
+        sqlx::query("SELECT set_config('football.membership_origin','',true)")
+            .execute(&mut *tx)
+            .await?;
 
         super::postgres_virtual_order_repository::snapshot_membership(
             &mut tx, order_no, user_id, false,

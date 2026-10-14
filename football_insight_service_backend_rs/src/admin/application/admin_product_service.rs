@@ -11,6 +11,24 @@ pub struct AdminProductService {
     repository: Arc<dyn AdminProductRepository>,
 }
 impl AdminProductService {
+    pub async fn members(
+        &self,
+        key: &str,
+        page: u32,
+        page_size: u32,
+    ) -> Result<crate::admin::domain::admin_product_purchase::ProductMemberPage, AdminProductError>
+    {
+        validate_product_key(key)?;
+        let query = AdminProductQuery {
+            page,
+            page_size,
+            ..Default::default()
+        }
+        .validate()?;
+        self.repository
+            .members(key, query.page, query.page_size)
+            .await
+    }
     pub fn new(repository: Arc<dyn AdminProductRepository>) -> Self {
         Self { repository }
     }

@@ -26,6 +26,24 @@ pub struct ProductPurchase {
     pub status: String,
 }
 #[derive(Debug, Clone)]
+pub struct ProductMember {
+    pub user_id: Uuid,
+    pub user_nickname: String,
+    pub user_avatar_url: Option<String>,
+    pub membership_origin: String,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub expired: bool,
+}
+#[derive(Debug, Clone)]
+pub struct ProductMemberPage {
+    pub catalog_product_id: Uuid,
+    pub membership_tier: String,
+    pub items: Vec<ProductMember>,
+    pub total: i64,
+    pub page: u32,
+    pub page_size: u32,
+}
+#[derive(Debug, Clone)]
 pub struct ProductPurchasePage {
     pub catalog_product_id: Uuid,
     pub summary: ProductPurchaseSummary,

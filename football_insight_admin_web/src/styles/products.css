@@ -310,3 +310,36 @@
     align-items: flex-start;
   }
 }
+.membership-view-switch {
+  display: flex;
+  gap: 0.5rem;
+}
+.membership-origin-badge[data-slot="badge"] {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+.membership-origin-badge svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+.membership-origin-badge[data-origin="purchase"] {
+  color: #0d9488;
+  background: #14b8a61a;
+  border: 1px solid #14b8a640;
+}
+.membership-origin-badge[data-origin="referral"] {
+  color: #a78bfa;
+  background: #8b5cf61a;
+  border: 1px solid #8b5cf640;
+}
+.membership-origin-badge[data-origin="unknown"] {
+  color: var(--muted-foreground);
+  background: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.purchase-members-table { min-width: 720px; }
+.purchase-members-table th:first-child { min-width: 280px; }

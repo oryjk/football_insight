@@ -52,7 +52,7 @@ impl Database {
             sqlx::raw_sql(migration).execute(&pool).await.unwrap();
         }
         // The duration migration also targets order snapshots; these tests only exercise catalog CRUD.
-        sqlx::raw_sql("CREATE TABLE f_i_virtual_payment_orders (order_no TEXT PRIMARY KEY,product_id TEXT,amount_cents INTEGER,grant_after JSONB)")
+        sqlx::raw_sql("CREATE TABLE f_i_virtual_payment_orders (order_no TEXT PRIMARY KEY,product_id TEXT,amount_cents INTEGER,grant_before JSONB,grant_after JSONB)")
             .execute(&pool)
             .await
             .unwrap();
@@ -62,9 +62,15 @@ impl Database {
         .execute(&pool)
         .await
         .unwrap();
-        sqlx::raw_sql("CREATE TABLE f_i_users(id UUID PRIMARY KEY,display_name TEXT,avatar_url TEXT); CREATE TABLE f_i_payment_orders(order_no TEXT PRIMARY KEY,user_id UUID NOT NULL,product_type TEXT NOT NULL,amount_cents INTEGER NOT NULL,status TEXT NOT NULL,paid_at TIMESTAMPTZ);").execute(&pool).await.unwrap();
+        sqlx::raw_sql("CREATE TABLE f_i_users(id UUID PRIMARY KEY,display_name TEXT,avatar_url TEXT,membership_tier TEXT NOT NULL DEFAULT 'V1',membership_expires_at TIMESTAMPTZ,status TEXT NOT NULL DEFAULT 'active',created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()); CREATE TABLE f_i_payment_orders(order_no TEXT PRIMARY KEY,user_id UUID NOT NULL,product_type TEXT NOT NULL,amount_cents INTEGER NOT NULL,status TEXT NOT NULL,paid_at TIMESTAMPTZ);").execute(&pool).await.unwrap();
         sqlx::raw_sql(include_str!(
             "../migrations/20261014093000_add_virtual_product_purchase_identity.sql"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::raw_sql(include_str!(
+            "../migrations/20261014110000_add_membership_origin.sql"
         ))
         .execute(&pool)
         .await
@@ -929,6 +935,82 @@ async fn product_purchases_http_requires_permission_validates_and_disables_cache
             .await
             .status(),
         StatusCode::FORBIDDEN
+    );
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires an explicit disposable localhost PostgreSQL database"]
+async fn same_tier_members_endpoint_includes_unknown_without_inventing_orders() {
+    let db = Database::new().await;
+    for (index, origin) in ["purchase", "referral", "unknown"].iter().enumerate() {
+        sqlx::query("INSERT INTO f_i_users(id,display_name,membership_tier,membership_origin) VALUES($1,$2,'V6',$3)")
+            .bind(Uuid::new_v4()).bind(format!("member{index}")).bind(origin).execute(&db.pool).await.unwrap();
+    }
+    sqlx::query("INSERT INTO f_i_users(id,membership_tier,status) VALUES($1,'V6','disabled'),($2,'V9','active')").bind(Uuid::new_v4()).bind(Uuid::new_v4()).execute(&db.pool).await.unwrap();
+    let app = http_app(&db);
+    let (token, _) = token(&db).await;
+    let path = "/api/v1/admin/products/membership%3AV6%403900/members";
+    assert_eq!(
+        request(&app, "GET", path, None, None).await.status(),
+        StatusCode::UNAUTHORIZED
+    );
+    let response = request(&app, "GET", path, Some(&token), None).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    let result = body(response).await;
+    assert_eq!(result["total"], 3);
+    assert_eq!(result["membership_tier"], "V6");
+    assert!(
+        result["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["membership_origin"] == "unknown")
+    );
+    assert!(
+        result["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|item| item.get("order_no").is_none())
+    );
+    assert_eq!(
+        body(
+            request(
+                &app,
+                "GET",
+                &format!("{path}?page_size=1&page=2"),
+                Some(&token),
+                None
+            )
+            .await
+        )
+        .await["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        request(&app, "GET", &format!("{path}?page=0"), Some(&token), None)
+            .await
+            .status(),
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        body(
+            request(
+                &app,
+                "GET",
+                "/api/v1/admin/products/membership%3AV6%403900/purchases",
+                Some(&token),
+                None
+            )
+            .await
+        )
+        .await["total"],
+        0
     );
     db.close().await;
 }

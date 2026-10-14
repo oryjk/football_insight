@@ -79,7 +79,7 @@ impl VirtualOrderRepository for PostgresVirtualOrderRepository {
                 .fetch_one(&mut *tx)
                 .await?;
         }
-        let metadata = sqlx::query("SELECT open_id,wx_order_id,grant_before,grant_after FROM f_i_virtual_payment_orders WHERE order_no=$1 FOR UPDATE")
+        let metadata = sqlx::query("SELECT open_id,wx_order_id,grant_before,grant_after,grant_before_origin,grant_after_origin FROM f_i_virtual_payment_orders WHERE order_no=$1 FOR UPDATE")
             .bind(&refund.order_no).fetch_one(&mut *tx).await?;
         if metadata.get::<String, _>("open_id") != refund.open_id
             || metadata
@@ -138,14 +138,28 @@ impl VirtualOrderRepository for PostgresVirtualOrderRepository {
                 // Lock the user: preserve any later purchase/admin adjustment that differs from our grant.
                 let current: serde_json::Value = sqlx::query_scalar("SELECT jsonb_build_object('tier',membership_tier,'expires_at',membership_expires_at) FROM f_i_users WHERE id=$1 FOR UPDATE")
                     .bind(user_id).fetch_one(&mut *tx).await?;
-                if current == after {
+                let current_origin: String =
+                    sqlx::query_scalar("SELECT membership_origin FROM f_i_users WHERE id=$1")
+                        .bind(user_id)
+                        .fetch_one(&mut *tx)
+                        .await?;
+                let after_origin: String = metadata.get("grant_after_origin");
+                if current == after && current_origin == after_origin {
+                    let origin: String = metadata.get("grant_before_origin");
+                    sqlx::query("SELECT set_config('football.membership_origin',$1,true)")
+                        .bind(&origin)
+                        .execute(&mut *tx)
+                        .await?;
                     sqlx::query("UPDATE f_i_users SET membership_tier=$2,membership_expires_at=$3::text::timestamptz,updated_at=NOW() WHERE id=$1")
                         .bind(user_id).bind(before["tier"].as_str().ok_or(VirtualPaymentError::InvalidOrder)?)
                         .bind(before["expires_at"].as_str()).execute(&mut *tx).await?;
+                    sqlx::query("SELECT set_config('football.membership_origin','',true)")
+                        .execute(&mut *tx)
+                        .await?;
                 }
                 // Remove this grant from a successor's rollback chain, preventing later refunds resurrecting it.
-                sqlx::query("UPDATE f_i_virtual_payment_orders v SET grant_before=$2 WHERE v.grant_before=$3 AND EXISTS(SELECT 1 FROM f_i_payment_orders p WHERE p.order_no=v.order_no AND p.user_id=$1 AND p.status='paid')")
-                    .bind(user_id).bind(&before).bind(&after).execute(&mut *tx).await?;
+                sqlx::query("UPDATE f_i_virtual_payment_orders v SET grant_before=$2,grant_before_origin=$4 WHERE v.grant_before=$3 AND v.grant_before_origin=$5 AND EXISTS(SELECT 1 FROM f_i_payment_orders p WHERE p.order_no=v.order_no AND p.user_id=$1 AND p.status='paid')")
+                    .bind(user_id).bind(&before).bind(&after).bind(metadata.get::<String,_>("grant_before_origin")).bind(after_origin).execute(&mut *tx).await?;
             } else if product_type.starts_with("reflux_subscription:") {
                 sqlx::query(
                     "UPDATE f_i_user_reflux_subscriptions SET status='cancelled' WHERE order_no=$1",
@@ -189,13 +203,14 @@ pub async fn snapshot_membership(
     let snapshot: serde_json::Value = sqlx::query_scalar("SELECT jsonb_build_object('tier',membership_tier,'expires_at',membership_expires_at) FROM f_i_users WHERE id=$1 FOR UPDATE")
         .bind(user_id).fetch_one(&mut **tx).await?;
     let query = if before {
-        "UPDATE f_i_virtual_payment_orders SET grant_before=$2 WHERE order_no=$1"
+        "UPDATE f_i_virtual_payment_orders SET grant_before=$2,grant_before_origin=(SELECT membership_origin FROM f_i_users WHERE id=$3) WHERE order_no=$1"
     } else {
-        "UPDATE f_i_virtual_payment_orders SET grant_after=$2 WHERE order_no=$1"
+        "UPDATE f_i_virtual_payment_orders SET grant_after=$2,grant_after_origin=(SELECT membership_origin FROM f_i_users WHERE id=$3) WHERE order_no=$1"
     };
     sqlx::query(query)
         .bind(order_no)
         .bind(snapshot)
+        .bind(user_id)
         .execute(&mut **tx)
         .await?;
     Ok(())

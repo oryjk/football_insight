@@ -1,6 +1,6 @@
 use super::product_handlers::{
     AdminProductWebState, create_product, delete_product, get_product, list_products,
-    product_no_store, product_purchases, update_product,
+    product_members, product_no_store, product_purchases, update_product,
 };
 use crate::admin::application::{
     admin_auth_service::AdminAuthService, admin_product_service::AdminProductService,
@@ -23,6 +23,10 @@ pub fn admin_product_routes(
         .route(
             "/api/v1/admin/products/{product_key}/purchases",
             get(product_purchases),
+        )
+        .route(
+            "/api/v1/admin/products/{product_key}/members",
+            get(product_members),
         )
         .with_state(AdminProductWebState {
             service,
