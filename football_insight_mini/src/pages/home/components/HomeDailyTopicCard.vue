@@ -1,7 +1,7 @@
 <template>
   <view class="topic-card">
     <view class="topic-card__top">
-      <text class="topic-card__category">蓉城动态</text>
+      <text class="topic-card__category">{{ homeTopicCategory(item) }}</text>
       <text class="topic-card__number">{{ indexLabel }}</text>
     </view>
     <view class="topic-card__reading" role="button" :aria-label="`阅读${item.title}`" hover-class="topic-card__reading--pressed" @tap="emit('read', item.id)">
@@ -21,6 +21,7 @@ import FiTopicHeat from '../../../components/topics/FiTopicHeat.vue'
 import FiTopicReadEntry from '../../../components/topics/FiTopicReadEntry.vue'
 import FiTopicAudioEntry from '../../../components/topics/FiTopicAudioEntry.vue'
 import type { DailyTopicItem } from '../../../types/dailyTopic'
+import { homeTopicCategory } from '../dailyTopics'
 defineProps<{ item: DailyTopicItem; heat: number; indexLabel: string; audioReady: boolean; audioPlaying: boolean; audioLoading: boolean }>()
 const emit = defineEmits<{ (e: 'read', id: string): void; (e: 'play', id: string): void }>()
 </script>

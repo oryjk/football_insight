@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { mapDailyTopicEdition, topicPlaybackSignature, formatTopicAudioTime } from './dailyTopics'
+import { mapDailyTopicEdition, topicPlaybackSignature, formatTopicAudioTime, homeTopicCategory } from './dailyTopics'
 
 function article(id = 'immutable-content-a') {
   return { id, team_id: 77680, title: '蓉城备战下一轮', summary: '训练报道整理。', paragraphs: ['基于原文的新闻整理。'],
@@ -12,6 +12,22 @@ function payload(items: unknown[] = [article()]) {
 function rejects(payload: unknown): boolean {
   try { mapDailyTopicEdition(payload); return false } catch { return true }
 }
+test('首页类别按文章标签判断，统一批次归属不将其他球队新闻归到蓉城', () => {
+  const original = { ...article('guangzhou'), title: '广州豹冲超', team_tags: [{ team_id: 469, name: '广东广州豹' }] }
+  const item = mapDailyTopicEdition(payload([original])).items[0]
+  expect(item.teamId).toBe(77680)
+  expect(homeTopicCategory(item)).toBe('其他动态')
+  expect(homeTopicCategory({ teamTags: [{ teamId: 77680, name: '成都蓉城' }] })).toBe('蓉城动态')
+})
+test('多球队文章包含成都蓉城仍归为蓉城动态，不依赖标签顺序或名称别名', () => {
+  expect(homeTopicCategory({ teamTags: [{ teamId: 148, name: '天津津门虎' }, { teamId: 77680, name: '蓉城' }] })).toBe('蓉城动态')
+  expect(homeTopicCategory({ teamTags: [{ teamId: 148, name: '天津津门虎' }] })).toBe('其他动态')
+})
+test('旧文章没有标签时不猜测蓉城归属', () => {
+  expect(homeTopicCategory(mapDailyTopicEdition(payload()).items[0])).toBe('其他动态')
+  expect(homeTopicCategory({})).toBe('其他动态')
+  expect(homeTopicCategory({ teamTags: [] })).toBe('其他动态')
+})
 describe('今日话题接口转换', () => {
   test('保留真实文章、来源与发布日期，时间显示固定北京时间', () => {
     const edition = mapDailyTopicEdition(payload())
