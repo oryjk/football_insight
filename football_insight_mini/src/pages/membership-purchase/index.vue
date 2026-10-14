@@ -45,7 +45,7 @@
           <text v-if="agreementAccepted">✓</text>
         </view>
         <text class="agreement-line__text">我已阅读并同意</text>
-        <text class="agreement-line__link" @tap.stop="agreementSheetVisible = true">《会员服务声明》</text>
+        <text class="agreement-line__link" @tap.stop="openAgreement">《会员服务声明》</text>
       </view>
 
       <view class="purchase-bar__main">
@@ -76,6 +76,7 @@
     <MembershipAgreementSheet
       v-model:visible="agreementSheetVisible"
       :points="agreementPoints"
+      :required="agreementRequired"
       @accept="acceptAgreement"
     />
   </view>
@@ -133,6 +134,8 @@ const selectedTier = ref('')
 const agreementAccepted = ref(false)
 const rulesSheetVisible = ref(false)
 const agreementSheetVisible = ref(false)
+// 声明弹层是否由「确认开通」触发（决定是否显示「开通前需要先同意」提示）。
+const agreementRequired = ref(false)
 // 弹层打开时锁住页面滚动（小程序需由页面 page-meta 承担）。
 const pageLockStyle = computed(() => rulesSheetVisible.value || agreementSheetVisible.value ? 'overflow: hidden;' : '')
 const agreementPoints = computed(() => buildMembershipPurchaseAgreement(selectedProduct.value?.membership_duration_months))
@@ -243,17 +246,15 @@ function selectTier(targetTier: string): void {
   selectedTier.value = targetTier
 }
 
-// 未勾选声明就点「确认开通」：说明原因并询问是否代为勾选（只勾选，不自动发起支付）。
+// 未勾选声明就点「确认开通」：打开声明弹层并提示原因，点弹层里的「同意」只勾选，不自动发起支付。
 function promptAgreement(): void {
-  uni.showModal({
-    title: '请先同意会员服务声明',
-    content: '开通会员前需要同意《会员服务声明》。是否现在同意并勾选？',
-    confirmText: '同意勾选',
-    cancelText: '再看看',
-    success: ({ confirm }) => {
-      if (confirm) agreementAccepted.value = true
-    },
-  })
+  agreementRequired.value = true
+  agreementSheetVisible.value = true
+}
+
+function openAgreement(): void {
+  agreementRequired.value = false
+  agreementSheetVisible.value = true
 }
 
 function acceptAgreement(): void {

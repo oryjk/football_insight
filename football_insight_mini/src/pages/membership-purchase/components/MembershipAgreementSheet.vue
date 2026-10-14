@@ -2,6 +2,7 @@
   <FiBottomSheet
     :visible="visible"
     title="会员服务声明"
+    :eyebrow="required ? '开通前需要先同意' : ''"
     height="76vh"
     @update:visible="emit('update:visible', $event)"
   >
@@ -24,6 +25,8 @@ import FiBottomSheet from '../../../components/FiBottomSheet.vue'
 defineProps<{
   visible: boolean
   points: string[]
+  /** 由「确认开通」触发时为 true，标题上方提示需要先同意。 */
+  required?: boolean
 }>()
 
 const emit = defineEmits<{
