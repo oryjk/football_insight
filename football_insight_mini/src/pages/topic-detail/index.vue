@@ -101,7 +101,7 @@ function copySource(url: string) {
 }
 function selectTimelineTeam(teamId: number) {
   timeline.selectTeam(teamId)
-  uni.pageScrollTo({ selector: '#topic-timeline', duration: 200 })
+  uni.pageScrollTo({ selector: '#topic-timeline', duration: 700 })
 }
 function openTimelineTopic(id: string) { audio.stop(); uni.navigateTo({ url: topicDetailUrl(id) }) }
 function previewPhoto(url: string, urls: string[]) {
