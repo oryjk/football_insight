@@ -145,7 +145,7 @@ page {
   --fi-space-64: var(--fi-primitive-space-64);
 
   /* 页面同级卡片 / 卡片列表间距，由父级容器负责，避免与子组件 margin 叠加。 */
-  --fi-space-card-gap: var(--fi-space-24);
+  --fi-space-card-gap: var(--fi-space-16);
 
   --fi-font-18: var(--fi-primitive-font-18);
   --fi-font-20: var(--fi-primitive-font-20);

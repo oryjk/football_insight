@@ -17,7 +17,7 @@ component（--fi-component-*）   组件级复合契约（卡片、kicker/标题
 覆盖八个维度，引用规则：
 
 - **颜色**：`var(--fi-color-*)`。新增页面、组件、共享壳层必须引用 token，不新增散落 hex；需要新色值时先加 primitive，再建 semantic 别名。
-- **间距**：页面同级卡片和卡片列表统一用 `var(--fi-space-card-gap)`，默认 24rpx；卡片内部文字、按钮、指标等布局继续使用 `var(--fi-space-<rpx>)` 数字刻度。
+- **间距**：页面同级卡片和卡片列表统一用 `var(--fi-space-card-gap)`，默认 16rpx；卡片内部文字、按钮、指标等布局继续使用 `var(--fi-space-<rpx>)` 数字刻度。
 - **字号**：`var(--fi-font-<rpx>)` 数字刻度。
 - **行高**：`var(--fi-leading-*)`（none/tight/snug/normal/loose/relaxed）。
 - **圆角**：`var(--fi-radius-*)`（sm/md/lg/xl/round）。
