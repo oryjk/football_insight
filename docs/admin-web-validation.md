@@ -1,6 +1,17 @@
 # Web 管理后台验证记录
 
 
+## 2026-10-14：shadcn 会员来源多选
+
+- 原因：用户要求用多选框查看支付购买、推荐升级和未知来源，替换原两个视图切换按钮。
+- 默认三个来源全选，通过 shadcn Checkbox 独立勾选，主列表直接展示筛选后的同等级会员。筛选改变重置第一页并取消旧请求；全不选提示选择来源。支付订单及原汇总在 shadcn Collapsible 中展开，勾选支付购买时保留入口，推荐/未知不伪造订单。来源徽标继续保留，灰色徽标已修正文字和背景同色的问题。
+- members API 新增可选 CSV `origins`：省略为全部；`origins=` 为零结果；支持 purchase/referral/unknown 多选组合，非法值返回 400。总数和记录 SQL 使用相同筛选条件；不在当前分页上过滤，权限、no-store 与固定商品 UUID 保持。
+- 验证：前端 60 passed、TypeScript/根路径/子路径构建通过；后端 397 passed / 55 ignored、cargo check、改动 Rust 格式检查通过；显式运行商品 PostgreSQL 9 passed。真实重启隔离 QA 后端 18094 后，7 项浏览器场景通过：默认全选、单选和组合、第二页切筛选回第一页、全不选、空结果、失败重试、支付订单原统计、桌面/390px 手机与键盘。截图只含测试数据，代码审查未发现缺陷。
+- 严格 Clippy 仍为 15 项既有错误；架构扫描已有字符串分支错误，新修改文件命中 0。
+- 发布代码 `e5d990c`，peiqian 镜像 `football-insight-service-backend-rs:e5d990c`、local233 镜像 `admin-origin-filters-20261014`，均已部署并重启、running/healthy；静态版本 `20261014T092112-3999088`。本次没有数据库迁移或业务数据修改，没有修改 Nginx 或 jd 备用后端。peiqian 回滚容器保留 `football-insight-service-backend-rs.backup-origin-filters-20261014T092145`，旧 local233 镜像及静态版本保留。
+- 线上 29 项只读 API/编译 UI 验收通过：各等级全部/未知/购买+推荐/空选择的准确人数与列表，401/400、no-store、jd→peiqian 真实路由、shadcn 默认全选、切换来源、全不选提示、支付订单展开和手机弹窗边界。仅维护短期验收会话并退出撤销，未改管理员凭据；私有 token 文件和镜像运输文件已清理。
+
+
 ## 2026-10-14：会员来源徽标与同等级会员
 
 - 原因：用户需要区分购买获得、推荐升级与无法确定来源的历史会员，推荐和未知账号不能冒充购买者。
