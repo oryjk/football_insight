@@ -33,6 +33,7 @@
 - `GET /api/v1/mini-review/review-status?project_code=&version=`：小程序运行时公开查询，未登记版本视为不在审核
 - `POST /api/v1/mini-review/allocate`：构建脚本申请版本号（最新版本审核中→复用；已出审核→+0.0.1；空库→以 manifest 为起点递增）
 - `PUT /api/v1/mini-review/review-status`：微信审核结束后标记 `is_reviewing=false`；支持双通道鉴权——静态 `X-Api-Key`（脚本）或白名单用户 JWT（小程序「我的 → 设置」入口，白名单来自 env `MINI_REVIEW_CONTROL_USER_IDS`，逗号分隔用户 UUID）
+- `GET /api/v1/mini-review/can-control`：「我的 → 设置」入口显隐判定；带 JWT 查询当前用户是否在 `MINI_REVIEW_CONTROL_USER_IDS` 白名单内，未登录/无效/不在白名单一律返回 200 + `allowed=false`
 - allocate 与 PUT 用请求头 `X-Api-Key` 静态鉴权，密钥来自后端 env `MINI_REVIEW_API_KEY`（为空时接口不开放）；与 `football_insight_mini/.env.ci.local` 同名键保持一致
 
 
@@ -55,7 +56,7 @@
 ## 本地开发
 
 ```bash
-cd /home/wangrui/projects/football_insight/football_insight_service_backend_rs
+cd /home/betalpha/projects/football_insight/football_insight_service_backend_rs
 cargo test
 cargo check
 cargo run --bin football_insight_service_backend_rs
@@ -69,8 +70,8 @@ cargo run --bin football_insight_service_backend_rs
 
 ## 部署注意
 
-- 默认生产服务器：`jd`，可以 ssh jd 上去
-- 备用生产服务器：`peiqian`，可以 `ssh peiqian` 上去
+- 真正承接线上 API / 公众号 webhook 流量的生产服务器：`peiqian`（线上入口 `match.oryjk.cn` 解析到 `jd` 公网 IP，jd 的 Nginx 把 `/api/v1/`、`/football/wechat/webhook` 反代到 `peiqian` 的 8092），可以 `ssh peiqian` 上去；发版 `peiqian` 即对线上生效
+- 备用生产服务器：`jd`，上面的后端容器不在流量路径上，无需每次同步发版，可以 ssh jd 上去
 - 生产 monorepo 目录：`/root/projects/football_insight`
 - 项目目录：`/root/projects/football_insight/football_insight_service_backend_rs`
 - 不要随意改 Nginx 非 football 路由

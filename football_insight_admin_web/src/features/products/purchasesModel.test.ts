@@ -52,7 +52,7 @@ test("汇总直接来自API，与当前订单分页无关，金额不是退款�
     }),
   ).toEqual({ users: "7", orders: "23", refunded: "5", amount: "¥39.01" });
 });
-test("真实头像仅允许绝对http/https，不接受可执行或带凭据URL", () => {
+test("远程头像仅允许绝对http/https，不接受可执行或带凭据URL", () => {
   expect(safeAvatarUrl("https://avatars.example.test/photo.png")).toBe(
     "https://avatars.example.test/photo.png",
   );
@@ -67,6 +67,31 @@ test("真实头像仅允许绝对http/https，不接受可执行或带凭据URL"
     "/relative/avatar.png",
     "ftp://example.test/a",
     "https://user:private@example.test/a",
+  ])
+    expect(safeAvatarUrl(value)).toBeNull();
+});
+
+test("购买用户的Base64图片头像可直接展示", () => {
+  const png =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=";
+  expect(safeAvatarUrl(png)).toBe(png);
+  expect(safeAvatarUrl(`  ${png}  `)).toBe(png);
+  for (const mime of ["jpeg", "jpg", "gif", "webp", "bmp"])
+    expect(safeAvatarUrl(`data:image/${mime};base64,YWJjZA==`)).toBe(
+      `data:image/${mime};base64,YWJjZA==`,
+    );
+});
+
+test("内嵌头像拒绝SVG、非图片内容和畸形Base64", () => {
+  for (const value of [
+    "data:image/svg+xml;base64,PHN2Zy8+",
+    "data:text/html;base64,PHNjcmlwdD4=",
+    "data:image/png,plain-text",
+    "data:image/png;base64,",
+    "data:image/png;base64,abc",
+    "data:image/png;base64,abcd===",
+    "data:image/png;base64,ab=c",
+    "data:image/png;base64,abcd<script>",
   ])
     expect(safeAvatarUrl(value)).toBeNull();
 });

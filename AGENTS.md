@@ -1,6 +1,6 @@
 # Football Insight Workspace Guide
 
-本目录下是一个已上线运行的足球数据产品（线上入口 `match.oryjk.cn`，部署拓扑见下方「当前部署约定」），前端架构参考了报名系统项目。当前是 monorepo，包含 4 个子项目：
+本目录下是一个已上线运行的足球数据产品（线上入口 `match.oryjk.cn`，部署拓扑见下方「当前部署约定」），前端架构参考了报名系统项目。当前是 monorepo，包含 6 个子项目：
 
 - `football_insight_service_backend_rs`
   - Rust + Axum + SQLx + PostgreSQL
@@ -12,7 +12,16 @@
   - Vite + Vue 3 + TypeScript + Bun（纯 H5，不依赖 uni-app）
   - 面向小程序 web-view 嵌入场景的独立 H5 页面，当前有换座位页
   - 鉴权：URL `?token=` 透传（web-view 场景）或后端 H5 测试登录白名单
-  - 纯函数与类型从 `football_insight_mini` 移植（`utils/seatSwap.ts`、`utils/stadiumRegions.ts`），后端 API 不变
+  - 纯函数与类型移植自 `football_insight_mini`（`src/pages/seat-swap/helpers.ts`、`src/utils/stadiumRegions.ts`），后端 API 不变
+- `football_insight_admin_android`
+  - Kotlin + Jetpack Compose + Material 3
+  - 原生 Android 管理端，只调用后端 `src/admin` 模块的 `/api/v1/admin/**` Admin API
+- `football_insight_admin_web`
+  - React 19 + Vite + TypeScript + Bun + Tailwind v4 + shadcn/ui
+  - 独立纯前端后台，复用现有 Admin JWT；首个菜单为会员商品管理
+  - 设计与技术规范沿用 `betalpha-admin/admin-frontend`，仅通过 `/api/v1/admin/**` 读写数据
+  - local233 内网入口：`http://172.16.60.233/football-admin/`；专属 API 前缀 `/football-admin/api/v1/admin/` 由主机网关转到本地 Docker 后端 18092
+  - 此后端连接生产 `football_data`，商品写操作即时生效；不要使用生产商品做创建/删除测试
 - `sina_csl_scraper`
   - Python + uv
   - 负责抓取新浪体育移动端数据、上传头像、写入 PostgreSQL
@@ -83,6 +92,7 @@
 
 ## 开发约定
 
+- 安卓管理端 `football_insight_admin_android` 暂停迭代更新。后端、Web 后台、小程序和 H5 的开发不默认同步修改、构建或发布安卓项目；保留现有安卓代码。仅在用户明确要求安卓相关改动或恢复安卓迭代时再开展对应工作。
 - 前端必须使用 `bun`
 - 后端用 `cargo`
 - scraper 用 `uv`

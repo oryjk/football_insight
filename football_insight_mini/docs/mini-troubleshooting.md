@@ -24,25 +24,25 @@
 不要再用系统缩略图导出。当前仓库已经改成：
 
 1. 保留 SVG 源文件：
-   - `/home/wangrui/projects/football_insight/football_insight_mini/src/static/tabbar`
+   - `/home/betalpha/projects/football_insight/football_insight_mini/src/static/tabbar`
 2. 使用 Playwright 在固定画布中渲染 SVG
 3. 直接截图导出透明 PNG
 
 导出脚本：
 
-- `/home/wangrui/projects/football_insight/football_insight_mini/scripts/generate-tabbar-pngs.mjs`
+- `/home/betalpha/projects/football_insight/football_insight_mini/scripts/generate-tabbar-pngs.mjs`
 
 ### 当前约定
 
 - 输出格式：透明 PNG
 - 输出尺寸：`81 x 81`
 - 输出目录：
-  - `/home/wangrui/projects/football_insight/football_insight_mini/src/static/tabbar-png`
+  - `/home/betalpha/projects/football_insight/football_insight_mini/src/static/tabbar-png`
 
 ### 重新生成命令
 
 ```bash
-cd /home/wangrui/projects/football_insight/football_insight_mini
+cd /home/betalpha/projects/football_insight/football_insight_mini
 node ./scripts/generate-tabbar-pngs.mjs
 ```
 
@@ -70,7 +70,7 @@ Error: timeout
 
 请求封装在：
 
-- `/home/wangrui/projects/football_insight/football_insight_mini/src/utils/request.ts`
+- `/home/betalpha/projects/football_insight/football_insight_mini/src/utils/request.ts`
 
 当前已经做了两点：
 

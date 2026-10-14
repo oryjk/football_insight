@@ -12,8 +12,14 @@ const beijingClock = new Intl.DateTimeFormat("zh-CN", {
 });
 export function safeAvatarUrl(value: string | null): string | null {
   if (!value) return null;
+  const normalized = value.trim();
+  const inlineImage =
+    /^data:image\/(?:png|jpe?g|gif|webp|bmp);base64,([A-Za-z0-9+/]+={0,2})$/i.exec(
+      normalized,
+    );
+  if (inlineImage && inlineImage[1].length % 4 === 0) return normalized;
   try {
-    const url = new URL(value.trim());
+    const url = new URL(normalized);
     return ["http:", "https:"].includes(url.protocol) &&
       !url.username &&
       !url.password

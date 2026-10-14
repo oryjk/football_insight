@@ -2,7 +2,7 @@
 
 一个面向中国足球用户的“数据洞察”产品实验项目，当前一期 MVP 聚焦中超联赛。
 
-当前 monorepo 下包含 4 个子项目：
+当前 monorepo 下包含 6 个子项目：
 
 - `sina_csl_scraper`
   - Python + `uv`
@@ -13,9 +13,16 @@
 - `football_insight_mini`
   - uni-app + Vue 3 + TypeScript + Bun
   - 负责微信小程序，并支持编译为 H5
+- `football_insight_h5`
+  - Vite + Vue 3 + TypeScript + Bun（纯 H5，不依赖 uni-app）
+  - 面向小程序 web-view 嵌入场景的独立 H5 页面，当前有换座位页
+  - 换座页早期设计原型见根目录 `seat-swap-mock.html`（方案 A 扁平化 mock，仅供设计参考）
 - `football_insight_admin_android`
   - Kotlin + Jetpack Compose + Material 3
   - 原生 Android 管理端，只调用 `/api/v1/admin/**`
+- `football_insight_admin_web`
+  - React 19 + Vite + TypeScript + Bun + Tailwind v4 + shadcn/ui
+  - 独立纯前端管理后台，复用管理员登录，首个菜单为会员商品管理
 
 ## 当前能力
 
@@ -37,13 +44,13 @@
   -> sina_csl_scraper
   -> PostgreSQL (football_data, f_i_* tables)
   -> football_insight_service_backend_rs
-  -> football_insight_mini / football_insight_admin_android
+  -> football_insight_mini / football_insight_h5 / football_insight_admin_android / football_insight_admin_web
 ```
 
 当前职责边界：
 
-- Python 项目负责“写”
-- Rust 项目负责“读”
+- Python 项目负责抓取并写入足球数据
+- Rust 项目负责读取足球数据及处理账号、支付和管理端业务写入
 - 前端只消费 Rust API，不直接访问新浪接口和数据库
 
 关于“归因 / 贡献”需要特别说明：
@@ -62,7 +69,9 @@ football_insight/
 ├── DEPLOYMENT.md
 ├── README.md
 ├── football_insight_mini/
+├── football_insight_h5/
 ├── football_insight_admin_android/
+├── football_insight_admin_web/
 ├── football_insight_service_backend_rs/
 └── sina_csl_scraper/
 ```
@@ -83,43 +92,37 @@ football_insight/
 
 ## 数据抓取补充
 
-如果后续需要用浏览器方式分析页面数据，优先看这份说明：
+如果后续需要用浏览器方式抓取页面数据，参考抓取器 README 中雷速角球补全的 Playwright 用法：
 
-- [docs/playwright-data-extraction.md](docs/playwright-data-extraction.md)
+- [sina_csl_scraper/README.md](sina_csl_scraper/README.md)（「数据来源」和「运行」章节）
 
-这份文档包含：
+里面包含：
 
-- 用 Playwright 监听页面真实接口
-- 用 Playwright 直接读 DOM
-- 先点击/切换再继续抓数据
-- 什么时候才应该走截图 + OCR
+- 用 Playwright 无头浏览器加载雷速页面，绕过前端 WAF challenge
+- 通过完场页 / 实时页发现详情页 `detail_id`
+- 用 `leisu_match_map` JSON 把新浪 `match_id` 手动映射到雷速 `detail_id`
 
 ## 快速启动
 
-### 1. 先抓取并写库
+### 1. 启动本地联调环境（后端 + Redis）
+
+```bash
+./deploy/local-test/up.sh
+```
+
+本地后端运行在 local233（API `http://172.16.60.233:18092/`），经私有 SSH 隧道连接 `peiqian` 上的生产 `football_data`，启动时自动执行 migration。生产 PostgreSQL 运行在 `peiqian` 的 Docker 容器内，不开放公网端口，不要尝试直连公网 IP。详见 [deploy/local-test/README.md](deploy/local-test/README.md)。
+
+注意：该环境读写的是真实生产用户数据。
+
+### 2. 抓取并写库（可选）
 
 ```bash
 cd sina_csl_scraper
-
-FI_DATABASE_URL='postgresql://football_app:***@117.72.164.211:5432/football_data?sslmode=disable' \
-FI_MINIO_ENDPOINT='https://oryjk.cn:82/minio' \
-FI_MINIO_ACCESS_KEY='***' \
-FI_MINIO_SECRET_KEY='***' \
-FI_MINIO_BUCKET='football-insight' \
-FI_MINIO_PREFIX='summary' \
+uv sync
 uv run sina-csl-scraper scrape --season 2026 --upload-avatars --write-db
 ```
 
-### 2. 启动 Rust 后端
-
-```bash
-cd football_insight_service_backend_rs
-
-DATABASE_URL='postgresql://football_app:***@117.72.164.211:5432/football_data?sslmode=disable' \
-JWT_SECRET='replace-with-a-long-random-secret' \
-PORT=8092 \
-cargo run
-```
+数据库和 MinIO 连接参数通过 `FI_DATABASE_URL`、`FI_MINIO_*` 等环境变量提供，取值见 `sina_csl_scraper/README.md`，不要提交到 git。
 
 ### 3. 启动前端 H5
 
@@ -158,7 +161,21 @@ ANDROID_HOME=/home/betalpha/Android/Sdk ./gradlew testDebugUnitTest lintDebug as
 ./deploy/local-test/up.sh
 ```
 
-后端和 Redis 运行在 local233，后端通过私有 SSH 隧道直接连接 `peiqian` 上的生产 `football_data`，并在启动时自动执行 migration。管理员：`admin` / `admin123`。会员调整、禁用/恢复等写操作会直接修改生产用户数据。
+后端和 Redis 运行在 local233，后端通过私有 SSH 隧道直接连接 `peiqian` 上的生产 `football_data`，并在启动时自动执行 migration。已有管理员账号与密码保留；管理员表为空且未配置初始密码时，先在 Web 后台初始化固定账号 `superadmin`，密码由管理员自行设置，没有内置默认密码。账号和密码随后可在「设置」中修改。会员调整、禁用/恢复等写操作会直接修改生产用户数据。
+
+### 6. 启动 Web 管理后台
+
+```bash
+cd football_insight_admin_web
+bun install
+bun run dev
+```
+
+开发地址为 `http://localhost:5176/`，默认将 `/api` 代理到本地后端 `http://127.0.0.1:18093`。
+目标后端必须运行包含商品管理 API 的新代码；使用其他后端端口时，设置
+`ADMIN_API_PROXY_TARGET=http://127.0.0.1:<端口> bun run dev`。
+使用现有独立管理员账号登录。前端只调用 Admin API，不持有数据库或微信密钥。
+详情见 [Web 管理后台 README](football_insight_admin_web/README.md)。
 
 ## 账号系统说明
 

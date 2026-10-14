@@ -50,26 +50,37 @@ DATABASE_URL='postgresql://football_app:***@117.72.164.211:5432/football_data?ss
 - 如果未单独配置小程序环境变量，后端会自动回退到 `WECHAT_APP_ID / WECHAT_APP_SECRET`
 - `TICKET_MONITOR_BASE_URL` 用于余票监控 / 下一场比赛等联动能力，本地默认会回落到 `http://127.0.0.1:4000`
 - `ADMIN_JWT_SECRET` 必须独立于 C 端 `JWT_SECRET`，且至少 32 个字符
-- `ADMIN_OWNER_*` 用于首次启动时创建独立 owner；同名账号已存在时不会覆盖密码
+- `ADMIN_OWNER_USERNAME` 缺省为 `superadmin`；`ADMIN_OWNER_PASSWORD` 缺省为空，不提供预设密码时启动不会创建管理员。
+- 空库首次使用 Web 初始化固定 `superadmin` 并自行设置密码；存在任意管理员（含禁用账号）时不允许重新初始化。
+- 显式提供 `ADMIN_OWNER_PASSWORD` 保留旧部署预设初始化方式；已有管理员会被复用，不重新创建旧用户名或覆盖密码。
 
 ## 数据库
 
-当前初始化迁移位于 `migrations/`，包含：
+当前迁移位于 `migrations/`，按功能域大致分为：
 
-- 抓取任务
-- 比赛
-- 积分榜
-- 球队榜快照/明细
-- 球员榜快照/明细
-- 邀请码和微信关注者
+- 基础抓取数据：抓取任务、比赛、积分榜、球队榜/球员榜快照与明细、球队和球员资料
+- 角球与技术统计字段、中超官网赛程对账
+- 球队洞察：进球/助攻/失球贡献预计算结果表
+- 账号与会员体系：邀请码、微信关注者/公众号绑定、用户状态、推荐关系、会员等级与商品、用户许可证
+- 支付订单
+- 系统配置与 AI 对话配置种子
+- 赛前助力、球队战术板、用户行为快照
+- 余票/回流：回流邮件订阅、概览查询性能索引
+- 换座：换座相关表与通知开关
+- 推送设备 token
+- 管理端：admin 身份与审计日志
+- 小程序审核：审核配置表、`f_i_mini_review_statuses` 登记库、`match_id_unlocks`
 
-执行迁移：
+执行迁移：生产库 `football-data-postgres` 运行在 `peiqian` 的 Docker 容器内，不开放公网端口，迁移需在 `peiqian` 上执行（`_sqlx_migrations` 表记账，部署脚本不会自动跑迁移）：
 
 ```bash
-DATABASE_URL='postgresql://football_app:***@117.72.164.211:5432/football_data?sslmode=disable' \
+ssh peiqian
+cd /root/projects/football_insight/football_insight_service_backend_rs
+DATABASE_URL='postgresql://football_app:***@127.0.0.1:5432/football_data?sslmode=disable' \
 cargo run --bin run_migrations
 
-DATABASE_URL='postgresql://football_app:***@117.72.164.211:5432/football_data?sslmode=disable' \
+# 只应用单个迁移文件时：
+DATABASE_URL='postgresql://football_app:***@127.0.0.1:5432/football_data?sslmode=disable' \
 cargo run --bin run_migrations -- migrations/20260409001000_add_membership_tier_to_users.sql
 ```
 
@@ -120,16 +131,25 @@ docker run -d \
   - `/api/v1/auth/me`
   - `/api/v1/auth/logout`
   - `/football/wechat/webhook`
-- 管理端认证（只供原生管理 App）
+- 管理端认证（供原生管理 App 与独立 Web 后台）
   - `POST /api/v1/admin/auth/login`
   - `GET /api/v1/admin/auth/me`
   - `POST /api/v1/admin/auth/logout`
+  - `PUT /api/v1/admin/auth/credentials`
+  - `GET /api/v1/admin/auth/setup`（公开初始化状态）
+  - `POST /api/v1/admin/auth/setup`（仅空库首次初始化）
   - `GET /api/v1/admin/users`
   - `GET /api/v1/admin/users/{id}`
   - `POST /api/v1/admin/users/{id}/disable`
   - `POST /api/v1/admin/users/{id}/restore`
   - `POST /api/v1/admin/users/{id}/membership`
   - `GET /api/v1/admin/audit-logs`
+- 管理端商品（仅会员微信道具映射）
+  - `GET /api/v1/admin/products`
+  - `GET /api/v1/admin/products/{encoded_product_key}`
+  - `POST /api/v1/admin/products`
+  - `PUT /api/v1/admin/products/{encoded_product_key}`
+  - `DELETE /api/v1/admin/products/{encoded_product_key}`
 - AI
   - `/api/v1/ai/chat`
   - `/api/v1/ai/chat/stream`
@@ -301,6 +321,19 @@ cargo test --test admin_products_postgres -- --ignored
 - `is_under_review=true`: 当前版本正在审核，小程序端应隐藏会员、支付等相关入口，并避免加载会员信息。
 - `is_under_review=false`: 审核完成或未配置该版本，小程序端可正常展示会员信息。
 - `matched=false`: 后端没有找到该版本的审核配置，默认按非审核处理。
+
+## Mini Review 审核版本登记接口
+
+新的 `mini_review` 模块（`src/mini_review/`）维护小程序审核版本登记库，表为 `f_i_mini_review_statuses`，该登记库是小程序版本号的唯一权威。小程序发版脚本（`football_insight_mini` 的 `mp:release`）和「我的 → 设置」入口都走这组接口：
+
+- `GET /api/v1/mini-review/review-status?project_code=&version=`：小程序运行时公开查询，不需要 JWT；未登记的版本视为不在审核中
+- `POST /api/v1/mini-review/allocate`：构建脚本申请版本号。最新版本审核中→复用该版本；已出审核→递增 `+0.0.1`；空库→以 manifest 当前版本为起点递增
+- `PUT /api/v1/mini-review/review-status`：微信审核结束后标记 `is_reviewing=false`。支持双通道鉴权：静态 `X-Api-Key`（脚本用），或白名单用户 JWT（小程序「我的 → 设置」入口，白名单来自后端 env `MINI_REVIEW_CONTROL_USER_IDS`，逗号分隔用户 UUID）
+- `GET /api/v1/mini-review/can-control`：「我的 → 设置」入口显隐判定。带 JWT 查询当前用户是否在 `MINI_REVIEW_CONTROL_USER_IDS` 白名单内；未登录、token 无效或不在白名单一律返回 200 + `allowed=false`，让前端只隐藏入口、不弹错误
+
+`allocate` 与 `PUT review-status` 的静态密钥来自后端 env `MINI_REVIEW_API_KEY`（为空时接口不开放），需与 `football_insight_mini/.env.ci.local` 同名键保持一致。
+
+上一节的 System Config 审核配置（`f_i_mini_program_review_configs`）是旧接口，保留兼容。
 
 ## 数据视图
 
@@ -555,9 +588,9 @@ cd football_insight_service_backend_rs
 ./deploy_peiqian_docker.sh
 ```
 
-这个脚本会在 `out109` 构建镜像并推送 Harbor，再到 `peiqian` 拉取镜像并重建容器。脚本还会确保 `peiqian:/root/projects/football_insight` 上存在 monorepo 工作区，并使用运行时环境文件 `/root/projects/football_insight/football-insight-service-backend-rs.env` 启动容器。
+这个脚本在 `peiqian` 本机直接构建镜像，并用本地镜像重建容器，不推 Harbor；每次部署会自动清理历史镜像，只保留最近 10 个 tag。脚本还会确保 `peiqian:/root/projects/football_insight` 上存在 monorepo 工作区（git 同步走本机 clash 代理），并使用运行时环境文件 `/root/projects/football_insight/football-insight-service-backend-rs.env` 启动容器。
 
-两个脚本运行前都需要确认当前提交已经 push，并在本地 `.env` 或环境变量里提供 Harbor 凭据，例如 `HARBOR_PASSWORD`。不要提交真实 `.env`。
+两个脚本运行前都需要确认当前提交已经 push。只有 `deploy_jd_docker.sh` 需要在本地 `.env` 或环境变量里提供 Harbor 凭据（例如 `HARBOR_PASSWORD`），`deploy_peiqian_docker.sh` 不涉及 Harbor。不要提交真实 `.env`。
 
 如果本次发布包含新 migration：
 
@@ -791,6 +824,7 @@ curl 'http://127.0.0.1:8092/api/v1/ai/chat' \
 - Python 抓取器：
   [sina_csl_scraper/README.md](../sina_csl_scraper/README.md)
 
+
 ### Admin 会员来源与同等级会员
 
 `GET /api/v1/admin/products/{product_key}/members?page=1&page_size=20` 要求 Admin JWT / ManageProducts，返回 no-store。响应 `{catalog_product_id,membership_tier,items,total,page,page_size}`；每位会员包含 `{user_id,user_nickname,user_avatar_url,membership_origin,expires_at,expired}`。会员来源为 purchase/referral/unknown。
@@ -798,5 +832,6 @@ curl 'http://127.0.0.1:8092/api/v1/ai/chat' \
 查询该商品等级对应的活跃账号，包含已到期账号；这不是当前 SKU 的购买证明，不影响原购买人数和金额统计。支付订单响应另含固定 `membership_origin:"purchase"`，表示这笔历史交易来源，不能当作用户当前会员来源。
 
 来源迁移 `20261014110000` 只以精确支付权益证据回填历史购买，无法确定的保留 unknown；不以没有订单或推荐人数推断来源。未来支付及推荐实际授予在同事务设置来源，其他权益变更由触发器归为 unknown，昵称修改不改变来源。退款额外保存前后来源，权益与来源都一致才撤销，恢复前一来源；旧快照来源保守回填，避免覆盖后续人工调整。
+
 
 会员来源筛选：members API 可选 `origins=purchase,referral,unknown`，支持任意组合；省略为全部，显式空字符串为不选择任何来源，非法来源返回 400。`total` 和分页记录均按所选来源在数据库筛选，不对已分页记录做前端过滤。该条件只作用于当前会员列表，原支付订单及金额汇总仍按真实交易查询。

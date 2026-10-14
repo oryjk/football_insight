@@ -4,12 +4,13 @@
 
 ## 生产环境
 
-- 线上域名入口机：`peiqian`（`match.oryjk.cn` 的 DNS 直接解析到 peiqian 公网 IP `117.72.164.211`）
-- peiqian 登录：`ssh peiqian`
-- 备用入口机：`jd`（`ssh jd`）；jd 上的 Nginx 同样把 `/api/v1/` 反代到 peiqian 的 `10.8.10.2:8092`（WireGuard）
+- 线上域名入口机：`jd`（`match.oryjk.cn` 的 DNS 解析到 jd 公网 IP `117.72.164.211`）
+- jd 登录：`ssh jd`；jd 上的 Nginx 把 `/api/v1/` 和 `/football/wechat/webhook` 反代到 `peiqian` 的 `10.8.10.2:8092`（WireGuard），`/football/` 前端静态资源由 jd 本地直接服务
+- 真正承接线上 API/webhook 流量的后端：`peiqian`（`ssh peiqian`）上的 Docker 容器；发版 peiqian 即对线上生效
+- jd 上也保留一个后端容器，但不在流量路径上（备用，无需每次同步发版）
 - 前端访问地址：`https://match.oryjk.cn/football/`
 - 后端接口前缀：`https://match.oryjk.cn/api/v1/`
-- 结论：后端发版必须 `jd` 和 `peiqian` 两台都执行；只发 `jd` 线上不会生效
+- 结论：后端发版发 `peiqian` 即生效；`jd` 容器为备用，无需每次同步发版
 
 ## 生产目录
 
@@ -36,6 +37,17 @@
   - 先跑 `nginx -t`
   - 不要 `reload`
   - 直接重启 Nginx Docker 容器
+
+### 更换 `match.oryjk.cn` TLS 证书
+
+在本地 Mac 执行：
+
+```bash
+bash deploy/renew-jd-nginx-ssl.sh [证书目录]
+```
+
+- 证书目录需包含 `match.oryjk.cn.pem`（含中间证书的 fullchain）和 `match.oryjk.cn.key`；不传参数时自动选取 `~/Downloads` 下最新的 `*_match.oryjk.cn_nginx` 目录
+- 流程：本地校验（文件存在 / 域名匹配 / 有效期 / 证书私钥配对）-> 远端备份旧证书到 `ssl.bak.<时间戳>` -> 覆盖上传 -> `nginx -t`（失败自动回滚）-> `nginx -s reload` -> 回读线上证书确认生效
 
 ## 前端部署
 
@@ -132,15 +144,7 @@ cd football_insight_service_backend_rs
 
 ### 3. 数据库迁移
 
-如果这次改动包含 migration，优先在生产目录执行仓库内置迁移入口：
-
-```bash
-ssh jd
-cd /root/projects/football_insight/football_insight_service_backend_rs
-cargo run --release --bin run_migrations
-```
-
-如部署到 `peiqian`：
+生产数据库 `football-data-postgres` 运行在 `peiqian`，不对外开放公网端口。如果这次改动包含 migration，在 `peiqian` 的生产目录执行仓库内置迁移入口（`_sqlx_migrations` 表记账，部署脚本不会自动跑迁移）：
 
 ```bash
 ssh peiqian
@@ -175,7 +179,6 @@ systemctl status football-insight.service --no-pager
 
 ### 5. 后端上线后验证
 
-```bash
 部署到 `jd`：
 
 ```bash
@@ -210,22 +213,22 @@ curl https://match.oryjk.cn/api/v1/system/public-config
 
 ## 日志查看
 
-应用代码会把 tracing 日志写入 `logs/` 目录，并按 10MB 滚动；这是排查业务日志时的优先入口：
+应用代码会把 tracing 日志写入 `logs/` 目录，并按 10MB 滚动；这是排查业务日志时的优先入口（线上流量在 `peiqian`，排查线上问题优先看 peiqian；jd 备用容器同理把 `ssh peiqian` 换成 `ssh jd`）：
 
 ```bash
-ssh jd 'tail -n 100 -f /root/projects/football_insight/football_insight_service_backend_rs/logs/app.log'
+ssh peiqian 'tail -n 100 -f /root/projects/football_insight/football_insight_service_backend_rs/logs/app.log'
 ```
 
 Docker 容器 stdout/stderr 作为进程级兜底日志；应用业务日志仍优先看 `logs/app.log`：
 
 ```bash
-ssh jd 'docker logs --tail 100 football-insight-service-backend-rs'
+ssh peiqian 'docker logs --tail 100 football-insight-service-backend-rs'
 ```
 
 如果切换到 systemd 备用部署，再用 journal 排查进程启动失败、panic 或早期 stderr 输出：
 
 ```bash
-ssh jd 'journalctl -u football-insight.service -n 100 --no-pager'
+ssh peiqian 'journalctl -u football-insight.service -n 100 --no-pager'
 ```
 
 说明：
@@ -248,10 +251,10 @@ ssh jd 'journalctl -u football-insight.service -n 100 --no-pager'
 ### 纯后端改动
 
 1. push 代码
-2. 两台都要发（线上入口是 `peiqian`，`jd` 是备用入口）：
-   - `football_insight_service_backend_rs/deploy_jd_docker.sh`
+2. 发 `peiqian` 即对线上生效（线上流量由 peiqian 后端容器承接）：
    - `football_insight_service_backend_rs/deploy_peiqian_docker.sh`
-3. 如有 migration，在对应目标机执行 `cargo run --release --bin run_migrations`
+   - `jd` 上的容器是备用、不在流量路径上，无需每次同步发版；确需同步时再跑 `football_insight_service_backend_rs/deploy_jd_docker.sh`
+3. 如有 migration，在 `peiqian` 上执行 `cargo run --release --bin run_migrations`
 4. 用 `https://match.oryjk.cn` 域名验证接口（目标机本机 8092 正常不代表线上生效）
 5. 优先看 `logs/app.log`，必要时再看 `docker logs`
 
@@ -276,11 +279,25 @@ ssh jd 'journalctl -u football-insight.service -n 100 --no-pager'
 
 ### 小程序改动
 
-小程序不通过 `jd` 上的 Nginx Docker 发布脚本，发布流程是：
+默认在本地 Mac 从干净 main 执行 `bun run mp:release -- --robot 2 --desc "本次变更说明"`，统一完成生产构建、审核版本登记和测试上传。上传前先提交推送全部业务改动；版本文件若因登记发生变化，也需提交推送后重跑。
 
-1. 本地 `bun run build:mp-weixin`
-2. 用微信开发者工具打开 `dist/build/mp-weixin`
-3. 在微信开发者工具里上传新版本
+Mac 不可用时可使用 peiqian 已配置私钥、`.env.ci.local` 与 Bun 的备用环境；先通过既有 clash 代理更新干净 main，再执行同一发布入口。robot 2 上传不代替微信公众平台提审和正式发布。
+
+审核版本号由后端 `f_i_mini_review_statuses` 统一分配，不手动修改 manifest。指定版本用 `MINI_PROGRAM_VERSION=x.y.z`，离线构建用 `MINI_REVIEW_SKIP=1`；正式上传不会跳过登记。完整步骤见 `football_insight_mini/README.md` 的「微信小程序发布」一节。
+
+## local233 联调后端部署
+
+根目录 `deploy_local233.sh` 把已提交并 push 的代码部署到 local233 的联调测试后端（默认容器 `football-insight-local-test-backend`，对外端口 `18092`）：
+
+```bash
+./deploy_local233.sh
+```
+
+- 要求本地和远端工作区都干净；从开发机执行时本地 HEAD 必须已 push 到 `origin`
+- 也可以直接登录 local233，在 `/home/betalpha/projects/football_insight` 里执行同一命令（脚本检测到自身位于部署工作区后进入本机模式，直接从 origin 拉当前分支）
+- 内部调用 `deploy/local-test/up.sh` 起容器，完成后自动校验 `/api/health` 等接口
+- 可用 `DEPLOY_HOST` / `DEPLOY_REPO_DIR` / `DEPLOY_BRANCH` / `DEPLOY_PORT` / `DEPLOY_CONTAINER` 环境变量覆盖默认值
+- 详细说明见 `deploy/local-test/README.md`
 
 ## local233 生产库 SSH 隧道
 
@@ -293,7 +310,7 @@ local233 管理联调后端经 SSH 隧道连接 peiqian 上的生产 `football_d
 
 ## 风险点
 
-- 线上域名入口当前就是 `peiqian`（DNS 直解析）；只把镜像发到 `jd` 线上不会有任何变化，必须两台都发
+- 线上域名入口是 `jd`（DNS 解析到 jd），但 jd 的 Nginx 把 `/api/v1/` 和 `/football/wechat/webhook` 反代到 `peiqian`；只把镜像发到 `jd` 线上不会有任何变化，发 `peiqian` 才生效
 - 后端部署前如果忘了 push，服务器拉不到最新代码
 - 有 migration 时，如果只重启服务不跑迁移，接口可能变成 `500`
 - 如果后端代码改了，本地验证前必须先重启本地后端，不要在旧进程上验证新逻辑
