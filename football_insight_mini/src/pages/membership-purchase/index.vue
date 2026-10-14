@@ -58,8 +58,8 @@
         </view>
         <button
           class="purchase-btn"
-          :class="{ 'purchase-btn--loading': loading }"
-          :disabled="loading || !paymentAvailable || !agreementAccepted || !selectedProduct"
+          :class="{ 'purchase-btn--loading': loading, 'purchase-btn--pending': !agreementAccepted }"
+          :disabled="loading || !paymentAvailable || !selectedProduct"
           @click="handlePurchase"
         >
           {{ loading ? '处理中...' : '确认开通' }}
@@ -243,6 +243,19 @@ function selectTier(targetTier: string): void {
   selectedTier.value = targetTier
 }
 
+// 未勾选声明就点「确认开通」：说明原因并询问是否代为勾选（只勾选，不自动发起支付）。
+function promptAgreement(): void {
+  uni.showModal({
+    title: '请先同意会员服务声明',
+    content: '开通会员前需要同意《会员服务声明》。是否现在同意并勾选？',
+    confirmText: '同意勾选',
+    cancelText: '再看看',
+    success: ({ confirm }) => {
+      if (confirm) agreementAccepted.value = true
+    },
+  })
+}
+
 function acceptAgreement(): void {
   agreementAccepted.value = true
   agreementSheetVisible.value = false
@@ -258,7 +271,11 @@ watch(session.revision, () => {
 
 async function handlePurchase() {
   if (loading.value || !paymentAvailable.value) return
-  if (!selectedProduct.value || !agreementAccepted.value) return
+  if (!selectedProduct.value) return
+  if (!agreementAccepted.value) {
+    promptAgreement()
+    return
+  }
   const revision = session.revision.value
   const targetTier = selectedProduct.value.target_tier
   const isCurrent = () => session.revision.value === revision
@@ -476,6 +493,11 @@ async function handlePurchase() {
 .purchase-btn[disabled] {
   background: rgba(var(--fi-primitive-red-rgb), 0.36);
   color: var(--fi-color-surface);
+}
+
+/* 未同意声明：保持灰态提示，但仍可点击以弹出说明。 */
+.purchase-btn--pending {
+  background: rgba(var(--fi-primitive-red-rgb), 0.36);
 }
 
 .purchase-btn--loading {
