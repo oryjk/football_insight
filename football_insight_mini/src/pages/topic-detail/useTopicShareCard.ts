@@ -3,6 +3,7 @@ import type { DailyTopicItem } from '../../types/dailyTopic'
 import { TOPIC_SHARE_CARD, topicShareSignature } from './share'
 import { drawTopicShareCard } from './shareCardDrawing'
 import { loadTopicSharePhoto } from './shareCardPhoto'
+import { exportCanvasToTempFile, flushCanvas } from '../../utils/canvasPoster'
 
 export const TOPIC_SHARE_CANVAS_ID = 'topicShareCanvas'
 
@@ -34,12 +35,9 @@ export function useTopicShareCard() {
       const context = uni.createCanvasContext(TOPIC_SHARE_CANVAS_ID, instance)
       const { width, height } = TOPIC_SHARE_CARD
       drawTopicShareCard(context, item, photo)
-      await new Promise<void>(resolve => context.draw(false, () => resolve()))
+      await flushCanvas(context)
       if (owner !== revision) return ''
-      const path = await new Promise<string>((resolve, reject) => {
-        uni.canvasToTempFilePath({ canvasId: TOPIC_SHARE_CANVAS_ID, width, height, destWidth: width, destHeight: height,
-          fileType: 'png', success: result => resolve(result.tempFilePath), fail: reject }, instance)
-      })
+      const path = await exportCanvasToTempFile({ canvasId: TOPIC_SHARE_CANVAS_ID, width, height, fileType: 'png', instance })
       if (owner !== revision) return ''
       imageUrl.value = path
       return path

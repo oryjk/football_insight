@@ -55,6 +55,7 @@ import { getCurrentInstance, ref, watch } from 'vue'
 import FiLoading from '../../../components/FiLoading.vue'
 import type { StandingsTable, StandingsTableEntry } from '../../../types/insight'
 import { extractApiErrorMessage } from '../../../utils/apiError'
+import { exportCanvasToTempFile, flushCanvas, savePosterToAlbum, traceRoundRect } from '../../../utils/canvasPoster'
 import {
   buildStandingsFallbackMetrics,
   buildStandingsPosterColumns,
@@ -160,7 +161,7 @@ async function generate(): Promise<void> {
     context.fillRect(0, 0, width, height)
 
     context.setFillStyle('#ffffff')
-    roundRect(context, 36, 36, width - 72, height - 72, 34)
+    traceRoundRect(context, 36, 36, width - 72, height - 72, 34)
     context.fill()
 
     context.setFillStyle('#121212')
@@ -231,21 +232,8 @@ async function generate(): Promise<void> {
     context.setFontSize(20)
     context.fillText(posterQrCaption, width - qrSize - 88, height - footerHeight + 176)
 
-    await new Promise<void>((resolve) => {
-      context.draw(false, () => resolve())
-    })
-
-    const tempFilePath = await new Promise<string>((resolve, reject) => {
-      uni.canvasToTempFilePath({
-        canvasId,
-        width,
-        height,
-        destWidth: width,
-        destHeight: height,
-        success: (result) => resolve(result.tempFilePath),
-        fail: (error) => reject(error),
-      }, instance)
-    })
+    await flushCanvas(context)
+    const tempFilePath = await exportCanvasToTempFile({ canvasId, width, height, instance })
 
     posterCache.set(props.table.slug, tempFilePath)
     posterImagePath.value = tempFilePath
@@ -291,22 +279,6 @@ async function resolvePosterLogoPath(src: string | null): Promise<string | null>
   }
 }
 
-function roundRect(
-  context: UniApp.CanvasContext,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number,
-): void {
-  context.beginPath()
-  context.moveTo(x + radius, y)
-  context.arcTo(x + width, y, x + width, y + height, radius)
-  context.arcTo(x + width, y + height, x, y + height, radius)
-  context.arcTo(x, y + height, x, y, radius)
-  context.arcTo(x, y, x + width, y, radius)
-  context.closePath()
-}
 
 function drawPosterQrCode(
   context: UniApp.CanvasContext,
@@ -360,22 +332,7 @@ function drawPosterTeamLogo(
 }
 
 function savePosterImage(): void {
-  if (!posterImagePath.value) {
-    return
-  }
-
-  uni.saveImageToPhotosAlbum({
-    filePath: posterImagePath.value,
-    success: () => {
-      uni.showToast({ title: '已保存到相册', icon: 'success' })
-    },
-    fail: (error) => {
-      uni.showToast({
-        title: extractApiErrorMessage(error, '保存失败'),
-        icon: 'none',
-      })
-    },
-  })
+  savePosterToAlbum(posterImagePath.value)
 }
 </script>
 

@@ -138,39 +138,42 @@ import FiLoading from '../../components/FiLoading.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
-import { cancelSupportVote, castSupportVote, getMatchSupportDetail } from '../../api/support'
-import { resolveSupportVoteState } from '../../utils/supportVoteState'
-import type { SupportMatchDetail, SupportMatchTeam } from '../../types/support'
-import { extractApiErrorMessage } from '../../utils/apiError'
+import type { SupportMatchTeam } from '../../types/support'
 import { setPostLoginRedirectTarget } from '../../utils/authStorage'
+import { savePosterToAlbum } from '../../utils/canvasPoster'
 import { useAppSession } from '../../stores/appSession'
 import {
   resolveSupportCountdownLabel,
-  resolveSupportCountdownSeconds,
   resolveSupportHeroBadge,
   resolveSupportHeroSummary,
   resolveSupportStanceDescription,
   resolveSupportWindowLabel,
-  resolveSupportedTeam,
 } from './helpers'
+import { useSupportPage } from './useSupportPage'
+import { useSupportPoster } from './useSupportPoster'
 
 const { navigationPageStyle } = useNavigationLayout()
 
-const loading = ref(true)
-const errorMessage = ref('')
-const detail = ref<SupportMatchDetail | null>(null)
-const voteSubmittingTeamId = ref<number | null>(null)
-let voteOwner: symbol | null = null
-const supportedTeam = computed(() => resolveSupportedTeam(detail.value))
-const matchTeams = computed(() => detail.value ? [detail.value.home_team, detail.value.away_team] : [])
-const matchId = ref<number | null>(null)
-const posterImagePath = ref('')
-const posterGenerating = ref(false)
-let posterRevision = 0
-const liveCountdownSeconds = ref(0)
-let countdownTimer: ReturnType<typeof setInterval> | null = null
 // 登录标记共享自 appSession，退出/换号后自动更新。
 const session = useAppSession()
+const matchId = ref<number | null>(null)
+const poster = useSupportPoster(session, matchId)
+const { posterImagePath, posterGenerating } = poster
+const {
+  loading,
+  errorMessage,
+  detail,
+  supportedTeam,
+  voteSubmittingTeamId,
+  liveCountdownSeconds,
+  setMatchId,
+  voteState,
+  loadPage,
+  submitVote,
+  pausePage,
+} = useSupportPage({ session, matchId, onDetailInvalidated: poster.invalidatePoster })
+
+const matchTeams = computed(() => detail.value ? [detail.value.home_team, detail.value.away_team] : [])
 
 const favoriteTeamId = computed(() => detail.value?.viewer.favorite_team_id ?? null)
 const favoriteTeam = computed(() => {
@@ -241,15 +244,7 @@ const stanceBadge = computed(() => {
     return ''
   }
 
-  if (detail.value.viewer.has_supported) {
-    return '已助力'
-  }
-
-  if (favoriteTeam.value) {
-    return '待助力'
-  }
-
-  return '待助力'
+  return detail.value.viewer.has_supported ? '已助力' : '待助力'
 })
 
 const stanceDescription = computed(() => {
@@ -267,10 +262,6 @@ const rankingNote = computed(() => {
     : `${favoriteTeam.value.team_name} 当前赛季助力排名还在形成中。`
 })
 
-function voteState(teamId: number) {
-  return resolveSupportVoteState(detail.value, teamId, voteSubmittingTeamId.value, Date.now())
-}
-
 function canTakeVoteAction(teamId: number) {
   return voteSubmittingTeamId.value === null && (!session.hasAccessToken.value || !voteState(teamId).disabled)
 }
@@ -283,8 +274,7 @@ function voteButtonLabel(team: SupportMatchTeam) {
 }
 
 onLoad((options) => {
-  const rawMatchId = typeof options?.matchId === 'string' ? Number(options.matchId) : Number.NaN
-  matchId.value = Number.isFinite(rawMatchId) && rawMatchId > 0 ? rawMatchId : null
+  setMatchId(options?.matchId)
 })
 
 onShow(() => {
@@ -292,11 +282,11 @@ onShow(() => {
 })
 
 onHide(() => {
-  stopCountdown()
+  pausePage()
 })
 
 onUnload(() => {
-  stopCountdown()
+  pausePage()
 })
 
 onShareAppMessage(() => {
@@ -317,130 +307,44 @@ onShareAppMessage(() => {
   }
 })
 
-async function loadPage(): Promise<void> {
-  invalidatePoster()
-  voteOwner = null
-  voteSubmittingTeamId.value = null
-  if (!matchId.value) {
-    errorMessage.value = '缺少比赛参数，无法打开助力页。'
-    loading.value = false
-    return
-  }
-
-  loading.value = true
-  errorMessage.value = ''
-
-  try {
-    detail.value = await getMatchSupportDetail(matchId.value)
-    syncCountdownState()
-    startCountdown()
-  } catch (error) {
-    errorMessage.value = extractApiErrorMessage(error, '助力页加载失败，请稍后重试。')
-  } finally {
-    loading.value = false
-  }
-}
-
 async function handleVote(teamId: number): Promise<void> {
-  if (!detail.value || !matchId.value || voteSubmittingTeamId.value !== null) {
-    return
-  }
-
-  if (!session.hasAccessToken.value) {
-    setPostLoginRedirectTarget({
-      type: 'navigateTo',
-      url: `/pages/support/index?matchId=${matchId.value}`,
-    })
-    uni.showModal({
-      title: '先登录再助力',
-      content: '登录后即可选择主队或客队助力，现在去“我的”页登录吗？',
-      confirmText: '去登录',
-      success: ({ confirm }) => {
-        if (!confirm) {
-          return
-        }
-
-        uni.switchTab({ url: '/pages/user/index' })
-      },
-    })
-    return
-  }
-
-  const canceling = detail.value.viewer.has_supported && detail.value.viewer.supported_team_id === teamId
-  if (voteState(teamId).disabled) {
-    uni.showToast({ title: '本场已助力或助力已截止', icon: 'none' })
-    return
-  }
-
-  const revision = session.revision.value
-  const selectedMatchId = matchId.value
-  const owner = Symbol('support-vote')
-  voteOwner = owner
-  voteSubmittingTeamId.value = teamId
-  const isCurrent = () => voteOwner === owner && session.revision.value === revision && matchId.value === selectedMatchId
-  try {
-    const updated = canceling ? await cancelSupportVote(selectedMatchId)
-      : await castSupportVote(selectedMatchId, { supported_team_id: teamId })
-    if (!isCurrent()) return
-    invalidatePoster()
-    detail.value = updated
-    syncCountdownState()
-    uni.showToast({ title: canceling ? '已取消助力' : '助力成功', icon: 'success' })
-  } catch (error) {
-    if (!isCurrent()) return
-    uni.showToast({ title: extractApiErrorMessage(error, canceling ? '取消失败' : '助力失败'), icon: 'none' })
-  } finally {
-    if (voteOwner === owner) {
-      voteOwner = null
-      voteSubmittingTeamId.value = null
-    }
-  }
-}
-
-function syncCountdownState(): void {
-  if (!detail.value) {
-    liveCountdownSeconds.value = 0
-    return
-  }
-
-  liveCountdownSeconds.value = resolveSupportCountdownSeconds(detail.value.kickoff_at)
-
-  if (liveCountdownSeconds.value <= 0) {
-    detail.value.support_window_status = 'closed'
-    detail.value.viewer.can_support = false
-  }
-}
-
-function stopCountdown(): void {
-  if (!countdownTimer) {
-    return
-  }
-
-  clearInterval(countdownTimer)
-  countdownTimer = null
-}
-
-function startCountdown(): void {
-  stopCountdown()
-
-  if (!detail.value || detail.value.support_window_status === 'closed') {
-    return
-  }
-
-  countdownTimer = setInterval(() => {
-    if (!detail.value) {
-      stopCountdown()
+  const outcome = await submitVote(teamId)
+  switch (outcome.kind) {
+    case 'login-required':
+      setPostLoginRedirectTarget({
+        type: 'navigateTo',
+        url: `/pages/support/index?matchId=${outcome.matchId}`,
+      })
+      uni.showModal({
+        title: '先登录再助力',
+        content: '登录后即可选择主队或客队助力，现在去“我的”页登录吗？',
+        confirmText: '去登录',
+        success: ({ confirm }) => {
+          if (confirm) {
+            uni.switchTab({ url: '/pages/user/index' })
+          }
+        },
+      })
       return
-    }
+    case 'blocked':
+      uni.showToast({ title: '本场已助力或助力已截止', icon: 'none' })
+      return
+    case 'cast':
+    case 'canceled':
+      uni.showToast({ title: outcome.kind === 'canceled' ? '已取消助力' : '助力成功', icon: 'success' })
+      return
+    case 'failed':
+      uni.showToast({ title: outcome.message, icon: 'none' })
+      return
+  }
+}
 
-    liveCountdownSeconds.value = Math.max(0, liveCountdownSeconds.value - 1)
+function generatePoster(): void {
+  void poster.generatePoster(detail.value, supportedTeam.value)
+}
 
-    if (liveCountdownSeconds.value <= 0) {
-      detail.value.support_window_status = 'closed'
-      detail.value.viewer.can_support = false
-      stopCountdown()
-    }
-  }, 1000)
+function savePosterImage(): void {
+  savePosterToAlbum(posterImagePath.value)
 }
 
 function formatSupportCount(value: number): string {
@@ -449,142 +353,6 @@ function formatSupportCount(value: number): string {
   }
 
   return String(value)
-}
-
-async function generatePoster(): Promise<void> {
-  if (!detail.value || posterGenerating.value) {
-    return
-  }
-
-  const generation = ++posterRevision
-  const revision = session.revision.value
-  const selectedMatchId = detail.value.match_id
-  const isCurrent = () => posterRevision === generation && session.revision.value === revision && detail.value?.match_id === selectedMatchId
-  posterGenerating.value = true
-  try {
-    const canvasId = 'supportPosterCanvas'
-    const width = 960
-    const height = 1320
-    const context = uni.createCanvasContext(canvasId)
-
-    context.setFillStyle('#f5f0e8')
-    context.fillRect(0, 0, width, height)
-
-    context.setFillStyle('#ffffff')
-    roundRect(context, 44, 44, width - 88, height - 88, 40)
-    context.fill()
-
-    context.setFillStyle('#121212')
-    context.setFontSize(34)
-    context.fillText('足球洞察 · 赛前助力', 96, 132)
-
-    context.setFontSize(52)
-    context.fillText(detail.value.home_team.team_name, 96, 244)
-    context.fillText('VS', width / 2 - 26, 326)
-    context.fillText(detail.value.away_team.team_name, 96, 408)
-
-    context.setFillStyle('#6b707b')
-    context.setFontSize(28)
-    context.fillText(`${detail.value.match_date} ${detail.value.match_time} · 第 ${detail.value.round_number} 轮`, 96, 486)
-
-    context.setFillStyle('#dc2626')
-    context.fillRect(96, 560, Math.max(40, (width - 192) * (detail.value.home_team.support_share_pct / 100)), 28)
-    context.setFillStyle('#2563eb')
-    context.fillRect(96, 616, Math.max(40, (width - 192) * (detail.value.away_team.support_share_pct / 100)), 28)
-
-    context.setFillStyle('#121212')
-    context.setFontSize(32)
-    context.fillText(`${detail.value.home_team.team_name} ${detail.value.home_team.support_count}`, 96, 724)
-    context.fillText(`${detail.value.away_team.team_name} ${detail.value.away_team.support_count}`, 96, 786)
-
-    context.setFillStyle('#444b57')
-    context.setFontSize(40)
-    context.fillText(buildPosterHeadline(), 96, 926)
-
-    context.setFillStyle('#6b707b')
-    context.setFontSize(28)
-    context.fillText('打开小程序，进入这场比赛继续站队助力。', 96, 1004)
-    context.fillText('主客队任选，开球前可取消重新选择。', 96, 1050)
-
-    await new Promise<void>((resolve) => {
-      context.draw(false, () => resolve())
-    })
-    if (!isCurrent()) return
-
-    const imagePath = await new Promise<string>((resolve, reject) => {
-      uni.canvasToTempFilePath({
-        canvasId,
-        width,
-        height,
-        destWidth: width,
-        destHeight: height,
-        success: (result) => resolve(result.tempFilePath),
-        fail: reject,
-      })
-    })
-
-    if (!isCurrent()) return
-    posterImagePath.value = imagePath
-    uni.showToast({ title: '海报已生成', icon: 'success' })
-  } catch (error) {
-    if (!isCurrent()) return
-    uni.showToast({ title: extractApiErrorMessage(error, '海报生成失败'), icon: 'none' })
-  } finally {
-    posterGenerating.value = false
-  }
-}
-
-function invalidatePoster(): void {
-  posterRevision += 1
-  posterImagePath.value = ''
-}
-
-function buildPosterHeadline(): string {
-  if (!detail.value) {
-    return '来为你的主队站队'
-  }
-
-  if (supportedTeam.value) {
-    const rivalTeam = supportedTeam.value.team_id === detail.value.home_team.team_id
-      ? detail.value.away_team
-      : detail.value.home_team
-    return `我已为${supportedTeam.value.team_name}助力，来把${rivalTeam.team_name}压过去`
-  }
-
-  return `${detail.value.home_team.team_name} 和 ${detail.value.away_team.team_name} 的热度对抗已经打响`
-}
-
-function savePosterImage(): void {
-  if (!posterImagePath.value) {
-    return
-  }
-
-  uni.saveImageToPhotosAlbum({
-    filePath: posterImagePath.value,
-    success: () => {
-      uni.showToast({ title: '已保存到相册', icon: 'success' })
-    },
-    fail: (error) => {
-      uni.showToast({ title: extractApiErrorMessage(error, '保存失败'), icon: 'none' })
-    },
-  })
-}
-
-function roundRect(
-  context: UniApp.CanvasContext,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number,
-): void {
-  context.beginPath()
-  context.moveTo(x + radius, y)
-  context.arcTo(x + width, y, x + width, y + height, radius)
-  context.arcTo(x + width, y + height, x, y + height, radius)
-  context.arcTo(x, y + height, x, y, radius)
-  context.arcTo(x, y, x + width, y, radius)
-  context.closePath()
 }
 </script>
 

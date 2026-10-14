@@ -80,7 +80,7 @@ src/pages/<domain>/
 - 组件按**变化原因**拆，不按行数机械拆：非声明式页面或组件超过约 600 行要主动评估拆分；超过约 1000 行必须按「页面编排 / 局部组件 / actions / helpers」小步拆分。
 - 单次任务只做增量拆分或增量迁移，不顺手重写整套页面风格或路由结构。
 
-已按此模式拆分的页面：`user`、`seat-swap`、`home`、`rankings`、`ticket-watch`、`matches`（`MatchesContent.vue` 与独立入口共享 `useMatchesPage.ts` / `presentation.ts` / `components/`）。`home`、`ticket-watch`、`matches` 可作为页面编排参考。
+已按此模式拆分的页面：`user`、`seat-swap`、`home`、`rankings`、`ticket-watch`、`support`（`useSupportPage.ts` 管加载/助力/倒计时，`useSupportPoster.ts` + `poster.ts` 管拉票海报）、`matches`（`MatchesContent.vue` 与独立入口共享 `useMatchesPage.ts` / `presentation.ts` / `components/`）。`home`、`ticket-watch`、`matches` 可作为页面编排参考。
 
 ### 首页今日话题
 
@@ -103,6 +103,7 @@ src/pages/<domain>/
 - 首页与洞察私有读取等待共享会话确认并按 owner 合并；跨会话先清缓存/选择，旧结果、错误和 finally 放弃。首页有效主队 PUT 后强制刷新，旧账号 PUT 不影响新读取；洞察首个 await 前捕获私有链身份，审核 gate 独立于账号。
 - 余票 board owner 与订阅 generation 独立：reset 后立即允许新 current/history 请求；恢复先重载可见看板，真实 activeTab watcher 补载尚未加载的目标，已载 cache 复用并遵守 hidden/审核/会员门控。历史列表与用户选择每次库存读取共用单调 owner，旧 cache/display/error/toast/finally 不发布。
 - 实际比赛替换统一同步复位订阅/解锁状态，正常同比赛 poll 保留合法操作。解锁 open/close/refresh/pay 按操作 owner 防护，支付开始使旧权益查询失效；原生支付返回后重新验证上下文，失效页面不再继续确认读取，已发出的真实支付不取消。
+- 新写的异步流程统一用 `utils/latestGuard.ts`（`createLatestGuard(() => [session.revision.value, 业务 key])`）防旧结果覆盖：`begin()` 取令牌，发布结果前查 `isCurrent()`，`finally` 里 `owns()` 才清 loading；重新加载等需要作废在途操作时调 `invalidate()`。存量页面的手写 owner/generation 触碰时再迁移。海报类 canvas 的圆角路径、绘制提交、导出与保存相册统一用 `utils/canvasPoster.ts`。
 - 共享数据失败允许下一次页面 `onShow` 或显式重试；不新增常驻定时器。余票看板轮询随页面离开/账号切换停止（`useTicketWatchPolling.ts`）。
 - 统计口径：抢票/余票/回流相关统计统一以 `sale_start_at + 10 minutes` 起算，缺起售时间的比赛报错或跳过该统计入口。
 
