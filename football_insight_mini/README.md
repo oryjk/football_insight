@@ -114,6 +114,29 @@ bun run dev:mp-weixin
 
 - `football_insight_mini/dist/dev/mp-weixin`
 
+### local233 开发、本机自动同步预览
+
+在 local233 开发并 **commit + push** 后，可让装有微信开发者工具的电脑自动拉取代码并编译：
+
+```bash
+cd football_insight_mini
+bun install
+bun run dev:mp-weixin:sync
+```
+
+微信开发者工具仍打开本机的 `football_insight_mini/dist/dev/mp-weixin`，开启「文件修改时自动编译小程序」。命令启动开发编译并立即检查远端，之后默认每 10 秒检查一次；小程序目录变化时先停编译、快进更新，再启动编译，避免拉取过程中的中间状态被编译。修改检查间隔：
+
+```bash
+bun run dev:mp-weixin:sync --interval 5
+# 或 MINI_SYNC_INTERVAL_SECONDS=5 bun run dev:mp-weixin:sync
+```
+
+- 跟踪本机**当前分支的远端上游**（如 `main → origin/main`），不绑定 Mac、local233 或固定仓库路径。其他电脑安装 Git、Bun 和微信开发者工具、配置好 Git 拉取认证后，同样可以运行。分支尚无上游时，先执行 `git branch --set-upstream-to=origin/main main`（按实际分支调整）。
+- 同步的是整个 monorepo；仅小程序目录变化会重启编译。`package.json` / `bun.lock` / `bun.lockb` 变化时自动执行 `bun install --frozen-lockfile`；安装失败暂停编译并重试。
+- 整个仓库有未提交修改（包括未跟踪文件）、本地领先提交或分支分叉时跳过同步并提示；不自动 stash、不覆盖本地改动、不创建合并提交。处理好 Git 状态后自动恢复。被 Git 忽略的 `.env.local`、私钥、`node_modules` 和 `dist` 不阻止同步。
+- 网络或 Git 认证失败时保留当前开发编译并定时重试；运行期间切换分支或修改上游会停止命令，需要重新启动。按 `Ctrl+C` 一并停止同步与编译，编译进程异常退出时同步也停止。
+- 远端必须已经 push，仅 local233 本地 commit 不会被同步。默认开发 API 仍为 `http://172.16.60.233:18092/api/v1`，预览电脑需要能访问 local233 内网；这个命令只更新本机代码和开发产物，不部署后端、不登记审核版本或上传微信。
+
 如果微信开发者工具是 Windows 侧打开，推荐直接同步产物到 Windows 目录再导入：
 
 ```bash
