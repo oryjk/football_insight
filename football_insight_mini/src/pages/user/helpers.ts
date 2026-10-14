@@ -9,13 +9,6 @@ export interface UserAccountInfoItem {
   value: string
 }
 
-export interface UserBenefitItem {
-  key: string
-  iconName: 'ticket' | 'activity' | 'radar' | 'history'
-  title: string
-  caption: string
-}
-
 export interface UserUpgradeStep {
   key: string
   code: string
@@ -30,11 +23,6 @@ interface BuildUserAccountInfoOptions {
   hasWechatBinding: boolean
   joinedAtLabel: string
   membershipExpiresAtLabel: string
-}
-
-interface BuildUserBenefitOptions {
-  membershipCode: string
-  refreshLabel: string
 }
 
 interface MembershipTierGuideLike {
@@ -72,39 +60,6 @@ export function buildUserAccountInfoItems(
       iconName: 'log-in',
       label: '登录状态',
       value: options.hasWechatBinding ? '已绑定微信' : '未绑定微信',
-    },
-  ]
-}
-
-export function buildUserBenefitItems(
-  options: BuildUserBenefitOptions,
-): UserBenefitItem[] {
-  const tierNumber = parseMembershipTierNumber(options.membershipCode)
-
-  return [
-    {
-      key: 'watch',
-      iconName: 'ticket',
-      title: '余票监控',
-      caption: options.refreshLabel,
-    },
-    {
-      key: 'recent-reflux',
-      iconName: 'activity',
-      title: '最近回流速览',
-      caption: resolveRecentRefluxBenefitCaption(tierNumber),
-    },
-    {
-      key: 'tracking',
-      iconName: 'radar',
-      title: '更多钓区跟踪',
-      caption: tierNumber >= 4 ? '跟踪上限更高' : '常用钓区可跟踪',
-    },
-    {
-      key: 'history',
-      iconName: 'history',
-      title: '历史回流复盘',
-      caption: tierNumber >= 5 ? '更全面复盘' : '回看近期变化',
     },
   ]
 }
@@ -176,27 +131,6 @@ export function isValidNotificationEmail(email: string): boolean {
 export function formatNotificationEmailLabel(email: string | null | undefined): string {
   const normalized = typeof email === 'string' ? email.trim() : ''
   return normalized || '未填写'
-}
-
-function parseMembershipTierNumber(code: string): number {
-  const parsed = Number.parseInt(code.trim().replace(/^V/i, ''), 10)
-  return Number.isFinite(parsed) ? parsed : 1
-}
-
-function resolveRecentRefluxBenefitCaption(tierNumber: number): string {
-  if (tierNumber >= 8) {
-    return '3 分钟内'
-  }
-
-  if (tierNumber >= 7) {
-    return '10 分钟内'
-  }
-
-  if (tierNumber >= 6) {
-    return '30 分钟内'
-  }
-
-  return 'V6 起开放'
 }
 
 export interface UserMembershipMeta {

@@ -2,7 +2,6 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   buildUserAccountInfoItems,
-  buildUserBenefitItems,
   buildUserUpgradeSteps,
   canShowMembershipPurchaseEntry,
   formatMembershipExpiryLabel,
@@ -88,37 +87,6 @@ describe('canShowMembershipPurchaseEntry', () => {
   test('keeps purchase entry for lower tiers with wechat binding', () => {
     expect(canShowMembershipPurchaseEntry(true, true, 'V8', null)).toBe(true)
     expect(canShowMembershipPurchaseEntry(true, false, 'V8', null)).toBe(false)
-  })
-})
-
-describe('buildUserBenefitItems', () => {
-  test('uses richer captions for higher membership tiers', () => {
-    expect(buildUserBenefitItems({
-      membershipCode: 'V9',
-      refreshLabel: '1 秒刷新',
-    })).toEqual([
-      { key: 'watch', iconName: 'ticket', title: '余票监控', caption: '1 秒刷新' },
-      { key: 'recent-reflux', iconName: 'activity', title: '最近回流速览', caption: '3 分钟内' },
-      { key: 'tracking', iconName: 'radar', title: '更多钓区跟踪', caption: '跟踪上限更高' },
-      { key: 'history', iconName: 'history', title: '历史回流复盘', caption: '更全面复盘' },
-    ])
-  })
-
-  test('describes recent reflux access by membership tier', () => {
-    expect(buildUserBenefitItems({
-      membershipCode: 'V6',
-      refreshLabel: '15 秒刷新',
-    })[1]).toEqual({ key: 'recent-reflux', iconName: 'activity', title: '最近回流速览', caption: '30 分钟内' })
-
-    expect(buildUserBenefitItems({
-      membershipCode: 'V7',
-      refreshLabel: '7 秒刷新',
-    })[1].caption).toBe('10 分钟内')
-
-    expect(buildUserBenefitItems({
-      membershipCode: 'V5',
-      refreshLabel: '30 秒刷新',
-    })[1].caption).toBe('V6 起开放')
   })
 })
 

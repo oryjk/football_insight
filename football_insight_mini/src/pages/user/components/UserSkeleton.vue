@@ -41,22 +41,6 @@
       </view>
     </view>
 
-    <view class="panel skeleton-panel">
-      <view class="skeleton-line skeleton-line--section" />
-      <view class="skeleton-privilege-grid">
-        <view
-          v-for="index in 4"
-          :key="`user-privilege-skeleton-${index}`"
-          class="skeleton-privilege-card"
-        >
-          <view class="skeleton-line skeleton-line--privilege-icon" />
-          <view class="skeleton-copy-group">
-            <view class="skeleton-line skeleton-line--privilege-title" />
-            <view class="skeleton-line skeleton-line--privilege-caption" />
-          </view>
-        </view>
-      </view>
-    </view>
 
   </view>
 </template>
@@ -116,8 +100,7 @@
 .skeleton-line,
 .skeleton-pill,
 .skeleton-button,
-.skeleton-account-cell,
-.skeleton-privilege-card {
+.skeleton-account-cell {
   background: linear-gradient(180deg, rgba(248, 246, 239, 0.96), rgba(235, 230, 216, 0.9));
   border: 2rpx solid rgba(232, 222, 198, 0.72);
 }
@@ -275,39 +258,6 @@
   width: 130rpx;
   height: 30rpx;
   border-radius: var(--fi-radius-sm);
-}
-
-.skeleton-privilege-grid {
-  margin-top: 24rpx;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12rpx;
-}
-
-.skeleton-privilege-card {
-  min-height: 150rpx;
-  padding: 18rpx 12rpx;
-  border-radius: var(--fi-radius-md);
-  display: grid;
-  justify-items: center;
-  align-content: center;
-  gap: 12rpx;
-}
-
-.skeleton-line--privilege-icon {
-  width: 52rpx;
-  height: 52rpx;
-  border-radius: var(--fi-radius-round);
-}
-
-.skeleton-line--privilege-title {
-  width: 82rpx;
-  height: 26rpx;
-}
-
-.skeleton-line--privilege-caption {
-  width: 98rpx;
-  height: 22rpx;
 }
 
 @keyframes skeleton-shimmer {

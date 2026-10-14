@@ -28,15 +28,15 @@ import activityIcon from '../../../static/user/activity.svg'
 import historyIcon from '../../../static/user/history.svg'
 import radarIcon from '../../../static/user/radar.svg'
 import ticketIcon from '../../../static/user/ticket.svg'
-import type { UserBenefitItem } from '../helpers'
+import type { MembershipBenefitItem } from '../../../utils/membershipBenefits'
 
 defineProps<{
   code: string
   toneClass: string
-  benefitItems: UserBenefitItem[]
+  benefitItems: MembershipBenefitItem[]
 }>()
 
-const benefitIconMap: Record<UserBenefitItem['iconName'], string> = {
+const benefitIconMap: Record<MembershipBenefitItem['iconName'], string> = {
   ticket: ticketIcon,
   activity: activityIcon,
   radar: radarIcon,
@@ -45,7 +45,6 @@ const benefitIconMap: Record<UserBenefitItem['iconName'], string> = {
 </script>
 
 <style scoped lang="css">
-.hero-card,
 .panel {
   position: relative;
   z-index: 1;
@@ -58,55 +57,11 @@ const benefitIconMap: Record<UserBenefitItem['iconName'], string> = {
   -webkit-backdrop-filter: blur(18rpx);
 }
 
-.skeleton-line,
-.skeleton-pill,
-.skeleton-button,
-.skeleton-account-cell,
-.skeleton-privilege-card {
-  background: linear-gradient(180deg, rgba(248, 246, 239, 0.96), rgba(235, 230, 216, 0.9));
-  border: 2rpx solid rgba(232, 222, 198, 0.72);
-}
-
-.skeleton-privilege-grid {
-  margin-top: 24rpx;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12rpx;
-}
-
-.skeleton-privilege-card {
-  min-height: 150rpx;
-  padding: 18rpx 12rpx;
-  border-radius: var(--fi-radius-md);
-  display: grid;
-  justify-items: center;
-  align-content: center;
-  gap: 12rpx;
-}
-
-.skeleton-line--privilege-icon {
-  width: 52rpx;
-  height: 52rpx;
-  border-radius: var(--fi-radius-round);
-}
-
-.skeleton-line--privilege-title {
-  width: 82rpx;
-  height: 26rpx;
-}
-
-.skeleton-line--privilege-caption {
-  width: 98rpx;
-  height: 22rpx;
-}
-
-.info-panel,
 .privilege-panel {
   padding: 22rpx;
   border-radius: var(--fi-radius-lg);
 }
 
-.info-panel,
 .privilege-panel {
   border-color: rgba(229, 232, 238, 0.96);
   background: rgba(255, 255, 255, 0.94);
@@ -116,7 +71,6 @@ const benefitIconMap: Record<UserBenefitItem['iconName'], string> = {
   animation: fi-fade-in-up 520ms cubic-bezier(0.22, 1, 0.36, 1) 160ms both;
 }
 
-.info-panel__title,
 .privilege-panel__title {
   color: #1b1c20;
   font-size: var(--fi-font-30);

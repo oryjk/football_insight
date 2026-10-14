@@ -38,12 +38,6 @@
             @edit-email="openNotificationEmailSheet"
           />
 
-          <UserMembershipPanel
-            :code="currentMembershipMeta.code"
-            :tone-class="currentMembershipGuide.toneClass"
-            :benefit-items="membershipBenefitItems"
-          />
-
           <view class="account-actions">
             <view class="account-actions__body">
               <text class="account-actions__label">账号管理</text>
@@ -117,7 +111,6 @@ import UserBasicAccountPanel from './components/UserBasicAccountPanel.vue'
 import UserSkeleton from './components/UserSkeleton.vue'
 import UserAccountHero from './components/UserAccountHero.vue'
 import UserAccountInfoPanel from './components/UserAccountInfoPanel.vue'
-import UserMembershipPanel from './components/UserMembershipPanel.vue'
 import UserPasswordLoginSheet from './components/UserPasswordLoginSheet.vue'
 import UserWechatBindSheet from './components/UserWechatBindSheet.vue'
 import UserNotificationEmailSheet from './components/UserNotificationEmailSheet.vue'
@@ -137,14 +130,12 @@ import { createUserAccountEffects } from './accountEffects'
 import { createUserLoginFlow, type MiniWechatBindForm } from './loginFlow'
 import {
   buildUserAccountInfoItems,
-  buildUserBenefitItems,
   canShowMembershipPurchaseEntry,
   formatMembershipExpiryLabel,
   formatNotificationEmailLabel,
   resolveCurrentUserInviteCode,
   resolveUserMembershipMeta,
   type UserAccountInfoItem,
-  type UserBenefitItem,
 } from './helpers'
 import {
   resolveMembershipTierGuide,
@@ -287,13 +278,6 @@ const accountInfoItems = computed<UserAccountInfoItem[]>(() => {
     membershipExpiresAtLabel: membershipExpiresAtLabel.value,
   })
 })
-const membershipBenefitItems = computed<UserBenefitItem[]>(() =>
-  buildUserBenefitItems({
-    membershipCode: currentMembershipMeta.value.code,
-    refreshLabel: currentMembershipGuide.value.refreshLabel,
-  }),
-)
-
 function openSettingsPage() {
   uni.navigateTo({
     url: '/pages/user/settings/index',

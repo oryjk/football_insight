@@ -47,6 +47,14 @@
         <text class="purchase-empty-card__body">{{ emptyProductBody }}</text>
       </view>
 
+      <MembershipBenefitsPanel
+        v-if="selectedBenefits"
+        class="membership-benefits"
+        :code="selectedBenefits.code === 'V3' ? 'VIP3' : selectedBenefits.code"
+        :tone-class="selectedBenefits.toneClass"
+        :benefit-items="selectedBenefits.items"
+      />
+
       <view class="membership-guide-card">
         <view class="membership-guide-card__title-row">
           <view class="membership-guide-card__info-icon">i</view>
@@ -124,6 +132,8 @@ import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { ref, computed, watch } from 'vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
+import MembershipBenefitsPanel from './components/MembershipBenefitsPanel.vue'
+import { buildMembershipBenefitPreview } from '../../utils/membershipBenefits'
 import { goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { getMembershipProduct, createMembershipOrder, getVirtualPaymentStatus } from '../../api/payment'
 import { prepareVirtualPayment } from '../../composables/prepareVirtualPayment'
@@ -200,6 +210,11 @@ const selectedProduct = computed(() =>
   ?? productOptions.value[0]
   ?? null,
 )
+
+const selectedBenefits = computed(() => buildMembershipBenefitPreview(
+  selectedProduct.value?.target_tier,
+  publicConfig.value?.membership_tier_rules,
+))
 
 const displayPrice = computed(() => {
   return formatMembershipPrice(getMembershipPayPriceCents(selectedProduct.value))
@@ -480,6 +495,10 @@ async function handlePurchase() {
   color: #6b7280;
   font-size: 25rpx;
   line-height: 1.5;
+}
+
+.membership-benefits {
+  margin-top: 28rpx;
 }
 
 .membership-guide-card {
