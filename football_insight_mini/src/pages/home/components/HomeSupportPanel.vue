@@ -51,7 +51,7 @@
           <text class="support-home-panel__favorite-name">{{ favoriteTeam.team_name }}</text>
           <text class="support-home-panel__favorite-note">{{ favoriteTeamLabel }}</text>
         </view>
-        <button class="support-home-panel__switch" @click="emit('select-team')">切换主队</button>
+        <button class="support-home-panel__switch" :disabled="voteSubmittingTeamId !== null || favoriteSubmitting" @click="emit('select-team')">切换主队</button>
       </view>
 
       <view class="support-home-match-card" @click="emit('open-match')">
@@ -71,11 +71,25 @@
           <view class="support-home-match-card__team-block">
             <text class="support-home-match-card__team">{{ nextMatch.home_team.team_name }}</text>
             <text class="support-home-match-card__rank">{{ homeRankLabel }}</text>
+            <view class="support-home-match-card__vote">
+              <HomeSupportVoteButton
+                :team="nextMatch.home_team"
+                v-bind="homeVoteState"
+                @vote="emit('vote', $event)"
+              />
+            </view>
           </view>
           <text class="support-home-match-card__vs">{{ windowShortLabel }}</text>
           <view class="support-home-match-card__team-block support-home-match-card__team-block--away">
             <text class="support-home-match-card__team support-home-match-card__team--away">{{ nextMatch.away_team.team_name }}</text>
             <text class="support-home-match-card__rank support-home-match-card__rank--away">{{ awayRankLabel }}</text>
+            <view class="support-home-match-card__vote support-home-match-card__vote--away">
+              <HomeSupportVoteButton
+                :team="nextMatch.away_team"
+                v-bind="awayVoteState"
+                @vote="emit('vote', $event)"
+              />
+            </view>
           </view>
         </view>
         <view class="support-home-match-card__bar">
@@ -83,7 +97,7 @@
           <view class="support-home-match-card__bar-away" :style="{ width: `${nextMatch.away_team.support_share_pct}%` }" />
         </view>
         <view class="support-home-match-card__footer">
-          <text>{{ nextMatchLabel }}</text>
+          <text>{{ nextMatch.viewer.has_supported ? '本场已助力' : '仅可为关注的主队助力' }}</text>
           <text class="support-home-match-card__action">进入助力页</text>
         </view>
       </view>
@@ -101,10 +115,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import FiLoading from '../../../components/FiLoading.vue'
+import HomeSupportVoteButton from './HomeSupportVoteButton.vue'
 import type { SupportProfile, SupportTeam } from '../../../types/support'
 import {
   resolveHomeSupportMatchWeekdayLabel,
-  resolveHomeSupportNextMatchLabel,
+  resolveHomeSupportVoteState,
   resolveHomeSupportMatchDaysRemaining,
   resolveHomeSupportTeamRankLabel,
   resolveHomeSupportWindowShortLabel,
@@ -118,11 +133,14 @@ const props = defineProps<{
   profile: SupportProfile | null
   errorMessage: string
   teams: SupportTeam[]
+  voteSubmittingTeamId: number | null
+  favoriteSubmitting: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'select-team'): void
   (e: 'open-match'): void
+  (e: 'vote', teamId: number): void
 }>()
 
 const favoriteTeam = computed(() => props.profile?.favorite_team ?? null)
@@ -161,7 +179,12 @@ const favoriteTeamLabel = computed(() => {
     : '已关注主队'
 })
 const windowShortLabel = computed(() => resolveHomeSupportWindowShortLabel(nextMatch.value))
-const nextMatchLabel = computed(() => resolveHomeSupportNextMatchLabel(nextMatch.value))
+const homeVoteState = computed(() => resolveHomeSupportVoteState(
+  nextMatch.value, nextMatch.value?.home_team.team_id ?? 0, props.voteSubmittingTeamId, props.now, props.favoriteSubmitting,
+))
+const awayVoteState = computed(() => resolveHomeSupportVoteState(
+  nextMatch.value, nextMatch.value?.away_team.team_id ?? 0, props.voteSubmittingTeamId, props.now, props.favoriteSubmitting,
+))
 const weekdayLabel = computed(() => resolveHomeSupportMatchWeekdayLabel(nextMatch.value?.match_date))
 const teamRankMap = computed(() => new Map(props.teams.map((team) => [team.team_id, team.rank_no])))
 const homeRankLabel = computed(() => {
@@ -419,6 +442,15 @@ const awayRankLabel = computed(() => {
 }
 .support-home-match-card__team-block--away {
   justify-items: end;
+}
+.support-home-match-card__vote {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-start;
+}
+.support-home-match-card__vote--away {
+  justify-content: flex-end;
 }
 .support-home-match-card__team {
   color: var(--fi-color-text-strong);

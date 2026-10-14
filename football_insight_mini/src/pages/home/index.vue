@@ -38,8 +38,11 @@
           :profile="supportProfile"
           :error-message="supportErrorMessage"
           :teams="supportTeams"
+          :vote-submitting-team-id="voteSubmittingTeamId"
+          :favorite-submitting="favoriteSubmitting"
           @select-team="openFavoriteTeamSheet"
           @open-match="openSupportMatch"
+          @vote="handleHomeSupportVote"
         />
 
         <HomeSkeleton v-if="loading" />
@@ -193,6 +196,9 @@ const {
   loginPromptVisible,
   favoriteTeamSheetVisible,
   selectedFavoriteTeamId,
+  favoriteSubmitting,
+  voteSubmittingTeamId,
+  submitSupportVote,
   submitFavoriteTeam,
   loadSupportData,
   loadSupportTeams,
@@ -458,6 +464,15 @@ function openSupportMatch() {
   uni.navigateTo({
     url: `/pages/support/index?matchId=${nextMatch.match_id}`,
   })
+}
+
+async function handleHomeSupportVote(teamId: number) {
+  try {
+    const completed = await submitSupportVote(teamId)
+    if (completed) uni.showToast({ title: '助力成功', icon: 'success' })
+  } catch (error) {
+    uni.showToast({ title: extractApiErrorMessage(error, '助力失败，请稍后重试'), icon: 'none' })
+  }
 }
 
 onShow(() => {

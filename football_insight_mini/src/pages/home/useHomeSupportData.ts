@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue'
-import { getSupportProfile, listSupportTeams, setFavoriteTeam } from '../../api/support'
-import type { SetFavoriteTeamPayload, SupportProfile, SupportTeam } from '../../types/support'
+import { castSupportVote, getSupportProfile, listSupportTeams, setFavoriteTeam } from '../../api/support'
+import type { CastSupportVotePayload, SetFavoriteTeamPayload, SupportMatchDetail, SupportProfile, SupportTeam } from '../../types/support'
 import type { AppSession } from '../../stores/appSession'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { isHomeAuthExpiredError } from './helpers'
@@ -12,6 +12,7 @@ export interface HomeSupportDataDeps {
   listSupportTeams?: () => Promise<SupportTeam[]>
   /** 测试注入可控的写操作；默认走真实 api 层。 */
   setFavoriteTeam?: (payload: SetFavoriteTeamPayload) => Promise<SupportTeam>
+  castSupportVote?: (matchId: number, payload: CastSupportVotePayload) => Promise<SupportMatchDetail>
 }
 
 export interface HomeSupportData {
@@ -25,6 +26,9 @@ export interface HomeSupportData {
   selectedFavoriteTeamId: Ref<number | null>
   /** 设置主队写操作是否提交中（会话作用域，跨账号同步复位）。 */
   favoriteSubmitting: Ref<boolean>
+  voteSubmittingTeamId: Ref<number | null>
+  /** 直接助力；重复点击或旧会话的迟到结果返回 false，不发布到当前页面。 */
+  submitSupportVote: (teamId: number) => Promise<boolean>
   /**
    * 设置主队写操作（带操作身份）。返回 true 表示写成功且调用方仍属于原会话，
    * 可继续关闭 sheet/toast/写后强制刷新；返回 false 表示等待期间会话已切换——
@@ -63,6 +67,7 @@ export function useHomeSupportData(deps: HomeSupportDataDeps): HomeSupportData {
   const fetchSupportProfile = deps.getSupportProfile ?? getSupportProfile
   const fetchSupportTeams = deps.listSupportTeams ?? listSupportTeams
   const writeFavoriteTeam = deps.setFavoriteTeam ?? setFavoriteTeam
+  const writeSupportVote = deps.castSupportVote ?? castSupportVote
 
   const supportLoading = ref(true)
   const supportErrorMessage = ref('')
@@ -73,12 +78,14 @@ export function useHomeSupportData(deps: HomeSupportDataDeps): HomeSupportData {
   const favoriteTeamSheetVisible = ref(false)
   const selectedFavoriteTeamId = ref<number | null>(null)
   const favoriteSubmitting = ref(false)
+  const voteSubmittingTeamId = ref<number | null>(null)
 
   // 私有加载的 owner：每次新加载（非合并）替换；旧请求凭 owner + revision 判定失效。
   let loadOwner: symbol | null = null
   let inFlightLoad: { revision: number; promise: Promise<void> } | null = null
   // 设置主队写操作的 owner：每次新写替换；旧写的成功/失败/finally 凭 owner + revision 判定失效。
   let submitOwner: symbol | null = null
+  let voteOwner: symbol | null = null
 
   function applyGuestView(): void {
     supportProfile.value = null
@@ -101,6 +108,8 @@ export function useHomeSupportData(deps: HomeSupportDataDeps): HomeSupportData {
     // 写操作状态同步复位：旧写的 finally 凭 owner 判定失效，不会清掉新账号新提交的 submitting。
     submitOwner = null
     favoriteSubmitting.value = false
+    voteOwner = null
+    voteSubmittingTeamId.value = null
     loginPromptVisible.value = !session.currentUser.value
   }
 
@@ -235,6 +244,62 @@ export function useHomeSupportData(deps: HomeSupportDataDeps): HomeSupportData {
     }
   }
 
+  async function submitSupportVote(teamId: number): Promise<boolean> {
+    if (voteSubmittingTeamId.value !== null || favoriteSubmitting.value) return false
+    const profile = supportProfile.value
+    const match = profile?.next_match
+    if (!session.hasAccessToken.value) throw new Error('请先登录再助力')
+    if (!match) throw new Error('比赛信息已更新，请刷新后再助力')
+    if (teamId !== match.home_team.team_id && teamId !== match.away_team.team_id) {
+      throw new Error('请选择本场比赛的球队')
+    }
+    if (match.viewer.has_supported) throw new Error('本场比赛已经助力过了')
+    const kickoff = Date.parse(match.kickoff_at)
+    if (match.support_window_status !== 'open' || !Number.isFinite(kickoff) || kickoff <= Date.now()) {
+      throw new Error('本场助力已关闭')
+    }
+    if (match.viewer.favorite_team_id !== teamId || profile.favorite_team?.team_id !== teamId) {
+      throw new Error('只能为关注的主队助力')
+    }
+    if (!match.viewer.can_support) throw new Error('本场暂时不能助力，请刷新后重试')
+
+    const requestRevision = session.revision.value
+    const favoriteTeamId = profile.favorite_team?.team_id
+    const owner = Symbol('home-support-vote')
+    voteOwner = owner
+    voteSubmittingTeamId.value = teamId
+    const isCurrent = () => voteOwner === owner && session.revision.value === requestRevision
+      && supportProfile.value?.next_match?.match_id === match.match_id
+      && supportProfile.value?.favorite_team?.team_id === favoriteTeamId
+    const invalidateReads = () => {
+      loadOwner = null
+      inFlightLoad = null
+      supportLoading.value = false
+    }
+    // 助力前的 profile 快照迟到时不能覆盖 POST 返回的票数与已助力状态。
+    invalidateReads()
+    try {
+      const updatedMatch = await writeSupportVote(match.match_id, { supported_team_id: teamId })
+      if (!isCurrent()) return false
+      if (updatedMatch.match_id !== match.match_id) throw new Error('助力结果与当前比赛不一致，请刷新后重试')
+      invalidateReads()
+      supportProfile.value = { ...supportProfile.value!, next_match: updatedMatch }
+      return true
+    } catch (error) {
+      if (!isCurrent()) return false
+      if (isHomeAuthExpiredError(error)) {
+        session.invalidateSession(requestRevision)
+        loginPromptVisible.value = true
+      }
+      throw error
+    } finally {
+      if (voteOwner === owner && session.revision.value === requestRevision) {
+        voteSubmittingTeamId.value = null
+        voteOwner = null
+      }
+    }
+  }
+
   return {
     supportLoading,
     supportErrorMessage,
@@ -245,6 +310,8 @@ export function useHomeSupportData(deps: HomeSupportDataDeps): HomeSupportData {
     favoriteTeamSheetVisible,
     selectedFavoriteTeamId,
     favoriteSubmitting,
+    voteSubmittingTeamId,
+    submitSupportVote,
     submitFavoriteTeam,
     loadSupportData,
     loadSupportTeams,
