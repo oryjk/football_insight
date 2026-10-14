@@ -6,7 +6,7 @@
 
 - 发版用 `bun run mp:release`：统一入口 `scripts/mini-release.mjs` 编排 Git 门禁、版本登记、构建与上传；版本登记在边界检查后显式执行一次 `scripts/sync-manifest-version.mjs`（不再走 prebuild 钩子），调 `POST /api/v1/mini-review/allocate` 申请版本号，并同步写入 `src/manifest.json` 和 `src/config/generatedMiniProgramVersion.ts`。
 - 正式上传的 Git 门禁：当前分支必须为 `main`、工作区干净、`fetch` 后本地 `HEAD` 与 `origin/main` 完全一致；若登记分配的新版本改动了版本文件，发布会在构建和上传前停止，必须提交并 push 版本文件后重新执行。底层 `scripts/mini-ci.mjs` 在加载微信 SDK 前会重复产物 API 校验与上传 Git 门禁，直接调用也不能绕过。
-- 发版位置：默认在本地 Mac 构建并上传，发版前先提交推送全部业务改动；不再默认去 peiqian 发版。测试用 `bun run mp:release -- --robot 2 --desc "本次变更说明"`，流程见 README「微信小程序发布」。
+- 发版位置：默认在 local233 Ubuntu 直接构建并上传，已配置被 Git 忽略的上传私钥与 `.env.ci.local`（0600 权限），登记地址为生产域名；发版前先提交推送全部业务改动。peiqian 保留为备用环境。测试用 `bun run mp:release -- --robot 2 --desc "本次变更说明"`，流程见 README「微信小程序发布」。
 - 登记库是唯一权威：最新版本仍在审核中则复用，已出审核则 `+0.0.1`；不要手动改 `manifest.json` 的 `versionName`。
 - 如果用户说"改版本号"或"指定版本号"，用显式覆盖：`MINI_PROGRAM_VERSION=x.y.z bun run build:mp-weixin`（作为指定版本传给登记接口）。
 - 纯本地离线构建（不登记、不递增版本）用 `MINI_REVIEW_SKIP=1 bun run build:mp-weixin`；正式 `mp:release` 强制登记，外层残留的 `MINI_REVIEW_SKIP=1` 不会跳过。验证已有产物用 `bun run verify:mp-release`，发布链路回归测试用 `bun run test:mp-release`。
