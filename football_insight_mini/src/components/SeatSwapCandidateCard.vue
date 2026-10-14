@@ -98,8 +98,7 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 
 <style scoped>
 .seat-swap-candidate {
-  margin: 10rpx 0;
-  padding: 22rpx;
+  padding: var(--fi-space-22);
   border-radius: 16rpx;
   background: rgba(255, 255, 255, 0.96);
   border: 1rpx solid rgba(232, 233, 238, 0.95);
@@ -109,7 +108,7 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 .seat-swap-candidate__main {
   display: flex;
   align-items: stretch;
-  gap: 18rpx;
+  gap: var(--fi-space-18);
 }
 
 .seat-swap-candidate__content {
@@ -120,7 +119,7 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 .seat-swap-candidate__user {
   display: flex;
   align-items: flex-start;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
 }
 
 .seat-swap-candidate__avatar {
@@ -156,7 +155,7 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   display: inline-flex;
   align-items: center;
   max-width: 100%;
-  margin-top: 8rpx;
+  margin-top: var(--fi-space-8);
   overflow: hidden;
   border-radius: 16rpx;
   background: #fff1f0;
@@ -165,7 +164,7 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 
 .seat-swap-candidate__seat-label {
   flex-shrink: 0;
-  padding: 7rpx 10rpx 7rpx 12rpx;
+  padding: 7rpx var(--fi-space-10) 7rpx var(--fi-space-12);
   background: rgba(226, 59, 46, 0.12);
   color: #b42318;
   font-size: 20rpx;
@@ -175,7 +174,7 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 
 .seat-swap-candidate__seat-value {
   min-width: 0;
-  padding: 7rpx 14rpx 7rpx 10rpx;
+  padding: 7rpx var(--fi-space-14) 7rpx var(--fi-space-10);
   overflow: hidden;
   font-size: 26rpx;
   font-weight: 800;
@@ -186,7 +185,7 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 
 .seat-swap-candidate__status {
   flex-shrink: 0;
-  padding: 6rpx 14rpx;
+  padding: var(--fi-space-6) var(--fi-space-14);
   border-radius: 999rpx;
   background: #f6f7fb;
   border: 1rpx solid rgba(232, 233, 238, 0.95);
@@ -224,7 +223,7 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   display: inline-flex;
   align-items: center;
   max-width: calc(100% - 80rpx);
-  margin-top: 12rpx;
+  margin-top: var(--fi-space-12);
   margin-left: 80rpx;
   overflow: hidden;
   border-radius: 16rpx;
@@ -235,7 +234,7 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 
 .seat-swap-candidate__wants-label {
   flex-shrink: 0;
-  padding: 7rpx 10rpx 7rpx 12rpx;
+  padding: 7rpx var(--fi-space-10) 7rpx var(--fi-space-12);
   background: rgba(70, 171, 89, 0.12);
   color: rgba(24, 103, 67, 0.88);
   font-size: 20rpx;
@@ -245,7 +244,7 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 
 .seat-swap-candidate__wants-value {
   min-width: 0;
-  padding: 7rpx 14rpx 7rpx 10rpx;
+  padding: 7rpx var(--fi-space-14) 7rpx var(--fi-space-10);
   overflow: hidden;
   font-size: 24rpx;
   font-weight: 700;
@@ -255,15 +254,15 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 }
 
 .seat-swap-candidate__contact {
-  margin-top: 12rpx;
-  padding: 16rpx 18rpx;
+  margin-top: var(--fi-space-12);
+  padding: var(--fi-space-16) var(--fi-space-18);
   border-radius: 16rpx;
   background: #f6f7fb;
   font-size: 22rpx;
   color: #6f6a5f;
   display: flex;
   flex-direction: column;
-  gap: 4rpx;
+  gap: var(--fi-space-4);
 }
 
 .seat-swap-candidate__contact-line {
@@ -275,7 +274,7 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   align-self: stretch;
   width: 168rpx;
   min-height: 152rpx;
-  padding: 18rpx 20rpx;
+  padding: var(--fi-space-18) var(--fi-space-20);
   border-radius: 26rpx;
   color: #fff;
   font-size: 30rpx;
@@ -361,11 +360,11 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 }
 
 .seat-swap-candidate--matched .seat-swap-candidate__contact {
-  margin-top: 16rpx;
-  padding: 20rpx 22rpx;
+  margin-top: var(--fi-space-16);
+  padding: var(--fi-space-20) var(--fi-space-22);
   background: rgba(255, 255, 255, 0.16);
   border: 2rpx solid rgba(255, 255, 255, 0.16);
   font-size: 25rpx;
-  gap: 8rpx;
+  gap: var(--fi-space-8);
 }
 </style>

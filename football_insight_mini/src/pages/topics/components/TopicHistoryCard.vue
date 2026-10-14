@@ -23,7 +23,7 @@ const emit = defineEmits<{ (e: 'read', id: string): void }>()
 const presentation = computed(() => topicCardPresentation(props.item.title))
 </script>
 <style scoped>
-.topic-row { --topic-bg: var(--fi-color-topic-history-news-bg); --topic-accent: var(--fi-color-topic-history-news-accent); position: relative; overflow: hidden; padding: var(--fi-space-28); margin-bottom: var(--fi-space-24); background: linear-gradient(120deg, var(--topic-bg), var(--fi-color-bg)); border: var(--fi-border-card); border-radius: var(--fi-radius-lg); box-shadow: var(--fi-shadow-soft); }
+.topic-row { --topic-bg: var(--fi-color-topic-history-news-bg); --topic-accent: var(--fi-color-topic-history-news-accent); position: relative; overflow: hidden; padding: var(--fi-space-28);  background: linear-gradient(120deg, var(--topic-bg), var(--fi-color-bg)); border: var(--fi-border-card); border-radius: var(--fi-radius-lg); box-shadow: var(--fi-shadow-soft); }
 .topic-row--championship { --topic-bg: var(--fi-color-topic-history-championship-bg); --topic-accent: var(--fi-color-topic-history-championship-accent); }
 .topic-row--preview { --topic-bg: var(--fi-color-topic-history-preview-bg); --topic-accent: var(--fi-color-topic-history-preview-accent); }
 .topic-row--analysis { --topic-bg: var(--fi-color-topic-history-analysis-bg); --topic-accent: var(--fi-color-topic-history-analysis-accent); }

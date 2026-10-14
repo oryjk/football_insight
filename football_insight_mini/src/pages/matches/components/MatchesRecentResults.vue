@@ -28,5 +28,5 @@ const emit = defineEmits<{ (event: 'open-tech-stats', match: MatchCard): void }>
 <style scoped lang="css">
 @import '../matches-shared.css';
 
-.recent-results { display: flex; flex-direction: column; gap: var(--fi-space-16); }
+.recent-results { display: flex; flex-direction: column; gap: var(--fi-space-card-gap); }
 </style>

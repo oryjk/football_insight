@@ -46,32 +46,11 @@
             <button class="logout-action" @click="handleLogout">退出登录</button>
           </view>
         </template>
-
-        <UserNotificationEmailSheet
-          v-model:visible="notificationEmailSheetVisible"
-          :email="notificationEmail"
-          :saving="notificationEmailSaving"
-          @save="saveNotificationEmail"
-        />
       </template>
-
-      <!-- #ifdef H5 -->
-      <UserPasswordLoginSheet
-        v-model:visible="passwordLoginSheetVisible"
-        :submitting="passwordLoginSubmitting"
-        @submit="handlePasswordLogin"
-      />
-      <!-- #endif -->
-
-      <UserWechatBindSheet
-        :bind-state="miniWechatBindState"
-        @close="closeMiniWechatBindSheet"
-        @bind="handleMiniWechatBind"
-      />
-
       <!-- H5 测试登录入口：仅当后端配置 H5_TEST_LOGIN_USER_IDS 白名单时展示，不受审核模式影响。 -->
       <!-- #ifdef H5 -->
       <UserH5TestLoginPanel
+        v-if="h5TestUsers.length"
         :users="h5TestUsers"
         :current-user-id="currentUser?.id"
         @select="handleH5TestLoginSelect"
@@ -86,8 +65,30 @@
         </view>
         <text class="settings-entry-panel__arrow">›</text>
       </view>
+      </view>
     </view>
-    </view>
+
+    <UserNotificationEmailSheet
+      v-if="!systemConfigUnderReview"
+      v-model:visible="notificationEmailSheetVisible"
+      :email="notificationEmail"
+      :saving="notificationEmailSaving"
+      @save="saveNotificationEmail"
+    />
+
+    <!-- #ifdef H5 -->
+    <UserPasswordLoginSheet
+      v-model:visible="passwordLoginSheetVisible"
+      :submitting="passwordLoginSubmitting"
+      @submit="handlePasswordLogin"
+    />
+    <!-- #endif -->
+
+    <UserWechatBindSheet
+      :bind-state="miniWechatBindState"
+      @close="closeMiniWechatBindSheet"
+      @bind="handleMiniWechatBind"
+    />
 
     <UserGuestChantWall v-if="showGuestChantWall" />
 
@@ -409,10 +410,10 @@ onShow(() => {
   --page-border-soft: rgba(238, 240, 245, 0.96);
   --page-border-warm: rgba(234, 226, 209, 0.92);
   position: relative;
-  padding: 24rpx 16rpx 40rpx;
+  padding: var(--fi-space-24) var(--fi-space-16) var(--fi-space-40);
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
+  gap: var(--fi-space-card-gap);
   min-height: calc(100vh - var(--fi-brand-nav-height));
   box-sizing: border-box;
 }
@@ -447,7 +448,7 @@ onShow(() => {
 
 .page-root--guest .page {
   justify-content: flex-end;
-  padding: 24rpx 28rpx calc(32rpx + env(safe-area-inset-bottom) + 100rpx);
+  padding: var(--fi-space-24) var(--fi-space-28) calc(var(--fi-space-32) + env(safe-area-inset-bottom) + var(--fi-space-100));
 }
 
 .hero-card, .panel {
@@ -455,7 +456,7 @@ onShow(() => {
   z-index: 1;
   background: rgba(255,255,255,0.72);
   border-radius: var(--fi-radius-xl);
-  padding: 20rpx;
+  padding: var(--fi-space-20);
   border: 2rpx solid rgba(255,255,255,0.55);
   box-shadow: 0 20rpx 48rpx rgba(26,28,36,0.06);
   backdrop-filter: blur(18rpx);
@@ -472,11 +473,11 @@ onShow(() => {
   justify-content: space-between;
 }
 
-.hero-card__top, .section-heading { align-items: flex-start; gap: 12rpx; }
+.hero-card__top, .section-heading { align-items: flex-start; gap: var(--fi-space-12); }
 
 .hero-card__title, .section-title {
   display: block;
-  margin-top: 10rpx;
+  margin-top: var(--fi-space-10);
   color: #2a2c31;
   font-size: var(--fi-font-48);
   line-height: 1.08;
@@ -485,7 +486,7 @@ onShow(() => {
 
 .hero-card__summary, .account-form-panel__summary, .user-panel__summary {
   display: block;
-  margin-top: 18rpx;
+  margin-top: var(--fi-space-18);
   color: #6b707b;
   font-size: var(--fi-font-28);
   line-height: 1.7;
@@ -499,7 +500,7 @@ onShow(() => {
   white-space: nowrap;
   line-height: 1;
   box-sizing: border-box;
-  padding: 14rpx 24rpx;
+  padding: var(--fi-space-14) var(--fi-space-24);
   border-radius: var(--fi-radius-round);
   border: 2rpx solid var(--page-border);
   background: var(--fi-color-page);
@@ -508,15 +509,14 @@ onShow(() => {
 }
 
 .account-actions {
-  margin-top: 24rpx;
   border-radius: var(--fi-radius-lg);
-  padding: 22rpx 24rpx;
+  padding: var(--fi-space-22) var(--fi-space-24);
   border: 1rpx solid rgba(229, 232, 238, 0.96);
   background: rgba(255, 255, 255, 0.94);
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 18rpx;
+  gap: var(--fi-space-18);
 }
 
 .account-actions__body {
@@ -532,18 +532,17 @@ onShow(() => {
 
 .account-actions__caption {
   display: block;
-  margin-top: 8rpx;
+  margin-top: var(--fi-space-8);
   color: #7a808d;
   font-size: 23rpx;
   line-height: 1.55;
 }
 
 .settings-entry-panel {
-  margin-top: 24rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
 }
 
 .settings-entry-panel--pressed {
@@ -553,7 +552,7 @@ onShow(() => {
 
 .settings-entry-panel__body {
   display: grid;
-  gap: 6rpx;
+  gap: var(--fi-space-6);
   min-width: 0;
 }
 
@@ -616,9 +615,8 @@ onShow(() => {
 }
 
 .account-actions {
-  margin-top: 0;
   border-radius: var(--fi-radius-lg);
-  padding: 18rpx 20rpx;
+  padding: var(--fi-space-18) var(--fi-space-20);
   animation: fi-fade-in-up 520ms cubic-bezier(0.22, 1, 0.36, 1) 320ms both;
 }
 </style>

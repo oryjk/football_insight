@@ -11,19 +11,21 @@
         <MatchesUpcomingPanel :sections="upcomingSections" :now-iso="pageNowIso" @open-round="openRoundDialog" @open-tech-stats="openMatchTechStats" />
         <MatchesRecentResults v-if="groupedMatches.length" :groups="groupedMatches" :now-iso="pageNowIso" @open-tech-stats="openMatchTechStats" />
       </template>
-      <MatchesRoundSheet
-        v-if="selectedRoundNumber !== null"
-        :round-number="selectedRoundNumber"
-        :matches="selectedRoundMatches"
-        :loading="roundDialogLoading"
-        :error-message="roundDialogErrorMessage"
-        :now-iso="pageNowIso"
-        @close="closeRoundDialog"
-        @open-tech-stats="openMatchTechStats"
-      />
-      <MatchesTechStatsSheet v-if="selectedTechStatsMatch" :match="selectedTechStatsMatch" @close="closeMatchTechStats" />
+      </view>
     </view>
-  </view>
+
+    <MatchesRoundSheet
+      v-if="selectedRoundNumber !== null"
+      :round-number="selectedRoundNumber"
+      :matches="selectedRoundMatches"
+      :loading="roundDialogLoading"
+      :error-message="roundDialogErrorMessage"
+      :now-iso="pageNowIso"
+      @close="closeRoundDialog"
+      @open-tech-stats="openMatchTechStats"
+    />
+
+    <MatchesTechStatsSheet v-if="selectedTechStatsMatch" :match="selectedTechStatsMatch" @close="closeMatchTechStats" />
   </view>
 </template>
 
@@ -53,9 +55,6 @@ onShow(() => { void loadPage() })
 <style scoped lang="css">
 @import './matches-shared.css';
 .page-root { position: relative; }
-.page-root--embedded {
-  margin-top: calc(-1 * var(--fi-space-16));
-}
 .page-scroll {
   padding-top: calc(var(--fi-brand-nav-height) + var(--fi-space-96));
   position: relative;
@@ -69,7 +68,7 @@ onShow(() => { void loadPage() })
   padding: var(--fi-space-24) var(--fi-space-16) var(--fi-space-40);
   display: flex;
   flex-direction: column;
-  gap: var(--fi-space-16);
+  gap: var(--fi-space-card-gap);
 }
 .page-root--embedded .page {
   padding-top: 0;

@@ -590,17 +590,17 @@ function roundRect(
 .page {
   position: relative;
   z-index: 1;
-  padding: 28rpx 24rpx 40rpx;
+  padding: var(--fi-space-28) var(--fi-space-24) var(--fi-space-40);
   display: flex;
   flex-direction: column;
-  gap: 24rpx;
+  gap: var(--fi-space-card-gap);
 }
 .hero-card,
 .panel,
 .state-card {
   background: rgba(255,255,255,0.94);
   border-radius: 36rpx;
-  padding: 28rpx;
+  padding: var(--fi-space-28);
   border: 2rpx solid rgba(236, 236, 241, 0.95);
   box-shadow: 0 28rpx 60rpx rgba(26,28,36,0.08);
 }
@@ -617,7 +617,7 @@ function roundRect(
 .hero-card__top,
 .section-heading {
   align-items: flex-start;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
 }
 .eyebrow,
 .section-kicker {
@@ -629,7 +629,7 @@ function roundRect(
 .hero-card__title,
 .section-title {
   display: block;
-  margin-top: 10rpx;
+  margin-top: var(--fi-space-10);
   color: #121212;
   font-size: 56rpx;
   line-height: 1.08;
@@ -641,7 +641,7 @@ function roundRect(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 14rpx 24rpx;
+  padding: var(--fi-space-14) var(--fi-space-24);
   border-radius: 999rpx;
   border: 2rpx solid rgba(232, 233, 238, 0.95);
   background: #f6f7fb;
@@ -653,7 +653,7 @@ function roundRect(
 .support-state-card__notes text,
 .support-state-card__rule {
   display: block;
-  margin-top: 18rpx;
+  margin-top: var(--fi-space-18);
   color: #6b707b;
   font-size: 28rpx;
   line-height: 1.7;
@@ -664,20 +664,20 @@ function roundRect(
   font-size: 24rpx;
 }
 .support-scoreboard__teams {
-  margin-top: 22rpx;
+  margin-top: var(--fi-space-22);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 16rpx;
+  gap: var(--fi-space-16);
   align-items: stretch;
 }
 .support-team-card {
-  padding: 20rpx;
+  padding: var(--fi-space-20);
   border-radius: 28rpx;
   border: 2rpx solid #ececf1;
   background: #ffffff;
   display: grid;
   justify-items: center;
-  gap: 8rpx;
+  gap: var(--fi-space-8);
 }
 .support-team-card--away { background: #ffffff; }
 .support-team-card--favorite {
@@ -708,7 +708,7 @@ function roundRect(
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 8rpx;
+  gap: var(--fi-space-8);
 }
 .support-scoreboard__vs-mark {
   color: #121212;
@@ -720,7 +720,7 @@ function roundRect(
   font-size: 22rpx;
 }
 .support-bar {
-  margin-top: 20rpx;
+  margin-top: var(--fi-space-20);
   height: 18rpx;
   border-radius: 999rpx;
   overflow: hidden;
@@ -736,13 +736,13 @@ function roundRect(
   background: #8f96a3;
 }
 .support-state-card__notes {
-  margin-top: 18rpx;
+  margin-top: var(--fi-space-18);
   display: grid;
-  gap: 10rpx;
+  gap: var(--fi-space-10);
 }
 .support-actions {
-  margin-top: 22rpx;
-  gap: 12rpx;
+  margin-top: var(--fi-space-22);
+  gap: var(--fi-space-12);
   flex-wrap: wrap;
   justify-content: flex-start;
 }
@@ -751,7 +751,7 @@ function roundRect(
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 18rpx 28rpx;
+  padding: var(--fi-space-18) var(--fi-space-28);
   border-radius: 999rpx;
   font-size: 26rpx;
   line-height: 1;
@@ -772,12 +772,12 @@ function roundRect(
   background: #f5f6fa;
 }
 .poster-panel__image {
-  margin-top: 18rpx;
+  margin-top: var(--fi-space-18);
   width: 100%;
   border-radius: 28rpx;
 }
 .poster-panel__save {
-  margin-top: 18rpx;
+  margin-top: var(--fi-space-18);
 }
 .state-card--error text {
   color: #c03a2b;

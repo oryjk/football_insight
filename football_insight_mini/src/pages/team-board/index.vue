@@ -485,11 +485,11 @@ onShow(() => {
   z-index: 0;
 }
 .page-scroll { height: 100vh; padding-top: var(--fi-brand-nav-height); }
-.page { position: relative; z-index: 1; padding: 28rpx 24rpx 40rpx; display: flex; flex-direction: column; gap: 24rpx; }
+.page { position: relative; z-index: 1; padding: var(--fi-space-28) var(--fi-space-24) var(--fi-space-40); display: flex; flex-direction: column; gap: var(--fi-space-card-gap); }
 .hero-card, .panel, .state-card, .team-board-composer__dialog {
   background: rgba(255,255,255,0.94);
   border-radius: 36rpx;
-  padding: 28rpx;
+  padding: var(--fi-space-28);
   border: 2rpx solid rgba(236, 236, 241, 0.95);
   box-shadow: 0 28rpx 60rpx rgba(26,28,36,0.08);
 }
@@ -498,7 +498,7 @@ onShow(() => {
   align-items: center;
   justify-content: space-between;
 }
-.hero-card__top, .section-heading, .team-board-post__header, .team-board-comment__head { align-items: flex-start; gap: 16rpx; }
+.hero-card__top, .section-heading, .team-board-post__header, .team-board-comment__head { align-items: flex-start; gap: var(--fi-space-16); }
 .eyebrow, .section-kicker {
   margin: 0;
   color: #131313;
@@ -508,7 +508,7 @@ onShow(() => {
 }
 .hero-card__title, .section-title, .team-board-post__title, .team-board-snapshot__headline {
   display: block;
-  margin-top: 10rpx;
+  margin-top: var(--fi-space-10);
   color: #121212;
   font-size: 56rpx;
   line-height: 1.08;
@@ -517,7 +517,7 @@ onShow(() => {
 .section-title, .team-board-post__title, .team-board-snapshot__headline { font-size: 44rpx; }
 .hero-card__summary, .team-board-post__body, .team-board-launcher__summary {
   display: block;
-  margin-top: 18rpx;
+  margin-top: var(--fi-space-18);
   color: #6b707b;
   font-size: 28rpx;
   line-height: 1.7;
@@ -530,21 +530,21 @@ onShow(() => {
   white-space: nowrap;
   line-height: 1;
   box-sizing: border-box;
-  padding: 14rpx 24rpx;
+  padding: var(--fi-space-14) var(--fi-space-24);
   border-radius: 999rpx;
   border: 2rpx solid rgba(232, 233, 238, 0.95);
   background: #f6f7fb;
   color: #6d7280;
   font-size: 24rpx;
 }
-.team-board-hero__back-row { margin-bottom: 16rpx; }
+.team-board-hero__back-row { margin-bottom: var(--fi-space-16); }
 .team-board-hero__back {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   white-space: nowrap;
   line-height: 1;
-  padding: 10rpx 18rpx;
+  padding: var(--fi-space-10) var(--fi-space-18);
   border-radius: 999rpx;
   background: #f6f7fb;
   color: #6d7280;
@@ -552,16 +552,16 @@ onShow(() => {
 }
 .team-board-launcher__grid, .team-board-snapshot__sections, .team-board-comments, .post-list {
   display: grid;
-  gap: 14rpx;
+  gap: var(--fi-space-14);
 }
 .team-board-launcher__grid {
-  margin-top: 18rpx;
+  margin-top: var(--fi-space-18);
   border-top: 2rpx solid rgba(235, 236, 241, 0.86);
 }
 .team-board-launcher__card {
   display: grid;
-  gap: 10rpx;
-  padding: 22rpx 0;
+  gap: var(--fi-space-10);
+  padding: var(--fi-space-22) 0;
   border-radius: 0;
   border: 0;
   border-bottom: 2rpx solid rgba(235, 236, 241, 0.86);
@@ -572,7 +572,7 @@ onShow(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12rpx;
+  gap: var(--fi-space-12);
 }
 .team-board-launcher__meta text { font-size: 24rpx; color: #121212; font-weight: 700; }
 .team-board-launcher__value { font-size: 34rpx !important; }
@@ -580,7 +580,7 @@ onShow(() => {
 .team-board-post__author {
   display: flex;
   align-items: center;
-  gap: 12rpx;
+  gap: var(--fi-space-12);
 }
 .team-board-post__author-avatar, .team-board-snapshot__avatar {
   width: 48rpx;
@@ -598,10 +598,10 @@ onShow(() => {
   color: #8f9198;
   font-size: 22rpx;
 }
-.team-board-post__body { margin-top: 12rpx; }
+.team-board-post__body { margin-top: var(--fi-space-12); }
 .team-board-snapshot {
-  margin-top: 18rpx;
-  padding: 22rpx;
+  margin-top: var(--fi-space-18);
+  padding: var(--fi-space-22);
   border-radius: 28rpx;
   background: #f7f8fb;
 }
@@ -612,25 +612,25 @@ onShow(() => {
 }
 .team-board-snapshot__section {
   display: grid;
-  gap: 10rpx;
+  gap: var(--fi-space-10);
 }
 .team-board-snapshot__rows {
   display: grid;
-  gap: 10rpx;
+  gap: var(--fi-space-10);
 }
 .team-board-snapshot__row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
 }
 .team-board-snapshot__identity {
   display: flex;
   align-items: center;
-  gap: 12rpx;
+  gap: var(--fi-space-12);
 }
 .team-board-post__actions {
-  margin-top: 18rpx;
+  margin-top: var(--fi-space-18);
 }
 .team-board-post__actions text {
   color: #8f9198;
@@ -642,7 +642,7 @@ onShow(() => {
   justify-content: center;
   white-space: nowrap;
   line-height: 1;
-  padding: 12rpx 20rpx;
+  padding: var(--fi-space-12) var(--fi-space-20);
   border-radius: 999rpx;
   background: #f6f7fb;
   color: #6d7280;
@@ -653,27 +653,27 @@ onShow(() => {
   color: #dc2626;
 }
 .team-board-comments {
-  margin-top: 18rpx;
+  margin-top: var(--fi-space-18);
 }
 .team-board-comment {
-  padding: 18rpx 0;
+  padding: var(--fi-space-18) 0;
   border-bottom: 2rpx solid #eff1f5;
 }
 .team-board-comment__body {
   display: block;
-  margin-top: 8rpx;
+  margin-top: var(--fi-space-8);
   color: #565b67;
   font-size: 26rpx;
   line-height: 1.65;
 }
 .team-board-comment-form {
   display: grid;
-  gap: 14rpx;
-  margin-top: 10rpx;
+  gap: var(--fi-space-14);
+  margin-top: var(--fi-space-10);
 }
 .team-board-comment-form__input, .team-board-composer__input, .team-board-composer__textarea {
   width: 100%;
-  padding: 20rpx 24rpx;
+  padding: var(--fi-space-20) var(--fi-space-24);
   border-radius: 22rpx;
   background: #f7f8fb;
   font-size: 28rpx;
@@ -686,7 +686,7 @@ onShow(() => {
   align-items: center;
   justify-content: center;
   align-self: flex-start;
-  padding: 20rpx 30rpx;
+  padding: var(--fi-space-20) var(--fi-space-30);
   border-radius: 999rpx;
   background: #15161b;
   color: #ffffff;
@@ -704,7 +704,7 @@ onShow(() => {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: 28rpx;
+  padding: var(--fi-space-28);
   background: rgba(21, 22, 27, 0.32);
   animation: fi-overlay-fade-in 180ms ease both;
 }
@@ -719,7 +719,7 @@ onShow(() => {
 }
 .team-board-composer__error {
   display: block;
-  margin-top: 12rpx;
+  margin-top: var(--fi-space-12);
   color: #c03a2b;
   font-size: 24rpx;
 }

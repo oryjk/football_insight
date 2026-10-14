@@ -17,7 +17,7 @@ component（--fi-component-*）   组件级复合契约（卡片、kicker/标题
 覆盖八个维度，引用规则：
 
 - **颜色**：`var(--fi-color-*)`。新增页面、组件、共享壳层必须引用 token，不新增散落 hex；需要新色值时先加 primitive，再建 semantic 别名。
-- **间距**：`var(--fi-space-<rpx>)` 数字刻度（如 `--fi-space-18` = 18rpx）。
+- **间距**：页面同级卡片和卡片列表统一用 `var(--fi-space-card-gap)`，默认 24rpx；卡片内部文字、按钮、指标等布局继续使用 `var(--fi-space-<rpx>)` 数字刻度。
 - **字号**：`var(--fi-font-<rpx>)` 数字刻度。
 - **行高**：`var(--fi-leading-*)`（none/tight/snug/normal/loose/relaxed）。
 - **圆角**：`var(--fi-radius-*)`（sm/md/lg/xl/round）。
@@ -32,6 +32,8 @@ component（--fi-component-*）   组件级复合契约（卡片、kicker/标题
 ## 布局责任
 
 跨组件布局由**父级 wrapper** 负责，子组件不自我布局。小程序端 uni-app 组件编译为微信自定义组件，存在宿主节点与样式隔离，以下写法 H5 正常、小程序静默失效（勿再犯）：
+
+卡片之间的距离只由父容器的 `gap: var(--fi-space-card-gap)` 提供，卡片根节点不再叠加外部 margin。一个组件内部包含多张卡片时，也应使用真实 `view` 包裹节点统一排列。固定弹层放在卡片容器外；避免其空宿主节点参与小程序的 flex 间距。跨组件的外部布局类写在父页面的真实 `view` 上，例如会员权益组件外部的包裹节点；换座地图的 sticky 和横向扩展也由页面包裹节点承担。
 
 1. 不要用 `custom-class` + 父级 scoped 样式给子组件根节点做布局——作用域 id + 样式隔离会让整条规则失效。布局类加在自己模板内的包裹 view 上。
 2. flex 行容器里子组件宿主节点收缩为内容宽，子组件内部 `width: 100%` 撑不满。由 flex 容器侧解决（`flex-direction: column` + `align-items: stretch`）。

@@ -494,7 +494,7 @@ onShow(() => {
   padding: var(--fi-space-24) var(--fi-space-16) var(--fi-space-40);
   display: flex;
   flex-direction: column;
-  gap: var(--fi-space-16);
+  gap: var(--fi-space-card-gap);
 }
 
 .state-card {

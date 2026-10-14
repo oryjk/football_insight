@@ -47,13 +47,16 @@
         <text class="purchase-empty-card__body">{{ emptyProductBody }}</text>
       </view>
 
-      <MembershipBenefitsPanel
+      <view
         v-if="selectedBenefits"
         class="membership-benefits"
-        :code="selectedBenefits.code === 'V3' ? 'VIP3' : selectedBenefits.code"
-        :tone-class="selectedBenefits.toneClass"
-        :benefit-items="selectedBenefits.items"
-      />
+      >
+        <MembershipBenefitsPanel
+          :code="selectedBenefits.code === 'V3' ? 'VIP3' : selectedBenefits.code"
+          :tone-class="selectedBenefits.toneClass"
+          :benefit-items="selectedBenefits.items"
+        />
+      </view>
 
       <view class="membership-guide-card">
         <view class="membership-guide-card__title-row">
@@ -344,6 +347,9 @@ async function handlePurchase() {
 }
 
 .page {
+  gap: var(--fi-space-card-gap);
+  flex-direction: column;
+  display: flex;
   position: relative;
   z-index: 1;
   padding: calc(var(--fi-brand-nav-height) + var(--fi-space-32)) var(--fi-space-32) var(--fi-space-32);
@@ -353,8 +359,8 @@ async function handlePurchase() {
 .purchase-hero {
   background-color: #ffffff;
   border-radius: 24rpx;
-  padding: 40rpx;
-  margin-bottom: 32rpx;
+  padding: var(--fi-space-40);
+
   box-shadow: 0 2rpx 16rpx rgba(0, 0, 0, 0.04);
 }
 
@@ -363,7 +369,7 @@ async function handlePurchase() {
   font-size: 22rpx;
   font-weight: 700;
   color: #b91c1c;
-  margin-bottom: 12rpx;
+  margin-bottom: var(--fi-space-12);
 }
 
 .purchase-hero__title {
@@ -371,7 +377,7 @@ async function handlePurchase() {
   font-size: 40rpx;
   font-weight: 700;
   color: #15161b;
-  margin-bottom: 12rpx;
+  margin-bottom: var(--fi-space-12);
 }
 
 .purchase-hero__summary {
@@ -384,13 +390,13 @@ async function handlePurchase() {
 .product-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20rpx;
+  gap: var(--fi-space-card-gap);
 }
 
 .product-card {
   min-width: 0;
   border-radius: 22rpx;
-  padding: 26rpx 24rpx;
+  padding: 26rpx var(--fi-space-24);
   background: linear-gradient(180deg, #ffffff, #fff7f7);
   border: 2rpx solid rgba(226, 220, 207, 0.9);
   box-shadow: 0 10rpx 26rpx rgba(43, 37, 26, 0.04);
@@ -406,7 +412,7 @@ async function handlePurchase() {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12rpx;
+  gap: var(--fi-space-12);
 }
 
 .product-card__tier {
@@ -427,16 +433,16 @@ async function handlePurchase() {
 .product-card__price-row {
   display: flex;
   align-items: baseline;
-  gap: 10rpx;
-  margin-top: 24rpx;
-  margin-bottom: 10rpx;
+  gap: var(--fi-space-10);
+  margin-top: var(--fi-space-24);
+  margin-bottom: var(--fi-space-10);
 }
 
 .product-card__currency {
   font-size: 30rpx;
   font-weight: 700;
   color: #cb544d;
-  margin-right: 6rpx;
+  margin-right: var(--fi-space-6);
 }
 
 .product-card__price {
@@ -457,8 +463,8 @@ async function handlePurchase() {
   display: inline-flex;
   align-items: center;
   max-width: 100%;
-  margin-bottom: 14rpx;
-  padding: 7rpx 12rpx;
+  margin-bottom: var(--fi-space-14);
+  padding: 7rpx var(--fi-space-12);
   border-radius: 999rpx;
   background: rgba(203, 84, 77, 0.1);
   color: #b53f38;
@@ -476,7 +482,7 @@ async function handlePurchase() {
 }
 
 .purchase-empty-card {
-  padding: 34rpx 30rpx;
+  padding: var(--fi-space-34) var(--fi-space-30);
   border-radius: 24rpx;
   background: #ffffff;
   border: 2rpx solid rgba(226, 220, 207, 0.9);
@@ -491,19 +497,14 @@ async function handlePurchase() {
 
 .purchase-empty-card__body {
   display: block;
-  margin-top: 12rpx;
+  margin-top: var(--fi-space-12);
   color: #6b7280;
   font-size: 25rpx;
   line-height: 1.5;
 }
 
-.membership-benefits {
-  margin-top: 28rpx;
-}
-
 .membership-guide-card {
-  margin-top: 28rpx;
-  padding: 30rpx;
+  padding: var(--fi-space-30);
   border-radius: 24rpx;
   background: #ffffff;
   border: 2rpx solid rgba(226, 220, 207, 0.9);
@@ -512,8 +513,8 @@ async function handlePurchase() {
 .membership-guide-card__title-row {
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  margin-bottom: 18rpx;
+  gap: var(--fi-space-12);
+  margin-bottom: var(--fi-space-18);
 }
 
 .membership-guide-card__info-icon {
@@ -543,8 +544,8 @@ async function handlePurchase() {
 
 .membership-guide-list {
   display: grid;
-  gap: 14rpx;
-  margin-top: 24rpx;
+  gap: var(--fi-space-14);
+  margin-top: var(--fi-space-24);
 }
 
 .membership-guide-item {
@@ -554,8 +555,8 @@ async function handlePurchase() {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 18rpx;
-  padding: 22rpx 20rpx;
+  gap: var(--fi-space-18);
+  padding: var(--fi-space-22) var(--fi-space-20);
   border-radius: 18rpx;
   background: var(--guide-bg);
   border: 2rpx solid var(--guide-border);
@@ -611,7 +612,7 @@ async function handlePurchase() {
 .membership-guide-item__title-row {
   display: flex;
   align-items: center;
-  gap: 8rpx;
+  gap: var(--fi-space-8);
 }
 
 .membership-guide-item__code {
@@ -629,7 +630,7 @@ async function handlePurchase() {
 
 .membership-guide-item__condition {
   display: block;
-  margin-top: 12rpx;
+  margin-top: var(--fi-space-12);
   color: #2f3640;
   font-size: 23rpx;
   line-height: 1.45;
@@ -640,7 +641,7 @@ async function handlePurchase() {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 10rpx;
+  gap: var(--fi-space-10);
 }
 
 .membership-guide-item__refresh,
@@ -649,7 +650,7 @@ async function handlePurchase() {
   align-items: center;
   justify-content: center;
   min-width: 112rpx;
-  padding: 10rpx 16rpx;
+  padding: var(--fi-space-10) var(--fi-space-16);
   border-radius: 999rpx;
   background: rgba(255, 255, 255, 0.86);
   border: 2rpx solid rgba(224, 214, 194, 0.86);
@@ -666,8 +667,7 @@ async function handlePurchase() {
 }
 
 .agreement-card {
-  margin-top: 28rpx;
-  padding: 30rpx;
+  padding: var(--fi-space-30);
   border-radius: 24rpx;
   background: #ffffff;
   border: 2rpx solid rgba(226, 220, 207, 0.9);
@@ -677,8 +677,8 @@ async function handlePurchase() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16rpx;
-  margin-bottom: 20rpx;
+  gap: var(--fi-space-16);
+  margin-bottom: var(--fi-space-20);
 }
 
 .agreement-card__title {
@@ -688,7 +688,7 @@ async function handlePurchase() {
 }
 
 .agreement-card__badge {
-  padding: 8rpx 16rpx;
+  padding: var(--fi-space-8) var(--fi-space-16);
   border-radius: 999rpx;
   background: rgba(220, 38, 38, 0.1);
   color: #991b1b;
@@ -698,12 +698,12 @@ async function handlePurchase() {
 
 .agreement-list {
   display: grid;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
 }
 
 .agreement-list__item {
   display: flex;
-  gap: 14rpx;
+  gap: var(--fi-space-14);
   align-items: flex-start;
 }
 
@@ -730,9 +730,9 @@ async function handlePurchase() {
 .agreement-check {
   display: flex;
   align-items: center;
-  gap: 14rpx;
+  gap: var(--fi-space-14);
   margin-top: 26rpx;
-  padding-top: 24rpx;
+  padding-top: var(--fi-space-24);
   border-top: 2rpx solid #f0eee9;
 }
 
@@ -759,10 +759,9 @@ async function handlePurchase() {
 }
 
 .purchase-actions {
-  margin-top: 32rpx;
   display: flex;
   align-items: center;
-  gap: 18rpx;
+  gap: var(--fi-space-18);
 }
 
 .purchase-actions__summary {
@@ -786,7 +785,7 @@ async function handlePurchase() {
 
 .purchase-actions__note {
   display: block;
-  margin-top: 4rpx;
+  margin-top: var(--fi-space-4);
   color: #991b1b;
   font-size: 18rpx;
   font-weight: 700;

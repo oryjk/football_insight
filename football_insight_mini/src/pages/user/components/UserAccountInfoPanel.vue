@@ -1,5 +1,5 @@
 <template>
-  <view>
+  <view class="account-info-stack">
     <view class="panel info-panel">
       <view class="info-panel__header">
         <text class="info-panel__title">账户信息</text>
@@ -46,12 +46,18 @@ const emit = defineEmits<{
 </script>
 
 <style scoped lang="css">
+.account-info-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fi-space-card-gap);
+}
+
 .hero-card, .panel {
   position: relative;
   z-index: 1;
   background: rgba(255,255,255,0.72);
   border-radius: var(--fi-radius-xl);
-  padding: 20rpx;
+  padding: var(--fi-space-20);
   border: 2rpx solid rgba(255,255,255,0.55);
   box-shadow: 0 20rpx 48rpx rgba(26,28,36,0.06);
   backdrop-filter: blur(18rpx);
@@ -62,7 +68,7 @@ const emit = defineEmits<{
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18rpx;
+  gap: var(--fi-space-18);
   border-color: rgba(229, 232, 238, 0.96);
   background: rgba(255, 255, 255, 0.94);
 }
@@ -70,7 +76,7 @@ const emit = defineEmits<{
 .notification-email-panel__body {
   min-width: 0;
   display: grid;
-  gap: 10rpx;
+  gap: var(--fi-space-10);
 }
 
 .notification-email-panel__title {
@@ -108,7 +114,7 @@ const emit = defineEmits<{
 .info-panel,
 .privilege-panel,
 .upgrade-panel {
-  padding: 22rpx;
+  padding: var(--fi-space-22);
   border-radius: var(--fi-radius-lg);
 }
 
@@ -132,18 +138,18 @@ const emit = defineEmits<{
 }
 
 .account-info-grid {
-  margin-top: 22rpx;
+  margin-top: var(--fi-space-22);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12rpx;
+  gap: var(--fi-space-12);
 }
 
 .account-info-item {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 14rpx;
-  padding: 18rpx;
+  gap: var(--fi-space-14);
+  padding: var(--fi-space-18);
   box-sizing: border-box;
   border-radius: 22rpx;
   border: 1rpx solid rgba(232, 235, 241, 0.98);
@@ -168,7 +174,7 @@ const emit = defineEmits<{
   min-width: 0;
   flex: 1;
   display: grid;
-  gap: 10rpx;
+  gap: var(--fi-space-10);
 }
 
 .account-info-item__label {

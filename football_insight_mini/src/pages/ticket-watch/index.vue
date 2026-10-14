@@ -552,7 +552,7 @@ onUnload(() => {
   padding: calc(var(--fi-brand-nav-height) + var(--fi-space-20)) var(--fi-space-20) var(--fi-space-36);
   display: flex;
   flex-direction: column;
-  gap: var(--fi-space-18);
+  gap: var(--fi-space-card-gap);
 }
 
 .page--entry-mask {
@@ -561,13 +561,13 @@ onUnload(() => {
 
 .inventory-stack {
   display: grid;
-  gap: var(--fi-space-14);
+  gap: var(--fi-space-card-gap);
 }
 
 .board-content {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: var(--fi-space-18);
+  gap: var(--fi-space-card-gap);
 }
 </style>

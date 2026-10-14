@@ -314,7 +314,7 @@ onShow(async () => {
   padding: var(--fi-space-24) var(--fi-space-16) calc(152rpx + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: var(--fi-space-16);
+  gap: var(--fi-space-card-gap);
 }
 .page-bg-img {
   position: absolute;

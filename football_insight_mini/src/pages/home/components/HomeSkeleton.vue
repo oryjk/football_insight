@@ -64,7 +64,7 @@
 <style scoped lang="css">
 .skeleton-stack {
   display: grid;
-  gap: 24rpx;
+  gap: var(--fi-space-card-gap);
 }
 
 .skeleton-panel {
@@ -88,7 +88,7 @@
 }
 
 .skeleton-hero-card {
-  padding: 26rpx 24rpx 20rpx;
+  padding: 26rpx var(--fi-space-24) var(--fi-space-20);
   border-radius: 36rpx;
   background: rgba(255, 255, 255, 0.96);
   border: 2rpx solid rgba(229, 231, 236, 0.98);
@@ -96,19 +96,19 @@
 }
 
 .skeleton-hero-guide {
-  margin-top: 24rpx;
-  padding-top: 24rpx;
+  margin-top: var(--fi-space-24);
+  padding-top: var(--fi-space-24);
   border-top: 2rpx solid #ececf1;
 }
 
 .skeleton-line--guide-title {
   width: 220rpx;
   height: 36rpx;
-  margin-bottom: 12rpx;
+  margin-bottom: var(--fi-space-12);
 }
 
 .skeleton-briefing-card {
-  padding: 20rpx;
+  padding: var(--fi-space-20);
   border-radius: 36rpx;
   background: rgba(255, 255, 255, 0.96);
   border: 2rpx solid rgba(229, 231, 236, 0.98);
@@ -116,11 +116,11 @@
 }
 
 .skeleton-briefing-row {
-  margin-top: 18rpx;
-  padding: 20rpx 0 20rpx 20rpx;
+  margin-top: var(--fi-space-18);
+  padding: var(--fi-space-20) 0 var(--fi-space-20) var(--fi-space-20);
   border-bottom: 2rpx solid rgba(231, 232, 238, 0.88);
   display: grid;
-  gap: 12rpx;
+  gap: var(--fi-space-12);
 }
 
 .skeleton-briefing-row:last-child {
@@ -128,7 +128,7 @@
 }
 
 .skeleton-panel-card {
-  padding: 20rpx;
+  padding: var(--fi-space-20);
   border-radius: 36rpx;
   background: rgba(255, 255, 255, 0.94);
   border: 2rpx solid rgba(236, 236, 241, 0.95);
@@ -139,12 +139,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12rpx;
+  gap: var(--fi-space-12);
 }
 
 .skeleton-copy-group {
   display: grid;
-  gap: 12rpx;
+  gap: var(--fi-space-12);
   width: 100%;
 }
 
@@ -186,7 +186,7 @@
 }
 
 .skeleton-line--meta {
-  margin-top: 18rpx;
+  margin-top: var(--fi-space-18);
   height: 24rpx;
 }
 
@@ -197,7 +197,7 @@
 .skeleton-line--body {
   width: 88%;
   height: 26rpx;
-  margin-top: 18rpx;
+  margin-top: var(--fi-space-18);
 }
 
 .skeleton-line--body-short {
@@ -228,25 +228,25 @@
 .skeleton-button {
   width: 100%;
   height: 72rpx;
-  margin-top: 18rpx;
+  margin-top: var(--fi-space-18);
   border-radius: 999rpx;
 }
 
 .skeleton-score-strip {
-  padding: 24rpx 22rpx;
+  padding: var(--fi-space-24) var(--fi-space-22);
   display: grid;
-  gap: 14rpx;
+  gap: var(--fi-space-14);
   border-radius: 28rpx;
   border: 2rpx solid #ececf1;
   background: linear-gradient(180deg, rgba(249, 249, 252, 0.9), rgba(255, 255, 255, 1));
-  margin-top: 16rpx;
+  margin-top: var(--fi-space-16);
 }
 
 .skeleton-score-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 18rpx;
+  gap: var(--fi-space-18);
 }
 
 .skeleton-line--score-team {
@@ -261,15 +261,15 @@
 }
 
 .skeleton-ranking-list {
-  margin-top: 12rpx;
+  margin-top: var(--fi-space-12);
   display: grid;
-  gap: 10rpx;
+  gap: var(--fi-space-10);
 }
 
 .skeleton-ranking-row {
-  gap: 16rpx;
+  gap: var(--fi-space-16);
   align-items: center;
-  padding: 12rpx 10rpx;
+  padding: var(--fi-space-12) var(--fi-space-10);
   display: flex;
 }
 
@@ -288,7 +288,7 @@
   flex: 1;
   min-width: 0;
   display: grid;
-  gap: 8rpx;
+  gap: var(--fi-space-8);
 }
 
 .skeleton-line--name {

@@ -32,7 +32,7 @@
           </view>
           <text class="group-row__caret">{{ expandedKeys.includes(group.region_key) ? '收起' : '展开' }}</text>
         </view>
-        <template v-if="expandedKeys.includes(group.region_key)">
+        <view v-if="expandedKeys.includes(group.region_key)" class="candidate-list">
           <SeatSwapCandidateCard
             v-for="candidate in group.requests"
             :key="candidate.request_id"
@@ -42,7 +42,7 @@
             @cancel-confirmation="(id: string) => emit('cancel-confirmation', id)"
             @matched-cancel="(id: string) => emit('matched-cancel', id)"
           />
-        </template>
+        </view>
       </template>
     </template>
 
@@ -50,6 +50,7 @@
       <view v-if="!filteredCandidates.length" class="empty-row">
         <text>该分区暂无换座意向。</text>
       </view>
+      <view v-if="filteredCandidates.length" class="candidate-list">
       <SeatSwapCandidateCard
         v-for="candidate in filteredCandidates"
         :key="candidate.request_id"
@@ -59,6 +60,7 @@
         @cancel-confirmation="(id: string) => emit('cancel-confirmation', id)"
         @matched-cancel="(id: string) => emit('matched-cancel', id)"
       />
+      </view>
     </template>
   </view>
 </template>
@@ -99,6 +101,7 @@ function candidateAction(candidate: SeatSwapCandidate): ReturnType<typeof resolv
 </script>
 
 <style scoped>
+.candidate-list { display: flex; flex-direction: column; gap: var(--fi-space-card-gap); margin: var(--fi-space-12) 0 var(--fi-space-card-gap); }
 .filter-row {
   display: flex;
   align-items: center;
@@ -163,7 +166,7 @@ function candidateAction(candidate: SeatSwapCandidate): ReturnType<typeof resolv
   align-items: center;
   justify-content: space-between;
   gap: var(--fi-space-18);
-  padding: var(--fi-space-22) 12rpx;
+  padding: var(--fi-space-22) var(--fi-space-12);
   border-top: 1rpx solid var(--fi-color-border-chip);
 }
 
@@ -192,7 +195,7 @@ function candidateAction(candidate: SeatSwapCandidate): ReturnType<typeof resolv
 
 .group-row__hit {
   font-size: var(--fi-font-20);
-  padding: 4rpx var(--fi-space-14);
+  padding: var(--fi-space-4) var(--fi-space-14);
   border-radius: var(--fi-radius-round);
   background: #eef8f2;
   color: #167348;
@@ -203,12 +206,12 @@ function candidateAction(candidate: SeatSwapCandidate): ReturnType<typeof resolv
   flex-shrink: 0;
   font-size: var(--fi-font-22);
   color: #9aa0aa;
-  padding: var(--fi-space-6) 4rpx;
+  padding: var(--fi-space-6) var(--fi-space-4);
   line-height: var(--fi-leading-snug);
 }
 
 .empty-row {
-  padding: var(--fi-space-32) 12rpx;
+  padding: var(--fi-space-32) var(--fi-space-12);
   text-align: center;
   color: var(--fi-color-text-muted);
   font-size: var(--fi-font-24);

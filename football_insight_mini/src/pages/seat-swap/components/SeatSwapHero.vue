@@ -30,7 +30,7 @@ defineProps<{
   border-radius: var(--fi-radius-md);
   background: rgba(255, 255, 255, 0.96);
   box-shadow: var(--fi-shadow-soft);
-  margin-bottom: var(--fi-space-16);
+
 }
 
 .hero-card__icon-box {

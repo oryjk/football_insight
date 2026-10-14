@@ -182,25 +182,25 @@ loadStatus()
 
 .settings-section {
   display: grid;
-  gap: 18rpx;
+  gap: var(--fi-space-card-gap);
 }
 
 .settings-item {
-  padding: 24rpx;
+  padding: var(--fi-space-24);
   border-radius: 24rpx;
   border: 2rpx solid rgba(232, 233, 238, 0.95);
   background: var(--fi-primitive-white);
   display: grid;
-  gap: 10rpx;
+  gap: var(--fi-space-10);
 }
 
 .settings-item--stacked {
-  gap: 18rpx;
+  gap: var(--fi-space-18);
 }
 
 .settings-item__row {
   display: grid;
-  gap: 6rpx;
+  gap: var(--fi-space-6);
 }
 
 .settings-item__label {
@@ -227,7 +227,7 @@ loadStatus()
 
 .settings-options {
   display: flex;
-  gap: 14rpx;
+  gap: var(--fi-space-14);
 }
 
 .settings-options--stacked {
@@ -239,7 +239,7 @@ loadStatus()
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 20rpx 24rpx;
+  padding: var(--fi-space-20) var(--fi-space-24);
   border-radius: 999rpx;
   border: 2rpx solid rgba(232, 233, 238, 0.95);
   background: var(--fi-color-page);

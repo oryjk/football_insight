@@ -7,7 +7,9 @@
       <text class="topics-title">全部话题</text>
       <text class="topics-caption">成都蓉城新闻 · 最新发布在前</text>
     </view>
-    <TopicHistoryCard v-for="item in items" :key="item.id" :item="item" :heat="topicHeatValue(item.id, item.heat)" @read="openTopic" />
+    <view v-if="items.length" class="topics-list">
+      <TopicHistoryCard v-for="item in items" :key="item.id" :item="item" :heat="topicHeatValue(item.id, item.heat)" @read="openTopic" />
+    </view>
     <view class="topics-state">
       <text v-if="loading">正在加载话题…</text>
       <template v-else-if="errorMessage"><text>{{ errorMessage }}</text><button @tap="retry">重新加载</button></template>
@@ -72,6 +74,7 @@ onScopeDispose(() => { revision += 1 })
 </script>
 
 <style scoped>
+.topics-list { display: flex; flex-direction: column; align-items: stretch; gap: var(--fi-space-card-gap); }
 .topic-page-offset { padding-top: var(--fi-brand-nav-height); }
 .topics-page { padding: var(--fi-space-28) var(--fi-space-24) var(--fi-space-40); background: var(--fi-color-page); min-height: 100%; }
 .topics-heading { margin-bottom: var(--fi-space-28); }

@@ -15,11 +15,13 @@
       </view>
 
       <template v-else>
-        <SeatSwapHero
-          :match-title="matchTitle"
-          :match-summary="matchSummary"
-          :candidates-count="candidatesCount"
-        />
+        <view>
+          <SeatSwapHero
+            :match-title="matchTitle"
+            :match-summary="matchSummary"
+            :candidates-count="candidatesCount"
+          />
+        </view>
 
         <view v-if="!currentView?.available" class="info-row">
           <text class="info-row__text">换座撮合只在成都蓉城当前比赛开放。</text>
@@ -29,16 +31,18 @@
           <button class="info-row__action" @tap="goToUserPage">去登录</button>
         </view>
 
-        <SeatSwapRegionPanel
-          :mode="mainMapMode"
-          :regions="regions"
-          :badges="regionBadgeCounts"
-          :filter-key="browsingFilterKey"
-          :current-key="currentView?.my_request?.current_region_key || ''"
-          :desired-keys="myDesiredKeys"
-          :has-my-request="!!currentView?.my_request"
-          @region-tap="handleMainMapTap"
-        />
+        <view class="seat-map-section">
+          <SeatSwapRegionPanel
+            :mode="mainMapMode"
+            :regions="regions"
+            :badges="regionBadgeCounts"
+            :filter-key="browsingFilterKey"
+            :current-key="currentView?.my_request?.current_region_key || ''"
+            :desired-keys="myDesiredKeys"
+            :has-my-request="!!currentView?.my_request"
+            @region-tap="handleMainMapTap"
+          />
+        </view>
 
         <SeatSwapPoolList
           :groups="seatSwapRegionGroups"
@@ -515,6 +519,7 @@ onShow(() => {
 </script>
 
 <style scoped>
+.seat-map-section { position: sticky; top: var(--fi-brand-nav-height); z-index: 5; margin: 0 calc(-1 * var(--fi-space-24)); }
 .page-root {
   position: relative;
   min-height: 100vh;
@@ -544,6 +549,9 @@ onShow(() => {
 }
 
 .page {
+  gap: var(--fi-space-card-gap);
+  flex-direction: column;
+  display: flex;
   position: relative;
   z-index: 1;
   min-height: calc(100vh - var(--fi-brand-nav-height));
@@ -555,7 +563,6 @@ onShow(() => {
 }
 
 .state-card {
-  margin-top: var(--fi-space-22);
   padding: var(--fi-space-28);
   border: 1rpx solid var(--fi-color-border-chip);
   border-radius: var(--fi-radius-md);
@@ -573,7 +580,7 @@ onShow(() => {
   align-items: center;
   gap: var(--fi-space-12);
   padding: var(--fi-space-18) var(--fi-space-22);
-  margin-bottom: var(--fi-space-14);
+
   border-radius: var(--fi-radius-md);
   background: var(--fi-color-page);
   border: 1rpx dashed rgba(207, 211, 220, 0.95);

@@ -31,40 +31,40 @@
           @open-player="openRankingPlayerSheet"
         />
       </template>
-
-      <RankingsTeamSeasonSheet
-        v-if="selectedRankingTeam"
-        :team="selectedRankingTeam.team"
-        :avatar="selectedRankingTeamAvatar"
-        :standing-rank-text="selectedRankingTeamStandingRankText"
-        :category-score-text="selectedRankingTeamCategoryScoreText"
-        :category-label-text="selectedRankingTeamCategoryLabelText"
-        :matches="selectedRankingTeamMatches"
-        :ability-values="selectedRankingTeamAbilityValues"
-        :loading="teamSeasonMatchesLoading"
-        :error-message="teamSeasonMatchesErrorMessage"
-        @close="closeRankingTeamSheet"
-      />
-
-      <RankingsPlayerSheet
-        v-if="selectedRankingPlayer"
-        :player="selectedRankingPlayer"
-        :category-label-text="selectedRankingPlayerCategoryLabelText"
-        :ability-values="selectedRankingPlayerAbilityDetail.values"
-        :raw-texts="selectedRankingPlayerAbilityDetail.rawTexts"
-        @close="closeRankingPlayerSheet"
-      />
-
-      <RankingsPosterSheet
-        v-if="selectedStandingsTable"
-        :table="selectedStandingsTable"
-        :season="rankings?.current_season ?? currentYear"
-        :round="rankings?.round_number ?? null"
-        @close="closeStandingsSheet"
-        @poster-ready="handlePosterReady"
-      />
+      </view>
     </view>
-  </view>
+
+    <RankingsTeamSeasonSheet
+      v-if="selectedRankingTeam"
+      :team="selectedRankingTeam.team"
+      :avatar="selectedRankingTeamAvatar"
+      :standing-rank-text="selectedRankingTeamStandingRankText"
+      :category-score-text="selectedRankingTeamCategoryScoreText"
+      :category-label-text="selectedRankingTeamCategoryLabelText"
+      :matches="selectedRankingTeamMatches"
+      :ability-values="selectedRankingTeamAbilityValues"
+      :loading="teamSeasonMatchesLoading"
+      :error-message="teamSeasonMatchesErrorMessage"
+      @close="closeRankingTeamSheet"
+    />
+
+    <RankingsPlayerSheet
+      v-if="selectedRankingPlayer"
+      :player="selectedRankingPlayer"
+      :category-label-text="selectedRankingPlayerCategoryLabelText"
+      :ability-values="selectedRankingPlayerAbilityDetail.values"
+      :raw-texts="selectedRankingPlayerAbilityDetail.rawTexts"
+      @close="closeRankingPlayerSheet"
+    />
+
+    <RankingsPosterSheet
+      v-if="selectedStandingsTable"
+      :table="selectedStandingsTable"
+      :season="rankings?.current_season ?? currentYear"
+      :round="rankings?.round_number ?? null"
+      @close="closeStandingsSheet"
+      @poster-ready="handlePosterReady"
+    />
   </view>
 </template>
 
@@ -372,7 +372,7 @@ defineExpose({
   height: 100vh;
   overflow: hidden;
 }
-.page { padding: var(--fi-space-24) var(--fi-space-16) var(--fi-space-40); display: flex; flex-direction: column; gap: var(--fi-space-16); }
+.page { padding: var(--fi-space-24) var(--fi-space-16) var(--fi-space-card-gap); display: flex; flex-direction: column; gap: var(--fi-space-card-gap); }
 .state-card {
   background: rgba(255, 255, 255, 0.94);
   border-radius: var(--fi-radius-xl);

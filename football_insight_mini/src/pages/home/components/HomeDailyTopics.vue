@@ -75,7 +75,7 @@ watch(() => props.edition.items.length, length => { if (activeIndex.value > leng
 .daily-topics__title { color: var(--fi-color-text-primary); font-size: var(--fi-font-44); font-weight: var(--fi-weight-extrabold); line-height: var(--fi-leading-snug); }
 .daily-topics__date { color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); }
 .daily-topics__swiper { height: calc(var(--fi-space-topic-card-height) + var(--fi-space-12)); }
-.daily-topics__slide { box-sizing: border-box; height: 100%; padding-bottom: var(--fi-space-12); padding-right: var(--fi-space-12); display: flex; flex-direction: column; align-items: stretch; }
+.daily-topics__slide { box-sizing: border-box; height: 100%; padding-bottom: var(--fi-space-12); padding-right: var(--fi-space-card-gap); display: flex; flex-direction: column; align-items: stretch; }
 .daily-topics__navigation { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-12); }
 .daily-topics__hint { color: var(--fi-color-text-secondary); font-size: var(--fi-font-22); line-height: var(--fi-leading-normal); }
 .daily-topics__dots { display: flex; align-items: center; flex-shrink: 0; }

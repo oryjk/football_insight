@@ -184,6 +184,6 @@ const emit = defineEmits<{ (e: 'toggle', section: string): void }>()
 }
 .insight-stack {
   display: grid;
-  gap: var(--fi-space-18);
+  gap: var(--fi-space-card-gap);
 }
 </style>

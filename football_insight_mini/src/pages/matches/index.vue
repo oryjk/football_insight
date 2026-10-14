@@ -19,25 +19,29 @@
       </view>
 
       <FiLoading v-if="loading" title="赛季进度加载中" caption="轮次和即将到来的比赛正在整理。" />
-      <view v-else-if="errorMessage" class="state-card state-card--error"><text>{{ errorMessage }}</text></view>
+      <view v-else-if="errorMessage" class="state-card state-card--error"><text>{{ errorMessage }}</text>
+
+  </view>
       <template v-else>
         <MatchesSeasonProgress :rounds="rounds" :selected-round-number="selectedRoundNumber" @open-round="openRoundDialog" />
         <MatchesUpcomingPanel :sections="upcomingSections" :now-iso="pageNowIso" @open-round="openRoundDialog" @open-tech-stats="openMatchTechStats" />
         <MatchesRecentResults v-if="groupedMatches.length" :groups="groupedMatches" :now-iso="pageNowIso" @open-tech-stats="openMatchTechStats" />
       </template>
-      <MatchesRoundSheet
-        v-if="selectedRoundNumber !== null"
-        :round-number="selectedRoundNumber"
-        :matches="selectedRoundMatches"
-        :loading="roundDialogLoading"
-        :error-message="roundDialogErrorMessage"
-        :now-iso="pageNowIso"
-        @close="closeRoundDialog"
-        @open-tech-stats="openMatchTechStats"
-      />
-      <MatchesTechStatsSheet v-if="selectedTechStatsMatch" :match="selectedTechStatsMatch" @close="closeMatchTechStats" />
       </view>
     </scroll-view>
+
+    <MatchesRoundSheet
+      v-if="selectedRoundNumber !== null"
+      :round-number="selectedRoundNumber"
+      :matches="selectedRoundMatches"
+      :loading="roundDialogLoading"
+      :error-message="roundDialogErrorMessage"
+      :now-iso="pageNowIso"
+      @close="closeRoundDialog"
+      @open-tech-stats="openMatchTechStats"
+    />
+
+    <MatchesTechStatsSheet v-if="selectedTechStatsMatch" :match="selectedTechStatsMatch" @close="closeMatchTechStats" />
   </view>
 </template>
 
@@ -78,7 +82,7 @@ onShareAppMessage(() => ({
   padding: var(--fi-space-24) var(--fi-space-16) var(--fi-space-40);
   display: flex;
   flex-direction: column;
-  gap: var(--fi-space-16);
+  gap: var(--fi-space-card-gap);
 }
 .page-bg-img {
   position: absolute;

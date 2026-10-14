@@ -57,12 +57,8 @@ const emit = defineEmits<{
 </script>
 
 <style scoped>
-/* 与页面主体同宽：面板 sticky 在品牌导航下方，负 margin 抵消页面左右 padding。 */
+/* sticky 与全宽布局由页面的 seat-map-section 包裹节点负责。 */
 .seat-map-panel {
-  position: sticky;
-  top: var(--fi-brand-nav-height);
-  z-index: 5;
-  margin: 4rpx -24rpx 0;
   padding: var(--fi-space-10) var(--fi-space-24) var(--fi-space-6);
   background: rgba(255, 255, 255, 0.97);
   box-shadow: var(--fi-shadow-soft);
@@ -73,7 +69,7 @@ const emit = defineEmits<{
   align-items: baseline;
   justify-content: space-between;
   gap: var(--fi-space-16);
-  padding: 0 4rpx 2rpx;
+  padding: 0 var(--fi-space-4) var(--fi-space-2);
 }
 
 .seat-map-panel__title {
@@ -95,7 +91,7 @@ const emit = defineEmits<{
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 2rpx 4rpx var(--fi-space-6);
+  padding: var(--fi-space-2) var(--fi-space-4) var(--fi-space-6);
   color: var(--fi-color-text-muted);
   font-size: var(--fi-font-22);
 }

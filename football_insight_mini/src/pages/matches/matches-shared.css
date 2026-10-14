@@ -82,7 +82,7 @@
 .match-stack {
   margin-top: var(--fi-space-14);
   display: grid;
-  gap: var(--fi-space-12);
+  gap: var(--fi-space-card-gap);
 }
 .state-card--error text { font-size: var(--fi-font-28); color: var(--fi-color-state-card-error-text-color); }
 .state-card--empty {

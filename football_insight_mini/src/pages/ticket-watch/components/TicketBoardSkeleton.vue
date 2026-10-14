@@ -180,7 +180,7 @@ defineProps<{ mode: 'current' | 'history' | 'history-stats' }>()
 
 .skeleton-stack {
   display: grid;
-  gap: var(--fi-space-18);
+  gap: var(--fi-space-card-gap);
 }
 
 .skeleton-panel {

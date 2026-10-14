@@ -41,7 +41,6 @@
       </view>
     </view>
 
-
   </view>
 </template>
 
@@ -67,7 +66,7 @@
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 16rpx;
+  gap: var(--fi-space-card-gap);
 }
 
 .skeleton-panel {
@@ -93,7 +92,7 @@
 
 .skeleton-copy-group {
   display: grid;
-  gap: 10rpx;
+  gap: var(--fi-space-10);
   min-width: 0;
 }
 
@@ -161,10 +160,10 @@
 }
 
 .skeleton-profile-row {
-  margin-top: 28rpx;
+  margin-top: var(--fi-space-28);
   display: flex;
   align-items: center;
-  gap: 22rpx;
+  gap: var(--fi-space-22);
 }
 
 .skeleton-line--avatar {
@@ -178,7 +177,7 @@
   flex: 1;
   min-width: 0;
   display: grid;
-  gap: 18rpx;
+  gap: var(--fi-space-18);
 }
 
 .skeleton-line--profile-name {
@@ -206,8 +205,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18rpx;
-  padding: 18rpx 20rpx;
+  gap: var(--fi-space-18);
+  padding: var(--fi-space-18) var(--fi-space-20);
   border-radius: var(--fi-radius-lg);
   border: 2rpx solid rgba(232, 212, 166, 0.82);
   background: rgba(255, 252, 244, 0.74);
@@ -220,7 +219,7 @@
 }
 
 .skeleton-account-grid {
-  margin-top: 24rpx;
+  margin-top: var(--fi-space-24);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   border-radius: var(--fi-radius-lg);
@@ -230,10 +229,10 @@
 
 .skeleton-account-cell {
   min-height: 104rpx;
-  padding: 20rpx;
+  padding: var(--fi-space-20);
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
   border-width: 0 2rpx 2rpx 0;
   border-radius: 0;
 }
