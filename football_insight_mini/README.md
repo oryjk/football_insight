@@ -167,8 +167,14 @@ bun run build:mp-weixin
 
 API 地址默认值：
 
-- `bun run dev:mp-weixin` 默认连 local233 `18092`；需要改回本机时设置 `VITE_API_BASE_URL=http://127.0.0.1:8092/api/v1`
+- `bun run dev:mp-weixin` 默认直连 `http://172.16.60.233:18092/api/v1`，配置位于 `src/config/apiBase.ts`；微信开发者工具和真机需能访问 local233 内网 IP。
 - `bun run build:mp-weixin` 默认连线上 `match.oryjk.cn`
+
+也可在启动开发构建时显式指定同一后端，无需新增或提交 `.env` 文件：
+
+```bash
+VITE_API_BASE_URL=http://172.16.60.233:18092/api/v1 bun run dev:mp-weixin
+```
 
 如果微信开发者工具没有及时吃到最新产物，重新编译或重新打开项目后再看 `/dist/dev/mp-weixin`。
 

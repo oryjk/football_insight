@@ -118,6 +118,7 @@
 
 ### C 端（小程序 / H5）
 
+- 小程序开发默认直连 `http://172.16.60.233:18092/api/v1`，配置在 `src/config/apiBase.ts`，可用 `VITE_API_BASE_URL` 显式覆盖；微信开发者工具和真机需能访问 local233 内网。原因：开发请求使用服务器 IP，避免回环地址指向客户端自身。
 - 余票看板：比赛列表、当前场次看板、库存/回流数据（`ticket_watch`，`/api/v1/ticket-watch/**`）
 - 换座位：提交换座请求、候选匹配与确认/取消（`seat_swap`，小程序 `pages/seat-swap` + 独立 H5 项目 `football_insight_h5`）
 - 付费解锁比赛 match_id（`match_id_unlock`，`/api/v1/match-id/**`）

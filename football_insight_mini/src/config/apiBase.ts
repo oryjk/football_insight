@@ -1,3 +1,5 @@
+// 微信开发者工具和真机直连 local233 内网后端，使用具体 IP，避免指向客户端的回环地址。
+// 开发地址可通过 VITE_API_BASE_URL 显式覆盖。
 const DEVELOPMENT_API_BASE_URL = 'http://172.16.60.233:18092/api/v1'
 const PRODUCTION_API_BASE_URL = 'https://match.oryjk.cn/api/v1'
 
