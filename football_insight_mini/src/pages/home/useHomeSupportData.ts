@@ -258,9 +258,6 @@ export function useHomeSupportData(deps: HomeSupportDataDeps): HomeSupportData {
     if (match.support_window_status !== 'open' || !Number.isFinite(kickoff) || kickoff <= Date.now()) {
       throw new Error('本场助力已关闭')
     }
-    if (match.viewer.favorite_team_id !== teamId || profile.favorite_team?.team_id !== teamId) {
-      throw new Error('只能为关注的主队助力')
-    }
     if (!match.viewer.can_support) throw new Error('本场暂时不能助力，请刷新后重试')
 
     const requestRevision = session.revision.value

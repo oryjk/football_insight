@@ -97,7 +97,7 @@
           <view class="support-home-match-card__bar-away" :style="{ width: `${nextMatch.away_team.support_share_pct}%` }" />
         </view>
         <view class="support-home-match-card__footer">
-          <text>{{ nextMatch.viewer.has_supported ? '本场已助力' : '仅可为关注的主队助力' }}</text>
+          <text>{{ nextMatch.viewer.has_supported ? '本场已助力' : '任选一队，每场助力一次' }}</text>
           <text class="support-home-match-card__action">进入助力页</text>
         </view>
       </view>

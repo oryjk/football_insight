@@ -86,20 +86,6 @@ pub fn resolve_support_window_status(
     SupportWindowStatus::Open
 }
 
-pub fn validate_vote_team(
-    favorite_team_id: Option<i64>,
-    supported_team_id: i64,
-) -> anyhow::Result<()> {
-    let favorite_team_id =
-        favorite_team_id.ok_or_else(|| anyhow::anyhow!("favorite team is required"))?;
-
-    if favorite_team_id != supported_team_id {
-        anyhow::bail!("supported team must match favorite team");
-    }
-
-    Ok(())
-}
-
 pub fn validate_supported_team_in_match(
     match_detail: &SupportMatchDetail,
     supported_team_id: i64,
@@ -131,7 +117,7 @@ pub fn refresh_match_detail(match_detail: &mut SupportMatchDetail, now: DateTime
     match_detail.countdown_seconds = resolve_countdown_seconds(match_detail.kickoff_at, now);
     match_detail.viewer.can_support = match_detail.support_window_status
         == SupportWindowStatus::Open
-        && match_detail.viewer.favorite_team_id.is_some()
+        && match_detail.viewer.user_id.is_some()
         && !match_detail.viewer.has_supported;
 }
 
@@ -198,24 +184,6 @@ mod tests {
         let status = super::resolve_support_window_status(kickoff_at, now);
 
         assert_eq!(status.as_str(), "closed");
-    }
-
-    #[test]
-    fn follower_can_only_support_the_followed_team() {
-        super::validate_vote_team(Some(77680), 77680).expect("favorite team should pass");
-
-        let error =
-            super::validate_vote_team(Some(77680), 500).expect_err("other team should be rejected");
-
-        assert!(error.to_string().contains("favorite team"));
-    }
-
-    #[test]
-    fn follower_must_have_selected_a_favorite_team_before_supporting() {
-        let error = super::validate_vote_team(None, 77680)
-            .expect_err("missing favorite team should be rejected");
-
-        assert!(error.to_string().contains("favorite team"));
     }
 
     #[test]

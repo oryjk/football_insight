@@ -89,11 +89,14 @@
 
           <view class="support-actions">
             <button
+              v-for="team in matchTeams"
+              :key="team.team_id"
               class="primary-action support-actions__primary"
-              :class="{ 'primary-action--disabled': !canCastVote }"
-              @click="handleVote"
+              :class="{ 'primary-action--disabled': !canCastVote || voteSubmittingTeamId !== null }"
+              :disabled="!canCastVote || voteSubmittingTeamId !== null"
+              @click="handleVote(team.team_id)"
             >
-              {{ voteButtonText }}
+              {{ voteSubmittingTeamId === team.team_id ? '提交中' : resolveSupportVoteButtonText(detail, team, session.hasAccessToken.value) }}
             </button>
             <button class="secondary-action" open-type="share">
               转发拉票
@@ -104,7 +107,7 @@
           </view>
 
           <text class="support-state-card__rule">
-            规则：每个用户每场比赛只能助力 1 次，只能为自己关注的主队助力，比赛开始后自动关闭。
+            规则：主队和客队均可助力，每个用户每场比赛只能选择一队助力 1 次，比赛开始后自动关闭。
           </text>
         </view>
 
@@ -148,6 +151,7 @@ import {
   resolveSupportStanceDescription,
   resolveSupportVoteButtonText,
   resolveSupportWindowLabel,
+  resolveSupportedTeam,
 } from './helpers'
 
 const { navigationPageStyle } = useNavigationLayout()
@@ -155,6 +159,10 @@ const { navigationPageStyle } = useNavigationLayout()
 const loading = ref(true)
 const errorMessage = ref('')
 const detail = ref<SupportMatchDetail | null>(null)
+const voteSubmittingTeamId = ref<number | null>(null)
+let voteOwner: symbol | null = null
+const supportedTeam = computed(() => resolveSupportedTeam(detail.value))
+const matchTeams = computed(() => detail.value ? [detail.value.home_team, detail.value.away_team] : [])
 const matchId = ref<number | null>(null)
 const posterImagePath = ref('')
 const liveCountdownSeconds = ref(0)
@@ -215,15 +223,15 @@ const stanceTitle = computed(() => {
     return '站队状态'
   }
 
-  if (detail.value.viewer.has_supported && favoriteTeam.value) {
-    return `你已为 ${favoriteTeam.value.team_name} 助力`
+  if (supportedTeam.value) {
+    return `你已为 ${supportedTeam.value.team_name} 助力`
   }
 
   if (favoriteTeam.value) {
     return `当前主队：${favoriteTeam.value.team_name}`
   }
 
-  return '还没有主队身份'
+  return '选择球队，为它助力'
 })
 
 const stanceBadge = computed(() => {
@@ -239,7 +247,7 @@ const stanceBadge = computed(() => {
     return '待助力'
   }
 
-  return '未关注主队'
+  return '待助力'
 })
 
 const stanceDescription = computed(() => {
@@ -266,11 +274,7 @@ const canCastVote = computed(() => {
     return true
   }
 
-  return detail.value.viewer.can_support && !!favoriteTeam.value
-})
-
-const voteButtonText = computed(() => {
-  return resolveSupportVoteButtonText(detail.value, favoriteTeam.value, session.hasAccessToken.value)
+  return detail.value.viewer.can_support
 })
 
 onLoad((options) => {
@@ -298,8 +302,8 @@ onShareAppMessage(() => {
     }
   }
 
-  const leadText = favoriteTeam.value
-    ? `我已为${favoriteTeam.value.team_name}助力`
+  const leadText = supportedTeam.value
+    ? `我已为${supportedTeam.value.team_name}助力`
     : '来这场比赛里站队'
 
   return {
@@ -309,6 +313,8 @@ onShareAppMessage(() => {
 })
 
 async function loadPage(): Promise<void> {
+  voteOwner = null
+  voteSubmittingTeamId.value = null
   if (!matchId.value) {
     errorMessage.value = '缺少比赛参数，无法打开助力页。'
     loading.value = false
@@ -329,8 +335,8 @@ async function loadPage(): Promise<void> {
   }
 }
 
-async function handleVote(): Promise<void> {
-  if (!detail.value || !matchId.value) {
+async function handleVote(teamId: number): Promise<void> {
+  if (!detail.value || !matchId.value || voteSubmittingTeamId.value !== null) {
     return
   }
 
@@ -341,7 +347,7 @@ async function handleVote(): Promise<void> {
     })
     uni.showModal({
       title: '先登录再助力',
-      content: '登录后才能为你的主队助力，现在去“我的”页登录吗？',
+      content: '登录后即可选择主队或客队助力，现在去“我的”页登录吗？',
       confirmText: '去登录',
       success: ({ confirm }) => {
         if (!confirm) {
@@ -354,35 +360,33 @@ async function handleVote(): Promise<void> {
     return
   }
 
-  if (!favoriteTeam.value) {
-    uni.showModal({
-      title: '先关注主队',
-      content: '你还没有设置主队，先去首页关注一支主队，再回来助力。',
-      confirmText: '去首页',
-      success: ({ confirm }) => {
-        if (!confirm) {
-          return
-        }
-
-        uni.switchTab({ url: '/pages/home/index' })
-      },
-    })
-    return
-  }
-
   if (!detail.value.viewer.can_support) {
-    uni.showToast({ title: voteButtonText.value, icon: 'none' })
+    uni.showToast({ title: '本场已助力或助力已截止', icon: 'none' })
     return
   }
 
+  const revision = session.revision.value
+  const selectedMatchId = matchId.value
+  const owner = Symbol('support-vote')
+  voteOwner = owner
+  voteSubmittingTeamId.value = teamId
+  const isCurrent = () => voteOwner === owner && session.revision.value === revision && matchId.value === selectedMatchId
   try {
-    detail.value = await castSupportVote(matchId.value, {
-      supported_team_id: favoriteTeam.value.team_id,
+    const updated = await castSupportVote(selectedMatchId, {
+      supported_team_id: teamId,
     })
+    if (!isCurrent()) return
+    detail.value = updated
     syncCountdownState()
     uni.showToast({ title: '助力成功', icon: 'success' })
   } catch (error) {
+    if (!isCurrent()) return
     uni.showToast({ title: extractApiErrorMessage(error, '助力失败'), icon: 'none' })
+  } finally {
+    if (voteOwner === owner) {
+      voteOwner = null
+      voteSubmittingTeamId.value = null
+    }
   }
 }
 
@@ -488,7 +492,7 @@ async function generatePoster(): Promise<void> {
     context.setFillStyle('#6b707b')
     context.setFontSize(28)
     context.fillText('打开小程序，进入这场比赛继续站队助力。', 96, 1004)
-    context.fillText('每人每场只能助力一次，只能为自己的主队投票。', 96, 1050)
+    context.fillText('主客队任选，每人每场只能助力一次。', 96, 1050)
 
     await new Promise<void>((resolve) => {
       context.draw(false, () => resolve())
@@ -517,11 +521,11 @@ function buildPosterHeadline(): string {
     return '来为你的主队站队'
   }
 
-  if (favoriteTeam.value) {
-    const rivalTeam = favoriteTeam.value.team_id === detail.value.home_team.team_id
+  if (supportedTeam.value) {
+    const rivalTeam = supportedTeam.value.team_id === detail.value.home_team.team_id
       ? detail.value.away_team
       : detail.value.home_team
-    return `我已为${favoriteTeam.value.team_name}助力，来把${rivalTeam.team_name}压过去`
+    return `我已为${supportedTeam.value.team_name}助力，来把${rivalTeam.team_name}压过去`
   }
 
   return `${detail.value.home_team.team_name} 和 ${detail.value.away_team.team_name} 的热度对抗已经打响`
@@ -765,7 +769,7 @@ function roundRect(
   opacity: 0.48;
 }
 .support-actions__primary {
-  background: #15161b;
+  background: var(--fi-color-primary);
 }
 .secondary-action {
   color: #5f6673;

@@ -100,7 +100,6 @@ test('未登录、已助力、比赛关闭或球队不属于本场时，不发 P
   await expectFailure(support.submitSupportVote(2), '登录')
   hasAccessToken.value = true
   await expectFailure(support.submitSupportVote(99), '本场比赛')
-  await expectFailure(support.submitSupportVote(1), '关注的主队')
   support.supportProfile.value!.next_match!.viewer.can_support = false
   await expectFailure(support.submitSupportVote(2), '暂时不能助力')
   support.supportProfile.value!.next_match!.viewer.can_support = true
@@ -114,15 +113,29 @@ test('未登录、已助力、比赛关闭或球队不属于本场时，不发 P
   expect(writes.length).toBe(0)
 })
 
-test('双方按钮按主队身份、提交状态、已助力和开球时刻判断可用性', () => {
+test('双方按钮均可助力，按提交状态、已助力和开球时刻判断可用性', () => {
   const match = profile().next_match!
   const now = Date.parse('2026-10-14T12:00:00Z')
-  expect(resolveHomeSupportVoteState(match, 1, null, now).disabled).toBe(true)
+  expect(resolveHomeSupportVoteState(match, 1, null, now).disabled).toBe(false)
   expect(resolveHomeSupportVoteState(match, 2, null, now)).toEqual({ label: '助力', disabled: false, supported: false })
   expect(resolveHomeSupportVoteState(match, 2, 2, now)).toEqual({ label: '提交中', disabled: true, supported: false })
   expect(resolveHomeSupportVoteState(match, 2, null, now, true).disabled).toBe(true)
   expect(resolveHomeSupportVoteState(voted(), 2, null, now)).toEqual({ label: '已助力', disabled: true, supported: true })
   expect(resolveHomeSupportVoteState(match, 2, null, Date.parse(match.kickoff_at))).toEqual({ label: '已结束', disabled: true, supported: false })
+})
+
+test('允许选择另一队，提交后不改变关注球队', async () => {
+  const { support, writes } = fixture()
+  const submit = support.submitSupportVote(1)
+  expect(writes[0].teamId).toBe(1)
+  const match = profile().next_match!
+  writes[0].request.resolve({ ...match, total_support_count: 1,
+    home_team: { ...match.home_team, support_count: 1, support_share_pct: 100 },
+    viewer: { ...match.viewer, has_supported: true, can_support: false, supported_team_id: 1 } })
+  expect(await submit).toBe(true)
+  expect(support.supportProfile.value?.favorite_team?.team_id).toBe(2)
+  expect(support.supportProfile.value?.next_match?.viewer.supported_team_id).toBe(1)
+  expect(resolveHomeSupportVoteState(support.supportProfile.value!.next_match, 2, null, Date.now()).disabled).toBe(true)
 })
 
 test('当前比赛已换场时，旧助力结果不覆盖新的比赛', async () => {

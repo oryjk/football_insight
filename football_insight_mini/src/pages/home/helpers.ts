@@ -190,7 +190,7 @@ export function resolveHomeSupportVoteState(
   return {
     label: !open && match?.support_window_status !== 'locked' ? '已结束' : '助力',
     disabled: !open || !match?.viewer.can_support || match.viewer.has_supported
-      || match.viewer.favorite_team_id !== teamId || submittingTeamId !== null || changingFavorite,
+      || submittingTeamId !== null || changingFavorite,
     supported: false,
   }
 }

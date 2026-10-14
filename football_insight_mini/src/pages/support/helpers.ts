@@ -27,7 +27,7 @@ export function resolveSupportHeroSummary(detail: SupportMatchLike | null): stri
       : '比赛已经开始，赛前助力入口已自动关闭。'
   }
 
-  return '现在就能为你的主队站队助力，并把页面转发给朋友继续拉票。'
+  return '任选主队或客队助力，并把页面转发给朋友继续拉票。'
 }
 
 export function resolveSupportWindowLabel(detail: SupportMatchLike | null): string {
@@ -67,7 +67,7 @@ export function resolveSupportCountdownSeconds(
 
 export function resolveSupportStanceDescription(
   detail: Pick<SupportMatchDetail, 'viewer' | 'support_window_status'> | null,
-  favoriteTeam: FavoriteTeamLike,
+  _favoriteTeam: FavoriteTeamLike,
 ): string {
   if (!detail) {
     return ''
@@ -77,15 +77,18 @@ export function resolveSupportStanceDescription(
     return '这场比赛你已经完成一次助力，接下来更适合转发拉票。'
   }
 
-  if (!favoriteTeam) {
-    return '先去首页关注一支主队，回到这里才能为它助力。'
-  }
-
   if (detail.support_window_status === 'closed') {
     return '比赛已经开始，当前只能查看这场比赛的最终助力结果。'
   }
 
-  return '当前助力只允许投给你关注的主队，每场比赛只能投一次。'
+  return '主队和客队均可助力，每场比赛只能选择一队投一次。'
+}
+
+export function resolveSupportedTeam(
+  detail: Pick<SupportMatchDetail, 'viewer' | 'home_team' | 'away_team'> | null,
+): SupportMatchTeam | null {
+  if (!detail?.viewer.has_supported) return null
+  return [detail.home_team, detail.away_team].find(team => team.team_id === detail.viewer.supported_team_id) ?? null
 }
 
 export function resolveSupportVoteButtonText(
@@ -94,11 +97,11 @@ export function resolveSupportVoteButtonText(
   hasAccessToken: boolean,
 ): string {
   if (!detail) {
-    return '为主队助力'
+    return '选择球队助力'
   }
 
   if (!hasAccessToken) {
-    return '登录后为主队助力'
+    return '登录后助力'
   }
 
   if (detail.viewer.has_supported) {
@@ -106,7 +109,7 @@ export function resolveSupportVoteButtonText(
   }
 
   if (!favoriteTeam) {
-    return '先去首页关注主队'
+    return '选择球队助力'
   }
 
   if (detail.support_window_status === 'closed') {

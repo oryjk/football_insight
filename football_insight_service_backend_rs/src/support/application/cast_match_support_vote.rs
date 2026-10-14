@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::support::{
     domain::support::{
         SupportMatchDetail, refresh_match_detail, validate_support_window,
-        validate_supported_team_in_match, validate_vote_team,
+        validate_supported_team_in_match,
     },
     ports::support_repository::SupportRepository,
 };
@@ -37,11 +37,8 @@ impl CastMatchSupportVoteUseCase {
         supported_team_id: i64,
         now: chrono::DateTime<Utc>,
     ) -> anyhow::Result<SupportMatchDetail> {
-        let context = self.repository.get_user_context(user_id).await?;
-        validate_vote_team(
-            context.favorite_team.as_ref().map(|item| item.team_id),
-            supported_team_id,
-        )?;
+        // 确认当前用户存在；助力队伍由本场对阵决定，不要求等于关注球队。
+        self.repository.get_user_context(user_id).await?;
 
         let mut match_detail = self
             .repository
@@ -136,9 +133,11 @@ mod tests {
         async fn find_match_detail(
             &self,
             _match_id: i64,
-            _viewer_user_id: Option<Uuid>,
+            viewer_user_id: Option<Uuid>,
         ) -> anyhow::Result<Option<SupportMatchDetail>> {
-            Ok(Some(self.detail.lock().expect("detail").clone()))
+            let mut detail = self.detail.lock().expect("detail").clone();
+            detail.viewer.user_id = viewer_user_id;
+            Ok(Some(detail))
         }
 
         async fn create_vote(
@@ -151,9 +150,12 @@ mod tests {
             detail.viewer.user_id = Some(user_id);
             detail.viewer.supported_team_id = Some(supported_team_id);
             detail.viewer.has_supported = true;
-            detail.home_team.support_count = 81;
-            detail.home_team.support_share_pct = 68;
-            detail.total_support_count = 121;
+            if detail.home_team.team_id == supported_team_id {
+                detail.home_team.support_count += 1;
+            } else {
+                detail.away_team.support_count += 1;
+            }
+            detail.total_support_count += 1;
             Ok(())
         }
     }
@@ -186,13 +188,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn execute_rejects_vote_for_non_favorite_team() {
+    async fn execute_casts_vote_for_either_match_team_without_changing_favorite() {
         let user_id = Uuid::new_v4();
         let now = Utc
             .with_ymd_and_hms(2026, 4, 11, 12, 0, 0)
             .single()
             .expect("valid now");
-        let use_case = CastMatchSupportVoteUseCase::new(Arc::new(FakeRepository {
+        let repository = Arc::new(FakeRepository {
             favorite_team: Some(SupportTeamSummary {
                 team_id: 77680,
                 team_name: "成都蓉城".to_string(),
@@ -200,14 +202,80 @@ mod tests {
                 rank_no: Some(2),
             }),
             detail: Mutex::new(build_detail(false)),
-        }));
+        });
+        let use_case = CastMatchSupportVoteUseCase::new(repository.clone());
 
-        let error = use_case
+        let result = use_case
             .execute_at(user_id, 1, 22, now)
             .await
-            .expect_err("vote should be rejected");
+            .expect("away team vote should pass");
 
-        assert!(error.to_string().contains("favorite team"));
+        assert_eq!(result.viewer.supported_team_id, Some(22));
+        assert_eq!(result.away_team.support_count, 41);
+        assert_eq!(
+            repository.favorite_team.as_ref().map(|team| team.team_id),
+            Some(77680)
+        );
+    }
+
+    #[tokio::test]
+    async fn execute_allows_vote_without_a_favorite_team() {
+        let user_id = Uuid::new_v4();
+        let now = Utc
+            .with_ymd_and_hms(2026, 4, 11, 12, 0, 0)
+            .single()
+            .unwrap();
+        let mut detail = build_detail(false);
+        detail.viewer.favorite_team_id = None;
+        let use_case = CastMatchSupportVoteUseCase::new(Arc::new(FakeRepository {
+            favorite_team: None,
+            detail: Mutex::new(detail),
+        }));
+        let result = use_case
+            .execute_at(user_id, 1, 22, now)
+            .await
+            .expect("vote without favorite");
+        assert_eq!(result.viewer.supported_team_id, Some(22));
+    }
+
+    #[tokio::test]
+    async fn execute_rejects_team_outside_match_and_closed_window() {
+        let user_id = Uuid::new_v4();
+        let use_case = CastMatchSupportVoteUseCase::new(Arc::new(FakeRepository {
+            favorite_team: None,
+            detail: Mutex::new(build_detail(false)),
+        }));
+        let before = Utc
+            .with_ymd_and_hms(2026, 4, 11, 12, 0, 0)
+            .single()
+            .unwrap();
+        let outside = use_case
+            .execute_at(user_id, 1, 999, before)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            outside.to_string(),
+            "supported team does not belong to this match"
+        );
+        let kickoff = Utc
+            .with_ymd_and_hms(2026, 4, 12, 11, 35, 0)
+            .single()
+            .unwrap();
+        let closed = use_case
+            .execute_at(user_id, 1, 22, kickoff)
+            .await
+            .unwrap_err();
+        assert_eq!(closed.to_string(), "support window is not open");
+        assert!(
+            !use_case
+                .repository
+                .find_match_detail(1, Some(user_id))
+                .await
+                .unwrap()
+                .unwrap()
+                .viewer
+                .has_supported
+        );
     }
 
     #[tokio::test]
@@ -233,6 +301,22 @@ mod tests {
             .expect_err("duplicate vote should be rejected");
 
         assert!(error.to_string().contains("already supported"));
+    }
+
+    #[test]
+    fn support_eligibility_depends_on_login_not_favorite_team() {
+        let mut detail = build_detail(false);
+        detail.viewer.favorite_team_id = None;
+        detail.viewer.user_id = Some(Uuid::new_v4());
+        let now = Utc
+            .with_ymd_and_hms(2026, 4, 11, 12, 0, 0)
+            .single()
+            .unwrap();
+        crate::support::domain::support::refresh_match_detail(&mut detail, now);
+        assert!(detail.viewer.can_support);
+        detail.viewer.user_id = None;
+        crate::support::domain::support::refresh_match_detail(&mut detail, now);
+        assert!(!detail.viewer.can_support);
     }
 
     fn build_detail(has_supported: bool) -> SupportMatchDetail {

@@ -7,6 +7,7 @@ import {
   resolveSupportStanceDescription,
   resolveSupportVoteButtonText,
   resolveSupportWindowLabel,
+  resolveSupportedTeam,
 } from './helpers'
 
 describe('support page voting window copy', () => {
@@ -21,11 +22,20 @@ describe('support page voting window copy', () => {
     }
 
     expect(resolveSupportHeroBadge(detail)).toBe('助力进行中')
-    expect(resolveSupportHeroSummary(detail)).toBe('现在就能为你的主队站队助力，并把页面转发给朋友继续拉票。')
+    expect(resolveSupportHeroSummary(detail)).toBe('任选主队或客队助力，并把页面转发给朋友继续拉票。')
     expect(resolveSupportWindowLabel(detail)).toBe('助力开放')
-    expect(resolveSupportStanceDescription(detail as never, { team_name: '成都蓉城' })).toBe('当前助力只允许投给你关注的主队，每场比赛只能投一次。')
+    expect(resolveSupportStanceDescription(detail as never, { team_name: '成都蓉城' })).toBe('主队和客队均可助力，每场比赛只能选择一队投一次。')
     expect(resolveSupportVoteButtonText(detail as never, { team_name: '成都蓉城' }, true)).toBe('为 成都蓉城 助力')
     expect(resolveSupportCountdownLabel(detail)).toBe('距开赛 46 小时 16 分 0 秒')
+  })
+
+  test('助力结果按实际投票球队展示，不按关注球队推断', () => {
+    const home = { team_id: 1, team_name: '主队' }
+    const away = { team_id: 2, team_name: '客队' }
+    const detail = { home_team: home, away_team: away,
+      viewer: { has_supported: true, favorite_team_id: 1, supported_team_id: 2 } }
+    expect(resolveSupportedTeam(detail as never)).toEqual(away)
+    expect(resolveSupportedTeam({ ...detail, viewer: { ...detail.viewer, has_supported: false } } as never)).toBeNull()
   })
 
   test('formats countdown to second precision', () => {
