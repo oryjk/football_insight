@@ -54,7 +54,7 @@
             <view class="skeleton-line skeleton-line--name" />
             <view v-if="list !== 1" class="skeleton-line skeleton-line--note" />
           </view>
-          <view v-if="list === 1" class="skeleton-line skeleton-line--form" />
+          <view class="skeleton-line skeleton-line--form" />
           <view class="skeleton-line skeleton-line--points" />
         </view>
       </view>
@@ -269,7 +269,7 @@
 
 .skeleton-ranking-row {
   display: grid;
-  grid-template-columns: var(--fi-space-32) var(--fi-space-44) minmax(0, 1fr) var(--fi-space-72);
+  grid-template-columns: var(--fi-space-32) var(--fi-space-44) minmax(0, calc(var(--fi-font-28) * 4.5)) minmax(0, 1fr) var(--fi-space-72);
   gap: var(--fi-space-8);
   align-items: center;
   padding: var(--fi-space-8) 0;

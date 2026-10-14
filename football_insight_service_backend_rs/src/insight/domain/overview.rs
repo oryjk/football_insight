@@ -72,6 +72,20 @@ pub struct OverviewPlayer {
     pub team_name: String,
     pub score_value: String,
     pub avatar_storage_url: Option<String>,
+    /// Verified league appearances, oldest first, at most ten; no padding.
+    pub recent_goals: Vec<PlayerMatchGoals>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlayerMatchGoals {
+    pub match_id: i64,
+    pub round_number: i32,
+    pub match_date: String,
+    pub match_time: String,
+    pub home_team_name: String,
+    pub away_team_name: String,
+    pub goals: i32,
+    pub minutes_played: i32,
 }
 
 #[cfg(test)]

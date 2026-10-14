@@ -22,6 +22,7 @@ from .constants import DEFAULT_LEAGUE_ID
 from .leisu import LeisuBrowserClient, LeisuCornerEnricher, load_leisu_match_map
 from .models import MatchResult
 from .postgres_repository import PostgresInsightSyncRepository
+from .player_goal_sync import refresh_top_scorer_goals
 from .schedule import fetch_reconciled_schedule
 from .sync import InsightSyncService, SyncPayload
 from .topics.cli import app as topics_app
@@ -165,6 +166,12 @@ def run_scrape(
         finally:
             repository.close()
 
+        try:
+            result = refresh_top_scorer_goals(database_url, target_season)
+            typer.echo(f"Player goal logs: {json.dumps(result, ensure_ascii=False)}")
+        except Exception as error:
+            typer.echo(f"[player-goals] refresh unavailable ({type(error).__name__}); core sync completed", err=True)
+
     _write_json(
         target_dir / "league_info.json",
         {
@@ -225,6 +232,20 @@ def run_scrape(
         "run_id": sync_result.run_id if sync_result is not None else None,
         "matches": len(matches),
     }
+
+
+@app.command("sync-player-goals")
+def sync_player_goals(
+    season: int = typer.Option(..., help="Season year."),
+    database_url: str | None = typer.Option(None, envvar=["FI_DATABASE_URL", "DATABASE_URL"]),
+) -> None:
+    """Backfill verified official appearances for the current top scorers."""
+    if not database_url:
+        raise typer.BadParameter("PostgreSQL database_url is required")
+    result = refresh_top_scorer_goals(database_url, season)
+    typer.echo(json.dumps(result, ensure_ascii=False))
+    if result["failed_players"]:
+        raise typer.Exit(1)
 
 
 @app.command()

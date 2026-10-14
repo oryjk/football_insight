@@ -3,6 +3,7 @@ use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Utc};
 use sqlx::{PgPool, types::Json};
 use std::time::Instant;
 
+use super::recent_player_goals::fetch_recent_player_goals;
 use super::recent_team_form::fetch_recent_team_form;
 
 use crate::insight::{
@@ -252,7 +253,17 @@ impl PostgresInsightQueryRepository {
             })
             .collect();
 
-        let top_scorers = Self::keep_scorers_with_boundary_ties(top_scorer_rows, 5)
+        let top_scorer_rows = Self::keep_scorers_with_boundary_ties(top_scorer_rows, 5);
+        let player_ids: Vec<_> = top_scorer_rows.iter().map(|row| row.player_id).collect();
+        let mut recent_goals = fetch_recent_player_goals(
+            &self.pool,
+            season,
+            &player_ids,
+            round_number,
+            round_number.and(latest_scrape_finished_at),
+        )
+        .await?;
+        let top_scorers = top_scorer_rows
             .into_iter()
             .map(|row| OverviewPlayer {
                 rank_no: row.rank_no,
@@ -261,6 +272,7 @@ impl PostgresInsightQueryRepository {
                 team_name: row.team_name,
                 score_value: row.score_value,
                 avatar_storage_url: row.avatar_storage_url,
+                recent_goals: recent_goals.remove(&row.player_id).unwrap_or_default(),
             })
             .collect();
 

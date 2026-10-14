@@ -42,6 +42,19 @@ export interface OverviewPlayer {
   team_name: string
   score_value: string
   avatar_storage_url: string | null
+  /** Verified league appearances, oldest first; absent on older backends. */
+  recent_goals?: PlayerMatchGoals[]
+}
+
+export interface PlayerMatchGoals {
+  match_id: number
+  round_number: number
+  match_date: string
+  match_time: string
+  home_team_name: string
+  away_team_name: string
+  goals: number
+  minutes_played: number
 }
 
 export interface InsightSummary {

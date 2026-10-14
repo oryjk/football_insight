@@ -2,6 +2,18 @@
 
 基于新浪体育移动端 JSON 接口抓取中超数据的 Python 项目，使用 `uv` 管理。
 
+## 首页射手榜逐场进球
+
+Python 从中足联官网的 `players/find` 和 `players/player/played` 拉取真实比赛日志，严格校验同名球员的球队身份、完整分页、赛季、联赛、赛程、出场分钟与累计进球；不从累计快照做单场差分。每次 `scrape --write-db` 核心同步成功后，更新射手榜前五及并列球员本赛季的出场记录到 `f_i_player_match_stats`。来源失败、数据不全或已验证出场缺失时保留旧记录并报告，不影响核心赛季同步。
+
+首次需在 peiqian 后端目录通过 `cargo run --bin run_migrations` 应用 `20261014163000_add_player_match_stats.sql`。沿用现有私有环境配置加载数据库地址后，可独立补采：
+
+```bash
+uv run sina-csl-scraper sync-player-goals --season 2026
+```
+
+Axum 仅批量读取本赛季最近十次已完赛实际出场，并随 overview 的 `top_scorers[].recent_goals` 返回。首页同一行绘制迷你柱，0 球灰横、有进球红柱，共用高度刻度；单场 3 球显示「帽」，点击查看比赛详情。未知数据不伪造为零，少于十场不补造。当前官方日历与球队身份映射沿用 `cfl_client.py` 的 2026 配置；扩展其他赛季需先配置映射。
+
 ## 今日话题与本地四川话语音
 
 local233 的安装路径、真实 CPU 基准、私有配置加载和手动运行命令见 [local233 今日话题运行说明](docs/topics-local233.md)。当前采集代码每次从积分榜动态选取中超前三/后三与中甲前二，读取全文后筛选；文章支持多个球队标签，供详情页话题时间线使用。代码验证与实际生产启用状态见项目 FEATURES.md。已有真实批次可用 `topics refresh-audio` 只刷新四川话音频：所有音频成功后才更新数据库，不再调用 LLM、不改原正文和来源。

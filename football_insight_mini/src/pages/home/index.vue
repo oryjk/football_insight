@@ -67,6 +67,7 @@
             kicker="射手榜"
             title="当前赛季累计射手榜"
             :rows="scorersRows"
+            @select-match="showScorerMatch"
           />
         </template>
       </view>
@@ -122,9 +123,11 @@ import type {
   MatchCard,
   OverviewPlayer,
   OverviewStanding,
+  PlayerMatchGoals,
   RoundReference,
 } from '../../types/insight'
 import { extractApiErrorMessage } from '../../utils/apiError'
+import { buildGoalMatchDetail } from './goalTrend'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
 import { useRuntimeConfig } from '../../stores/runtimeConfig'
@@ -288,8 +291,13 @@ const scorersRows = computed(() =>
     metricValue: player.score_value,
     metricNote: '累计进球',
     avatarMode: 'fill' as const,
+    recentGoals: player.recent_goals,
   })),
 )
+
+function showScorerMatch(playerName: string, match: PlayerMatchGoals) {
+  uni.showModal({ ...buildGoalMatchDetail(playerName, match), showCancel: false, confirmText: '知道了' })
+}
 
 onShareAppMessage(() => ({
   title: supportFavoriteTeam.value

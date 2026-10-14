@@ -80,6 +80,7 @@ mod tests {
                     avatar_storage_url: Some(
                         "https://cdn.example.com/players/204211.png".to_string(),
                     ),
+                    recent_goals: vec![],
                 }],
                 insight_summary: None,
             })

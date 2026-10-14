@@ -3,7 +3,10 @@ use serde::Serialize;
 use crate::insight::domain::{
     insight_summary::InsightSummary,
     match_list::{MatchCard, MatchListView},
-    overview::{InsightOverview, MatchOutcome, OverviewMatch, OverviewPlayer, OverviewStanding},
+    overview::{
+        InsightOverview, MatchOutcome, OverviewMatch, OverviewPlayer, OverviewStanding,
+        PlayerMatchGoals,
+    },
     rankings::{
         PlayerRankingCategory, PlayerRankingEntry, RankingsView, StandingsTable,
         StandingsTableEntry, TeamRankingCategory, TeamRankingEntry,
@@ -83,6 +86,34 @@ pub struct OverviewPlayerDto {
     pub team_name: String,
     pub score_value: String,
     pub avatar_storage_url: Option<String>,
+    pub recent_goals: Vec<PlayerMatchGoalsDto>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PlayerMatchGoalsDto {
+    pub match_id: i64,
+    pub round_number: i32,
+    pub match_date: String,
+    pub match_time: String,
+    pub home_team_name: String,
+    pub away_team_name: String,
+    pub goals: i32,
+    pub minutes_played: i32,
+}
+
+impl From<PlayerMatchGoals> for PlayerMatchGoalsDto {
+    fn from(value: PlayerMatchGoals) -> Self {
+        Self {
+            match_id: value.match_id,
+            round_number: value.round_number,
+            match_date: value.match_date,
+            match_time: value.match_time,
+            home_team_name: value.home_team_name,
+            away_team_name: value.away_team_name,
+            goals: value.goals,
+            minutes_played: value.minutes_played,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -335,6 +366,7 @@ impl From<OverviewPlayer> for OverviewPlayerDto {
             team_name: value.team_name,
             score_value: value.score_value,
             avatar_storage_url: value.avatar_storage_url,
+            recent_goals: value.recent_goals.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -605,6 +637,40 @@ impl From<InsightSummary> for InsightSummaryDto {
 mod tests {
     use super::MatchCardDto;
     use crate::insight::domain::match_list::{MatchCard, MatchTechnicalStat};
+
+    #[test]
+    fn scorer_dto_preserves_zero_and_hat_trick_appearances_and_match_details() {
+        use super::{OverviewPlayer, OverviewPlayerDto, PlayerMatchGoals};
+        let appearances = [0, 3]
+            .into_iter()
+            .enumerate()
+            .map(|(i, goals)| PlayerMatchGoals {
+                match_id: i as i64 + 10,
+                round_number: 1,
+                match_date: "2026-09-01".into(),
+                match_time: "19:35".into(),
+                home_team_name: "主队".into(),
+                away_team_name: "客队".into(),
+                goals,
+                minutes_played: 90,
+            })
+            .collect();
+        let dto = OverviewPlayerDto::from(OverviewPlayer {
+            rank_no: 1,
+            player_id: 1,
+            player_name: "球员".into(),
+            team_name: "主队".into(),
+            score_value: "3".into(),
+            avatar_storage_url: None,
+            recent_goals: appearances,
+        });
+        let json = serde_json::to_value(dto).unwrap();
+        assert_eq!(json["recent_goals"][0]["goals"], 0);
+        assert_eq!(json["recent_goals"][1]["goals"], 3);
+        assert_eq!(json["recent_goals"][1]["match_id"], 11);
+        assert_eq!(json["recent_goals"][1]["minutes_played"], 90);
+        assert_eq!(json["score_value"], "3");
+    }
 
     #[test]
     fn overview_dto_exposes_recent_form_in_chronological_order() {

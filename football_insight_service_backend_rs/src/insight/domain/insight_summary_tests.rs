@@ -55,6 +55,7 @@ mod tests {
                     team_name: "成都蓉城".to_string(),
                     score_value: "4".to_string(),
                     avatar_storage_url: None,
+                    recent_goals: vec![],
                 },
                 OverviewPlayer {
                     rank_no: 2,
@@ -63,6 +64,7 @@ mod tests {
                     team_name: "成都蓉城".to_string(),
                     score_value: "4".to_string(),
                     avatar_storage_url: None,
+                    recent_goals: vec![],
                 },
             ],
             insight_summary: None,
