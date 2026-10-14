@@ -66,7 +66,7 @@
           <HomeRankingPanel
             kicker="射手榜"
             title="当前赛季累计射手榜"
-            :rows="scorersRows"
+            :players="scorers"
             @select-match="showScorerMatch"
           />
         </template>
@@ -127,7 +127,7 @@ import type {
   RoundReference,
 } from '../../types/insight'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { buildGoalMatchDetail } from './goalTrend'
+import { buildGoalMatchDetail } from '../../utils/playerGoals'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
 import { useRuntimeConfig } from '../../stores/runtimeConfig'
@@ -279,20 +279,6 @@ const watchPoints = computed(() =>
     topScorer: topScorer.value,
     secondScorer: scorers.value[1] ?? null,
   }),
-)
-
-const scorersRows = computed(() =>
-  scorers.value.map(player => ({
-    key: player.player_id,
-    rankNo: player.rank_no,
-    avatar: player.avatar_storage_url,
-    name: player.player_name,
-    note: player.team_name,
-    metricValue: player.score_value,
-    metricNote: '累计进球',
-    avatarMode: 'fill' as const,
-    recentGoals: player.recent_goals,
-  })),
 )
 
 function showScorerMatch(playerName: string, match: PlayerMatchGoals) {

@@ -202,4 +202,20 @@ mod tests {
         );
         pool.close().await;
     }
+
+    #[tokio::test]
+    #[ignore = "requires disposable TEAM_FORM_TEST_DATABASE_URL"]
+    async fn every_requested_scorer_is_returned_beyond_the_home_top_five() {
+        let pool = fixture().await;
+        sqlx::raw_sql("INSERT INTO f_i_player_match_stats(match_id,player_id,goals) SELECT 14,n,3 FROM generate_series(30,49) n")
+            .execute(&pool).await.unwrap();
+        let ids: Vec<i64> = (30..=50).collect();
+        let result = fetch_recent_player_goals(&pool, 2026, &ids, None, None)
+            .await
+            .unwrap();
+        assert_eq!(result.len(), 20);
+        assert_eq!(result[&49][0].goals, 3);
+        assert!(!result.contains_key(&50));
+        pool.close().await;
+    }
 }

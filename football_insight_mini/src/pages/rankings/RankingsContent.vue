@@ -29,6 +29,7 @@
           :rankings="rankings"
           @open-team="openRankingTeamSheet"
           @open-player="openRankingPlayerSheet"
+          @select-match="showGoalMatchDetail"
         />
       </template>
       </view>
@@ -78,9 +79,11 @@ import RankingsTeamSeasonSheet from './components/RankingsTeamSeasonSheet.vue'
 import RankingsPlayerSheet from './components/RankingsPlayerSheet.vue'
 import RankingsPosterSheet from './components/RankingsPosterSheet.vue'
 import { getAvailableRounds, getMatches, getRankings } from '../../api/insight'
+import { buildGoalMatchDetail } from '../../utils/playerGoals'
 import type {
   MatchCard,
   PlayerRankingEntry,
+  PlayerMatchGoals,
   RankingsViewResponse,
   RoundReference,
   StandingsTable,
@@ -311,6 +314,10 @@ function activeTeamCategoryLabel(): string {
 function activePlayerCategoryLabel(): string {
   const category = rankings.value?.player_categories.find((item) => item.slug === activeCategorySlug.value)
   return category?.label ?? '球员榜'
+}
+
+function showGoalMatchDetail(playerName: string, match: PlayerMatchGoals): void {
+  uni.showModal({ ...buildGoalMatchDetail(playerName, match), showCancel: false, confirmText: '知道了' })
 }
 
 function openRankingPlayerSheet(entry: PlayerRankingEntry): void {

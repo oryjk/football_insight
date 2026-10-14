@@ -261,6 +261,7 @@ mod tests {
                             score_value: "7".to_string(),
                             penalty_value: Some("1".to_string()),
                             avatar_storage_url: None,
+                            recent_goals: vec![],
                         },
                         PlayerRankingEntry {
                             rank_no: 2,
@@ -271,6 +272,7 @@ mod tests {
                             score_value: "6".to_string(),
                             penalty_value: Some("0".to_string()),
                             avatar_storage_url: None,
+                            recent_goals: vec![],
                         },
                         PlayerRankingEntry {
                             rank_no: 3,
@@ -281,6 +283,7 @@ mod tests {
                             score_value: "5".to_string(),
                             penalty_value: Some("0".to_string()),
                             avatar_storage_url: None,
+                            recent_goals: vec![],
                         },
                     ],
                 },
@@ -298,6 +301,7 @@ mod tests {
                             score_value: "7".to_string(),
                             penalty_value: None,
                             avatar_storage_url: None,
+                            recent_goals: vec![],
                         },
                         PlayerRankingEntry {
                             rank_no: 2,
@@ -308,6 +312,7 @@ mod tests {
                             score_value: "5".to_string(),
                             penalty_value: None,
                             avatar_storage_url: None,
+                            recent_goals: vec![],
                         },
                         PlayerRankingEntry {
                             rank_no: 3,
@@ -318,6 +323,7 @@ mod tests {
                             score_value: "4".to_string(),
                             penalty_value: None,
                             avatar_storage_url: None,
+                            recent_goals: vec![],
                         },
                     ],
                 },

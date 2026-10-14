@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
-import { buildGoalMatchDetail, goalChartScale, normalizeRecentGoals } from './goalTrend'
-import type { PlayerMatchGoals } from '../../types/insight'
+import { buildGoalMatchDetail, goalChartScale, normalizeRecentGoals } from './playerGoals'
+import type { PlayerMatchGoals } from '../types/insight'
 
 const appearance = (goals: number, matchId = 1): PlayerMatchGoals => ({
   goals, match_id: matchId, round_number: matchId, match_date: '2026-09-01',

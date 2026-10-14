@@ -198,6 +198,8 @@ pub struct PlayerRankingEntryDto {
     pub score_value: String,
     pub penalty_value: Option<String>,
     pub avatar_storage_url: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub recent_goals: Vec<PlayerMatchGoalsDto>,
 }
 
 #[derive(Debug, Serialize)]
@@ -480,6 +482,7 @@ impl From<PlayerRankingEntry> for PlayerRankingEntryDto {
             score_value: value.score_value,
             penalty_value: value.penalty_value,
             avatar_storage_url: value.avatar_storage_url,
+            recent_goals: value.recent_goals.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -639,6 +642,35 @@ impl From<InsightSummary> for InsightSummaryDto {
 mod tests {
     use super::MatchCardDto;
     use crate::insight::domain::match_list::{MatchCard, MatchTechnicalStat};
+
+    #[test]
+    fn player_ranking_dto_keeps_recent_appearance_goals_beyond_home_top_five() {
+        use super::{PlayerMatchGoals, PlayerRankingEntry, PlayerRankingEntryDto};
+        let entry = PlayerRankingEntry {
+            rank_no: 20,
+            player_id: 20,
+            player_name: "球员".into(),
+            team_id: 1,
+            team_name: "球队".into(),
+            score_value: "3".into(),
+            penalty_value: None,
+            avatar_storage_url: None,
+            recent_goals: vec![PlayerMatchGoals {
+                match_id: 123,
+                round_number: 10,
+                match_date: "2026-09-01".into(),
+                match_time: "19:35".into(),
+                home_team_name: "主队".into(),
+                away_team_name: "客队".into(),
+                goals: 3,
+                minutes_played: 90,
+            }],
+        };
+        let json = serde_json::to_value(PlayerRankingEntryDto::from(entry)).unwrap();
+        assert_eq!(json["rank_no"], 20);
+        assert_eq!(json["recent_goals"][0]["goals"], 3);
+        assert_eq!(json["recent_goals"][0]["match_id"], 123);
+    }
 
     #[test]
     fn scorer_dto_preserves_zero_and_hat_trick_appearances_and_match_details() {

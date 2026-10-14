@@ -76,20 +76,29 @@ class Response:
 class Session:
     headers = {}
 
-    def __init__(self, *, incomplete=False, ambiguous=False, duplicate=False, transfer=False):
+    def __init__(self, *, incomplete=False, ambiguous=False, duplicate=False, transfer=False, sparse_search=False):
         self.incomplete = incomplete
         self.ambiguous = ambiguous
         self.duplicate = duplicate
         self.transfer = transfer
+        self.sparse_search = sparse_search
 
     def get(self, url, *, params, timeout):
         if url.endswith('/players/find') and params.get('name_like') == '奥斯卡':
+            if self.sparse_search and params['curPage'] > 1:
+                return Response({'status': 200, 'data': {'count': 3, 'dataList': []}})
             candidates = [{"id": "oscar-id", "name": "奥斯卡", "contestant_id": "3n4jrcw6w965v1qvp0azx5kwk"}]
             if self.ambiguous:
                 candidates.append({**candidates[0], "id": "other"})
             if self.transfer:
                 candidates.append({**candidates[0], "contestant_id": "cvx4yvx5oby9dz7vm70mw04um"})
-            return Response({"status": 200, "data": {"count": len(candidates), "dataList": candidates}})
+            return Response({"status": 200, "data": {"count": 3 if self.sparse_search else len(candidates), "dataList": candidates}})
+        if (url.endswith('/players/page') and self.sparse_search
+                and params.get('contestant_id') == '3n4jrcw6w965v1qvp0azx5kwk'):
+            return Response({'status': 200, 'data': {'count': 1, 'dataList': [{
+                'id': 'roster-row-uuid', 'player_id': 'oscar-id', 'player_name': '奥斯卡',
+                'contestant_id': '3n4jrcw6w965v1qvp0azx5kwk',
+            }]}})
         if self.transfer and params.get('contestant_id') == 'cvx4yvx5oby9dz7vm70mw04um':
             return Response({"status": 200, "data": {"count": 1, "dataList": [log(match_id='previous-club', goals=1)]}})
         if (url.endswith('/players/player/played') and params.get('player_id') == 'oscar-id'
@@ -110,6 +119,18 @@ def test_client_uses_verified_identity_required_club_and_all_pages():
 
 def test_same_player_identity_at_two_clubs_includes_both_club_logs():
     identity, rows = CflPlayerLogClient(session=Session(transfer=True)).fetch_player_logs(name='奥斯卡', team_id=500, season=2026)
+    assert identity == 'oscar-id'
+    assert [row['goals'] for row in rows] == [3, 0, 1]
+
+
+def test_sparse_name_search_uses_complete_season_club_roster_for_identity():
+    identity, rows = CflPlayerLogClient(session=Session(sparse_search=True)).fetch_player_logs(name='奥斯卡', team_id=500, season=2026)
+    assert identity == 'oscar-id'
+    assert [row['goals'] for row in rows] == [3, 0]
+
+
+def test_sparse_search_preserves_previous_clubs_after_independent_roster_verification():
+    identity, rows = CflPlayerLogClient(session=Session(sparse_search=True, transfer=True)).fetch_player_logs(name='奥斯卡', team_id=500, season=2026)
     assert identity == 'oscar-id'
     assert [row['goals'] for row in rows] == [3, 0, 1]
 

@@ -20,6 +20,14 @@ class PlayerMatchGoals:
     source_match_id: str
 
 
+class IncompletePlayerPage(ValueError):
+    """The official endpoint counted rows that were not returned."""
+
+    def __init__(self, message: str, rows: list[dict]) -> None:
+        super().__init__(message)
+        self.rows = rows.copy()
+
+
 def _integer(value: Any, label: str) -> int:
     if isinstance(value, bool) or not str(value).isascii() or not str(value).isdigit():
         raise ValueError(f"invalid {label}: expected nonnegative integer")
@@ -112,14 +120,27 @@ class CflPlayerLogClient(CflCslClient):
             if len(rows) == count:
                 return rows
             if not batch or len(rows) > count:
-                raise ValueError("official player log pagination incomplete")
+                raise IncompletePlayerPage("official player log pagination incomplete", rows)
         raise ValueError("official player log pagination limit exceeded")
 
     def fetch_player_logs(self, *, name: str, team_id: int, season: int) -> tuple[str, list[dict]]:
         calendar = self.tournament_calendar_id or DEFAULT_CFL_CALENDARS.get(season)
         if not calendar:
             raise ValueError(f"no official calendar configured for {season}")
-        candidates = self._get_rows("/players/find", {"competition_code": "CSL", "name_like": name})
+        try:
+            candidates = self._get_rows("/players/find", {"competition_code": "CSL", "name_like": name})
+        except IncompletePlayerPage as error:
+            # Name search counts some historical records it does not return. The
+            # season club roster supplies a complete, independently checked identity.
+            club = TeamIdentityIndex.for_season(season).official_id_for(team_id)
+            roster = self._get_rows("/players/page", {
+                "competition_code": "CSL", "name_like": name,
+                "tournament_calendar_id": calendar, "contestant_id": club,
+            })
+            candidates = [{**row, "id": row.get("player_id"), "name": row.get("player_name")}
+                          for row in roster]
+            verified = resolve_official_player(candidates, name=name, team_id=team_id, season=season)
+            candidates.extend(row for row in error.rows if str(row.get("id")) == verified)
         identity = resolve_official_player(candidates, name=name, team_id=team_id, season=season)
         # This API requires a club. Include every club returned for the same identity.
         clubs = {str(row["contestant_id"]) for row in candidates

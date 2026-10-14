@@ -1,4 +1,4 @@
-"""Refresh top scorers independently so provider outages cannot break core sync."""
+"""Refresh the scorer ranking independently so provider outages cannot break core sync."""
 from __future__ import annotations
 
 import sys
@@ -37,7 +37,7 @@ def replace_player_logs(connection, *, season: int, player_id: int,
             )
 
 
-def refresh_top_scorer_goals(database_url: str, season: int,
+def refresh_scorer_goals(database_url: str, season: int,
                             client: CflPlayerLogClient | None = None) -> dict:
     client = client or CflPlayerLogClient()
     summary: dict = {"players_updated": 0, "appearances": 0, "failed_players": []}
@@ -58,9 +58,6 @@ def refresh_top_scorer_goals(database_url: str, season: int,
                 ORDER BY e.rank_no,e.player_id
             """, (season,))
             targets = cursor.fetchall()
-            if len(targets) > 5:
-                boundary = targets[4][3]
-                targets = [r for i, r in enumerate(targets) if i < 5 or r[3] == boundary]
             cursor.execute("""
                 SELECT match_id,round_number,round_name,match_date::text,match_time,status,
                        home_team_id,home_team_name,home_score,away_team_id,away_team_name,away_score

@@ -26,8 +26,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { PlayerMatchGoals } from '../../../types/insight'
-import { normalizeRecentGoals } from '../goalTrend'
+import type { PlayerMatchGoals } from '../types/insight'
+import { normalizeRecentGoals } from '../utils/playerGoals'
 
 const props = defineProps<{ playerName: string; appearances?: PlayerMatchGoals[]; scaleMax: number }>()
 const matches = computed(() => normalizeRecentGoals(props.appearances))

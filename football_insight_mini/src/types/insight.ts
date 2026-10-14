@@ -104,6 +104,8 @@ export interface PlayerRankingEntry {
   score_value: string
   penalty_value: string | null
   avatar_storage_url: string | null
+  /** Recent verified appearances on the goals category; absent on older APIs. */
+  recent_goals?: PlayerMatchGoals[]
 }
 
 export interface PlayerRankingCategory {

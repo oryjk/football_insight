@@ -61,6 +61,12 @@ class TeamIdentityIndex:
             )
         return identity
 
+    def official_id_for(self, team_id: int) -> str:
+        matches = [key for key, identity in self._by_official_id.items() if identity.team_id == team_id]
+        if len(matches) != 1:
+            raise CflApiError(f"cannot uniquely resolve official team {team_id}")
+        return matches[0]
+
 
 def _official_match_id(value: str) -> int:
     digest = hashlib.blake2b(value.encode("utf-8"), digest_size=8).digest()

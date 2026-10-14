@@ -671,6 +671,19 @@ impl PostgresInsightQueryRepository {
 
         let team_categories = Self::prepend_standings_category(team_categories, standings_rows);
 
+        let scorer_ids: Vec<_> = player_rows
+            .iter()
+            .filter(|row| row.slug == "goals")
+            .map(|row| row.player_id)
+            .collect();
+        let mut recent_goals = fetch_recent_player_goals(
+            &self.pool,
+            season,
+            &scorer_ids,
+            round_number,
+            minimum_snapshot_at,
+        )
+        .await?;
         let mut player_categories: Vec<PlayerRankingCategory> = Vec::new();
         for row in player_rows {
             if player_categories
@@ -695,6 +708,11 @@ impl PostgresInsightQueryRepository {
                     score_value: row.score_value,
                     penalty_value: row.penalty_value,
                     avatar_storage_url: row.avatar_storage_url,
+                    recent_goals: if row.slug == "goals" {
+                        recent_goals.remove(&row.player_id).unwrap_or_default()
+                    } else {
+                        Vec::new()
+                    },
                 });
             }
         }

@@ -1,4 +1,7 @@
-import type { PlayerMatchGoals } from '../../types/insight'
+import type { OverviewPlayer, PlayerMatchGoals } from '../types/insight'
+
+export type PlayerGoalEntry = Pick<OverviewPlayer,
+  'rank_no' | 'player_id' | 'player_name' | 'team_name' | 'score_value' | 'avatar_storage_url' | 'recent_goals'>
 
 export function normalizeRecentGoals(rows?: PlayerMatchGoals[]): PlayerMatchGoals[] {
   return (rows ?? [])

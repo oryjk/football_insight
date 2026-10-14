@@ -1,4 +1,4 @@
-use super::overview::MatchOutcome;
+use super::overview::{MatchOutcome, PlayerMatchGoals};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RankingsView {
@@ -72,4 +72,5 @@ pub struct PlayerRankingEntry {
     pub score_value: String,
     pub penalty_value: Option<String>,
     pub avatar_storage_url: Option<String>,
+    pub recent_goals: Vec<PlayerMatchGoals>,
 }
