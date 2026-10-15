@@ -19,4 +19,3 @@ export function resolveRankRowClass(rankNo: number): Record<string, boolean> {
 export function formatRankLabel(rankNo: number): string {
   return rankNo <= 3 ? `${rankNo}` : `#${rankNo}`
 }
-
