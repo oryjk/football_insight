@@ -35,16 +35,18 @@
       <input v-model="form.referralCode" class="auth-input" placeholder="请输入推荐码（可选，填推荐人的邀请码）" />
     </view>
 
-    <view class="sheet-actions">
-      <button class="primary-action primary-action--ghost" @click="emit('close')">取消</button>
-      <button class="primary-action" @click="submit">完成绑定</button>
-    </view>
+    <template #footer>
+      <view class="sheet-actions">
+        <button class="primary-action primary-action--ghost" @click="emit('close')">取消</button>
+        <button class="primary-action" @click="submit">完成绑定</button>
+      </view>
+    </template>
   </FiBottomSheet>
 </template>
 
 <script setup lang="ts">
-import FiBottomSheet from '../../../components/FiBottomSheet.vue'
 import { reactive, watch } from 'vue'
+import FiBottomSheet from '../../../components/FiBottomSheet.vue'
 import type { MiniWechatBindingRequiredResponse } from '../../../types/auth'
 
 const props = defineProps<{
@@ -260,7 +262,7 @@ async function submit(): Promise<void> {
 }
 
 .sheet-actions {
-  margin-top: 24rpx;
+  width: 100%;
   display: flex;
   gap: 16rpx;
 }

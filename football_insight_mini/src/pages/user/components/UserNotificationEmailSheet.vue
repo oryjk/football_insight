@@ -11,18 +11,21 @@
   >
     <text class="account-form-panel__summary">订阅回流提醒后，新增回流会发送到这个邮箱。</text>
     <input v-model="draft" class="auth-input" type="text" placeholder="请输入邮箱地址" />
-    <view class="sheet-actions">
-      <button class="primary-action primary-action--ghost" :disabled="saving" @click="close">取消</button>
-      <button class="primary-action" :disabled="saving" @click="submit">
-        {{ saving ? '保存中...' : '保存邮箱' }}
-      </button>
-    </view>
+
+    <template #footer>
+      <view class="sheet-actions">
+        <button class="primary-action primary-action--ghost" :disabled="saving" @click="close">取消</button>
+        <button class="primary-action" :disabled="saving" @click="submit">
+          {{ saving ? '保存中...' : '保存邮箱' }}
+        </button>
+      </view>
+    </template>
   </FiBottomSheet>
 </template>
 
 <script setup lang="ts">
-import FiBottomSheet from '../../../components/FiBottomSheet.vue'
 import { ref, watch } from 'vue'
+import FiBottomSheet from '../../../components/FiBottomSheet.vue'
 import { isValidNotificationEmail } from '../helpers'
 
 const props = defineProps<{
@@ -109,7 +112,7 @@ function submit(): void {
 }
 
 .sheet-actions {
-  margin-top: 24rpx;
+  width: 100%;
   display: flex;
   gap: 16rpx;
 }

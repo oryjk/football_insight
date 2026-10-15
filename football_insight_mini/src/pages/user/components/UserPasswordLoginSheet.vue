@@ -28,18 +28,20 @@
       />
     </view>
 
-    <view class="sheet-actions">
-      <button class="primary-action primary-action--ghost" :disabled="submitting" @click="close">取消</button>
-      <button class="primary-action" :disabled="submitting" @click="submit">
-        {{ submitting ? '登录中...' : '登录' }}
-      </button>
-    </view>
+    <template #footer>
+      <view class="sheet-actions">
+        <button class="primary-action primary-action--ghost" :disabled="submitting" @click="close">取消</button>
+        <button class="primary-action" :disabled="submitting" @click="submit">
+          {{ submitting ? '登录中...' : '登录' }}
+        </button>
+      </view>
+    </template>
   </FiBottomSheet>
 </template>
 
 <script setup lang="ts">
-import FiBottomSheet from '../../../components/FiBottomSheet.vue'
 import { reactive } from 'vue'
+import FiBottomSheet from '../../../components/FiBottomSheet.vue'
 import { validatePasswordLoginForm } from '../loginHelpers'
 
 const props = defineProps<{
@@ -120,7 +122,7 @@ function submit(): void {
 }
 
 .sheet-actions {
-  margin-top: 24rpx;
+  width: 100%;
   display: flex;
   gap: 16rpx;
 }
