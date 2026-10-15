@@ -6,7 +6,8 @@ import { DAILY_TOPICS_TEAM_ID, emptyDailyTopicEdition, mapDailyTopicEdition } fr
 
 export function useHomeDailyTopics() {
   const edition = ref(emptyDailyTopicEdition())
-  const loading = ref(false)
+  // 首次 onShow 才发起 load；初始为 true，避免先闪一帧「暂无已发布话题」再切到加载态。
+  const loading = ref(true)
   const errorMessage = ref('')
   let revision = 0
   async function load() {
