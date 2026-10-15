@@ -41,20 +41,7 @@
         <text>赛季走势 · 已赛 {{ finishedMatches.length }} 场</text>
         <text>点圆点看单场</text>
       </view>
-      <view class="team-season-form__dots">
-        <view
-          v-for="match in finishedMatches"
-          :key="match.matchId"
-          class="team-season-form__hit"
-          role="button"
-          :aria-label="`第${match.roundNumber}轮 ${match.resultLabel} ${match.scoreText}，查看单场详情`"
-          hover-class="team-season-form__hit--pressed"
-          hover-stay-time="80"
-          @tap="emit('select-match', match)"
-        >
-          <view class="team-season-form__dot" :class="`team-season-form__dot--${match.resultTone}`" />
-        </view>
-      </view>
+      <FiResultDots :items="formDots" interactive @select="emit('select-match', matchById.get($event.id as number)!)" />
     </view>
 
     <scroll-view v-if="!loading && !errorMessage && matches.length" scroll-y class="team-season-sheet__list">
@@ -99,6 +86,8 @@
 import { computed } from 'vue'
 import HomeSheetShell from './HomeSheetShell.vue'
 import FiLoading from '../../../components/FiLoading.vue'
+import FiResultDots from '../../../components/FiResultDots.vue'
+import type { ResultDotItem } from '../../../utils/resultDots'
 import type { OverviewStanding } from '../../../types/insight'
 import { formatHomeTeamSeasonRecord, type HomeTeamSeasonMatch } from '../helpers'
 
@@ -117,6 +106,14 @@ const emit = defineEmits<{
 const finishedMatches = computed(() =>
   props.matches.filter((match) => ['win', 'draw', 'loss'].includes(match.resultTone)),
 )
+const matchById = computed(() => new Map(finishedMatches.value.map((match) => [match.matchId, match])))
+const formDots = computed<ResultDotItem[]>(() =>
+  finishedMatches.value.map((match) => ({
+    id: match.matchId,
+    tone: match.resultTone as ResultDotItem['tone'],
+    ariaLabel: `第${match.roundNumber}轮 ${match.resultLabel} ${match.scoreText}，查看单场详情`,
+  })),
+)
 const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
 </script>
 
@@ -131,42 +128,6 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
   color: var(--fi-color-text-muted);
   font-size: var(--fi-font-22);
   line-height: var(--fi-leading-normal);
-}
-
-.team-season-form__dots {
-  display: flex;
-  flex-wrap: nowrap;
-  margin-top: var(--fi-space-8);
-}
-
-.team-season-form__hit {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: 52rpx;
-  height: var(--fi-space-44);
-  border-radius: var(--fi-radius-round);
-}
-
-.team-season-form__hit--pressed {
-  background: var(--fi-color-divider-soft);
-}
-
-.team-season-form__dot {
-  width: var(--fi-space-22);
-  height: var(--fi-space-22);
-  border-radius: var(--fi-radius-round);
-  background: var(--fi-color-team-form-line);
-}
-
-.team-season-form__dot--win {
-  background: var(--fi-color-primary);
-}
-
-.team-season-form__dot--loss {
-  background: var(--fi-color-success-accent);
 }
 
 .state-card--error text {

@@ -19,7 +19,7 @@
         <image class="standings__avatar" :src="team.avatar_storage_url || ''" mode="aspectFit" />
         <text class="standings__name">{{ team.team_name }}</text>
         <view class="standings__form">
-          <FiTeamFormTrend :outcomes="team.recent_form" />
+          <FiResultDots :items="buildOutcomeDots(team.recent_form)" size="sm" align="end" highlight-latest show-latest-label empty-text="近期战绩待更新" />
         </view>
         <text class="standings__points">{{ team.points }}</text>
       </view>
@@ -36,7 +36,9 @@
 </template>
 
 <script setup lang="ts">
-import FiTeamFormTrend from './FiTeamFormTrend.vue'
+// 走势线组件 FiTeamFormTrend 保留，需要折线形态时在此换回：<FiTeamFormTrend :outcomes="team.recent_form" />
+import FiResultDots from './FiResultDots.vue'
+import { buildOutcomeDots } from '../utils/resultDots'
 import type { OverviewStanding } from '../types/insight'
 
 defineProps<{ teams: OverviewStanding[] }>()
