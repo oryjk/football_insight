@@ -29,10 +29,10 @@ const emit = defineEmits<{ (e: 'play'): void }>()
 .audio-entry__bar { width: var(--fi-space-4); height: 50%; border-radius: var(--fi-radius-round); background: currentColor; }
 .audio-entry__bar--tall { height: 100%; }
 .audio-entry__bar--medium { height: 75%; }
-.audio-entry.audio-entry--hero { box-sizing: border-box; height: var(--fi-component-topic-hero-action-height); padding: 0 var(--fi-space-20); gap: var(--fi-space-10); background: var(--fi-color-topic-hero-control); color: var(--fi-color-topic-hero-text); font-size: var(--fi-font-26); }
+.audio-entry.audio-entry--hero { box-sizing: border-box; height: var(--fi-component-topic-hero-action-height); padding: 0 var(--fi-space-22); gap: var(--fi-space-10); background: var(--fi-color-topic-hero-control); color: var(--fi-color-topic-hero-text); font-size: var(--fi-font-24); }
 .audio-entry.audio-entry--hero[disabled] { background: var(--fi-color-topic-hero-disabled); color: var(--fi-color-topic-hero-caption); }
 .audio-entry__control { display: flex; align-items: center; justify-content: center; width: var(--fi-space-20); height: var(--fi-space-24); flex-shrink: 0; }
-.audio-entry__play { width: 0; height: 0; border-top: var(--fi-space-10) solid transparent; border-bottom: var(--fi-space-10) solid transparent; border-left: var(--fi-space-16) solid currentColor; }
+.audio-entry__play { width: 0; height: 0; border-top: var(--fi-space-8) solid transparent; border-bottom: var(--fi-space-8) solid transparent; border-left: var(--fi-space-14) solid currentColor; }
 .audio-entry__pause { display: flex; justify-content: space-between; width: var(--fi-space-16); height: var(--fi-space-24); }
 .audio-entry__pause view { width: var(--fi-space-6); height: 100%; border-radius: var(--fi-space-1); background: currentColor; }
 </style>

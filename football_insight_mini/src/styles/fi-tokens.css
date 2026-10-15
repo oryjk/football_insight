@@ -928,7 +928,7 @@ page {
   --fi-component-topic-hero-radius: var(--fi-radius-topic-hero);
   --fi-component-topic-hero-title: var(--fi-color-topic-hero-text);
   --fi-component-topic-hero-copy: var(--fi-color-topic-hero-muted);
-  --fi-component-topic-hero-action-height: var(--fi-space-64);
+  --fi-component-topic-hero-action-height: 52rpx;
   --fi-component-topic-hero-crest-size: var(--fi-space-topic-hero-crest);
   --fi-component-topic-hero-crest-opacity: var(--fi-opacity-topic-hero-crest);
 }
