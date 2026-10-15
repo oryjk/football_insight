@@ -1,6 +1,6 @@
 <template>
   <view v-if="items.length" class="result-dots" :class="[`result-dots--${size}`, `result-dots--${align}`]">
-    <view class="result-dots__row" :role="interactive ? undefined : 'img'" :aria-label="interactive ? undefined : summary">
+    <view class="result-dots__row" :class="{ 'result-dots__row--grid': perRow }" :style="perRow ? { '--result-columns': perRow } : undefined" :role="interactive ? undefined : 'img'" :aria-label="interactive ? undefined : summary">
       <template v-for="(item, index) in items" :key="item.id">
         <view
           v-if="interactive"
@@ -34,19 +34,21 @@ const props = withDefaults(
     size?: 'md' | 'sm'
     /** end keeps short records on the right, with the same spacing as a full record. */
     align?: 'start' | 'end'
+    /** Wrap into rows of this many dots (oldest to newest, left to right, top to bottom); omit for a single shrinking row. */
+    perRow?: number
     interactive?: boolean
     highlightLatest?: boolean
     showLatestLabel?: boolean
     emptyText?: string
   }>(),
-  { size: 'md', align: 'start', interactive: false, highlightLatest: false, showLatestLabel: false, emptyText: '' },
+  { size: 'md', align: 'start', perRow: undefined, interactive: false, highlightLatest: false, showLatestLabel: false, emptyText: '' },
 )
 
 const emit = defineEmits<{ (event: 'select', item: ResultDotItem): void }>()
 
 const latestLabel = computed(() => RESULT_DOT_LABELS[props.items[props.items.length - 1]!.tone])
 const summary = computed(
-  () => `近${props.items.length}场，从旧到新：${props.items.map(item => RESULT_DOT_LABELS[item.tone]).join('、')}`,
+  () => `共${props.items.length}场，从旧到新：${props.items.map(item => RESULT_DOT_LABELS[item.tone]).join('、')}`,
 )
 </script>
 
@@ -74,6 +76,13 @@ const summary = computed(
 }
 .result-dots--end .result-dots__row {
   justify-content: flex-end;
+}
+.result-dots__row--grid {
+  display: grid;
+  grid-template-columns: repeat(var(--result-columns), minmax(0, var(--result-cell-max)));
+}
+.result-dots--sm .result-dots__row--grid {
+  --result-cell-height: var(--fi-space-36);
 }
 .result-dots__cell {
   display: flex;
