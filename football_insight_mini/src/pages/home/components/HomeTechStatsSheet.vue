@@ -10,7 +10,9 @@
         </text>
       </view>
 
-      <view class="tech-stats-sheet__list">
+      <text v-if="!techStats.length" class="tech-stats-sheet__empty">这场比赛暂时还没有技术统计</text>
+
+      <view v-else class="tech-stats-sheet__list">
         <view
           v-for="(stat, index) in techStats"
           :key="stat.key"
@@ -49,6 +51,14 @@ const techStats = computed(() => resolveHomePulseTechStats(props.match))
 </script>
 
 <style scoped lang="css">
+.tech-stats-sheet__empty {
+  display: block;
+  margin-top: var(--fi-space-32);
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-26);
+  text-align: center;
+}
+
 .tech-stats-body {
   max-height: 72vh;
   padding-bottom: calc(40rpx + env(safe-area-inset-bottom) + 100rpx);

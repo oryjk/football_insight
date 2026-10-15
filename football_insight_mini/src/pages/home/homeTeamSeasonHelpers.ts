@@ -1,4 +1,5 @@
-import type { MatchCard, OverviewStanding } from '../../types/insight'
+import type { MatchCard, MatchTechnicalStat, OverviewStanding } from '../../types/insight'
+import type { HomePulseLeadMatch } from './homePulseHelpers'
 import { resolveMatchDisplayStatus } from '../../utils/matchDisplayStatus'
 
 export interface HomeTeamSeasonMatch {
@@ -20,11 +21,14 @@ export interface HomeTeamSeasonMatch {
   resultTone: 'win' | 'draw' | 'loss' | 'live' | 'scheduled'
   scoreText: string
   venueLabel: '主' | '客'
+  technicalStats: MatchTechnicalStat[]
+  homeCorners: number | null
+  awayCorners: number | null
 }
 
 export function resolveHomeTeamSeasonMatches(
   team: Pick<OverviewStanding, 'team_id' | 'team_name'>,
-  matches: Array<Pick<MatchCard, 'match_id' | 'round_number' | 'match_date' | 'match_time' | 'status' | 'home_team_id' | 'home_team_name' | 'home_score' | 'away_team_id' | 'away_team_name' | 'away_score' | 'home_team_avatar' | 'away_team_avatar'>>,
+  matches: Array<Pick<MatchCard, 'match_id' | 'round_number' | 'match_date' | 'match_time' | 'status' | 'home_team_id' | 'home_team_name' | 'home_score' | 'away_team_id' | 'away_team_name' | 'away_score' | 'home_team_avatar' | 'away_team_avatar'> & Partial<Pick<MatchCard, 'technical_stats' | 'home_corners' | 'away_corners'>>>,
   nowIso = new Date().toISOString(),
 ): HomeTeamSeasonMatch[] {
   return matches
@@ -61,6 +65,11 @@ export function resolveHomeTeamSeasonMatches(
 
       const opponentName = isHomeTeam ? match.away_team_name : match.home_team_name
       const venueLabel = isHomeTeam ? '主' : '客'
+      const techFields = {
+        technicalStats: match.technical_stats ?? [],
+        homeCorners: match.home_corners ?? null,
+        awayCorners: match.away_corners ?? null,
+      }
 
       if (displayStatus === 'live') {
         return {
@@ -82,6 +91,7 @@ export function resolveHomeTeamSeasonMatches(
           resultTone: 'live',
           scoreText,
           venueLabel,
+          ...techFields,
         }
       }
 
@@ -105,6 +115,7 @@ export function resolveHomeTeamSeasonMatches(
           resultTone: 'scheduled',
           scoreText,
           venueLabel,
+          ...techFields,
         }
       }
 
@@ -129,6 +140,7 @@ export function resolveHomeTeamSeasonMatches(
         resultTone,
         scoreText,
         venueLabel,
+        ...techFields,
       }
     })
 }
@@ -160,4 +172,21 @@ export function formatHomeTeamSeasonRecord(matches: Array<Pick<HomeTeamSeasonMat
   }
 
   return `${counts.win}胜 ${counts.draw}平 ${counts.loss}负`
+}
+
+export function toHomeTeamSeasonPulseMatch(match: HomeTeamSeasonMatch): HomePulseLeadMatch {
+  return {
+    match_id: match.matchId,
+    round_number: match.roundNumber,
+    match_date: match.matchDate,
+    match_time: match.matchTime,
+    home_team_name: match.homeTeamName,
+    home_score: match.homeScore,
+    away_team_name: match.awayTeamName,
+    away_score: match.awayScore,
+    technical_stats: match.technicalStats,
+    home_corners: match.homeCorners,
+    away_corners: match.awayCorners,
+    status: 'finished',
+  }
 }

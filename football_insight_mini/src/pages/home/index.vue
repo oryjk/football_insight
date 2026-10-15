@@ -83,19 +83,20 @@
       @close="selectedScorerMatch = null"
     />
 
-    <HomeTechStatsSheet
-      v-if="selectedPulseMatch"
-      :match="selectedPulseMatch"
-      @close="closePulseMatchTechStats"
-    />
-
     <HomeTeamSeasonSheet
       v-if="selectedStandingsTeam"
       :team="selectedStandingsTeam"
       :matches="selectedStandingsTeamMatches"
       :loading="teamSeasonMatchesLoading"
       :error-message="teamSeasonMatchesErrorMessage"
+      @select-match="openSeasonMatchDetail"
       @close="closeStandingsTeamSheet"
+    />
+
+    <HomeTechStatsSheet
+      v-if="selectedPulseMatch"
+      :match="selectedPulseMatch"
+      @close="closePulseMatchTechStats"
     />
 
     <HomeFavoriteTeamSheet
@@ -152,6 +153,7 @@ import {
   resolveHomePulseMatches,
   resolveHomePulseTechStats,
   resolveHomeTeamSeasonMatches,
+  toHomeTeamSeasonPulseMatch,
   type HomePulseLeadMatch,
   type HomeTeamSeasonMatch,
 } from './helpers'
@@ -316,6 +318,10 @@ function openPulseMatchTechStats(match: HomePulseLeadMatch) {
   }
 
   selectedPulseMatch.value = match
+}
+
+function openSeasonMatchDetail(match: HomeTeamSeasonMatch) {
+  selectedPulseMatch.value = toHomeTeamSeasonPulseMatch(match)
 }
 
 function closePulseMatchTechStats() {
