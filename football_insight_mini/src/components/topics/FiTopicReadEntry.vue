@@ -1,14 +1,15 @@
 <template>
-  <button class="topic-read" @tap.stop="emit('read')">
-    <view class="topic-read-icon" aria-hidden="true">
+  <button class="topic-read" :class="{ 'topic-read--hero': variant === 'hero' }" @tap.stop="emit('read')">
+    <view v-if="variant !== 'hero'" class="topic-read-icon" aria-hidden="true">
       <view class="topic-read-line" />
       <view class="topic-read-line" />
       <view class="topic-read-line topic-read-line--short" />
     </view>
-    <text>阅读全文</text>
+    <text>{{ variant === 'hero' ? '阅读' : '阅读全文' }}</text>
   </button>
 </template>
 <script setup lang="ts">
+withDefaults(defineProps<{ variant?: 'default' | 'hero' }>(), { variant: 'default' })
 const emit = defineEmits<{ (e: 'read'): void }>()
 </script>
 <style scoped>
@@ -17,4 +18,5 @@ const emit = defineEmits<{ (e: 'read'): void }>()
 .topic-read-icon { box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; flex-shrink: 0; gap: var(--fi-space-4); width: var(--fi-space-24); height: var(--fi-space-28); padding: var(--fi-space-4); border: var(--fi-border-width) solid currentColor; border-radius: var(--fi-space-4); color: var(--fi-color-primary); }
 .topic-read-line { flex-shrink: 0; height: var(--fi-border-width); background: currentColor; border-radius: var(--fi-radius-round); }
 .topic-read-line--short { width: 75%; }
+.topic-read--hero { box-sizing: border-box; justify-content: center; height: var(--fi-component-topic-hero-action-height); padding: 0 var(--fi-space-24); border-radius: var(--fi-radius-round); background: var(--fi-color-surface); color: var(--fi-color-text-primary); font-size: var(--fi-font-26); }
 </style>

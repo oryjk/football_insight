@@ -79,6 +79,12 @@ component（--fi-component-*）   组件级复合契约（卡片、kicker/标题
 - 宿主是一个纵向 flex 卡片（`gap`/`padding`/圆角/磨砂白底/浮起阴影），宽度由父级 wrapper 决定；长 title/caption 自然换行，组件不做截断。
 - 样式全部来自 component token：`--fi-component-loading-*`（bg/radius/shadow/gap/padding/title-*/caption-*），取值提取自组件原实现，token 化前后视觉不变。
 
+### 首页话题入口
+
+- `HomeDailyTopicCard` 使用 `--fi-component-topic-hero-*` 契约：深色红晕渐变、大圆角、红色类别标签、白色标题和浅灰摘要；热度、阅读与收听在同一 footer 行中。继续保留下一张卡片的露出、滑动与圆点导航。
+- `FiTopicHeat`、`FiTopicReadEntry`、`FiTopicAudioEntry` 提供可选 `variant="hero"`，默认 `default` 保持列表/详情页现有外观；各组件自行持有样式，不依赖父级 scoped 穿透。首页收听标签为“听”，准备中/加载中/暂停沿用同一播放状态。
+- 热度读数仍为原计数及既有万/亿格式；装饰条只表示强弱，0–100 填充、超过 100 填满，不作为百分比或榜单指标。
+
 ### FiBottomSheet（新增均为向后兼容的可选 prop）
 
 底部弹层，承载各页面的 sheet 交互。

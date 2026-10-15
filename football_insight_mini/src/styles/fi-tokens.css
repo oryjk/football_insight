@@ -890,3 +890,39 @@ page {
   --fi-primitive-topic-history-news-accent: #347953;
   --fi-color-topic-history-news-accent: var(--fi-primitive-topic-history-news-accent);
 }
+
+/* 首页话题入口：深色新闻卡片与胶囊操作区。 */
+:root,
+page {
+  --fi-primitive-topic-hero-top: #24252e;
+  --fi-primitive-topic-hero-glow: rgba(220, 38, 38, 0.45);
+  --fi-primitive-topic-hero-muted: rgba(255, 255, 255, 0.68);
+  --fi-primitive-topic-hero-caption: rgba(255, 255, 255, 0.46);
+  --fi-primitive-topic-hero-control: rgba(255, 255, 255, 0.14);
+  --fi-primitive-topic-hero-disabled: rgba(255, 255, 255, 0.08);
+  --fi-primitive-topic-hero-track: rgba(255, 255, 255, 0.16);
+  --fi-primitive-topic-heat-start: #ff875b;
+  --fi-primitive-topic-heat-end: #ff3d45;
+  --fi-primitive-topic-hero-radius: 56rpx;
+
+  --fi-color-topic-hero-top: var(--fi-primitive-topic-hero-top);
+  --fi-color-topic-hero-bg: var(--fi-primitive-ink);
+  --fi-color-topic-hero-glow: var(--fi-primitive-topic-hero-glow);
+  --fi-color-topic-hero-text: var(--fi-color-surface);
+  --fi-color-topic-hero-muted: var(--fi-primitive-topic-hero-muted);
+  --fi-color-topic-hero-caption: var(--fi-primitive-topic-hero-caption);
+  --fi-color-topic-hero-control: var(--fi-primitive-topic-hero-control);
+  --fi-color-topic-hero-disabled: var(--fi-primitive-topic-hero-disabled);
+  --fi-color-topic-hero-track: var(--fi-primitive-topic-hero-track);
+  --fi-color-topic-heat-start: var(--fi-primitive-topic-heat-start);
+  --fi-color-topic-heat-end: var(--fi-primitive-topic-heat-end);
+  --fi-radius-topic-hero: var(--fi-primitive-topic-hero-radius);
+  --fi-gradient-topic-hero: radial-gradient(ellipse at top right, var(--fi-color-topic-hero-glow), transparent 62%), linear-gradient(150deg, var(--fi-color-topic-hero-top), var(--fi-color-topic-hero-bg) 65%);
+  --fi-gradient-topic-heat: linear-gradient(90deg, var(--fi-color-topic-heat-start), var(--fi-color-topic-heat-end));
+
+  --fi-component-topic-hero-bg: var(--fi-gradient-topic-hero);
+  --fi-component-topic-hero-radius: var(--fi-radius-topic-hero);
+  --fi-component-topic-hero-title: var(--fi-color-topic-hero-text);
+  --fi-component-topic-hero-copy: var(--fi-color-topic-hero-muted);
+  --fi-component-topic-hero-action-height: var(--fi-space-64);
+}

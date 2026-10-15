@@ -89,9 +89,9 @@ watch(() => props.edition.items.length, length => { if (activeIndex.value > leng
 .daily-topics__state-copy { display: block; margin-top: var(--fi-space-16); color: var(--fi-color-text-secondary); font-size: var(--fi-font-26); line-height: var(--fi-leading-relaxed); }
 .daily-topics__retry { display: inline-flex; margin: var(--fi-space-24) 0 0; padding: var(--fi-space-12) var(--fi-space-24); color: var(--fi-color-primary); background: var(--fi-color-topic-audio-surface); font-size: var(--fi-font-24); line-height: var(--fi-leading-normal); border-radius: var(--fi-radius-round); }
 .daily-topics__retry::after { border: 0; }
-.daily-topics__more { box-sizing: border-box; width: 100%; height: var(--fi-space-topic-card-height); margin: 0; padding: var(--fi-space-28); display: flex; flex-direction: column; align-items: flex-start; justify-content: center; border: var(--fi-border-card); border-radius: var(--fi-radius-lg); background: var(--fi-color-bg); text-align: left; box-shadow: var(--fi-shadow-card); }
+.daily-topics__more { box-sizing: border-box; width: 100%; height: var(--fi-space-topic-card-height); margin: 0; padding: var(--fi-space-28); display: flex; flex-direction: column; align-items: flex-start; justify-content: center; border: 0; border-radius: var(--fi-component-topic-hero-radius); background: var(--fi-component-topic-hero-bg); text-align: left; }
 .daily-topics__more::after { border: 0; }
-.daily-topics__more-title { color: var(--fi-color-text-primary); font-size: var(--fi-font-36); font-weight: var(--fi-weight-bold); line-height: var(--fi-leading-normal); }
-.daily-topics__more-copy { margin-top: var(--fi-space-16); color: var(--fi-color-text-secondary); font-size: var(--fi-font-26); line-height: var(--fi-leading-normal); }
-.daily-topics__more-arrow { margin-top: var(--fi-space-28); color: var(--fi-color-primary); font-size: var(--fi-font-44); }
+.daily-topics__more-title { color: var(--fi-color-topic-hero-text); font-size: var(--fi-font-36); font-weight: var(--fi-weight-bold); line-height: var(--fi-leading-normal); }
+.daily-topics__more-copy { margin-top: var(--fi-space-16); color: var(--fi-color-topic-hero-muted); font-size: var(--fi-font-26); line-height: var(--fi-leading-normal); }
+.daily-topics__more-arrow { margin-top: var(--fi-space-28); color: var(--fi-color-topic-hero-text); font-size: var(--fi-font-44); }
 </style>
