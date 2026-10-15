@@ -66,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import SeatSwapCandidateCard from '../../../components/SeatSwapCandidateCard.vue'
+import SeatSwapCandidateCard from './SeatSwapCandidateCard.vue'
 import type { SeatSwapCandidate } from '../../../types/seatSwap'
 import { buildSeatSwapRegionAnchorId, resolveSeatSwapCandidateAction } from '../helpers'
 

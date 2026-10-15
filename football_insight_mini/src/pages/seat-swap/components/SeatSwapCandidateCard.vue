@@ -63,12 +63,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { SeatSwapCandidate } from '../types/seatSwap'
+import type { SeatSwapCandidate } from '../../../types/seatSwap'
 import {
   formatSeatSwapDesiredSeats,
   formatSeatSwapSeatLabel,
   seatSwapStatusLabel,
-} from '../utils/stadiumRegions'
+} from '../../../utils/stadiumRegions'
 
 const props = defineProps<{
   candidate: SeatSwapCandidate

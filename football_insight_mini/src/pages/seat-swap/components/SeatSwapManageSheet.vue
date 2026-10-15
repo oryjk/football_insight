@@ -53,9 +53,9 @@
 </template>
 
 <script setup lang="ts">
-import FiBottomSheet from './FiBottomSheet.vue'
-import type { SeatSwapRequest } from '../types/seatSwap'
-import { formatSeatSwapSeatLabel } from '../utils/stadiumRegions'
+import FiBottomSheet from '../../../components/FiBottomSheet.vue'
+import type { SeatSwapRequest } from '../../../types/seatSwap'
+import { formatSeatSwapSeatLabel } from '../../../utils/stadiumRegions'
 
 defineProps<{
   visible: boolean
