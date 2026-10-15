@@ -32,11 +32,32 @@
       caption="正在整理这支球队本赛季的每场比赛。"
     />
 
-    <view v-else-if="errorMessage" class="state-card state-card--error team-season-sheet__state">
+    <view v-if="!loading && errorMessage" class="state-card state-card--error team-season-sheet__state">
       <text>{{ errorMessage }}</text>
     </view>
 
-    <scroll-view v-else-if="matches.length" scroll-y class="team-season-sheet__list">
+    <view v-if="!loading && !errorMessage && finishedMatches.length" class="team-season-form">
+      <view class="team-season-form__caption">
+        <text>赛季走势 · 已赛 {{ finishedMatches.length }} 场</text>
+        <text>点圆点看单场</text>
+      </view>
+      <view class="team-season-form__dots">
+        <view
+          v-for="match in finishedMatches"
+          :key="match.matchId"
+          class="team-season-form__hit"
+          role="button"
+          :aria-label="`第${match.roundNumber}轮 ${match.resultLabel} ${match.scoreText}，查看单场详情`"
+          hover-class="team-season-form__hit--pressed"
+          hover-stay-time="80"
+          @tap="emit('select-match', match)"
+        >
+          <view class="team-season-form__dot" :class="`team-season-form__dot--${match.resultTone}`" />
+        </view>
+      </view>
+    </view>
+
+    <scroll-view v-if="!loading && !errorMessage && matches.length" scroll-y class="team-season-sheet__list">
       <view
         v-for="(match, index) in matches"
         :key="match.matchId"
@@ -68,7 +89,7 @@
       </view>
     </scroll-view>
 
-    <view v-else class="team-season-sheet__empty">
+    <view v-else-if="!loading && !errorMessage" class="team-season-sheet__empty">
       <text>这支球队当前还没有可展示的赛季比赛记录。</text>
     </view>
   </HomeSheetShell>
@@ -90,12 +111,63 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
+  (e: 'select-match', match: HomeTeamSeasonMatch): void
 }>()
 
+const finishedMatches = computed(() =>
+  props.matches.filter((match) => ['win', 'draw', 'loss'].includes(match.resultTone)),
+)
 const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
 </script>
 
 <style scoped lang="css">
+.team-season-form {
+  margin-top: var(--fi-space-18);
+}
+
+.team-season-form__caption {
+  display: flex;
+  justify-content: space-between;
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-22);
+  line-height: var(--fi-leading-normal);
+}
+
+.team-season-form__dots {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: var(--fi-space-8);
+}
+
+.team-season-form__hit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 60rpx;
+  height: var(--fi-space-44);
+  border-radius: var(--fi-radius-round);
+}
+
+.team-season-form__hit--pressed {
+  background: var(--fi-color-divider-soft);
+}
+
+.team-season-form__dot {
+  width: var(--fi-space-22);
+  height: var(--fi-space-22);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-team-form-line);
+}
+
+.team-season-form__dot--win {
+  background: var(--fi-color-primary);
+}
+
+.team-season-form__dot--loss {
+  background: var(--fi-color-success-accent);
+}
+
 .state-card--error text {
   font-size: 28rpx;
   color: #c03a2b;

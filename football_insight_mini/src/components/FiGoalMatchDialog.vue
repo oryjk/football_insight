@@ -44,8 +44,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { PlayerMatchGoals } from '../../../types/insight'
-import { buildGoalMatchDetail } from '../../../utils/playerGoals'
+import type { PlayerMatchGoals } from '../types/insight'
+import { buildGoalMatchDetail } from '../utils/playerGoals'
 
 const props = defineProps<{ playerName: string; match: PlayerMatchGoals }>()
 const emit = defineEmits<{ (event: 'close'): void }>()
