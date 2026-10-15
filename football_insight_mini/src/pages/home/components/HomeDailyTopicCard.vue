@@ -41,7 +41,7 @@ const emit = defineEmits<{ (e: 'read', id: string): void; (e: 'play', id: string
 
 <style scoped>
 .topic-card { position: relative; box-sizing: border-box; height: var(--fi-space-topic-card-height); padding: var(--fi-space-32); border-radius: var(--fi-component-topic-hero-radius); background: var(--fi-component-topic-hero-bg); display: flex; flex-direction: column; overflow: hidden; }
-.topic-card__crest { position: absolute; z-index: 0; width: var(--fi-component-topic-hero-crest-size); height: var(--fi-component-topic-hero-crest-size); right: calc(-1 * var(--fi-space-32)); top: 50%; transform: translateY(-50%); opacity: 0; pointer-events: none; }
+.topic-card__crest { position: absolute; z-index: 0; width: var(--fi-component-topic-hero-crest-size); height: var(--fi-component-topic-hero-crest-size); right: calc(-1 * var(--fi-space-32)); top: 50%; transform: translateY(-50%) rotate(12deg); opacity: 0; pointer-events: none; }
 .topic-card__crest--loaded { opacity: var(--fi-component-topic-hero-crest-opacity); }
 .topic-card__top, .topic-card__reading, .topic-card__footer { position: relative; z-index: 1; }
 .topic-card__top { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-12); }
