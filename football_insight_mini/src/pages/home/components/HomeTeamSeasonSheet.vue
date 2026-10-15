@@ -135,7 +135,7 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
 
 .team-season-form__dots {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   margin-top: var(--fi-space-8);
 }
 
@@ -143,8 +143,9 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 auto;
-  width: 60rpx;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 52rpx;
   height: var(--fi-space-44);
   border-radius: var(--fi-radius-round);
 }
