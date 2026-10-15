@@ -343,7 +343,11 @@ function closeRankingTeamSheet(): void {
 }
 
 async function loadPage(): Promise<void> {
-  loading.value = true
+  // Only the first load shows the blocking loader; later refreshes swap data in silently.
+  const silent = rankings.value !== null
+  if (!silent) {
+    loading.value = true
+  }
   errorMessage.value = ''
 
   try {
@@ -359,7 +363,9 @@ async function loadPage(): Promise<void> {
       await openSharedStandingsPoster(pendingAutoOpenStandingsSlug.value)
     }
   } catch (error) {
-    errorMessage.value = extractApiErrorMessage(error, '榜单加载失败，请稍后重试。')
+    if (!silent) {
+      errorMessage.value = extractApiErrorMessage(error, '榜单加载失败，请稍后重试。')
+    }
   } finally {
     loading.value = false
   }

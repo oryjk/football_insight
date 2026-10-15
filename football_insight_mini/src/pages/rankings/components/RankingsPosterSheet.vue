@@ -7,28 +7,35 @@
           <text class="section-title">{{ table.label }}</text>
         </view>
         <view class="standings-sheet__actions">
-          <button v-if="posterImagePath" class="standings-sheet__share" open-type="share">分享</button>
-          <button v-if="posterImagePath" class="standings-sheet__save" @click="savePosterImage">保存图片</button>
-          <button class="standings-sheet__close" @click="emit('close')">关闭</button>
+          <button
+            class="standings-sheet__icon-btn standings-sheet__icon-btn--share"
+            :class="{ 'standings-sheet__icon-btn--idle': !posterImagePath }"
+            :disabled="!posterImagePath"
+            aria-label="分享榜单图片"
+            open-type="share"
+          >
+            <image :src="shareIcon" class="standings-sheet__icon" mode="aspectFit" />
+          </button>
+          <button
+            class="standings-sheet__icon-btn standings-sheet__icon-btn--save"
+            :class="{ 'standings-sheet__icon-btn--idle': !posterImagePath }"
+            :disabled="!posterImagePath"
+            aria-label="保存榜单图片"
+            @tap="savePosterImage"
+          >
+            <image :src="downloadIcon" class="standings-sheet__icon" mode="aspectFit" />
+          </button>
+          <button class="standings-sheet__icon-btn" aria-label="关闭" @tap="emit('close')">
+            <image :src="closeIcon" class="standings-sheet__icon" mode="aspectFit" />
+          </button>
         </view>
-      </view>
-
-      <FiLoading
-        v-if="generating"
-        title="榜单图片生成中"
-        caption="正在把当前积分榜整理成一张可保存的图片。"
-      />
-
-      <view v-else-if="posterImagePath" class="standings-sheet__poster">
-        <image :src="posterImagePath" mode="widthFix" class="standings-sheet__poster-image" />
-        <text class="standings-sheet__hint standings-sheet__hint--resolved">{{ posterHintText }}</text>
       </view>
 
       <view v-if="errorMessage" class="state-card state-card--error standings-sheet__error">
         <text>{{ errorMessage }}</text>
       </view>
 
-      <view v-if="!posterImagePath" class="standings-sheet__list">
+      <view class="standings-sheet__list">
         <view v-for="entry in table.entries" :key="`${table.slug}-${entry.team_id}`" class="standings-sheet__row">
           <text class="standings-sheet__rank">{{ entry.rank_no }}</text>
           <text class="standings-sheet__name">{{ entry.team_name }}</text>
@@ -52,7 +59,9 @@
 
 <script setup lang="ts">
 import { getCurrentInstance, ref, watch } from 'vue'
-import FiLoading from '../../../components/FiLoading.vue'
+import shareIcon from '../../../static/rankings/share.svg'
+import downloadIcon from '../../../static/rankings/download.svg'
+import closeIcon from '../../../static/home/sheet-close.svg'
 import type { StandingsTable, StandingsTableEntry } from '../../../types/insight'
 import { extractApiErrorMessage } from '../../../utils/apiError'
 import { exportCanvasToTempFile, flushCanvas, savePosterToAlbum, traceRoundRect } from '../../../utils/canvasPoster'
@@ -75,7 +84,6 @@ const emit = defineEmits<{
   (e: 'poster-ready', path: string): void
 }>()
 
-const posterHintText = '图片右下角已附公众号二维码水印，可直接保存或转发。'
 const posterTitleText = '中超积分榜'
 const posterBrandText = '足球洞察 · 何止编程'
 const posterSourceText = '数据来自当前抓取时点的赛季累计值'
@@ -122,7 +130,6 @@ const posterLogoCache = new Map<string, string | null>()
 
 const instance = getCurrentInstance()
 const posterImagePath = ref('')
-const generating = ref(false)
 const errorMessage = ref('')
 
 watch(
@@ -150,7 +157,6 @@ async function generate(): Promise<void> {
   const maxRows = Math.min(props.table.entries.length, 16)
   const height = headerHeight + footerHeight + rowHeight * maxRows
   errorMessage.value = ''
-  generating.value = true
 
   try {
     const context = uni.createCanvasContext(canvasId, instance)
@@ -240,8 +246,6 @@ async function generate(): Promise<void> {
     emit('poster-ready', tempFilePath)
   } catch (error) {
     errorMessage.value = extractApiErrorMessage(error, '积分榜图片生成失败，请稍后重试。')
-  } finally {
-    generating.value = false
   }
 }
 
@@ -370,66 +374,35 @@ function savePosterImage(): void {
   gap: var(--fi-space-12);
 }
 
-.standings-sheet__close {
-  display: inline-flex;
+.standings-sheet__icon-btn {
+  display: flex;
   align-items: center;
   justify-content: center;
-  white-space: nowrap;
-  line-height: var(--fi-leading-none);
-  padding: var(--fi-space-10) var(--fi-space-18);
+  width: 64rpx;
+  height: 64rpx;
+  margin: 0;
+  padding: 0;
   border-radius: var(--fi-radius-round);
   background: var(--fi-component-close-bg);
-  font-size: var(--fi-component-close-size);
-  color: var(--fi-component-close-text);
+  line-height: 1;
 }
 
-.standings-sheet__share {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-  line-height: var(--fi-leading-none);
-  padding: var(--fi-space-10) var(--fi-space-18);
-  border-radius: var(--fi-radius-round);
-  background: rgba(21, 22, 27, 0.92);
-  font-size: var(--fi-font-24);
-  color: var(--fi-primitive-white);
+.standings-sheet__icon-btn::after {
+  border: 0;
 }
 
-.standings-sheet__save {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-  line-height: var(--fi-leading-none);
-  padding: var(--fi-space-10) var(--fi-space-18);
-  border-radius: var(--fi-radius-round);
+.standings-sheet__icon-btn--save {
   background: rgba(var(--fi-primitive-red-rgb), 0.12);
-  font-size: var(--fi-font-24);
-  color: var(--fi-color-primary);
 }
 
-.standings-sheet__poster {
-  margin-top: var(--fi-space-18);
+/* Reserved from the first frame so the header never reflows when the poster finishes. */
+.standings-sheet__icon-btn--idle {
+  opacity: 0.35;
 }
 
-.standings-sheet__poster-image {
-  width: 100%;
-  border-radius: var(--fi-radius-md);
-}
-
-.standings-sheet__hint {
-  display: block;
-  margin-top: var(--fi-space-14);
-  color: transparent;
-  font-size: 0;
-  line-height: 0;
-}
-
-.standings-sheet__hint--resolved {
-  color: #767a84;
-  font-size: var(--fi-font-24);
-  line-height: 1.6;
+.standings-sheet__icon {
+  width: 32rpx;
+  height: 32rpx;
 }
 
 .standings-sheet__error {

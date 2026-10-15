@@ -19,15 +19,20 @@ export function sortStandingsPreviewTables(tables: StandingsTable[]): StandingsT
   )
 }
 
-export function buildStandingsPreviewSummary(table: StandingsTable): string {
-  if (table.slug === 'standings_without_penalty') {
-    return `榜首是 ${table.entries[0]?.team_name ?? '暂无数据'}，按理论积分重新排序。`
-  }
+export interface StandingsPreviewFacts {
+  leaderName: string
+  leaderAvatar: string | null
+  adjustedCount: number
+}
 
-  const impactedCount = table.entries.filter((item) => item.points_adjustment !== 0).length
-  return impactedCount > 0
-    ? `${impactedCount} 支球队当前存在积分调整，查看完整实际积分榜。`
-    : '当前所有球队积分与理论积分一致。'
+/** The few facts the launcher card shows instead of a sentence of prose. */
+export function buildStandingsPreviewFacts(table: StandingsTable): StandingsPreviewFacts {
+  const leader = table.entries[0]
+  return {
+    leaderName: leader?.team_name ?? '暂无数据',
+    leaderAvatar: leader?.avatar_storage_url ?? null,
+    adjustedCount: table.entries.filter((item) => item.points_adjustment !== 0).length,
+  }
 }
 
 export function buildStandingsPosterSubtitle(options: {
