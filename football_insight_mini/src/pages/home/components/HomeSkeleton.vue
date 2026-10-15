@@ -1,5 +1,16 @@
 <template>
   <view class="skeleton-stack">
+    <view class="skeleton-topic skeleton-panel">
+      <view class="skeleton-line skeleton-line--kicker" />
+      <view class="skeleton-line skeleton-line--title" />
+      <view class="skeleton-line skeleton-line--body" />
+      <view class="skeleton-line skeleton-line--body skeleton-line--body-short" />
+      <view class="skeleton-topic__footer">
+        <view class="skeleton-line skeleton-line--topic-heat" />
+        <view class="skeleton-line skeleton-line--topic-action" />
+      </view>
+    </view>
+
     <view class="skeleton-panel-card skeleton-panel">
       <view class="skeleton-heading">
         <view class="skeleton-copy-group">
@@ -66,6 +77,37 @@
 .skeleton-stack {
   display: grid;
   gap: var(--fi-space-card-gap);
+}
+
+.skeleton-topic {
+  display: grid;
+  gap: var(--fi-space-12);
+  padding: var(--fi-space-32) var(--fi-space-28, 28rpx);
+  border-radius: var(--fi-radius-topic-hero);
+  background: var(--fi-gradient-topic-hero);
+}
+
+.skeleton-topic .skeleton-line {
+  margin-top: 0;
+  background: var(--fi-color-topic-hero-control);
+  border-color: transparent;
+}
+
+.skeleton-topic__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--fi-space-16);
+}
+
+.skeleton-line--topic-heat {
+  width: 260rpx;
+  height: 16rpx;
+}
+
+.skeleton-line--topic-action {
+  width: var(--fi-space-72);
+  height: 52rpx;
 }
 
 .skeleton-panel {

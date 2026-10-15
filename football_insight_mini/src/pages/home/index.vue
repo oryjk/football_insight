@@ -6,6 +6,10 @@
     <view class="page-bg-fade"></view>
     <view class="page-scroll">
       <view class="page">
+        <!-- 首屏三路数据（话题/助力/总览）全部落定前只显示一个统一骨架，避免部分已出内容、部分仍是骨架 -->
+        <HomeSkeleton v-if="!homeInitialSettled" />
+
+        <template v-else>
         <HomeDailyTopics
           :edition="topicEdition"
           :loading="topicsLoading"
@@ -45,7 +49,8 @@
           @vote="handleHomeSupportVote"
         />
 
-        <HomeSkeleton v-if="loading" />
+        <!-- 回到页面的后台刷新沿用已有内容，只有还没有总览数据时才显示骨架 -->
+        <HomeSkeleton v-if="loading && !overview" />
 
         <view v-else-if="errorMessage" class="state-card state-card--error">
           <text>{{ errorMessage }}</text>
@@ -72,6 +77,7 @@
             :players="scorers"
             @select-match="showScorerMatch"
           />
+        </template>
         </template>
       </view>
     </view>
@@ -170,6 +176,8 @@ const homeMatchNow = useHomeMatchClock()
 const currentSeason = new Date().getFullYear()
 let homeLoadRevision = 0
 const loading = ref(true)
+// 首屏三路加载（总览/话题/助力）首次全部落定后置 true，此后刷新不再回到骨架。
+const homeInitialSettled = ref(false)
 const errorMessage = ref('')
 const overview = ref<InsightOverviewResponse | null>(null)
 const liveMatches = ref<MatchCard[]>([])
@@ -484,9 +492,10 @@ async function handleHomeSupportVote(teamId: number) {
 
 onShow(() => {
   reportPageActivity('home')
-  void loadPage()
-  void loadDailyTopics()
-  void loadSupportData()
+  const pending = [loadPage(), loadDailyTopics(), loadSupportData()]
+  if (!homeInitialSettled.value) {
+    void Promise.allSettled(pending).then(() => { homeInitialSettled.value = true })
+  }
 })
 </script>
 
