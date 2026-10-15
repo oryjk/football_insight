@@ -2,7 +2,7 @@
   <view class="page-root">
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
-    <view class="page-scroll" :class="{ 'page-scroll--locked': selectedRankingTeam || selectedRankingPlayer || selectedStandingsTable }">
+    <view class="page-scroll" :class="{ 'page-scroll--locked': selectedRankingTeam || selectedRankingPlayer || selectedStandingsTable || selectedGoalMatch }">
       <view class="page">
       <FiLoading
         v-if="loading"
@@ -34,6 +34,13 @@
       </template>
       </view>
     </view>
+
+    <FiGoalMatchDialog
+      v-if="selectedGoalMatch"
+      :player-name="selectedGoalMatch.playerName"
+      :match="selectedGoalMatch.match"
+      @close="selectedGoalMatch = null"
+    />
 
     <RankingsTeamSeasonSheet
       v-if="selectedRankingTeam"
@@ -73,13 +80,13 @@
 import { computed, ref, watch } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
+import FiGoalMatchDialog from '../../components/FiGoalMatchDialog.vue'
 import RankingsStandingsLauncher from './components/RankingsStandingsLauncher.vue'
 import RankingsSurfacePanel from './components/RankingsSurfacePanel.vue'
 import RankingsTeamSeasonSheet from './components/RankingsTeamSeasonSheet.vue'
 import RankingsPlayerSheet from './components/RankingsPlayerSheet.vue'
 import RankingsPosterSheet from './components/RankingsPosterSheet.vue'
 import { getAvailableRounds, getMatches, getRankings } from '../../api/insight'
-import { buildGoalMatchDetail } from '../../utils/playerGoals'
 import type {
   MatchCard,
   PlayerRankingEntry,
@@ -103,6 +110,8 @@ interface StandingsPosterSharePayload {
   path: string
   imageUrl?: string
 }
+
+const selectedGoalMatch = ref<{ playerName: string; match: PlayerMatchGoals } | null>(null)
 
 interface SelectedRankingTeamSheet {
   team: TeamRankingEntry
@@ -227,7 +236,7 @@ const selectedRankingTeamCategoryLabelText = computed(() => {
 })
 
 watch(
-  () => Boolean(selectedRankingTeam.value || selectedRankingPlayer.value || selectedStandingsTable.value),
+  () => Boolean(selectedRankingTeam.value || selectedRankingPlayer.value || selectedStandingsTable.value || selectedGoalMatch.value),
   (locked) => {
     emit('page-scroll-lock-change', locked)
   },
@@ -317,7 +326,7 @@ function activePlayerCategoryLabel(): string {
 }
 
 function showGoalMatchDetail(playerName: string, match: PlayerMatchGoals): void {
-  uni.showModal({ ...buildGoalMatchDetail(playerName, match), showCancel: false, confirmText: '知道了' })
+  selectedGoalMatch.value = { playerName, match }
 }
 
 function openRankingPlayerSheet(entry: PlayerRankingEntry): void {
