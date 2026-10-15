@@ -1,7 +1,7 @@
 <template>
   <view>
     <view class="standings__caption">
-      <text>本赛季赛果 · 每行 10 场，由旧到新</text>
+      <text>本赛季赛果 · 每行 15 场，由旧到新</text>
       <text>积分</text>
     </view>
     <view class="standings__list">
@@ -19,7 +19,7 @@
         <image class="standings__avatar" :src="team.avatar_storage_url || ''" mode="aspectFit" />
         <text class="standings__name">{{ team.team_name }}</text>
         <view class="standings__form">
-          <FiResultDots :items="buildOutcomeDots(team.recent_form)" size="sm" align="end" :per-row="10" highlight-latest show-latest-label empty-text="近期战绩待更新" />
+          <FiResultDots :items="buildOutcomeDots(team.recent_form)" size="sm" align="end" :per-row="15" highlight-latest show-latest-label empty-text="近期战绩待更新" />
         </view>
         <text class="standings__points">{{ team.points }}</text>
       </view>
