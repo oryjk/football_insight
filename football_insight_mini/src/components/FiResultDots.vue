@@ -64,7 +64,7 @@ const summary = computed(
   --result-cell-max: 52rpx;
 }
 .result-dots--sm {
-  --result-dot-size: 14rpx;
+  --result-dot-size: 18rpx;
   --result-cell-height: var(--fi-space-44);
   --result-cell-max: 28rpx;
 }
