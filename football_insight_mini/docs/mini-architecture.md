@@ -64,7 +64,8 @@ Store 只解决真实的跨页状态；页面 loading、弹层开关、筛选和
 ```text
 src/pages/<domain>/
   index.vue                 # 页面编排：生命周期、加载状态、导航、事件 wiring
-  helpers.ts                # 本页面纯函数/格式化/视图模型转换（现状命名，等价于 *State.ts）
+  helpers.ts                # 本页面纯函数，或保持旧导入路径的纯函数/类型门面
+  *Helpers.ts               # 可选：按业务域拆分的大型 helpers
   use<Domain>Page.ts        # 可选：较重的页面级状态与动作编排 composable
   <domain>Actions.ts        # 可选：页面级提交动作和 API 编排
   components/               # 页面局部组件（XxxPanel/XxxCard/XxxSheet）
@@ -81,6 +82,16 @@ src/pages/<domain>/
 - 单次任务只做增量拆分或增量迁移，不顺手重写整套页面风格或路由结构。
 
 已按此模式拆分的页面：`user`、`seat-swap`、`home`、`rankings`、`ticket-watch`、`support`（`useSupportPage.ts` 管加载/助力/倒计时，`useSupportPoster.ts` + `poster.ts` 管拉票海报）、`matches`（`MatchesContent.vue` 与独立入口共享 `useMatchesPage.ts` / `presentation.ts` / `components/`）。`home`、`ticket-watch`、`matches` 可作为页面编排参考。
+
+### 页面拆分进度（2026-10）
+
+- `team-board`：入口保留生命周期、导航和接线；`useTeamBoardPage.ts` 管请求、会话与草稿，五个页面局部组件管展示。快照模板只保留一份，不可变帖子/评论/点赞更新在 helpers。
+- `home`、`ticket-watch`：原 `helpers.ts` 保留为纯函数/类型重导出门面，调用路径与导出集合不变；实现按加载、展示和业务域拆分，内部共享函数不进入公开门面。
+- `ticket-watch`：`useTicketWatchBoards.ts` 负责装配；当前、历史与请求状态分别由同页模块负责。六个请求 owner/序号字段每实例创建，原 state refs 与订阅 generation 保持归属；成都/渝坤分支和旧响应保护保持原样。
+- `seat-swap`：页面 refs、加载、导航、滚动锁和弹层开关仍在入口，提交动作由 `useSeatSwapActions.ts` 编排。发布弹层同目录 `useSeatSwapPublishForm.ts` 管向导状态，通过四项 props 和 submit 回调接线。
+- `rankings`：`RankingsSurfacePanel` 保留榜单切换与滚动，球队/球员列表各自持有展示样式，通过 `rankings-shared.css` 共享原规则；运行时组件仍直接导入 `.vue`。
+
+各阶段行数、依赖图、导出集合及验证边界见[大文件拆分验证记录](plans/2026-10-large-file-splitting-validation.md)。当前仅本地分支完成；微信开发者工具/真机未验收。
 
 ### 首页今日话题
 
