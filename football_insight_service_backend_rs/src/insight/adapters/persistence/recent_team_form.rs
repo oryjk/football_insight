@@ -5,7 +5,7 @@ use sqlx::PgPool;
 
 use crate::insight::domain::overview::MatchOutcome;
 
-/// Fetch only the requested teams' ten latest valid, completed matches.
+/// Fetch every valid, completed match of the requested teams in the season, oldest first.
 /// Dates take precedence over round numbers so postponed games stay chronological.
 pub(super) async fn fetch_recent_team_form(
     pool: &PgPool,
@@ -37,8 +37,6 @@ pub(super) async fn fetch_recent_team_form(
                  AND ($4::timestamptz IS NULL OR
                       ((m.match_date::timestamp + m.match_time::time + INTERVAL '120 minutes')
                           AT TIME ZONE 'Asia/Shanghai') <= $4)
-               ORDER BY m.match_date DESC, m.match_time DESC, m.match_id DESC
-               LIMIT 10
           ) recent
          ORDER BY teams.team_id, recent.match_date, recent.match_time, recent.match_id
         "#,
@@ -129,7 +127,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "requires TEAM_FORM_TEST_DATABASE_URL pointing to disposable localhost _test DB"]
-    async fn latest_ten_follow_match_dates_and_each_teams_home_away_perspective() {
+    async fn all_matches_follow_match_dates_and_each_teams_home_away_perspective() {
         use MatchOutcome::{Draw, Loss, Win};
         let pool = fixture().await;
         let forms = fetch_recent_team_form(&pool, 2026, &[10, 20, 999], None, None)
@@ -137,11 +135,11 @@ mod tests {
             .unwrap();
         assert_eq!(
             forms[&10],
-            vec![Win, Win, Win, Loss, Draw, Win, Draw, Loss, Win, Loss]
+            vec![Loss, Draw, Win, Win, Win, Loss, Draw, Win, Draw, Loss, Win, Loss]
         );
         assert_eq!(
             forms[&20],
-            vec![Loss, Loss, Loss, Win, Draw, Loss, Draw, Win, Loss, Win]
+            vec![Win, Draw, Loss, Loss, Loss, Win, Draw, Loss, Draw, Win, Loss, Win]
         );
         assert!(!forms.contains_key(&999));
         pool.close().await;
