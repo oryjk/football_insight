@@ -92,6 +92,7 @@
 
 ## 开发约定
 
+- 每次修改完成并通过相应验证后，默认提交并推送当前工作分支，不要只停留在本地提交；用户明确要求暂不推送时除外。合并 `main`、上传小程序和生产部署按用户指令执行，推送代码不代表自动上传或部署。
 - local233 后端统一用 `cargo run --bin football_insight_service_backend_rs`，固定端口 `18092`。常驻开发服务 `football-insight-local-backend.service` 由用户级 systemd 托管该命令；仓库根目录 `./deploy/local-test/up.sh` 先编译再重启，`down.sh` 停止后端与 Redis。前台调试先停止该用户服务；开发启动不自动执行数据库迁移。小程序、H5 和 Web 后台统一连接 `172.16.60.233:18092`，不再另建 18095 验证实例。生产 peiqian 仍按现有 Docker 约定部署。
 - 安卓管理端 `football_insight_admin_android` 暂停迭代更新。后端、Web 后台、小程序和 H5 的开发不默认同步修改、构建或发布安卓项目；保留现有安卓代码。仅在用户明确要求安卓相关改动或恢复安卓迭代时再开展对应工作。
 - 前端必须使用 `bun`
