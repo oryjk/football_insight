@@ -1,0 +1,193 @@
+.section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--fi-space-12);
+}
+
+.section-heading > view {
+  display: grid;
+  gap: var(--fi-space-8);
+  min-width: 0;
+}
+
+.section-kicker {
+  margin: 0;
+  color: var(--fi-component-kicker-text);
+  font-size: var(--fi-component-kicker-size);
+  font-weight: var(--fi-weight-bold);
+  letter-spacing: 3rpx;
+}
+
+.section-title {
+  display: block;
+  color: var(--fi-color-text-strong);
+  font-size: 50rpx;
+  line-height: 1.08;
+  font-weight: var(--fi-weight-extrabold);
+}
+
+.ranking-list {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+}
+
+.ranking-row {
+  display: grid;
+  grid-template-columns: 72rpx 68rpx minmax(0, 1fr) 112rpx;
+  gap: var(--fi-space-16);
+  align-items: center;
+  width: 100%;
+  overflow: hidden;
+  padding: var(--fi-space-16) 12rpx;
+  box-sizing: border-box;
+  border-bottom: var(--fi-primitive-border-width) solid #eff1f5;
+}
+
+.ranking-row--interactive {
+  padding: var(--fi-space-14) 12rpx;
+  border-radius: var(--fi-radius-md);
+  transition: transform 180ms ease, background-color 180ms ease;
+}
+
+/* 球队行/球员行多出六边形能力图一列，能力图在列内居中并右移，避免与名称文案重叠 */
+.ranking-row--team,
+.ranking-row--player {
+  grid-template-columns: 72rpx 68rpx minmax(0, 1fr) 140rpx 112rpx;
+}
+
+.ranking-row--team .ability-hex,
+.ranking-row--player .ability-hex {
+  justify-self: end;
+}
+
+.ranking-row--pressed {
+  transform: scale(0.99);
+  background: rgba(243, 244, 247, 0.9);
+}
+
+.ranking-row__rank-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--fi-space-6);
+  flex-shrink: 0;
+}
+
+.ranking-row__rank {
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-24);
+  font-weight: var(--fi-weight-bold);
+  white-space: nowrap;
+}
+
+/* 前 3 名奖牌徽标：金 / 银 / 铜 */
+.ranking-row__rank--medal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: var(--fi-font-24);
+  font-weight: var(--fi-weight-extrabold);
+  line-height: 1;
+}
+
+.ranking-row__rank--medal.ranking-row__rank--1 {
+  background: linear-gradient(135deg, #f6c453 0%, #e89b0c 100%);
+  box-shadow: 0 6rpx 14rpx rgba(232, 155, 12, 0.35);
+}
+
+.ranking-row__rank--medal.ranking-row__rank--2 {
+  background: linear-gradient(135deg, #d7dee8 0%, #a8b3c2 100%);
+  box-shadow: 0 6rpx 14rpx rgba(148, 163, 184, 0.35);
+}
+
+.ranking-row__rank--medal.ranking-row__rank--3 {
+  background: linear-gradient(135deg, #e0995c 0%, #b06a32 100%);
+  box-shadow: 0 6rpx 14rpx rgba(176, 106, 50, 0.35);
+}
+
+/* 前 3 名行底色高亮 */
+.ranking-row--top-1,
+.ranking-row--top-2,
+.ranking-row--top-3 {
+  border-radius: var(--fi-radius-md);
+  border-bottom-color: transparent;
+}
+
+.ranking-row--top-1 {
+  background: linear-gradient(90deg, rgba(246, 196, 83, 0.14) 0%, rgba(246, 196, 83, 0.02) 70%, transparent 100%);
+}
+
+.ranking-row--top-2 {
+  background: linear-gradient(90deg, rgba(168, 179, 194, 0.16) 0%, rgba(168, 179, 194, 0.02) 70%, transparent 100%);
+}
+
+.ranking-row--top-3 {
+  background: linear-gradient(90deg, rgba(224, 153, 92, 0.14) 0%, rgba(224, 153, 92, 0.02) 70%, transparent 100%);
+}
+
+.ranking-row__avatar {
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: var(--fi-radius-round);
+  background: #f5f6fa;
+  flex-shrink: 0;
+}
+
+.ranking-row__avatar--clickable {
+  cursor: pointer;
+}
+
+.ranking-row__body,
+.ranking-row__metric {
+  display: grid;
+  min-width: 0;
+}
+
+.ranking-row__body {
+  align-content: center;
+}
+
+.ranking-row__metric {
+  justify-items: end;
+  align-content: center;
+  width: 112rpx;
+  min-width: 112rpx;
+  text-align: right;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.ranking-row__name {
+  color: var(--fi-color-text-strong);
+  font-size: var(--fi-font-30);
+  font-weight: var(--fi-weight-bold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ranking-row__note,
+.ranking-row__metric-note {
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-22);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ranking-row__metric-value {
+  color: var(--fi-color-text-strong);
+  font-size: var(--fi-font-36);
+  font-weight: var(--fi-weight-extrabold);
+  white-space: nowrap;
+}
+
+.ranking-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}

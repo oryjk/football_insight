@@ -36,103 +36,23 @@
       </view>
     </view>
 
-    <view v-if="scope === 'team' && activeTeamCategory" class="ranking-list">
-      <view class="section-heading" :class="{ 'section-heading--standings': isStandingsTeamCategory }">
-        <view>
-          <text class="section-kicker">{{ teamKicker }}</text>
-          <text class="section-title">{{ activeTeamCategory.label }}</text>
-        </view>
-        <view v-if="isStandingsTeamCategory" class="standings-mode-toggle">
-          <view
-            class="standings-mode-toggle__item"
-            :class="{ active: standingsRankingMode === 'with_penalty' }"
-            @click.stop="emit('update:standingsRankingMode', 'with_penalty')"
-          >
-            <text>含罚分</text>
-          </view>
-          <view
-            class="standings-mode-toggle__item"
-            :class="{ active: standingsRankingMode === 'without_penalty' }"
-            @click.stop="emit('update:standingsRankingMode', 'without_penalty')"
-          >
-            <text>无罚分</text>
-          </view>
-        </view>
-      </view>
+    <RankingsTeamList
+      v-if="scope === 'team' && activeTeamCategory"
+      :active-team-category="activeTeamCategory"
+      :team-categories="teamCategories"
+      :standings-tables="standingsTables"
+      :standings-ranking-mode="standingsRankingMode"
+      @update:standings-ranking-mode="emit('update:standingsRankingMode', $event)"
+      @open-team="emit('open-team', $event)"
+    />
 
-      <FiStandingsTable
-        v-if="isStandingsTeamCategory"
-        :teams="standingsTeams"
-        @select="openStandingsTeam"
-      />
-      <template v-else>
-        <view
-          v-for="entry in teamEntries"
-          :key="`${activeTeamCategory.slug}-${standingsRankingMode}-${entry.team_id}`"
-          class="ranking-row ranking-row--interactive ranking-row--team"
-          :class="resolveRankRowClass(entry.rank_no)"
-          hover-class="ranking-row--pressed"
-          hover-stay-time="100"
-          @click="emit('open-team', entry)"
-        >
-          <view class="ranking-row__rank-wrap">
-            <text class="ranking-row__rank" :class="resolveRankBadgeClass(entry.rank_no)">{{ formatRankLabel(entry.rank_no) }}</text>
-          </view>
-          <image :src="entry.avatar_storage_url || ''" mode="aspectFit" class="ranking-row__avatar" />
-          <view class="ranking-row__body">
-            <text class="ranking-row__name">{{ entry.team_name }}</text>
-            <text class="ranking-row__note">点击查看球队信息和赛程</text>
-          </view>
-          <TeamAbilityHexagon :values="resolveTeamAbilityValues(entry.team_id)" />
-          <view class="ranking-row__metric">
-            <text class="ranking-row__metric-value">{{ entry.score_value }}</text>
-            <text class="ranking-row__metric-note">{{ teamMetricLabel }}</text>
-          </view>
-        </view>
-      </template>
-    </view>
-
-    <view v-if="scope === 'player' && activePlayerCategory" class="ranking-list">
-      <view class="section-heading">
-        <view>
-          <text class="section-kicker">实时球员累计榜</text>
-          <text class="section-title">{{ activePlayerCategory.label }}</text>
-        </view>
-      </view>
-
-      <FiPlayerGoalsTable
-        v-if="activePlayerCategory.slug === 'goals'"
-        :players="activePlayerCategory.entries"
-        player-details
-        @open-player="openGoalPlayer"
-        @select-match="(name, match) => emit('select-match', name, match)"
-      />
-      <template v-else>
-        <view
-          v-for="entry in activePlayerCategory.entries"
-          :key="`${activePlayerCategory.slug}-${entry.player_id}`"
-          class="ranking-row ranking-row--player"
-          :class="resolveRankRowClass(entry.rank_no)"
-        >
-          <text class="ranking-row__rank" :class="resolveRankBadgeClass(entry.rank_no)">{{ formatRankLabel(entry.rank_no) }}</text>
-          <image
-            :src="entry.avatar_storage_url || ''"
-            mode="aspectFill"
-            class="ranking-row__avatar ranking-row__avatar--player ranking-row__avatar--clickable"
-            @click.stop="emit('open-player', entry)"
-          />
-          <view class="ranking-row__body">
-            <text class="ranking-row__name">{{ entry.player_name }}</text>
-            <text class="ranking-row__note">{{ entry.team_name }}</text>
-          </view>
-          <TeamAbilityHexagon :values="resolvePlayerAbilityValues(entry.player_id)" />
-          <view class="ranking-row__metric">
-            <text class="ranking-row__metric-value">{{ entry.score_value }}</text>
-            <text class="ranking-row__metric-note">{{ activePlayerCategory.label }}</text>
-          </view>
-        </view>
-      </template>
-    </view>
+    <RankingsPlayerList
+      v-if="scope === 'player' && activePlayerCategory"
+      :active-player-category="activePlayerCategory"
+      :player-categories="playerCategories"
+      @open-player="emit('open-player', $event)"
+      @select-match="(name, match) => emit('select-match', name, match)"
+    />
   </view>
 </template>
 
@@ -147,12 +67,9 @@ import type {
   TeamRankingCategory,
   TeamRankingEntry,
 } from '../../../types/insight'
-import { buildStandingsRankingEntries, type StandingsRankingMode } from '../poster'
-import { buildPlayerAbilityValues, buildTeamAbilityValues, TEAM_ABILITY_FALLBACK } from '../ability'
-import TeamAbilityHexagon from './TeamAbilityHexagon.vue'
-import FiStandingsTable from '../../../components/FiStandingsTable.vue'
-import FiPlayerGoalsTable from '../../../components/FiPlayerGoalsTable.vue'
-import { buildStandingsTeams } from '../helpers'
+import type { StandingsRankingMode } from '../poster'
+import RankingsTeamList from './RankingsTeamList.vue'
+import RankingsPlayerList from './RankingsPlayerList.vue'
 
 const props = defineProps<{
   rankings: RankingsViewResponse
@@ -187,51 +104,6 @@ const activeTeamCategory = computed(() =>
 const activePlayerCategory = computed(() =>
   playerCategories.value.find((item) => item.slug === props.activeCategorySlug) ?? null,
 )
-const isStandingsTeamCategory = computed(() => activeTeamCategory.value?.slug === 'standings')
-
-function openGoalPlayer(playerId: number): void {
-  const entry = activePlayerCategory.value?.entries.find(player => player.player_id === playerId)
-  if (entry) emit('open-player', entry)
-}
-const teamEntries = computed<TeamRankingEntry[]>(() => {
-  if (!activeTeamCategory.value) {
-    return []
-  }
-
-  if (!isStandingsTeamCategory.value) {
-    return activeTeamCategory.value.entries
-  }
-
-  return buildStandingsRankingEntries(standingsTables.value, props.standingsRankingMode)
-})
-const standingsTeams = computed(() => buildStandingsTeams(standingsTables.value, props.standingsRankingMode))
-
-function openStandingsTeam(row: { key: number }): void {
-  const entry = teamEntries.value.find((item) => item.team_id === row.key)
-  if (entry) emit('open-team', entry)
-}
-
-const teamKicker = computed(() =>
-  isStandingsTeamCategory.value ? '实时球队排名' : '实时球队累计榜',
-)
-const teamMetricLabel = computed(() => (isStandingsTeamCategory.value ? '积分' : '总计'))
-
-const teamAbilityByTeamId = computed<Map<number, number[]>>(() =>
-  buildTeamAbilityValues(teamCategories.value),
-)
-
-function resolveTeamAbilityValues(teamId: number): number[] {
-  return teamAbilityByTeamId.value.get(teamId) ?? TEAM_ABILITY_FALLBACK
-}
-
-const playerAbilityByPlayerId = computed<Map<number, number[]>>(() =>
-  buildPlayerAbilityValues(playerCategories.value),
-)
-
-function resolvePlayerAbilityValues(playerId: number): number[] {
-  return playerAbilityByPlayerId.value.get(playerId) ?? TEAM_ABILITY_FALLBACK
-}
-
 watch(
   categoryOptions,
   (items) => {
@@ -252,28 +124,6 @@ watch(
 watch(() => props.activeCategorySlug, () => {
   void centerActiveCategory()
 })
-
-// 前 3 名使用奖牌徽标和行高亮，其余名次保持 #n 文本。
-function resolveRankBadgeClass(rankNo: number): Record<string, boolean> {
-  return {
-    'ranking-row__rank--medal': rankNo <= 3,
-    'ranking-row__rank--1': rankNo === 1,
-    'ranking-row__rank--2': rankNo === 2,
-    'ranking-row__rank--3': rankNo === 3,
-  }
-}
-
-function resolveRankRowClass(rankNo: number): Record<string, boolean> {
-  return {
-    'ranking-row--top-1': rankNo === 1,
-    'ranking-row--top-2': rankNo === 2,
-    'ranking-row--top-3': rankNo === 3,
-  }
-}
-
-function formatRankLabel(rankNo: number): string {
-  return rankNo <= 3 ? `${rankNo}` : `#${rankNo}`
-}
 
 function hasRectShape(value: unknown): value is { left: number; width: number } {
   return !!value && typeof value === 'object'
@@ -323,48 +173,6 @@ async function centerActiveCategory(): Promise<void> {
   box-shadow: var(--fi-shadow-card);
 }
 
-.section-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--fi-space-12);
-}
-
-.section-heading > view {
-  display: grid;
-  gap: var(--fi-space-8);
-  min-width: 0;
-}
-
-.section-kicker {
-  margin: 0;
-  color: var(--fi-component-kicker-text);
-  font-size: var(--fi-component-kicker-size);
-  font-weight: var(--fi-weight-bold);
-  letter-spacing: 3rpx;
-}
-
-.section-title {
-  display: block;
-  color: var(--fi-color-text-strong);
-  font-size: 50rpx;
-  line-height: 1.08;
-  font-weight: var(--fi-weight-extrabold);
-}
-
-.section-heading--standings .section-kicker {
-  font-size: var(--fi-font-22);
-  font-weight: var(--fi-weight-medium);
-  color: var(--fi-color-primary);
-  letter-spacing: var(--fi-space-2);
-}
-
-.section-heading--standings .section-title {
-  font-size: var(--fi-font-40);
-  font-weight: var(--fi-weight-bold);
-  line-height: var(--fi-leading-snug);
-}
-
 .rankings-controls {
   display: grid;
   gap: var(--fi-space-14);
@@ -382,36 +190,6 @@ async function centerActiveCategory(): Promise<void> {
   border: var(--fi-primitive-border-width) solid var(--fi-color-border-chip);
   border-radius: var(--fi-radius-round);
   background: rgba(246, 247, 251, 0.92);
-}
-
-.standings-mode-toggle {
-  display: inline-grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2rpx;
-  flex: 0 0 auto;
-  padding: 3rpx;
-  border-radius: var(--fi-radius-round);
-  background: rgba(242, 243, 247, 0.92);
-}
-
-.standings-mode-toggle__item {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 96rpx;
-  padding: var(--fi-space-12) var(--fi-space-16);
-  border-radius: var(--fi-radius-round);
-  color: #7b818d;
-  font-size: var(--fi-font-22);
-  line-height: var(--fi-leading-none);
-  white-space: nowrap;
-}
-
-.standings-mode-toggle__item.active {
-  color: var(--fi-color-text-strong);
-  font-weight: var(--fi-weight-bold);
-  background: var(--fi-primitive-white);
-  box-shadow: 0 6rpx 14rpx rgba(18, 18, 18, 0.05);
 }
 
 .scope-toggle__button {
@@ -503,170 +281,5 @@ async function centerActiveCategory(): Promise<void> {
   width: 100%;
   padding: var(--fi-space-20);
   overflow: hidden;
-}
-
-.ranking-list {
-  display: grid;
-  gap: 0;
-  overflow: hidden;
-}
-
-.ranking-row {
-  display: grid;
-  grid-template-columns: 72rpx 68rpx minmax(0, 1fr) 112rpx;
-  gap: var(--fi-space-16);
-  align-items: center;
-  width: 100%;
-  overflow: hidden;
-  padding: var(--fi-space-16) 12rpx;
-  box-sizing: border-box;
-  border-bottom: var(--fi-primitive-border-width) solid #eff1f5;
-}
-
-.ranking-row--interactive {
-  padding: var(--fi-space-14) 12rpx;
-  border-radius: var(--fi-radius-md);
-  transition: transform 180ms ease, background-color 180ms ease;
-}
-
-/* 球队行/球员行多出六边形能力图一列，能力图在列内居中并右移，避免与名称文案重叠 */
-.ranking-row--team,
-.ranking-row--player {
-  grid-template-columns: 72rpx 68rpx minmax(0, 1fr) 140rpx 112rpx;
-}
-
-.ranking-row--team .ability-hex,
-.ranking-row--player .ability-hex {
-  justify-self: end;
-}
-
-.ranking-row--pressed {
-  transform: scale(0.99);
-  background: rgba(243, 244, 247, 0.9);
-}
-
-.ranking-row__rank-wrap {
-  display: flex;
-  align-items: center;
-  gap: var(--fi-space-6);
-  flex-shrink: 0;
-}
-
-.ranking-row__rank {
-  color: var(--fi-color-text-muted);
-  font-size: var(--fi-font-24);
-  font-weight: var(--fi-weight-bold);
-  white-space: nowrap;
-}
-
-/* 前 3 名奖牌徽标：金 / 银 / 铜 */
-.ranking-row__rank--medal {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44rpx;
-  height: 44rpx;
-  border-radius: 50%;
-  color: #ffffff;
-  font-size: var(--fi-font-24);
-  font-weight: var(--fi-weight-extrabold);
-  line-height: 1;
-}
-
-.ranking-row__rank--medal.ranking-row__rank--1 {
-  background: linear-gradient(135deg, #f6c453 0%, #e89b0c 100%);
-  box-shadow: 0 6rpx 14rpx rgba(232, 155, 12, 0.35);
-}
-
-.ranking-row__rank--medal.ranking-row__rank--2 {
-  background: linear-gradient(135deg, #d7dee8 0%, #a8b3c2 100%);
-  box-shadow: 0 6rpx 14rpx rgba(148, 163, 184, 0.35);
-}
-
-.ranking-row__rank--medal.ranking-row__rank--3 {
-  background: linear-gradient(135deg, #e0995c 0%, #b06a32 100%);
-  box-shadow: 0 6rpx 14rpx rgba(176, 106, 50, 0.35);
-}
-
-/* 前 3 名行底色高亮 */
-.ranking-row--top-1,
-.ranking-row--top-2,
-.ranking-row--top-3 {
-  border-radius: var(--fi-radius-md);
-  border-bottom-color: transparent;
-}
-
-.ranking-row--top-1 {
-  background: linear-gradient(90deg, rgba(246, 196, 83, 0.14) 0%, rgba(246, 196, 83, 0.02) 70%, transparent 100%);
-}
-
-.ranking-row--top-2 {
-  background: linear-gradient(90deg, rgba(168, 179, 194, 0.16) 0%, rgba(168, 179, 194, 0.02) 70%, transparent 100%);
-}
-
-.ranking-row--top-3 {
-  background: linear-gradient(90deg, rgba(224, 153, 92, 0.14) 0%, rgba(224, 153, 92, 0.02) 70%, transparent 100%);
-}
-
-.ranking-row__avatar {
-  width: 68rpx;
-  height: 68rpx;
-  border-radius: var(--fi-radius-round);
-  background: #f5f6fa;
-  flex-shrink: 0;
-}
-
-.ranking-row__avatar--clickable {
-  cursor: pointer;
-}
-
-.ranking-row__body,
-.ranking-row__metric {
-  display: grid;
-  min-width: 0;
-}
-
-.ranking-row__body {
-  align-content: center;
-}
-
-.ranking-row__metric {
-  justify-items: end;
-  align-content: center;
-  width: 112rpx;
-  min-width: 112rpx;
-  text-align: right;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-
-.ranking-row__name {
-  color: var(--fi-color-text-strong);
-  font-size: var(--fi-font-30);
-  font-weight: var(--fi-weight-bold);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.ranking-row__note,
-.ranking-row__metric-note {
-  color: var(--fi-color-text-muted);
-  font-size: var(--fi-font-22);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.ranking-row__metric-value {
-  color: var(--fi-color-text-strong);
-  font-size: var(--fi-font-36);
-  font-weight: var(--fi-weight-extrabold);
-  white-space: nowrap;
-}
-
-.ranking-row:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
 }
 </style>
