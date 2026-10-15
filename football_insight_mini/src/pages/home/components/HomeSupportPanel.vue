@@ -16,7 +16,6 @@
         <text class="support-home-panel__context-label">{{ badge }}</text>
         <text class="support-home-panel__context-note">{{ contextNote }}</text>
       </view>
-      <text v-if="refreshing" class="support-home-panel__refreshing">更新中</text>
     </view>
 
     <FiLoading
@@ -151,7 +150,6 @@ const daysRemaining = computed(() => props.hasAuthToken && favoriteTeam.value &&
 const showLoading = computed(() =>
   shouldShowHomeSupportLoading({ loading: props.loading, hasCachedProfile: !!props.profile }),
 )
-const refreshing = computed(() => props.loading && !!props.profile)
 const badge = computed(() => {
   if (!props.hasAuthToken) {
     return '登录后开启'
@@ -275,15 +273,6 @@ const awayRankLabel = computed(() => {
   color: var(--fi-color-text-muted);
   font-size: 22rpx;
   line-height: 1.2;
-}
-.support-home-panel__refreshing {
-  justify-self: start;
-  color: var(--fi-color-text-secondary);
-  font-size: 20rpx;
-  line-height: 1;
-  padding: 8rpx 14rpx;
-  border-radius: 999rpx;
-  background: var(--fi-color-page);
 }
 .support-home-panel__action {
   margin-top: 18rpx;
