@@ -82,8 +82,8 @@ component（--fi-component-*）   组件级复合契约（卡片、kicker/标题
 ### 首页话题入口
 
 - `HomeDailyTopicCard` 使用 `--fi-component-topic-hero-*` 契约：深色红晕渐变、大圆角、红色类别标签、白色标题和浅灰摘要；热度、阅读与收听在同一 footer 行中。继续保留下一张卡片的露出、滑动与圆点导航。
-- 文章标签包含成都蓉城稳定 ID 时，卡片右侧展示现有队徽的放大半透明水印，顺时针倾斜 12°；尺寸和透明度归入 `--fi-component-topic-hero-crest-*`。图片加载失败隐藏，装饰层不拦截点击。
-- `FiTopicHeat`、`FiTopicReadEntry`、`FiTopicAudioEntry` 提供可选 `variant="hero"`，默认 `default` 保持列表/详情页现有外观；各组件自行持有样式，不依赖父级 scoped 穿透。首页收听标签为“听”，准备中/加载中/暂停沿用同一播放状态。
+- 文章标签包含成都蓉城稳定 ID 时，卡片右侧展示现有队徽的放大半透明水印，顺时针倾斜 12°；尺寸和透明度归入 `--fi-component-topic-crest-*`。`FiTopicCrest` 由首页与全部话题列表共用：保持浅色列表布局，`history` 变体使用更淡的透明度。图片加载失败隐藏，装饰层不拦截点击。
+- `FiTopicHeat`、`FiTopicReadEntry`、`FiTopicAudioEntry` 提供可选 `variant="hero"`，默认 `default` 保持列表/详情页现有外观；各组件自行持有样式，不依赖父级 scoped 穿透。首页收听标签为“听”，准备中/加载中/暂停沿用同一播放状态；hero 标签固定预留三个汉字的宽度，状态变化不挤压相邻热度条。
 - 热度读数仍为原计数及既有万/亿格式；装饰条只表示强弱，0–100 填充、超过 100 填满，不作为百分比或榜单指标。
 
 ### FiBottomSheet（新增均为向后兼容的可选 prop）

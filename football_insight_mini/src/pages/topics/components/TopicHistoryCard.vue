@@ -1,5 +1,6 @@
 <template>
   <view class="topic-row" :class="`topic-row--${presentation.tone}`" role="button" :aria-label="`阅读${item.title}`" hover-class="topic-row--pressed" @tap="emit('read', item.id)">
+    <FiTopicCrest :item="item" variant="history" />
     <view class="topic-row__top">
       <text class="topic-row__badge">{{ presentation.label }}</text>
       <text class="topic-row__date">{{ item.publishedLabel }}</text>
@@ -14,6 +15,7 @@
 </template>
 <script setup lang="ts">
 import { computed } from 'vue'
+import FiTopicCrest from '../../../components/topics/FiTopicCrest.vue'
 import FiTopicHeat from '../../../components/topics/FiTopicHeat.vue'
 import FiTopicReadEntry from '../../../components/topics/FiTopicReadEntry.vue'
 import type { DailyTopicItem } from '../../../types/dailyTopic'
@@ -28,6 +30,7 @@ const presentation = computed(() => topicCardPresentation(props.item.title))
 .topic-row--preview { --topic-bg: var(--fi-color-topic-history-preview-bg); --topic-accent: var(--fi-color-topic-history-preview-accent); }
 .topic-row--analysis { --topic-bg: var(--fi-color-topic-history-analysis-bg); --topic-accent: var(--fi-color-topic-history-analysis-accent); }
 .topic-row--pressed { opacity: 0.9; transform: scale(0.99); }
+.topic-row__top, .topic-row__title, .topic-row__summary, .topic-row__footer { position: relative; z-index: 1; }
 .topic-row__top { display: flex; justify-content: space-between; align-items: center; gap: var(--fi-space-12); }
 .topic-row__badge { flex-shrink: 0; padding: var(--fi-space-6) var(--fi-space-14); border: var(--fi-border-width) solid currentColor; border-radius: var(--fi-radius-round); color: var(--topic-accent); background: var(--fi-color-bg); font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); }
 .topic-row__date { min-width: 0; color: var(--fi-color-text-caption); font-size: var(--fi-font-20); text-align: right; }

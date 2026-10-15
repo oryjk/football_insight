@@ -3,6 +3,11 @@ import type { DailyTopicEdition, DailyTopicImage, DailyTopicItem, DailyTopicSour
 export const DAILY_TOPICS_TEAM_ID = 77680
 export const DAILY_TOPICS_LIMIT = 5
 
+export function isRongchengTopic(item: Pick<DailyTopicItem, 'teamTags'>): boolean {
+  // The edition owner is shared by all clubs; only article tags identify Rongcheng.
+  return item.teamTags?.some(tag => tag.teamId === DAILY_TOPICS_TEAM_ID) ?? false
+}
+
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown> : null
