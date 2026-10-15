@@ -1,6 +1,6 @@
 # 大文件拆分验证记录（2026-10-15）
 
-对应计划：[`2026-10-large-file-splitting.md`](./2026-10-large-file-splitting.md)。基线 `9d5eed1`；最终交付分支 `codex/large-file-splitting-isolated`。本次为纯重构，保留业务行为、文案、接口与路由。执行顺序为 1 → 2 → 4 → 3，把请求并发状态拆分放在最后。
+对应计划：[`2026-10-large-file-splitting.md`](./2026-10-large-file-splitting.md)。基线 `9d5eed1`；交付分支 `codex/large-file-splitting-isolated`，现已合入 main。本次为纯重构，保留业务行为、文案、接口与路由。执行顺序为 1 → 2 → 4 → 3，把请求并发状态拆分放在最后。
 
 ## 本地提交与规模
 
@@ -74,10 +74,18 @@ flowchart TD
 - 按仓库前端约定，仅新增计划要求的 8 项状态更新测试，其他提取用现有测试、源代码核对、构建及 H5 对比验证；未覆盖的微信原生行为仍需人工验收。
 - 换座页 script 保留 259 行，未达到约 200 行目标。原计划要求页面保留加载、导航、弹层、区域和滚动编排；避免为行数再扩大提取范围，代价是页面仍比目标多约 59 行。
 
-- 施工中共享 checkout 出现无关弹框提交 `19db4ba`；保留原目录及全部提交，使用 Codex 托管 worktree 从 `36fce36` 继续，只 cherry-pick 本阶段的 `38f6587` 为 `1bb8b6d`。最终分支不包含外部提交；代价是原 `codex/large-file-splitting` 混合分支仍保留，后续应使用这里指定的 isolated 分支。
+- 施工中共享 checkout 出现无关弹框提交 `19db4ba`；保留原目录及全部提交，使用 Codex 托管 worktree 从 `36fce36` 继续，只 cherry-pick 本阶段的 `38f6587` 为 `1bb8b6d`。最终分支不包含外部提交；代价是原 `codex/large-file-splitting` 混合分支仍保留；交付的 isolated 分支已合入 main，后续以 main 为准。
 
 ## 验证边界与发布状态
 
 浏览器检查使用拦截的模拟 API，没有写生产数据。H5 不能替代微信原生组件样式隔离、触控、键盘与真机布局验收；本次未在微信开发者工具或真机验证。构建的 uni-app/caniuse-lite 更新提示为现有提示，未升级依赖。
 
-交付工作区：`/home/betalpha/.codex/worktrees/large-file-splitting/football_insight`。仅本地分阶段提交；未合并 main、未推送、未上传小程序、未部署。本地和生产后端均未修改、未重启。
+开发 worktree：`/home/betalpha/.codex/worktrees/large-file-splitting/football_insight`，保留原实现快照。
+
+2026-10-15 按用户要求发布：
+
+- 实现 `79121d9` 已快进合入并推送 main；原目录 `/home/betalpha/projects/football_insight` 已切回 main。
+- 合并后类型检查通过，649 项测试全过（52 文件）；全分支空白检查通过。
+- 统一 `bun run mp:release -- --robot 2` 向登记库申请版本，分配 `1.0.73` 后按门禁先提交推送两个版本文件（`42fbeb4`），再次执行时复用该版本。
+- 从同一干净、与 origin/main 同步的 `42fbeb4` 构建并成功上传 robot 2，完整包 2,023,964 字节。Git 门禁、依赖边界、组件注册及生产 API 产物校验通过。
+- 本地和生产后端均未修改、未部署或重启；微信开发者工具及真机未验收。

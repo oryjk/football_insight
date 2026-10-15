@@ -91,7 +91,7 @@ src/pages/<domain>/
 - `seat-swap`：页面 refs、加载、导航、滚动锁和弹层开关仍在入口，提交动作由 `useSeatSwapActions.ts` 编排。发布弹层同目录 `useSeatSwapPublishForm.ts` 管向导状态，通过四项 props 和 submit 回调接线。
 - `rankings`：`RankingsSurfacePanel` 保留榜单切换与滚动，球队/球员列表各自持有展示样式，通过 `rankings-shared.css` 共享原规则；运行时组件仍直接导入 `.vue`。
 
-各阶段行数、依赖图、导出集合及验证边界见[大文件拆分验证记录](plans/2026-10-large-file-splitting-validation.md)。当前仅本地分支完成；微信开发者工具/真机未验收。
+各阶段行数、依赖图、导出集合及验证边界见[大文件拆分验证记录](plans/2026-10-large-file-splitting-validation.md)。已合入 main 并上传 robot 2 测试版；微信开发者工具/真机未验收。
 
 ### 首页今日话题
 

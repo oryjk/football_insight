@@ -4,7 +4,7 @@
 
 - 项目定位：面向中国足球用户的数据洞察产品，包含数据抓取、Rust API、小程序/H5、Web 和原生 Android 管理端。
 - 当前状态：已上线运行（线上入口 `match.oryjk.cn`）
-- 最新发布（2026-10-14）：peiqian 生产 Docker `3dc20d6` 已部署并重启且 healthy；同一干净 main 构建的小程序 1.0.70 已上传 robot 2，包含首页双方一键助力、紧凑红色选中状态、开球前取消与重新选择，以及已提交的进球居中详情弹框。线上助力接口、首页读取及未登录提交/取消拒绝已验证，旧后端容器保留回滚。
+- 最新发布（2026-10-15）：小程序 1.0.73 已从干净 main（`42fbeb4`）通过 robot 2 上传，包含战术板、home/ticket-watch helpers、换座流程与排行榜的职责拆分。合并后 649 项测试、类型检查、发布门禁、组件注册与生产 API 校验通过；本次未部署或重启本地/生产后端，微信开发者工具与真机验收待完成。
 
 ## 已完成
 
@@ -111,7 +111,7 @@
 
 ### 小程序设计规范
 
-- 大页面按编排、局部展示与状态/动作模块拆分；home/ticket-watch helpers 保留兼容门面，请求 owner 按实例隔离。已在本地分支完成，未发布；详见[结构与验证记录](football_insight_mini/docs/plans/2026-10-large-file-splitting-validation.md)。
+- 大页面按编排、局部展示与状态/动作模块拆分；home/ticket-watch helpers 保留兼容门面，请求 owner 按实例隔离。已合入推送 main，并上传小程序 1.0.73 robot 2；详见[结构与验证记录](football_insight_mini/docs/plans/2026-10-large-file-splitting-validation.md)。
 
 - 换座专用组件归位；我的页三个表单复用支持自适应高度、层级与 H5 底栏避让的 `FiBottomSheet`，操作区使用带安全区留白的 footer。已合入推送 main，并从干净 `7f62074` 上传小程序 `1.0.72` robot 2；微信端滚动、键盘与安全区待真机验收。
 
