@@ -11,7 +11,7 @@ import type {
 } from '../../types/insight'
 import type { SupportMatchDetail } from '../../types/support'
 import { isUnauthorizedError } from '../../utils/apiError'
-import { resolveMatchDisplayStatus } from '../../utils/matchDisplayStatus'
+import { LIVE_INFERENCE_WINDOW_MS, parseMatchKickoff, resolveMatchDisplayStatus } from '../../utils/matchDisplayStatus'
 import type { HomeBriefingMarqueeAccent } from '../../utils/homeBriefingMarquees'
 
 export type HomeHeroGuide =
@@ -105,6 +105,12 @@ function mapLiveMatchToPulseMatch(
     away_corners: match.away_corners,
     status: 'live',
   }
+}
+
+function mapFinishedMatchToPulseMatch(
+  match: Pick<MatchCard, 'match_id' | 'round_number' | 'match_date' | 'match_time' | 'home_team_name' | 'home_score' | 'away_team_name' | 'away_score' | 'technical_stats' | 'home_corners' | 'away_corners'>,
+): HomePulseLeadMatch {
+  return { ...mapLiveMatchToPulseMatch(match), status: 'finished' }
 }
 
 function mergeRecentMatchWithLiveMatch(
@@ -241,16 +247,37 @@ export function resolveHomePulseMatches(
     return activeLiveMatches.map(mapLiveMatchToPulseMatch)
   }
 
-  const recentMatch = recentMatches[0]
-  if (!recentMatch) {
-    return []
+  // 无进行中比赛：展示最近一轮已完赛的全部场次（live 列表即最新一轮），
+  // 首屏 live 列表未返回时退回概览里的最近完赛。
+  const finishedRound = liveMatches
+    .filter((match) => match.status === 'finished')
+    .map((match) => mapFinishedMatchToPulseMatch(match))
+  const finished = finishedRound.length
+    ? finishedRound
+    : recentMatches
+        .filter((match) => match.round_number === recentMatches[0]?.round_number)
+        .map((match) => mergeRecentMatchWithLiveMatch(match, undefined))
+
+  return isHomePulseResultFresh(finished, nowIso) ? finished : []
+}
+
+/** 最近一轮最晚一场完赛超过 24 小时后，不再作为"实时"信息展示。 */
+export const HOME_PULSE_RESULT_FRESH_WINDOW_MS = 24 * 60 * 60 * 1000
+
+function isHomePulseResultFresh(
+  matches: Array<Pick<HomePulseLeadMatch, 'match_date' | 'match_time'>>,
+  nowIso: string,
+): boolean {
+  const nowAt = new Date(nowIso).getTime()
+  const kickoffs = matches
+    .map((match) => parseMatchKickoff(match.match_date, match.match_time))
+    .filter((value): value is number => value !== null)
+
+  if (!kickoffs.length || Number.isNaN(nowAt)) {
+    return false
   }
 
-  const liveMatchMap = new Map(liveMatches.map((match) => [match.match_id, match]))
-
-  return recentMatches
-    .slice(0, 3)
-    .map((match) => mergeRecentMatchWithLiveMatch(match, liveMatchMap.get(match.match_id)))
+  return nowAt <= Math.max(...kickoffs) + LIVE_INFERENCE_WINDOW_MS + HOME_PULSE_RESULT_FRESH_WINDOW_MS
 }
 
 export function formatHomePulseCornerText(

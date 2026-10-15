@@ -98,14 +98,6 @@ const emit = defineEmits<{
   color: var(--fi-color-primary);
 }
 
-.ranking-row__rank--2 {
-  color: var(--fi-color-ranking-second);
-}
-
-.ranking-row__rank--3 {
-  color: var(--fi-color-ranking-third);
-}
-
 .ranking-row__avatar {
   width: var(--fi-space-44);
   height: var(--fi-space-44);

@@ -71,9 +71,9 @@ const emit = defineEmits<{ (event: 'select', row: { key: number }): void }>()
   background: var(--fi-color-team-form-pressed);
 }
 .standings__rank {
-  color: var(--fi-color-text-caption);
+  color: var(--fi-color-text-muted);
   font-size: var(--fi-font-24);
-  font-weight: var(--fi-weight-medium);
+  font-weight: var(--fi-weight-bold);
   font-variant-numeric: tabular-nums;
 }
 .standings__rank--first {

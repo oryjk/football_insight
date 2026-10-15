@@ -2,9 +2,9 @@ import type { MatchCard } from '../types/insight'
 
 export type MatchDisplayStatus = MatchCard['status']
 
-const LIVE_INFERENCE_WINDOW_MS = 3 * 60 * 60 * 1000
+export const LIVE_INFERENCE_WINDOW_MS = 3 * 60 * 60 * 1000
 
-function parseMatchKickoff(matchDate: string, matchTime: string): number | null {
+export function parseMatchKickoff(matchDate: string, matchTime: string): number | null {
   const date = matchDate?.trim()
   const time = matchTime?.trim()
 

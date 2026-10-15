@@ -330,46 +330,56 @@ describe('resolveHomePulseMatches', () => {
     expect(matches[0]?.status).toBe('live')
   })
 
-  test('falls back to a single recent finished match when there are no live matches', () => {
+  test('shows every finished match of the latest round when nothing is live', () => {
     const matches = resolveHomePulseMatches(
       [
-        createLiveMatch({ status: 'scheduled' }),
-        createLiveMatch({
-          match_id: 11,
-          status: 'finished',
-          home_team_name: '上海申花',
-          away_team_name: '上海海港',
-          home_score: '2',
-          away_score: '1',
-          home_corners: 4,
-          away_corners: 8,
-          corner_source: 'leisu_detail',
-          technical_stats: [
-            { slug: 'attacks', label: '进攻', home_value: 92, away_value: 118, unit: null },
-            { slug: 'corners', label: '角球', home_value: 4, away_value: 8, unit: null },
-          ],
-        }),
+        ...[11, 12, 13, 14, 15, 16, 17, 18].map((id) =>
+          createLiveMatch({ match_id: id, status: 'finished', match_date: '2026-04-17' }),
+        ),
+        createLiveMatch({ match_id: 19, status: 'scheduled', match_date: '2026-04-20' }),
       ],
-      [
-        createRecentMatch(),
-        createRecentMatch({ match_id: 12, home_team_name: '北京国安', away_team_name: '成都蓉城' }),
-        createRecentMatch({ match_id: 13, home_team_name: '天津津门虎', away_team_name: '青岛海牛' }),
-        createRecentMatch({ match_id: 14, home_team_name: '浙江队', away_team_name: '武汉三镇' }),
-      ],
-      '2026-04-17T18:00:00+08:00',
+      [createRecentMatch()],
+      '2026-04-18T10:00:00+08:00',
     )
 
-    expect(matches.length).toBe(3)
-    expect(matches[0]?.status).toBe('finished')
-    expect(matches[0]?.match_id).toBe(11)
-    expect(matches[0]?.home_corners).toBe(4)
-    expect(matches[0]?.away_corners).toBe(8)
-    expect(matches[0]?.technical_stats).toEqual([
-      { slug: 'attacks', label: '进攻', home_value: 92, away_value: 118, unit: null },
+    expect(matches.map((match) => match.match_id)).toEqual([11, 12, 13, 14, 15, 16, 17, 18])
+    expect(matches.every((match) => match.status === 'finished')).toBe(true)
+  })
+
+  test('keeps technical stats of finished matches', () => {
+    const technicalStats = [
       { slug: 'corners', label: '角球', home_value: 4, away_value: 8, unit: null },
-    ])
-    expect(matches[1]?.match_id).toBe(12)
-    expect(matches[2]?.match_id).toBe(13)
+    ]
+    const matches = resolveHomePulseMatches(
+      [createLiveMatch({ status: 'finished', home_corners: 4, away_corners: 8, technical_stats: technicalStats })],
+      [],
+      '2026-04-17T23:00:00+08:00',
+    )
+
+    expect(matches[0]?.home_corners).toBe(4)
+    expect(matches[0]?.technical_stats).toEqual(technicalStats)
+  })
+
+  test('uses the overview recent matches of the latest round before the live list arrives', () => {
+    const matches = resolveHomePulseMatches(
+      [],
+      [
+        createRecentMatch({ match_id: 12, round_number: 6 }),
+        createRecentMatch({ match_id: 13, round_number: 6 }),
+        createRecentMatch({ match_id: 14, round_number: 5 }),
+      ],
+      '2026-04-17T12:00:00+08:00',
+    )
+
+    expect(matches.map((match) => match.match_id)).toEqual([12, 13])
+  })
+
+  test('hides finished results once the latest match ended more than a day ago', () => {
+    const live = [createLiveMatch({ status: 'finished', match_date: '2026-04-17', match_time: '19:35' })]
+
+    expect(resolveHomePulseMatches(live, [], '2026-04-18T22:00:00+08:00').length).toBe(1)
+    expect(resolveHomePulseMatches(live, [], '2026-04-19T00:00:00+08:00')).toEqual([])
+    expect(resolveHomePulseMatches([], [createRecentMatch()], '2026-04-30T00:00:00+08:00')).toEqual([])
   })
 })
 
