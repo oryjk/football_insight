@@ -936,3 +936,18 @@ page {
   --fi-component-topic-crest-opacity: var(--fi-opacity-topic-hero-crest);
   --fi-component-topic-crest-history-opacity: var(--fi-opacity-topic-history-crest);
 }
+
+/* 赛事记分牌弹框（单场进球详情）：沿用话题 hero 深色底，金色仅用于帽子戏法 */
+:root {
+  --fi-primitive-match-card-gold: #f5c451;
+  --fi-primitive-match-card-gold-soft: rgba(245, 196, 81, 0.16);
+  --fi-primitive-match-card-hairline: rgba(255, 255, 255, 0.1);
+  --fi-primitive-match-card-overlay: rgba(10, 11, 16, 0.72);
+  --fi-primitive-match-card-shadow: 0 40rpx 96rpx rgba(0, 0, 0, 0.5);
+
+  --fi-color-match-card-gold: var(--fi-primitive-match-card-gold);
+  --fi-color-match-card-gold-soft: var(--fi-primitive-match-card-gold-soft);
+  --fi-color-match-card-hairline: var(--fi-primitive-match-card-hairline);
+  --fi-color-match-card-overlay: var(--fi-primitive-match-card-overlay);
+  --fi-shadow-match-card: var(--fi-primitive-match-card-shadow);
+}
