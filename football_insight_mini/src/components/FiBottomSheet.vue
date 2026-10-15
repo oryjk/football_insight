@@ -3,6 +3,7 @@
     v-if="rendered"
     class="fi-sheet-mask"
     :class="{ 'fi-sheet-mask--closing': closing }"
+    :style="maskStyle"
     @touchmove.stop.prevent
     @tap="handleMaskTap"
   >
@@ -23,7 +24,14 @@
         <button class="fi-sheet-card__close" @tap="handleClose">✕</button>
       </view>
 
-      <scroll-view scroll-y class="fi-sheet-card__body" @touchmove.stop>
+      <view
+        v-if="fitContent"
+        class="fi-sheet-card__body fi-sheet-card__body--fit-content"
+        @touchmove.stop
+      >
+        <slot></slot>
+      </view>
+      <scroll-view v-else scroll-y class="fi-sheet-card__body" @touchmove.stop>
         <slot></slot>
       </scroll-view>
 
@@ -48,6 +56,9 @@ interface Props {
   height?: string
   closeOnMask?: boolean
   compactFooter?: boolean
+  fitContent?: boolean
+  zIndex?: number
+  respectWindowBottom?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -56,6 +67,9 @@ const props = withDefaults(defineProps<Props>(), {
   height: '88vh',
   closeOnMask: true,
   compactFooter: false,
+  fitContent: false,
+  zIndex: 40,
+  respectWindowBottom: false,
 })
 
 const emit = defineEmits<{
@@ -65,9 +79,13 @@ const emit = defineEmits<{
 
 const slots = useSlots()
 const hasFooter = computed(() => !!slots.footer)
+const maskStyle = computed(() => ({
+  zIndex: props.zIndex,
+  bottom: props.respectWindowBottom ? 'var(--window-bottom, 0px)' : undefined,
+}))
 const cardStyle = computed(() => ({
   '--fi-sheet-height': props.height,
-  height: props.height,
+  height: props.fitContent ? 'auto' : props.height,
   maxHeight: props.height,
 }))
 const rendered = ref(props.visible)
@@ -213,6 +231,13 @@ function handleMaskTap() {
   height: 100%;
   padding: 6rpx 30rpx 20rpx;
   box-sizing: border-box;
+}
+
+.fi-sheet-card__body--fit-content {
+  flex: 0 1 auto;
+  height: auto;
+  max-height: var(--fi-sheet-height);
+  overflow-y: auto;
 }
 
 .fi-sheet-card__footer {

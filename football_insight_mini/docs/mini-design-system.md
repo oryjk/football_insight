@@ -79,14 +79,18 @@ component（--fi-component-*）   组件级复合契约（卡片、kicker/标题
 - 宿主是一个纵向 flex 卡片（`gap`/`padding`/圆角/磨砂白底/浮起阴影），宽度由父级 wrapper 决定；长 title/caption 自然换行，组件不做截断。
 - 样式全部来自 component token：`--fi-component-loading-*`（bg/radius/shadow/gap/padding/title-*/caption-*），取值提取自组件原实现，token 化前后视觉不变。
 
-### FiBottomSheet（既有契约，记录不改实现）
+### FiBottomSheet（新增均为向后兼容的可选 prop）
 
 底部弹层，承载各页面的 sheet 交互。
 
 - Props：`visible: boolean`（必填，配合 `v-model:visible`）、`title?: string`、`eyebrow?: string`（默认 `''`）、`height?: string`（默认 `'88vh'`）、`closeOnMask?: boolean`（默认 `true`）、`compactFooter?: boolean`（默认 `false`）。
+- `fitContent?: boolean`（默认 `false`）：卡片随内容自适应高度，`height` 作为最大高度；内容区使用普通 `view` + `overflow-y: auto`，避免自适应 flex 下 `scroll-view` 内层高度大于可见区域而裁掉底部内容。默认模式保留固定高度和原结构。
+- `zIndex?: number`（默认 `40`）：设置遮罩层级，需要覆盖页面浮层的表单弹层可显式传入。
+- `respectWindowBottom?: boolean`（默认 `false`）：遮罩底部使用 `var(--window-bottom, 0px)`，用于 H5 底栏避让。
 - Emits：`update:visible`、`close`。
-- Slots：默认（body，scroll-view 滚动）、`footer`。
+- Slots：默认（body，默认 `scroll-view` 滚动，自适应时 `view` 滚动）、`footer`。
 - mask 已处理 `@touchmove.stop.prevent` 与内容区 `@touchmove.stop` 防穿透。
+- 关闭仍保留 220ms 动画。表单保存中需设置 `closeOnMask=false`，并在 `update:visible` 处理函数中拦截关闭（头部 `✕` 同样走该事件）；组件不自行修改 `visible`。由外部控制显隐，关闭动画期间需保留表单展示数据。
 
 **弹框滚动锁约定**：小程序里 sheet 打开后要锁底层页面滚动时，由真正的页面入口（`src/pages/**/index.vue`）用 `page-meta` 做页面级锁：
 
