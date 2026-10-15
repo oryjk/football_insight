@@ -1,13 +1,22 @@
 <template>
-  <HomeSheetShell animated kicker="比赛技术统计" title="技术统计" @close="emit('close')">
+  <HomeSheetShell animated kicker="MATCH CENTER · 技术统计" @close="emit('close')">
     <view class="tech-stats-body">
-      <view class="tech-stats-sheet__summary">
-        <text class="tech-stats-sheet__teams">
-          {{ match.home_team_name }} {{ match.home_score }} : {{ match.away_score }} {{ match.away_team_name }}
-        </text>
-        <text class="tech-stats-sheet__meta">
-          第 {{ match.round_number }} 轮 · {{ match.match_date }} {{ match.match_time }}
-        </text>
+      <view class="tech-board">
+        <view class="tech-board__stripe" />
+        <text class="tech-board__round">第 {{ match.round_number }} 轮 · 中超</text>
+        <view class="tech-board__score-row">
+          <text class="tech-board__team">{{ match.home_team_name }}</text>
+          <view class="tech-board__score">
+            <text class="tech-board__num">{{ match.home_score }}</text>
+            <text class="tech-board__colon">:</text>
+            <text class="tech-board__num">{{ match.away_score }}</text>
+          </view>
+          <text class="tech-board__team">{{ match.away_team_name }}</text>
+        </view>
+        <view class="tech-board__foot">
+          <text class="tech-board__ft">FT</text>
+          <text class="tech-board__meta">{{ match.match_date }} {{ match.match_time }}</text>
+        </view>
       </view>
 
       <text v-if="!techStats.length" class="tech-stats-sheet__empty">这场比赛暂时还没有技术统计</text>
@@ -19,15 +28,25 @@
           class="tech-stat-row"
           :style="{ '--tech-stat-delay': `${120 + index * 70}ms` }"
         >
-          <text class="tech-stat-row__value">{{ stat.homeValue }}</text>
-          <view class="tech-stat-row__track tech-stat-row__track--home">
-            <view class="tech-stat-row__fill tech-stat-row__fill--home" :style="{ width: `${stat.homeBarPercent}%` }" />
-          </view>
           <text class="tech-stat-row__label">{{ stat.label }}</text>
-          <view class="tech-stat-row__track tech-stat-row__track--away">
-            <view class="tech-stat-row__fill tech-stat-row__fill--away" :style="{ width: `${stat.awayBarPercent}%` }" />
+          <view class="tech-stat-row__line">
+            <text class="tech-stat-row__value" :class="{ 'tech-stat-row__value--lead': stat.homeBarPercent > stat.awayBarPercent }">{{ stat.homeValue }}</text>
+            <view class="tech-stat-row__track tech-stat-row__track--home">
+              <view
+                class="tech-stat-row__fill tech-stat-row__fill--home"
+                :class="{ 'tech-stat-row__fill--dim': stat.homeBarPercent < stat.awayBarPercent }"
+                :style="{ width: `${stat.homeBarPercent}%` }"
+              />
+            </view>
+            <view class="tech-stat-row__track tech-stat-row__track--away">
+              <view
+                class="tech-stat-row__fill tech-stat-row__fill--away"
+                :class="{ 'tech-stat-row__fill--dim': stat.awayBarPercent < stat.homeBarPercent }"
+                :style="{ width: `${stat.awayBarPercent}%` }"
+              />
+            </view>
+            <text class="tech-stat-row__value tech-stat-row__value--away" :class="{ 'tech-stat-row__value--lead': stat.awayBarPercent > stat.homeBarPercent }">{{ stat.awayValue }}</text>
           </view>
-          <text class="tech-stat-row__value tech-stat-row__value--away">{{ stat.awayValue }}</text>
         </view>
       </view>
     </view>
@@ -51,6 +70,100 @@ const techStats = computed(() => resolveHomePulseTechStats(props.match))
 </script>
 
 <style scoped lang="css">
+.tech-stats-body {
+  max-height: 72vh;
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom) + 100rpx);
+}
+
+.tech-board {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin-top: var(--fi-space-20);
+  overflow: hidden;
+  border-radius: var(--fi-radius-lg);
+  background: var(--fi-gradient-topic-hero);
+  border: 1rpx solid var(--fi-color-match-card-hairline);
+  box-shadow: var(--fi-shadow-match-card);
+  color: var(--fi-color-topic-hero-text);
+  text-align: center;
+}
+
+.tech-board__stripe {
+  height: 6rpx;
+  background: linear-gradient(90deg, var(--fi-color-primary-deep), var(--fi-color-primary), var(--fi-color-primary-deep));
+}
+
+.tech-board__round {
+  display: block;
+  margin-top: var(--fi-space-24);
+  color: var(--fi-color-primary);
+  font-size: var(--fi-font-22);
+  font-weight: var(--fi-weight-extrabold);
+  letter-spacing: 4rpx;
+}
+
+.tech-board__score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--fi-space-16) var(--fi-space-24) 0;
+}
+
+.tech-board__team {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fi-font-28);
+  line-height: var(--fi-leading-snug);
+  font-weight: var(--fi-weight-bold);
+  overflow-wrap: anywhere;
+}
+
+.tech-board__score {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--fi-space-16);
+}
+
+.tech-board__num {
+  min-width: 64rpx;
+  font-size: 88rpx;
+  line-height: 1.1;
+  font-weight: var(--fi-weight-black);
+  font-style: italic;
+}
+
+.tech-board__colon {
+  padding: 0 var(--fi-space-4);
+  color: var(--fi-color-topic-hero-caption);
+  font-size: 56rpx;
+  font-weight: var(--fi-weight-bold);
+}
+
+.tech-board__foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fi-space-12);
+  padding: var(--fi-space-8) 0 var(--fi-space-24);
+}
+
+.tech-board__ft {
+  padding: 2rpx var(--fi-space-12);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-topic-hero-control);
+  color: var(--fi-color-topic-hero-muted);
+  font-size: var(--fi-font-20);
+  font-weight: var(--fi-weight-extrabold);
+  letter-spacing: 2rpx;
+}
+
+.tech-board__meta {
+  color: var(--fi-color-topic-hero-caption);
+  font-size: var(--fi-font-24);
+}
+
 .tech-stats-sheet__empty {
   display: block;
   margin-top: var(--fi-space-32);
@@ -59,59 +172,13 @@ const techStats = computed(() => resolveHomePulseTechStats(props.match))
   text-align: center;
 }
 
-.tech-stats-body {
-  max-height: 72vh;
-  padding-bottom: calc(40rpx + env(safe-area-inset-bottom) + 100rpx);
-}
-
-.tech-stats-sheet__summary {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  margin-top: 18rpx;
-  padding: 22rpx 24rpx;
-  border-radius: 24rpx;
-  border: 2rpx solid rgba(232, 233, 238, 0.95);
-  background: var(--fi-primitive-white);
-  box-shadow: 0 12rpx 28rpx rgba(18, 20, 28, 0.06);
-}
-
-.tech-stats-sheet__teams {
-  display: block;
-  color: var(--fi-color-text-strong);
-  font-size: 30rpx;
-  line-height: 1.35;
-  font-weight: 800;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tech-stats-sheet__meta {
-  display: block;
-  margin-top: 10rpx;
-  color: var(--fi-color-text-muted);
-  font-size: 24rpx;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .tech-stats-sheet__list {
-  margin-top: 24rpx;
-  display: grid;
-  gap: 18rpx;
+  margin-top: var(--fi-space-16);
 }
 
 .tech-stat-row {
-  display: grid;
-  grid-template-columns: 44rpx minmax(0, 1fr) auto minmax(0, 1fr) 44rpx;
-  align-items: center;
-  gap: 16rpx;
-  padding: 18rpx 0;
-  border-top: 2rpx solid #f0f1f5;
+  padding: var(--fi-space-20) var(--fi-space-8);
+  border-top: 1rpx solid var(--fi-color-divider-soft);
   opacity: 0;
   transform: translateY(14rpx);
   animation: tech-stat-row-enter 320ms cubic-bezier(0.24, 0.88, 0.28, 1) both;
@@ -122,10 +189,28 @@ const techStats = computed(() => resolveHomePulseTechStats(props.match))
   border-top: none;
 }
 
+.tech-stat-row__label {
+  display: block;
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-24);
+  font-weight: var(--fi-weight-bold);
+  letter-spacing: 4rpx;
+  text-align: center;
+}
+
+.tech-stat-row__line {
+  display: flex;
+  align-items: center;
+  gap: var(--fi-space-8);
+  margin-top: var(--fi-space-12);
+}
+
 .tech-stat-row__value {
-  color: var(--fi-color-text-strong);
-  font-size: 28rpx;
-  font-weight: 800;
+  flex: none;
+  width: 88rpx;
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-30);
+  font-weight: var(--fi-weight-bold);
   text-align: left;
 }
 
@@ -133,18 +218,17 @@ const techStats = computed(() => resolveHomePulseTechStats(props.match))
   text-align: right;
 }
 
-.tech-stat-row__label {
-  min-width: 84rpx;
-  color: #2a2c31;
-  font-size: 30rpx;
-  font-weight: 800;
-  text-align: center;
+.tech-stat-row__value--lead {
+  color: var(--fi-color-text-strong);
+  font-size: var(--fi-font-36);
+  font-weight: var(--fi-weight-black);
 }
 
 .tech-stat-row__track {
-  height: 14rpx;
-  border-radius: 999rpx;
-  background: #eceef3;
+  flex: 1;
+  height: 12rpx;
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-divider-soft);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -156,8 +240,7 @@ const techStats = computed(() => resolveHomePulseTechStats(props.match))
 
 .tech-stat-row__fill {
   height: 100%;
-  border-radius: 999rpx;
-  background: var(--fi-primitive-ink);
+  border-radius: var(--fi-radius-round);
   transform: scaleX(0);
   animation: tech-stat-fill-grow 480ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
   animation-delay: calc(var(--tech-stat-delay, 120ms) + 70ms);
@@ -169,8 +252,12 @@ const techStats = computed(() => resolveHomePulseTechStats(props.match))
 }
 
 .tech-stat-row__fill--away {
-  background: var(--fi-color-primary);
+  background: var(--fi-color-topic-hero-bg);
   transform-origin: left center;
+}
+
+.tech-stat-row__fill--dim {
+  opacity: 0.35;
 }
 
 @keyframes tech-stat-row-enter {
