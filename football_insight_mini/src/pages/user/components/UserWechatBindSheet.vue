@@ -1,48 +1,49 @@
 <template>
-  <view v-if="bindState" class="sheet-mask" @tap="emit('close')">
-    <view class="sheet-card" @tap.stop>
-      <view class="section-heading">
-        <view>
-          <text class="section-kicker">首次微信登录</text>
-          <text class="section-title">补充头像和昵称</text>
-        </view>
-        <text class="meta-note">完成后直接登录</text>
-      </view>
+  <FiBottomSheet
+    :visible="!!bindState"
+    eyebrow="首次微信登录"
+    title="补充头像和昵称"
+    fit-content
+    :z-index="80"
+    respect-window-bottom
+    @update:visible="emit('close')"
+  >
+    <text class="meta-note">完成后直接登录</text>
 
-      <text class="account-form-panel__summary">
-        完成一次绑定后，后续就能直接用微信进入。邀请码和推荐码都可选。
-      </text>
+    <text class="account-form-panel__summary">
+      完成一次绑定后，后续就能直接用微信进入。邀请码和推荐码都可选。
+    </text>
 
-      <view class="mini-wechat-bind-form">
-        <button
-          class="avatar-picker"
-          open-type="chooseAvatar"
-          @tap.stop
-          @chooseavatar="handleChooseAvatar"
-        >
-          <image
-            v-if="form.avatarPreviewUrl"
-            :src="form.avatarPreviewUrl"
-            mode="aspectFill"
-            class="avatar-picker__image"
-          />
-          <text v-else class="avatar-picker__placeholder">选择头像</text>
-        </button>
+    <view class="mini-wechat-bind-form">
+      <button
+        class="avatar-picker"
+        open-type="chooseAvatar"
+        @tap.stop
+        @chooseavatar="handleChooseAvatar"
+      >
+        <image
+          v-if="form.avatarPreviewUrl"
+          :src="form.avatarPreviewUrl"
+          mode="aspectFill"
+          class="avatar-picker__image"
+        />
+        <text v-else class="avatar-picker__placeholder">选择头像</text>
+      </button>
 
-        <input v-model="form.displayName" type="nickname" class="auth-input" placeholder="请输入昵称" />
-        <input v-model="form.inviteCode" class="auth-input" placeholder="请输入邀请码（可选）" />
-        <input v-model="form.referralCode" class="auth-input" placeholder="请输入推荐码（可选，填推荐人的邀请码）" />
-      </view>
-
-      <view class="sheet-actions">
-        <button class="primary-action primary-action--ghost" @click="emit('close')">取消</button>
-        <button class="primary-action" @click="submit">完成绑定</button>
-      </view>
+      <input v-model="form.displayName" type="nickname" class="auth-input" placeholder="请输入昵称" />
+      <input v-model="form.inviteCode" class="auth-input" placeholder="请输入邀请码（可选）" />
+      <input v-model="form.referralCode" class="auth-input" placeholder="请输入推荐码（可选，填推荐人的邀请码）" />
     </view>
-  </view>
+
+    <view class="sheet-actions">
+      <button class="primary-action primary-action--ghost" @click="emit('close')">取消</button>
+      <button class="primary-action" @click="submit">完成绑定</button>
+    </view>
+  </FiBottomSheet>
 </template>
 
 <script setup lang="ts">
+import FiBottomSheet from '../../../components/FiBottomSheet.vue'
 import { reactive, watch } from 'vue'
 import type { MiniWechatBindingRequiredResponse } from '../../../types/auth'
 
@@ -61,6 +62,8 @@ const emit = defineEmits<{
   }): void
 }>()
 
+// Keep the last form values while bindState is null during the 220ms close animation.
+// The next non-null bindState resets the form for the new binding attempt.
 const form = reactive({
   inviteCode: '',
   referralCode: '',
@@ -157,34 +160,7 @@ async function submit(): Promise<void> {
 </script>
 
 <style scoped lang="css">
-.hero-card__top, .section-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.hero-card__top, .section-heading { align-items: flex-start; gap: 12rpx; }
-
-.eyebrow, .section-kicker {
-  margin: 0;
-  color: var(--fi-color-text-muted);
-  font-size: var(--fi-font-22);
-  font-weight: 700;
-  letter-spacing: 3rpx;
-}
-
-.hero-card__title, .section-title {
-  display: block;
-  margin-top: 10rpx;
-  color: #2a2c31;
-  font-size: var(--fi-font-48);
-  line-height: 1.08;
-  font-weight: 800;
-}
-
-.section-title { font-size: var(--fi-font-44); }
-
-.hero-card__summary, .account-form-panel__summary, .user-panel__summary {
+.account-form-panel__summary {
   display: block;
   margin-top: 18rpx;
   color: #6b707b;
@@ -253,35 +229,7 @@ async function submit(): Promise<void> {
   opacity: 0.5;
 }
 
-.sheet-mask {
-  position: fixed;
-  inset: 0;
-  bottom: var(--window-bottom, 0px);
-  z-index: 80;
-  background: rgba(18, 20, 28, 0.36);
-  backdrop-filter: blur(8rpx);
-  display: flex;
-  align-items: flex-end;
-  animation: fi-overlay-fade-in 180ms ease both;
-}
-
-.sheet-card {
-  width: 100%;
-  border-radius: var(--fi-radius-xl) 36rpx 0 0;
-  background: rgba(255,255,255,0.98);
-  padding: 28rpx 24rpx 40rpx;
-  box-shadow: 0 -24rpx 56rpx rgba(12,14,20,0.12);
-  animation: fi-sheet-up 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.password-login-sheet {
-  max-width: 720rpx;
-  margin: 0 auto;
-  box-sizing: border-box;
-}
-
-.mini-wechat-bind-form,
-.password-login-form {
+.mini-wechat-bind-form {
   margin-top: 22rpx;
   display: flex;
   flex-direction: column;
