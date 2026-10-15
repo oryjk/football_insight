@@ -1,0 +1,91 @@
+.hero-card, .panel, .state-card, .team-board-composer__dialog {
+  background: rgba(255,255,255,0.94);
+  border-radius: 36rpx;
+  padding: var(--fi-space-28);
+  border: 2rpx solid rgba(236, 236, 241, 0.95);
+  box-shadow: 0 28rpx 60rpx rgba(26,28,36,0.08);
+}
+.hero-card__top, .section-heading, .team-board-post__header, .team-board-post__actions, .team-board-snapshot__summary, .team-board-snapshot__section-head, .team-board-comment__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.hero-card__top, .section-heading, .team-board-post__header, .team-board-comment__head { align-items: flex-start; gap: var(--fi-space-16); }
+.eyebrow, .section-kicker {
+  margin: 0;
+  color: #131313;
+  font-size: 24rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+}
+.hero-card__title, .section-title, .team-board-post__title, .team-board-snapshot__headline {
+  display: block;
+  margin-top: var(--fi-space-10);
+  color: #121212;
+  font-size: 56rpx;
+  line-height: 1.08;
+  font-weight: 800;
+}
+.section-title, .team-board-post__title, .team-board-snapshot__headline { font-size: 44rpx; }
+.hero-card__summary, .team-board-post__body, .team-board-launcher__summary {
+  display: block;
+  margin-top: var(--fi-space-18);
+  color: #6b707b;
+  font-size: 28rpx;
+  line-height: 1.7;
+}
+.hero-card__badge, .meta-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  white-space: nowrap;
+  line-height: 1;
+  box-sizing: border-box;
+  padding: var(--fi-space-14) var(--fi-space-24);
+  border-radius: 999rpx;
+  border: 2rpx solid rgba(232, 233, 238, 0.95);
+  background: #f6f7fb;
+  color: #6d7280;
+  font-size: 24rpx;
+}
+.team-board-launcher__grid, .team-board-snapshot__sections, .team-board-comments, .post-list {
+  display: grid;
+  gap: var(--fi-space-14);
+}
+.team-board-post__author-avatar, .team-board-snapshot__avatar {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 999rpx;
+  background: #f5f6fa;
+}
+.team-board-post__author-name, .team-board-snapshot__name, .team-board-comment__author {
+  display: block;
+  color: #121212;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+.team-board-post__author-time, .team-board-snapshot__label, .team-board-snapshot__metric, .team-board-snapshot__share, .team-board-comment__time {
+  color: #8f9198;
+  font-size: 22rpx;
+}
+.team-board-comment-form__input, .team-board-composer__input, .team-board-composer__textarea {
+  width: 100%;
+  padding: var(--fi-space-20) var(--fi-space-24);
+  border-radius: 22rpx;
+  background: #f7f8fb;
+  font-size: 28rpx;
+}
+.team-board-comment-form__submit, .team-board-composer__submit, .team-board-composer__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  padding: var(--fi-space-20) var(--fi-space-30);
+  border-radius: 999rpx;
+  background: #15161b;
+  color: #ffffff;
+  font-size: 28rpx;
+  white-space: nowrap;
+  line-height: 1;
+}
