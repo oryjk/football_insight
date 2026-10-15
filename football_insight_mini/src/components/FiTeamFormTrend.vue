@@ -58,31 +58,32 @@ const form = computed(() => buildTeamForm(props.outcomes))
   top: 50%;
   height: var(--fi-space-1);
   background: var(--fi-color-divider-soft);
+  transform: translateY(-50%);
 }
 .team-form__segment {
   --form-stroke: var(--fi-color-team-form-line);
+  --form-stroke-width: var(--fi-space-4);
+  --form-half-stroke-width: calc(var(--form-stroke-width) / 2);
+  --form-gradient-direction: to bottom;
   position: absolute;
   pointer-events: none;
+  background: linear-gradient(var(--form-gradient-direction), transparent calc(50% - var(--form-half-stroke-width)), var(--form-stroke) calc(50% - var(--form-half-stroke-width)), var(--form-stroke) calc(50% + var(--form-half-stroke-width)), transparent calc(50% + var(--form-half-stroke-width)));
 }
-.team-form__segment--latest {
+.team-form__segment--win {
   --form-stroke: var(--fi-color-primary);
 }
-.team-form__segment--latest.team-form__segment--draw {
-  --form-stroke: var(--fi-color-team-form-line);
-}
-.team-form__segment--latest.team-form__segment--loss {
+.team-form__segment--loss {
   --form-stroke: var(--fi-color-success-accent);
 }
 .team-form__segment--flat {
-  height: var(--fi-space-2);
+  height: var(--form-stroke-width);
   transform: translateY(-50%);
-  background: var(--form-stroke);
 }
 .team-form__segment--up {
-  background: linear-gradient(to bottom right, transparent calc(50% - var(--fi-space-1)), var(--form-stroke) calc(50% - var(--fi-space-1)), var(--form-stroke) calc(50% + var(--fi-space-1)), transparent calc(50% + var(--fi-space-1)));
+  --form-gradient-direction: to bottom right;
 }
 .team-form__segment--down {
-  background: linear-gradient(to top right, transparent calc(50% - var(--fi-space-1)), var(--form-stroke) calc(50% - var(--fi-space-1)), var(--form-stroke) calc(50% + var(--fi-space-1)), transparent calc(50% + var(--fi-space-1)));
+  --form-gradient-direction: to top right;
 }
 .team-form__point {
   --form-node-color: var(--fi-color-team-form-line);
