@@ -8,7 +8,15 @@
             <text v-if="title" class="section-title">{{ title }}</text>
           </slot>
         </view>
-        <button v-if="closable" class="sheet-shell__close" @click="emit('close')">关闭</button>
+        <button
+          v-if="closable"
+          class="sheet-shell__close"
+          aria-label="关闭"
+          hover-class="sheet-shell__close--pressed"
+          @tap="emit('close')"
+        >
+          <image :src="closeIcon" class="sheet-shell__close-icon" mode="aspectFit" aria-hidden="true" />
+        </button>
         <slot v-else name="meta" />
       </view>
       <slot />
@@ -17,6 +25,8 @@
 </template>
 
 <script setup lang="ts">
+import closeIcon from '../../../static/home/sheet-close.svg'
+
 withDefaults(
   defineProps<{
     kicker?: string
@@ -92,17 +102,31 @@ const emit = defineEmits<{
 }
 
 .sheet-shell__close {
-  display: inline-flex;
-  margin: 0 0 0 auto;
+  flex-shrink: 0;
+  display: flex;
   align-items: center;
   justify-content: center;
-  white-space: nowrap;
+  align-self: flex-start;
+  width: 64rpx;
+  height: 64rpx;
+  margin: 0 0 0 auto;
+  padding: 0;
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-component-close-bg);
   line-height: 1;
-  padding: 12rpx 18rpx;
-  border-radius: 999rpx;
-  background: var(--fi-color-page);
-  color: var(--fi-color-text-secondary);
-  font-size: 24rpx;
+}
+
+.sheet-shell__close::after {
+  border: 0;
+}
+
+.sheet-shell__close--pressed {
+  background: rgba(var(--fi-primitive-ink-rgb), 0.1);
+}
+
+.sheet-shell__close-icon {
+  width: 32rpx;
+  height: 32rpx;
 }
 
 @keyframes sheet-shell-mask-fade {
