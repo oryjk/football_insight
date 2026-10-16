@@ -11,6 +11,9 @@ pub struct GetCurrentUserUseCase {
 }
 
 impl GetCurrentUserUseCase {
+    pub async fn official_wechat_bound(&self, user_id: uuid::Uuid) -> anyhow::Result<Option<bool>> {
+        self.repository.official_wechat_bound(user_id).await
+    }
     pub fn new(repository: Arc<dyn AuthRepository>, token_port: Arc<dyn TokenPort>) -> Self {
         Self {
             repository,

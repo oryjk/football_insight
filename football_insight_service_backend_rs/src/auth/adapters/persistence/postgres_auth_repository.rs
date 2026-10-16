@@ -16,6 +16,8 @@ use crate::auth::{
 };
 use crate::system_config::domain::public_system_config::parse_membership_tier_rules;
 
+const OFFICIAL_BOUND_SQL: &str = r#"SELECT (official_wechat_open_id IS NOT NULL) FROM f_i_users WHERE id=$1 AND status='active'"#;
+
 #[derive(Clone)]
 pub struct PostgresAuthRepository {
     pool: PgPool,
@@ -1468,6 +1470,12 @@ impl StoredAuthUserRow {
 
 #[async_trait]
 impl AuthRepository for PostgresAuthRepository {
+    async fn official_wechat_bound(&self, user_id: Uuid) -> anyhow::Result<Option<bool>> {
+        Ok(sqlx::query_scalar::<_, bool>(OFFICIAL_BOUND_SQL)
+            .bind(user_id)
+            .fetch_optional(&self.pool)
+            .await?)
+    }
     async fn create_user_with_invite(
         &self,
         invite_code: &str,

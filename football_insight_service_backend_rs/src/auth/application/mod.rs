@@ -7,5 +7,6 @@ pub mod login_with_mini_wechat;
 pub mod login_with_password;
 pub mod login_with_wechat;
 pub mod logout;
+pub mod official_bind;
 pub mod register_with_invite;
 pub mod reset_password_with_invite;

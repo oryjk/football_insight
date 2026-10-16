@@ -36,6 +36,8 @@ pub struct HandleWechatWebhookUseCase {
     current_standard_match_port: Arc<dyn CurrentStandardMatchPort>,
     system_config_port: Arc<dyn SystemConfigPort>,
     official_account_access_port: Arc<dyn OfficialAccountMatchIdAccessPort>,
+    official_bind_use_case:
+        Option<Arc<crate::auth::application::official_bind::CompleteOfficialBindUseCase>>,
 }
 
 impl HandleWechatWebhookUseCase {
@@ -52,6 +54,7 @@ impl HandleWechatWebhookUseCase {
             current_standard_match_port,
             system_config_port,
             official_account_access_port,
+            official_bind_use_case: None,
         }
     }
 
@@ -64,15 +67,19 @@ impl HandleWechatWebhookUseCase {
         )
     }
 
+    pub fn with_official_bind(
+        mut self,
+        use_case: Arc<crate::auth::application::official_bind::CompleteOfficialBindUseCase>,
+    ) -> Self {
+        self.official_bind_use_case = Some(use_case);
+        self
+    }
+
     pub async fn handle_message(
         &self,
         input: WechatMessageInput,
     ) -> anyhow::Result<Option<String>> {
-        tracing::info!(
-            timestamp = %input.timestamp,
-            nonce = %input.nonce,
-            "received wechat webhook message"
-        );
+        tracing::info!("received wechat webhook message");
 
         let message_mode = detect_message_mode(&input.body);
         let incoming = match message_mode {
@@ -90,16 +97,25 @@ impl HandleWechatWebhookUseCase {
             )?,
         };
 
-        tracing::info!(
-            mode = ?message_mode,
-            msg_type = %incoming.msg_type,
-            event = incoming.event.as_deref().unwrap_or(""),
-            content = incoming.content.as_deref().unwrap_or(""),
-            from_user = %incoming.from_user_name,
-            to_user = %incoming.to_user_name,
-            app_id = %incoming.app_id,
-            "wechat message decrypted"
-        );
+        let is_binding_message = incoming.msg_type == "text"
+            && incoming
+                .content
+                .as_deref()
+                .is_some_and(|text| normalize_text_command(text).starts_with("绑定"));
+        if is_binding_message {
+            tracing::info!("verified official-account bind message received");
+        } else {
+            tracing::info!(
+                mode = ?message_mode,
+                msg_type = %incoming.msg_type,
+                event = incoming.event.as_deref().unwrap_or(""),
+                content = incoming.content.as_deref().unwrap_or(""),
+                from_user = %incoming.from_user_name,
+                to_user = %incoming.to_user_name,
+                app_id = %incoming.app_id,
+                "wechat message decrypted"
+            );
+        }
 
         if incoming.msg_type == "text" {
             let normalized_content = incoming
@@ -108,6 +124,21 @@ impl HandleWechatWebhookUseCase {
                 .map(str::trim)
                 .unwrap_or_default();
             let normalized_command = normalize_text_command(normalized_content);
+
+            if let Some(code) = normalized_command.strip_prefix("绑定") {
+                let reply_content = self
+                    .official_bind_reply(&incoming.from_user_name, code)
+                    .await;
+                return Ok(Some(self.build_text_reply(
+                    message_mode,
+                    &incoming.from_user_name,
+                    &incoming.to_user_name,
+                    &input.timestamp,
+                    &input.nonce,
+                    &incoming.app_id,
+                    reply_content,
+                )?));
+            }
 
             if normalized_command == "邀请码" {
                 tracing::info!(
@@ -258,6 +289,16 @@ impl HandleWechatWebhookUseCase {
         }
     }
 
+    async fn official_bind_reply(&self, official_open_id: &str, code: &str) -> String {
+        use crate::auth::domain::official_bind::OfficialBindDecision;
+        let decision = match &self.official_bind_use_case {
+            Some(use_case) => use_case.execute(official_open_id, code).await,
+            None => OfficialBindDecision::Error,
+        };
+        tracing::info!(decision = %decision.as_str(), "wechat_bind");
+        official_bind_message(decision)
+    }
+
     async fn next_match_reply(&self, official_open_id: &str) -> String {
         use crate::auth::domain::official_account_match_id_access::OfficialAccountMatchIdAccess;
 
@@ -372,6 +413,38 @@ fn build_invite_code_message(invite_code: &str, template: Option<&str>) -> Strin
     with_product_intro(template.replace("{invite_code}", invite_code))
 }
 
+fn official_bind_message(
+    decision: crate::auth::domain::official_bind::OfficialBindDecision,
+) -> String {
+    use crate::auth::domain::official_bind::OfficialBindDecision::*;
+    let message = match decision {
+        Success => {
+            r#"【足球洞察】绑定成功
+
+已将本公众号与你的小程序账号关联。请保持关注本公众号，取关后会员权益会暂停。
+
+现在可以回复“下一场”查询比赛 ID（V6 及以上会员可用）。"#
+        }
+        Invalid | Error => {
+            r#"【足球洞察】绑定失败
+
+绑定码无效或已过期。请回到小程序「我的」页，点「绑定公众号」重新获取绑定码，再回复“绑定 + 绑定码”。"#
+        }
+        AlreadyBound => {
+            r#"【足球洞察】已绑定
+
+你的账号已经绑定过本公众号，无需重复操作。可以直接回复“下一场”查询比赛 ID（V6 及以上会员可用）。"#
+        }
+        MissingCode => {
+            r#"【足球洞察】绑定公众号
+
+请先打开小程序「足球洞察」，在「我的」页点「绑定公众号」获取绑定码，然后回复“绑定 + 绑定码”，例如：绑定 ABC234"#
+        }
+        RateLimited => r#"【足球洞察】操作过于频繁，请稍后再试。"#,
+    };
+    with_product_intro(message.to_string())
+}
+
 fn next_match_id_message(match_id: &str) -> String {
     with_product_intro(format!(
         "【足球洞察】当前比赛信息\n\n当前下一场比赛 match_id：{match_id}\n\n常用指令：\n- 回复“邀请码”或“1”获取注册邀请码\n- 回复“下一场”或“2”再次查询\n- 回复“下一场id”或“3”再次查询"
@@ -397,7 +470,9 @@ fn next_match_unrecognized_message() -> String {
 
 下一场比赛 ID 是会员权益，V6 及以上会员可直接查询。
 
-暂未识别到你的会员账号。已是 V6 及以上会员的话，可以直接在小程序「余票监控」页点「获取比赛 ID」查看；还不是会员的话，在小程序「我的」页点会员卡上的「升级」即可开通。
+暂未识别到你的会员账号。如果你已经是会员，请打开小程序「足球洞察」，在「我的」页点「绑定公众号」获取绑定码，再回复“绑定 + 绑定码”（例如：绑定 ABC234），只需绑定一次，之后就可以直接在这里回复“下一场”查询。也可以直接在小程序「余票监控」页点「获取比赛 ID」查看。
+
+还不是会员的话，在小程序「我的」页点会员卡上的「升级」即可开通。
 
 常用指令：
 - 回复“邀请码”或“1”获取注册邀请码"#.to_string())
@@ -1455,7 +1530,7 @@ mod tests {
                                 "【足球洞察】当前比赛信息\n\n下一场比赛 ID 是会员权益，V6 及以上会员可直接查询。\n\n开通方式：打开小程序「足球洞察」，在「我的」页点会员卡上的「升级」，选择 V6 及以上档位即可。\n\n常用指令：\n- 回复“邀请码”或“1”获取注册邀请码"
                             }
                             "unrecognized" => {
-                                "【足球洞察】当前比赛信息\n\n下一场比赛 ID 是会员权益，V6 及以上会员可直接查询。\n\n暂未识别到你的会员账号。已是 V6 及以上会员的话，可以直接在小程序「余票监控」页点「获取比赛 ID」查看；还不是会员的话，在小程序「我的」页点会员卡上的「升级」即可开通。\n\n常用指令：\n- 回复“邀请码”或“1”获取注册邀请码"
+                                "【足球洞察】当前比赛信息\n\n下一场比赛 ID 是会员权益，V6 及以上会员可直接查询。\n\n暂未识别到你的会员账号。如果你已经是会员，请打开小程序「足球洞察」，在「我的」页点「绑定公众号」获取绑定码，再回复“绑定 + 绑定码”（例如：绑定 ABC234），只需绑定一次，之后就可以直接在这里回复“下一场”查询。也可以直接在小程序「余票监控」页点「获取比赛 ID」查看。\n\n还不是会员的话，在小程序「我的」页点会员卡上的「升级」即可开通。\n\n常用指令：\n- 回复“邀请码”或“1”获取注册邀请码"
                             }
                             _ => {
                                 "【足球洞察】当前比赛信息\n\n暂时无法确认你的会员身份，请稍后再回复“下一场”重试。"
@@ -1633,6 +1708,203 @@ mod tests {
             assert!(
                 !logs.contains("987654321") && !logs.contains("openid_123"),
                 "{logs}"
+            );
+        }
+    }
+    use crate::auth::{
+        application::official_bind::CompleteOfficialBindUseCase,
+        domain::official_bind::{ConsumeBindCodeOutcome, IssueBindCodeOutcome},
+        ports::official_bind_repository::OfficialBindRepository,
+    };
+    struct WebhookBindFake {
+        outcome: ConsumeBindCodeOutcome,
+        fail: bool,
+        calls: std::sync::atomic::AtomicUsize,
+    }
+    #[async_trait]
+    impl OfficialBindRepository for WebhookBindFake {
+        async fn issue(
+            &self,
+            _: uuid::Uuid,
+            _: &str,
+            _: chrono::DateTime<chrono::Utc>,
+            _: chrono::DateTime<chrono::Utc>,
+        ) -> anyhow::Result<IssueBindCodeOutcome> {
+            unreachable!()
+        }
+        async fn consume(
+            &self,
+            hash: &str,
+            openid: &str,
+        ) -> anyhow::Result<ConsumeBindCodeOutcome> {
+            self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            assert_eq!(
+                hash,
+                crate::auth::domain::official_bind::hash_bind_code("ABC234")
+            );
+            assert_eq!(openid, "openid_123");
+            if self.fail {
+                anyhow::bail!("ABC234 openid_123 user_id=fixture");
+            }
+            Ok(self.outcome)
+        }
+    }
+    fn binding_use_case(scenario: &str) -> HandleWechatWebhookUseCase {
+        let repo = Arc::new(WebhookBindFake {
+            outcome: match scenario {
+                "success" | "override" => ConsumeBindCodeOutcome::Success,
+                "already_bound" => ConsumeBindCodeOutcome::AlreadyBound,
+                _ => ConsumeBindCodeOutcome::Invalid,
+            },
+            fail: scenario == "error",
+            calls: std::sync::atomic::AtomicUsize::new(0),
+        });
+        HandleWechatWebhookUseCase::new(
+            Arc::new(FakeRepository::default()),
+            Arc::new(FakeCryptoPort),
+            Arc::new(FakeCurrentStandardMatchPort),
+            Arc::new(next_match_enabled_config()),
+            Arc::new(GateAccessFake::granted()),
+        )
+        .with_official_bind(Arc::new(CompleteOfficialBindUseCase::new(repo)))
+    }
+    fn bind_expected(scenario: &str) -> String {
+        let text = match scenario {
+            "success" | "override" => {
+                "【足球洞察】绑定成功\n\n已将本公众号与你的小程序账号关联。请保持关注本公众号，取关后会员权益会暂停。\n\n现在可以回复“下一场”查询比赛 ID（V6 及以上会员可用）。"
+            }
+            "already_bound" => {
+                "【足球洞察】已绑定\n\n你的账号已经绑定过本公众号，无需重复操作。可以直接回复“下一场”查询比赛 ID（V6 及以上会员可用）。"
+            }
+            "missing_code" => {
+                "【足球洞察】绑定公众号\n\n请先打开小程序「足球洞察」，在「我的」页点「绑定公众号」获取绑定码，然后回复“绑定 + 绑定码”，例如：绑定 ABC234"
+            }
+            "rate_limited" => "【足球洞察】操作过于频繁，请稍后再试。",
+            _ => {
+                "【足球洞察】绑定失败\n\n绑定码无效或已过期。请回到小程序「我的」页，点「绑定公众号」重新获取绑定码，再回复“绑定 + 绑定码”。"
+            }
+        };
+        super::with_product_intro(text.into())
+    }
+    #[tokio::test]
+    async fn official_bind_commands_have_uniform_failures_exact_copy_and_both_reply_modes() {
+        for scenario in [
+            "success",
+            "override",
+            "already_bound",
+            "invalid",
+            "expired",
+            "used",
+            "inactive",
+            "error",
+            "missing_code",
+            "malformed",
+        ] {
+            for plain in [false, true] {
+                for command in [
+                    "绑定ABC234",
+                    "绑定 abc234",
+                    "绑定  ABC234",
+                    "绑 定 a b c 2 3 4",
+                ] {
+                    let use_case = binding_use_case(scenario);
+                    let command = match scenario {
+                        "missing_code" => "绑定",
+                        "malformed" => "绑定000000",
+                        _ => command,
+                    };
+                    let body = if plain {
+                        format!("<xml><Content><![CDATA[{command}]]></Content></xml>")
+                    } else {
+                        command.into()
+                    };
+                    let result = use_case
+                        .handle_message(WechatMessageInput {
+                            signature: "sig".into(),
+                            timestamp: "1".into(),
+                            nonce: "2".into(),
+                            body,
+                        })
+                        .await
+                        .unwrap()
+                        .unwrap();
+                    assert_eq!(
+                        result,
+                        format!(
+                            "{}{}",
+                            if plain { "plain::" } else { "encrypted::" },
+                            bind_expected(scenario)
+                        )
+                    );
+                    assert!(!result.contains("MATCH_2026_001"));
+                    assert!(!result.contains("openid_123"));
+                }
+            }
+        }
+    }
+    #[tokio::test(flavor = "current_thread")]
+    #[ignore = "run log capture separately with --ignored --test-threads=1"]
+    async fn official_bind_logs_redact_every_input_and_have_one_decision_per_command() {
+        let bytes = Arc::new(Mutex::new(Vec::new()));
+        let sink = bytes.clone();
+        let _guard = tracing::subscriber::set_default(
+            tracing_subscriber::fmt()
+                .without_time()
+                .with_ansi(false)
+                .with_writer(move || GateLogWriter(sink.clone()))
+                .finish(),
+        );
+        for scenario in [
+            "success",
+            "already_bound",
+            "invalid",
+            "error",
+            "missing_code",
+            "rate_limited",
+        ] {
+            let use_case = binding_use_case(scenario);
+            if scenario == "rate_limited" {
+                for _ in 0..5 {
+                    use_case
+                        .handle_message(WechatMessageInput {
+                            signature: "sig".into(),
+                            timestamp: "1".into(),
+                            nonce: "2".into(),
+                            body: "绑定 ABC234".into(),
+                        })
+                        .await
+                        .unwrap();
+                }
+            }
+            bytes.lock().unwrap().clear();
+            let body = if scenario == "missing_code" {
+                "绑定"
+            } else {
+                "绑定 abc234"
+            };
+            let reply = use_case
+                .handle_message(WechatMessageInput {
+                    signature: "sig".into(),
+                    timestamp: "1".into(),
+                    nonce: "2".into(),
+                    body: body.into(),
+                })
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(reply, format!("encrypted::{}", bind_expected(scenario)));
+            let logs = String::from_utf8(bytes.lock().unwrap().clone()).unwrap();
+            let decisions: Vec<_> = logs
+                .lines()
+                .filter(|l| l.contains("wechat_bind decision="))
+                .collect();
+            assert_eq!(decisions.len(), 1, "{logs}");
+            assert!(decisions[0].contains(&format!("decision={scenario}")));
+            assert!(
+                !logs.contains("ABC234")
+                    && !logs.contains("abc234")
+                    && !logs.contains("openid_123")
+                    && !logs.contains("user_id")
             );
         }
     }

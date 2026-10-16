@@ -132,6 +132,9 @@ pub trait AuthRepository: Send + Sync {
         anyhow::bail!("create mini program wechat user without invite is not supported")
     }
     async fn get_user_by_id(&self, user_id: Uuid) -> anyhow::Result<Option<AuthUser>>;
+    async fn official_wechat_bound(&self, _user_id: Uuid) -> anyhow::Result<Option<bool>> {
+        Ok(None)
+    }
     async fn record_user_login(&self, user_id: Uuid) -> anyhow::Result<()> {
         let _ = user_id;
         Ok(())

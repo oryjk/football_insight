@@ -154,3 +154,29 @@ The migration only adds catalog/snapshot fields, backfills new catalog metadata 
 顺序为现有开关 → current-standard 比赛 ID → 公众号身份判定。关闭、无比赛或获取失败继续原缺省回复且不查身份；身份出错 fail closed。有效等级达到 `MATCH_ID_UNLOCK_MINIMUM_TIER` 或已解锁本场才返回 ID，过期等级沿用现有回落规则。ID 解析失败仍可按等级授权，不能按解锁授权。
 
 身份端口仅执行一条按 active 账号公众号 openid 读取等级、到期时间及本场解锁的 SELECT；None 比赛 ID 使用 CASE 跳过解锁子查询。无迁移、配置键或系统配置值修改。每次命令记录 `next_match_id_reply decision=...`，不记录 ID/openid 或原始上游错误。
+
+## C 端公众号自助绑定
+
+### `POST /api/v1/auth/wechat-official-bind-code`
+
+需要 C 端 `Authorization: Bearer <access_token>`，仅 active 用户可用，无请求体。已绑定用户也允许获取，用于换微信号。
+
+成功 `200 OK`：
+
+```json
+{"code":"ABC234","expires_in_seconds":600}
+```
+
+所有响应（包括错误）均带 `Cache-Control: no-store`。错误为纯文本：未登录、无效 JWT 或非 active 用户返回 `401`（`not logged in`）；同账号一小时第六次发码返回 `429`（`获取过于频繁，请稍后再试`）；存储或安全随机源不可用返回 `503`（`暂时无法获取绑定码，请稍后再试`）。
+
+绑定码为六位无易混字符的大写字母/数字，只存 SHA-256 哈希，十分钟有效且一次性；重新获取使该账号所有仍有效的旧码失效。
+
+### `GET /api/v1/auth/me` 新增可选字段
+
+现有响应字段保持原样，新增 `official_wechat_bound?: boolean`，含义为公众号 openid 是否非 NULL。它与现有的小程序微信绑定 `has_wechat_binding` 无关；状态读取异常时省略该字段，原接口成功/错误映射不变。其他登录响应不增加此字段。
+
+### 公众号绑定指令
+
+仅在现有 webhook 签名/加密校验成功后处理文本：去空白并忽略大小写，`绑定ABC234`、`绑定 abc234` 均可。缺码给格式提示；错误、过期、已用或非 active 一律回复同一失败文案。按公众号身份限制十分钟内五次失败（包含在途预约），第六次停止校验。码消耗与账号绑定在同一事务完成；相同 openid 仍消耗码并回复已绑定，换微信号可覆盖，同一 openid 可关联多个账号。
+
+每条绑定指令仅记录 `wechat_bind decision=success|already_bound|invalid|rate_limited|missing_code|error`，不记录码、openid、user_id。所有定稿回复及下一场未识别提示见设计第 4.6–4.7 节，保留产品介绍。绑定不授予会员或单场解锁；下一场仍使用既有 fail-closed 门控。绑定后关注状态参与会员权益计算，取关会暂停权益；无主动消息推送。

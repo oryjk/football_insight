@@ -157,7 +157,16 @@ pub async fn get_current_user_handler(
         .map_err(|error| (StatusCode::UNAUTHORIZED, error.to_string()))?
         .ok_or((StatusCode::UNAUTHORIZED, "not logged in".to_string()))?;
 
-    Ok(Json(user.into()))
+    let official_wechat_bound = use_case
+        .official_wechat_bound(user.id)
+        .await
+        .unwrap_or_else(|_| {
+            tracing::warn!("failed to read official-account binding status");
+            None
+        });
+    let mut dto = CurrentUserDto::from(user);
+    dto.official_wechat_bound = official_wechat_bound;
+    Ok(Json(dto))
 }
 
 pub async fn logout_handler(

@@ -18,6 +18,8 @@ pub struct CurrentUserDto {
     pub invite_code: Option<String>,
     pub avatar_url: Option<String>,
     pub has_wechat_binding: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub official_wechat_bound: Option<bool>,
     pub membership_tier: String,
     pub membership_expires_at: Option<String>,
     pub membership_benefits_enabled: bool,
@@ -36,6 +38,7 @@ impl From<AuthUser> for CurrentUserDto {
             invite_code: value.invite_code,
             avatar_url: value.avatar_url,
             has_wechat_binding: value.has_wechat_binding,
+            official_wechat_bound: None,
             membership_tier: value.membership_tier,
             membership_expires_at: value
                 .membership_expires_at
@@ -133,8 +136,8 @@ mod tests {
             updated_at: Utc::now(),
         };
 
-        let json =
-            serde_json::to_value(CurrentUserDto::from(user)).expect("serialize current user");
+        let mut dto = CurrentUserDto::from(user);
+        let json = serde_json::to_value(&dto).expect("serialize current user");
 
         assert_eq!(
             json.get("account_identifier"),
@@ -158,5 +161,15 @@ mod tests {
             Some(&Value::Number(600.into()))
         );
         assert!(json.get("phone_number").is_none());
+        assert!(json.get("official_wechat_bound").is_none());
+        dto.official_wechat_bound = Some(true);
+        let enriched = serde_json::to_value(&dto).unwrap();
+        assert_eq!(enriched["official_wechat_bound"], true);
+        assert_eq!(enriched["has_wechat_binding"], false);
+        dto.official_wechat_bound = Some(false);
+        assert_eq!(
+            serde_json::to_value(&dto).unwrap()["official_wechat_bound"],
+            false
+        );
     }
 }

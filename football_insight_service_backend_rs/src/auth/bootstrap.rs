@@ -13,9 +13,18 @@ use crate::{
                 wechat_crypto_port::OfficialWechatCryptoPort,
                 wechat_oauth_port::OfficialWechatOauthPort,
             },
-            persistence::postgres_auth_repository::PostgresAuthRepository,
-            security::{argon2_password_port::Argon2PasswordPort, jwt_token_port::JwtTokenPort},
-            web::{handlers::AuthWebConfig, routes::auth_routes},
+            persistence::{
+                postgres_auth_repository::PostgresAuthRepository,
+                postgres_official_bind_repository::PostgresOfficialBindRepository,
+            },
+            security::{
+                argon2_password_port::Argon2PasswordPort, jwt_token_port::JwtTokenPort,
+                official_bind_code_generator::SecureOfficialBindCodeGenerator,
+            },
+            web::{
+                handlers::AuthWebConfig, official_bind_handlers::official_bind_code_routes,
+                routes::auth_routes,
+            },
         },
         application::{
             bind_wechat_account::BindWechatAccountUseCase,
@@ -25,7 +34,9 @@ use crate::{
             login_as_h5_test_user::LoginAsH5TestUserUseCase,
             login_with_mini_wechat::CompleteMiniWechatLoginUseCase,
             login_with_password::LoginWithPasswordUseCase,
-            login_with_wechat::CompleteWechatLoginUseCase, logout::LogoutUseCase,
+            login_with_wechat::CompleteWechatLoginUseCase,
+            logout::LogoutUseCase,
+            official_bind::{CompleteOfficialBindUseCase, CreateOfficialBindCodeUseCase},
             register_with_invite::RegisterWithInviteUseCase,
             reset_password_with_invite::ResetPasswordWithInviteUseCase,
         },
@@ -47,6 +58,7 @@ pub fn build_auth(
     system_config_port: Arc<dyn SystemConfigPort>,
     official_account_access_port: Arc<dyn OfficialAccountMatchIdAccessPort>,
 ) -> AuthBootstrap {
+    let official_bind_repository = Arc::new(PostgresOfficialBindRepository::new(pool.clone()));
     let auth_repository = Arc::new(PostgresAuthRepository::new(pool));
     let password_port = Arc::new(Argon2PasswordPort);
     let token_port = Arc::new(JwtTokenPort::new(config.jwt_secret.clone()));
@@ -120,13 +132,23 @@ pub fn build_auth(
         Duration::days(30),
     ));
     let logout_use_case = Arc::new(LogoutUseCase::new());
-    let wechat_webhook_use_case = Arc::new(HandleWechatWebhookUseCase::new(
-        auth_repository.clone(),
-        wechat_crypto_port,
-        current_standard_match_port,
-        system_config_port,
-        official_account_access_port,
+    let create_official_bind_code_use_case = Arc::new(CreateOfficialBindCodeUseCase::new(
+        official_bind_repository.clone(),
+        token_port.clone(),
+        Arc::new(SecureOfficialBindCodeGenerator),
     ));
+    let wechat_webhook_use_case = Arc::new(
+        HandleWechatWebhookUseCase::new(
+            auth_repository.clone(),
+            wechat_crypto_port,
+            current_standard_match_port,
+            system_config_port,
+            official_account_access_port,
+        )
+        .with_official_bind(Arc::new(CompleteOfficialBindUseCase::new(
+            official_bind_repository,
+        ))),
+    );
     let auth_web_config = Arc::new(AuthWebConfig {
         wechat_app_id: config.wechat_app_id.clone(),
     });
@@ -145,7 +167,10 @@ pub fn build_auth(
             logout_use_case,
             wechat_webhook_use_case,
             auth_web_config,
-        ),
+        )
+        .merge(official_bind_code_routes(
+            create_official_bind_code_use_case,
+        )),
         auth_repository,
         token_port,
         get_current_user_use_case,

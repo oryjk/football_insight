@@ -61,7 +61,7 @@ pub async fn wechat_message_handler(
         })
         .await
         .map_err(|error| {
-            tracing::warn!(error = %error, "wechat message handler failed");
+            tracing::warn!("wechat message handler failed");
             map_wechat_error(error)
         })?;
 
