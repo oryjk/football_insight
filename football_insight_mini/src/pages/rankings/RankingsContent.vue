@@ -71,7 +71,7 @@
       :season="rankings?.current_season ?? currentYear"
       :round="rankings?.round_number ?? null"
       @close="closeStandingsSheet"
-      @poster-ready="handlePosterReady"
+      @share-cover-ready="handleShareCoverReady"
     />
   </view>
 </template>
@@ -157,7 +157,7 @@ const selectedStandingsSharePayload = computed<StandingsPosterSharePayload | nul
       rankings.value?.current_season ?? currentYear,
       selectedStandingsTable.value,
     ),
-    path: buildStandingsPosterSharePath(selectedStandingsTable.value),
+    path: buildStandingsPosterSharePath(),
     ...(imageUrl ? { imageUrl } : {}),
   }
 })
@@ -242,7 +242,7 @@ watch(
   },
 )
 
-function handlePosterReady(path: string): void {
+function handleShareCoverReady(path: string): void {
   latestPosterImagePath.value = path
 }
 

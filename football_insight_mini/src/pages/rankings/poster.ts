@@ -39,8 +39,9 @@ export function buildStandingsPosterShareTitle(season: number, table: Pick<Stand
   return `${season} 中超${table.label}`
 }
 
-export function buildStandingsPosterSharePath(table: Pick<StandingsTable, 'slug'>): string {
-  return `/pages/rankings/index?mode=rankings&openPoster=1&table=${encodeURIComponent(table.slug)}`
+/** Shared cards land on the rankings page itself; the standings are visible there without reopening the sheet. */
+export function buildStandingsPosterSharePath(): string {
+  return '/pages/rankings/index?mode=rankings'
 }
 
 export function buildStandingsRankingEntries(

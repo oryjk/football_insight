@@ -115,10 +115,8 @@ describe('standings poster sharing', () => {
     expect(buildStandingsPosterShareTitle(2026, createTable('standings_with_penalty'))).toBe('2026 中超含罚分版积分榜')
   })
 
-  test('builds a path that reopens the selected standings poster', () => {
-    expect(buildStandingsPosterSharePath(createTable('standings_without_penalty'))).toBe(
-      '/pages/rankings/index?mode=rankings&openPoster=1&table=standings_without_penalty',
-    )
+  test('shares a path that lands on the rankings page', () => {
+    expect(buildStandingsPosterSharePath()).toBe('/pages/rankings/index?mode=rankings')
   })
 })
 

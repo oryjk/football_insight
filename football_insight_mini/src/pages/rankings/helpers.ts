@@ -19,18 +19,27 @@ export function sortStandingsPreviewTables(tables: StandingsTable[]): StandingsT
   )
 }
 
+export interface StandingsPodiumEntry {
+  rank: number
+  teamId: number
+  teamName: string
+  avatar: string | null
+}
+
 export interface StandingsPreviewFacts {
-  leaderName: string
-  leaderAvatar: string | null
+  podium: StandingsPodiumEntry[]
   adjustedCount: number
 }
 
-/** The few facts the launcher card shows instead of a sentence of prose. */
+/** What the launcher card shows instead of prose: the top three and how many teams carry a points adjustment. */
 export function buildStandingsPreviewFacts(table: StandingsTable): StandingsPreviewFacts {
-  const leader = table.entries[0]
   return {
-    leaderName: leader?.team_name ?? '暂无数据',
-    leaderAvatar: leader?.avatar_storage_url ?? null,
+    podium: table.entries.slice(0, 3).map((entry, index) => ({
+      rank: index + 1,
+      teamId: entry.team_id,
+      teamName: entry.team_name,
+      avatar: entry.avatar_storage_url,
+    })),
     adjustedCount: table.entries.filter((item) => item.points_adjustment !== 0).length,
   }
 }

@@ -35,25 +35,28 @@
         <text>{{ errorMessage }}</text>
       </view>
 
-      <view class="standings-sheet__list">
-        <view v-for="entry in table.entries" :key="`${table.slug}-${entry.team_id}`" class="standings-sheet__row">
-          <text class="standings-sheet__rank">{{ entry.rank_no }}</text>
-          <text class="standings-sheet__name">{{ entry.team_name }}</text>
-          <view class="standings-sheet__metrics">
-            <view
-              v-for="metric in buildStandingsFallbackMetrics(table, entry)"
-              :key="metric.label"
-              class="standings-sheet__metric"
-            >
-              <text class="standings-sheet__metric-value">{{ metric.value }}</text>
-              <text class="standings-sheet__metric-label">{{ metric.label }}</text>
+      <scroll-view scroll-y class="standings-sheet__scroll">
+        <view class="standings-sheet__list">
+          <view v-for="entry in table.entries" :key="`${table.slug}-${entry.team_id}`" class="standings-sheet__row">
+            <text class="standings-sheet__rank">{{ entry.rank_no }}</text>
+            <text class="standings-sheet__name">{{ entry.team_name }}</text>
+            <view class="standings-sheet__metrics">
+              <view
+                v-for="metric in buildStandingsFallbackMetrics(table, entry)"
+                :key="metric.label"
+                class="standings-sheet__metric"
+              >
+                <text class="standings-sheet__metric-value">{{ metric.value }}</text>
+                <text class="standings-sheet__metric-label">{{ metric.label }}</text>
+              </view>
             </view>
           </view>
         </view>
-      </view>
+      </scroll-view>
     </view>
 
     <canvas canvas-id="standingsPosterCanvas" class="standings-poster-canvas" />
+    <canvas canvas-id="standingsShareCoverCanvas" class="standings-share-cover-canvas" />
   </view>
 </template>
 
@@ -81,7 +84,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'poster-ready', path: string): void
+  (e: 'share-cover-ready', path: string): void
 }>()
 
 const posterTitleText = '中超积分榜'
@@ -126,6 +129,7 @@ const posterQrModules = [
 
 // 模块级缓存：弹层多次开关、切换榜单表时复用已生成的海报与队徽，避免重复绘制。
 const posterCache = new Map<string, string>()
+const shareCoverCache = new Map<string, string>()
 const posterLogoCache = new Map<string, string | null>()
 
 const instance = getCurrentInstance()
@@ -144,7 +148,7 @@ async function generate(): Promise<void> {
   const cached = posterCache.get(props.table.slug)
   if (cached) {
     posterImagePath.value = cached
-    emit('poster-ready', cached)
+    emit('share-cover-ready', shareCoverCache.get(props.table.slug) ?? cached)
     return
   }
 
@@ -242,11 +246,69 @@ async function generate(): Promise<void> {
     const tempFilePath = await exportCanvasToTempFile({ canvasId, width, height, instance })
 
     posterCache.set(props.table.slug, tempFilePath)
+    // The share thumbnail (a 5:4 ranking card) is ready before the save/share buttons unlock.
+    const coverPath = await generateShareCover().catch(() => null)
+    if (coverPath) {
+      shareCoverCache.set(props.table.slug, coverPath)
+    }
     posterImagePath.value = tempFilePath
-    emit('poster-ready', tempFilePath)
+    emit('share-cover-ready', coverPath ?? tempFilePath)
   } catch (error) {
     errorMessage.value = extractApiErrorMessage(error, '积分榜图片生成失败，请稍后重试。')
   }
+}
+
+/** 5:4 card matching WeChat's share thumbnail ratio: title plus the top of the table. */
+async function generateShareCover(): Promise<string> {
+  const canvasId = 'standingsShareCoverCanvas'
+  const width = 500
+  const height = 400
+  const headerHeight = 88
+  const rowHeight = 56
+  const rows = props.table.entries.slice(0, 5)
+  const logos = await resolvePosterLogoPaths(rows)
+  const context = uni.createCanvasContext(canvasId, instance)
+
+  context.setFillStyle('#ffffff')
+  context.fillRect(0, 0, width, height)
+  context.setFillStyle('#dc2626')
+  context.fillRect(0, 0, width, headerHeight)
+  context.setTextAlign('left')
+  context.setFillStyle('#ffffff')
+  context.setFontSize(30)
+  context.fillText(`${props.season} 中超${props.table.label}`, 28, 42)
+  context.setFillStyle('rgba(255,255,255,0.82)')
+  context.setFontSize(20)
+  context.fillText(props.round ? `第 ${props.round} 轮` : '本赛季', 28, 72)
+
+  rows.forEach((entry, index) => {
+    const centerY = headerHeight + rowHeight * index + rowHeight / 2
+    const logo = logos.get(entry.team_id) ?? null
+    context.setTextAlign('left')
+    context.setFillStyle(index < 3 ? '#dc2626' : '#121212')
+    context.setFontSize(26)
+    context.fillText(String(entry.rank_no), 28, centerY + 9)
+    drawPosterTeamLogo(context, logo, 68, centerY - 18, 36)
+    context.setFillStyle('#121212')
+    context.fillText(truncateStandingsPosterTeamName(entry.team_name), logo ? 118 : 68, centerY + 9)
+    context.setTextAlign('right')
+    context.setFillStyle('#dc2626')
+    context.fillText(buildStandingsFallbackMetrics(props.table, entry)[0]?.value ?? '', width - 28, centerY + 9)
+    context.setStrokeStyle('#f0f1f5')
+    context.setLineWidth(1)
+    context.beginPath()
+    context.moveTo(28, centerY + rowHeight / 2)
+    context.lineTo(width - 28, centerY + rowHeight / 2)
+    context.stroke()
+  })
+
+  context.setTextAlign('left')
+  context.setFillStyle('#8f9198')
+  context.setFontSize(18)
+  context.fillText(posterBrandText, 28, height - 16)
+
+  await flushCanvas(context)
+  return exportCanvasToTempFile({ canvasId, width, height, instance })
 }
 
 async function resolvePosterLogoPaths(entries: StandingsTableEntry[]): Promise<Map<number, string | null>> {
@@ -359,9 +421,11 @@ function savePosterImage(): void {
 }
 
 .standings-sheet {
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  max-height: 76vh;
-  overflow-y: auto;
+  height: 76vh;
+  box-sizing: border-box;
   padding: var(--fi-space-28);
   border-radius: 32rpx;
   background: var(--fi-primitive-white);
@@ -407,6 +471,12 @@ function savePosterImage(): void {
 
 .standings-sheet__error {
   margin-top: var(--fi-space-18);
+}
+
+.standings-sheet__scroll {
+  flex: 1;
+  height: 0;
+  min-height: 0;
 }
 
 .standings-sheet__list {
@@ -465,6 +535,15 @@ function savePosterImage(): void {
   font-size: var(--fi-font-20);
   line-height: var(--fi-leading-none);
   white-space: nowrap;
+}
+
+.standings-share-cover-canvas {
+  position: fixed;
+  left: -9999rpx;
+  top: -9999rpx;
+  width: 500px;
+  height: 400px;
+  pointer-events: none;
 }
 
 .standings-poster-canvas {
