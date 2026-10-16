@@ -34,7 +34,7 @@
               :key="item.slug"
               class="pill-row__item"
               :class="{ active: item.slug === effectiveSlug }"
-              @click="emit('update:activeCategorySlug', item.slug)"
+              @click="selectCategory(item.slug)"
             >
               <text class="pill-row__item-text">{{ item.label }}</text>
             </view>
@@ -66,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, getCurrentInstance, nextTick, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, reactive, ref, watch } from 'vue'
 import type {
   PlayerRankingCategory,
   PlayerRankingEntry,
@@ -111,21 +111,18 @@ const categoryOptions = computed(() =>
     ? teamCategories.value.map((item) => ({ slug: item.slug, label: item.label }))
     : playerCategories.value.map((item) => ({ slug: item.slug, label: item.label })),
 )
-// Each scope remembers its own last category, so switching back restores it.
-const rememberedSlugs: Record<'team' | 'player', string> = { team: '', player: '' }
-// The parent's slug lags one tick behind a scope switch; resolve it here so the new list never renders empty in between.
+// Each scope owns its selection: team and player categories can share slugs (e.g. goals), so the
+// parent's single slug cannot tell which scope it belongs to right after a switch.
+const selectedSlugs = reactive<Record<'team' | 'player', string>>({ team: '', player: '' })
 const effectiveSlug = computed(() => {
   const options = categoryOptions.value
-  const isValid = (slug: string) => options.some((item) => item.slug === slug)
-  if (isValid(props.activeCategorySlug)) {
-    return props.activeCategorySlug
-  }
-  const remembered = rememberedSlugs[props.scope]
-  return isValid(remembered) ? remembered : (options[0]?.slug ?? '')
+  const selected = selectedSlugs[props.scope]
+  return options.some((item) => item.slug === selected) ? selected : (options[0]?.slug ?? '')
 })
-watch(effectiveSlug, (slug) => {
-  rememberedSlugs[props.scope] = slug
-}, { immediate: true })
+
+function selectCategory(slug: string): void {
+  selectedSlugs[props.scope] = slug
+}
 const activeTeamCategory = computed(() =>
   teamCategories.value.find((item) => item.slug === effectiveSlug.value) ?? null,
 )
