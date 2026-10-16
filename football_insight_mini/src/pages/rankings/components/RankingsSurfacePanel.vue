@@ -27,11 +27,11 @@
 
       <view class="category-tabs-wrap">
         <scroll-view scroll-x class="pill-row" :scroll-left="categoryScrollLeft" scroll-with-animation>
-          <view class="pill-row__list">
+          <view :key="scope" class="pill-row__list">
             <view
               v-for="item in categoryOptions"
               :id="`ranking-category-${item.slug}`"
-              :key="item.slug"
+              :key="`${scope}-${item.slug}`"
               class="pill-row__item"
               :class="{ active: item.slug === effectiveSlug }"
               @click="selectCategory(item.slug)"
@@ -148,7 +148,7 @@ watch(
   { immediate: true },
 )
 
-watch(() => props.activeCategorySlug, () => {
+watch([() => props.activeCategorySlug, () => props.scope], () => {
   void centerActiveCategory()
 })
 
@@ -310,7 +310,6 @@ async function centerActiveCategory(): Promise<void> {
   white-space: nowrap;
   line-height: var(--fi-leading-none);
   box-sizing: border-box;
-  transition: background-color 240ms ease, color 240ms ease, box-shadow 240ms ease;
 }
 
 .pill-row__item.active {
