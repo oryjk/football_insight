@@ -146,3 +146,9 @@
 helpers.test.ts 新增 10 项表驱动覆盖主客场、B 队、无关球队、可靠性开关及云南分支；effects.test.ts 新增两种球队的真实 boards/state 集成测试，断言只预取合格样本、历史列表保持完整，并核对均值/最高值/场次数。RED：旧逻辑 4 pass/8 fail，明确错误预取 B 队/无关队；GREEN：相关两文件合计 141 pass/0 fail。独立只读复审通过，无生产数据读取或写入。
 
 最终验证：bun test 793 pass/0 fail（67 files，5515 expect calls）；type-check、check:boundaries、verify:mp-components、H5 与离线微信构建全部退出 0。原始日志在会话 scratch `.tmp/chengdu-reflux-stats/`，没有版本登记、上传或部署。
+
+## 后续用户指令：上传测试版
+
+2026-10-16 按用户“上传一下”指令，使用统一 mp:release 流程上传 1.0.82 robot 2。登记库自动分配版本，生成文件单独提交为 baec7a5 并推送；随后从该干净、同步的 main 构建并上传。Git 门禁、依赖边界、组件注册及生产 API 校验通过，微信 SDK 确认完整包 2,081,073 字节；登记库回读 is_reviewing=false，保持测试展示状态。发布链路回归 30 pass/0 fail，真实 mp:release 退出 0。原始输出留在会话 scratch `.tmp/mini-upload-1.0.82/release.log`。
+
+本次只上传小程序，没有后端部署/重启或迁移；前文“未上传”描述为各实现阶段当时状态，此处为后续发布状态。用户可测试历史走势默认高度与一线队统计筛选。
