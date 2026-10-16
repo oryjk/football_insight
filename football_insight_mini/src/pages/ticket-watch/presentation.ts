@@ -11,6 +11,36 @@ import {
   type TicketWatchRecentRefluxBucketKey,
 } from './helpers'
 
+export function formatRefreshInterval(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 1) return ''
+  const total = Math.floor(seconds)
+  if (total < 60) return `${total} 秒`
+  const minutes = Math.floor(total / 60)
+  const remainder = total % 60
+  return remainder ? `${minutes} 分 ${remainder} 秒` : `${minutes} 分钟`
+}
+
+export function formatFreshness(nowMs: number, loadedAtMs: number | null): string {
+  if (loadedAtMs === null || !Number.isFinite(loadedAtMs) || !Number.isFinite(nowMs)) return '尚未更新'
+  const seconds = Math.max(0, Math.floor((nowMs - loadedAtMs) / 1000))
+  if (seconds < 5) return '刚刚'
+  if (seconds < 60) return `${seconds} 秒前`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟前`
+  return `${Math.floor(seconds / 3600)} 小时前`
+}
+
+export type TicketRefreshState = 'idle' | 'refreshing' | 'failing' | 'live'
+
+export function resolveRefreshState(input: {
+  monitoring: boolean
+  refreshing: boolean
+  pollFailing: boolean
+}): TicketRefreshState {
+  if (!input.monitoring) return 'idle'
+  if (input.refreshing) return 'refreshing'
+  return input.pollFailing ? 'failing' : 'live'
+}
+
 export function resolveFallbackMatchId(
   match: Pick<TicketWatchMatchSummary, 'match_id' | 'external_match_id'> | null,
 ): number | null {

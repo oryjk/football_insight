@@ -11,9 +11,7 @@
     <view class="page-bg-fade" />
     <view class="page">
       <TicketWatchHeader
-        :selected-team="selectedTeam"
         :active-tab="activeTab"
-        @team="switchTeam"
         @tab="activeTab = $event"
       />
       <view v-if="systemConfigUnderReview" class="state-card"
@@ -24,7 +22,7 @@
         @login="goToUserPage"
       />
       <view v-else-if="activeTab === 'current'" class="board-content">
-        <TicketBoardSkeleton v-if="currentLoading" mode="current" />
+        <TicketBoardSkeleton v-if="currentLoading" mode="current" :show-tabs="false" />
         <view
           v-else-if="currentErrorMessage"
           class="state-card state-card--error"
@@ -36,8 +34,12 @@
             :match="currentMatch"
             :available-regions="currentAvailableRegionCount"
             :total-occurrences="currentTotalOccurrences"
-            :membership-label="membershipExclusiveLabel"
             :monitoring="isMonitoringActive"
+            :refreshing="currentBoardRequestInFlight"
+            :poll-failing="currentBoardPollFailing"
+            :interval-seconds="pollIntervalSeconds"
+            :last-updated-at-ms="currentBoardLoadedAtMs"
+            :ticking="isPageVisible"
             :subscribed="refluxSubscriptionSubscribed"
             :message="currentMessage"
             @monitor="toggleMonitoring"
@@ -47,6 +49,13 @@
           <view v-else class="state-card state-card--empty"
             ><text>{{ currentMessage }}</text></view
           >
+          <TicketTrackedInterests
+            v-if="currentMatch && currentUser && currentTrackedInterests.length > 0"
+            :interests="currentTrackedInterests"
+            :summary="currentTrackedInterestSummary"
+            :collapsed="isCurrentSectionCollapsed('tracked-interests')"
+            @toggle="toggleCurrentSectionCollapsed('tracked-interests')"
+          />
           <TicketRecentRefluxPanel
             v-if="currentMatch && currentRecentRefluxPanelMode !== 'hidden'"
             :mode="currentRecentRefluxPanelMode"
@@ -65,7 +74,7 @@
             @toggle="toggleCurrentSectionCollapsed('focus')"
           />
           <TicketTrackedInterests
-            v-if="currentMatch && currentUser"
+            v-if="currentMatch && currentUser && !currentTrackedInterests.length"
             :interests="currentTrackedInterests"
             :summary="currentTrackedInterestSummary"
             :collapsed="isCurrentSectionCollapsed('tracked-interests')"
@@ -229,7 +238,6 @@ import { reportPageActivity } from '../../utils/userActivity'
 import { beginPaywallVisit, reportPaywallImpression, reportPaywallTap } from '../../composables/usePaywallTelemetry'
 import { useAppSession } from '../../stores/appSession'
 import type { TicketWatchGroupedInventoryItem } from '../../types/ticketWatch'
-import type { TicketWatchTeam } from './types'
 import TicketBoardSkeleton from './components/TicketBoardSkeleton.vue'
 import TicketCurrentMatchCard from './components/TicketCurrentMatchCard.vue'
 import TicketFocusPanel from './components/TicketFocusPanel.vue'
@@ -258,8 +266,12 @@ const { navigationPageStyle } = useNavigationLayout()
 const state = useTicketWatchState()
 const {
   activeTab,
-  selectedTeam,
   currentLoading,
+  currentBoardLoadedAtMs,
+  currentBoardPollFailing,
+  currentBoardRequestInFlight,
+  isPageVisible,
+  pollIntervalSeconds,
   historyLoading,
   currentErrorMessage,
   historyErrorMessage,
@@ -310,7 +322,6 @@ const {
   currentDecisionLines,
   historyDecisionLines,
   historyRefluxTrend,
-  membershipExclusiveLabel,
   membershipBenefitsLocked,
   isCurrentSectionCollapsed,
   isHistorySectionCollapsed,
@@ -346,7 +357,6 @@ const {
   stopPolling,
   startFreshnessClock,
   stopFreshnessClock,
-  handleStopMonitoring,
   toggleMonitoring,
 } = useTicketWatchPolling(state, loadCurrentBoard, session)
 
@@ -398,18 +408,6 @@ watch(activeTab, (tab) => {
 function handleCurrentInterest(item: TicketWatchGroupedInventoryItem): void {
   if (currentMatch.value)
     void handleBlockInterestToggle(currentMatch.value, item, 'current')
-}
-
-async function switchTeam(team: TicketWatchTeam): Promise<void> {
-  if (selectedTeam.value === team) return
-  selectedTeam.value = team
-  handleStopMonitoring()
-  resetCurrentBoard()
-  resetHistoryBoard()
-  await Promise.all([
-    loadCurrentBoard('initial'),
-    loadHistoryMatches('initial'),
-  ])
 }
 
 function goToUserPage(): void {
@@ -482,6 +480,7 @@ onShow(() => {
   beginPaywallVisit()
   reportRecentRefluxLockImpression()
   pageVisible = true
+  isPageVisible.value = true
   const showToken = ++pageShowToken
   void (async () => {
     // 捕获本次 onShow 的可见身份：hide/unload/再次 onShow 后不再继续后续读取。
@@ -528,12 +527,14 @@ onReady(() => {
 
 onHide(() => {
   pageVisible = false
+  isPageVisible.value = false
   stopPolling()
   stopFreshnessClock()
 })
 
 onUnload(() => {
   pageVisible = false
+  isPageVisible.value = false
   stopPolling()
   stopFreshnessClock()
   pageEntered.value = false
@@ -564,13 +565,7 @@ onUnload(() => {
   left: 0;
   width: 100%;
   height: 100vh;
-  background: linear-gradient(
-    180deg,
-    var(--fi-color-ticket-page-bg-fade-background) 0%,
-    var(--fi-color-ticket-page-bg-fade-background-2) 32%,
-    var(--fi-color-page-soft) 58%,
-    var(--fi-color-page-soft) 100%
-  );
+  background: var(--fi-color-ticket-page-bg-fade-background-2);
   pointer-events: none;
   z-index: 0;
 }

@@ -36,6 +36,8 @@ export function createTicketWatchCurrentBoard(
     currentMatch,
     currentSections,
     hasLoadedCurrentBoard,
+    currentBoardLoadedAtMs,
+    currentBoardPollFailing,
     currentBoardGeneration,
     currentBoardRequestInFlight,
     currentUser,
@@ -94,6 +96,8 @@ export function createTicketWatchCurrentBoard(
     resetCurrentMatchScopedState()
     currentErrorMessage.value = ''
     hasLoadedCurrentBoard.value = false
+    currentBoardLoadedAtMs.value = null
+    currentBoardPollFailing.value = false
     currentMessage.value = '暂无当前比赛。'
   }
 
@@ -141,10 +145,14 @@ export function createTicketWatchCurrentBoard(
         return
       }
       hasLoadedCurrentBoard.value = true
+      // Client retrieval completion time, independent of the server's data age.
+      currentBoardLoadedAtMs.value = Date.now()
+      currentBoardPollFailing.value = false
     } catch (error) {
       if (!isOwner() || requestRevision !== session.revision.value) {
         return
       }
+      currentBoardPollFailing.value = reason === 'poll' && hasLoadedCurrentBoard.value
       if (reason === 'initial' || !hasLoadedCurrentBoard.value) {
         currentErrorMessage.value = extractApiErrorMessage(
           error,

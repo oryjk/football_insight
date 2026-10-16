@@ -48,6 +48,9 @@ export function useTicketWatchState() {
   const historySections = ref<TicketWatchGroupedInventorySection[]>([])
   const historyTrendTotals = ref<Record<number, number>>({})
   const hasLoadedCurrentBoard = ref(false)
+  const currentBoardLoadedAtMs = ref<number | null>(null)
+  const currentBoardPollFailing = ref(false)
+  const isPageVisible = ref(false)
   const hasLoadedHistoryBoard = ref(false)
   // 当前看板生命周期：reset/球队切换/比赛上下文替换时单调递增（不归零），
   // 订阅/套餐/下单/支付等请求捕获 generation，过期请求永不发布结果或清 loading。
@@ -276,6 +279,9 @@ export function useTicketWatchState() {
     historySections,
     historyTrendTotals,
     hasLoadedCurrentBoard,
+    currentBoardLoadedAtMs,
+    currentBoardPollFailing,
+    isPageVisible,
     hasLoadedHistoryBoard,
     currentBoardGeneration,
     currentBoardRequestInFlight,

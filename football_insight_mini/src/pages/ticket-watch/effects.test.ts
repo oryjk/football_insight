@@ -51,6 +51,7 @@ const testGlobal = globalThis as typeof globalThis & { uni: typeof uni }
 const originalUni = testGlobal.uni
 const originalSetInterval = globalThis.setInterval
 const originalClearInterval = globalThis.clearInterval
+const originalDateNow = Date.now
 
 /** 页面 composable 的会话注入 stub：状态用可写 ref，action 默认不应被调用。 */
 type SessionStub = AppSession & { revision: Ref<number> }
@@ -89,6 +90,7 @@ afterEach(() => {
   testGlobal.uni = originalUni
   globalThis.setInterval = originalSetInterval
   globalThis.clearInterval = originalClearInterval
+  Date.now = originalDateNow
 })
 
 describe('ticket watch page effects', () => {
@@ -2660,6 +2662,122 @@ describe('ticket watch 比赛上下文替换统一复位（自然 rollover 边�
       expect(state.matchIdSheetState.value).toBe('unlocked')
       expect(state.matchIdSheetVisible.value).toBe(true)
       expect(toasts).toEqual(['已解锁'])
+    })
+  }
+})
+
+
+describe('ticket watch refresh display state', () => {
+  function boardResponse(): TicketWatchCurrentBoardResponse {
+    return {
+      current_match: match(1), group_ticket_active: false, message: 'existing message',
+      inventory: [], block_interests: [], tracked_interests: [],
+    }
+  }
+
+  test('starts with no retrieval time, no poll failure and an invisible page', () => {
+    const state = useTicketWatchState()
+    expect(state.currentBoardLoadedAtMs.value).toBeNull()
+    expect(state.currentBoardPollFailing.value).toBe(false)
+    expect(state.isPageVisible.value).toBe(false)
+  })
+
+  test('records client completion time for initial and subsequent successful loads', async () => {
+    const state = useTicketWatchState()
+    state.regions.value = [{ block_name: 'A1', price: '180', usable_count: 10, estate: 0 }]
+    let now = 1000
+    Date.now = () => now
+    const boards = useTicketWatchBoards(state, async () => {}, {
+      ...source, getCurrentTicketWatchBoard: async () => { now += 50; return boardResponse() },
+    }, createSessionStub())
+    for (const reason of ['initial', 'poll', 'initial'] as const) {
+      now += 1000
+      await boards.loadCurrentBoard(reason)
+      expect(state.currentBoardLoadedAtMs.value).toBe(now)
+      expect(state.currentBoardPollFailing.value).toBe(false)
+    }
+  })
+
+  test('retains prior data and timestamp on silent poll failure, then clears failure on recovery', async () => {
+    const state = useTicketWatchState()
+    state.regions.value = [{ block_name: 'A1', price: '180', usable_count: 10, estate: 0 }]
+    let failing = false
+    let now = 1000
+    Date.now = () => now
+    const boards = useTicketWatchBoards(state, async () => {}, {
+      ...source, getCurrentTicketWatchBoard: async () => {
+        if (failing) throw new ApiRequestError('offline', 0, true)
+        return boardResponse()
+      },
+    }, createSessionStub())
+    await boards.loadCurrentBoard('initial')
+    const previousMatch = state.currentMatch.value
+    const previousSections = state.currentSections.value
+    failing = true
+    now = 2000
+    await boards.loadCurrentBoard('poll')
+    expect(state.currentBoardPollFailing.value).toBe(true)
+    expect(state.currentBoardLoadedAtMs.value).toBe(1000)
+    expect(state.currentMatch.value).toBe(previousMatch)
+    expect(state.currentSections.value).toBe(previousSections)
+    expect(state.currentMessage.value).toBe('existing message')
+    expect(state.currentErrorMessage.value).toBe('')
+    expect(state.currentLoading.value).toBe(false)
+    failing = false
+    now = 3000
+    await boards.loadCurrentBoard('poll')
+    expect(state.currentBoardPollFailing.value).toBe(false)
+    expect(state.currentBoardLoadedAtMs.value).toBe(3000)
+  })
+
+  for (const loaded of [false, true]) {
+    for (const reason of ['initial', 'poll'] as const) {
+      test(`failure display: reason=${reason}, previously loaded=${loaded}`, async () => {
+        const state = useTicketWatchState()
+        state.regions.value = [{ block_name: 'A1', price: '180', usable_count: 10, estate: 0 }]
+        state.hasLoadedCurrentBoard.value = loaded
+        state.currentBoardLoadedAtMs.value = loaded ? 1000 : null
+        state.currentBoardPollFailing.value = true
+        const boards = useTicketWatchBoards(state, async () => {}, {
+          ...source, getCurrentTicketWatchBoard: async () => { throw new Error('fixture load error') },
+        }, createSessionStub())
+        await boards.loadCurrentBoard(reason)
+        expect(state.currentBoardPollFailing.value).toBe(reason === 'poll' && loaded)
+        expect(state.currentBoardLoadedAtMs.value).toBe(loaded ? 1000 : null)
+        expect(state.currentErrorMessage.value).toBe(reason === 'poll' && loaded ? '' : 'fixture load error')
+      })
+    }
+  }
+
+  for (const outcome of ['success', 'failure'] as const) {
+    test(`reset and account replacement discard late ${outcome} refresh metadata`, async () => {
+      const state = useTicketWatchState()
+      const session = createSessionStub()
+      state.regions.value = [{ block_name: 'A1', price: '180', usable_count: 10, estate: 0 }]
+      state.hasLoadedCurrentBoard.value = true
+      state.currentBoardLoadedAtMs.value = 1000
+      state.currentBoardPollFailing.value = true
+      const old = deferred<TicketWatchCurrentBoardResponse>()
+      const boards = useTicketWatchBoards(state, async () => {}, {
+        ...source, getCurrentTicketWatchBoard: () => old.promise,
+      }, session)
+      const pending = boards.loadCurrentBoard('poll')
+      const sync = createTicketWatchSessionSync(state, session, {
+        resetSessionScopedBoards: boards.resetCurrentBoard,
+        loadViewerMembershipTier: async () => {}, loadCurrentBoard: boards.loadCurrentBoard,
+        loadHistoryMatches: async () => {}, isPageVisible: () => false,
+      })
+      session.revision.value += 1
+      sync.handleSessionRevisionChange()
+      expect(state.currentBoardLoadedAtMs.value).toBeNull()
+      expect(state.currentBoardPollFailing.value).toBe(false)
+      if (outcome === 'success') old.resolve(boardResponse())
+      else old.reject(new Error('old error'))
+      await pending
+      expect(state.currentBoardLoadedAtMs.value).toBeNull()
+      expect(state.currentBoardPollFailing.value).toBe(false)
+      expect(state.currentErrorMessage.value).toBe('')
+      expect(state.currentMatch.value).toBeNull()
     })
   }
 })
