@@ -109,6 +109,8 @@ import type { TeamInsight } from '../../types/insight'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
 import { resolveMembershipBenefitsLocked } from '../../utils/membershipBenefits'
+import { isMembershipTierAtLeast } from '../../utils/membershipRules'
+import { beginPaywallVisit, reportPaywallImpression, reportPaywallTap } from '../../composables/usePaywallTelemetry'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
 import { reportPageActivity } from '../../utils/userActivity'
@@ -223,6 +225,21 @@ watch([session.revision, currentUser], ([revision, user], [previousRevision, pre
   }
 })
 
+// 付费引导度量：只统计登录、权益未暂停且尚未达到 V6 的用户，这类用户才会在回流看板里遇到升级引导。
+function shouldMeasureTicketWatchEntry(): boolean {
+  return Boolean(currentUser.value)
+    && !userLoading.value
+    && !systemConfigUnderReview.value
+    && !membershipBenefitsLocked.value
+    && !isMembershipTierAtLeast(currentUser.value?.membership_tier, 'V6')
+}
+
+function reportTicketWatchEntryImpression(): void {
+  if (shouldMeasureTicketWatchEntry()) reportPaywallImpression('insights_ticket_watch_entry')
+}
+
+watch([currentUser, userLoading], reportTicketWatchEntryImpression)
+
 function openTicketWatch(): void {
   if (!currentUser.value) {
     return
@@ -240,6 +257,8 @@ function openTicketWatch(): void {
   if (ticketWatchNavigating.value) {
     return
   }
+
+  if (shouldMeasureTicketWatchEntry()) reportPaywallTap('insights_ticket_watch_entry')
 
   ticketWatchNavigating.value = true
   uni.navigateTo({
@@ -276,6 +295,8 @@ function goToTeamBoard(): void {
 
 onShow(async () => {
   reportPageActivity('insights')
+  beginPaywallVisit()
+  reportTicketWatchEntryImpression()
   ticketWatchNavigating.value = false
   // onShow 操作身份在第一个 await 之前建立。
   const shownRevision = session.revision.value

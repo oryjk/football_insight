@@ -52,7 +52,7 @@
             :mode="currentRecentRefluxPanelMode"
             :buckets="currentRecentRefluxBuckets"
             :membership-tier="viewerMembershipTier"
-            @upgrade="goToMembershipPurchase"
+            @upgrade="handleRecentRefluxUpgrade"
           />
           <TicketFocusPanel
             v-if="
@@ -205,7 +205,7 @@
       :via="matchIdEntitlement?.via ?? null"
       @close="closeMatchIdSheet"
       @pay="payForMatchId"
-      @upgrade="goToMembershipPurchase"
+      @upgrade="handleMatchIdSheetUpgrade"
     />
   </view>
   <view v-else class="page page--entry-mask" />
@@ -226,6 +226,7 @@ import {
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
 import { reportPageActivity } from '../../utils/userActivity'
+import { beginPaywallVisit, reportPaywallImpression, reportPaywallTap } from '../../composables/usePaywallTelemetry'
 import { useAppSession } from '../../stores/appSession'
 import type { TicketWatchGroupedInventoryItem } from '../../types/ticketWatch'
 import type { TicketWatchTeam } from './types'
@@ -428,6 +429,33 @@ function goToMembershipPurchase(): void {
   uni.navigateTo({ url: '/pages/membership-purchase/index' })
 }
 
+// 付费引导度量：只在原有 goToMembershipPurchase 之前补记点击，原有逻辑不变。
+function handleRecentRefluxUpgrade(): void {
+  if (!systemConfigUnderReview.value) {
+    reportPaywallTap('ticket_watch_recent_reflux_lock', { matchId: currentMatch.value?.match_id })
+  }
+  goToMembershipPurchase()
+}
+
+function handleMatchIdSheetUpgrade(): void {
+  if (!systemConfigUnderReview.value) {
+    reportPaywallTap('ticket_watch_match_id_sheet', { matchId: currentMatch.value?.match_id })
+  }
+  goToMembershipPurchase()
+}
+
+function reportRecentRefluxLockImpression(): void {
+  if (systemConfigUnderReview.value || !currentMatch.value || currentRecentRefluxPanelMode.value !== 'locked') return
+  reportPaywallImpression('ticket_watch_recent_reflux_lock', { matchId: currentMatch.value.match_id })
+}
+
+watch([currentRecentRefluxPanelMode, currentMatch], reportRecentRefluxLockImpression)
+watch([matchIdSheetVisible, matchIdSheetState], ([visible, sheetState]) => {
+  if (visible && sheetState === 'locked' && !systemConfigUnderReview.value) {
+    reportPaywallImpression('ticket_watch_match_id_sheet', { matchId: currentMatch.value?.match_id })
+  }
+})
+
 onShareAppMessage(() => {
   if (activeTab.value === 'history' && displayedHistoryMatch.value) {
     return {
@@ -451,6 +479,8 @@ onShareAppMessage(() => {
 
 onShow(() => {
   reportPageActivity('ticket_watch')
+  beginPaywallVisit()
+  reportRecentRefluxLockImpression()
   pageVisible = true
   const showToken = ++pageShowToken
   void (async () => {

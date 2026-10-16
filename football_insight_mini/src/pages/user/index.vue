@@ -126,6 +126,7 @@ import type { H5TestLoginUser, MiniWechatBindingRequiredResponse } from '../../t
 import { useMiniReviewStatus } from '../../stores/miniReview'
 import { useRuntimeConfig } from '../../stores/runtimeConfig'
 import { reportPageActivity } from '../../utils/userActivity'
+import { beginPaywallVisit, reportPaywallImpression, reportPaywallTap } from '../../composables/usePaywallTelemetry'
 import { createUserAccountEffects } from './accountEffects'
 import { createUserLoginFlow, type MiniWechatBindForm } from './loginFlow'
 import {
@@ -316,11 +317,18 @@ function handleCopyInviteCode(): void {
 
 function handleMembershipCardAction(): void {
   if (canPurchaseMembership.value) {
+    reportPaywallTap('user_membership_entry')
     uni.navigateTo({
       url: '/pages/membership-purchase/index',
     })
   }
 }
+
+function reportMembershipEntryImpression(): void {
+  if (canPurchaseMembership.value && !systemConfigUnderReview.value) reportPaywallImpression('user_membership_entry')
+}
+
+watch(canPurchaseMembership, reportMembershipEntryImpression)
 
 function handleLoginAction(): void {
   if (loginPresentation.method === 'password') {
@@ -367,6 +375,8 @@ async function handleH5TestLoginSelect(user: H5TestLoginUser): Promise<void> {
 
 onShow(() => {
   reportPageActivity('user')
+  beginPaywallVisit()
+  reportMembershipEntryImpression()
   void miniReview.ensureMiniReviewReady()
   void loadUser()
   void loadH5TestUsers()
