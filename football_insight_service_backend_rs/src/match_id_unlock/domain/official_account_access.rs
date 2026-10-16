@@ -30,3 +30,22 @@ pub fn resolve_official_account_access(
         OfficialAccountMatchIdAccess::NotMember
     }
 }
+
+/// An official-account openid is not unique in `f_i_users`: a follower can be linked to several
+/// accounts. The reply must not depend on which row happens to come back first, so the follower is
+/// granted when ANY linked active account qualifies, and recognized (but not a member) otherwise.
+pub fn resolve_official_account_access_for_users(
+    users: &[OfficialAccountUser],
+    now: DateTime<Utc>,
+) -> OfficialAccountMatchIdAccess {
+    if users.is_empty() {
+        return OfficialAccountMatchIdAccess::Unrecognized;
+    }
+    if users.iter().any(|user| {
+        resolve_official_account_access(Some(user), now) == OfficialAccountMatchIdAccess::Granted
+    }) {
+        OfficialAccountMatchIdAccess::Granted
+    } else {
+        OfficialAccountMatchIdAccess::NotMember
+    }
+}

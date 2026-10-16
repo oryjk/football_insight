@@ -8,7 +8,7 @@ use crate::{
         ports::official_account_match_id_access_port::OfficialAccountMatchIdAccessPort,
     },
     match_id_unlock::domain::official_account_access::{
-        OfficialAccountUser, resolve_official_account_access,
+        OfficialAccountUser, resolve_official_account_access_for_users,
     },
 };
 
@@ -22,8 +22,8 @@ SELECT u.membership_tier, u.membership_expires_at,
             ) END AS has_unlock_for_match
 FROM f_i_users u
 WHERE u.official_wechat_open_id = $1 AND u.status = 'active'
-LIMIT 1
 "#;
+// No LIMIT: the openid is not unique, so every linked active account is considered (see the domain fn).
 
 pub struct PostgresOfficialAccountMatchIdAccess {
     pool: PgPool,
@@ -42,18 +42,21 @@ impl OfficialAccountMatchIdAccessPort for PostgresOfficialAccountMatchIdAccess {
         official_open_id: &str,
         match_id: Option<i64>,
     ) -> anyhow::Result<OfficialAccountMatchIdAccess> {
-        let row = sqlx::query_as::<_, (String, Option<DateTime<Utc>>, bool)>(ACCESS_SQL)
+        let rows = sqlx::query_as::<_, (String, Option<DateTime<Utc>>, bool)>(ACCESS_SQL)
             .bind(official_open_id)
             .bind(match_id)
-            .fetch_optional(&self.pool)
+            .fetch_all(&self.pool)
             .await?;
-        let user = row.map(
-            |(membership_tier, membership_expires_at, has_unlock_for_match)| OfficialAccountUser {
-                membership_tier,
-                membership_expires_at,
-                has_unlock_for_match,
-            },
-        );
-        Ok(resolve_official_account_access(user.as_ref(), Utc::now()))
+        let users: Vec<OfficialAccountUser> = rows
+            .into_iter()
+            .map(
+                |(membership_tier, membership_expires_at, has_unlock_for_match)| OfficialAccountUser {
+                    membership_tier,
+                    membership_expires_at,
+                    has_unlock_for_match,
+                },
+            )
+            .collect();
+        Ok(resolve_official_account_access_for_users(&users, Utc::now()))
     }
 }
