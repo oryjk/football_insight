@@ -111,12 +111,21 @@ const categoryOptions = computed(() =>
     ? teamCategories.value.map((item) => ({ slug: item.slug, label: item.label }))
     : playerCategories.value.map((item) => ({ slug: item.slug, label: item.label })),
 )
+// Each scope remembers its own last category, so switching back restores it.
+const rememberedSlugs: Record<'team' | 'player', string> = { team: '', player: '' }
 // The parent's slug lags one tick behind a scope switch; resolve it here so the new list never renders empty in between.
-const effectiveSlug = computed(() =>
-  categoryOptions.value.some((item) => item.slug === props.activeCategorySlug)
-    ? props.activeCategorySlug
-    : (categoryOptions.value[0]?.slug ?? ''),
-)
+const effectiveSlug = computed(() => {
+  const options = categoryOptions.value
+  const isValid = (slug: string) => options.some((item) => item.slug === slug)
+  if (isValid(props.activeCategorySlug)) {
+    return props.activeCategorySlug
+  }
+  const remembered = rememberedSlugs[props.scope]
+  return isValid(remembered) ? remembered : (options[0]?.slug ?? '')
+})
+watch(effectiveSlug, (slug) => {
+  rememberedSlugs[props.scope] = slug
+}, { immediate: true })
 const activeTeamCategory = computed(() =>
   teamCategories.value.find((item) => item.slug === effectiveSlug.value) ?? null,
 )
@@ -133,17 +142,10 @@ watch(bodyKey, (next, prev) => {
   enterMotion.value = nextScope === prevScope ? 'fade' : nextScope === 'player' ? 'from-right' : 'from-left'
 }, { flush: 'sync' })
 watch(
-  categoryOptions,
-  (items) => {
-    if (!items.length) {
-      if (props.activeCategorySlug) {
-        emit('update:activeCategorySlug', '')
-      }
-      return
-    }
-
-    if (!items.some((item) => item.slug === props.activeCategorySlug)) {
-      emit('update:activeCategorySlug', items[0]?.slug ?? '')
+  [categoryOptions, effectiveSlug],
+  () => {
+    if (effectiveSlug.value !== props.activeCategorySlug) {
+      emit('update:activeCategorySlug', effectiveSlug.value)
     }
   },
   { immediate: true },
