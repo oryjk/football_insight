@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { resolveMembershipBenefitsLocked, buildMembershipBenefitItems, buildMembershipBenefitPreview, buildMembershipTierSummary } from './membershipBenefits'
+import { resolveMembershipBenefitsLocked, buildMembershipBenefitItems, buildMembershipBenefitPreview, buildMembershipTierSummary, buildMembershipPassSummary } from './membershipBenefits'
 
 describe('resolveMembershipBenefitsLocked', () => {
   test('keeps benefits unlocked when the backend field is missing', () => {
@@ -101,5 +101,22 @@ describe('buildMembershipTierSummary', () => {
   test('缺少该档位规则时退回后端副标题，不臆造刷新速度', () => {
     expect(buildMembershipTierSummary('V7', rules, '查看 10 分钟内')).toBe('查看 10 分钟内')
     expect(buildMembershipTierSummary('V7', null, '查看 10 分钟内')).toBe('查看 10 分钟内')
+  })
+})
+
+describe('buildMembershipPassSummary', () => {
+  const rules = [
+    { code: 'V4', kind: 'referral', min_referrals: 10, ticket_watch_poll_interval_seconds: 60 },
+    { code: 'V5', kind: 'referral', min_referrals: 15, ticket_watch_poll_interval_seconds: 30 },
+  ]
+
+  test('体验卡只说明刷新速度，不把回流时间窗当成卖点', () => {
+    expect(buildMembershipPassSummary('V4', rules, '次日 23:59 前有效')).toBe('余票监控 1 分钟刷新')
+    expect(buildMembershipPassSummary('V5', rules, '次日 23:59 前有效')).toBe('余票监控 30 秒刷新')
+  })
+
+  test('缺少该档位规则时退回后端副标题，不臆造刷新速度', () => {
+    expect(buildMembershipPassSummary('V4', null, '次日 23:59 前有效')).toBe('次日 23:59 前有效')
+    expect(buildMembershipPassSummary('V7', rules, '次日 23:59 前有效')).toBe('次日 23:59 前有效')
   })
 })

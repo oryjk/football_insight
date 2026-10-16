@@ -94,6 +94,22 @@ export function buildMembershipTierSummary(
   return `最近回流 ${window} · ${guide.refreshLabel}`
 }
 
+/**
+ * 体验卡档位行的一句话描述：只说明余票刷新速度。回流时间窗是年度档位的权益，
+ * 不放进体验卡的卖点里；该档位没有后端规则时退回商品副标题，不臆造刷新速度。
+ */
+export function buildMembershipPassSummary(
+  tier: string,
+  rules: MembershipTierRule[] | null | undefined,
+  fallbackSubtitle: string,
+): string {
+  const guide = resolveMembershipTierGuide(tier, rules)
+  const hasConfiguredRule = rules?.some(rule => rule.code.trim().toUpperCase() === guide.code)
+  if (!hasConfiguredRule) return fallbackSubtitle
+
+  return `余票监控 ${guide.refreshLabel}`
+}
+
 export interface MembershipBenefitPreview {
   code: string
   toneClass: string

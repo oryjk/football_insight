@@ -43,6 +43,12 @@ export function formatMembershipDuration(value: MembershipDurationInput): string
   return duration % 12 === 0 ? `${duration / 12} 年` : `${duration} 个月`
 }
 
+/** 档位列表行右侧的有效期短文案；完整说明（含北京时间）仍用 formatMembershipDuration 展示在底部与协议里。 */
+export function formatMembershipRowDuration(option: MembershipProductOption): string {
+  if (option.expiry_rule === 'end_of_next_day' || (!option.expiry_rule && option.is_pass)) return '次日 23:59 前'
+  return formatMembershipDuration(option)
+}
+
 export function buildMembershipPurchaseAgreement(value: MembershipDurationInput): string[] {
   const validity = value && typeof value === 'object' && (value.expiry_rule === 'end_of_next_day' || (!value.expiry_rule && value.is_pass))
     ? '有效期至购买次日 23:59（北京时间）'

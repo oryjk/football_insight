@@ -93,7 +93,7 @@ import MembershipAgreementSheet from './components/MembershipAgreementSheet.vue'
 import MembershipBenefitsPanel from './components/MembershipBenefitsPanel.vue'
 import MembershipRulesSheet from './components/MembershipRulesSheet.vue'
 import MembershipTierList from './components/MembershipTierList.vue'
-import { buildMembershipBenefitPreview, buildMembershipTierSummary } from '../../utils/membershipBenefits'
+import { buildMembershipBenefitPreview, buildMembershipPassSummary, buildMembershipTierSummary } from '../../utils/membershipBenefits'
 import { goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { getMembershipProduct, createMembershipOrder, getVirtualPaymentStatus } from '../../api/payment'
 import { startPaymentAttempt } from '../../composables/paymentTelemetry'
@@ -182,7 +182,9 @@ const selectedProduct = computed(() =>
 const tierSummaries = computed<Record<string, string>>(() => Object.fromEntries(
   productOptions.value.map(option => [
     option.target_tier,
-    buildMembershipTierSummary(option.target_tier, publicConfig.value?.membership_tier_rules, option.subtitle),
+    option.is_pass
+      ? buildMembershipPassSummary(option.target_tier, publicConfig.value?.membership_tier_rules, option.subtitle)
+      : buildMembershipTierSummary(option.target_tier, publicConfig.value?.membership_tier_rules, option.subtitle),
   ]),
 ))
 

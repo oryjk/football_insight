@@ -27,7 +27,7 @@
           <text v-if="isMembershipUpgradePrice(option)" class="tier-row__original">
             ¥{{ formatMembershipPrice(getMembershipOriginalPriceCents(option)) }}
           </text>
-          <text v-else class="tier-row__duration">{{ formatMembershipDuration(option) }}</text>
+          <text v-else class="tier-row__duration">{{ formatMembershipRowDuration(option) }}</text>
         </view>
       </view>
     </template>
@@ -38,7 +38,7 @@
 import { computed } from 'vue'
 import type { MembershipProductOption } from '../../../types/payment'
 import {
-  formatMembershipDuration,
+  formatMembershipRowDuration,
   formatMembershipPrice,
   formatMembershipTierLabel,
   formatMembershipUpgradeNote,
@@ -144,6 +144,7 @@ const emit = defineEmits<{
 
 .tier-row__price {
   flex-shrink: 0;
+  min-width: 150rpx;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -183,5 +184,6 @@ const emit = defineEmits<{
 .tier-row__duration {
   color: var(--fi-color-text-muted);
   font-size: var(--fi-font-22);
+  white-space: nowrap;
 }
 </style>

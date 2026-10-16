@@ -14,6 +14,7 @@ import {
   formatMembershipTierLabel,
   resolveSelectedTier,
   groupMembershipProductOptions,
+  formatMembershipRowDuration,
 } from './helpers'
 
 const backendProductOptions = [
@@ -236,5 +237,22 @@ describe('catalog-v2 pass metadata', () => {
     expect(getMembershipPayPriceCents(groups[0].options[0])).toBe(3900)
     expect(buildMembershipPurchaseAgreement(backendProductOptions[0])).toEqual(MEMBERSHIP_PURCHASE_AGREEMENT_POINTS)
     expect(groupMembershipProductOptions([])).toEqual([])
+  })
+})
+
+describe('formatMembershipRowDuration', () => {
+  const pass = { target_tier: 'V4', expiry_rule: 'end_of_next_day', duration_label: '购买次日 23:59（北京时间）', is_pass: true } as never
+
+  test('列表行里体验卡用短文案，避免撑宽价格列导致文字换行错位', () => {
+    expect(formatMembershipRowDuration(pass)).toBe('次日 23:59 前')
+  })
+
+  test('年卡与按月商品保持原有展示', () => {
+    expect(formatMembershipRowDuration({ target_tier: 'V6', price_cents: 3900 } as never)).toBe('一年')
+    expect(formatMembershipRowDuration({ target_tier: 'V6', membership_duration_months: 1 } as never)).toBe('1 个月')
+  })
+
+  test('完整文案仍用于底部说明与协议', () => {
+    expect(formatMembershipDuration(pass)).toBe('购买次日 23:59（北京时间）')
   })
 })
