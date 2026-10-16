@@ -1,3 +1,7 @@
+use crate::payment::{
+    application::payment_events::{OrderAttempt, PaymentEvents},
+    ports::payment_event_recorder::PaymentEventRecorder,
+};
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -16,6 +20,7 @@ use crate::{
 };
 
 pub struct CreateMembershipOrderUseCase {
+    events: PaymentEvents,
     order_repository: Arc<dyn OrderRepository>,
     user_membership_port: Arc<dyn UserMembershipPort>,
     wechat_pay_port: Arc<dyn WechatPayPort>,
@@ -28,15 +33,29 @@ impl CreateMembershipOrderUseCase {
         wechat_pay_port: Arc<dyn WechatPayPort>,
     ) -> Self {
         Self {
+            events: PaymentEvents::default(),
             order_repository,
             user_membership_port,
             wechat_pay_port,
         }
     }
 
+    pub fn with_event_recorder(mut self, recorder: Arc<dyn PaymentEventRecorder>) -> Self {
+        self.events = PaymentEvents::new(recorder);
+        self
+    }
+
     pub async fn execute(
         &self,
         input: CreateMembershipOrderInput,
+    ) -> anyhow::Result<CreateMembershipOrderOutput> {
+        self.execute_with_attempt(input, None).await
+    }
+
+    pub async fn execute_with_attempt(
+        &self,
+        input: CreateMembershipOrderInput,
+        attempt_id: Option<uuid::Uuid>,
     ) -> anyhow::Result<CreateMembershipOrderOutput> {
         let openid = self
             .user_membership_port
@@ -83,10 +102,21 @@ impl CreateMembershipOrderUseCase {
             })
             .await?;
 
-        let wx_pay_params = self
-            .wechat_pay_port
-            .unified_order(&order_no, &product.title, price.pay_price_cents, &openid)
-            .await?;
+        let attempt = OrderAttempt::new(
+            self.events.clone(),
+            attempt_id.unwrap_or_else(uuid::Uuid::new_v4),
+            input.user_id,
+            "membership",
+            input.target_tier.clone(),
+            order_no.clone(),
+        );
+        attempt.created();
+
+        let wx_pay_params = attempt.params(
+            self.wechat_pay_port
+                .unified_order(&order_no, &product.title, price.pay_price_cents, &openid)
+                .await,
+        )?;
 
         Ok(CreateMembershipOrderOutput {
             order_no,
@@ -322,5 +352,93 @@ mod tests {
             *wechat_pay_port.amounts.lock().expect("wechat amounts"),
             vec![9900]
         );
+    }
+    #[derive(Default)]
+    struct EventTestRecorder(Mutex<Vec<crate::payment::domain::payment_event::NewPaymentEvent>>);
+    #[async_trait]
+    impl crate::payment::ports::payment_event_recorder::PaymentEventRecorder for EventTestRecorder {
+        async fn record(&self, event: crate::payment::domain::payment_event::NewPaymentEvent) {
+            self.0.lock().unwrap().push(event);
+        }
+    }
+    struct EventTestPay {
+        fail: bool,
+    }
+    #[async_trait]
+    impl WechatPayPort for EventTestPay {
+        async fn unified_order(
+            &self,
+            _: &str,
+            _: &str,
+            _: i32,
+            _: &str,
+        ) -> anyhow::Result<WxPayParams> {
+            if self.fail {
+                return Err(
+                    crate::payment::domain::virtual_payment::VirtualPaymentError::Provider.into(),
+                );
+            }
+            Ok(WxPayParams {
+                virtual_payment: None,
+                time_stamp: "1".into(),
+                nonce_str: "n".into(),
+                package: "p".into(),
+                sign_type: "MD5".into(),
+                pay_sign: "s".into(),
+            })
+        }
+    }
+    #[tokio::test]
+    async fn records_success_and_preserves_parameter_failure_error() {
+        for fail in [false, true] {
+            let recorder = Arc::new(EventTestRecorder::default());
+            let use_case = CreateMembershipOrderUseCase::new(
+                Arc::new(FakeOrderRepository::default()),
+                Arc::new(FakeUserMembershipPort {
+                    open_id: Some("openid".into()),
+                    membership_tier: Some("V6".into()),
+                }),
+                Arc::new(EventTestPay { fail }),
+            )
+            .with_event_recorder(recorder.clone());
+            let attempt_id = Uuid::new_v4();
+            let result = use_case
+                .execute_with_attempt(
+                    CreateMembershipOrderInput {
+                        user_id: Uuid::new_v4(),
+                        target_tier: "V7".into(),
+                        products: default_membership_product_options(),
+                    },
+                    Some(attempt_id),
+                )
+                .await;
+            if fail {
+                assert!(matches!(
+                    result.err().unwrap().downcast_ref(),
+                    Some(crate::payment::domain::virtual_payment::VirtualPaymentError::Provider)
+                ));
+            } else {
+                assert!(result.is_ok());
+            }
+            for _ in 0..20 {
+                tokio::task::yield_now().await;
+            }
+            let events = recorder.0.lock().unwrap();
+            assert_eq!(
+                events.iter().map(|v| v.event.as_str()).collect::<Vec<_>>(),
+                [
+                    "order_created",
+                    if fail {
+                        "pay_params_failed"
+                    } else {
+                        "pay_params_issued"
+                    }
+                ]
+            );
+            assert!(events.iter().all(|v| v.attempt_id == attempt_id
+                && v.scenario == "membership"
+                && v.product_ref.as_deref() == Some("V7")));
+            assert_eq!(events[0].order_no, events[1].order_no);
+        }
     }
 }

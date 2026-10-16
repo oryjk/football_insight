@@ -1,3 +1,7 @@
+use crate::payment::{
+    application::payment_events::{OrderAttempt, PaymentEvents},
+    ports::payment_event_recorder::PaymentEventRecorder,
+};
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -24,6 +28,7 @@ use crate::{
 };
 
 pub struct CreateMatchIdOrderUseCase {
+    events: PaymentEvents,
     repository: Arc<dyn MatchIdUnlockRepository>,
     match_id_source: Arc<dyn MatchIdSource>,
     order_repository: Arc<dyn OrderRepository>,
@@ -40,6 +45,7 @@ impl CreateMatchIdOrderUseCase {
         wechat_pay_port: Arc<dyn WechatPayPort>,
     ) -> Self {
         Self {
+            events: PaymentEvents::default(),
             repository,
             match_id_source,
             order_repository,
@@ -48,9 +54,22 @@ impl CreateMatchIdOrderUseCase {
         }
     }
 
+    pub fn with_event_recorder(mut self, recorder: Arc<dyn PaymentEventRecorder>) -> Self {
+        self.events = PaymentEvents::new(recorder);
+        self
+    }
+
     pub async fn execute(
         &self,
         input: CreateMatchIdOrderInput,
+    ) -> anyhow::Result<CreateMatchIdOrderOutput> {
+        self.execute_with_attempt(input, None).await
+    }
+
+    pub async fn execute_with_attempt(
+        &self,
+        input: CreateMatchIdOrderInput,
+        attempt_id: Option<uuid::Uuid>,
     ) -> anyhow::Result<CreateMatchIdOrderOutput> {
         if !self.match_id_source.known_match_id(input.match_id).await? {
             return Err(MatchIdUnlockError::MatchNotFound.into());
@@ -91,15 +110,26 @@ impl CreateMatchIdOrderUseCase {
             })
             .await?;
 
-        let wx_pay_params = self
-            .wechat_pay_port
-            .unified_order(
-                &order_no,
-                MATCH_ID_UNLOCK_ORDER_DESCRIPTION,
-                MATCH_ID_UNLOCK_PRICE_CENTS,
-                &openid,
-            )
-            .await?;
+        let attempt = OrderAttempt::new(
+            self.events.clone(),
+            attempt_id.unwrap_or_else(uuid::Uuid::new_v4),
+            input.user_id,
+            "match_id_unlock",
+            input.match_id.to_string(),
+            order_no.clone(),
+        );
+        attempt.created();
+
+        let wx_pay_params = attempt.params(
+            self.wechat_pay_port
+                .unified_order(
+                    &order_no,
+                    MATCH_ID_UNLOCK_ORDER_DESCRIPTION,
+                    MATCH_ID_UNLOCK_PRICE_CENTS,
+                    &openid,
+                )
+                .await,
+        )?;
 
         Ok(CreateMatchIdOrderOutput {
             order_no,
@@ -437,5 +467,90 @@ mod tests {
             downcast_error(&error),
             MatchIdUnlockError::MatchNotFound
         ));
+    }
+    #[derive(Default)]
+    struct EventTestRecorder(Mutex<Vec<crate::payment::domain::payment_event::NewPaymentEvent>>);
+    #[async_trait]
+    impl crate::payment::ports::payment_event_recorder::PaymentEventRecorder for EventTestRecorder {
+        async fn record(&self, event: crate::payment::domain::payment_event::NewPaymentEvent) {
+            self.0.lock().unwrap().push(event);
+        }
+    }
+    struct EventTestPay {
+        fail: bool,
+    }
+    #[async_trait]
+    impl WechatPayPort for EventTestPay {
+        async fn unified_order(
+            &self,
+            _: &str,
+            _: &str,
+            _: i32,
+            _: &str,
+        ) -> anyhow::Result<WxPayParams> {
+            if self.fail {
+                return Err(
+                    crate::payment::domain::virtual_payment::VirtualPaymentError::Provider.into(),
+                );
+            }
+            Ok(WxPayParams {
+                virtual_payment: None,
+                time_stamp: "1".into(),
+                nonce_str: "n".into(),
+                package: "p".into(),
+                sign_type: "MD5".into(),
+                pay_sign: "s".into(),
+            })
+        }
+    }
+    #[tokio::test]
+    async fn records_success_and_preserves_parameter_failure_error() {
+        for fail in [false, true] {
+            let recorder = Arc::new(EventTestRecorder::default());
+            let use_case = CreateMatchIdOrderUseCase::new(
+                Arc::new(FakeRepository {
+                    unlocked_matches: vec![],
+                }),
+                Arc::new(FakeMatchIdSource { known: true }),
+                Arc::new(FakeOrderRepository::default()),
+                Arc::new(FakeUserMembershipPort {
+                    tier: Some("V5".into()),
+                    open_id: Some("openid".into()),
+                }),
+                Arc::new(EventTestPay { fail }),
+            )
+            .with_event_recorder(recorder.clone());
+            let attempt_id = Uuid::new_v4();
+            let result = use_case
+                .execute_with_attempt(input(), Some(attempt_id))
+                .await;
+            if fail {
+                assert!(matches!(
+                    result.err().unwrap().downcast_ref(),
+                    Some(crate::payment::domain::virtual_payment::VirtualPaymentError::Provider)
+                ));
+            } else {
+                assert!(result.is_ok());
+            }
+            for _ in 0..20 {
+                tokio::task::yield_now().await;
+            }
+            let events = recorder.0.lock().unwrap();
+            assert_eq!(
+                events.iter().map(|v| v.event.as_str()).collect::<Vec<_>>(),
+                [
+                    "order_created",
+                    if fail {
+                        "pay_params_failed"
+                    } else {
+                        "pay_params_issued"
+                    }
+                ]
+            );
+            assert!(events.iter().all(|v| v.attempt_id == attempt_id
+                && v.scenario == "match_id_unlock"
+                && v.product_ref.as_deref() == Some("571")));
+            assert_eq!(events[0].order_no, events[1].order_no);
+        }
     }
 }

@@ -1,15 +1,19 @@
 use crate::{
     auth::ports::user_membership_port::UserMembershipPort,
     payment::{
-        application::handle_wechat_notify::HandleWechatNotifyUseCase,
+        application::{
+            handle_wechat_notify::HandleWechatNotifyUseCase, payment_events::PaymentEvents,
+        },
         domain::{
             order::{OrderStatus, WxPayParams},
+            payment_event::PaymentEventKind,
             virtual_payment::{
                 Delivery, Refund, VirtualPaymentError, product_key, validate_delivery,
             },
         },
         ports::{
             order_repository::OrderRepository,
+            payment_event_recorder::PaymentEventRecorder,
             virtual_payment_port::{
                 VirtualOrderRepository, VirtualPaymentGateway, VirtualProductRepository,
             },
@@ -27,6 +31,8 @@ pub struct VirtualPaymentService {
     users: Arc<dyn UserMembershipPort>,
     settlement: Arc<HandleWechatNotifyUseCase>,
     products: Arc<dyn VirtualProductRepository>,
+    events: PaymentEvents,
+    event_orders: Option<Arc<dyn OrderRepository>>,
 }
 
 impl VirtualPaymentService {
@@ -45,7 +51,18 @@ impl VirtualPaymentService {
             users,
             settlement,
             products,
+            events: PaymentEvents::default(),
+            event_orders: None,
         }
+    }
+    pub fn with_event_recorder(mut self, recorder: Arc<dyn PaymentEventRecorder>) -> Self {
+        self.events = PaymentEvents::new(recorder);
+        self
+    }
+    /// Production uses the isolated telemetry pool for this background metadata lookup.
+    pub fn with_event_order_repository(mut self, orders: Arc<dyn OrderRepository>) -> Self {
+        self.event_orders = Some(orders);
+        self
     }
     pub fn available(&self) -> bool {
         self.gateway.available()
@@ -130,7 +147,13 @@ impl VirtualPaymentService {
         {
             return Err(VirtualPaymentError::InvalidOrder.into());
         }
-        self.virtual_orders.refund(refund).await
+        self.virtual_orders.refund(refund).await?;
+        self.events.record_order_no(
+            self.event_orders.as_ref().unwrap_or(&self.orders).clone(),
+            refund.order_no.clone(),
+            PaymentEventKind::Refunded,
+        );
+        Ok(())
     }
     pub async fn acknowledge_delivery(&self, order_no: &str) -> anyhow::Result<()> {
         self.virtual_orders.acknowledge_delivery(order_no).await
@@ -229,3 +252,7 @@ impl WechatPayPort for VirtualPaymentService {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "virtual_payment_tests.rs"]
+mod tests;

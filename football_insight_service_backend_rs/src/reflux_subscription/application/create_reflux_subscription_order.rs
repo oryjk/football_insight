@@ -1,3 +1,7 @@
+use crate::payment::{
+    application::payment_events::{OrderAttempt, PaymentEvents},
+    ports::payment_event_recorder::PaymentEventRecorder,
+};
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -20,6 +24,7 @@ use crate::{
 };
 
 pub struct CreateRefluxSubscriptionOrderUseCase {
+    events: PaymentEvents,
     repository: Arc<dyn RefluxSubscriptionRepository>,
     order_repository: Arc<dyn OrderRepository>,
     user_membership_port: Arc<dyn UserMembershipPort>,
@@ -34,6 +39,7 @@ impl CreateRefluxSubscriptionOrderUseCase {
         wechat_pay_port: Arc<dyn WechatPayPort>,
     ) -> Self {
         Self {
+            events: PaymentEvents::default(),
             repository,
             order_repository,
             user_membership_port,
@@ -41,9 +47,22 @@ impl CreateRefluxSubscriptionOrderUseCase {
         }
     }
 
+    pub fn with_event_recorder(mut self, recorder: Arc<dyn PaymentEventRecorder>) -> Self {
+        self.events = PaymentEvents::new(recorder);
+        self
+    }
+
     pub async fn execute(
         &self,
         input: CreateRefluxSubscriptionOrderInput,
+    ) -> anyhow::Result<CreateRefluxSubscriptionOrderOutput> {
+        self.execute_with_attempt(input, None).await
+    }
+
+    pub async fn execute_with_attempt(
+        &self,
+        input: CreateRefluxSubscriptionOrderInput,
+        attempt_id: Option<uuid::Uuid>,
     ) -> anyhow::Result<CreateRefluxSubscriptionOrderOutput> {
         let email = input.email.trim();
         if !is_valid_notification_email(email) {
@@ -83,10 +102,21 @@ impl CreateRefluxSubscriptionOrderUseCase {
             })
             .await?;
 
-        let wx_pay_params = self
-            .wechat_pay_port
-            .unified_order(&order_no, &plan.title, plan.price_cents, &openid)
-            .await?;
+        let attempt = OrderAttempt::new(
+            self.events.clone(),
+            attempt_id.unwrap_or_else(uuid::Uuid::new_v4),
+            input.user_id,
+            "reflux_subscription",
+            input.plan_code.clone(),
+            order_no.clone(),
+        );
+        attempt.created();
+
+        let wx_pay_params = attempt.params(
+            self.wechat_pay_port
+                .unified_order(&order_no, &plan.title, plan.price_cents, &openid)
+                .await,
+        )?;
 
         Ok(CreateRefluxSubscriptionOrderOutput {
             order_no,
@@ -419,5 +449,98 @@ mod tests {
             .expect_err("single match requires match");
 
         assert!(error.to_string().contains("需要选择比赛"));
+    }
+    #[derive(Default)]
+    struct EventTestRecorder(Mutex<Vec<crate::payment::domain::payment_event::NewPaymentEvent>>);
+    #[async_trait]
+    impl crate::payment::ports::payment_event_recorder::PaymentEventRecorder for EventTestRecorder {
+        async fn record(&self, event: crate::payment::domain::payment_event::NewPaymentEvent) {
+            self.0.lock().unwrap().push(event);
+        }
+    }
+    struct EventTestPay {
+        fail: bool,
+    }
+    #[async_trait]
+    impl WechatPayPort for EventTestPay {
+        async fn unified_order(
+            &self,
+            _: &str,
+            _: &str,
+            _: i32,
+            _: &str,
+        ) -> anyhow::Result<WxPayParams> {
+            if self.fail {
+                return Err(
+                    crate::payment::domain::virtual_payment::VirtualPaymentError::Provider.into(),
+                );
+            }
+            Ok(WxPayParams {
+                virtual_payment: None,
+                time_stamp: "1".into(),
+                nonce_str: "n".into(),
+                package: "p".into(),
+                sign_type: "MD5".into(),
+                pay_sign: "s".into(),
+            })
+        }
+    }
+    #[tokio::test]
+    async fn records_success_and_preserves_parameter_failure_error() {
+        for fail in [false, true] {
+            let recorder = Arc::new(EventTestRecorder::default());
+            let use_case = CreateRefluxSubscriptionOrderUseCase::new(
+                Arc::new(FakeRepository {
+                    plan: Some(plan(RefluxSubscriptionScope::SingleMatch)),
+                    saved_emails: Mutex::new(vec![]),
+                }),
+                Arc::new(FakeOrderRepository::default()),
+                Arc::new(FakeUserMembershipPort {
+                    open_id: Some("openid".into()),
+                }),
+                Arc::new(EventTestPay { fail }),
+            )
+            .with_event_recorder(recorder.clone());
+            let attempt_id = Uuid::new_v4();
+            let result = use_case
+                .execute_with_attempt(
+                    CreateRefluxSubscriptionOrderInput {
+                        user_id: Uuid::new_v4(),
+                        plan_code: "single_match".into(),
+                        team_code: "chengdu".into(),
+                        match_id: Some(571),
+                        email: "test@example.com".into(),
+                    },
+                    Some(attempt_id),
+                )
+                .await;
+            if fail {
+                assert!(matches!(
+                    result.err().unwrap().downcast_ref(),
+                    Some(crate::payment::domain::virtual_payment::VirtualPaymentError::Provider)
+                ));
+            } else {
+                assert!(result.is_ok());
+            }
+            for _ in 0..20 {
+                tokio::task::yield_now().await;
+            }
+            let events = recorder.0.lock().unwrap();
+            assert_eq!(
+                events.iter().map(|v| v.event.as_str()).collect::<Vec<_>>(),
+                [
+                    "order_created",
+                    if fail {
+                        "pay_params_failed"
+                    } else {
+                        "pay_params_issued"
+                    }
+                ]
+            );
+            assert!(events.iter().all(|v| v.attempt_id == attempt_id
+                && v.scenario == "reflux_subscription"
+                && v.product_ref.as_deref() == Some("single_match")));
+            assert_eq!(events[0].order_no, events[1].order_no);
+        }
     }
 }

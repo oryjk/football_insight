@@ -54,10 +54,13 @@ pub async fn create_match_id_order_handler(
     let user_id = authenticate_user(&headers, state.token_port.as_ref())?;
     let result = state
         .create_order_use_case
-        .execute(CreateMatchIdOrderInput {
-            user_id,
-            match_id: request.match_id,
-        })
+        .execute_with_attempt(
+            CreateMatchIdOrderInput {
+                user_id,
+                match_id: request.match_id,
+            },
+            Some(crate::payment::adapters::web::event_handlers::attempt_from_headers(&headers)),
+        )
         .await
         .map_err(map_match_id_unlock_error)?;
 

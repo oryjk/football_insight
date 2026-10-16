@@ -27,6 +27,7 @@ pub fn build_match_id_unlock_routes(
     user_membership_port: Arc<dyn UserMembershipPort>,
     wechat_pay_port: Arc<dyn WechatPayPort>,
     token_port: Arc<dyn TokenPort>,
+    event_recorder: Arc<dyn crate::payment::ports::payment_event_recorder::PaymentEventRecorder>,
 ) -> Router {
     let repository = Arc::new(PostgresMatchIdUnlockRepository::new(pool));
     let match_id_source = Arc::new(TicketMonitorMatchIdSource::new(ticket_monitor_port));
@@ -36,13 +37,16 @@ pub fn build_match_id_unlock_routes(
             match_id_source.clone(),
             user_membership_port.clone(),
         )),
-        create_order_use_case: Arc::new(CreateMatchIdOrderUseCase::new(
-            repository,
-            match_id_source,
-            order_repository,
-            user_membership_port,
-            wechat_pay_port,
-        )),
+        create_order_use_case: Arc::new(
+            CreateMatchIdOrderUseCase::new(
+                repository,
+                match_id_source,
+                order_repository,
+                user_membership_port,
+                wechat_pay_port,
+            )
+            .with_event_recorder(event_recorder),
+        ),
         token_port,
     });
 

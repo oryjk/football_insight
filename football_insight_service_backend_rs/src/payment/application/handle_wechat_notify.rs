@@ -1,16 +1,22 @@
 use std::{collections::HashMap, sync::Arc};
 
 use crate::payment::{
+    application::payment_events::PaymentEvents,
     domain::order::{
         membership_tier_from_product_type, parse_match_id_unlock_product_type,
         parse_reflux_subscription_product_type,
     },
-    ports::{order_repository::OrderRepository, payment_settlement_port::PaymentSettlementPort},
+    domain::payment_event::PaymentEventKind,
+    ports::{
+        order_repository::OrderRepository, payment_event_recorder::PaymentEventRecorder,
+        payment_settlement_port::PaymentSettlementPort,
+    },
 };
 
 pub struct HandleWechatNotifyUseCase {
     order_repository: Arc<dyn OrderRepository>,
     payment_settlement_port: Arc<dyn PaymentSettlementPort>,
+    events: PaymentEvents,
 }
 
 impl HandleWechatNotifyUseCase {
@@ -21,7 +27,13 @@ impl HandleWechatNotifyUseCase {
         Self {
             order_repository,
             payment_settlement_port,
+            events: PaymentEvents::default(),
         }
+    }
+
+    pub fn with_event_recorder(mut self, recorder: Arc<dyn PaymentEventRecorder>) -> Self {
+        self.events = PaymentEvents::new(recorder);
+        self
     }
 
     pub async fn execute(
@@ -99,6 +111,10 @@ impl HandleWechatNotifyUseCase {
                 .await?;
         }
 
+        // Both legacy callbacks and virtual delivery converge here. Record once only
+        // after settlement succeeds; already-paid retries return above without an event.
+        self.events
+            .record_order(order.clone(), PaymentEventKind::Delivered);
         Ok(())
     }
 }
@@ -466,5 +482,120 @@ mod tests {
                 .as_slice(),
             [571]
         );
+    }
+
+    struct RecordingEvents(
+        tokio::sync::mpsc::UnboundedSender<crate::payment::domain::payment_event::NewPaymentEvent>,
+    );
+
+    #[async_trait]
+    impl crate::payment::ports::payment_event_recorder::PaymentEventRecorder for RecordingEvents {
+        async fn record(&self, event: crate::payment::domain::payment_event::NewPaymentEvent) {
+            self.0.send(event).expect("event receiver");
+        }
+    }
+
+    fn observable_order(product: &str, status: OrderStatus) -> PaymentOrder {
+        PaymentOrder {
+            id: Uuid::new_v4(),
+            order_no: "OBSERVABILITY_UNIT_ONLY".into(),
+            user_id: Uuid::new_v4(),
+            amount_cents: 500,
+            status,
+            prepay_id: None,
+            transaction_id: None,
+            product_type: product.into(),
+            paid_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[tokio::test]
+    async fn successful_settlement_records_delivered_for_every_product() {
+        use crate::payment::domain::payment_event::PaymentEventKind;
+        for (product, scenario) in [
+            ("membership:V7", "membership"),
+            ("match_id_unlock:571", "match_id_unlock"),
+            (
+                "reflux_subscription:single_match:chengdu:571",
+                "reflux_subscription",
+            ),
+        ] {
+            let order = observable_order(product, OrderStatus::Pending);
+            let repository = Arc::new(FakeOrderRepository {
+                order: Mutex::new(Some(order.clone())),
+            });
+            let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel();
+            let use_case = HandleWechatNotifyUseCase::new(
+                repository,
+                Arc::new(CountingPaymentSettlementPort::default()),
+            )
+            .with_event_recorder(Arc::new(RecordingEvents(sender)));
+            use_case
+                .settle_verified_order(&order, "fake_tx")
+                .await
+                .unwrap();
+            let event = tokio::time::timeout(std::time::Duration::from_secs(1), receiver.recv())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(event.event, PaymentEventKind::Delivered);
+            assert_eq!(event.scenario, scenario);
+            assert_eq!(event.user_id, order.user_id);
+            assert_eq!(event.order_no.as_deref(), Some(order.order_no.as_str()));
+            assert!(receiver.try_recv().is_err());
+        }
+    }
+
+    #[tokio::test]
+    async fn failed_or_already_paid_settlement_emits_no_delivered() {
+        for status in [OrderStatus::Pending, OrderStatus::Paid] {
+            let order = observable_order("membership:V7", status);
+            let repository = Arc::new(FakeOrderRepository {
+                order: Mutex::new(Some(order.clone())),
+            });
+            let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel();
+            let use_case =
+                HandleWechatNotifyUseCase::new(repository, Arc::new(FailingPaymentSettlementPort))
+                    .with_event_recorder(Arc::new(RecordingEvents(sender)));
+            let result = use_case.settle_verified_order(&order, "fake_tx").await;
+            if status == OrderStatus::Pending {
+                assert_eq!(result.unwrap_err().to_string(), "payment settlement failed");
+            } else {
+                result.unwrap();
+            }
+            tokio::task::yield_now().await;
+            assert!(receiver.try_recv().is_err());
+        }
+    }
+
+    struct BlockedEvents;
+
+    #[async_trait]
+    impl crate::payment::ports::payment_event_recorder::PaymentEventRecorder for BlockedEvents {
+        async fn record(&self, _: crate::payment::domain::payment_event::NewPaymentEvent) {
+            std::future::pending::<()>().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn blocked_recorder_does_not_delay_settlement() {
+        let order = observable_order("membership:V7", OrderStatus::Pending);
+        let repository = Arc::new(FakeOrderRepository {
+            order: Mutex::new(Some(order.clone())),
+        });
+        let use_case = HandleWechatNotifyUseCase::new(
+            repository,
+            Arc::new(CountingPaymentSettlementPort::default()),
+        )
+        .with_event_recorder(Arc::new(BlockedEvents));
+        tokio::time::timeout(
+            std::time::Duration::from_millis(50),
+            use_case.settle_verified_order(&order, "fake_tx"),
+        )
+        .await
+        .expect("recorder cannot block settlement")
+        .unwrap();
     }
 }

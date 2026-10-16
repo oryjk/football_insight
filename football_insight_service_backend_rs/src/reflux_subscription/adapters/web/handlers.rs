@@ -102,13 +102,16 @@ pub async fn create_reflux_subscription_order_handler(
     let user_id = authenticate_user(&headers, state.token_port.as_ref())?;
     let result = state
         .create_order_use_case
-        .execute(CreateRefluxSubscriptionOrderInput {
-            user_id,
-            plan_code: request.plan_code,
-            team_code: request.team_code,
-            match_id: request.match_id,
-            email: request.email,
-        })
+        .execute_with_attempt(
+            CreateRefluxSubscriptionOrderInput {
+                user_id,
+                plan_code: request.plan_code,
+                team_code: request.team_code,
+                match_id: request.match_id,
+                email: request.email,
+            },
+            Some(crate::payment::adapters::web::event_handlers::attempt_from_headers(&headers)),
+        )
         .await
         .map_err(map_reflux_subscription_error)?;
 

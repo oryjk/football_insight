@@ -8,3 +8,9 @@ pub mod product_routes;
 pub mod routes;
 pub mod setup_handlers;
 pub mod setup_routes;
+
+pub mod payment_handlers;
+pub mod payment_routes;
+
+#[cfg(test)]
+mod payment_tests;

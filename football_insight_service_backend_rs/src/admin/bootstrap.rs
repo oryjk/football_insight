@@ -11,6 +11,7 @@ use crate::{
                 postgres_admin_audit_repository::PostgresAdminAuditRepository,
                 postgres_admin_auth_repository::PostgresAdminAuthRepository,
                 postgres_admin_credentials_repository::PostgresAdminCredentialsRepository,
+                postgres_admin_payment_repository::PostgresAdminPaymentRepository,
                 postgres_admin_product_repository::PostgresAdminProductRepository,
                 postgres_admin_user_repository::PostgresAdminUserRepository,
             },
@@ -20,6 +21,7 @@ use crate::{
             },
             web::{
                 credentials_routes::admin_credentials_routes,
+                payment_routes::admin_payment_routes,
                 product_routes::admin_product_routes,
                 routes::{admin_audit_routes, admin_auth_routes, admin_user_routes},
                 setup_routes::admin_setup_routes,
@@ -28,8 +30,8 @@ use crate::{
         application::{
             admin_audit_service::AdminAuditService, admin_auth_service::AdminAuthService,
             admin_credentials_service::AdminCredentialsService,
-            admin_product_service::AdminProductService, admin_setup_service::AdminSetupService,
-            admin_user_service::AdminUserService,
+            admin_payment_service::AdminPaymentService, admin_product_service::AdminProductService,
+            admin_setup_service::AdminSetupService, admin_user_service::AdminUserService,
         },
     },
     auth::adapters::security::argon2_password_port::Argon2PasswordPort,
@@ -63,6 +65,10 @@ pub fn build_admin_routes(pool: PgPool, config: &AppConfig) -> Router {
         PostgresAdminProductRepository::new(pool.clone()),
     )));
 
+    let payment_service = Arc::new(AdminPaymentService::new(Arc::new(
+        PostgresAdminPaymentRepository::new(pool.clone()),
+    )));
+
     let audit_service = Arc::new(AdminAuditService::new(Arc::new(
         PostgresAdminAuditRepository::new(pool),
     )));
@@ -75,6 +81,7 @@ pub fn build_admin_routes(pool: PgPool, config: &AppConfig) -> Router {
         ))
         .merge(admin_user_routes(user_service, auth_service.clone()))
         .merge(admin_product_routes(product_service, auth_service.clone()))
+        .merge(admin_payment_routes(payment_service, auth_service.clone()))
         .merge(admin_audit_routes(audit_service, auth_service))
 }
 

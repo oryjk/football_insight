@@ -66,6 +66,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         user_membership_port.clone(),
         payment.wechat_pay_port.clone(),
         auth.token_port.clone(),
+        payment.event_recorder.clone(),
     );
     let match_id_unlock_routes = build_match_id_unlock_routes(
         pool.clone(),
@@ -74,6 +75,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         user_membership_port.clone(),
         payment.wechat_pay_port.clone(),
         auth.token_port.clone(),
+        payment.event_recorder.clone(),
     );
 
     let auth_license_routes = build_auth_license_routes(pool.clone(), auth.token_port.clone());

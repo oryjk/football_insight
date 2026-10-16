@@ -24,16 +24,20 @@ pub fn build_reflux_subscription_routes(
     user_membership_port: Arc<dyn UserMembershipPort>,
     wechat_pay_port: Arc<dyn WechatPayPort>,
     token_port: Arc<dyn TokenPort>,
+    event_recorder: Arc<dyn crate::payment::ports::payment_event_recorder::PaymentEventRecorder>,
 ) -> Router {
     let repository = Arc::new(PostgresRefluxSubscriptionRepository::new(pool));
     let state = Arc::new(RefluxSubscriptionWebState {
         get_plans_use_case: Arc::new(GetRefluxSubscriptionPlansUseCase::new(repository.clone())),
-        create_order_use_case: Arc::new(CreateRefluxSubscriptionOrderUseCase::new(
-            repository.clone(),
-            order_repository,
-            user_membership_port,
-            wechat_pay_port,
-        )),
+        create_order_use_case: Arc::new(
+            CreateRefluxSubscriptionOrderUseCase::new(
+                repository.clone(),
+                order_repository,
+                user_membership_port,
+                wechat_pay_port,
+            )
+            .with_event_recorder(event_recorder),
+        ),
         repository,
         token_port,
     });

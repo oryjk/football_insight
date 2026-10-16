@@ -36,6 +36,8 @@ pub struct PaymentBootstrap {
     pub routes: Router,
     pub order_repository: Arc<dyn OrderRepository>,
     pub wechat_pay_port: Arc<dyn WechatPayPort>,
+    pub event_recorder:
+        Arc<dyn crate::payment::ports::payment_event_recorder::PaymentEventRecorder>,
 }
 
 fn build_virtual_webhook(
@@ -63,25 +65,43 @@ pub fn build_payment(
 ) -> PaymentBootstrap {
     let order_repository: Arc<dyn OrderRepository> =
         Arc::new(PostgresOrderRepository::new(pool.clone()));
+    // Dedicated, bounded pool: telemetry cannot exhaust the business connection pool.
+    let event_pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(2)
+        .acquire_timeout(std::time::Duration::from_millis(100))
+        .connect_lazy_with((*pool.connect_options()).clone());
+    let event_recorder: Arc<dyn crate::payment::ports::payment_event_recorder::PaymentEventRecorder> = Arc::new(
+        crate::payment::adapters::persistence::postgres_payment_event_recorder::PostgresPaymentEventRecorder::new(event_pool.clone()));
+    let event_orders: Arc<dyn OrderRepository> = Arc::new(PostgresOrderRepository::new(event_pool));
+    let report_events = Arc::new(
+        crate::payment::application::report_payment_events::ReportPaymentEvents::new(
+            event_orders.clone(),
+            crate::payment::application::payment_events::PaymentEvents::new(event_recorder.clone()),
+        ),
+    );
     let payment_settlement_port = Arc::new(PostgresPaymentSettlementPort::new(pool.clone()));
-    let settlement = Arc::new(HandleWechatNotifyUseCase::new(
-        order_repository.clone(),
-        payment_settlement_port,
-    ));
+    let settlement = Arc::new(
+        HandleWechatNotifyUseCase::new(order_repository.clone(), payment_settlement_port)
+            .with_event_recorder(event_recorder.clone()),
+    );
     let gateway = Arc::new(HttpVirtualPaymentGateway::new(
         config.virtual_payment.clone(),
         config.wechat_mini_app_id.clone(),
         config.wechat_mini_app_secret.clone(),
     ));
     let virtual_products = Arc::new(PostgresVirtualProductRepository::new(pool.clone()));
-    let virtual_payment = Arc::new(VirtualPaymentService::new(
-        gateway,
-        order_repository.clone(),
-        Arc::new(PostgresVirtualOrderRepository::new(pool.clone())),
-        user_membership_port.clone(),
-        settlement.clone(),
-        virtual_products.clone(),
-    ));
+    let virtual_payment = Arc::new(
+        VirtualPaymentService::new(
+            gateway,
+            order_repository.clone(),
+            Arc::new(PostgresVirtualOrderRepository::new(pool.clone())),
+            user_membership_port.clone(),
+            settlement.clone(),
+            virtual_products.clone(),
+        )
+        .with_event_recorder(event_recorder.clone())
+        .with_event_order_repository(event_orders),
+    );
     let wechat_pay_port: Arc<dyn WechatPayPort> = virtual_payment.clone();
     let virtual_webhook =
         build_virtual_webhook(&config.virtual_payment, &config.wechat_mini_app_id);
@@ -100,11 +120,14 @@ pub fn build_payment(
     }
 
     let state = Arc::new(PaymentWebState {
-        create_membership_order_use_case: Arc::new(CreateMembershipOrderUseCase::new(
-            order_repository.clone(),
-            user_membership_port.clone(),
-            wechat_pay_port.clone(),
-        )),
+        create_membership_order_use_case: Arc::new(
+            CreateMembershipOrderUseCase::new(
+                order_repository.clone(),
+                user_membership_port.clone(),
+                wechat_pay_port.clone(),
+            )
+            .with_event_recorder(event_recorder.clone()),
+        ),
         get_membership_product_use_case: Arc::new(GetMembershipProductUseCase::new(
             system_config_port,
             virtual_products,
@@ -113,15 +136,21 @@ pub fn build_payment(
         handle_wechat_notify_use_case: settlement,
         virtual_payment,
         virtual_webhook,
-        token_port,
+        token_port: token_port.clone(),
         user_membership_port,
         wechat_pay_api_key: config.wechat_pay_api_key.clone(),
     });
 
     PaymentBootstrap {
-        routes: payment_routes(state),
+        routes: payment_routes(state).merge(
+            crate::payment::adapters::web::event_handlers::payment_event_routes(
+                report_events,
+                token_port,
+            ),
+        ),
         order_repository,
         wechat_pay_port,
+        event_recorder,
     }
 }
 

@@ -5,3 +5,5 @@ pub mod admin_product;
 pub mod admin_product_purchase;
 pub mod admin_setup;
 pub mod admin_user;
+
+pub mod admin_payment;

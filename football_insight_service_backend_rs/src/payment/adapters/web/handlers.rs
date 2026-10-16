@@ -37,7 +37,7 @@ pub struct PaymentWebState {
     pub wechat_pay_api_key: String,
 }
 
-fn authenticate_user(
+pub(super) fn authenticate_user(
     headers: &HeaderMap,
     token_port: &dyn TokenPort,
 ) -> Result<uuid::Uuid, (StatusCode, String)> {
@@ -136,11 +136,14 @@ pub async fn create_membership_order_handler(
 
     let result = state
         .create_membership_order_use_case
-        .execute(CreateMembershipOrderInput {
-            user_id,
-            target_tier: product.target_tier.clone(),
-            products: catalog.products,
-        })
+        .execute_with_attempt(
+            CreateMembershipOrderInput {
+                user_id,
+                target_tier: product.target_tier.clone(),
+                products: catalog.products,
+            },
+            Some(crate::payment::adapters::web::event_handlers::attempt_from_headers(&headers)),
+        )
         .await
         .map_err(|error| {
             if let Some(error) =
