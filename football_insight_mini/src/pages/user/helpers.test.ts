@@ -5,6 +5,11 @@ import {
   formatMembershipCardExpiry,
   buildUserUpgradeSteps,
   canShowMembershipPurchaseEntry,
+  canShowOfficialWechatBindEntry,
+  formatOfficialWechatBindCode,
+  getOfficialWechatBindRemainingSeconds,
+  formatOfficialWechatBindCountdown,
+  resolveOfficialWechatBindError,
   formatMembershipExpiryLabel,
   formatNotificationEmailLabel,
   isValidNotificationEmail,
@@ -12,6 +17,41 @@ import {
   resolveUserMembershipMeta,
 } from './helpers'
 import type { MembershipTierGuide } from '../../utils/membershipRules'
+import { ApiRequestError } from '../../utils/apiError'
+
+describe('official account binding helpers', () => {
+  test('shows entry only for logged in, non-review users without a confirmed official binding', () => {
+    expect(canShowOfficialWechatBindEntry(true, false, undefined)).toBe(true)
+    expect(canShowOfficialWechatBindEntry(true, false, false)).toBe(true)
+    expect(canShowOfficialWechatBindEntry(true, false, true)).toBe(false)
+    expect(canShowOfficialWechatBindEntry(false, false, false)).toBe(false)
+    expect(canShowOfficialWechatBindEntry(true, true, false)).toBe(false)
+  })
+
+  test('normalizes six safe code characters and rejects malformed codes', () => {
+    expect(formatOfficialWechatBindCode(' abc234 ')).toBe('ABC234')
+    for (const code of ['', 'ABC23', 'ABC2345', 'AB I23', 'ABO234', 'AB1234', 'AB0234']) {
+      expect(formatOfficialWechatBindCode(code)).toBe('')
+    }
+  })
+
+  test('derives countdown from expiry so time spent in the background is included', () => {
+    expect(getOfficialWechatBindRemainingSeconds(601_000, 1_000)).toBe(600)
+    expect(getOfficialWechatBindRemainingSeconds(601_000, 599_001)).toBe(2)
+    expect(getOfficialWechatBindRemainingSeconds(601_000, 601_000)).toBe(0)
+    expect(getOfficialWechatBindRemainingSeconds(601_000, 900_000)).toBe(0)
+    expect(getOfficialWechatBindRemainingSeconds(null, 1_000)).toBe(0)
+    expect(formatOfficialWechatBindCountdown(600)).toBe('10:00')
+    expect(formatOfficialWechatBindCountdown(9)).toBe('00:09')
+    expect(formatOfficialWechatBindCountdown(0)).toBe('00:00')
+  })
+
+  test('maps real 429 status to rate limit and never guesses from error text', () => {
+    expect(resolveOfficialWechatBindError(new ApiRequestError('server', 429))).toBe('获取过于频繁，请稍后再试')
+    expect(resolveOfficialWechatBindError(new ApiRequestError('429', 500))).toBe('获取绑定码失败，请稍后重试')
+    expect(resolveOfficialWechatBindError(new Error('获取过于频繁'))).toBe('获取绑定码失败，请稍后重试')
+  })
+})
 
 describe('resolveCurrentUserInviteCode', () => {
   test('returns trimmed invite code when present', () => {

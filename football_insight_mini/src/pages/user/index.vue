@@ -1,5 +1,5 @@
 <template>
-  <page-meta :page-style="navigationPageStyle" />
+  <page-meta :page-style="pageStyle" />
   <view class="page-root" :class="{ 'page-root--guest': isGuestPage }">
     <FiBrandNav :transparent="isGuestPage" />
     <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
@@ -35,7 +35,9 @@
             :icon-map="accountInfoIconMap"
             :email-label="notificationEmailLabel"
             :has-email="!!notificationEmail"
+            :show-official-bind="canOpenOfficialBind"
             @edit-email="openNotificationEmailSheet"
+            @bind-official="officialBind.open"
           />
 
           <view class="account-actions">
@@ -76,6 +78,17 @@
       @save="saveNotificationEmail"
     />
 
+    <UserOfficialBindSheet
+      :visible="officialBindVisible"
+      :code="officialBindCode"
+      :remaining-seconds="officialBindRemainingSeconds"
+      :loading="officialBindLoading"
+      :error="officialBindError"
+      @close="officialBind.close"
+      @get-code="officialBind.getCode"
+      @copy="officialBind.copyCode"
+    />
+
     <!-- #ifdef H5 -->
     <UserPasswordLoginSheet
       v-model:visible="passwordLoginSheetVisible"
@@ -103,8 +116,8 @@
 
 <script setup lang="ts">
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
-import { computed, ref, watch } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { computed, onUnmounted, ref, watch } from 'vue'
+import { onHide, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
 import UserGuestChantWall from './components/UserGuestChantWall.vue'
@@ -115,6 +128,7 @@ import UserAccountInfoPanel from './components/UserAccountInfoPanel.vue'
 import UserPasswordLoginSheet from './components/UserPasswordLoginSheet.vue'
 import UserWechatBindSheet from './components/UserWechatBindSheet.vue'
 import UserNotificationEmailSheet from './components/UserNotificationEmailSheet.vue'
+import UserOfficialBindSheet from './components/UserOfficialBindSheet.vue'
 import UserH5TestLoginPanel from './components/UserH5TestLoginPanel.vue'
 import badgeCheckIcon from '../../static/user/badge-check.svg'
 import calendarDaysIcon from '../../static/user/calendar-days.svg'
@@ -128,6 +142,7 @@ import { useRuntimeConfig } from '../../stores/runtimeConfig'
 import { reportPageActivity } from '../../utils/userActivity'
 import { beginPaywallVisit, reportPaywallImpression, reportPaywallTap } from '../../composables/usePaywallTelemetry'
 import { createUserAccountEffects } from './accountEffects'
+import { createUserOfficialBindFlow } from './officialBindFlow'
 import { createUserLoginFlow, type MiniWechatBindForm } from './loginFlow'
 import {
   buildUserAccountInfoItems,
@@ -158,6 +173,37 @@ const publicConfig = runtimeConfig.config
 const miniReview = useMiniReviewStatus()
 // 生产构建查询期间保留会员展示限制；开发构建放开，登录和认证始终独立。
 const systemConfigUnderReview = miniReview.shouldRestrictFeatures
+const officialBind = createUserOfficialBindFlow(session, systemConfigUnderReview)
+const {
+  visible: officialBindVisible,
+  code: officialBindCode,
+  remainingSeconds: officialBindRemainingSeconds,
+  loading: officialBindLoading,
+  error: officialBindError,
+  canOpen: canOpenOfficialBind,
+} = officialBind
+const pageStyle = computed(() => `${navigationPageStyle.value};${officialBindVisible.value ? 'overflow: hidden;' : ''}`)
+let officialBindTimer: ReturnType<typeof setInterval> | null = null
+function stopOfficialBindTimer(): void {
+  if (officialBindTimer !== null) clearInterval(officialBindTimer)
+  officialBindTimer = null
+}
+function syncOfficialBindTimer(): void {
+  stopOfficialBindTimer()
+  officialBind.refreshCountdown()
+  if (officialBindVisible.value) {
+    officialBindTimer = setInterval(officialBind.refreshCountdown, 1000)
+  }
+}
+watch(officialBindVisible, syncOfficialBindTimer)
+onHide(() => {
+  stopOfficialBindTimer()
+  officialBind.handlePageHide()
+})
+onUnmounted(() => {
+  stopOfficialBindTimer()
+  officialBind.dispose()
+})
 const notificationEmail = ref('')
 const notificationEmailSheetVisible = ref(false)
 const notificationEmailSaving = ref(false)
@@ -218,7 +264,8 @@ const isGuestPage = computed(() => !hasAccessToken.value || (!loading.value && !
 const hasOpenSheet = computed(() =>
   passwordLoginSheetVisible.value
   || Boolean(miniWechatBindState.value)
-  || notificationEmailSheetVisible.value,
+  || notificationEmailSheetVisible.value
+  || officialBindVisible.value,
 )
 // H5 测试登录面板展开时，隐藏游客歌词墙和登录浮窗，避免遮挡测试账号列表。
 const h5TestUsers = ref<H5TestLoginUser[]>([])
@@ -374,6 +421,8 @@ async function handleH5TestLoginSelect(user: H5TestLoginUser): Promise<void> {
 }
 
 onShow(() => {
+  syncOfficialBindTimer()
+  void officialBind.handlePageShow()
   reportPageActivity('user')
   beginPaywallVisit()
   reportMembershipEntryImpression()

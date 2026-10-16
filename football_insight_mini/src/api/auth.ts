@@ -83,6 +83,14 @@ export function logout(): Promise<void> {
   return request<void>({ url: '/auth/logout', method: 'POST', auth: true })
 }
 
+export function createWechatOfficialBindCode(): Promise<{ code: string; expires_in_seconds: number }> {
+  return request<{ code: string; expires_in_seconds: number }>({
+    url: '/auth/wechat-official-bind-code',
+    method: 'POST',
+    auth: true,
+  })
+}
+
 export function getNotificationEmail(): Promise<NotificationEmailResponse> {
   return request<NotificationEmailResponse>({
     url: '/ticket-watch/reflux-subscriptions/email',

@@ -5,6 +5,7 @@ export interface CurrentUser {
   invite_code?: string | null
   avatar_url: string | null
   has_wechat_binding: boolean
+  official_wechat_bound?: boolean
   membership_tier: string
   membership_expires_at?: string | null
   membership_benefits_enabled?: boolean

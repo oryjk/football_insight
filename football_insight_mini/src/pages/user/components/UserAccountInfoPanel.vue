@@ -11,6 +11,11 @@
           <text class="account-info-item__label">{{ item.label }}</text>
           <text class="account-info-item__value">{{ item.value }}</text>
         </view>
+        <view v-if="showOfficialBind" class="account-info-item" @tap="emit('bind-official')">
+          <image class="account-info-item__icon" :src="iconMap['badge-check']" mode="aspectFit" />
+          <text class="account-info-item__label">绑定公众号</text>
+          <text class="account-info-item__value">去绑定 ›</text>
+        </view>
       </view>
     </view>
 
@@ -34,10 +39,12 @@ defineProps<{
   iconMap: Record<UserAccountInfoItem['iconName'], string>
   emailLabel: string
   hasEmail: boolean
+  showOfficialBind: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'edit-email'): void
+  (e: 'bind-official'): void
 }>()
 </script>
 
