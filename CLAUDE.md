@@ -35,6 +35,7 @@ Claude Code 不会自动加载子目录的 `AGENTS.md`。进入某个子项目�
 
 ## 工作方式
 
+- 打包 Docker 镜像一律在当前机器 local233 上做，用 `docker save | gzip | ssh peiqian 'gunzip | docker load'` 传到 peiqian 再启动，不要在 peiqian 上 `docker build`（peiqian 拉基础镜像极慢，会卡死）。因此不要直接运行 `deploy_peiqian_docker.sh`，详见 `AGENTS.md`。
 - 提交信息沿用现有风格：`feat(mini): ...`、`fix(mini): ...`、`chore(mini): ...`、`docs: ...`，subject 用英文。
 - 后端代码改动后，本地验证前先重启本地后端。汇报时分开说明：本地后端已重启 / 生产未部署 / 生产已部署并重启。
 - 本地后端连接的是生产 `football_data`。涉及写操作（尤其会员商品、支付、用户数据）的测试，不要用生产的真实数据去创建或删除。

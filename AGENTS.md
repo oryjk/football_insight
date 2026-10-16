@@ -118,6 +118,7 @@ cargo run
 **生产部署脚本**：
 - `./deploy_jd_docker.sh` — Docker 方式（out109 build → Harbor → jd 拉镜像）
 - `./deploy_peiqian_docker.sh` — Docker 方式（peiqian 本机 build + 本地镜像直接运行，不推 Harbor；自动清理只保留最近 10 个镜像；git 走 peiqian clash 代理）
+  - **镜像一律在 local233 构建，不要在 peiqian 上 `docker build`**：peiqian 拉基础镜像极慢（实测约 200KB/秒，会卡死）。做法：local233 `docker build` 后 `docker save <tag> | gzip | ssh peiqian 'gunzip | docker load'`，再在 peiqian 用该脚本里的 `docker run` 参数重启容器（`--network host`、`--env-file /root/projects/football_insight/football-insight-service-backend-rs.env`、`-e PORT=8092`、日志卷），保留上一个镜像 tag 便于回滚。不要直接运行此脚本
 - `bash deploy/deploy-backend-docker.sh` — 旧 Docker 脚本，默认部署到 jd
 - `bash deploy/deploy-backend-binary.sh` — systemd 方式（jd 上 cargo build --release → systemctl restart）
 - 生产默认用 Docker 方式，systemd 为备用
