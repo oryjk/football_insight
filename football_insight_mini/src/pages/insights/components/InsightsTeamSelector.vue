@@ -97,13 +97,13 @@ async function centerSelectedChip(): Promise<void> {
 </script>
 
 <style scoped lang="css">
-/* 外层容器与进球/助攻/失球分段切换、榜赛页球队榜/球员榜切换同一种外观。 */
+/* 外层轨道与 FiSegmented（进球/助攻/失球、球队榜/球员榜）使用同一组 token，外观保持一致。 */
 .team-selector {
   min-width: 0;
   padding: var(--fi-space-6);
   border: var(--fi-border-width) solid var(--fi-color-border-chip);
   border-radius: var(--fi-radius-round);
-  background: var(--fi-color-page);
+  background: var(--fi-color-segmented-track);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -120,7 +120,7 @@ async function centerSelectedChip(): Promise<void> {
   padding: 0 var(--fi-space-22);
   border-radius: var(--fi-radius-round);
   background: transparent;
-  color: var(--fi-color-insights-tab-idle);
+  color: var(--fi-color-segmented-idle);
   font-size: var(--fi-font-24);
   line-height: var(--fi-leading-none);
   flex-shrink: 0;
@@ -131,6 +131,7 @@ async function centerSelectedChip(): Promise<void> {
 .team-chip::after { border: 0; }
 .team-chip.active {
   background: var(--fi-color-text-primary);
+  box-shadow: var(--fi-shadow-segmented-thumb);
   color: var(--fi-color-surface);
   font-weight: var(--fi-weight-extrabold);
 }

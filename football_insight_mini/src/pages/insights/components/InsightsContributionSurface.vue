@@ -1,20 +1,7 @@
 <template>
   <FiPanel>
     <view class="contribution-surface">
-      <view class="scope-toggle" :class="`scope-toggle--${tab}`">
-        <view class="scope-toggle__thumb" />
-        <view
-          v-for="item in INSIGHT_CONTRIBUTION_TABS"
-          :key="item.key"
-          class="scope-toggle__button"
-          :class="{ active: tab === item.key }"
-          role="button"
-          :aria-label="item.label"
-          :aria-pressed="tab === item.key"
-          hover-class="contribution-control--pressed"
-          @tap="tab = item.key"
-        >{{ item.label }}</view>
-      </view>
+      <FiSegmented v-model="tab" :items="tabItems" aria-label="贡献类型" />
 
       <view v-if="tab === 'goals-for'" class="pill-row">
         <view
@@ -74,6 +61,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import FiPanel from '../../../components/FiPanel.vue'
+import FiSegmented from '../../../components/FiSegmented.vue'
+import goalsIdle from '../../../static/insights/contribution-goals-idle.svg'
+import goalsActive from '../../../static/insights/contribution-goals-active.svg'
+import assistsIdle from '../../../static/insights/contribution-assists-idle.svg'
+import assistsActive from '../../../static/insights/contribution-assists-active.svg'
+import concededIdle from '../../../static/insights/contribution-conceded-idle.svg'
+import concededActive from '../../../static/insights/contribution-conceded-active.svg'
+import type { FiSegmentedItem } from '../../../types/segmented'
 import {
   INSIGHT_CONTRIBUTION_TABS,
   INSIGHT_GOALS_FOR_DIMENSIONS,
@@ -95,6 +90,17 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ (e: 'toggle', key: InsightContributionViewKey): void }>()
 
+const TAB_ICONS: Record<InsightContributionTab, { icon: string; iconActive: string }> = {
+  'goals-for': { icon: goalsIdle, iconActive: goalsActive },
+  assists: { icon: assistsIdle, iconActive: assistsActive },
+  'goals-against': { icon: concededIdle, iconActive: concededActive },
+}
+const tabItems: FiSegmentedItem[] = INSIGHT_CONTRIBUTION_TABS.map(item => ({
+  key: item.key,
+  label: item.label,
+  ...TAB_ICONS[item.key],
+}))
+
 const tab = ref<InsightContributionTab>('goals-for')
 const dimension = ref<InsightGoalsForDimension>('opponent')
 const viewKey = computed(() => resolveContributionViewKey(tab.value, dimension.value))
@@ -105,46 +111,6 @@ const visibleRows = computed(() =>
 
 <style scoped lang="css">
 .contribution-surface { display: grid; gap: var(--fi-space-14); min-width: 0; }
-.scope-toggle {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--fi-space-6);
-  padding: var(--fi-space-6);
-  border: var(--fi-border-width) solid var(--fi-color-border-chip);
-  border-radius: var(--fi-radius-round);
-  background: var(--fi-color-page);
-}
-.scope-toggle__thumb {
-  position: absolute;
-  top: var(--fi-space-6);
-  bottom: var(--fi-space-6);
-  left: var(--fi-space-6);
-  width: calc((100% - var(--fi-space-6) * 4) / 3);
-  border-radius: var(--fi-radius-round);
-  background: var(--fi-color-text-primary);
-  transform: translateX(0);
-  transition: transform 300ms cubic-bezier(0.3, 0.9, 0.3, 1);
-  pointer-events: none;
-}
-.scope-toggle--assists .scope-toggle__thumb { transform: translateX(calc(100% + var(--fi-space-6))); }
-.scope-toggle--goals-against .scope-toggle__thumb { transform: translateX(calc(200% + var(--fi-space-6) * 2)); }
-.scope-toggle__button {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  min-height: var(--fi-space-64);
-  padding: 0 var(--fi-space-20);
-  border-radius: var(--fi-radius-round);
-  color: var(--fi-color-insights-tab-idle);
-  font-size: var(--fi-font-26);
-  line-height: var(--fi-leading-none);
-  white-space: nowrap;
-}
-.scope-toggle__button.active { color: var(--fi-color-surface); font-weight: var(--fi-weight-bold); }
 .pill-row { display: flex; flex-wrap: wrap; gap: var(--fi-space-10); padding-bottom: var(--fi-space-4); }
 .pill-row__item {
   padding: var(--fi-space-18) var(--fi-space-22);
@@ -200,7 +166,6 @@ const visibleRows = computed(() =>
 }
 .contribution-toggle::after { border: 0; }
 @media (prefers-reduced-motion: reduce) {
-  .scope-toggle__thumb,
   .contribution-row__fill { transition: none; }
   .contribution-body { animation: none; }
 }

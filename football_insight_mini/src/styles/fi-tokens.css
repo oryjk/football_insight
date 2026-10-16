@@ -23,6 +23,9 @@ page {
   --fi-primitive-ink: #15161b;
   --fi-primitive-ink-deep: #121212;
   --fi-primitive-member-gold: #e9c477;
+  --fi-primitive-segmented-track: rgba(246, 247, 251, 0.92);
+  --fi-primitive-segmented-idle: #7f8490;
+  --fi-primitive-opacity-pressed: 0.7;
   --fi-primitive-icon-sm: 32rpx;
   --fi-primitive-icon-md: 40rpx;
   --fi-primitive-avatar-md: 96rpx;
@@ -117,6 +120,10 @@ page {
   --fi-color-primary: var(--fi-primitive-red);
   --fi-color-member-card-bg: var(--fi-primitive-ink);
   --fi-color-member-card-accent: var(--fi-primitive-member-gold);
+  --fi-color-segmented-track: var(--fi-primitive-segmented-track);
+  --fi-color-segmented-idle: var(--fi-primitive-segmented-idle);
+  --fi-opacity-pressed: var(--fi-primitive-opacity-pressed);
+  --fi-shadow-segmented-thumb: 0 8rpx 18rpx rgba(var(--fi-primitive-ink-rgb), 0.16);
   --fi-icon-sm: var(--fi-primitive-icon-sm);
   --fi-icon-md: var(--fi-primitive-icon-md);
   --fi-avatar-md: var(--fi-primitive-avatar-md);
@@ -956,7 +963,6 @@ page {
 :root,
 page {
   --fi-primitive-insights-green: #0dbd73;
-  --fi-primitive-insights-tab-idle: #7f8490;
   --fi-primitive-insights-track: #edf0f5;
   --fi-primitive-insights-red-soft: rgba(220, 38, 38, 0.1);
   --fi-primitive-insights-red-faint: rgba(220, 38, 38, 0.06);
@@ -979,7 +985,6 @@ page {
   --fi-primitive-insights-pressed: 0.7;
 
   --fi-color-insights-assist: var(--fi-primitive-insights-green);
-  --fi-color-insights-tab-idle: var(--fi-primitive-insights-tab-idle);
   --fi-color-insights-track: var(--fi-primitive-insights-track);
   --fi-color-insights-entry-icon: var(--fi-primitive-insights-red-soft);
   --fi-color-insights-preview-metric: var(--fi-primitive-insights-red-faint);
