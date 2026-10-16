@@ -216,6 +216,7 @@
       @pay="payForMatchId"
       @upgrade="handleMatchIdSheetUpgrade"
     />
+      :watermark="currentUser?.display_name?.trim() || ''"
   </view>
   <view v-else class="page page--entry-mask" />
 </template>

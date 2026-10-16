@@ -46,6 +46,12 @@
         </view>
       </view>
     </view>
+    <!-- 付费内容防泄露水印：铺满整个遮罩（含卡片），截图时可追溯到账号 -->
+    <view v-if="watermark" class="match-id-watermark" aria-hidden="true">
+      <view class="match-id-watermark__grid">
+        <text v-for="n in WATERMARK_TILE_COUNT" :key="n" class="match-id-watermark__tile">{{ watermark }}</text>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -59,7 +65,10 @@ const props = defineProps<{
   matchLabel: string
   state: 'loading' | 'locked' | 'unlocked' | 'paying'
   via: 'membership' | 'purchase' | null
+  watermark?: string
 }>()
+
+const WATERMARK_TILE_COUNT = 72
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -152,6 +161,39 @@ function copy(): void {
   justify-content: center;
   padding: 0 var(--fi-space-32);
   animation: fi-match-id-overlay-in 180ms ease both;
+}
+
+.match-id-watermark {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* 放大并旋转的平铺网格：旋转后四角仍被铺满。 */
+.match-id-watermark__grid {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: space-around;
+  transform: rotate(-24deg);
+}
+
+.match-id-watermark__tile {
+  flex: 0 0 33.3333%;
+  text-align: center;
+  color: var(--fi-color-text-primary);
+  opacity: var(--fi-opacity-watermark);
+  font-size: var(--fi-font-24);
+  font-weight: var(--fi-weight-bold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .match-id-card {
