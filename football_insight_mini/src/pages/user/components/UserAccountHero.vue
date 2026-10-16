@@ -13,7 +13,6 @@
 
       <view class="member-identity__copy">
         <text class="member-identity__name">{{ displayName }}</text>
-        <text class="member-identity__tag">{{ tagLabel }}</text>
       </view>
     </view>
 
@@ -23,7 +22,7 @@
       @click="emit('membership-action')"
     >
       <view class="membership-card__main">
-        <text class="membership-card__label">会员有效期</text>
+        <text class="membership-card__title">{{ tierTitle }}</text>
         <text class="membership-card__expire">{{ heroExpiryLabel }}</text>
       </view>
       <view v-if="canPurchase" class="membership-card__action">{{ heroActionText }}</view>
@@ -65,8 +64,8 @@ const displayName = computed(() => props.user.display_name?.trim() || '会员')
 
 const avatarFallbackLabel = computed(() => displayName.value.slice(0, 1).toUpperCase())
 
-// 等级只在这里出现一次：会员卡里不再重复写等级或"恭喜您…"整句。
-const tagLabel = computed(() => (props.code === 'V9' ? 'V9 至尊会员' : props.badgeLabel))
+// 等级、有效期与操作集中在同一张会员卡里；头像旁只放名字，不再重复等级。
+const tierTitle = computed(() => (props.code === 'V9' ? 'V9 至尊会员' : props.badgeLabel))
 
 const heroExpiryLabel = computed(() => formatMembershipCardExpiry(props.user.membership_expires_at))
 
@@ -134,16 +133,6 @@ const heroActionText = computed(() => (props.canRenewV9 ? '续费' : '升级'))
   word-break: break-all;
 }
 
-.member-identity__tag {
-  padding: var(--fi-space-6) var(--fi-space-16);
-  border-radius: var(--fi-radius-round);
-  background: var(--fi-color-page);
-  color: var(--fi-color-text-secondary);
-  font-size: var(--fi-font-22);
-  font-weight: var(--fi-weight-bold);
-  line-height: var(--fi-leading-none);
-}
-
 .membership-card {
   margin-top: var(--fi-space-24);
   padding: var(--fi-space-28);
@@ -163,17 +152,17 @@ const heroActionText = computed(() => (props.canRenewV9 ? '续费' : '升级'))
   gap: var(--fi-space-14);
 }
 
-.membership-card__label {
-  color: rgba(var(--fi-primitive-white-rgb), 0.62);
-  font-size: var(--fi-font-22);
-  font-weight: var(--fi-weight-bold);
+.membership-card__title {
+  color: var(--fi-color-member-card-accent);
+  font-size: var(--fi-font-40);
+  font-weight: var(--fi-weight-extrabold);
   line-height: var(--fi-leading-none);
 }
 
 .membership-card__expire {
-  color: var(--fi-color-member-card-accent);
-  font-size: var(--fi-font-40);
-  font-weight: var(--fi-weight-extrabold);
+  color: rgba(var(--fi-primitive-white-rgb), 0.72);
+  font-size: var(--fi-font-24);
+  font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-none);
 }
 
