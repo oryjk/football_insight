@@ -33,6 +33,8 @@ use crate::ticket_watch::{
 
 #[derive(Clone)]
 pub struct TicketWatchWebState {
+    pub get_best_watch_windows_use_case:
+        Arc<crate::ticket_watch::application::get_best_watch_windows::GetBestWatchWindowsUseCase>,
     pub get_current_ticket_watch_board_use_case: Arc<GetCurrentTicketWatchBoardUseCase>,
     pub get_current_ticket_watch_match_use_case: Arc<GetCurrentTicketWatchMatchUseCase>,
     pub list_ticket_watch_matches_use_case: Arc<ListTicketWatchMatchesUseCase>,
@@ -243,4 +245,19 @@ fn extract_bearer_token(headers: &HeaderMap) -> Option<&str> {
 
 fn map_ticket_watch_error(error: anyhow::Error) -> (StatusCode, String) {
     (StatusCode::BAD_GATEWAY, error.to_string())
+}
+
+/// Optional authentication follows current-board; monitor outages are an HTTP-200 state.
+pub async fn get_best_watch_windows_handler(
+    State(state): State<Arc<TicketWatchWebState>>,
+    headers: HeaderMap,
+) -> Json<crate::ticket_watch::adapters::web::best_windows_dto::BestWindowsDto> {
+    let viewer = authenticate_user_optional(&headers, state.token_port.as_ref());
+    Json(
+        state
+            .get_best_watch_windows_use_case
+            .execute(viewer)
+            .await
+            .into(),
+    )
 }

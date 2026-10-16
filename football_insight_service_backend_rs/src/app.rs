@@ -45,10 +45,14 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         auth.token_port.clone(),
     );
     let support_routes = build_support_routes(pool.clone(), auth.token_port.clone());
-    let ticket_watch = build_ticket_watch(config, auth.token_port.clone());
     let user_membership_port: Arc<
         dyn crate::auth::ports::user_membership_port::UserMembershipPort,
     > = auth.auth_repository.clone();
+    let ticket_watch = build_ticket_watch(
+        config,
+        auth.token_port.clone(),
+        user_membership_port.clone(),
+    );
     let seat_swap_routes = build_seat_swap_routes(
         pool.clone(),
         config,

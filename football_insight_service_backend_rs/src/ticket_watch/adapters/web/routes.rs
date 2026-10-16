@@ -15,6 +15,10 @@ use crate::ticket_watch::adapters::web::handlers::{
 pub fn ticket_watch_routes(state: Arc<TicketWatchWebState>) -> Router {
     Router::new()
         .route(
+            "/api/v1/ticket-watch/best-windows",
+            get(crate::ticket_watch::adapters::web::handlers::get_best_watch_windows_handler),
+        )
+        .route(
             "/api/v1/ticket-watch/current-match",
             get(get_current_ticket_watch_match_handler),
         )
@@ -231,10 +235,27 @@ mod tests {
         }
     }
 
+    struct GuestMembership;
+    #[async_trait]
+    impl crate::auth::ports::user_membership_port::UserMembershipPort for GuestMembership {
+        async fn get_user_open_id(&self, _: Uuid) -> anyhow::Result<Option<String>> {
+            unreachable!()
+        }
+        async fn get_user_membership_tier(&self, _: Uuid) -> anyhow::Result<Option<String>> {
+            Ok(None)
+        }
+        async fn update_user_membership_tier(&self, _: Uuid, _: &str) -> anyhow::Result<()> {
+            unreachable!()
+        }
+        async fn is_seat_swap_notice_enabled(&self, _: Uuid) -> anyhow::Result<Option<bool>> {
+            unreachable!()
+        }
+    }
     #[tokio::test]
     async fn tracked_interests_route_should_exist() {
         let port = Arc::new(StubTicketMonitorPort);
         let state = Arc::new(TicketWatchWebState {
+            get_best_watch_windows_use_case: Arc::new(crate::ticket_watch::application::get_best_watch_windows::GetBestWatchWindowsUseCase::new(port.clone(),Arc::new(GuestMembership))),
             get_current_ticket_watch_board_use_case: Arc::new(
                 GetCurrentTicketWatchBoardUseCase::new(
                     Arc::new(CurrentTicketWatchBoardCache::new(
@@ -307,6 +328,7 @@ mod tests {
     async fn current_board_route_should_exist() {
         let port = Arc::new(StubTicketMonitorPort);
         let state = Arc::new(TicketWatchWebState {
+            get_best_watch_windows_use_case: Arc::new(crate::ticket_watch::application::get_best_watch_windows::GetBestWatchWindowsUseCase::new(port.clone(),Arc::new(GuestMembership))),
             get_current_ticket_watch_board_use_case: Arc::new(
                 GetCurrentTicketWatchBoardUseCase::new(
                     Arc::new(CurrentTicketWatchBoardCache::new(
@@ -372,5 +394,31 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
+    }
+    #[tokio::test]
+    async fn best_windows_route_returns_http_200_preview_when_cache_not_ready() {
+        let state = crate::ticket_watch::bootstrap::build_ticket_watch_state(
+            Arc::new(StubTicketMonitorPort),
+            Arc::new(NoopTrackedInterestCachePort),
+            Arc::new(StubTokenPort),
+            Arc::new(GuestMembership),
+        );
+        let response = ticket_watch_routes(state)
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/ticket-watch/best-windows")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["status"], "unavailable");
+        assert_eq!(json["access"], "preview");
+        assert_eq!(json["hours"], serde_json::json!([]));
     }
 }

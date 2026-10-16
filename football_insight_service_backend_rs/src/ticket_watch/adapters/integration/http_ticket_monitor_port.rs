@@ -103,6 +103,48 @@ impl TicketMonitorPort for HttpTicketMonitorPort {
         Ok(matches)
     }
 
+    async fn fetch_restock_profile(
+        &self,
+        match_id: i64,
+        fallback_match_id: Option<i64>,
+        since: &str,
+    ) -> anyhow::Result<crate::ticket_watch::domain::best_watch_windows::RestockProfile> {
+        if since.trim().is_empty() {
+            anyhow::bail!("sale_start_at is required for restock snapshots");
+        }
+        let mut empty = None;
+        for lookup_id in resolve_inventory_lookup_match_ids(match_id, fallback_match_id) {
+            let path = format!(
+                "/api/match/restock-profile/{lookup_id}?since={}",
+                percent_encode(since)
+            );
+            match self
+                .get_json::<super::restock_profile_dto::RestockResponse>(&path)
+                .await
+            {
+                Ok(payload) => {
+                    let profile = payload.into_profile(lookup_id, since)?;
+                    if profile.total_events > 0 {
+                        return Ok(profile);
+                    }
+                    empty = Some(profile);
+                }
+                Err(error)
+                    if error
+                        .chain()
+                        .filter_map(|source| source.downcast_ref::<reqwest::Error>())
+                        .any(|source| source.status() == Some(reqwest::StatusCode::NOT_FOUND)) =>
+                {
+                    continue
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        empty.ok_or_else(|| {
+            crate::ticket_watch::domain::best_watch_windows::RestockProfileNotReady.into()
+        })
+    }
+
     async fn fetch_regions(&self) -> anyhow::Result<Vec<TicketWatchRegion>> {
         let payload: ExternalRegionTemplateResponse =
             self.get_json("/api/match/regions-template").await?;
@@ -326,6 +368,7 @@ fn map_match_summary(item: ExternalMatchDto) -> anyhow::Result<TicketWatchMatchS
         away_team_name,
         is_current: item.is_current,
         include_in_reflux_stats: item.include_in_reflux_stats,
+        ticket_sale_ended: item.ticket_sale_ended,
     })
 }
 
@@ -364,6 +407,7 @@ fn map_yukun_match_summary(item: ExternalYukunMatchDto) -> anyhow::Result<Ticket
         away_team_name: item.away_name.unwrap_or_else(|| "未知对手".to_string()),
         is_current: item.is_current,
         include_in_reflux_stats: item.begin_time.is_some(),
+        ticket_sale_ended: false,
     })
 }
 
@@ -547,6 +591,8 @@ struct ExternalMatchDto {
     round: i32,
     #[serde(default = "default_include_in_reflux_stats")]
     include_in_reflux_stats: bool,
+    #[serde(default)]
+    ticket_sale_ended: bool,
 }
 
 fn default_include_in_reflux_stats() -> bool {
@@ -756,6 +802,7 @@ mod tests {
             match_id: Some("74".to_string()),
             round: 4,
             include_in_reflux_stats: true,
+            ticket_sale_ended: false,
         })
         .expect("summary");
 
@@ -779,6 +826,7 @@ mod tests {
             match_id: Some("78".to_string()),
             round: 8,
             include_in_reflux_stats: true,
+            ticket_sale_ended: false,
         })
         .expect("summary");
 
@@ -817,5 +865,99 @@ mod tests {
 
         assert!(view.current_match.is_none());
         assert_eq!(view.message, "获取当前比赛失败");
+    }
+    #[tokio::test]
+    async fn best_windows_http_adapter_encodes_since_and_falls_back_only_to_legacy_snapshot() {
+        use crate::ticket_watch::ports::ticket_monitor_port::TicketMonitorPort;
+        use axum::{
+            extract::{Path, Query},
+            http::StatusCode,
+            routing::get,
+            Json, Router,
+        };
+        use std::{
+            collections::HashMap,
+            sync::{Arc, Mutex},
+        };
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let captured = calls.clone();
+        let app = Router::new().route(
+            "/api/match/restock-profile/{id}",
+            get(move |Path(id): Path<i64>, Query(query): Query<HashMap<String, String>>| {
+                let calls = captured.clone();
+                async move {
+                    calls.lock().unwrap().push((id, query.get("since").cloned()));
+                    if id == 570 {
+                        return (StatusCode::NOT_FOUND, Json(serde_json::json!({})));
+                    }
+                    let hourly: Vec<_> = (0..24)
+                        .map(|hour| serde_json::json!({"hour": hour, "events": 1}))
+                        .collect();
+                    (StatusCode::OK, Json(serde_json::json!({
+                        "success": true,
+                        "data": {
+                            "schema_version": 2,
+                            "stat_unit": "seat_restock_event",
+                            "match_id": id,
+                            "since": "2026-10-08T14:10:00+08:00",
+                            "total_events": 24,
+                            "appear_events": 20,
+                            "up_events": 4,
+                            "seats_with_events": 2,
+                            "hourly": hourly
+                        }
+                    })))
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let task = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let port = super::HttpTicketMonitorPort::new(Some(format!("http://{address}")));
+        let result = port
+            .fetch_restock_profile(570, Some(72), "2026-10-08T14:10:00+08:00")
+            .await
+            .unwrap();
+        assert_eq!(result.hourly, [1; 24]);
+        assert_eq!(
+            *calls.lock().unwrap(),
+            vec![
+                (570, Some("2026-10-08T14:10:00+08:00".into())),
+                (72, Some("2026-10-08T14:10:00+08:00".into()))
+            ]
+        );
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn best_windows_missing_snapshots_have_typed_error_but_server_errors_do_not() {
+        use crate::ticket_watch::domain::best_watch_windows::RestockProfileNotReady;
+        use crate::ticket_watch::ports::ticket_monitor_port::TicketMonitorPort;
+        use axum::{extract::Path, http::StatusCode, routing::get, Router};
+        let app = Router::new().route(
+            "/api/match/restock-profile/{id}",
+            get(|Path(id): Path<i64>| async move {
+                if id == 500 {
+                    StatusCode::INTERNAL_SERVER_ERROR
+                } else {
+                    StatusCode::NOT_FOUND
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let port = super::HttpTicketMonitorPort::new(Some(format!("http://{address}")));
+        assert!(port
+            .fetch_restock_profile(570, Some(72), "2026-10-08T14:10:00+08:00")
+            .await
+            .unwrap_err()
+            .is::<RestockProfileNotReady>());
+        assert!(!port
+            .fetch_restock_profile(500, Some(72), "2026-10-08T14:10:00+08:00")
+            .await
+            .unwrap_err()
+            .is::<RestockProfileNotReady>());
+        server.abort();
     }
 }

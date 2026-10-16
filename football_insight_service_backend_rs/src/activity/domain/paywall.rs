@@ -6,6 +6,7 @@ use uuid::Uuid;
 pub const PAYWALL_SURFACES: &[&str] = &[
     "ticket_watch_recent_reflux_lock",
     "ticket_watch_match_id_sheet",
+    "ticket_watch_best_window_lock",
     "insights_ticket_watch_entry",
     "user_membership_entry",
 ];
@@ -89,7 +90,8 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn only_the_four_known_surfaces_are_valid() {
+    fn only_known_surfaces_are_valid() {
+        assert!(valid_surface("ticket_watch_best_window_lock"));
         for surface in PAYWALL_SURFACES {
             assert!(valid_surface(surface));
         }

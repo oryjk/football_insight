@@ -226,6 +226,7 @@ mod tests {
                     away_team_name: "浙江俱乐部绿城".to_string(),
                     is_current: true,
                     include_in_reflux_stats: true,
+                    ticket_sale_ended: false,
                 }),
                 group_ticket_active: false,
                 message: "ok".to_string(),

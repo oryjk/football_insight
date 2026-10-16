@@ -11,6 +11,7 @@ pub struct TicketWatchMatchSummary {
     pub away_team_name: String,
     pub is_current: bool,
     pub include_in_reflux_stats: bool,
+    pub ticket_sale_ended: bool,
 }
 
 #[derive(Debug, Clone)]

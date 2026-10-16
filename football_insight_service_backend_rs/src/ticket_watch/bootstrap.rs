@@ -16,6 +16,7 @@ use crate::{
         },
         application::{
             current_board_cache::CurrentTicketWatchBoardCache,
+            get_best_watch_windows::{GetBestWatchWindowsUseCase, BEST_WINDOWS_RETRY_SECONDS},
             get_current_ticket_watch_board::GetCurrentTicketWatchBoardUseCase,
             get_current_ticket_watch_match::GetCurrentTicketWatchMatchUseCase,
             get_match_block_interests::GetMatchBlockInterestsUseCase,
@@ -44,6 +45,7 @@ pub struct TicketWatchBootstrap {
 pub fn build_ticket_watch(
     config: &AppConfig,
     token_port: Arc<dyn TokenPort>,
+    membership_port: Arc<dyn crate::auth::ports::user_membership_port::UserMembershipPort>,
 ) -> TicketWatchBootstrap {
     let ticket_monitor_port: Arc<dyn TicketMonitorPort> = Arc::new(HttpTicketMonitorPort::new(
         config.ticket_monitor_base_url.clone(),
@@ -60,7 +62,19 @@ pub fn build_ticket_watch(
         ticket_monitor_port.clone(),
         tracked_interest_cache_port,
         token_port,
+        membership_port,
     );
+    let background = state.get_best_watch_windows_use_case.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(
+            BEST_WINDOWS_RETRY_SECONDS as u64,
+        ));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            background.refresh_at(chrono::Utc::now()).await;
+        }
+    });
 
     TicketWatchBootstrap {
         routes: ticket_watch_routes(state),
@@ -72,8 +86,13 @@ pub fn build_ticket_watch_state(
     ticket_monitor_port: Arc<dyn TicketMonitorPort>,
     tracked_interest_cache_port: Arc<dyn TrackedInterestCachePort>,
     token_port: Arc<dyn TokenPort>,
+    membership_port: Arc<dyn crate::auth::ports::user_membership_port::UserMembershipPort>,
 ) -> Arc<TicketWatchWebState> {
     Arc::new(TicketWatchWebState {
+        get_best_watch_windows_use_case: Arc::new(GetBestWatchWindowsUseCase::new(
+            ticket_monitor_port.clone(),
+            membership_port,
+        )),
         get_current_ticket_watch_board_use_case: Arc::new(GetCurrentTicketWatchBoardUseCase::new(
             Arc::new(CurrentTicketWatchBoardCache::new(
                 std::time::Duration::from_secs(2),

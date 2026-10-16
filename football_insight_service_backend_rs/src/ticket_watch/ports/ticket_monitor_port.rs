@@ -10,6 +10,16 @@ use uuid::Uuid;
 pub trait TicketMonitorPort: Send + Sync {
     async fn fetch_current_match(&self) -> anyhow::Result<TicketWatchCurrentMatchView>;
     async fn fetch_all_matches(&self) -> anyhow::Result<Vec<TicketWatchMatchSummary>>;
+    /// Reads an offline snapshot; missing snapshots must never cause online SQL calculation.
+    async fn fetch_restock_profile(
+        &self,
+        _match_id: i64,
+        _fallback_match_id: Option<i64>,
+        _since: &str,
+    ) -> anyhow::Result<crate::ticket_watch::domain::best_watch_windows::RestockProfile> {
+        anyhow::bail!("offline restock profiles unavailable")
+    }
+
     async fn fetch_regions(&self) -> anyhow::Result<Vec<TicketWatchRegion>>;
     async fn fetch_inventory(
         &self,
