@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { buildBestWindowsBars, formatBestWindowsConclusion, formatBestWindow, resolveBestWindowsData, bestWindowsHourDetail } from './bestWindowsHelpers'
+import { hourFromChartX, buildBestWindowsBars, formatBestWindowsConclusion, formatBestWindow, resolveBestWindowsData, bestWindowsHourDetail } from './bestWindowsHelpers'
 const hours = Array.from({ length: 24 }, (_, hour) => ({ hour, avg_events: hour === 12 ? 100 : hour === 11 ? 1 : 0, share: 0, hit_matches: hour === 12 ? 4 : 0 }))
 const peak = { start_hour: 12, end_hour: 13, avg_events: 100, hit_matches: 4 }
 const full = { status: 'ok' as const, access: 'full' as const, sample_size: 5, generated_at: '2026-10-16T00:00:00Z', top_windows: [peak], hours }
@@ -35,4 +35,22 @@ test('review and unsuccessful states hide the entire panel', () => {
  expect(resolveBestWindowsData({ ...full, status: 'insufficient' }, false, false)).toBeNull()
  expect(resolveBestWindowsData({ ...full, status: 'unavailable' }, false, false)).toBeNull()
  expect(resolveBestWindowsData(null, false, false)).toBeNull()
+})
+
+test('preview masks the hour even when the server sent it, and never leaks it into copy', () => {
+ const preview = resolveBestWindowsData(full, true, false)!
+ expect(preview.top_windows[0].start_hour).toBeNull()
+ expect(formatBestWindow(preview.top_windows[0])).toBe('**:**–**:**')
+ expect(/12|13/.test(formatBestWindowsConclusion(preview.top_windows))).toBe(false)
+ const serverPreview = resolveBestWindowsData({ ...full, access: 'preview', top_windows: [{ ...peak, start_hour: null, end_hour: null }], hours: [] }, false, false)!
+ expect(formatBestWindow(serverPreview.top_windows[0])).toBe('**:**–**:**')
+})
+test('touch x maps to the hour column and clamps outside the chart', () => {
+ expect(hourFromChartX(10, 10, 240)).toBe(0)
+ expect(hourFromChartX(10 + 125, 10, 240)).toBe(12)
+ expect(hourFromChartX(10 + 239, 10, 240)).toBe(23)
+ expect(hourFromChartX(-50, 10, 240)).toBe(0)
+ expect(hourFromChartX(900, 10, 240)).toBe(23)
+ expect(hourFromChartX(5, 0, 0)).toBeNull()
+ expect(hourFromChartX(Number.NaN, 0, 240)).toBeNull()
 })

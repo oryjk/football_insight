@@ -8,7 +8,9 @@ export function resolveBestWindowsData(
 ): TicketWatchBestWindowsResponse | null {
   if (underReview || data?.status !== 'ok' || !data.top_windows.length) return null
   if (benefitsLocked || data.access === 'preview') {
-    return { ...data, access: 'preview', top_windows: data.top_windows.slice(0, 1), hours: [] }
+    // Even if the server sent a full response, a suspended member must not see the hour.
+    const top = data.top_windows.slice(0, 1).map(row => ({ ...row, start_hour: null, end_hour: null }))
+    return { ...data, access: 'preview', top_windows: top, hours: [] }
   }
   return data
 }
@@ -26,8 +28,18 @@ export function buildBestWindowsBars(data: TicketWatchBestWindowsResponse, curre
   }))
 }
 
+export const MASKED_BEST_WINDOW = '**:**–**:**'
+
 export function formatBestWindow(window: TicketWatchBestWindow): string {
+  if (window.start_hour === null || window.end_hour === null) return MASKED_BEST_WINDOW
   return `${String(window.start_hour).padStart(2, '0')}:00–${String(window.end_hour).padStart(2, '0')}:00`
+}
+
+/** Map a horizontal touch position over the chart to its hour column (0-23). */
+export function hourFromChartX(x: number, left: number, width: number, hours = 24): number | null {
+  if (!(width > 0) || !Number.isFinite(x) || !Number.isFinite(left)) return null
+  const index = Math.floor((x - left) / width * hours)
+  return Math.min(hours - 1, Math.max(0, index))
 }
 
 export function formatBestWindowsConclusion(windows: TicketWatchBestWindow[]): string {

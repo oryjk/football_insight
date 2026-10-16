@@ -11,8 +11,9 @@ pub struct BestWindowsDto {
 }
 #[derive(Debug, Serialize)]
 pub struct BestWindowDto {
-    pub start_hour: u8,
-    pub end_hour: u8,
+    /// null in preview: the hour itself is the paid content.
+    pub start_hour: Option<u8>,
+    pub end_hour: Option<u8>,
     pub avg_events: f64,
     pub hit_matches: usize,
 }
@@ -38,8 +39,8 @@ impl From<(bool, BestWindowsAggregate)> for BestWindowsDto {
                 .top_windows
                 .into_iter()
                 .map(|h| BestWindowDto {
-                    start_hour: h.start_hour,
-                    end_hour: h.end_hour,
+                    start_hour: full.then_some(h.start_hour),
+                    end_hour: full.then_some(h.end_hour),
                     avg_events: h.avg_events,
                     hit_matches: h.hit_matches,
                 })
@@ -55,5 +56,30 @@ impl From<(bool, BestWindowsAggregate)> for BestWindowsDto {
                 })
                 .collect(),
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ticket_watch::domain::best_watch_windows::{BestWindow, BestWindowsAggregate};
+    fn aggregate() -> BestWindowsAggregate {
+        let mut value = BestWindowsAggregate::unavailable("now".into());
+        value.top_windows = vec![BestWindow {
+            start_hour: 12,
+            end_hour: 13,
+            avg_events: 38.4,
+            hit_matches: 7,
+        }];
+        value
+    }
+    #[test]
+    fn preview_json_never_contains_the_hour_of_the_window() {
+        let preview = serde_json::to_value(BestWindowsDto::from((false, aggregate()))).unwrap();
+        let window = &preview["top_windows"][0];
+        assert!(window["start_hour"].is_null() && window["end_hour"].is_null());
+        assert_eq!(window["hit_matches"], 7);
+        let full = serde_json::to_value(BestWindowsDto::from((true, aggregate()))).unwrap();
+        assert_eq!(full["top_windows"][0]["start_hour"], 12);
+        assert_eq!(full["top_windows"][0]["end_hour"], 13);
     }
 }

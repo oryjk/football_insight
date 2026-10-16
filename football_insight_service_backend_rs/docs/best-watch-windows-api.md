@@ -15,12 +15,12 @@
 |top_windows|array|full最多3项，preview最多1项；非ok为空|
 |hours|array|full+ok恒24项，preview或非ok为空|
 
-`top_windows`项为`{start_hour,end_hour,avg_events,hit_matches}`；`hours`项为`{hour,avg_events,share,hit_matches}`。按北京时间小时分桶，平均保留1位小数，占比保留3位小数。相邻小时不合并，峰值按平均降序、小时升序稳定取前三。
+`top_windows`项为`{start_hour,end_hour,avg_events,hit_matches}`，**preview 中 `start_hour`、`end_hour` 恒为 null**（具体时段是付费内容，不下发）；`hours`项为`{hour,avg_events,share,hit_matches}`。按北京时间小时分桶，平均保留1位小数，占比保留3位小数。相邻小时不合并，峰值按平均降序、小时升序稳定取前三。
 
 示例（preview）：
 
 ```json
-{"status":"ok","access":"preview","sample_size":8,"generated_at":"2026-10-16T13:00:00+00:00","top_windows":[{"start_hour":12,"end_hour":13,"avg_events":38.4,"hit_matches":7}],"hours":[]}
+{"status":"ok","access":"preview","sample_size":8,"generated_at":"2026-10-16T13:00:00+00:00","top_windows":[{"start_hour":null,"end_hour":null,"avg_events":38.4,"hit_matches":7}],"hours":[]}
 ```
 
 后台选已结束、include_in_reflux_stats、一线队精确主场、有效开售时间的最近8场；起点为开售+10分钟，404在固定8场内跳过，不补老场；少于20事件丢弃，少于3场insufficient。monitor的其他错误保留上次成功结果，初始无结果unavailable；失败1分钟重试，成功10分钟刷新。前台不访问monitor，不计算窗口SQL。

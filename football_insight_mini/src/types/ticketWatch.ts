@@ -118,8 +118,9 @@ export interface CreateRefluxSubscriptionOrderResponse {
 }
 
 export interface TicketWatchBestWindow {
-  start_hour: number
-  end_hour: number
+  /** null in preview: the server withholds the hour of the paid window. */
+  start_hour: number | null
+  end_hour: number | null
   avg_events: number
   hit_matches: number
 }

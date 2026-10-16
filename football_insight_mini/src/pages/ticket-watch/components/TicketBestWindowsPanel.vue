@@ -9,24 +9,31 @@
       <FiSectionHeading title="最佳盯盘时段" />
       <text class="best-windows__sample">近 {{ data.sample_size }} 场主场的补票分布</text>
       <template v-if="data.access === 'full'">
-        <view class="best-windows__chart">
+        <view
+          class="best-windows__chart"
+          @touchstart="handleTouch"
+          @touchmove="handleTouch"
+        >
           <view
             v-for="bar in bars"
             :key="bar.hour"
             class="best-windows__column"
+            :class="{ 'best-windows__column--selected': bar.hour === selectedHour }"
             role="button"
             :aria-label="bestWindowsHourDetail(bar.hour, data.sample_size, bar.hit_matches)"
-            @tap="selectedHour = bar.hour"
           >
             <view class="best-windows__track">
+              <view v-if="bar.isNow" class="best-windows__now-line" />
               <view
                 class="best-windows__bar"
-                :class="{ 'best-windows__bar--peak': bar.isPeak }"
+                :class="{
+                  'best-windows__bar--peak': bar.isPeak,
+                  'best-windows__bar--selected': bar.hour === selectedHour,
+                }"
                 :style="{ height: `${bar.heightPercent}%` }"
               />
             </view>
             <text class="best-windows__tick">{{ bar.label }}</text>
-            <text v-if="bar.isNow" class="best-windows__now">现在</text>
           </view>
         </view>
         <text class="best-windows__conclusion">{{ formatBestWindowsConclusion(data.top_windows) }}</text>
@@ -45,11 +52,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, getCurrentInstance, onUnmounted, ref, watch } from 'vue'
 import FiPanel from '../../../components/FiPanel.vue'
 import FiSectionHeading from '../../../components/FiSectionHeading.vue'
 import type { TicketWatchBestWindowsResponse } from '../../../types/ticketWatch'
-import { bestWindowsHourDetail, buildBestWindowsBars, formatBestWindow, formatBestWindowsConclusion } from '../bestWindowsHelpers'
+import {
+  bestWindowsHourDetail,
+  buildBestWindowsBars,
+  formatBestWindow,
+  formatBestWindowsConclusion,
+  hourFromChartX,
+} from '../bestWindowsHelpers'
 
 const props = defineProps<{
   data: TicketWatchBestWindowsResponse | null
@@ -63,6 +76,30 @@ const currentHour = ref(beijingHour())
 const selectedHour = ref<number | null>(null)
 const bars = computed(() => props.data ? buildBestWindowsBars(props.data, currentHour.value) : [])
 const selectedBar = computed(() => bars.value.find(bar => bar.hour === selectedHour.value))
+const instance = getCurrentInstance()
+let chartRect: { left: number; width: number } | null = null
+let disposed = false
+
+function selectHourAt(x: number) {
+  const hour = chartRect ? hourFromChartX(x, chartRect.left, chartRect.width) : null
+  if (hour !== null) selectedHour.value = hour
+}
+// Touch start/move select the column under the finger, so a slide scrubs across hours.
+function handleTouch(event: TouchEvent) {
+  const touch = event.touches?.[0] ?? event.changedTouches?.[0]
+  const x = touch?.clientX ?? touch?.pageX
+  if (typeof x !== 'number' || !instance) return
+  if (chartRect && event.type !== 'touchstart') {
+    selectHourAt(x)
+    return
+  }
+  uni.createSelectorQuery().in(instance).select('.best-windows__chart').boundingClientRect().exec((result) => {
+    const rect = result?.[0] as { left?: number; width?: number } | undefined
+    if (disposed || typeof rect?.left !== 'number' || typeof rect.width !== 'number') return
+    chartRect = { left: rect.left, width: rect.width }
+    selectHourAt(x)
+  })
+}
 let timer: ReturnType<typeof setInterval> | null = null
 function stopClock() {
   if (timer !== null) clearInterval(timer)
@@ -76,7 +113,10 @@ watch(() => props.visible && !props.loading && props.data?.access === 'full', (r
   }
 }, { immediate: true })
 watch(() => props.data, () => { selectedHour.value = null })
-onUnmounted(stopClock)
+onUnmounted(() => {
+  disposed = true
+  stopClock()
+})
 </script>
 
 <style scoped>
@@ -96,7 +136,6 @@ onUnmounted(stopClock)
   display: flex;
   gap: var(--fi-space-4);
   min-width: 0;
-  padding-bottom: var(--fi-space-30);
 }
 .best-windows__column {
   position: relative;
@@ -104,6 +143,7 @@ onUnmounted(stopClock)
   min-width: 0;
 }
 .best-windows__track {
+  position: relative;
   height: calc(var(--fi-space-100) + var(--fi-space-100));
   display: flex;
   align-items: flex-end;
@@ -114,6 +154,11 @@ onUnmounted(stopClock)
   background: var(--fi-color-divider);
 }
 .best-windows__bar--peak { background: var(--fi-color-text-primary); }
+.best-windows__bar--selected { background: var(--fi-color-text-primary); }
+.best-windows__column--selected .best-windows__track {
+  border-radius: var(--fi-radius-sm);
+  background: var(--fi-color-page);
+}
 .best-windows__tick {
   display: block;
   min-height: var(--fi-space-24);
@@ -122,17 +167,18 @@ onUnmounted(stopClock)
   font-size: var(--fi-font-18);
   line-height: var(--fi-leading-none);
 }
-.best-windows__now {
+.best-windows__now-line {
   position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
   left: 50%;
+  width: var(--fi-space-4);
   transform: translateX(-50%);
-  white-space: nowrap;
-  color: var(--fi-color-text-primary);
-  font-size: var(--fi-font-18);
-  line-height: var(--fi-leading-normal);
+  border-radius: var(--fi-radius-sm);
+  background: var(--fi-color-primary);
+  pointer-events: none;
 }
-.best-windows__column:first-child .best-windows__now { left: 0; transform: none; }
-.best-windows__column:last-child .best-windows__now { left: auto; right: 0; transform: none; }
 .best-windows__conclusion,
 .best-windows__detail,
 .best-windows__lock-copy {

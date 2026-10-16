@@ -44,20 +44,31 @@ test('full renders exactly 24 bars, top three and one current marker with exact 
  const panel = mount()
  expect(panel.bars()).toHaveLength(24)
  expect(byClass(panel.root, 'best-windows__bar--peak')).toHaveLength(3)
- expect(panel.text().split('现在')).toHaveLength(2)
+ expect(byClass(panel.root, 'best-windows__now-line')).toHaveLength(1)
+ expect(panel.text()).not.toContain('现在')
  expect(panel.text()).toContain('近 5 场主场的补票分布')
  expect(panel.text()).toContain('补票最集中在 12:00–13:00、11:00–12:00、14:00–15:00')
- byClass(panel.root, 'best-windows__column')[12].props.onTap(); await nextTick()
+ // Chart spans x 0..240, so each hour column is 10 wide.
+ const original = (globalThis as any).uni
+ ;(globalThis as any).uni = { createSelectorQuery: () => ({ in: () => ({ select: () => ({ boundingClientRect: () => ({ exec: (cb: (rows: unknown[]) => void) => cb([{ left: 0, width: 240 }]) }) }) }) }) }
+ cleanups.push(() => { (globalThis as any).uni = original })
+ const chart = byClass(panel.root, 'best-windows__chart')[0]
+ const touch = (type: string, x: number) => chart.props[type === 'touchstart' ? 'onTouchstart' : 'onTouchmove']({ type, touches: [{ clientX: x }] })
+ touch('touchstart', 125); await nextTick()
  expect(panel.text()).toContain('12 点：近 5 场里有 4 场出现补票')
- byClass(panel.root, 'best-windows__column')[14].props.onTap(); await nextTick()
+ expect(byClass(panel.root, 'best-windows__bar--selected')).toHaveLength(1)
+ touch('touchmove', 145); await nextTick()
  expect(panel.text()).not.toContain('12 点：')
  expect(panel.text()).toContain('14 点：近 5 场里有 2 场出现补票')
+ touch('touchmove', 999); await nextTick()
+ expect(panel.text()).toContain('23 点：')
 })
 test('preview has no distribution or secondary peaks and emits upgrade', () => {
  let taps = 0
- const panel = mount({ data: { ...full, access: 'preview', hours: [], top_windows: full.top_windows.slice(0, 1) }, onUpgrade: () => { taps++ } })
+ const panel = mount({ data: { ...full, access: 'preview', hours: [], top_windows: [{ ...full.top_windows[0], start_hour: null, end_hour: null }] }, onUpgrade: () => { taps++ } })
  expect(panel.bars()).toHaveLength(0)
- expect(panel.text()).toContain('最容易出票的时段：12:00–13:00')
+ expect(panel.text()).toContain('最容易出票的时段：**:**–**:**')
+ expect(panel.text()).not.toContain('12:00')
  expect(panel.text()).toContain('开通 V6 查看全天分布和前三个高峰时段')
  expect(panel.text()).not.toContain('11:00–12:00')
  byClass(panel.root, 'best-windows__upgrade')[0].props.onTap()
