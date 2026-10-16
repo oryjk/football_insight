@@ -117,8 +117,12 @@
           ><text>{{ historyErrorMessage }}</text></view
         >
         <template v-else>
+          <view v-if="!visibleHistoryMatches.length" class="state-card">
+            <text>{{ historyTrendLoading ? '正在加载历史回流数据…' : '暂无有回流数据的历史比赛。' }}</text>
+          </view>
           <TicketHistorySelector
-            :matches="historyMatches"
+            v-else
+            :matches="visibleHistoryMatches"
             :selected-match-id="selectedHistoryMatchId"
             @select="handleHistoryMatchSelect"
           />
@@ -212,11 +216,11 @@
       :match-label="matchIdMatchLabel"
       :state="matchIdSheetState"
       :via="matchIdEntitlement?.via ?? null"
+      :watermark="currentUser?.display_name?.trim() || ''"
       @close="closeMatchIdSheet"
       @pay="payForMatchId"
       @upgrade="handleMatchIdSheetUpgrade"
     />
-      :watermark="currentUser?.display_name?.trim() || ''"
   </view>
   <view v-else class="page page--entry-mask" />
 </template>
@@ -261,6 +265,7 @@ import { useTicketWatchPolling } from './useTicketWatchPolling'
 import { useTicketWatchSubscription } from './useTicketWatchSubscription'
 import { useTicketWatchMatchId } from './useTicketWatchMatchId'
 import { createTicketWatchSessionSync } from './sessionSync'
+import { syncVisibleHistorySelection } from './ticketWatchHistorySelection'
 
 const { navigationPageStyle } = useNavigationLayout()
 
@@ -280,6 +285,7 @@ const {
   regions,
   currentMatch,
   historyMatches,
+  visibleHistoryMatches,
   selectedHistoryMatchId,
   currentSections,
   historySections,
@@ -406,6 +412,10 @@ watch(activeTab, (tab) => {
     return
   }
   loadBoardForTab(tab)
+})
+
+watch([activeTab, visibleHistoryMatches, historyLoading, historyTrendLoading, isPageVisible], () => {
+  void syncVisibleHistorySelection(state, handleHistoryMatchSelect)
 })
 
 function handleCurrentInterest(item: TicketWatchGroupedInventoryItem): void {

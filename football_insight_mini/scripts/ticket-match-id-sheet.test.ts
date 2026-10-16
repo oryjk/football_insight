@@ -41,24 +41,33 @@ const cleanups: Array<() => void> = []
 afterEach(() => { while (cleanups.length) cleanups.pop()!() })
 
 function mountSheet(overrides = {}) {
+  const originalUni = (globalThis as any).uni
+  const loadingCalls: unknown[] = []
+  let hideLoadingCalls = 0
+  ;(globalThis as any).uni = {
+    ...originalUni,
+    showLoading: (options: unknown) => { loadingCalls.push(options) },
+    hideLoading: () => { hideLoadingCalls += 1 },
+  }
+  cleanups.push(() => { (globalThis as any).uni = originalUni })
   const props = reactive({ visible: true, matchId: '78' as string | null, matchLabel: '成都蓉城 VS 浙江队', state: 'loading', via: null, ...overrides })
   const root = node()
   const app = renderer.createApp({ render: () => h(componentExports.default, props) })
   app.mount(root)
   cleanups.push(() => app.unmount())
-  return { props, text: () => readText(root), button: (label: string) => flatten(root).find(item => item.props.onTap && readText(item).trim() === label) }
+  return { props, loadingCalls, hiddenLoading: () => hideLoadingCalls, text: () => readText(root), button: (label: string) => flatten(root).find(item => item.props.onTap && readText(item).trim() === label) }
 }
 
-test('loading entitlement shows progress without flashing purchase actions or revealing an ID', async () => {
-  const sheet = mountSheet()
-  expect(sheet.text()).toContain('正在查询解锁状态')
-  expect(sheet.text()).not.toContain('¥5')
-  expect(sheet.text()).not.toContain('升级到 V6')
-  expect(sheet.text()).not.toContain('78')
+test('loading entitlement uses native progress and renders the sheet only after resolution', async () => {
+  const sheet = mountSheet({ visible: false })
+  sheet.props.visible = true
+  await nextTick()
+  expect(sheet.text()).toBe('')
+  expect(sheet.loadingCalls).toEqual([{ title: '查询中', mask: true }])
   sheet.props.state = 'unlocked'
   await nextTick()
   expect(sheet.text()).toContain('78')
-  expect(sheet.text()).not.toContain('正在查询解锁状态')
+  expect(sheet.hiddenLoading()).toBe(1)
 })
 
 test('the copy action preserves the full business ID rather than a schedule key', () => {
@@ -66,7 +75,8 @@ test('the copy action preserves the full business ID rather than a schedule key'
   const copied: string[] = []
   ;(globalThis as any).uni = { setClipboardData: ({ data }: { data: string }) => copied.push(data) }
   cleanups.push(() => { (globalThis as any).uni = originalUni })
-  const sheet = mountSheet({ state: 'unlocked', matchId: '08', via: 'membership' })
+  const sheet = mountSheet({ state: 'unlocked', matchId: '08', via: 'membership', watermark: '测试昵称' })
+  expect(sheet.text()).toContain('测试昵称')
   sheet.button('复制')!.props.onTap()
   expect(copied).toEqual(['08'])
 })

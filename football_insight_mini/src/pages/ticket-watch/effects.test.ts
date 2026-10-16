@@ -1845,8 +1845,10 @@ describe('ticket watch 页内 tab 补载与历史选择 owner（真实 boards + 
     }
   }
 
-  function statsOff(id: number): TicketWatchMatchSummary {
-    return { ...match(id), include_in_reflux_stats: false }
+  function cachedHistoryMatch(f: ReturnType<typeof createTabFixture>, id: number): TicketWatchMatchSummary {
+    // These tests isolate selection races, so satisfy the trend prefetch from its cache.
+    f.state.historyTrendTotals.value = { ...f.state.historyTrendTotals.value, [id]: f.state.historyTrendTotals.value[id] ?? 1 }
+    return match(id)
   }
 
   function inventoryEntry(
@@ -1961,7 +1963,7 @@ describe('ticket watch 页内 tab 补载与历史选择 owner（真实 boards + 
     // 首次加载 [1,2,3]，displayed=1。
     const initial = f.boards.loadHistoryMatches('initial')
     await f.flush()
-    f.historyMatchesCalls[0].resolve([statsOff(1), statsOff(2), statsOff(3)])
+    f.historyMatchesCalls[0].resolve([cachedHistoryMatch(f, 1), cachedHistoryMatch(f, 2), cachedHistoryMatch(f, 3)])
     await f.flush()
     expect(f.inventoryCalls.length).toBe(1)
     f.inventoryCalls[0].resolve(inventoryEntry(1))
@@ -1982,7 +1984,7 @@ describe('ticket watch 页内 tab 补载与历史选择 owner（真实 boards + 
     expect(f.inventoryCalls.length).toBe(2)
 
     // list 刷新返回，沿用用户已选的 A=2，发出自己的库存请求。
-    f.historyMatchesCalls[1].resolve([statsOff(1), statsOff(2), statsOff(3)])
+    f.historyMatchesCalls[1].resolve([cachedHistoryMatch(f, 1), cachedHistoryMatch(f, 2), cachedHistoryMatch(f, 3)])
     await f.flush()
     expect(f.inventoryCalls.length).toBe(3)
 
@@ -2026,7 +2028,7 @@ describe('ticket watch 页内 tab 补载与历史选择 owner（真实 boards + 
     const f = createTabFixture({ tab: 'history' })
     const initial = f.boards.loadHistoryMatches('initial')
     await f.flush()
-    f.historyMatchesCalls[0].resolve([statsOff(1), statsOff(2), statsOff(3)])
+    f.historyMatchesCalls[0].resolve([cachedHistoryMatch(f, 1), cachedHistoryMatch(f, 2), cachedHistoryMatch(f, 3)])
     await f.flush()
     f.inventoryCalls[0].resolve(inventoryEntry(1))
     await initial
@@ -2036,7 +2038,7 @@ describe('ticket watch 页内 tab 补载与历史选择 owner（真实 boards + 
     await f.flush()
     const selectA = f.boards.handleHistoryMatchSelect(2)
     await f.flush()
-    f.historyMatchesCalls[1].resolve([statsOff(1), statsOff(2), statsOff(3)])
+    f.historyMatchesCalls[1].resolve([cachedHistoryMatch(f, 1), cachedHistoryMatch(f, 2), cachedHistoryMatch(f, 3)])
     await f.flush()
     expect(f.inventoryCalls.length).toBe(3)
     const selectB = f.boards.handleHistoryMatchSelect(3)
@@ -2074,7 +2076,7 @@ describe('ticket watch 页内 tab 补载与历史选择 owner（真实 boards + 
     const f = createTabFixture({ tab: 'history' })
     const initial = f.boards.loadHistoryMatches('initial')
     await f.flush()
-    f.historyMatchesCalls[0].resolve([statsOff(1), statsOff(2)])
+    f.historyMatchesCalls[0].resolve([cachedHistoryMatch(f, 1), cachedHistoryMatch(f, 2)])
     await f.flush()
     f.inventoryCalls[0].resolve(inventoryEntry(1))
     await initial
@@ -2090,7 +2092,7 @@ describe('ticket watch 页内 tab 补载与历史选择 owner（真实 boards + 
     expect(f.inventoryCalls.length).toBe(2)
 
     // list 返回 [3]：比赛 2 已不在列表 → list 接管选择 owner 并持有 loading。
-    f.historyMatchesCalls[1].resolve([statsOff(3)])
+    f.historyMatchesCalls[1].resolve([cachedHistoryMatch(f, 3)])
     await f.flush()
     expect(f.state.selectedHistoryMatchId.value).toBe(3)
     expect(f.state.historySelectionLoading.value).toBe(true)
@@ -2120,7 +2122,7 @@ describe('ticket watch 页内 tab 补载与历史选择 owner（真实 boards + 
     const f = createTabFixture({ tab: 'history' })
     const initial = f.boards.loadHistoryMatches('initial')
     await f.flush()
-    f.historyMatchesCalls[0].resolve([statsOff(1), statsOff(2), statsOff(3)])
+    f.historyMatchesCalls[0].resolve([cachedHistoryMatch(f, 1), cachedHistoryMatch(f, 2), cachedHistoryMatch(f, 3)])
     await f.flush()
     f.inventoryCalls[0].resolve(inventoryEntry(1))
     await initial
@@ -2131,7 +2133,7 @@ describe('ticket watch 页内 tab 补载与历史选择 owner（真实 boards + 
     // 用户选 A=2（T1）→ list 沿用 A 发库存（捕获 T1）→ 改选 B=3（T2）→ 再选 A=2（T3）。
     const selectA1 = f.boards.handleHistoryMatchSelect(2)
     await f.flush()
-    f.historyMatchesCalls[1].resolve([statsOff(1), statsOff(2), statsOff(3)])
+    f.historyMatchesCalls[1].resolve([cachedHistoryMatch(f, 1), cachedHistoryMatch(f, 2), cachedHistoryMatch(f, 3)])
     await f.flush()
     const selectB = f.boards.handleHistoryMatchSelect(3)
     await f.flush()
@@ -2180,7 +2182,7 @@ describe('ticket watch 页内 tab 补载与历史选择 owner（真实 boards + 
       // 初次加载 [1,2,3]：list 接管选择 1 并缓存。
       const initial = f.boards.loadHistoryMatches('initial')
       await f.flush()
-      f.historyMatchesCalls[0].resolve([statsOff(1), statsOff(2), statsOff(3)])
+      f.historyMatchesCalls[0].resolve([cachedHistoryMatch(f, 1), cachedHistoryMatch(f, 2), cachedHistoryMatch(f, 3)])
       await f.flush()
       f.inventoryCalls[0].resolve(inventoryEntry(1))
       await initial
@@ -2197,7 +2199,7 @@ describe('ticket watch 页内 tab 补载与历史选择 owner（真实 boards + 
 
       // list 返回并沿用 A=2：递增共享 owner 发出自己的 GET2，
       // 使用户 GET1 失效，并由本次 list 同步持有 selectionLoading。
-      f.historyMatchesCalls[1].resolve([statsOff(1), statsOff(2), statsOff(3)])
+      f.historyMatchesCalls[1].resolve([cachedHistoryMatch(f, 1), cachedHistoryMatch(f, 2), cachedHistoryMatch(f, 3)])
       await f.flush()
       expect(f.inventoryCalls.length).toBe(3)
       expect(f.state.historySelectionLoading.value).toBe(true)
@@ -2827,6 +2829,31 @@ describe('ticket match ID display', () => {
 })
 
 describe('ticket history first-team statistics', () => {
+  for (const onlyExcluded of [false, true]) {
+    test(`excluded first fixture never blocks the visible history list (all excluded: ${onlyExcluded})`, async () => {
+      const state = useTicketWatchState()
+      const excluded = { ...match(1), home_team_name: '成都蓉城希拉谷', sale_start_at: null }
+      const reads: number[] = []
+      const boards = useTicketWatchBoards(state, async () => {}, {
+        ...source,
+        getTicketWatchRegions: async () => [],
+        getTicketWatchMatches: async () => onlyExcluded ? [excluded] : [excluded, match(2)],
+        getTicketWatchBlockInterests: async () => [],
+        getTicketWatchInventorySince: async id => {
+          reads.push(id)
+          return [{ block_name: 'A1', occurrences: 10, latest_time: '2026-09-01T10:15:00+08:00' }]
+        },
+      }, createSessionStub())
+      await boards.loadHistoryMatches()
+      for (let i = 0; i < 10; i += 1) await Promise.resolve()
+      expect(state.historyErrorMessage.value).toBe('')
+      expect(state.hasLoadedHistoryBoard.value).toBe(true)
+      expect(state.selectedHistoryMatchId.value).toBe(onlyExcluded ? null : 2)
+      expect([...new Set(reads)]).toEqual(onlyExcluded ? [] : [2])
+      expect(state.visibleHistoryMatches.value.map(item => item.match_id)).toEqual(onlyExcluded ? [] : [2])
+    })
+  }
+
   for (const [team, primaryName] of [
     ['chengdurongcheng', '成都蓉城'], ['yunnanyukun', '云南玉昆'],
   ] as const) {
@@ -2868,6 +2895,25 @@ describe('ticket history first-team statistics', () => {
       expect(state.historyRefluxTrend.value.loadedCount).toBe(2)
       expect(state.historyRefluxTrend.value.averageTotal).toBe(20)
       expect(state.historyRefluxTrend.value.maxTotal).toBe(30)
+      expect(state.visibleHistoryMatches.value.map(item => item.match_id)).toEqual([1, 2])
+      expect(state.displayedHistoryMatch.value?.match_id).toBe(1)
     })
   }
+
+  test('hides an excluded selected match and keeps history and trend lists identical as totals arrive', () => {
+    const state = useTicketWatchState()
+    state.historyMatches.value = [
+      { ...match(1), home_team_name: '成都蓉城希拉谷' },
+      match(2), match(3), match(4), { ...match(5), include_in_reflux_stats: false },
+    ]
+    state.displayedHistoryMatchId.value = 1
+    state.historyTrendTotals.value = { 1: 999, 2: 0, 3: 12, 5: 888 }
+    expect(state.visibleHistoryMatches.value.map(item => item.match_id)).toEqual([3])
+    expect(state.displayedHistoryMatch.value).toBeNull()
+    state.historyTrendTotals.value = { ...state.historyTrendTotals.value, 4: 20 }
+    expect(state.visibleHistoryMatches.value.map(item => item.match_id)).toEqual([3, 4])
+    expect(state.historyRefluxTrend.value.points.map(point => point.match_id)).toEqual([3, 4])
+    state.displayedHistoryMatchId.value = 3
+    expect(state.displayedHistoryMatch.value?.match_id).toBe(3)
+  })
 })

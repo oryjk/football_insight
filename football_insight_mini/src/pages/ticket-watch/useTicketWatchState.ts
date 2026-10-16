@@ -20,6 +20,7 @@ import {
   resolveRecentRefluxPanelMode,
   buildTicketWatchMatchLabel,
   selectRefluxStatsMatches,
+  selectHistoryMatchesWithData,
   summarizeInventoryBoard,
   type TicketWatchCollapsedSectionState,
   toggleTicketWatchSectionCollapsed,
@@ -103,6 +104,13 @@ export function useTicketWatchState() {
       ? currentMatch.value?.external_match_id.trim() || null
       : null,
   )
+  const visibleHistoryMatches = computed(() =>
+    selectHistoryMatchesWithData(
+      historyMatches.value,
+      historyTrendTotals.value,
+      selectedTeam.value === 'yunnanyukun' ? '云南玉昆' : '成都蓉城',
+    ),
+  )
 
   const displayedHistoryMatch = computed(() => {
     if (displayedHistoryMatchId.value === null) {
@@ -110,7 +118,7 @@ export function useTicketWatchState() {
     }
 
     return (
-      historyMatches.value.find(
+      visibleHistoryMatches.value.find(
         (match) => match.match_id === displayedHistoryMatchId.value,
       ) ?? null
     )
@@ -193,7 +201,7 @@ export function useTicketWatchState() {
   )
   const historyRefluxTrend = computed(() =>
     buildHistoryRefluxTrend(
-      historyStatsMatches.value,
+      visibleHistoryMatches.value,
       historyTrendTotals.value,
       selectedHistoryMatchId.value,
       selectedTeam.value === 'yunnanyukun' ? '云南玉昆' : '成都蓉城',
@@ -283,6 +291,7 @@ export function useTicketWatchState() {
     regions,
     currentMatch,
     historyMatches,
+    visibleHistoryMatches,
     selectedHistoryMatchId,
     currentSections,
     historySections,

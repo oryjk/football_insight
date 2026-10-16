@@ -462,6 +462,30 @@ describe('selectRefluxStatsMatches', () => {
 })
 
 describe('groupInventoryByPrice', () => {
+  for (const price of ['', '   ', '0', '0.00', '-1', 'unknown', 'NaN', 'Infinity']) {
+    test(`omits an unpriced or invalid-price region (${JSON.stringify(price)}) even with inventory`, () => {
+      const result = groupInventoryByPrice([
+        { block_name: 'VIP2', price, usable_count: 0, estate: 0 },
+        { block_name: 'A1', price: '180.50', usable_count: 0, estate: 0 },
+      ], [
+        { block_name: 'VIP2', occurrences: 99, latest_time: '2026-09-01T10:15:00+08:00' },
+        { block_name: 'A1', occurrences: 3, latest_time: '2026-09-01T10:15:00+08:00' },
+      ])
+      expect(result.map(section => section.price)).toEqual(['180.50'])
+      expect(result[0].items.map(item => item.block_name)).toEqual(['A1'])
+      expect(result[0].region_count).toBe(1)
+      expect(result[0].total_occurrences).toBe(3)
+    })
+  }
+
+  test('keeps priced VIP regions rather than excluding regions by their names', () => {
+    const result = groupInventoryByPrice(['VIP1', 'VIP2', 'VIP3'].map(block_name => ({
+      block_name, price: '1288.00', usable_count: 0, estate: 0,
+    })), [])
+    expect(result[0].items.map(item => item.block_name)).toEqual(['VIP1', 'VIP2', 'VIP3'])
+    expect(result[0].region_count).toBe(3)
+  })
+
   test('groups regions by price and marks zones with inventory', () => {
     const regions: TicketWatchRegion[] = [
       { block_name: 'A1', price: '380', usable_count: 0, estate: 0 },

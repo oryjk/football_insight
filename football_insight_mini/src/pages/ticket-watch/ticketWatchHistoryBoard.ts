@@ -150,31 +150,10 @@ export function createTicketWatchHistoryBoard(
       return
     }
     historyMatches.value = selectCompletedMatches(matches)
-    void loadHistoryRefluxTrendTotals(
-      selectRefluxStatsMatches(historyMatches.value),
-    )
+    const candidates = selectRefluxStatsMatches(historyMatches.value)
+    void loadHistoryRefluxTrendTotals(candidates)
 
-    if (!historyMatches.value.length) {
-      selectedHistoryMatchId.value = null
-      historySections.value = []
-      return
-    }
-
-    // list 改变选中比赛（为空或已不在列表）时先切换到列表首场比赛；
-    // 无论是否改变选择，sync 都会递增共享选择 owner 并持有 loading（见下）。
-    const selectionMissing =
-      selectedHistoryMatchId.value === null ||
-      !historyMatches.value.some(
-        (match) => match.match_id === selectedHistoryMatchId.value,
-      )
-    if (selectionMissing) {
-      selectedHistoryMatchId.value = historyMatches.value[0].match_id
-    }
-
-    await syncDisplayedHistoryMatch(
-      selectedHistoryMatchId.value,
-      isStale,
-    )
+    await syncInitialHistorySelection(candidates, isStale)
   }
 
   async function loadYukunHistoryMatches(
@@ -190,31 +169,32 @@ export function createTicketWatchHistoryBoard(
     }
     historyMatches.value = selectCompletedMatches(matches)
 
-    void loadHistoryRefluxTrendTotals(
-      selectRefluxStatsMatches(historyMatches.value, '云南玉昆'),
-    )
+    const candidates = selectRefluxStatsMatches(historyMatches.value, '云南玉昆')
+    void loadHistoryRefluxTrendTotals(candidates)
 
-    if (!historyMatches.value.length) {
+    await syncInitialHistorySelection(candidates, isStale)
+  }
+
+  async function syncInitialHistorySelection(
+    candidates: TicketWatchMatchSummary[],
+    isStale: () => boolean,
+  ): Promise<void> {
+    if (!candidates.length) {
+      // Invalidate an in-flight selection when the refreshed list has no eligible games.
+      requests.historySelectionRequestToken += 1
+      historySelectionLoading.value = false
       selectedHistoryMatchId.value = null
+      displayedHistoryMatchId.value = null
       historySections.value = []
       return
     }
 
-    // list 改变选中比赛（为空或已不在列表）时先切换到列表首场比赛；
-    // 无论是否改变选择，sync 都会递增共享选择 owner 并持有 loading（见下）。
-    const selectionMissing =
-      selectedHistoryMatchId.value === null ||
-      !historyMatches.value.some(
-        (match) => match.match_id === selectedHistoryMatchId.value,
-      )
-    if (selectionMissing) {
-      selectedHistoryMatchId.value = historyMatches.value[0].match_id
+    // Keep the candidate source for loading unknown totals, but never default to excluded clubs.
+    if (!candidates.some(match => match.match_id === selectedHistoryMatchId.value)) {
+      selectedHistoryMatchId.value = candidates[0].match_id
     }
-
-    await syncDisplayedHistoryMatch(
-      selectedHistoryMatchId.value,
-      isStale,
-    )
+    // Preserve the shared selection owner even when the list keeps the same selection.
+    await syncDisplayedHistoryMatch(selectedHistoryMatchId.value, isStale)
   }
 
   async function getHistoryInventorySections(

@@ -38,6 +38,9 @@ export function groupInventoryByPrice(
   const grouped = new Map<string, TicketWatchGroupedInventorySection>()
 
   regions.forEach((region) => {
+    const price = Number(region.price)
+    if (!Number.isFinite(price) || price <= 0) return
+
     const blockKey = resolveTicketWatchBlockKey(region)
     const matched = inventoryMap.get(blockKey)
     const section = grouped.get(region.price) ?? {

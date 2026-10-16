@@ -64,6 +64,18 @@ export function selectRefluxStatsMatches(
   )
 }
 
+/** One displayed sample for both history tabs; unknown totals remain load candidates only. */
+export function selectHistoryMatchesWithData(
+  matches: TicketWatchMatchSummary[],
+  totalsByMatchId: Record<number, number | undefined>,
+  primaryTeamName = '成都蓉城',
+): TicketWatchMatchSummary[] {
+  return selectRefluxStatsMatches(matches, primaryTeamName).filter((match) => {
+    const total = totalsByMatchId[match.match_id]
+    return typeof total === 'number' && Number.isFinite(total) && total > 0
+  })
+}
+
 export function buildInventorySince(saleStartAt?: string | null): string | null {
   if (!saleStartAt) {
     return null

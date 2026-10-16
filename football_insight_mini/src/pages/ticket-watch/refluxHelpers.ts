@@ -1,6 +1,7 @@
 import type { TicketWatchGroupedInventorySection, TicketWatchMatchSummary } from '../../types/ticketWatch'
 import { isMembershipTierAtLeast } from '../../utils/membershipRules'
 import { resolveTicketWatchBlockKey } from './ticketWatchSharedHelpers'
+import { selectHistoryMatchesWithData } from './ticketWatchLoadHelpers'
 
 export type TicketWatchInventoryRefluxFreshness = 'strong' | 'weak' | 'none'
 
@@ -52,10 +53,7 @@ export function buildHistoryRefluxTrend(
   selectedMatchId: number | null,
   primaryTeamName: string = '成都蓉城',
 ): TicketWatchHistoryRefluxTrend {
-  const matchesWithData = matches.filter((match) => {
-    const total = totalsByMatchId[match.match_id]
-    return typeof total === 'number' && Number.isFinite(total) && total > 0
-  })
+  const matchesWithData = selectHistoryMatchesWithData(matches, totalsByMatchId, primaryTeamName)
   const loadedTotals = matchesWithData
     .map((match) => totalsByMatchId[match.match_id])
     .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
