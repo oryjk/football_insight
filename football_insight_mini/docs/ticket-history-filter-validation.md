@@ -41,3 +41,11 @@
 - 新增：src/pages/ticket-watch/historySelection.test.ts、ticketWatchHistorySelection.ts，当前 docs/ticket-history-filter-validation.md。
 - 修改：src/pages/ticket-watch/index.vue、useTicketWatchState.ts、refluxHelpers.ts、ticketWatchLoadHelpers.ts、ticketWatchHistoryBoard.ts、inventoryHelpers.ts、effects.test.ts、helpers.test.ts，scripts/ticket-match-id-sheet.test.ts，根 CHANGELOG.md、FEATURES.md。
 - 无删除文件，后端不变。原 @tap/@click、历史横向 scroll-view、居中滚动与 hover 行为保留；新增 watch 由页面生命周期释放，无新计时器或样式。用户水印 CSS 变量保留，组件层不调用业务 API。
+
+## 用户授权后的实际上传
+
+用户确认水印是自己所加并授权上传。功能提交 006c9f4 先推送 main；统一 mp:release 登记库分配 1.0.85，首次按 Git 门禁在版本文件生成后暂停（退出 1，无构建/上传），版本文件单独提交为 060de1f 并推送后重跑。
+
+真实命令 `bun run mp:release -- --robot 2 --desc '历史比赛与统计统一筛选，隐藏无票价区域，保留昵称水印'` 最终退出 0。源为干净且同步的 main 060de1f，保留用户原生 loading/水印提交。Git 门禁、依赖边界、生产构建、组件注册与生产 API 校验通过；微信 SDK 确认版本 1.0.85 robot=2 上传完成，完整包 2,090,729 字节。登记库回读 version_code=10085、is_reviewing=false；只是测试版本上传，不代表正式微信审核/发布。
+
+原始输出位于会话 scratch `.tmp/mini-upload-history-filter/allocate.log`、`release.log`。本次没有后端部署/重启、迁移或其他生产数据操作；真机效果由用户体验版验收。前文“待上传”为实现阶段状态，以本节后续上传结果为准。
