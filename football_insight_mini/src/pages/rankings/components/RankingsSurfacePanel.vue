@@ -1,29 +1,7 @@
 <template>
   <view class="panel ranking-surface">
     <view class="rankings-controls">
-      <view class="scope-toggle" :class="{ 'scope-toggle--player': scope === 'player' }">
-        <view class="scope-toggle__thumb" />
-        <view
-          class="scope-toggle__button"
-          :class="{ active: scope === 'team' }"
-          role="button"
-          aria-label="球队榜"
-          @click="emit('update:scope', 'team')"
-        >
-          <image :src="scope === 'team' ? teamIconActive : teamIconIdle" class="scope-toggle__icon" mode="aspectFit" />
-          <text class="scope-toggle__button-text">球队榜</text>
-        </view>
-        <view
-          class="scope-toggle__button"
-          :class="{ active: scope === 'player' }"
-          role="button"
-          aria-label="球员榜"
-          @click="emit('update:scope', 'player')"
-        >
-          <image :src="scope === 'player' ? playerIconActive : playerIconIdle" class="scope-toggle__icon" mode="aspectFit" />
-          <text class="scope-toggle__button-text">球员榜</text>
-        </view>
-      </view>
+      <FiSegmented :model-value="scope" :items="scopeItems" aria-label="榜单类型" @update:model-value="onScopeChange" />
 
       <view class="category-tabs-wrap">
         <scroll-view scroll-x class="pill-row" :scroll-left="categoryScrollLeft" scroll-with-animation>
@@ -81,6 +59,8 @@ import teamIconIdle from '../../../static/rankings/scope-team-idle.svg'
 import teamIconActive from '../../../static/rankings/scope-team-active.svg'
 import playerIconIdle from '../../../static/rankings/scope-player-idle.svg'
 import playerIconActive from '../../../static/rankings/scope-player-active.svg'
+import FiSegmented from '../../../components/FiSegmented.vue'
+import type { FiSegmentedItem } from '../../../types/segmented'
 import RankingsTeamList from './RankingsTeamList.vue'
 import RankingsPlayerList from './RankingsPlayerList.vue'
 
@@ -99,6 +79,15 @@ const emit = defineEmits<{
   (e: 'open-player', entry: PlayerRankingEntry): void
   (e: 'select-match', playerName: string, match: PlayerMatchGoals): void
 }>()
+
+const scopeItems: FiSegmentedItem[] = [
+  { key: 'team', label: '球队榜', icon: teamIconIdle, iconActive: teamIconActive },
+  { key: 'player', label: '球员榜', icon: playerIconIdle, iconActive: playerIconActive },
+]
+
+function onScopeChange(value: string): void {
+  if (value === 'team' || value === 'player') emit('update:scope', value)
+}
 
 const instance = getCurrentInstance()
 const categoryScrollLeft = ref(0)
@@ -206,76 +195,6 @@ async function centerActiveCategory(): Promise<void> {
   width: 100%;
   padding: 0 0 var(--fi-space-10);
   overflow: hidden;
-}
-
-.scope-toggle {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  width: 100%;
-  gap: var(--fi-space-6);
-  padding: var(--fi-space-6);
-  border: var(--fi-primitive-border-width) solid var(--fi-color-border-chip);
-  border-radius: var(--fi-radius-round);
-  background: rgba(246, 247, 251, 0.92);
-}
-
-.scope-toggle__thumb {
-  position: absolute;
-  top: var(--fi-space-6);
-  bottom: var(--fi-space-6);
-  left: var(--fi-space-6);
-  width: calc((100% - var(--fi-space-6) * 3) / 2);
-  border-radius: var(--fi-radius-round);
-  background: var(--fi-primitive-ink);
-  box-shadow: 0 8rpx 18rpx rgba(21, 22, 27, 0.16);
-  transition: transform 300ms cubic-bezier(0.3, 0.9, 0.3, 1);
-}
-
-.scope-toggle--player .scope-toggle__thumb {
-  transform: translateX(calc(100% + var(--fi-space-6)));
-}
-
-.scope-toggle__button {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fi-space-10);
-  width: 100%;
-  min-width: 0;
-  min-height: 64rpx;
-  padding: 0 var(--fi-space-20);
-  border-radius: var(--fi-radius-round);
-  text-align: center;
-  background: transparent;
-  color: #7f8490;
-  font-size: var(--fi-font-26);
-  font-weight: var(--fi-weight-bold);
-  white-space: nowrap;
-  line-height: var(--fi-leading-none);
-  box-sizing: border-box;
-  transition: color 260ms ease;
-}
-
-.scope-toggle__button::after {
-  border: 0;
-}
-
-.scope-toggle__button.active {
-  color: var(--fi-primitive-white);
-  font-weight: var(--fi-weight-black);
-}
-
-.scope-toggle__icon {
-  width: 32rpx;
-  height: 32rpx;
-}
-
-.scope-toggle__button-text {
-  display: block;
-  text-align: center;
 }
 
 .category-tabs-wrap {
