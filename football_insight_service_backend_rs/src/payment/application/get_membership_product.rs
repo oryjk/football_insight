@@ -275,7 +275,16 @@ impl GetMembershipProductUseCase {
                     ProductSpecError::Ineligible
                 });
             }
-            if !registry.eligible(&spec, &context) || !added.insert(grant.tier.clone()) {
+            if !registry.eligible(&spec, &context) {
+                continue;
+            }
+            // The protocol carries one option per tier. A legacy or private option already
+            // occupying the tier wins; a table offer never displaces it.
+            if product.products.iter().any(|p| p.target_tier == grant.tier) {
+                tracing::warn!(tier = %grant.tier, "membership catalog offer ignored: tier already offered");
+                continue;
+            }
+            if !added.insert(grant.tier.clone()) {
                 continue;
             }
             let is_pass = spec.is_pass();
@@ -285,7 +294,6 @@ impl GetMembershipProductUseCase {
                 }
                 _ => None,
             };
-            product.products.retain(|p| p.target_tier != grant.tier);
             additions.push(MembershipProductOption {
                 target_tier: grant.tier,
                 price_cents: spec.price_cents,

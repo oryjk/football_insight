@@ -348,3 +348,28 @@ async fn checkout_uses_catalog_identity_and_eligible_sibling_cannot_change_price
             .is_ok()
     );
 }
+
+#[tokio::test]
+async fn table_offer_never_displaces_a_legacy_annual_option_of_the_same_tier() {
+    let service = GetMembershipProductUseCase::new(
+        Arc::new(Config),
+        Arc::new(Products(Mutex::new(vec![spec("V6", 900), spec("V5", 1900)]))),
+    )
+    .with_kind_registry(Arc::new(
+        football_insight_service_backend_rs::payment::domain::product_kind::ProductKindRegistry::default(),
+    ));
+    let caps = vec!["catalog-v2".to_owned()];
+    let catalog = service
+        .execute_catalog_for_user(Some(Uuid::new_v4()), Some("V3"), &caps)
+        .await
+        .unwrap();
+    let annual = catalog.find_option("V6").expect("annual V6 stays visible");
+    assert_eq!(annual.price_cents, 3900, "annual price is untouched");
+    assert!(annual.presentation.spec.is_none(), "V6 is still the legacy annual option");
+    assert_eq!(
+        catalog.products.iter().filter(|p| p.target_tier == "V6").count(),
+        1,
+        "one option per tier"
+    );
+    assert_eq!(catalog.find_option("V5").unwrap().price_cents, 1900);
+}
