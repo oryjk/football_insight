@@ -1,19 +1,26 @@
 <template>
   <view class="panel ranking-surface">
     <view class="rankings-controls">
-      <view class="scope-toggle">
+      <view class="scope-toggle" :class="{ 'scope-toggle--player': scope === 'player' }">
+        <view class="scope-toggle__thumb" />
         <view
           class="scope-toggle__button"
           :class="{ active: scope === 'team' }"
+          role="button"
+          aria-label="球队榜"
           @click="emit('update:scope', 'team')"
         >
+          <image :src="scope === 'team' ? teamIconActive : teamIconIdle" class="scope-toggle__icon" mode="aspectFit" />
           <text class="scope-toggle__button-text">球队榜</text>
         </view>
         <view
           class="scope-toggle__button"
           :class="{ active: scope === 'player' }"
+          role="button"
+          aria-label="球员榜"
           @click="emit('update:scope', 'player')"
         >
+          <image :src="scope === 'player' ? playerIconActive : playerIconIdle" class="scope-toggle__icon" mode="aspectFit" />
           <text class="scope-toggle__button-text">球员榜</text>
         </view>
       </view>
@@ -26,7 +33,7 @@
               :id="`ranking-category-${item.slug}`"
               :key="item.slug"
               class="pill-row__item"
-              :class="{ active: item.slug === activeCategorySlug }"
+              :class="{ active: item.slug === effectiveSlug }"
               @click="emit('update:activeCategorySlug', item.slug)"
             >
               <text class="pill-row__item-text">{{ item.label }}</text>
@@ -36,6 +43,7 @@
       </view>
     </view>
 
+    <view :key="bodyKey" class="ranking-surface__body" :class="`ranking-surface__body--${enterMotion}`">
     <RankingsTeamList
       v-if="scope === 'team' && activeTeamCategory"
       :active-team-category="activeTeamCategory"
@@ -53,6 +61,7 @@
       @open-player="emit('open-player', $event)"
       @select-match="(name, match) => emit('select-match', name, match)"
     />
+    </view>
   </view>
 </template>
 
@@ -68,6 +77,10 @@ import type {
   TeamRankingEntry,
 } from '../../../types/insight'
 import type { StandingsRankingMode } from '../poster'
+import teamIconIdle from '../../../static/rankings/scope-team-idle.svg'
+import teamIconActive from '../../../static/rankings/scope-team-active.svg'
+import playerIconIdle from '../../../static/rankings/scope-player-idle.svg'
+import playerIconActive from '../../../static/rankings/scope-player-active.svg'
 import RankingsTeamList from './RankingsTeamList.vue'
 import RankingsPlayerList from './RankingsPlayerList.vue'
 
@@ -98,12 +111,27 @@ const categoryOptions = computed(() =>
     ? teamCategories.value.map((item) => ({ slug: item.slug, label: item.label }))
     : playerCategories.value.map((item) => ({ slug: item.slug, label: item.label })),
 )
+// The parent's slug lags one tick behind a scope switch; resolve it here so the new list never renders empty in between.
+const effectiveSlug = computed(() =>
+  categoryOptions.value.some((item) => item.slug === props.activeCategorySlug)
+    ? props.activeCategorySlug
+    : (categoryOptions.value[0]?.slug ?? ''),
+)
 const activeTeamCategory = computed(() =>
-  teamCategories.value.find((item) => item.slug === props.activeCategorySlug) ?? null,
+  teamCategories.value.find((item) => item.slug === effectiveSlug.value) ?? null,
 )
 const activePlayerCategory = computed(() =>
-  playerCategories.value.find((item) => item.slug === props.activeCategorySlug) ?? null,
+  playerCategories.value.find((item) => item.slug === effectiveSlug.value) ?? null,
 )
+const enterMotion = ref<'from-left' | 'from-right' | 'fade'>('fade')
+const bodyKey = computed(() => `${props.scope}:${effectiveSlug.value}`)
+
+// Sync flush so the re-keyed body is created with the right entrance motion: slide for a scope switch, fade for a category switch.
+watch(bodyKey, (next, prev) => {
+  const [nextScope] = next.split(':')
+  const [prevScope] = prev.split(':')
+  enterMotion.value = nextScope === prevScope ? 'fade' : nextScope === 'player' ? 'from-right' : 'from-left'
+}, { flush: 'sync' })
 watch(
   categoryOptions,
   (items) => {
@@ -182,6 +210,7 @@ async function centerActiveCategory(): Promise<void> {
 }
 
 .scope-toggle {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
@@ -192,14 +221,32 @@ async function centerActiveCategory(): Promise<void> {
   background: rgba(246, 247, 251, 0.92);
 }
 
+.scope-toggle__thumb {
+  position: absolute;
+  top: var(--fi-space-6);
+  bottom: var(--fi-space-6);
+  left: var(--fi-space-6);
+  width: calc((100% - var(--fi-space-6) * 3) / 2);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-primitive-ink);
+  box-shadow: 0 8rpx 18rpx rgba(21, 22, 27, 0.16);
+  transition: transform 300ms cubic-bezier(0.3, 0.9, 0.3, 1);
+}
+
+.scope-toggle--player .scope-toggle__thumb {
+  transform: translateX(calc(100% + var(--fi-space-6)));
+}
+
 .scope-toggle__button {
   position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: var(--fi-space-10);
   width: 100%;
   min-width: 0;
-  min-height: 58rpx;
+  min-height: 64rpx;
   padding: 0 var(--fi-space-20);
   border-radius: var(--fi-radius-round);
   text-align: center;
@@ -209,8 +256,8 @@ async function centerActiveCategory(): Promise<void> {
   font-weight: var(--fi-weight-bold);
   white-space: nowrap;
   line-height: var(--fi-leading-none);
-  overflow: hidden;
   box-sizing: border-box;
+  transition: color 260ms ease;
 }
 
 .scope-toggle__button::after {
@@ -220,13 +267,15 @@ async function centerActiveCategory(): Promise<void> {
 .scope-toggle__button.active {
   color: var(--fi-primitive-white);
   font-weight: var(--fi-weight-black);
-  background: var(--fi-primitive-ink);
-  box-shadow: 0 8rpx 18rpx rgba(21, 22, 27, 0.12);
+}
+
+.scope-toggle__icon {
+  width: 32rpx;
+  height: 32rpx;
 }
 
 .scope-toggle__button-text {
   display: block;
-  width: 100%;
   text-align: center;
 }
 
@@ -262,12 +311,14 @@ async function centerActiveCategory(): Promise<void> {
   white-space: nowrap;
   line-height: var(--fi-leading-none);
   box-sizing: border-box;
+  transition: background-color 240ms ease, color 240ms ease, box-shadow 240ms ease;
 }
 
 .pill-row__item.active {
   color: var(--fi-primitive-white);
   font-weight: var(--fi-weight-extrabold);
   background: var(--fi-primitive-ink);
+  box-shadow: 0 6rpx 14rpx rgba(21, 22, 27, 0.14);
 }
 
 .pill-row__item-text {
@@ -281,5 +332,54 @@ async function centerActiveCategory(): Promise<void> {
   width: 100%;
   padding: var(--fi-space-20);
   overflow: hidden;
+}
+
+.ranking-surface__body {
+  min-width: 0;
+}
+
+.ranking-surface__body--fade {
+  animation: ranking-body-fade 260ms ease both;
+}
+
+.ranking-surface__body--from-right {
+  animation: ranking-body-from-right 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ranking-surface__body--from-left {
+  animation: ranking-body-from-left 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes ranking-body-fade {
+  from {
+    opacity: 0;
+    transform: translateY(10rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ranking-body-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(36rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ranking-body-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-36rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 </style>
