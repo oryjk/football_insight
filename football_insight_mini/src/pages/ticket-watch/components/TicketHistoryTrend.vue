@@ -71,11 +71,20 @@ const emit = defineEmits<{ (e: 'select', matchId: number): void }>()
 @import '../ticket-watch-shared.css';
 
 .history-trend-panel {
+  height: var(--fi-ticket-history-panel-height, auto);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
   background: var(--fi-color-ticket-history-trend-panel-background);
   border-color: var(--fi-color-ticket-history-trend-panel-border-color);
 }
 
+.history-trend-panel > .section-heading {
+  flex-shrink: 0;
+}
+
 .history-trend-summary {
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--fi-space-10);
@@ -109,8 +118,10 @@ const emit = defineEmits<{ (e: 'select', matchId: number): void }>()
 
 .history-trend-scroll {
   width: 100%;
+  height: 0;
+  min-height: 0;
+  flex: 1;
   margin-top: var(--fi-space-20);
-  max-height: calc(var(--fi-space-600) + var(--fi-space-20));
 }
 
 .history-trend-list {

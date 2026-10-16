@@ -169,7 +169,7 @@
           />
         </template>
       </view>
-      <view v-else-if="activeTab === 'history-stats'" class="board-content">
+      <view v-else-if="activeTab === 'history-stats'" class="board-content board-content--history-stats">
         <TicketBoardSkeleton v-if="historyLoading" mode="history-stats" />
         <view
           v-else-if="historyErrorMessage"
@@ -594,5 +594,14 @@ onUnload(() => {
   flex-direction: column;
   align-items: stretch;
   gap: var(--fi-space-card-gap);
+}
+
+.board-content--history-stats {
+  /* Remaining viewport after page padding, the segmented track and their gap. */
+  --fi-ticket-history-panel-height: calc(
+    100vh - var(--fi-brand-nav-height) - var(--fi-space-20) - var(--fi-space-36)
+    - var(--fi-space-card-gap) - var(--fi-space-64)
+    - var(--fi-space-6) * 2 - var(--fi-border-width) * 2
+  );
 }
 </style>

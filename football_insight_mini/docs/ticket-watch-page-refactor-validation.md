@@ -98,6 +98,7 @@
 
 ## 文件清单
 
+
 - 新增：`football_insight_mini/docs/ticket-watch-page-refactor-validation.md`
 - 新增：`football_insight_mini/scripts/ticket-board-skeleton.test.ts`
 - 新增：`football_insight_mini/scripts/ticket-refresh-status.test.ts`
@@ -129,3 +130,9 @@
 - 修改：`CHANGELOG.md`、`FEATURES.md`（任务 B 自己的条目与原因）。
 - 新增：`docs/superpowers/plans/2026-10-16-ticket-watch-page-refactor.md`。
 - 无删除文件；fi-tokens.css、manifest、ALLOWLIST 未改。
+
+## 后续修正：历史走势默认高度
+
+仅修改 index.vue 的历史统计布局变量和 TicketHistoryTrend.vue 的高度/flex 样式。页面使用现有导航、间距和 FiSegmented 尺寸 token 计算可用高度；组件使用明确高度，不依赖小程序自定义组件宿主的百分比高度。删除原 620rpx max-height，标题/摘要不收缩，scroll-view 使用 height:0 + flex:1 占满剩余高度。无业务脚本、接口、统计或点击行为改动，新增 token 为零。修正后重新执行：bun test 781 pass/0 fail，type-check、check:boundaries、verify:mp-components、H5 与离线微信构建均退出 0；日志在同一会话目录。
+
+用真实源样式和现有 token 构造 Chromium 布局夹具，对比原版与修改版：375×812 的 18 行样例，卡片底部留白从约 253px 减为原页面预留的 18px；仅一行也保持卡片填满。320×568、430×932 与各自 1/18 行共六种情况均通过，长列表的 scrollHeight 大于 clientHeight，仍在卡内滚动。此验证是浏览器布局夹具，不冒充微信真机或完整 H5 页面验收；脚本位于会话 scratch `.tmp/ticket-history-height/check-layout.cjs`。
