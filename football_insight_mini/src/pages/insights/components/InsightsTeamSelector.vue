@@ -1,4 +1,5 @@
 <template>
+  <view class="team-selector">
     <scroll-view
       scroll-x
       class="team-selector__scroll"
@@ -28,6 +29,7 @@
         </button>
       </view>
     </scroll-view>
+  </view>
 </template>
 
 <script setup lang="ts">
@@ -95,20 +97,30 @@ async function centerSelectedChip(): Promise<void> {
 </script>
 
 <style scoped lang="css">
+/* 外层容器与进球/助攻/失球分段切换、榜赛页球队榜/球员榜切换同一种外观。 */
+.team-selector {
+  min-width: 0;
+  padding: var(--fi-space-6);
+  border: var(--fi-border-width) solid var(--fi-color-border-chip);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-page);
+  overflow: hidden;
+  box-sizing: border-box;
+}
 .team-selector__scroll { width: 100%; min-width: 0; white-space: nowrap; }
 .team-selector__list {
   display: inline-flex;
-  gap: var(--fi-space-10);
-  padding-bottom: var(--fi-space-4);
+  gap: var(--fi-space-6);
 }
 .team-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--fi-space-12);
-  padding: var(--fi-space-18) var(--fi-space-22);
+  min-height: var(--fi-space-64);
+  padding: 0 var(--fi-space-22);
   border-radius: var(--fi-radius-round);
-  background: var(--fi-color-page);
-  color: var(--fi-color-text-secondary);
+  background: transparent;
+  color: var(--fi-color-insights-tab-idle);
   font-size: var(--fi-font-24);
   line-height: var(--fi-leading-none);
   flex-shrink: 0;
