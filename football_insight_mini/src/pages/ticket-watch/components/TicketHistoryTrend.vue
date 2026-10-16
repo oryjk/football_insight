@@ -30,7 +30,10 @@
     </view>
 
     <scroll-view scroll-y class="history-trend-scroll" show-scrollbar="false">
-      <view class="history-trend-list">
+      <view v-if="!trend.points.length" class="history-trend-empty">
+        <text>{{ loading ? '正在加载历史回流数据…' : '暂无有回流数据的历史比赛。' }}</text>
+      </view>
+      <view v-else class="history-trend-list">
         <view
           v-for="point in trend.points"
           :key="`history-trend-${point.match_id}`"
@@ -128,6 +131,15 @@ const emit = defineEmits<{ (e: 'select', matchId: number): void }>()
   display: grid;
   gap: var(--fi-space-12);
   padding: var(--fi-space-4) 0 var(--fi-space-2);
+}
+
+.history-trend-empty {
+  padding: var(--fi-space-24);
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-24);
+  font-weight: var(--fi-weight-medium);
+  line-height: var(--fi-leading-normal);
+  text-align: center;
 }
 
 .history-trend-row {

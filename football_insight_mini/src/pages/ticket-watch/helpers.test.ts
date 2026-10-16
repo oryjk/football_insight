@@ -275,7 +275,7 @@ describe('selectCompletedMatches', () => {
 })
 
 describe('buildHistoryRefluxTrend', () => {
-  test('keeps completed matches in display order and scales totals against the busiest match', () => {
+  test('keeps matches with reflux data in display order and scales against the busiest match', () => {
     const matches: TicketWatchMatchSummary[] = [
       {
         match_id: 574,
@@ -318,14 +318,16 @@ describe('buildHistoryRefluxTrend', () => {
       572: 0,
     }, 573)
 
-    expect(result.points.map((point) => point.match_id)).toEqual([574, 573, 572])
-    expect(result.points.map((point) => point.bar_percent)).toEqual([25, 100, 0])
+    expect(result.points.map((point) => point.match_id)).toEqual([574, 573])
+    expect(result.points.map((point) => point.bar_percent)).toEqual([25, 100])
     expect(result.points[1].is_selected).toBe(true)
     expect(result.maxTotal).toBe(120)
-    expect(result.averageTotal).toBe(50)
+    expect(result.averageTotal).toBe(75)
+    expect(result.totalCount).toBe(2)
+    expect(result.loadedCount).toBe(2)
   })
 
-  test('marks matches without loaded totals so the UI can show a pending state', () => {
+  test('omits pending matches until loaded reflux data becomes available', () => {
     const matches: TicketWatchMatchSummary[] = [
       {
         match_id: 574,
@@ -343,11 +345,32 @@ describe('buildHistoryRefluxTrend', () => {
     const result = buildHistoryRefluxTrend(matches, {}, null)
 
     expect(result.loadedCount).toBe(0)
-    expect(result.points[0]?.match_id).toBe(574)
-    expect(result.points[0]?.total_occurrences).toBe(0)
-    expect(result.points[0]?.is_loaded).toBe(false)
-    expect(result.points[0]?.bar_percent).toBe(0)
+    expect(result.points).toEqual([])
+    expect(result.totalCount).toBe(0)
+    expect(result.maxTotal).toBe(0)
+    expect(result.averageTotal).toBe(0)
+    expect(result.latestTotal).toBe(0)
+    const loaded = buildHistoryRefluxTrend(matches, { 574: 8 }, null)
+    expect(loaded.points.map(point => point.match_id)).toEqual([574])
+    expect(loaded.averageTotal).toBe(8)
   })
+
+  for (const total of [undefined, 0, -1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+    test(`excludes empty or invalid totals (${total}) from both rows and aggregates`, () => {
+      const match: TicketWatchMatchSummary = {
+        match_id: 574, external_match_id: '78', round_number: 8,
+        match_date: '2026-04-25', match_time: '19:00', kickoff_at: '2026-04-25T19:00:00+08:00',
+        home_team_name: '成都蓉城', away_team_name: '浙江队', is_current: false,
+      }
+      const result = buildHistoryRefluxTrend([match], { 574: total }, null)
+      expect(result.points).toEqual([])
+      expect(result.totalCount).toBe(0)
+      expect(result.loadedCount).toBe(0)
+      expect(result.averageTotal).toBe(0)
+      expect(result.maxTotal).toBe(0)
+      expect(result.latestTotal).toBe(0)
+    })
+  }
 
   test('uses match dates and opponent names instead of round labels', () => {
     const matches: TicketWatchMatchSummary[] = [

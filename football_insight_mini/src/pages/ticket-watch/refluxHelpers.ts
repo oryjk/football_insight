@@ -52,7 +52,11 @@ export function buildHistoryRefluxTrend(
   selectedMatchId: number | null,
   primaryTeamName: string = '成都蓉城',
 ): TicketWatchHistoryRefluxTrend {
-  const loadedTotals = matches
+  const matchesWithData = matches.filter((match) => {
+    const total = totalsByMatchId[match.match_id]
+    return typeof total === 'number' && Number.isFinite(total) && total > 0
+  })
+  const loadedTotals = matchesWithData
     .map((match) => totalsByMatchId[match.match_id])
     .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
     .map((value) => Math.max(0, value))
@@ -63,7 +67,7 @@ export function buildHistoryRefluxTrend(
     : 0
 
   return {
-    points: matches.map((match) => {
+    points: matchesWithData.map((match) => {
       const rawTotal = totalsByMatchId[match.match_id]
       const isLoaded = typeof rawTotal === 'number' && Number.isFinite(rawTotal)
       const total = isLoaded ? Math.max(0, rawTotal) : 0
@@ -84,7 +88,7 @@ export function buildHistoryRefluxTrend(
     averageTotal,
     latestTotal: loadedTotals[0] ?? 0,
     loadedCount,
-    totalCount: matches.length,
+    totalCount: matchesWithData.length,
   }
 }
 

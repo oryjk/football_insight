@@ -152,3 +152,24 @@ helpers.test.ts 新增 10 项表驱动覆盖主客场、B 队、无关球队、�
 2026-10-16 按用户“上传一下”指令，使用统一 mp:release 流程上传 1.0.82 robot 2。登记库自动分配版本，生成文件单独提交为 baec7a5 并推送；随后从该干净、同步的 main 构建并上传。Git 门禁、依赖边界、组件注册及生产 API 校验通过，微信 SDK 确认完整包 2,081,073 字节；登记库回读 is_reviewing=false，保持测试展示状态。发布链路回归 30 pass/0 fail，真实 mp:release 退出 0。原始输出留在会话 scratch `.tmp/mini-upload-1.0.82/release.log`。
 
 本次只上传小程序，没有后端部署/重启或迁移；前文“未上传”描述为各实现阶段当时状态，此处为后续发布状态。用户可测试历史走势默认高度与一线队统计筛选。
+
+## 后续要求：历史统计隐藏无数据比赛（待上传）
+
+用户要求从历史统计列表移除无数据比赛。buildHistoryRefluxTrend 只保留已加载、有限且大于 0 的回流总量；零值、缺失、负数、NaN 和无穷值均排除，列表、场均、最高值、最近值和场次数共用同一批样本。保留一线队精确匹配与服务端排除规则；历史详情列表与统计候选预取不变，避免先过滤未知总量导致比赛永远无法加载。既有自动预取最近 12 场的上限未扩改，更早比赛需要先查看历史详情加载后才有机会进入走势。
+
+TicketHistoryTrend 在全空时提示“暂无有回流数据的历史比赛。”，拉取中提示“正在加载历史回流数据…”。仅新增 token 样式：space-24、color-text-muted、font-24、weight-medium、leading-normal，保留原撑满高度和 scroll-view。无新增事件、计时器或端差异；实际 SFC SSR 验证空态、加载态与非空列表，H5/微信真机视觉未测试。没有后端/API、数据库、manifest 或 ALLOWLIST 改动，未上传、未部署。
+
+TDD：统计与 boards/state 回归先得到 1 pass/10 fail；真实 SFC 渲染测试先得到 1 pass/2 fail。实现后相关三个文件合计 150 pass/0 fail，新增 SFC 三项单独复跑 3 pass/0 fail。集成用例证明一线队零值比赛仍被请求但不进入图表/计数；独立只读复审未发现筛选错误或拉取死锁。
+
+最终真实输出（各命令退出码均为 0），日志在会话 scratch `.tmp/reflux-stats-with-data/`：
+
+| 命令 | 输出结论 |
+|---|---|
+| `bun test` | `802 pass` / `0 fail` / `5562 expect() calls` / `Ran 802 tests across 68 files. [13.07s]` |
+| `bun run type-check` | `$ vue-tsc --noEmit`，退出 0 |
+| `bun run check:boundaries` | `依赖边界检查通过（组件↛api/页面、页面不互引、api 依赖受限、uni.request 收口）` |
+| `bun run build:h5` | `DONE Build complete.` |
+| `MINI_REVIEW_SKIP=1 bun run build:mp-weixin` | `DONE Build complete.`，组件全部注册、生产 API 校验通过；未分配版本或上传 |
+| `bun run verify:mp-components` | `All mini-program custom components are registered.` |
+
+双端构建仍有现存 uni-app 更新和 Browserslist 旧数据提示，不影响退出结果。新增 scripts/ticket-history-trend-render.test.ts；修改 refluxHelpers.ts、helpers.test.ts、effects.test.ts、components/TicketHistoryTrend.vue、当前验证报告、根 CHANGELOG.md 和 FEATURES.md，无删除文件。

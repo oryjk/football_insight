@@ -2797,11 +2797,12 @@ describe('ticket history first-team statistics', () => {
         { ...match(3), home_team_name: primaryName === '成都蓉城' ? '成都蓉城希拉谷' : '云南玉昆青年队' },
         { ...match(4), home_team_name: '上海申花', away_team_name: '浙江队' },
         { ...match(5), home_team_name: primaryName, include_in_reflux_stats: false },
+        { ...match(6), home_team_name: primaryName },
       ]
       const inventoryReads: number[] = []
       const inventory = async (id: number): Promise<TicketWatchInventoryEntry[]> => {
         inventoryReads.push(id)
-        return [{ block_name: 'A1', occurrences: id === 1 ? 10 : id === 2 ? 30 : 9999, latest_time: '2026-09-01T10:15:00+08:00' }]
+        return [{ block_name: 'A1', occurrences: id === 1 ? 10 : id === 2 ? 30 : id === 6 ? 0 : 9999, latest_time: '2026-09-01T10:15:00+08:00' }]
       }
       const boards = useTicketWatchBoards(state, async () => {}, {
         ...source,
@@ -2815,9 +2816,10 @@ describe('ticket history first-team statistics', () => {
       await boards.loadHistoryMatches('initial')
       for (let i = 0; i < 10; i += 1) await Promise.resolve()
       // The historical detail list remains complete; only the statistics sample is narrowed.
-      expect(state.historyMatches.value.map(item => item.match_id)).toEqual([1, 2, 3, 4, 5])
-      expect([...new Set(inventoryReads)].sort()).toEqual([1, 2])
-      expect(state.historyStatsMatches.value.map(item => item.match_id)).toEqual([1, 2])
+      expect(state.historyMatches.value.map(item => item.match_id)).toEqual([1, 2, 3, 4, 5, 6])
+      expect([...new Set(inventoryReads)].sort()).toEqual([1, 2, 6])
+      // Still fetch eligible games before totals are known; zero-total games are only hidden in the view.
+      expect(state.historyStatsMatches.value.map(item => item.match_id)).toEqual([1, 2, 6])
       expect(state.historyRefluxTrend.value.points.map(point => point.match_id)).toEqual([1, 2])
       expect(state.historyRefluxTrend.value.totalCount).toBe(2)
       expect(state.historyRefluxTrend.value.loadedCount).toBe(2)
