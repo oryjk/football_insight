@@ -27,7 +27,7 @@
       </view>
     </view>
 
-    <template v-if="!collapsed">
+    <FiCollapse :open="!collapsed">
       <view v-if="focusBlocks.length" class="focus-section">
         <view class="focus-section__head">
           <view class="focus-section__title-row">
@@ -105,11 +105,12 @@
           history ? '下面再看完整价位分布。' : '下面再看完整分区看板。'
         }}</text
       >
-    </template>
+    </FiCollapse>
   </view>
 </template>
 
 <script setup lang="ts">
+import FiCollapse from '../../../components/FiCollapse.vue'
 import type {
   TicketWatchBoardTopBlock,
   TicketWatchBoardTopInterestBlock,

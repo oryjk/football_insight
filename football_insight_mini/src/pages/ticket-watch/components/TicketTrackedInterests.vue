@@ -15,7 +15,7 @@
       </view>
     </view>
 
-    <template v-if="!collapsed">
+    <FiCollapse :open="!collapsed">
       <text v-if="summary.total" class="tracked-interest-summary">
         你当前钓了 {{ summary.total }} 个区，其中
         {{ summary.hitCount }} 个区已经等到回流，{{
@@ -71,11 +71,12 @@
           </view>
         </view>
       </view>
-    </template>
+    </FiCollapse>
   </view>
 </template>
 
 <script setup lang="ts">
+import FiCollapse from '../../../components/FiCollapse.vue'
 import type { TicketWatchTrackedInterest } from '../../../types/ticketWatch'
 import type { TicketWatchTrackedInterestSummary } from '../helpers'
 import {

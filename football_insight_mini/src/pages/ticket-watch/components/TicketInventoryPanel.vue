@@ -24,7 +24,8 @@
       </view>
     </view>
 
-    <view v-if="!collapsed" class="inventory-grid">
+    <FiCollapse :open="!collapsed">
+    <view class="inventory-grid">
       <template
         v-for="item in section.items"
         :key="resolveInventoryBlockKey(item)"
@@ -96,10 +97,12 @@
         </button>
       </template>
     </view>
+    </FiCollapse>
   </view>
 </template>
 
 <script setup lang="ts">
+import FiCollapse from '../../../components/FiCollapse.vue'
 import type {
   TicketWatchGroupedInventoryItem,
   TicketWatchGroupedInventorySection,

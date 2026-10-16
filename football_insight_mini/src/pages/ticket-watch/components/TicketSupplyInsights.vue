@@ -18,7 +18,7 @@
         </view>
       </view>
 
-      <template v-if="!insightCollapsed">
+      <FiCollapse :open="!insightCollapsed">
         <view class="insight-grid">
           <view class="insight-metric">
             <text class="insight-metric__label">覆盖率</text>
@@ -50,7 +50,7 @@
         <text class="insight-copy">{{
           buildBoardInsightSummary(stats, history ? 'history' : 'current')
         }}</text>
-      </template>
+      </FiCollapse>
     </view>
     <view class="panel">
       <view class="section-heading section-heading--compact">
@@ -70,17 +70,20 @@
         </view>
       </view>
 
-      <view v-if="!decisionCollapsed" class="decision-list">
+      <FiCollapse :open="!decisionCollapsed">
+      <view class="decision-list">
         <view v-for="line in decisionLines" :key="line" class="decision-item">
           <text class="decision-item__dot" />
           <text class="decision-item__text">{{ line }}</text>
         </view>
       </view>
+      </FiCollapse>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
+import FiCollapse from '../../../components/FiCollapse.vue'
 import type { TicketWatchBoardStats } from '../helpers'
 import {
   formatCoverage,
