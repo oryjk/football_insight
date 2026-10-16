@@ -173,3 +173,9 @@ TDD：统计与 boards/state 回归先得到 1 pass/10 fail；真实 SFC 渲染�
 | `bun run verify:mp-components` | `All mini-program custom components are registered.` |
 
 双端构建仍有现存 uni-app 更新和 Browserslist 旧数据提示，不影响退出结果。新增 scripts/ticket-history-trend-render.test.ts；修改 refluxHelpers.ts、helpers.test.ts、effects.test.ts、components/TicketHistoryTrend.vue、当前验证报告、根 CHANGELOG.md 和 FEATURES.md，无删除文件。
+
+## 后续用户指令：上传无数据过滤测试版
+
+2026-10-16 按用户“上传一下”指令，真实执行 `bun run mp:release -- --robot 2 --desc '历史统计过滤无回流数据的比赛，场均与场次数同步筛选'`。登记库分配 1.0.83，第一次按 Git 门禁在生成版本文件后停止（退出 1，未构建/上传）；将两个自动生成文件单独提交为 7d77926、推送 main 后重新执行，发布退出 0。
+
+上传源为干净且同步的 main 7d77926，包含功能提交 dbd4f45。发布链路回归 30 pass/0 fail（146 expect calls）；依赖边界、构建、组件注册、生产 API 与上传前 Git 检查通过。微信 SDK 确认版本 1.0.83 robot=2 上传完成，完整包 2,081,747 字节；登记库回读 version_code=10083、is_reviewing=false，供用户测试，不代表正式微信审核/发布。本次未部署或重启后端、未执行迁移。真实输出在会话 scratch `.tmp/mini-upload-no-data-filter/allocate.log`、`release.log`。前节“待上传”为实现阶段当时状态，以本节后续上传状态为准。
