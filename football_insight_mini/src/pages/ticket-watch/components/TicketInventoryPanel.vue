@@ -251,8 +251,8 @@ function cellClasses(item: TicketWatchGroupedInventoryItem) {
 
 .inventory-panel__actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  flex-direction: row;
+  align-items: center;
   gap: var(--fi-space-12);
 }
 
@@ -264,10 +264,14 @@ function cellClasses(item: TicketWatchGroupedInventoryItem) {
   line-height: var(--fi-leading-none);
 }
 
-.inventory-panel__meta,
-.inventory-panel__summary {
+.inventory-panel__meta {
   display: block;
   margin-top: var(--fi-space-6);
+  color: var(--fi-color-ticket-inventory-panel-meta-color);
+  font-size: var(--fi-font-24);
+}
+
+.inventory-panel__summary {
   color: var(--fi-color-ticket-inventory-panel-meta-color);
   font-size: var(--fi-font-24);
 }
