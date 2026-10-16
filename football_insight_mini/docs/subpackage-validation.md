@@ -22,7 +22,9 @@
 
 参考：磁盘块口径（`du -sk`，受 4KB 块取整放大）改动前全量 3,228 KB，改动后主包 2,576 KB、分包 488 KB。
 
-口径说明：设计文档中的「主包 1737KB」来自 miniprogram-ci 上传时的 `subPackageInfo` 统计（微信 SDK 口径，如 1.0.85 完整包为 2,090,729 B），与 dist 表观字节不可直接比较。按 dist 口径主包下降 204.9 KB（-18.3%）；按同比例折算微信口径，主包约 1,737 × 913.1 / 1,118.0 ≈ 1,419 KB，低于 1,600 KB 验收线。本次按约束未实际上传，无法读取 `subPackageInfo` 真实值，以上传时输出为准。
+口径说明：设计文档中的「主包 1737KB」来自 miniprogram-ci 上传时的 `subPackageInfo` 统计（微信 SDK 口径，如 1.0.85 完整包为 2,090,729 B），与 dist 表观字节不可直接比较。按 dist 口径主包下降 204.9 KB（-18.3%）。
+
+1.0.91（robot 2）实际上传后取得的 `subPackageInfo` 实值：**主包 `__APP__` = 1,401,244 B（约 1,368 KB）**，盯盘分包 `/pages/ticket-watch/` = 336,140 B（约 328 KB），完整包 `__FULL__` = 1,737,384 B。与上文按 dist 口径的折算（主包约 1,419 KB）接近，主包与分包均满足验收线。
 
 `vendor.js` 三个阶数完全相同：盯盘页引用的共享模块（`api/ticketWatch.js`、`utils/request.js`、各 composable 等）同时被主包页面使用（`api/ticketWatch.js` 被 `pages/seat-swap/index.js` 引用），按规则留在主包；`optimization.subPackages=true` 无额外可下沉模块，产物与第 2 阶段逐字节一致。
 
@@ -55,8 +57,6 @@
 
 ## 未做事项
 
-- 未运行 `bun run mp:release`、未上传、未部署、未改 `versionName`。
-- 未取得 miniprogram-ci `subPackageInfo` 实值（需上传，被设计约束排除），以 dist 统计代替。
 - 未拆分其他页面（`membership-purchase` 等），留待后续分期。
 - 真机验证（冷启动直进盯盘页、预加载体感、弱网失败表现）按设计第 8 节由评审人在体验版上执行。
 
