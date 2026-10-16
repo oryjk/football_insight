@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use axum::{
     Json,
-    extract::State,
+    body::to_bytes,
+    extract::{Request, State},
     http::{HeaderMap, StatusCode, header::AUTHORIZATION},
     response::IntoResponse,
 };
@@ -10,8 +11,11 @@ use uuid::Uuid;
 
 use crate::{
     activity::{
-        adapters::web::dto::RecordPageActivityRequest,
-        application::record_page_activity::{RecordPageActivityInput, RecordPageActivityUseCase},
+        adapters::web::dto::{PaywallEventsRequest, RecordPageActivityRequest},
+        application::{
+            record_page_activity::{RecordPageActivityInput, RecordPageActivityUseCase},
+            record_paywall_events::{PaywallEventInput, RecordPaywallEvents},
+        },
         domain::page_key::ActivityError,
     },
     auth::ports::token_port::TokenPort,
@@ -20,7 +24,41 @@ use crate::{
 #[derive(Clone)]
 pub struct ActivityWebState {
     pub record_page_activity_use_case: Arc<RecordPageActivityUseCase>,
+    pub record_paywall_events_use_case: Arc<RecordPaywallEvents>,
     pub token_port: Arc<dyn TokenPort>,
+}
+
+const MAX_PAYWALL_BODY_BYTES: usize = 4096;
+
+/// Measurement endpoint: only a missing/invalid token is an error; every other outcome is 204
+/// so the client never changes behavior because of a measurement problem.
+pub async fn record_paywall_events_handler(
+    State(state): State<Arc<ActivityWebState>>,
+    headers: HeaderMap,
+    request: Request,
+) -> StatusCode {
+    let Ok(user_id) = authenticate_user(&headers, state.token_port.as_ref()) else {
+        return StatusCode::UNAUTHORIZED;
+    };
+    let Ok(bytes) = to_bytes(request.into_body(), MAX_PAYWALL_BODY_BYTES).await else {
+        tracing::warn!("paywall telemetry body discarded");
+        return StatusCode::NO_CONTENT;
+    };
+    if let Ok(body) = serde_json::from_slice::<PaywallEventsRequest>(&bytes) {
+        state.record_paywall_events_use_case.execute(
+            user_id,
+            body.events
+                .into_iter()
+                .map(|event| PaywallEventInput {
+                    surface: event.surface,
+                    action: event.action,
+                    membership_tier: event.membership_tier,
+                    detail: event.detail,
+                })
+                .collect(),
+        );
+    }
+    StatusCode::NO_CONTENT
 }
 
 pub async fn record_page_activity_handler(

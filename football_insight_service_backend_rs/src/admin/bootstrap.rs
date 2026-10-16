@@ -12,6 +12,7 @@ use crate::{
                 postgres_admin_auth_repository::PostgresAdminAuthRepository,
                 postgres_admin_credentials_repository::PostgresAdminCredentialsRepository,
                 postgres_admin_payment_repository::PostgresAdminPaymentRepository,
+                postgres_admin_paywall_repository::PostgresAdminPaywallRepository,
                 postgres_admin_product_repository::PostgresAdminProductRepository,
                 postgres_admin_user_repository::PostgresAdminUserRepository,
             },
@@ -22,6 +23,7 @@ use crate::{
             web::{
                 credentials_routes::admin_credentials_routes,
                 payment_routes::admin_payment_routes,
+                paywall_routes::admin_paywall_routes,
                 product_routes::admin_product_routes,
                 routes::{admin_audit_routes, admin_auth_routes, admin_user_routes},
                 setup_routes::admin_setup_routes,
@@ -30,7 +32,8 @@ use crate::{
         application::{
             admin_audit_service::AdminAuditService, admin_auth_service::AdminAuthService,
             admin_credentials_service::AdminCredentialsService,
-            admin_payment_service::AdminPaymentService, admin_product_service::AdminProductService,
+            admin_payment_service::AdminPaymentService,
+            admin_paywall_service::AdminPaywallService, admin_product_service::AdminProductService,
             admin_setup_service::AdminSetupService, admin_user_service::AdminUserService,
         },
     },
@@ -69,6 +72,10 @@ pub fn build_admin_routes(pool: PgPool, config: &AppConfig) -> Router {
         PostgresAdminPaymentRepository::new(pool.clone()),
     )));
 
+    let paywall_service = Arc::new(AdminPaywallService::new(Arc::new(
+        PostgresAdminPaywallRepository::new(pool.clone()),
+    )));
+
     let audit_service = Arc::new(AdminAuditService::new(Arc::new(
         PostgresAdminAuditRepository::new(pool),
     )));
@@ -82,6 +89,7 @@ pub fn build_admin_routes(pool: PgPool, config: &AppConfig) -> Router {
         .merge(admin_user_routes(user_service, auth_service.clone()))
         .merge(admin_product_routes(product_service, auth_service.clone()))
         .merge(admin_payment_routes(payment_service, auth_service.clone()))
+        .merge(admin_paywall_routes(paywall_service, auth_service.clone()))
         .merge(admin_audit_routes(audit_service, auth_service))
 }
 

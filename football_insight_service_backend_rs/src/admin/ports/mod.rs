@@ -8,3 +8,4 @@ pub mod admin_token_port;
 pub mod admin_user_repository;
 
 pub mod admin_payment_repository;
+pub mod admin_paywall_repository;

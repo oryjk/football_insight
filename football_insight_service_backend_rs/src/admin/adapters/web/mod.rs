@@ -14,3 +14,6 @@ pub mod payment_routes;
 
 #[cfg(test)]
 mod payment_tests;
+
+pub mod paywall_handlers;
+pub mod paywall_routes;

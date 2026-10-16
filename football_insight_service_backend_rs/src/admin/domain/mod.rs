@@ -7,3 +7,4 @@ pub mod admin_setup;
 pub mod admin_user;
 
 pub mod admin_payment;
+pub mod admin_paywall;

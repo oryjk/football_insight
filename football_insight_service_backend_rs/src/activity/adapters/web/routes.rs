@@ -2,13 +2,19 @@ use std::sync::Arc;
 
 use axum::{Router, routing::post};
 
-use crate::activity::adapters::web::handlers::{ActivityWebState, record_page_activity_handler};
+use crate::activity::adapters::web::handlers::{
+    ActivityWebState, record_page_activity_handler, record_paywall_events_handler,
+};
 
 pub fn activity_routes(state: Arc<ActivityWebState>) -> Router {
     Router::new()
         .route(
             "/api/v1/activity/page-view",
             post(record_page_activity_handler),
+        )
+        .route(
+            "/api/v1/activity/paywall-events",
+            post(record_paywall_events_handler),
         )
         .with_state(state)
 }

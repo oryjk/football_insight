@@ -6,3 +6,4 @@ pub mod admin_setup_service;
 pub mod admin_user_service;
 
 pub mod admin_payment_service;
+pub mod admin_paywall_service;
