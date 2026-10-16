@@ -136,3 +136,13 @@
 仅修改 index.vue 的历史统计布局变量和 TicketHistoryTrend.vue 的高度/flex 样式。页面使用现有导航、间距和 FiSegmented 尺寸 token 计算可用高度；组件使用明确高度，不依赖小程序自定义组件宿主的百分比高度。删除原 620rpx max-height，标题/摘要不收缩，scroll-view 使用 height:0 + flex:1 占满剩余高度。无业务脚本、接口、统计或点击行为改动，新增 token 为零。修正后重新执行：bun test 781 pass/0 fail，type-check、check:boundaries、verify:mp-components、H5 与离线微信构建均退出 0；日志在同一会话目录。
 
 用真实源样式和现有 token 构造 Chromium 布局夹具，对比原版与修改版：375×812 的 18 行样例，卡片底部留白从约 253px 减为原页面预留的 18px；仅一行也保持卡片填满。320×568、430×932 与各自 1/18 行共六种情况均通过，长列表的 scrollHeight 大于 clientHeight，仍在卡内滚动。此验证是浏览器布局夹具，不冒充微信真机或完整 H5 页面验收；脚本位于会话 scratch `.tmp/ticket-history-height/check-layout.cjs`。
+
+## 后续要求：统计只纳入成都蓉城一线队
+
+这是用户在重构完成后新增的统计口径要求，单独提交。后端票务接口是通用赛程，HTTP adapter 还供比赛 ID 存在性查询使用，因此不在适配器中过滤赛程。仅在小程序统计样本入口 selectRefluxStatsMatches 中，将既有 include_in_reflux_stats !== false 与主/客队全名精确相等条件取 AND；默认目标成都蓉城，保留休眠云南分支显式传云南玉昆。
+
+修改 ticketWatchLoadHelpers.ts、useTicketWatchState.ts 与 ticketWatchHistoryBoard.ts，图表样本与趋势预取一致：排除“成都蓉城希拉谷”和无关球队，不使用 includes 模糊匹配。历史比赛列表/详情仍完整；即便用户查看其他队详情产生 totals 缓存，也不会进入趋势点、场均、最高值、场次数。后端/API、原可靠性排除标记、开售十分钟口径、加载/会话/请求 owner 均不变。
+
+helpers.test.ts 新增 10 项表驱动覆盖主客场、B 队、无关球队、可靠性开关及云南分支；effects.test.ts 新增两种球队的真实 boards/state 集成测试，断言只预取合格样本、历史列表保持完整，并核对均值/最高值/场次数。RED：旧逻辑 4 pass/8 fail，明确错误预取 B 队/无关队；GREEN：相关两文件合计 141 pass/0 fail。独立只读复审通过，无生产数据读取或写入。
+
+最终验证：bun test 793 pass/0 fail（67 files，5515 expect calls）；type-check、check:boundaries、verify:mp-components、H5 与离线微信构建全部退出 0。原始日志在会话 scratch `.tmp/chengdu-reflux-stats/`，没有版本登记、上传或部署。

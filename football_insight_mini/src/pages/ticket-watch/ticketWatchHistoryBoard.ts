@@ -191,7 +191,7 @@ export function createTicketWatchHistoryBoard(
     historyMatches.value = selectCompletedMatches(matches)
 
     void loadHistoryRefluxTrendTotals(
-      selectRefluxStatsMatches(historyMatches.value),
+      selectRefluxStatsMatches(historyMatches.value, '云南玉昆'),
     )
 
     if (!historyMatches.value.length) {

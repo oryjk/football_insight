@@ -180,7 +180,10 @@ export function useTicketWatchState() {
     buildBoardDecisionLines(historyBoardStats.value, 'history'),
   )
   const historyStatsMatches = computed(() =>
-    selectRefluxStatsMatches(historyMatches.value),
+    selectRefluxStatsMatches(
+      historyMatches.value,
+      selectedTeam.value === 'yunnanyukun' ? '云南玉昆' : '成都蓉城',
+    ),
   )
   const historyRefluxTrend = computed(() =>
     buildHistoryRefluxTrend(

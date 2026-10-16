@@ -2781,3 +2781,48 @@ describe('ticket watch refresh display state', () => {
     })
   }
 })
+
+
+describe('ticket history first-team statistics', () => {
+  for (const [team, primaryName] of [
+    ['chengdurongcheng', '成都蓉城'], ['yunnanyukun', '云南玉昆'],
+  ] as const) {
+    test(`${primaryName} statistics exclude reserve/unrelated games from chart and trend prefetch`, async () => {
+      const state = useTicketWatchState()
+      state.selectedTeam.value = team
+      state.regions.value = [{ block_name: 'A1', price: '180', usable_count: 10, estate: 0 }]
+      const matches: TicketWatchMatchSummary[] = [
+        { ...match(1), home_team_name: primaryName },
+        { ...match(2), home_team_name: '浙江队', away_team_name: primaryName },
+        { ...match(3), home_team_name: primaryName === '成都蓉城' ? '成都蓉城希拉谷' : '云南玉昆青年队' },
+        { ...match(4), home_team_name: '上海申花', away_team_name: '浙江队' },
+        { ...match(5), home_team_name: primaryName, include_in_reflux_stats: false },
+      ]
+      const inventoryReads: number[] = []
+      const inventory = async (id: number): Promise<TicketWatchInventoryEntry[]> => {
+        inventoryReads.push(id)
+        return [{ block_name: 'A1', occurrences: id === 1 ? 10 : id === 2 ? 30 : 9999, latest_time: '2026-09-01T10:15:00+08:00' }]
+      }
+      const boards = useTicketWatchBoards(state, async () => {}, {
+        ...source,
+        getTicketWatchMatches: async () => matches,
+        getYukunTicketWatchMatches: async () => matches,
+        getTicketWatchInventorySince: inventory,
+        getYukunTicketWatchInventory: inventory,
+        getTicketWatchBlockInterests: async () => [],
+        getYukunTicketWatchRegions: async () => state.regions.value,
+      }, createSessionStub())
+      await boards.loadHistoryMatches('initial')
+      for (let i = 0; i < 10; i += 1) await Promise.resolve()
+      // The historical detail list remains complete; only the statistics sample is narrowed.
+      expect(state.historyMatches.value.map(item => item.match_id)).toEqual([1, 2, 3, 4, 5])
+      expect([...new Set(inventoryReads)].sort()).toEqual([1, 2])
+      expect(state.historyStatsMatches.value.map(item => item.match_id)).toEqual([1, 2])
+      expect(state.historyRefluxTrend.value.points.map(point => point.match_id)).toEqual([1, 2])
+      expect(state.historyRefluxTrend.value.totalCount).toBe(2)
+      expect(state.historyRefluxTrend.value.loadedCount).toBe(2)
+      expect(state.historyRefluxTrend.value.averageTotal).toBe(20)
+      expect(state.historyRefluxTrend.value.maxTotal).toBe(30)
+    })
+  }
+})

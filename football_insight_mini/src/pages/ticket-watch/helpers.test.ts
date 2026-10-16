@@ -383,6 +383,30 @@ describe('buildHistoryRefluxTrend', () => {
 })
 
 describe('selectRefluxStatsMatches', () => {
+  const cases: Array<[string, string, string, string, boolean | undefined, boolean]> = [
+    ['first-team home', '成都蓉城', '浙江队', '成都蓉城', undefined, true],
+    ['first-team away', '浙江队', '成都蓉城', '成都蓉城', true, true],
+    ['reserve home', '成都蓉城希拉谷', '重庆春蕾', '成都蓉城', undefined, false],
+    ['reserve away', '重庆春蕾', '成都蓉城希拉谷', '成都蓉城', undefined, false],
+    ['unrelated clubs', '上海申花', '浙江队', '成都蓉城', undefined, false],
+    ['excluded first-team game', '成都蓉城', '浙江队', '成都蓉城', false, false],
+    ['reserve explicitly reliable', '成都蓉城希拉谷', '重庆春蕾', '成都蓉城', true, false],
+    ['name contains first-team name', '青年成都蓉城', '浙江队', '成都蓉城', undefined, false],
+    ['dormant Yukun branch', '云南玉昆', '浙江队', '云南玉昆', undefined, true],
+    ['Chengdu is not Yukun', '成都蓉城', '浙江队', '云南玉昆', undefined, false],
+  ]
+  for (const [label, home, away, primaryTeam, reliable, included] of cases) {
+    test(`matches the exact primary team: ${label}`, () => {
+      const match: TicketWatchMatchSummary = {
+        match_id: 1, external_match_id: '1', round_number: 1,
+        match_date: '2026-09-01', match_time: '19:30', kickoff_at: '2026-09-01T19:30:00+08:00',
+        home_team_name: home, away_team_name: away, is_current: false,
+        include_in_reflux_stats: reliable,
+      }
+      expect(selectRefluxStatsMatches([match], primaryTeam).length).toBe(included ? 1 : 0)
+    })
+  }
+
   test('excludes matches marked as unreliable for reflux statistics', () => {
     const matches: TicketWatchMatchSummary[] = [
       {

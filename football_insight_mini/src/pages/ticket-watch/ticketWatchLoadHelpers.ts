@@ -56,8 +56,12 @@ export function selectCompletedMatches(
 
 export function selectRefluxStatsMatches(
   matches: TicketWatchMatchSummary[],
+  primaryTeamName = '成都蓉城',
 ): TicketWatchMatchSummary[] {
-  return matches.filter((match) => match.include_in_reflux_stats !== false)
+  return matches.filter((match) =>
+    match.include_in_reflux_stats !== false
+    && (match.home_team_name === primaryTeamName || match.away_team_name === primaryTeamName),
+  )
 }
 
 export function buildInventorySince(saleStartAt?: string | null): string | null {
