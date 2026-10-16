@@ -62,6 +62,7 @@
 
 - 线上域名入口：`jd`（`match.oryjk.cn` DNS 解析到 jd 公网 IP 117.72.164.211）；jd 的 Nginx 把 `/api/v1/`、`/football/wechat/webhook` 反代到 `peiqian`（内网 10.8.10.2:8092），`/football/` 前端静态资源由 jd 本地直接服务
 - 真正承接线上 API / 公众号 webhook 流量的后端是 `peiqian` 上的 Docker 容器；发版 `peiqian` 即对线上生效。jd 上也保留一个后端容器但不在流量路径上（备用，无需每次同步发版）
+- 「最佳盯盘时段」离线统计在 `peiqian` 以独立镜像、独立容器和 systemd timer 运行，不改动 monitor 抢票容器；部署、验证和回滚见 `DEPLOYMENT.md`「最佳盯盘时段（离线统计）部署」
 - 生产数据库 `football-data-postgres` 运行在 `peiqian`；后端迁移在 `peiqian` 上用 `cargo run --bin run_migrations` 应用（`_sqlx_migrations` 表记账），部署脚本不会自动跑迁移
 - 今日话题自动采集与正文/语音更新在 local233 用户 crontab 运行：每天北京时间 07:00–22:30 每半小时检查，23:00 截止自动执行；入口 `sina_csl_scraper/update_daily_topics.sh --scheduled`。无新文章或失败保留已发布内容。
 - 生产 monorepo 目录：`/root/projects/football_insight`

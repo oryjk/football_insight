@@ -140,7 +140,21 @@ cd football_insight_service_backend_rs
 其中：
 
 - `deploy_jd_docker.sh`：在 `out109` 构建镜像并推送到 Harbor，`jd` 拉取镜像并重启容器（可用 `BUILD_HOST` / `BUILD_REPO_DIR` 环境变量换构建机）；发布前需要在本地 `football_insight_service_backend_rs/.env` 或环境变量中提供 Harbor 凭据 `HARBOR_PASSWORD`，不要提交真实 `.env`
-- `deploy_peiqian_docker.sh`（生产默认）：直接在 `peiqian` 本机（`/root/projects/football_insight`）构建，镜像只保留在 peiqian 本地、不推 Harbor，每次部署自动清理只保留最近 10 个历史 tag。Dockerfile 已内置 rsproxy / 国内镜像加速拉取依赖；git 同步走 peiqian 本机 clash 代理（`proxyOn`），订阅过期时在 peiqian 执行 `/root/clash/update-subscription.sh` 刷新；首次部署会自动补齐 monorepo 工作区
+- `deploy_peiqian_docker.sh`：在 `peiqian` 本机构建。**不要直接用它**：peiqian 拉基础镜像极慢（实测约 200KB/秒，会卡死）。生产发布改为在 local233 构建镜像、传到 peiqian 再启动，步骤见下面「Docker 发布（local233 构建）」
+
+### Docker 发布（local233 构建，生产默认）
+
+```bash
+cd football_insight_service_backend_rs
+TAG=$(git rev-parse --short HEAD)
+docker build -t football-insight-service-backend-rs:$TAG -t football-insight-service-backend-rs:latest .
+docker save football-insight-service-backend-rs:$TAG football-insight-service-backend-rs:latest | gzip | ssh peiqian 'gunzip | docker load'
+ssh peiqian "docker rm -f football-insight-service-backend-rs; docker run -d --name football-insight-service-backend-rs --restart unless-stopped --network host --env-file /root/projects/football_insight/football-insight-service-backend-rs.env -e PORT=8092 -v /root/projects/football_insight/football_insight_service_backend_rs/logs:/app/logs football-insight-service-backend-rs:$TAG"
+```
+
+- 先确认本地提交已 push；发布后检查 `curl http://127.0.0.1:8092/api/health` 和容器 `healthy`
+- 回滚：用上一个镜像 tag 重新执行最后一条 `docker run`（peiqian 保留历史 tag，可用 `docker images football-insight-service-backend-rs` 查看）
+- 环境文件 `football-insight-service-backend-rs.env` 不在 Git 里；修改前先备份（例如 `cp -p x.env x.env.before-<说明>-<日期>`）
 
 ### 3. 数据库迁移
 
@@ -210,6 +224,56 @@ curl https://match.oryjk.cn/api/v1/system/public-config
 
 - `GET /football/wechat/webhook`
 - 关注事件或文本指令实际回调
+
+## 最佳盯盘时段（离线统计）部署
+
+功能：当前比赛页的「最佳盯盘时段」面板。数据由 ticket-monitor 的离线批处理按历史主场比赛统计，football 后端每 10 分钟后台聚合，前台只读缓存。设计见 `docs/superpowers/specs/2026-10-16-best-watch-windows-design.md`。
+
+全部运行在 `peiqian`。peiqian 上的 monitor 抢票容器（`ticket-monitor-axum`，镜像停在旧版本）**不动**，统计功能走独立镜像，避免把 monitor master 上未上线的改动带到抢票服务。
+
+| 组件 | 位置 | 说明 |
+|---|---|---|
+| 镜像 `ticket-restock-profiles` | peiqian 本地 | 由 monitor 仓库 `Dockerfile.restock` 构建，只含 `rebuild-restock-profiles` 和 `restock-profile-server`，不含抢票程序 |
+| 快照读取容器 `ticket-restock-profile-server` | host 网络，`127.0.0.1:4001` | 只读挂载 `/root/projects/ticket-monitor-axum/data`，快照在 `data/restock-profiles/<match_id>.json`；不连数据库 |
+| 批处理 | systemd `ticket-restock-profiles.service` + `.timer`（`/etc/systemd/system/`） | `*-*-1/2 04:00:00 Asia/Shanghai`，即每两天北京时间凌晨 4 点；peiqian 系统时区是 UTC，所以必须带 `Asia/Shanghai`。已有快照的比赛自动跳过，`--force` 才强制重算 |
+| 批处理凭据 | `/root/projects/ticket-monitor-axum/restock.env`（0600） | 只含 `RS_DATABASE_URL`；批处理会话强制 `READ ONLY`，单条查询上限 60 秒 |
+| football 配置 | `football-insight-service-backend-rs.env` 里的 `TICKET_RESTOCK_PROFILE_BASE_URL=http://127.0.0.1:4001` | 只用于读快照；未设置时回退 `TICKET_MONITOR_BASE_URL` |
+
+统计口径：只统计已结束的成都蓉城主场、开售后 10 分钟起算、按北京时间小时分桶；批处理遇到正在售票或 2 分钟内开售的比赛会整轮跳过，不影响抢票。非 V6 用户的预览响应里不含具体小时（`start_hour`/`end_hour` 为 null）。
+
+### 发布或更新
+
+1. 在 local233 的 monitor 仓库构建并传输镜像（不要在 peiqian 上构建）：
+
+```bash
+cd /home/betalpha/projects/ticket/ticket-monitor-axum
+docker build -f Dockerfile.restock -t ticket-restock-profiles:$(git rev-parse --short HEAD) .
+docker tag ticket-restock-profiles:$(git rev-parse --short HEAD) ticket-restock-profiles:current
+docker save ticket-restock-profiles:$(git rev-parse --short HEAD) ticket-restock-profiles:current | gzip | ssh peiqian 'gunzip | docker load'
+```
+
+2. 重启读取容器：`ssh peiqian 'docker rm -f ticket-restock-profile-server; docker run -d --name ticket-restock-profile-server --restart unless-stopped --network host -v /root/projects/ticket-monitor-axum/data:/app/data:ro ticket-restock-profiles:current'`
+3. 如 unit 文件有变化，复制 `deploy/systemd/ticket-restock-profiles.{service,timer}` 到 `/etc/systemd/system/` 并 `systemctl daemon-reload`。
+4. football 后端按上面「Docker 发布（local233 构建）」发布。
+
+### 验证
+
+```bash
+# 手动跑一遍批处理（已有快照应全部 unchanged）
+ssh peiqian 'systemctl start ticket-restock-profiles.service; journalctl -u ticket-restock-profiles.service --since "-3min" --no-pager | grep "restock offline batch"'
+# 下次定时触发时间
+ssh peiqian 'systemctl list-timers ticket-restock-profiles.timer --no-pager'
+# 读接口（since 是该场开售后 10 分钟，带偏移）
+ssh peiqian 'curl -s "http://127.0.0.1:4001/api/match/restock-profile/583?since=2026-10-08T14:10:00%2B08:00"'
+# football 公开接口：匿名应为 preview，且 start_hour/end_hour 为 null
+ssh peiqian 'curl -s http://127.0.0.1:8092/api/v1/ticket-watch/best-windows'
+```
+
+### 回滚与排查
+
+- 关闭功能：`systemctl disable --now ticket-restock-profiles.timer` 并 `docker stop ticket-restock-profile-server`；football 面板会因快照读取失败静默隐藏，其他功能不受影响。
+- 面板消失：先看 `best-windows` 接口的 `status`（`ok` / `insufficient` / `unavailable`），再看 4001 读接口和 `data/restock-profiles` 是否有最新比赛的快照；最近 8 场里没就绪的比赛会被跳过，不影响其余样本。
+- 批处理失败：单场失败只记录并继续，整轮结束时才以非零退出；`journalctl -u ticket-restock-profiles.service` 看是哪场、什么原因。
 
 ## 日志查看
 
