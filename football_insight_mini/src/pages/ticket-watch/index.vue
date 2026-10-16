@@ -1,5 +1,5 @@
 <template>
-  <page-meta :page-style="navigationPageStyle" />
+  <page-meta :page-style="pageStyle" />
   <FiSecondaryNav @back="goBackFromSecondaryPage('/pages/insights/index')" @share="copyPageShareLink('/pages/ticket-watch/index')" />
   <view v-if="pageEntered" class="page-root">
     <image
@@ -208,7 +208,7 @@
     />
     <TicketMatchIdSheet
       :visible="matchIdSheetVisible"
-      :match-id="currentMatch?.match_id ?? null"
+      :match-id="matchIdDisplayValue"
       :match-label="matchIdMatchLabel"
       :state="matchIdSheetState"
       :via="matchIdEntitlement?.via ?? null"
@@ -222,7 +222,7 @@
 
 <script setup lang="ts">
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
-import { nextTick, watch } from 'vue'
+import { computed, nextTick, watch } from 'vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import {
@@ -302,6 +302,7 @@ const {
   matchIdSheetVisible,
   matchIdSheetState,
   matchIdEntitlement,
+  matchIdDisplayValue,
   currentTrackedInterests,
   matchIdMatchLabel,
   displayedHistoryMatch,
@@ -328,6 +329,7 @@ const {
   toggleCurrentSectionCollapsed,
   toggleHistorySectionCollapsed,
 } = state
+const pageStyle = computed(() => `${navigationPageStyle.value};${matchIdSheetVisible.value ? 'overflow: hidden;' : ''}`)
 const session = useAppSession()
 const {
   refreshRefluxSubscriptionStatus,

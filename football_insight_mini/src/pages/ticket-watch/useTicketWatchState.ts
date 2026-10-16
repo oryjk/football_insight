@@ -97,6 +97,12 @@ export function useTicketWatchState() {
   const matchIdMatchLabel = computed(() =>
     buildTicketWatchMatchLabel(currentMatch.value),
   )
+  // Entitlements/orders use the schedule key; only the external business ID is shown/copied.
+  const matchIdDisplayValue = computed(() =>
+    matchIdSheetState.value === 'unlocked'
+      ? currentMatch.value?.external_match_id.trim() || null
+      : null,
+  )
 
   const displayedHistoryMatch = computed(() => {
     if (displayedHistoryMatchId.value === null) {
@@ -317,6 +323,7 @@ export function useTicketWatchState() {
     historyCollapsedSections,
     freshnessNowMs,
     matchIdMatchLabel,
+    matchIdDisplayValue,
     displayedHistoryMatch,
     currentAvailableRegionCount,
     currentTotalOccurrences,

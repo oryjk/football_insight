@@ -1,6 +1,6 @@
 <template>
-  <view v-if="visible" class="match-id-mask" @tap="close">
-    <view class="match-id-card" @tap.stop>
+  <view v-if="visible" class="match-id-mask" @touchmove.stop.prevent @tap="close">
+    <view class="match-id-card" @touchmove.stop @tap.stop>
       <view class="match-id-card__head">
         <view>
           <text class="match-id-card__kicker">比赛 ID</text>
@@ -15,10 +15,14 @@
 
       <text class="match-id-card__match">{{ matchLabel }}</text>
 
-      <view v-if="state === 'unlocked'" class="match-id-card__body">
+      <view v-if="state === 'loading'" class="match-id-card__body match-id-card__body--loading">
+        <text class="match-id-card__copy">正在查询解锁状态…</text>
+      </view>
+      <view v-else-if="state === 'unlocked'" class="match-id-card__body">
         <view class="match-id-value-panel">
-          <text class="match-id-value-panel__value">{{ matchId }}</text>
-          <button class="match-id-value-panel__copy" @tap="copy">复制</button>
+          <text v-if="matchId !== null" class="match-id-value-panel__value">{{ matchId }}</text>
+          <text v-else class="match-id-card__copy">业务 ID 暂不可用</text>
+          <button class="match-id-value-panel__copy" :disabled="matchId === null" @tap="copy">复制</button>
         </view>
         <text class="match-id-card__source">{{ sourceLabel }}</text>
       </view>
@@ -54,7 +58,7 @@ import { buildMatchIdSourceLabel } from '../helpers'
 
 const props = defineProps<{
   visible: boolean
-  matchId: number | null
+  matchId: string | null
   matchLabel: string
   state: 'loading' | 'locked' | 'unlocked' | 'paying'
   via: 'membership' | 'purchase' | null
@@ -119,24 +123,13 @@ function copy(): void {
   }
 }
 
-@keyframes fi-match-id-card-in {
-  from {
-    opacity: 0;
-    transform: translateY(24rpx) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
 .match-id-mask {
   position: fixed;
   inset: 0;
   bottom: var(--window-bottom, 0px);
   z-index: 90;
   background: var(--fi-color-overlay);
-  backdrop-filter: blur(8rpx);
+  backdrop-filter: blur(var(--fi-space-8));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -146,13 +139,12 @@ function copy(): void {
 
 .match-id-card {
   width: 100%;
-  max-width: 640rpx;
+  max-width: calc(var(--fi-space-64) * 10);
   box-sizing: border-box;
   border-radius: var(--fi-radius-lg);
   background: var(--fi-color-ticket-history-trend-summary-item-background-2);
   padding: var(--fi-space-28) var(--fi-space-24) var(--fi-space-32);
   box-shadow: var(--fi-shadow-card-strong);
-  animation: fi-match-id-card-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .match-id-card__head {
@@ -181,9 +173,12 @@ function copy(): void {
 
 .match-id-card__close {
   padding: 0;
-  width: 56rpx;
-  height: 56rpx;
-  line-height: 52rpx;
+  width: var(--fi-space-56);
+  height: var(--fi-space-56);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: var(--fi-leading-none);
   border-radius: var(--fi-radius-round);
   background: var(--fi-color-page);
   color: var(--fi-color-text-secondary);
@@ -204,9 +199,16 @@ function copy(): void {
 
 .match-id-card__body {
   margin-top: var(--fi-space-22);
+  /* Reserve enough room for the longest (locked) content before the request resolves. */
+  min-height: calc(var(--fi-space-84) + var(--fi-space-18) + var(--fi-font-26) * var(--fi-leading-relaxed) * 3);
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: var(--fi-space-18);
+}
+
+.match-id-card__body--loading {
+  align-items: center;
 }
 
 .match-id-value-panel {
@@ -221,7 +223,7 @@ function copy(): void {
 }
 
 .match-id-value-panel__value {
-  color: var(--fi-primitive-ink);
+  color: var(--fi-color-text-primary);
   font-size: var(--fi-font-48);
   font-weight: var(--fi-weight-extrabold);
   letter-spacing: var(--fi-space-2);
@@ -232,15 +234,18 @@ function copy(): void {
 .match-id-value-panel__copy {
   flex-shrink: 0;
   margin: 0;
-  min-width: 112rpx;
-  height: 64rpx;
+  min-width: calc(var(--fi-space-56) * 2);
+  height: var(--fi-space-64);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0 var(--fi-space-24);
   border-radius: var(--fi-radius-round);
-  background: var(--fi-primitive-ink);
-  color: var(--fi-primitive-white);
+  background: var(--fi-color-text-primary);
+  color: var(--fi-color-surface);
   font-size: var(--fi-font-24);
   font-weight: var(--fi-weight-bold);
-  line-height: 64rpx;
+  line-height: var(--fi-leading-none);
 }
 
 .match-id-value-panel__copy::after {
@@ -266,11 +271,14 @@ function copy(): void {
 .match-id-actions__button {
   flex: 1;
   margin: 0;
-  height: 84rpx;
+  height: var(--fi-space-84);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--fi-radius-round);
   font-size: var(--fi-font-26);
   font-weight: var(--fi-weight-bold);
-  line-height: 84rpx;
+  line-height: var(--fi-leading-none);
 }
 
 .match-id-actions__button::after {
@@ -283,8 +291,8 @@ function copy(): void {
 }
 
 .match-id-actions__button--pay {
-  background: var(--fi-primitive-ink);
-  color: var(--fi-primitive-white);
+  background: var(--fi-color-text-primary);
+  color: var(--fi-color-surface);
 }
 
 .match-id-actions__button[disabled] {

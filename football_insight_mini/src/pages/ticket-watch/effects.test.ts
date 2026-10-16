@@ -2783,6 +2783,49 @@ describe('ticket watch refresh display state', () => {
 })
 
 
+describe('ticket match ID display', () => {
+  for (const externalId of ['78', '100', '08']) {
+    test(`reveals business ID ${externalId} after entitlement resolves while querying by schedule ID`, async () => {
+      const state = useTicketWatchState()
+      state.currentMatch.value = { ...match(584), external_match_id: externalId }
+      const entitlement = deferred<MatchIdEntitlement>()
+      const queries: number[] = []
+      const actions = useTicketWatchMatchId(state, () => {}, {
+        prepareVirtualPayment: async () => {},
+        createMatchIdOrder: async () => { throw new Error('must not place an order') },
+        getMatchIdEntitlement: id => { queries.push(id); return entitlement.promise },
+        waitForPaidOrder: async () => false,
+        requestTicketWatchPayment: async () => { throw new Error('must not start payment') },
+      }, createSessionStub({ hasAccessToken: ref(true) }))
+      const pending = actions.openMatchIdSheet()
+      expect(state.matchIdSheetState.value).toBe('loading')
+      expect(state.matchIdDisplayValue.value).toBeNull()
+      entitlement.resolve({ unlocked: true, via: 'membership', effective_tier: 'V6' })
+      await pending
+      expect(queries).toEqual([584])
+      expect(state.matchIdDisplayValue.value).toBe(externalId)
+    })
+  }
+
+  test('never substitutes a schedule primary key when the business ID is missing', () => {
+    const state = useTicketWatchState()
+    state.currentMatch.value = { ...match(584), external_match_id: '  ' }
+    state.matchIdSheetState.value = 'unlocked'
+    expect(state.matchIdDisplayValue.value).toBeNull()
+    state.currentMatch.value = null
+    expect(state.matchIdDisplayValue.value).toBeNull()
+  })
+
+  test('withholds the display ID while locked, loading, or paying', () => {
+    const state = useTicketWatchState()
+    state.currentMatch.value = { ...match(584), external_match_id: '78' }
+    for (const status of ['locked', 'loading', 'paying'] as const) {
+      state.matchIdSheetState.value = status
+      expect(state.matchIdDisplayValue.value).toBeNull()
+    }
+  })
+})
+
 describe('ticket history first-team statistics', () => {
   for (const [team, primaryName] of [
     ['chengdurongcheng', '成都蓉城'], ['yunnanyukun', '云南玉昆'],
