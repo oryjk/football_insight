@@ -1,4 +1,5 @@
 import type {
+  TicketWatchBestWindowsResponse,
   TicketWatchBlockInterest,
   TicketWatchCurrentBoardResponse,
   TicketWatchCurrentMatchResponse,
@@ -212,5 +213,13 @@ export function createRefluxSubscriptionOrder(input: {
     method: 'POST',
     auth: true,
     data: input,
+  })
+}
+
+export function getTicketWatchBestWindows(): Promise<TicketWatchBestWindowsResponse> {
+  return request<TicketWatchBestWindowsResponse>({
+    url: '/ticket-watch/best-windows',
+    auth: true,
+    silentNetworkError: true,
   })
 }

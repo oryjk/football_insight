@@ -63,6 +63,13 @@
             :membership-tier="viewerMembershipTier"
             @upgrade="handleRecentRefluxUpgrade"
           />
+          <TicketBestWindowsPanel
+            v-if="bestWindowsLoading || bestWindowsData"
+            :data="bestWindowsData"
+            :loading="bestWindowsLoading"
+            :visible="bestWindowsVisible"
+            @upgrade="handleBestWindowsUpgrade"
+          />
           <TicketFocusPanel
             v-if="
               currentMatch &&
@@ -244,6 +251,9 @@ import { beginPaywallVisit, reportPaywallImpression, reportPaywallTap } from '..
 import { useAppSession } from '../../stores/appSession'
 import type { TicketWatchGroupedInventoryItem } from '../../types/ticketWatch'
 import TicketBoardSkeleton from './components/TicketBoardSkeleton.vue'
+import TicketBestWindowsPanel from './components/TicketBestWindowsPanel.vue'
+import { useTicketWatchBestWindows } from './useTicketWatchBestWindows'
+import { resolveBestWindowsData } from './bestWindowsHelpers'
 import TicketCurrentMatchCard from './components/TicketCurrentMatchCard.vue'
 import TicketFocusPanel from './components/TicketFocusPanel.vue'
 import TicketHistoryMatchCard from './components/TicketHistoryMatchCard.vue'
@@ -338,6 +348,30 @@ const {
 } = state
 const pageStyle = computed(() => `${navigationPageStyle.value};${matchIdSheetVisible.value ? 'overflow: hidden;' : ''}`)
 const session = useAppSession()
+const bestWindows = useTicketWatchBestWindows({
+  revision: session.revision,
+  underReview: systemConfigUnderReview,
+})
+const { data: bestWindowsRawData, loading: bestWindowsLoading } = bestWindows
+const bestWindowsData = computed(() => resolveBestWindowsData(
+  bestWindowsRawData.value, membershipBenefitsLocked.value, systemConfigUnderReview.value,
+))
+const bestWindowsVisible = computed(() =>
+  isPageVisible.value && pageEntered.value && activeTab.value === 'current'
+  && !systemConfigUnderReview.value && !membershipBenefitsLocked.value
+  && !currentLoading.value && !currentErrorMessage.value
+  && !bestWindowsLoading.value && bestWindowsData.value !== null,
+)
+function handleBestWindowsUpgrade(): void {
+  if (!bestWindowsVisible.value || bestWindowsData.value?.access !== 'preview') return
+  reportPaywallTap('ticket_watch_best_window_lock', { matchId: currentMatch.value?.match_id })
+  goToMembershipPurchase()
+}
+watch([bestWindowsVisible, bestWindowsData], () => {
+  if (bestWindowsVisible.value && bestWindowsData.value?.access === 'preview') {
+    reportPaywallImpression('ticket_watch_best_window_lock', { matchId: currentMatch.value?.match_id })
+  }
+})
 const {
   refreshRefluxSubscriptionStatus,
   openRefluxSubscriptionSheet,
@@ -518,6 +552,7 @@ onShow(() => {
     if (!isCurrentShow()) {
       return
     }
+    void bestWindows.show()
     if (membershipBenefitsLocked.value) {
       stopPolling()
       return
@@ -539,6 +574,7 @@ onReady(() => {
 })
 
 onHide(() => {
+  bestWindows.hide()
   pageVisible = false
   isPageVisible.value = false
   stopPolling()
@@ -546,6 +582,7 @@ onHide(() => {
 })
 
 onUnload(() => {
+  bestWindows.hide()
   pageVisible = false
   isPageVisible.value = false
   stopPolling()

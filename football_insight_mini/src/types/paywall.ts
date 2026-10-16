@@ -1,6 +1,7 @@
 export type PaywallSurface =
   | 'ticket_watch_recent_reflux_lock'
   | 'ticket_watch_match_id_sheet'
+  | 'ticket_watch_best_window_lock'
   | 'insights_ticket_watch_entry'
   | 'user_membership_entry'
 

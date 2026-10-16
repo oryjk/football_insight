@@ -116,3 +116,26 @@ export interface CreateRefluxSubscriptionOrderResponse {
   order_no: string
   params: DigitalPaymentParams
 }
+
+export interface TicketWatchBestWindow {
+  start_hour: number
+  end_hour: number
+  avg_events: number
+  hit_matches: number
+}
+
+export interface TicketWatchBestHour {
+  hour: number
+  avg_events: number
+  share: number
+  hit_matches: number
+}
+
+export interface TicketWatchBestWindowsResponse {
+  status: 'ok' | 'insufficient' | 'unavailable'
+  access: 'full' | 'preview'
+  sample_size: number
+  generated_at: string | null
+  top_windows: TicketWatchBestWindow[]
+  hours: TicketWatchBestHour[]
+}
