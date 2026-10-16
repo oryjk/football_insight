@@ -46,3 +46,11 @@ H5/微信均使用 @tap，不双绑 @click；保留原生按钮和禁用行为�
 - 新增：scripts/ticket-match-id-sheet.test.ts、docs/ticket-match-id-fix-validation.md。
 - 修改：src/pages/ticket-watch/index.vue、useTicketWatchState.ts、effects.test.ts、components/TicketMatchIdSheet.vue；根 CHANGELOG.md、FEATURES.md。
 - 无删除文件；后端不变，本地/生产后端均未因本次改动重启或部署。
+
+## 后续用户指令：上传测试版
+
+2026-10-16 按用户“上传一下”指令，通过统一 `bun run mp:release -- --robot 2 --desc '比赛 ID 改为业务编号，修复获取弹层跳动'` 上传 1.0.84。登记库自动分配版本；首次执行按 Git 门禁在版本文件生成后暂停（退出 1，未构建/上传），两个生成文件单独提交为 75a8487 并推送后重跑，发布退出 0。
+
+上传从干净且同步的 main 75a8487 构建，含功能提交 a45e315。发布链路测试 30 pass/0 fail（146 expect calls）；Git 门禁、边界、生产构建、组件注册与生产 API 校验通过。微信 SDK 确认版本 1.0.84 robot=2 上传完成，完整包 2,082,953 字节；登记库回读 version_code=10084、is_reviewing=false，仅供测试，并非正式微信审核/发布。本次未部署/重启后端、未执行迁移，微信真机效果仍由用户复测。
+
+实际输出留在会话 scratch `.tmp/mini-upload-business-id-fix/` 的 allocate.log、release-tests.log、release.log。文档前文“未上传”为实现阶段状态，以本节后续上传状态为准。
