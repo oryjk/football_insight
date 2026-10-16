@@ -86,6 +86,8 @@ pub struct AppConfig {
     pub wechat_webhook_token: String,
     pub wechat_encoding_aes_key: String,
     pub ticket_monitor_base_url: Option<String>,
+    /// Optional separate origin for offline restock snapshots.
+    pub ticket_restock_profile_base_url: Option<String>,
     pub redis_url: String,
     pub wechat_pay_mch_id: String,
     pub wechat_pay_api_key: String,
@@ -167,6 +169,7 @@ impl AppConfig {
         let wechat_encoding_aes_key = std::env::var("WECHAT_ENCODING_AES_KEY")
             .context("WECHAT_ENCODING_AES_KEY is required")?;
         let ticket_monitor_base_url = std::env::var("TICKET_MONITOR_BASE_URL").ok();
+        let ticket_restock_profile_base_url = std::env::var("TICKET_RESTOCK_PROFILE_BASE_URL").ok();
         let redis_url =
             std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
         let wechat_pay_mch_id = std::env::var("WECHAT_PAY_MCH_ID").unwrap_or_default();
@@ -221,6 +224,7 @@ impl AppConfig {
             wechat_webhook_token,
             wechat_encoding_aes_key,
             ticket_monitor_base_url,
+            ticket_restock_profile_base_url,
             redis_url,
             wechat_pay_mch_id,
             wechat_pay_api_key,

@@ -22,6 +22,8 @@ const TICKET_MONITOR_HTTP_TIMEOUT_SECS: u64 = 5;
 pub struct HttpTicketMonitorPort {
     client: Client,
     base_url: String,
+    /// Offline restock snapshots may be served separately from the live monitor.
+    restock_base_url: Option<String>,
 }
 
 impl HttpTicketMonitorPort {
@@ -37,11 +39,27 @@ impl HttpTicketMonitorPort {
                 .build()
                 .expect("failed to build ticket monitor http client"),
             base_url,
+            restock_base_url: None,
         }
     }
 
+    pub fn with_restock_base_url(mut self, restock_base_url: Option<String>) -> Self {
+        self.restock_base_url = restock_base_url
+            .map(|value| value.trim().trim_end_matches('/').to_string())
+            .filter(|value| !value.is_empty());
+        self
+    }
+
     async fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> anyhow::Result<T> {
-        let url = format!("{}{}", self.base_url, path);
+        self.get_json_from(&self.base_url, path).await
+    }
+
+    async fn get_json_from<T: for<'de> Deserialize<'de>>(
+        &self,
+        base_url: &str,
+        path: &str,
+    ) -> anyhow::Result<T> {
+        let url = format!("{base_url}{path}");
 
         self.client
             .get(&url)
@@ -118,8 +136,9 @@ impl TicketMonitorPort for HttpTicketMonitorPort {
                 "/api/match/restock-profile/{lookup_id}?since={}",
                 percent_encode(since)
             );
+            let base_url = self.restock_base_url.as_deref().unwrap_or(&self.base_url);
             match self
-                .get_json::<super::restock_profile_dto::RestockResponse>(&path)
+                .get_json_from::<super::restock_profile_dto::RestockResponse>(base_url, &path)
                 .await
             {
                 Ok(payload) => {
@@ -927,6 +946,46 @@ mod tests {
             ]
         );
         task.abort();
+    }
+
+    #[tokio::test]
+    async fn best_windows_use_separate_restock_origin_when_configured() {
+        use crate::ticket_watch::ports::ticket_monitor_port::TicketMonitorPort;
+        use axum::{extract::Path, routing::get, Json, Router};
+        let app = Router::new().route(
+            "/api/match/restock-profile/{id}",
+            get(|Path(id): Path<i64>| async move {
+                let hourly: Vec<_> = (0..24)
+                    .map(|hour| serde_json::json!({"hour": hour, "events": 1}))
+                    .collect();
+                Json(serde_json::json!({
+                    "success": true,
+                    "data": {
+                        "schema_version": 2,
+                        "stat_unit": "seat_restock_event",
+                        "match_id": id,
+                        "since": "2026-10-08T14:10:00+08:00",
+                        "total_events": 24,
+                        "appear_events": 20,
+                        "up_events": 4,
+                        "seats_with_events": 2,
+                        "hourly": hourly
+                    }
+                }))
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        // The live monitor origin is unreachable; only the restock origin can answer.
+        let port = super::HttpTicketMonitorPort::new(Some("http://127.0.0.1:1".into()))
+            .with_restock_base_url(Some(format!("http://{address}/")));
+        let profile = port
+            .fetch_restock_profile(570, None, "2026-10-08T14:10:00+08:00")
+            .await
+            .unwrap();
+        assert_eq!(profile.hourly, [1; 24]);
+        server.abort();
     }
 
     #[tokio::test]

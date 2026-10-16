@@ -51,6 +51,7 @@ async fn wechat_webhook_verification_returns_plaintext_echo() {
             seat_swap_mini_subscribe_template_id: String::new(),
             seat_swap_mini_subscribe_page: String::new(),
             ticket_monitor_base_url: None,
+            ticket_restock_profile_base_url: None,
             redis_url: "redis://127.0.0.1:6379".to_string(),
             wechat_pay_mch_id: String::new(),
             virtual_payment: football_insight_service_backend_rs::config::VirtualPaymentConfig {

@@ -47,9 +47,10 @@ pub fn build_ticket_watch(
     token_port: Arc<dyn TokenPort>,
     membership_port: Arc<dyn crate::auth::ports::user_membership_port::UserMembershipPort>,
 ) -> TicketWatchBootstrap {
-    let ticket_monitor_port: Arc<dyn TicketMonitorPort> = Arc::new(HttpTicketMonitorPort::new(
-        config.ticket_monitor_base_url.clone(),
-    ));
+    let ticket_monitor_port: Arc<dyn TicketMonitorPort> = Arc::new(
+        HttpTicketMonitorPort::new(config.ticket_monitor_base_url.clone())
+            .with_restock_base_url(config.ticket_restock_profile_base_url.clone()),
+    );
     let tracked_interest_cache_port: Arc<dyn TrackedInterestCachePort> =
         match RedisTrackedInterestCachePort::new(&config.redis_url, 60) {
             Ok(port) => Arc::new(port),
