@@ -6,6 +6,25 @@ use async_trait::async_trait;
 
 #[async_trait]
 pub trait VirtualProductRepository: Send + Sync {
+    async fn membership_catalog_products(
+        &self,
+        _user_id: uuid::Uuid,
+    ) -> Result<Vec<crate::payment::domain::product_kind::ProductSpec>, VirtualPaymentError> {
+        Ok(vec![])
+    }
+    async fn find_catalog_product(
+        &self,
+        key: &str,
+        user_id: uuid::Uuid,
+    ) -> Result<Option<crate::payment::domain::product_kind::ProductSpec>, VirtualPaymentError>
+    {
+        Ok(self
+            .membership_catalog_products(user_id)
+            .await?
+            .into_iter()
+            .find(|p| p.product_key == key))
+    }
+
     async fn find_enabled(
         &self,
         key: &str,
@@ -42,6 +61,14 @@ pub trait VirtualPaymentGateway: Send + Sync {
 
 #[async_trait]
 pub trait VirtualOrderRepository: Send + Sync {
+    async fn record_with_snapshot(
+        &self,
+        order: VirtualOrder,
+        _snapshot: Option<crate::payment::domain::product_kind::GrantSnapshot>,
+    ) -> anyhow::Result<()> {
+        self.record(order).await
+    }
+
     async fn record(&self, order: VirtualOrder) -> anyhow::Result<()>;
     async fn find(&self, order_no: &str) -> anyhow::Result<Option<VirtualOrder>>;
     async fn record_delivery(&self, delivery: &Delivery) -> anyhow::Result<()>;

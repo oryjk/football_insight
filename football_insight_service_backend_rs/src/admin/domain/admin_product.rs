@@ -188,7 +188,7 @@ fn invalid(message: &str) -> AdminProductError {
 }
 fn validate_tier(value: &str) -> Result<&str, AdminProductError> {
     match value.trim() {
-        tier @ ("V3" | "V6" | "V7" | "V8" | "V9") => Ok(tier),
+        tier if crate::payment::domain::product_kind::is_valid_membership_tier(tier) => Ok(tier),
         _ => Err(invalid("membership_tier must be V3, V6, V7, V8 or V9")),
     }
 }
@@ -239,7 +239,7 @@ mod tests {
     }
     #[test]
     fn rejects_unsupported_tiers_and_nonpositive_prices() {
-        for tier in ["V1", "V4", "v6", "match_id_unlock"] {
+        for tier in ["V1", "V2", "v6", "match_id_unlock"] {
             let mut v = input();
             v.membership_tier = tier.into();
             assert!(v.validate().is_err());
@@ -248,6 +248,17 @@ mod tests {
             let mut v = input();
             v.price_cents = price;
             assert!(v.validate().is_err());
+        }
+    }
+    #[test]
+    fn every_catalog_tier_v3_to_v9_uses_the_shared_validator() {
+        for tier in ["V3", "V4", "V5", "V6", "V7", "V8", "V9"] {
+            let mut value = input();
+            value.membership_tier = tier.into();
+            if tier == "V3" {
+                value.allowed_user_ids = vec!["11111111-1111-4111-8111-111111111111".into()];
+            }
+            assert!(value.validate().is_ok());
         }
     }
     #[test]
@@ -278,7 +289,7 @@ mod tests {
             "match_id_unlock@100",
             "membership:V6@03900",
             "membership:V6@0",
-            "membership:V4@100",
+            "membership:V2@100",
             "membership:V6@999999999999",
         ] {
             assert!(validate_product_key(key).is_err());

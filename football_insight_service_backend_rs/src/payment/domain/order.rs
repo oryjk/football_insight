@@ -65,6 +65,8 @@ pub struct MembershipProduct {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MembershipProductOption {
+    #[serde(default, flatten)]
+    pub presentation: MembershipPresentation,
     pub target_tier: String,
     pub price_cents: i32,
     pub title: String,
@@ -75,6 +77,20 @@ pub struct MembershipProductOption {
     /// Server-selected account offer; never accepted from public/system-config JSON.
     #[serde(skip)]
     pub private_price_cents: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MembershipPresentation {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expiry_rule: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration_label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_pass: Option<bool>,
+    #[serde(skip)]
+    pub spec: Option<super::product_kind::ProductSpec>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,6 +120,7 @@ pub fn default_membership_product_options() -> Vec<MembershipProductOption> {
             description: "购买后立即升级为 V6 会员，可查看最近 30 分钟内的回流区域。".to_string(),
             membership_duration_months: None,
             private_price_cents: None,
+            presentation: Default::default(),
         },
         MembershipProductOption {
             target_tier: "V7".to_string(),
@@ -113,6 +130,7 @@ pub fn default_membership_product_options() -> Vec<MembershipProductOption> {
             description: "购买后立即升级为 V7 会员，可查看最近 10 分钟内的回流区域。".to_string(),
             membership_duration_months: None,
             private_price_cents: None,
+            presentation: Default::default(),
         },
         MembershipProductOption {
             target_tier: "V8".to_string(),
@@ -122,6 +140,7 @@ pub fn default_membership_product_options() -> Vec<MembershipProductOption> {
             description: "购买后立即升级为 V8 会员，可查看最近 3 分钟内的回流区域。".to_string(),
             membership_duration_months: None,
             private_price_cents: None,
+            presentation: Default::default(),
         },
         MembershipProductOption {
             target_tier: "V9".to_string(),
@@ -131,6 +150,7 @@ pub fn default_membership_product_options() -> Vec<MembershipProductOption> {
             description: "购买后立即升级为 V9 会员，最近回流速览权限与 V8 一致。".to_string(),
             membership_duration_months: None,
             private_price_cents: None,
+            presentation: Default::default(),
         },
     ]
 }
@@ -219,13 +239,17 @@ pub fn parse_match_id_unlock_product_type(product_type: &str) -> Option<i64> {
     parts[1].trim().parse::<i64>().ok()
 }
 
-pub fn membership_tier_from_product_type(product_type: &str) -> String {
-    product_type
+pub fn membership_tier_from_product_type(product_type: &str) -> anyhow::Result<String> {
+    // Historical ordinary payment orders used the unqualified membership product for V9.
+    if product_type.trim() == "membership" {
+        return Ok("V9".into());
+    }
+    let tier = product_type
         .trim()
         .strip_prefix("membership:")
-        .map(|tier| tier.trim().to_uppercase())
-        .filter(|tier| matches!(tier.as_str(), "V3" | "V6" | "V7" | "V8" | "V9"))
-        .unwrap_or_else(|| "V9".to_string())
+        .map(|v| v.trim().to_uppercase())
+        .filter(|tier| super::product_kind::is_valid_membership_tier(tier));
+    tier.ok_or_else(|| anyhow::anyhow!("请选择有效的会员档位"))
 }
 
 pub fn calculate_membership_checkout_price(
@@ -254,6 +278,14 @@ pub fn calculate_membership_checkout_price(
         })
         .ok_or_else(|| anyhow::anyhow!("请选择有效的会员档位"))?;
 
+    if let Some(spec) = &target_product.presentation.spec {
+        super::product_kind::ProductKindRegistry::default().validate(spec)?;
+        return Ok(MembershipCheckoutPrice {
+            original_price_cents: spec.price_cents,
+            pay_price_cents: spec.price_cents,
+            upgrade_fee_cents: 0,
+        });
+    }
     if let Some(price_cents) = target_product.private_price_cents {
         if price_cents <= 0 {
             return Err(super::virtual_payment::VirtualPaymentError::InvalidOrder.into());

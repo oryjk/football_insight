@@ -25,6 +25,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 pub struct VirtualPaymentService {
+    registry: Arc<crate::payment::domain::product_kind::ProductKindRegistry>,
     gateway: Arc<dyn VirtualPaymentGateway>,
     orders: Arc<dyn OrderRepository>,
     virtual_orders: Arc<dyn VirtualOrderRepository>,
@@ -45,6 +46,9 @@ impl VirtualPaymentService {
         products: Arc<dyn VirtualProductRepository>,
     ) -> Self {
         Self {
+            registry: Arc::new(
+                crate::payment::domain::product_kind::ProductKindRegistry::default(),
+            ),
             gateway,
             orders,
             virtual_orders,
@@ -55,6 +59,14 @@ impl VirtualPaymentService {
             event_orders: None,
         }
     }
+    pub fn with_kind_registry(
+        mut self,
+        registry: Arc<crate::payment::domain::product_kind::ProductKindRegistry>,
+    ) -> Self {
+        self.registry = registry;
+        self
+    }
+
     pub fn with_event_recorder(mut self, recorder: Arc<dyn PaymentEventRecorder>) -> Self {
         self.events = PaymentEvents::new(recorder);
         self
@@ -198,14 +210,13 @@ impl VirtualPaymentService {
     }
 }
 
-#[async_trait::async_trait]
-impl WechatPayPort for VirtualPaymentService {
-    async fn unified_order(
+impl VirtualPaymentService {
+    async fn order_parameters(
         &self,
         order_no: &str,
-        _description: &str,
         amount_cents: i32,
         openid: &str,
+        capabilities: Option<&[String]>,
     ) -> anyhow::Result<WxPayParams> {
         if !self.available() {
             return Err(VirtualPaymentError::Unavailable.into());
@@ -227,20 +238,52 @@ impl WechatPayPort for VirtualPaymentService {
         if product.price_cents != amount_cents {
             return Err(VirtualPaymentError::ProductUnavailable.into());
         }
+        let snapshot = if let Some(capabilities) = capabilities {
+            use crate::payment::domain::product_kind::{GrantSnapshot, UserContext};
+            let spec = self
+                .products
+                .find_catalog_product(&key, order.user_id)
+                .await?
+                .ok_or(VirtualPaymentError::ProductUnavailable)?;
+            if Some(spec.catalog_product_id) != product.catalog_product_id {
+                return Err(VirtualPaymentError::ProductUnavailable.into());
+            }
+            let current_tier = self
+                .users
+                .get_user_membership_tier(order.user_id)
+                .await?
+                .unwrap_or_else(|| "V1".into());
+            let price = self.registry.resolve_price(
+                &spec,
+                &UserContext {
+                    current_tier,
+                    capabilities: capabilities.to_vec(),
+                },
+            )?;
+            if price != amount_cents {
+                return Err(VirtualPaymentError::ProductUnavailable.into());
+            }
+            Some(GrantSnapshot::from_spec(&spec)?)
+        } else {
+            None
+        };
         let params = self
             .gateway
             .payment_params(order_no, openid, &product)
             .await?;
         self.virtual_orders
-            .record(crate::payment::domain::virtual_payment::VirtualOrder {
-                catalog_product_id: product.catalog_product_id,
-                order_no: order_no.into(),
-                open_id: openid.into(),
-                product_id: product.product_id.clone(),
-                amount_cents,
-                membership_duration_months: product.membership_duration_months,
-                wx_order_id: None,
-            })
+            .record_with_snapshot(
+                crate::payment::domain::virtual_payment::VirtualOrder {
+                    catalog_product_id: product.catalog_product_id,
+                    order_no: order_no.into(),
+                    open_id: openid.into(),
+                    product_id: product.product_id.clone(),
+                    amount_cents,
+                    membership_duration_months: product.membership_duration_months,
+                    wx_order_id: None,
+                },
+                snapshot,
+            )
             .await?;
         Ok(WxPayParams {
             virtual_payment: Some(params),
@@ -250,6 +293,30 @@ impl WechatPayPort for VirtualPaymentService {
             sign_type: String::new(),
             pay_sign: String::new(),
         })
+    }
+}
+#[async_trait::async_trait]
+impl WechatPayPort for VirtualPaymentService {
+    async fn unified_order(
+        &self,
+        order_no: &str,
+        _description: &str,
+        amount_cents: i32,
+        openid: &str,
+    ) -> anyhow::Result<WxPayParams> {
+        self.order_parameters(order_no, amount_cents, openid, None)
+            .await
+    }
+    async fn unified_membership_order(
+        &self,
+        order_no: &str,
+        _description: &str,
+        amount_cents: i32,
+        openid: &str,
+        capabilities: &[String],
+    ) -> anyhow::Result<WxPayParams> {
+        self.order_parameters(order_no, amount_cents, openid, Some(capabilities))
+            .await
     }
 }
 

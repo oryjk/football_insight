@@ -10,7 +10,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 const COLUMNS: &str = "id AS catalog_product_id, product_key, split_part(split_part(product_key, '@', 1), ':', 2) AS membership_tier, name, product_id, price_cents, membership_duration_months, enabled, remark, allowed_user_ids, created_at, updated_at";
-const SCOPE: &str = "product_key ~ '^membership:V(3|[6-9])@[1-9][0-9]*$'";
+const SCOPE: &str = "product_key ~ '^membership:V[3-9]@[1-9][0-9]*$'";
 #[derive(sqlx::FromRow)]
 struct ProductRow {
     catalog_product_id: Uuid,

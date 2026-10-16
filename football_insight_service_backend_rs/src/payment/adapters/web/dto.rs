@@ -15,6 +15,8 @@ pub struct MembershipProductResponse {
 
 #[derive(Debug, Serialize)]
 pub struct MembershipProductOptionResponse {
+    #[serde(flatten)]
+    pub presentation: crate::payment::domain::order::MembershipPresentation,
     pub target_tier: String,
     pub price_cents: i32,
     pub original_price_cents: i32,
@@ -79,6 +81,7 @@ impl MembershipProductOptionResponse {
             description: value.description,
             membership_duration_months: value.membership_duration_months,
             is_private_offer: value.private_price_cents.is_some(),
+            presentation: value.presentation,
         }
     }
 }

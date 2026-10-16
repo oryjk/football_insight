@@ -105,7 +105,7 @@ impl HandleWechatNotifyUseCase {
                 .settle_match_id_unlock_order(out_trade_no, transaction_id, order.user_id, match_id)
                 .await?;
         } else {
-            let target_tier = membership_tier_from_product_type(&order.product_type);
+            let target_tier = membership_tier_from_product_type(&order.product_type)?;
             self.payment_settlement_port
                 .settle_membership_order(out_trade_no, transaction_id, order.user_id, &target_tier)
                 .await?;

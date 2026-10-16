@@ -20,7 +20,9 @@ use crate::{
 };
 
 pub struct CreateMembershipOrderUseCase {
+    registry: Arc<crate::payment::domain::product_kind::ProductKindRegistry>,
     events: PaymentEvents,
+    catalog: Option<Arc<dyn crate::payment::ports::virtual_payment_port::VirtualProductRepository>>,
     order_repository: Arc<dyn OrderRepository>,
     user_membership_port: Arc<dyn UserMembershipPort>,
     wechat_pay_port: Arc<dyn WechatPayPort>,
@@ -33,7 +35,11 @@ impl CreateMembershipOrderUseCase {
         wechat_pay_port: Arc<dyn WechatPayPort>,
     ) -> Self {
         Self {
+            registry: Arc::new(
+                crate::payment::domain::product_kind::ProductKindRegistry::default(),
+            ),
             events: PaymentEvents::default(),
+            catalog: None,
             order_repository,
             user_membership_port,
             wechat_pay_port,
@@ -42,6 +48,22 @@ impl CreateMembershipOrderUseCase {
 
     pub fn with_event_recorder(mut self, recorder: Arc<dyn PaymentEventRecorder>) -> Self {
         self.events = PaymentEvents::new(recorder);
+        self
+    }
+
+    pub fn with_kind_registry(
+        mut self,
+        registry: Arc<crate::payment::domain::product_kind::ProductKindRegistry>,
+    ) -> Self {
+        self.registry = registry;
+        self
+    }
+
+    pub fn with_catalog_repository(
+        mut self,
+        catalog: Arc<dyn crate::payment::ports::virtual_payment_port::VirtualProductRepository>,
+    ) -> Self {
+        self.catalog = Some(catalog);
         self
     }
 
@@ -57,6 +79,14 @@ impl CreateMembershipOrderUseCase {
         input: CreateMembershipOrderInput,
         attempt_id: Option<uuid::Uuid>,
     ) -> anyhow::Result<CreateMembershipOrderOutput> {
+        self.execute_with_capabilities(input, attempt_id, &[]).await
+    }
+    pub async fn execute_with_capabilities(
+        &self,
+        input: CreateMembershipOrderInput,
+        attempt_id: Option<uuid::Uuid>,
+        capabilities: &[String],
+    ) -> anyhow::Result<CreateMembershipOrderOutput> {
         let openid = self
             .user_membership_port
             .get_user_open_id(input.user_id)
@@ -68,6 +98,26 @@ impl CreateMembershipOrderUseCase {
             .await?
             .unwrap_or_else(|| "V1".to_string());
 
+        let mut fixed_price = None;
+        let selected_spec = input
+            .products
+            .iter()
+            .find(|p| p.target_tier == input.target_tier)
+            .and_then(|p| p.presentation.spec.as_ref());
+        if let (Some(catalog), Some(selected)) = (&self.catalog, selected_spec) {
+            use crate::payment::domain::product_kind::UserContext;
+            let spec=catalog.membership_catalog_products(input.user_id).await?.into_iter()
+                .find(|spec|spec.catalog_product_id==selected.catalog_product_id && spec.product_key==selected.product_key && spec.price_cents==selected.price_cents)
+                .ok_or(crate::payment::domain::virtual_payment::VirtualPaymentError::ProductUnavailable)?;
+            fixed_price = Some(self.registry.resolve_price(
+                &spec,
+                &UserContext {
+                    current_tier: current_tier.clone(),
+                    capabilities: capabilities.to_vec(),
+                },
+            )?);
+        }
+
         let is_v9_renewal = current_tier.trim().eq_ignore_ascii_case("V9")
             && input.target_tier.trim().eq_ignore_ascii_case("V9");
         if !is_v9_renewal
@@ -75,11 +125,18 @@ impl CreateMembershipOrderUseCase {
         {
             anyhow::bail!("请选择高于当前等级的会员档位");
         }
-        let price = calculate_membership_checkout_price(
-            &input.products,
-            &current_tier,
-            &input.target_tier,
-        )?;
+        let price = match fixed_price {
+            Some(price) => crate::payment::domain::order::MembershipCheckoutPrice {
+                original_price_cents: price,
+                pay_price_cents: price,
+                upgrade_fee_cents: 0,
+            },
+            None => calculate_membership_checkout_price(
+                &input.products,
+                &current_tier,
+                &input.target_tier,
+            )?,
+        };
         let product = input
             .products
             .iter()
@@ -114,7 +171,13 @@ impl CreateMembershipOrderUseCase {
 
         let wx_pay_params = attempt.params(
             self.wechat_pay_port
-                .unified_order(&order_no, &product.title, price.pay_price_cents, &openid)
+                .unified_membership_order(
+                    &order_no,
+                    &product.title,
+                    price.pay_price_cents,
+                    &openid,
+                    capabilities,
+                )
                 .await,
         )?;
 

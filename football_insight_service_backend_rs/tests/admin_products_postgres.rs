@@ -75,6 +75,12 @@ impl Database {
         .execute(&pool)
         .await
         .unwrap();
+        sqlx::raw_sql(include_str!(
+            "../migrations/20261016130000_add_product_catalog_specs.sql"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
         let actor = Uuid::new_v4();
         sqlx::query("INSERT INTO f_i_admin_users(id,username,password_hash,display_name,role) VALUES($1,'test_owner','unused','Test Owner','owner')").bind(actor).execute(&pool).await.unwrap();
         Self {
@@ -1046,5 +1052,66 @@ async fn same_tier_members_endpoint_includes_unknown_without_inventing_orders() 
         .await["total"],
         0
     );
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires an explicit disposable localhost PostgreSQL database"]
+async fn legacy_admin_crud_remains_compatible_with_catalog_kind_default_and_v4_v5_scope() {
+    let db = Database::new().await;
+    let service = db.service();
+    for (tier, price) in [("V4", 900), ("V5", 1900)] {
+        let created = service.create(input(tier, price), db.actor).await.unwrap();
+        let persisted: (String, serde_json::Value) = sqlx::query_as(
+            "SELECT kind,grant_spec FROM f_i_virtual_payment_products WHERE product_key=$1",
+        )
+        .bind(&created.product_key)
+        .fetch_one(&db.pool)
+        .await
+        .unwrap();
+        assert_eq!(persisted, ("membership".into(), serde_json::json!({})));
+        assert_eq!(
+            service
+                .get(&created.product_key)
+                .await
+                .unwrap()
+                .membership_tier,
+            tier
+        );
+        let page = service
+            .list(AdminProductQuery {
+                membership_tier: Some(tier.into()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(page.total, 1);
+        assert_eq!(
+            service
+                .purchases(&created.product_key, 1, 20)
+                .await
+                .unwrap()
+                .total,
+            0
+        );
+        let mut edited = input(tier, price);
+        edited.membership_duration_months = 3;
+        assert_eq!(
+            service
+                .update(&created.product_key, edited, db.actor)
+                .await
+                .unwrap()
+                .membership_duration_months,
+            3
+        );
+        service
+            .delete(&created.product_key, db.actor)
+            .await
+            .unwrap();
+        assert!(matches!(
+            service.get(&created.product_key).await,
+            Err(AdminProductError::NotFound)
+        ));
+    }
     db.close().await;
 }

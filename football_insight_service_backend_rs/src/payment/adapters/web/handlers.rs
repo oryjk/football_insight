@@ -53,6 +53,19 @@ pub(super) fn authenticate_user(
         .map_err(|_| (StatusCode::UNAUTHORIZED, "请先登录".to_string()))
 }
 
+pub(crate) fn client_capabilities(headers: &HeaderMap) -> Vec<String> {
+    headers
+        .get("X-Client-Capabilities")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| {
+            v.split([',', ' '])
+                .filter(|v| !v.is_empty())
+                .map(str::to_owned)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 fn try_authenticate_user(headers: &HeaderMap, token_port: &dyn TokenPort) -> Option<uuid::Uuid> {
     let token = headers
         .get(AUTHORIZATION)
@@ -67,17 +80,6 @@ pub async fn get_membership_product_handler(
     headers: HeaderMap,
 ) -> Result<Json<MembershipProductResponse>, (StatusCode, String)> {
     let user_id = try_authenticate_user(&headers, state.token_port.as_ref());
-    let product = state
-        .get_membership_product_use_case
-        .execute_for_user(user_id)
-        .await
-        .map_err(|error| {
-            tracing::error!(error = %error, "failed to get membership product");
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "获取会员信息失败".to_string(),
-            )
-        })?;
     let current_tier = match user_id {
         Some(user_id) => state
             .user_membership_port
@@ -93,6 +95,21 @@ pub async fn get_membership_product_handler(
         None => None,
     };
 
+    let product = state
+        .get_membership_product_use_case
+        .execute_catalog_for_user(
+            user_id,
+            current_tier.as_deref(),
+            &client_capabilities(&headers),
+        )
+        .await
+        .map_err(|error| {
+            tracing::error!(error = %error, "failed to get membership product");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "获取会员信息失败".to_string(),
+            )
+        })?;
     let product = state
         .get_membership_product_use_case
         .with_duration_for_tier(product, current_tier.as_deref(), user_id)
@@ -119,11 +136,33 @@ pub async fn create_membership_order_handler(
         .trim()
         .to_uppercase();
 
-    let catalog = state
-        .get_membership_product_use_case
-        .execute_for_user(Some(user_id))
+    let capabilities = client_capabilities(&headers);
+    let current_tier = state
+        .user_membership_port
+        .get_user_membership_tier(user_id)
         .await
         .map_err(|error| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("创建订单失败: {}", error),
+            )
+        })?;
+    let catalog = state
+        .get_membership_product_use_case
+        .execute_purchase_catalog(
+            user_id,
+            current_tier.as_deref(),
+            &capabilities,
+            &target_tier,
+        )
+        .await
+        .map_err(|error| {
+            if error
+                .downcast_ref::<crate::payment::domain::product_kind::ProductSpecError>()
+                .is_some()
+            {
+                return (StatusCode::BAD_REQUEST, error.to_string());
+            }
             tracing::error!(error = %error, "failed to get membership product for order");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -136,16 +175,23 @@ pub async fn create_membership_order_handler(
 
     let result = state
         .create_membership_order_use_case
-        .execute_with_attempt(
+        .execute_with_capabilities(
             CreateMembershipOrderInput {
                 user_id,
                 target_tier: product.target_tier.clone(),
                 products: catalog.products,
             },
             Some(crate::payment::adapters::web::event_handlers::attempt_from_headers(&headers)),
+            &capabilities,
         )
         .await
         .map_err(|error| {
+            if error
+                .downcast_ref::<crate::payment::domain::product_kind::ProductSpecError>()
+                .is_some()
+            {
+                return (StatusCode::BAD_REQUEST, error.to_string());
+            }
             if let Some(error) =
                 error.downcast_ref::<crate::payment::domain::virtual_payment::VirtualPaymentError>()
             {

@@ -656,6 +656,14 @@ impl Database {
         .execute(&pool)
         .await
         .unwrap();
+        if include_duration {
+            sqlx::raw_sql(include_str!(
+                "../migrations/20261016130000_add_product_catalog_specs.sql"
+            ))
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
         let user = Uuid::new_v4();
         sqlx::query("INSERT INTO f_i_users(id,wx_open_id,account_identifier,display_name,password_hash) VALUES($1,'buyer','buyer','Buyer','unused')").bind(user).execute(&pool).await.unwrap();
         Self {

@@ -6,7 +6,10 @@ use crate::{
     auth::domain::membership::membership_tier_rank,
     auth::domain::user::resolve_effective_membership_tier,
     payment::{
-        domain::order::RefluxSubscriptionProductType,
+        domain::{
+            membership_settlement::resolve_snapshot_membership_settlement,
+            order::RefluxSubscriptionProductType, product_kind::GrantSnapshot,
+        },
         ports::payment_settlement_port::PaymentSettlementPort,
     },
     reflux_subscription::domain::subscription::normalize_team_code,
@@ -92,6 +95,53 @@ mod tests {
         assert_eq!(settlement.effective_tier, "V3");
         assert!(!settlement.should_refresh_paid_expiration);
     }
+
+    #[test]
+    fn snapshot_monthly_v6_to_v9_matches_every_legacy_tier_and_expiration_case() {
+        use crate::payment::domain::{
+            membership_settlement::resolve_snapshot_membership_settlement,
+            product_kind::{MembershipExpiry, MembershipGrant},
+        };
+        let now = Utc.with_ymd_and_hms(2026, 1, 31, 12, 0, 0).unwrap();
+        for paid in ["V6", "V7", "V8", "V9"] {
+            for current in ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9"] {
+                for expiration in [
+                    None,
+                    Some(now - chrono::Duration::days(1)),
+                    Some(now + chrono::Duration::days(800)),
+                ] {
+                    for months in [1, 12, 24] {
+                        let legacy =
+                            resolve_membership_settlement(current, expiration, paid, now, true);
+                        let grant = MembershipGrant {
+                            tier: paid.into(),
+                            expiry: MembershipExpiry::Months { months },
+                        };
+                        let snapshot = resolve_snapshot_membership_settlement(
+                            current, expiration, &grant, now,
+                        )
+                        .unwrap();
+                        assert_eq!(
+                            snapshot.tier, legacy.effective_tier,
+                            "paid={paid}, current={current}, expiration={expiration:?}"
+                        );
+                        let expected_expiration = if legacy.should_refresh_paid_expiration {
+                            Some(
+                                now.checked_add_months(chrono::Months::new(months as u32))
+                                    .unwrap(),
+                            )
+                        } else {
+                            expiration
+                        };
+                        assert_eq!(
+                            snapshot.expires_at, expected_expiration,
+                            "paid={paid}, current={current}, expiration={expiration:?}, months={months}"
+                        );
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -144,12 +194,27 @@ impl PaymentSettlementPort for PostgresPaymentSettlementPort {
                 (membership_tier, membership_expires_at)
             })
             .unwrap_or_else(|| ("V1".to_string(), None));
-        let duration: Option<i32> = sqlx::query_scalar(
-            "SELECT membership_duration_months FROM f_i_virtual_payment_orders WHERE order_no=$1",
+        let metadata = sqlx::query_as::<_, (i32, Option<serde_json::Value>, DateTime<Utc>)>(
+            "SELECT membership_duration_months, grant_snapshot, NOW() FROM f_i_virtual_payment_orders WHERE order_no=$1",
         )
         .bind(order_no)
         .fetch_optional(&mut *tx)
         .await?;
+        let duration = metadata.as_ref().map(|row| row.0);
+        let snapshot_settlement = metadata
+            .as_ref()
+            .and_then(|row| row.1.as_ref())
+            .map(|value| -> anyhow::Result<_> {
+                let snapshot: GrantSnapshot = serde_json::from_value(value.clone())?;
+                let grant = snapshot.membership()?;
+                Ok(resolve_snapshot_membership_settlement(
+                    &current_tier,
+                    current_expires_at,
+                    &grant,
+                    metadata.as_ref().expect("snapshot has metadata").2,
+                )?)
+            })
+            .transpose()?;
         let settlement = resolve_membership_settlement(
             &current_tier,
             current_expires_at,
@@ -164,8 +229,19 @@ impl PaymentSettlementPort for PostgresPaymentSettlementPort {
             .execute(&mut *tx)
             .await?;
 
-        sqlx::query(
-            r#"
+        if let Some(grant) = snapshot_settlement {
+            // The immutable checkout snapshot is the sole source of the new grant.
+            sqlx::query(
+                "UPDATE f_i_users SET membership_tier=$2, membership_expires_at=$3, updated_at=NOW() WHERE id=$1",
+            )
+            .bind(user_id)
+            .bind(grant.tier)
+            .bind(grant.expires_at)
+            .execute(&mut *tx)
+            .await?;
+        } else {
+            sqlx::query(
+                r#"
             UPDATE f_i_users
             SET membership_tier = $2,
                 membership_expires_at = CASE
@@ -175,13 +251,14 @@ impl PaymentSettlementPort for PostgresPaymentSettlementPort {
                 updated_at = NOW()
             WHERE id = $1
             "#,
-        )
-        .bind(user_id)
-        .bind(&settlement.effective_tier)
-        .bind(settlement.should_refresh_paid_expiration)
-        .bind(duration_months)
-        .execute(&mut *tx)
-        .await?;
+            )
+            .bind(user_id)
+            .bind(&settlement.effective_tier)
+            .bind(settlement.should_refresh_paid_expiration)
+            .bind(duration_months)
+            .execute(&mut *tx)
+            .await?;
+        }
 
         sqlx::query("SELECT set_config('football.membership_origin','',true)")
             .execute(&mut *tx)

@@ -89,7 +89,7 @@ pub fn product_key(product_type: &str, amount_cents: i32) -> Result<String, Virt
     }
     let parts: Vec<_> = product_type.split(':').collect();
     let key = match parts.as_slice() {
-        ["membership", tier] if matches!(*tier, "V3" | "V6" | "V7" | "V8" | "V9") => {
+        ["membership", tier] if super::product_kind::is_valid_membership_tier(tier) => {
             format!("membership:{tier}")
         }
         ["match_id_unlock", id] if id.parse::<i64>().is_ok_and(|v| v > 0) => {

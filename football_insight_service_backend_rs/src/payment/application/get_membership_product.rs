@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::payment::domain::order::MembershipProduct;
 
 pub struct GetMembershipProductUseCase {
+    registry: Arc<crate::payment::domain::product_kind::ProductKindRegistry>,
     system_config_port: Arc<dyn crate::system_config::ports::system_config_port::SystemConfigPort>,
     products: Arc<dyn crate::payment::ports::virtual_payment_port::VirtualProductRepository>,
 }
@@ -118,9 +119,20 @@ impl GetMembershipProductUseCase {
         products: Arc<dyn crate::payment::ports::virtual_payment_port::VirtualProductRepository>,
     ) -> Self {
         Self {
+            registry: Arc::new(
+                crate::payment::domain::product_kind::ProductKindRegistry::default(),
+            ),
             system_config_port,
             products,
         }
+    }
+
+    pub fn with_kind_registry(
+        mut self,
+        registry: Arc<crate::payment::domain::product_kind::ProductKindRegistry>,
+    ) -> Self {
+        self.registry = registry;
+        self
     }
 
     pub async fn execute(&self) -> anyhow::Result<MembershipProduct> {
@@ -160,7 +172,9 @@ impl GetMembershipProductUseCase {
                 let Some(tier) = private
                     .product_type
                     .strip_prefix("membership:")
-                    .filter(|tier| matches!(*tier, "V3" | "V6" | "V7" | "V8" | "V9"))
+                    .filter(|tier| {
+                        crate::payment::domain::product_kind::is_valid_membership_tier(tier)
+                    })
                 else {
                     continue;
                 };
@@ -188,10 +202,118 @@ impl GetMembershipProductUseCase {
                             description: format!("支付确认后开通 {tier}，权益按现有等级规则执行。"),
                             membership_duration_months: Some(private.membership_duration_months),
                             private_price_cents: Some(private.price_cents),
+                            presentation: Default::default(),
                         });
                 }
             }
         }
+        Ok(product)
+    }
+
+    pub async fn execute_catalog_for_user(
+        &self,
+        user_id: Option<uuid::Uuid>,
+        current_tier: Option<&str>,
+        capabilities: &[String],
+    ) -> anyhow::Result<MembershipProduct> {
+        self.catalog_for_context(user_id, current_tier, capabilities, None)
+            .await
+    }
+    pub async fn execute_purchase_catalog(
+        &self,
+        user_id: uuid::Uuid,
+        current_tier: Option<&str>,
+        capabilities: &[String],
+        target: &str,
+    ) -> anyhow::Result<MembershipProduct> {
+        self.catalog_for_context(Some(user_id), current_tier, capabilities, Some(target))
+            .await
+    }
+    async fn catalog_for_context(
+        &self,
+        user_id: Option<uuid::Uuid>,
+        current_tier: Option<&str>,
+        capabilities: &[String],
+        target: Option<&str>,
+    ) -> anyhow::Result<MembershipProduct> {
+        use crate::payment::domain::{
+            order::{MembershipPresentation, MembershipProductOption},
+            product_kind::{ProductSpecError, UserContext},
+        };
+        let mut product = self.execute_for_user(user_id).await?;
+        let context = UserContext {
+            current_tier: current_tier.unwrap_or("V1").into(),
+            capabilities: capabilities.to_vec(),
+        };
+        let registry = &self.registry;
+        let mut rows = self
+            .products
+            .membership_catalog_products(user_id.unwrap_or_default())
+            .await?;
+        rows.sort_by(|a, b| {
+            a.sort_order
+                .cmp(&b.sort_order)
+                .then(a.price_cents.cmp(&b.price_cents))
+                .then(a.product_key.cmp(&b.product_key))
+        });
+        let mut added = std::collections::HashSet::new();
+        let mut additions = Vec::new();
+        let mut target_error = None;
+        for spec in rows.into_iter().filter(|spec| spec.is_table_offer()) {
+            if let Err(error) = registry.validate(&spec) {
+                tracing::warn!(%error,"invalid membership catalog offer omitted");
+                continue;
+            }
+            let snapshot = crate::payment::domain::product_kind::GrantSnapshot::from_spec(&spec)?;
+            let grant = snapshot.membership()?;
+            if target.is_some_and(|target| target == grant.tier)
+                && !registry.eligible(&spec, &context)
+            {
+                target_error = Some(if !spec.capability_allowed(capabilities) {
+                    ProductSpecError::CapabilityRequired
+                } else {
+                    ProductSpecError::Ineligible
+                });
+            }
+            if !registry.eligible(&spec, &context) || !added.insert(grant.tier.clone()) {
+                continue;
+            }
+            let is_pass = spec.is_pass();
+            let months = match grant.expiry {
+                crate::payment::domain::product_kind::MembershipExpiry::Months { months } => {
+                    Some(months)
+                }
+                _ => None,
+            };
+            product.products.retain(|p| p.target_tier != grant.tier);
+            additions.push(MembershipProductOption {
+                target_tier: grant.tier,
+                price_cents: spec.price_cents,
+                title: spec.title.clone().unwrap_or_default(),
+                subtitle: spec.subtitle.clone().unwrap_or_default(),
+                description: spec.description.clone().unwrap_or_default(),
+                membership_duration_months: months,
+                private_price_cents: None,
+                presentation: MembershipPresentation {
+                    expiry_rule: Some(if is_pass { "end_of_next_day" } else { "months" }.into()),
+                    duration_label: if is_pass {
+                        Some("购买次日 23:59（北京时间）".into())
+                    } else {
+                        None
+                    },
+                    group_key: spec.group_key.clone(),
+                    is_pass: Some(is_pass),
+                    spec: Some(spec),
+                },
+            });
+        }
+        if target.is_some_and(|tier| !added.contains(tier) && product.find_option(tier).is_none()) {
+            if let Some(error) = target_error {
+                return Err(error.into());
+            }
+        }
+        additions.extend(product.products);
+        product.products = additions;
         Ok(product)
     }
 
@@ -203,6 +325,9 @@ impl GetMembershipProductUseCase {
     ) -> anyhow::Result<MembershipProduct> {
         let options = product.products.clone();
         for option in &mut product.products {
+            if option.presentation.spec.is_some() {
+                continue;
+            }
             let price = current_tier
                 .and_then(|tier| {
                     crate::payment::domain::order::calculate_membership_checkout_price(

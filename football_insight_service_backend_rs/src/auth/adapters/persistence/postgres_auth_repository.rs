@@ -1225,6 +1225,35 @@ mod tests {
     use crate::auth::domain::membership::MembershipTierRule;
 
     #[test]
+    fn day_card_referrals_do_not_downgrade_or_refresh_same_tier() {
+        let rules = vec![
+            MembershipTierRule::new("V3", "invite", Some(4), 120),
+            MembershipTierRule::new("V4", "referral", Some(10), 60),
+            MembershipTierRule::new("V5", "referral", Some(15), 30),
+        ];
+        for (current_tier, count) in [("V4", 4), ("V4", 10), ("V5", 10), ("V5", 15)] {
+            let upgrade = PostgresAuthRepository::resolve_referral_membership_upgrade(
+                count,
+                current_tier,
+                &rules,
+            );
+            assert!(
+                !upgrade.should_upgrade,
+                "holding {current_tier} with {count} referrals preserves existing expiration"
+            );
+        }
+        let upgrade = PostgresAuthRepository::resolve_referral_membership_upgrade(15, "V4", &rules);
+        assert!(upgrade.should_upgrade);
+        assert_eq!(upgrade.next_tier, "V5");
+        assert!(PostgresAuthRepository::is_referral_tier(
+            &upgrade.next_tier,
+            &rules
+        ));
+        // The existing upgrade SQL grants NOW() + INTERVAL '1 year', never NULL.
+        // This resolver deliberately leaves the expiry write policy unchanged.
+    }
+
+    #[test]
     fn referral_threshold_upgrade_requires_expiring_membership_window() {
         let rules = vec![
             MembershipTierRule::new("V3", "invite", Some(0), 120),

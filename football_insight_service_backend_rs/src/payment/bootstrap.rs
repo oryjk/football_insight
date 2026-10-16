@@ -63,6 +63,8 @@ pub fn build_payment(
     user_membership_port: Arc<dyn UserMembershipPort>,
     token_port: Arc<dyn TokenPort>,
 ) -> PaymentBootstrap {
+    let kind_registry =
+        Arc::new(crate::payment::domain::product_kind::ProductKindRegistry::default());
     let order_repository: Arc<dyn OrderRepository> =
         Arc::new(PostgresOrderRepository::new(pool.clone()));
     // Dedicated, bounded pool: telemetry cannot exhaust the business connection pool.
@@ -100,7 +102,8 @@ pub fn build_payment(
             virtual_products.clone(),
         )
         .with_event_recorder(event_recorder.clone())
-        .with_event_order_repository(event_orders),
+        .with_event_order_repository(event_orders)
+        .with_kind_registry(kind_registry.clone()),
     );
     let wechat_pay_port: Arc<dyn WechatPayPort> = virtual_payment.clone();
     let virtual_webhook =
@@ -126,12 +129,14 @@ pub fn build_payment(
                 user_membership_port.clone(),
                 wechat_pay_port.clone(),
             )
-            .with_event_recorder(event_recorder.clone()),
+            .with_event_recorder(event_recorder.clone())
+            .with_catalog_repository(virtual_products.clone())
+            .with_kind_registry(kind_registry.clone()),
         ),
-        get_membership_product_use_case: Arc::new(GetMembershipProductUseCase::new(
-            system_config_port,
-            virtual_products,
-        )),
+        get_membership_product_use_case: Arc::new(
+            GetMembershipProductUseCase::new(system_config_port, virtual_products)
+                .with_kind_registry(kind_registry),
+        ),
         get_order_status_use_case: Arc::new(GetOrderStatusUseCase::new(order_repository.clone())),
         handle_wechat_notify_use_case: settlement,
         virtual_payment,

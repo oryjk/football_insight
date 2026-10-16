@@ -1,5 +1,8 @@
 use crate::payment::{
-    domain::virtual_payment::{Delivery, Refund, VirtualOrder, VirtualPaymentError},
+    domain::{
+        product_kind::GrantSnapshot,
+        virtual_payment::{Delivery, Refund, VirtualOrder, VirtualPaymentError},
+    },
     ports::virtual_payment_port::VirtualOrderRepository,
 };
 use sqlx::{PgPool, Row};
@@ -27,6 +30,14 @@ fn map(row: &sqlx::postgres::PgRow) -> VirtualOrder {
 #[async_trait::async_trait]
 impl VirtualOrderRepository for PostgresVirtualOrderRepository {
     async fn record(&self, order: VirtualOrder) -> anyhow::Result<()> {
+        self.record_with_snapshot(order, None).await
+    }
+    async fn record_with_snapshot(
+        &self,
+        order: VirtualOrder,
+        snapshot: Option<GrantSnapshot>,
+    ) -> anyhow::Result<()> {
+        let snapshot = snapshot.map(serde_json::to_value).transpose()?;
         let mut tx = self.pool.begin().await?;
         let existing=sqlx::query_as::<_,(Option<uuid::Uuid>,i32)>("SELECT catalog_product_id,amount_cents FROM f_i_payment_orders WHERE order_no=$1 FOR UPDATE")
             .bind(&order.order_no).fetch_optional(&mut *tx).await?.ok_or(VirtualPaymentError::InvalidOrder)?;
@@ -39,8 +50,8 @@ impl VirtualOrderRepository for PostgresVirtualOrderRepository {
             }
             sqlx::query("UPDATE f_i_payment_orders SET catalog_product_id=$2 WHERE order_no=$1 AND catalog_product_id IS NULL").bind(&order.order_no).bind(id).execute(&mut *tx).await?;
         }
-        sqlx::query("INSERT INTO f_i_virtual_payment_orders(order_no,open_id,product_id,amount_cents,membership_duration_months) VALUES($1,$2,$3,$4,$5)")
-            .bind(order.order_no).bind(order.open_id).bind(order.product_id).bind(order.amount_cents).bind(order.membership_duration_months).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO f_i_virtual_payment_orders(order_no,open_id,product_id,amount_cents,membership_duration_months,grant_snapshot) VALUES($1,$2,$3,$4,$5,$6)")
+            .bind(order.order_no).bind(order.open_id).bind(order.product_id).bind(order.amount_cents).bind(order.membership_duration_months).bind(snapshot).execute(&mut *tx).await?;
         tx.commit().await?;
         Ok(())
     }
