@@ -150,6 +150,11 @@ page {
   --fi-color-divider-soft: var(--fi-primitive-divider-soft);
   --fi-color-border-card: var(--fi-primitive-border-card);
   --fi-color-border-chip: var(--fi-primitive-border-chip);
+  --fi-color-skeleton-start: var(--fi-primitive-ticket-skeleton-line-background);
+  --fi-color-skeleton-end: var(--fi-primitive-ticket-skeleton-line-background-2);
+  --fi-color-skeleton-border: var(--fi-primitive-ticket-skeleton-line-border);
+  --fi-color-skeleton-sweep: var(--fi-primitive-ticket-skeleton-panel-background-2);
+  --fi-color-skeleton-sweep-edge: var(--fi-primitive-ticket-skeleton-panel-background);
 
   /* ===== Semantic：间距 / 字号（数字刻度直通） ===== */
   --fi-space-4: var(--fi-primitive-space-4);

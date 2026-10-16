@@ -4,7 +4,7 @@
     <view v-if="!embedded" class="page-bg-fade"></view>
     <view class="page-scroll">
       <view class="page">
-      <FiLoading v-if="loading" title="赛季进度加载中" caption="轮次和即将到来的比赛正在整理。" />
+      <MatchesSkeleton v-if="loading" />
       <view v-else-if="errorMessage" class="state-card state-card--error"><text>{{ errorMessage }}</text></view>
       <template v-else>
         <MatchesSeasonProgress :rounds="rounds" :selected-round-number="selectedRoundNumber" @open-round="openRoundDialog" />
@@ -31,7 +31,7 @@
 
 <script setup lang="ts">
 import { onShow } from '@dcloudio/uni-app'
-import FiLoading from '../../components/FiLoading.vue'
+import MatchesSkeleton from './components/MatchesSkeleton.vue'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import MatchesSeasonProgress from './components/MatchesSeasonProgress.vue'
 import MatchesUpcomingPanel from './components/MatchesUpcomingPanel.vue'
