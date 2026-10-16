@@ -64,13 +64,6 @@
 			}
 		},
 		{
-			"path": "pages/ticket-watch/index",
-			"style": {
-				"navigationBarTitleText": "余票看板",
-				"navigationStyle": "custom"
-			}
-		},
-		{
 			"path": "pages/topics/index",
 			"style": {
 				"navigationBarTitleText": "全部话题",
@@ -87,6 +80,26 @@
 			}
 		}
 	],
+	"subPackages": [
+		{
+			"root": "pages/ticket-watch",
+			"pages": [
+				{
+					"path": "index",
+					"style": {
+						"navigationBarTitleText": "余票看板",
+						"navigationStyle": "custom"
+					}
+				}
+			]
+		}
+	],
+	"preloadRule": {
+		"pages/insights/index": {
+			"network": "all",
+			"packages": ["pages/ticket-watch"]
+		}
+	},
 	"tabBar": {
 		"color": "#8c8f99",
 		"selectedColor": "#eb3f41",

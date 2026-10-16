@@ -47,7 +47,7 @@
       "urlCheck": false
     },
     "optimization": {
-      "subPackages": false
+      "subPackages": true
     },
     "usingComponents": true
   },

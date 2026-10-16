@@ -2,6 +2,12 @@
 
 > 按时间倒序记录用户可见变更。每条记录必须说明“原因”。
 
+## 2026-10-16 · 小程序分包第一期：盯盘页拆为分包（未上传）
+
+- 变更：`pages/ticket-watch` 从主包移入 `subPackages`（`root` 用现有目录，页面路径 `/pages/ticket-watch/index` 不变），`mp-weixin.optimization.subPackages` 开启，进入洞察页时 `preloadRule` 后台预载盯盘分包。无目录搬迁、无跳转/分享路径变更、无 ALLOWLIST 新增。
+- 原因：主包逼近 2MB 上限（1.0.86 曾因 2058KB 被拒），盯盘页是最大单页（dist 口径 205KB），拆出后主包从 1,118KB 降到 913KB（折算微信口径约 1,419KB），余量够后续多个功能；单入口页面便于预加载。
+- 验证：主包不引用分包文件（仅 insights 页 navigateTo 字符串）；type-check、859 项测试、边界、组件注册、mp-weixin/H5 构建全部通过。未上传、未部署、版本保持 1.0.89。详见小程序 `docs/subpackage-validation.md`。
+
 ## 2026-10-16 · 最佳盯盘时段上线（体验版 1.0.86）
 
 - 变更：monitor 离线快照与 football 聚合已部署到 peiqian，小程序体验版 1.0.86（robot 2）已上传，含最佳盯盘时段面板、获取比赛ID弹框防闪烁与用户昵称水印。
