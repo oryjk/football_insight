@@ -16,7 +16,7 @@
     "mp:release": "bun --no-env-file scripts/mini-release.mjs upload",
     "mp:preview": "bun --no-env-file scripts/mini-release.mjs preview",
     "test": "bun test",
-    "test:mp-release": "bun test scripts/mini-release.test.mjs",
+    "test:mp-release": "bun test scripts/mini-release.test.mjs scripts/set-review-status.test.mjs",
     "check:boundaries": "bun scripts/check-import-boundaries.mjs"
   },
   "dependencies": {

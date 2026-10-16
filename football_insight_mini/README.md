@@ -237,8 +237,11 @@ Python 负责采集新闻全文、LLM 整理、逐篇四川话 TTS 和上传，R
 ```bash
 bun run mp:release -- --desc "本次变更说明"           # robot=1：日常开发版
 bun run mp:release -- --robot 2 --desc "体验版说明"    # robot=2：体验版专用线
+bun run mp:release -- --reviewing --desc "提审版"      # 保持「审核中」：用于准备提交微信审核的版本
 bun run mp:preview -- --desc "预览说明"               # 只传预览版，生成 dist/preview-qrcode.jpg
 ```
+
+**审核状态默认值**：`mp:release` 上传成功后，会自动调用 `scripts/set-review-status.mjs` 把该版本在登记库里标记为**已审核通过**（`is_reviewing=false`），测试时不再需要手动切换。**准备提交微信审核的版本必须加 `--reviewing`**，让审核人员看到的是审核态；提审期间（版本以 `--reviewing` 上传后、微信审核结束前）不要再做默认上传，因为登记库会复用同一个审核中的版本号，默认上传会把正在审核的版本标成已过审。上传失败时不会标记，版本保持审核中，重跑会复用同一版本号。
 
 **robot 双轨约定**：`robot=1` 日常开发版本，随便传互不影响；`robot=2` 是体验版专用线——首次用 robot=2 上传后，需在公众平台「版本管理 → 开发版本」对该版本点一次「选为体验版」，之后每次 robot=2 上传的新代码会自动成为体验版内容。robot=1 的上传不会影响体验版。
 

@@ -10,7 +10,7 @@
 - 登记库是唯一权威：最新版本仍在审核中则复用，已出审核则 `+0.0.1`；不要手动改 `manifest.json` 的 `versionName`。
 - 如果用户说"改版本号"或"指定版本号"，用显式覆盖：`MINI_PROGRAM_VERSION=x.y.z bun run build:mp-weixin`（作为指定版本传给登记接口）。
 - 纯本地离线构建（不登记、不递增版本）用 `MINI_REVIEW_SKIP=1 bun run build:mp-weixin`；正式 `mp:release` 强制登记，外层残留的 `MINI_REVIEW_SKIP=1` 不会跳过。验证已有产物用 `bun run verify:mp-release`，发布链路回归测试用 `bun run test:mp-release`。
-- 微信审核结束后要调 `PUT /api/v1/mini-review/review-status` 把当前版本标记 `is_reviewing=false`，否则后续构建会一直复用审核中的版本号。
+- `mp:release` 上传成功后默认自动把该版本标记 `is_reviewing=false`（已审核通过），测试上传无需手动切换；准备提交微信审核的版本用 `--reviewing` 保持审核中。提审期间不要做默认上传（会复用同一版本号并把审核中的版本标成已过审）。微信审核结束后，`--reviewing` 的版本仍需调 `PUT /api/v1/mini-review/review-status` 标记 `is_reviewing=false`，否则后续构建会一直复用审核中的版本号。
 - 若构建分配了新版本号，`src/manifest.json` 与 `src/config/generatedMiniProgramVersion.ts` 的变更需要单独提交。
 
 运行时来源：`src/api/system.ts` 的 `MINI_PROGRAM_VERSION` 优先读 `src/config/generatedMiniProgramVersion.ts`，构建时生成。
