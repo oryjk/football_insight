@@ -23,17 +23,47 @@ export function resolveSelectedTier(
   return options[0]?.target_tier ?? ''
 }
 
-export function formatMembershipDuration(months: number | null | undefined): string {
+type MembershipDurationInput = number | null | undefined | MembershipProductOption
+
+export function formatMembershipDuration(value: MembershipDurationInput): string {
+  if (value && typeof value === 'object') {
+    if (value.duration_label?.trim()) return value.duration_label.trim()
+    if (value.expiry_rule === 'end_of_next_day' || (!value.expiry_rule && value.is_pass)) return '次日 23:59 前有效'
+  }
+  const months = value && typeof value === 'object' ? value.membership_duration_months : value
   const duration = typeof months === 'number' && Number.isInteger(months) && months > 0 ? months : 12
   if (duration === 12) return '一年'
   return duration % 12 === 0 ? `${duration / 12} 年` : `${duration} 个月`
 }
 
-export function buildMembershipPurchaseAgreement(months: number | null | undefined): string[] {
+export function buildMembershipPurchaseAgreement(value: MembershipDurationInput): string[] {
+  const validity = value && typeof value === 'object' && (value.expiry_rule === 'end_of_next_day' || (!value.expiry_rule && value.is_pass))
+    ? '有效期至购买次日 23:59（北京时间）'
+    : `有效期为${formatMembershipDuration(value)}`
   return [
-    MEMBERSHIP_PURCHASE_AGREEMENT_POINTS[0].replace('有效期为一年', `有效期为${formatMembershipDuration(months)}`),
+    MEMBERSHIP_PURCHASE_AGREEMENT_POINTS[0].replace('有效期为一年', validity),
     ...MEMBERSHIP_PURCHASE_AGREEMENT_POINTS.slice(1),
   ]
+}
+
+export interface MembershipProductGroup {
+  key: string
+  title: string
+  options: MembershipProductOption[]
+}
+
+/** Legacy catalogs retain their existing flat layout without group headings. */
+export function groupMembershipProductOptions(options: MembershipProductOption[]): MembershipProductGroup[] {
+  if (!options.length) return []
+  if (!options.some(option => option.group_key?.trim())) return [{ key: 'legacy', title: '', options }]
+  const groups = new Map<string, MembershipProductGroup>()
+  for (const option of options) {
+    const key = option.group_key?.trim() || 'annual'
+    if (!groups.has(key)) groups.set(key, { key, title: key === 'pass' ? '场次体验卡' : key === 'annual' ? '年度会员' : key, options: [] })
+    groups.get(key)!.options.push(option)
+  }
+  const rank = (key: string) => key === 'pass' ? 0 : key === 'annual' ? 1 : 2
+  return [...groups.values()].sort((left, right) => rank(left.key) - rank(right.key))
 }
 
 export function normalizeMembershipProductOptions(

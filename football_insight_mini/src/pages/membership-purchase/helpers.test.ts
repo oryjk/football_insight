@@ -13,6 +13,7 @@ import {
   buildMembershipPurchaseAgreement,
   formatMembershipTierLabel,
   resolveSelectedTier,
+  groupMembershipProductOptions,
 } from './helpers'
 
 const backendProductOptions = [
@@ -175,5 +176,45 @@ describe('resolveSelectedTier', () => {
 
   test('没有可购买档位时为空', () => {
     expect(resolveSelectedTier('V6', [])).toBe('')
+  })
+})
+
+describe('catalog-v2 pass metadata', () => {
+  const pass = { ...backendProductOptions[0], target_tier: 'V4', price_cents: 900, membership_duration_months: 1, expiry_rule: 'end_of_next_day', duration_label: '次日 23:59 前有效', group_key: 'pass', is_pass: true }
+
+  test('duration prioritizes catalog label and does not misrepresent pass as monthly or annual', () => {
+    expect(formatMembershipDuration(pass)).toBe('次日 23:59 前有效')
+    expect(formatMembershipDuration({ ...pass, duration_label: '' })).toBe('次日 23:59 前有效')
+    expect(formatMembershipDuration({ ...backendProductOptions[0], membership_duration_months: 3 })).toBe('3 个月')
+  })
+
+  test('pass agreement states the precise Beijing expiry and retains other agreement points', () => {
+    const points = buildMembershipPurchaseAgreement(pass)
+    expect(points[0]).toBe('会员服务自支付成功并完成系统确认之时起生效；在服务器正常运营、相关服务未因不可抗力或监管要求中止的情况下，有效期至购买次日 23:59（北京时间）。')
+    expect(points.join('').includes('一年')).toBe(false)
+    expect(points.slice(1)).toEqual(MEMBERSHIP_PURCHASE_AGREEMENT_POINTS.slice(1))
+    expect(buildMembershipPurchaseAgreement({ ...backendProductOptions[0], membership_duration_months: 12 })).toEqual(MEMBERSHIP_PURCHASE_AGREEMENT_POINTS)
+    expect(buildMembershipPurchaseAgreement(undefined)).toEqual(MEMBERSHIP_PURCHASE_AGREEMENT_POINTS)
+    expect(buildMembershipPurchaseAgreement({ ...pass, expiry_rule: 'months', duration_label: '三个月' })[0].includes('有效期为三个月')).toBe(true)
+  })
+
+  test('groups mixed catalogs and preserves each option and selection key', () => {
+    const secondPass = { ...pass, target_tier: 'V5' }
+    const annual = { ...backendProductOptions[0], group_key: 'annual' }
+    const groups = groupMembershipProductOptions([pass, secondPass, annual, backendProductOptions[1]])
+    expect(groups.map(group => [group.key, group.title, group.options.map(option => option.target_tier)])).toEqual([
+      ['pass', '场次体验卡', ['V4', 'V5']], ['annual', '年度会员', ['V6', 'V7']],
+    ])
+    expect(resolveSelectedTier('V5', groups.flatMap(group => group.options))).toBe('V5')
+    expect(groups[0].options[0]).toBe(pass)
+  })
+
+  test('old backend catalogs stay ungrouped and keep annual duration, prices and agreement', () => {
+    const groups = groupMembershipProductOptions(backendProductOptions)
+    expect(groups).toEqual([{ key: 'legacy', title: '', options: backendProductOptions }])
+    expect(formatMembershipDuration(backendProductOptions[0])).toBe('一年')
+    expect(getMembershipPayPriceCents(groups[0].options[0])).toBe(3900)
+    expect(buildMembershipPurchaseAgreement(backendProductOptions[0])).toEqual(MEMBERSHIP_PURCHASE_AGREEMENT_POINTS)
+    expect(groupMembershipProductOptions([])).toEqual([])
   })
 })

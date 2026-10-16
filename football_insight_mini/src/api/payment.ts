@@ -23,13 +23,20 @@ export interface OrderStatusResponse {
 }
 
 export function getMembershipProduct(): Promise<MembershipProduct> {
-  return request<MembershipProduct>({ url: '/payment/membership-product', auth: true })
+  return request<MembershipProduct>({
+    url: '/payment/membership-product',
+    auth: true,
+    headers: { 'X-Client-Capabilities': 'catalog-v2' },
+  })
 }
 
 export function createMembershipOrder(targetTier: string, attemptId?: string): Promise<CreateOrderResponse> {
   return request<CreateOrderResponse>({
     url: '/payment/membership/order',
-    ...(attemptId ? { headers: { 'X-Payment-Attempt-Id': attemptId } } : {}),
+    headers: {
+      'X-Client-Capabilities': 'catalog-v2',
+      ...(attemptId ? { 'X-Payment-Attempt-Id': attemptId } : {}),
+    },
     method: 'POST',
     auth: true,
     data: {

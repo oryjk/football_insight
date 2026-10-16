@@ -139,7 +139,7 @@ const agreementSheetVisible = ref(false)
 const agreementRequired = ref(false)
 // 弹层打开时锁住页面滚动（小程序需由页面 page-meta 承担）。
 const pageLockStyle = computed(() => rulesSheetVisible.value || agreementSheetVisible.value ? 'overflow: hidden;' : '')
-const agreementPoints = computed(() => buildMembershipPurchaseAgreement(selectedProduct.value?.membership_duration_months))
+const agreementPoints = computed(() => buildMembershipPurchaseAgreement(selectedProduct.value))
 const paymentAvailable = ref(false)
 // 首次检查完成前不展示「暂未开放」；之后的刷新沿用上次结果，避免卡片闪现导致页面抖动。
 const paymentChecked = ref(false)
@@ -199,7 +199,7 @@ const selectedUpgradeNote = computed(() => formatMembershipUpgradeNote(selectedP
 // 价格下方的小字说明：档位 · 有效期，升级补差价时附上补差说明。
 const purchaseCaption = computed(() => {
   if (!selectedProduct.value) return '请选择会员档位'
-  const base = `${formatMembershipTierLabel(selectedProduct.value.target_tier)} · ${formatMembershipDuration(selectedProduct.value.membership_duration_months)}`
+  const base = `${formatMembershipTierLabel(selectedProduct.value.target_tier)} · ${formatMembershipDuration(selectedProduct.value)}`
   return selectedUpgradeNote.value ? `${base} · ${selectedUpgradeNote.value}` : base
 })
 

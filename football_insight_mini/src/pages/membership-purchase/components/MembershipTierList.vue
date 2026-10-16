@@ -1,37 +1,41 @@
 <template>
   <view class="tier-list">
-    <view
-      v-for="option in options"
-      :key="option.target_tier"
-      class="tier-row"
-      :class="{ 'tier-row--active': option.target_tier === selectedTier }"
-      @tap="emit('select', option.target_tier)"
-    >
-      <view class="tier-row__radio">
-        <view v-if="option.target_tier === selectedTier" class="tier-row__radio-dot" />
-      </view>
-
-      <view class="tier-row__main">
-        <text class="tier-row__code">{{ formatMembershipTierLabel(option.target_tier) }}</text>
-        <text class="tier-row__subtitle">{{ summaries[option.target_tier] ?? option.subtitle }}</text>
-        <text v-if="isMembershipUpgradePrice(option)" class="tier-row__note">{{ formatMembershipUpgradeNote(option) }}</text>
-      </view>
-
-      <view class="tier-row__price">
-        <view class="tier-row__price-line">
-          <text class="tier-row__currency">¥</text>
-          <text class="tier-row__amount">{{ formatMembershipPrice(getMembershipPayPriceCents(option)) }}</text>
+    <template v-for="group in groups" :key="group.key">
+      <text v-if="group.title" class="tier-group__title">{{ group.title }}</text>
+      <view
+        v-for="option in group.options"
+        :key="option.target_tier"
+        class="tier-row"
+        :class="{ 'tier-row--active': option.target_tier === selectedTier }"
+        @tap="emit('select', option.target_tier)"
+      >
+        <view class="tier-row__radio">
+          <view v-if="option.target_tier === selectedTier" class="tier-row__radio-dot" />
         </view>
-        <text v-if="isMembershipUpgradePrice(option)" class="tier-row__original">
-          ¥{{ formatMembershipPrice(getMembershipOriginalPriceCents(option)) }}
-        </text>
-        <text v-else class="tier-row__duration">{{ formatMembershipDuration(option.membership_duration_months) }}</text>
+
+        <view class="tier-row__main">
+          <text class="tier-row__code">{{ formatMembershipTierLabel(option.target_tier) }}</text>
+          <text class="tier-row__subtitle">{{ summaries[option.target_tier] ?? option.subtitle }}</text>
+          <text v-if="isMembershipUpgradePrice(option)" class="tier-row__note">{{ formatMembershipUpgradeNote(option) }}</text>
+        </view>
+
+        <view class="tier-row__price">
+          <view class="tier-row__price-line">
+            <text class="tier-row__currency">¥</text>
+            <text class="tier-row__amount">{{ formatMembershipPrice(getMembershipPayPriceCents(option)) }}</text>
+          </view>
+          <text v-if="isMembershipUpgradePrice(option)" class="tier-row__original">
+            ¥{{ formatMembershipPrice(getMembershipOriginalPriceCents(option)) }}
+          </text>
+          <text v-else class="tier-row__duration">{{ formatMembershipDuration(option) }}</text>
+        </view>
       </view>
-    </view>
+    </template>
   </view>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { MembershipProductOption } from '../../../types/payment'
 import {
   formatMembershipDuration,
@@ -41,14 +45,17 @@ import {
   getMembershipOriginalPriceCents,
   getMembershipPayPriceCents,
   isMembershipUpgradePrice,
+  groupMembershipProductOptions,
 } from '../helpers'
 
-defineProps<{
+const props = defineProps<{
   options: MembershipProductOption[]
   selectedTier: string
   /** 档位 → 一句话描述（回流时间窗 · 刷新速度），缺省时用商品副标题。 */
   summaries: Record<string, string>
 }>()
+
+const groups = computed(() => groupMembershipProductOptions(props.options))
 
 const emit = defineEmits<{
   (e: 'select', tier: string): void
@@ -61,6 +68,13 @@ const emit = defineEmits<{
   flex-direction: column;
   gap: var(--fi-space-12);
   margin-top: var(--fi-space-16);
+}
+
+.tier-group__title {
+  color: var(--fi-color-text-strong);
+  font-size: var(--fi-font-28);
+  font-weight: var(--fi-weight-bold);
+  line-height: var(--fi-leading-snug);
 }
 
 .tier-row {

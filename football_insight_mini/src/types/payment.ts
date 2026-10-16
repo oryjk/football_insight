@@ -16,6 +16,10 @@ export interface MembershipProductOption {
   subtitle: string
   description: string
   membership_duration_months?: number | null
+  expiry_rule?: string
+  duration_label?: string
+  group_key?: string
+  is_pass?: boolean
 }
 
 export interface VirtualPayParams {

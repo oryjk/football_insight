@@ -2,6 +2,7 @@
 
 日期：2026-10-16。主分支基线 `d478ae8`。设计：`docs/superpowers/specs/2026-10-16-product-catalog-data-driven-design.md`。
 仅 P1；后端、小程序分两个英文 subject 提交，均带 Co-Authored-By；不新建分支。
+后端提交 `3cced5d`；小程序与最终交付文档为紧随其后的独立提交，提交身份以 Git 历史为准。
 
 ## 结果与发布状态
 

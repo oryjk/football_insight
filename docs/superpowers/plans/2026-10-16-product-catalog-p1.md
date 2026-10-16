@@ -16,7 +16,7 @@
 - [x] Mini worker: tests first, optional DTOs, capability+attempt headers, grouping and day agreement; old response rendering and annual wording unchanged.
 - [x] SQL worker: prepare scratch-only script extracting actual SQL; production PG version first; BEGIN + lock_timeout2s, migration, own simulated rows, execute every new/changed SQL, unconditional ROLLBACK and schema/data restoration assertions. Never change existing user data; shadow user updates with temporary table.
 - [x] Root: restart local backend before final validation, cargo test/check, mini four required checks and offline build; independent review and fixes via TDD.
-- [ ] Root: update FEATURES/CHANGELOG/API docs/verification report with review checklist, deviations, actual SQL evidence and ordered operator actions; backend and mini commits with Co-Authored-By, push main. No persistent migration, production deploy or upload.
+- [x] Root: update FEATURES/CHANGELOG/API docs/verification report with review checklist, deviations, actual SQL evidence and ordered operator actions; backend and mini commits with Co-Authored-By, push main. No persistent migration, production deploy or upload.
 
 ## Review focus
 
