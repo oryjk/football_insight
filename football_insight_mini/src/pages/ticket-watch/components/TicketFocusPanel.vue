@@ -217,11 +217,7 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
 }
 
 .focus-panel {
-  background: linear-gradient(
-    180deg,
-    var(--fi-color-ticket-focus-panel-background),
-    var(--fi-color-ticket-history-trend-summary-item-background-2)
-  );
+  background: var(--fi-color-ticket-focus-panel-background);
 }
 
 .focus-panel__heading {
@@ -236,8 +232,8 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
 }
 
 .focus-panel__headline-icon {
-  width: 32rpx;
-  height: 32rpx;
+  width: var(--fi-icon-sm);
+  height: var(--fi-icon-sm);
   flex-shrink: 0;
 }
 
@@ -292,8 +288,8 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
 }
 
 .focus-section__title-icon-image {
-  width: 22rpx;
-  height: 22rpx;
+  width: var(--fi-icon-sm);
+  height: var(--fi-icon-sm);
   flex-shrink: 0;
 }
 
@@ -313,18 +309,14 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
   overflow: hidden;
   border-radius: var(--fi-radius-ticket-20);
   padding: var(--fi-space-18) var(--fi-space-16);
-  background: linear-gradient(
-    180deg,
-    rgba(var(--fi-component-ticket-tone-rgb), 0.08),
-    rgba(var(--fi-component-ticket-tone-rgb), 0.02)
-  );
+  background: rgba(var(--fi-component-ticket-tone-rgb), 0.08);
   border: var(--fi-border-width) solid
     rgba(var(--fi-component-ticket-tone-rgb), 0.14);
   box-shadow: var(--fi-shadow-ticket-focus-chip);
 }
 
 .focus-chip--compact {
-  min-height: 118rpx;
+  min-height: calc(var(--fi-space-100) + var(--fi-space-18));
   padding: var(--fi-space-16) var(--fi-space-14);
   border-radius: var(--fi-radius-sm);
 }
@@ -344,8 +336,8 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
 }
 
 .focus-chip__name-icon-image {
-  width: 16rpx;
-  height: 16rpx;
+  width: var(--fi-icon-sm);
+  height: var(--fi-icon-sm);
   flex-shrink: 0;
 }
 

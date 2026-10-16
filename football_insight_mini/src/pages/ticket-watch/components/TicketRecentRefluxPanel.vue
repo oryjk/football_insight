@@ -196,18 +196,14 @@ function isUnlocked(key: TicketWatchRecentRefluxBucketKey) {
 .recent-reflux-panel {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(
-    180deg,
-    var(--fi-color-ticket-history-trend-summary-item-background-2),
-    var(--fi-color-ticket-recent-reflux-panel-background)
-  );
+  background: var(--fi-color-ticket-recent-reflux-panel-background);
   border-color: var(--fi-color-ticket-recent-reflux-panel-border-color);
   box-shadow: var(--fi-shadow-ticket-recent-reflux-panel);
 }
 
 .recent-reflux-panel__heading {
   display: grid;
-  grid-template-columns: 34rpx minmax(0, 1fr);
+  grid-template-columns: var(--fi-icon-md) minmax(0, 1fr);
   column-gap: var(--fi-space-8);
   align-items: center;
 }
@@ -219,24 +215,20 @@ function isUnlocked(key: TicketWatchRecentRefluxBucketKey) {
 .recent-reflux-panel__icon {
   grid-column: 1;
   align-self: center;
-  width: 34rpx;
-  height: 34rpx;
+  width: var(--fi-icon-md);
+  height: var(--fi-icon-md);
   border-radius: var(--fi-radius-ticket-12);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(
-    180deg,
-    var(--fi-color-ticket-recent-reflux-panel-icon-background),
-    var(--fi-color-ticket-recent-reflux-panel-icon-background-2)
-  );
+  background: var(--fi-color-ticket-recent-reflux-panel-icon-background);
   border: var(--fi-border-width) solid
     var(--fi-color-ticket-recent-reflux-panel-icon-border);
 }
 
 .recent-reflux-panel__icon-image {
-  width: 20rpx;
-  height: 20rpx;
+  width: var(--fi-icon-sm);
+  height: var(--fi-icon-sm);
 }
 
 .recent-reflux-buckets {
@@ -256,38 +248,22 @@ function isUnlocked(key: TicketWatchRecentRefluxBucketKey) {
 }
 
 .recent-reflux-bucket--within3 {
-  background: linear-gradient(
-    180deg,
-    var(--fi-color-ticket-recent-reflux-bucket-within3-background),
-    var(--fi-color-ticket-recent-reflux-bucket-within3-background-2)
-  );
+  background: var(--fi-color-ticket-recent-reflux-bucket-within3-background);
   border-color: var(
     --fi-color-ticket-recent-reflux-bucket-within3-border-color
   );
 }
 
 .recent-reflux-bucket--within10 {
-  background: linear-gradient(
-    180deg,
-    var(--fi-color-ticket-recent-reflux-bucket-within10-background),
-    var(--fi-color-ticket-recent-reflux-bucket-within3-background-2)
-  );
+  background: var(--fi-color-ticket-recent-reflux-bucket-within10-background);
 }
 
 .recent-reflux-bucket--within30 {
-  background: linear-gradient(
-    180deg,
-    var(--fi-color-ticket-recent-reflux-bucket-within30-background),
-    var(--fi-color-ticket-recent-reflux-bucket-within3-background-2)
-  );
+  background: var(--fi-color-ticket-recent-reflux-bucket-within30-background);
 }
 
 .recent-reflux-bucket--locked {
-  background: linear-gradient(
-    180deg,
-    var(--fi-color-ticket-recent-reflux-bucket-locked-background),
-    var(--fi-color-ticket-recent-reflux-bucket-locked-background-2)
-  );
+  background: var(--fi-color-ticket-recent-reflux-bucket-locked-background);
   border-color: var(--fi-color-ticket-recent-reflux-bucket-locked-border-color);
 }
 
@@ -319,18 +295,14 @@ function isUnlocked(key: TicketWatchRecentRefluxBucketKey) {
   position: relative;
   overflow: hidden;
   margin-top: var(--fi-space-14);
-  min-height: 82rpx;
+  min-height: calc(var(--fi-space-78) + var(--fi-space-4));
   border-radius: var(--fi-radius-ticket-14);
   padding: var(--fi-space-12);
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: var(--fi-space-8);
-  background: linear-gradient(
-    135deg,
-    var(--fi-color-ticket-recent-reflux-bucket-locked-background),
-    var(--fi-color-ticket-recent-reflux-bucket-lock-background)
-  );
+  background: var(--fi-color-ticket-recent-reflux-bucket-locked-background);
   border: var(--fi-border-width) dashed
     var(--fi-color-ticket-recent-reflux-bucket-lock-border);
   box-sizing: border-box;
@@ -338,28 +310,24 @@ function isUnlocked(key: TicketWatchRecentRefluxBucketKey) {
 
 .recent-reflux-bucket-lock:active {
   transform: scale(0.985);
-  background: linear-gradient(
-    135deg,
-    var(--fi-color-ticket-recent-reflux-bucket-lock-background-2),
-    var(--fi-color-ticket-recent-reflux-bucket-lock-background-3)
-  );
+  background: var(--fi-color-ticket-recent-reflux-bucket-lock-background-2);
 }
 
 .recent-reflux-bucket-lock__icon {
   position: absolute;
-  right: 12rpx;
-  top: 14rpx;
-  width: 34rpx;
-  height: 34rpx;
+  right: var(--fi-space-12);
+  top: var(--fi-space-14);
+  width: var(--fi-space-34);
+  height: var(--fi-space-34);
   opacity: 0.72;
 }
 
 .recent-reflux-bucket-lock__shackle {
   position: absolute;
-  left: 8rpx;
-  top: 2rpx;
-  width: 18rpx;
-  height: 18rpx;
+  left: var(--fi-space-8);
+  top: var(--fi-space-2);
+  width: var(--fi-space-18);
+  height: var(--fi-space-18);
   border: var(--fi-border-width-4) solid
     var(--fi-color-ticket-recent-reflux-bucket-lock-shackle-border);
   border-bottom: 0;
@@ -369,10 +337,10 @@ function isUnlocked(key: TicketWatchRecentRefluxBucketKey) {
 
 .recent-reflux-bucket-lock__body {
   position: absolute;
-  left: 4rpx;
-  bottom: 2rpx;
-  width: 26rpx;
-  height: 20rpx;
+  left: var(--fi-space-4);
+  bottom: var(--fi-space-2);
+  width: calc(var(--fi-space-24) + var(--fi-space-2));
+  height: var(--fi-space-20);
   border-radius: var(--fi-radius-ticket-7);
   background: var(--fi-color-ticket-recent-reflux-bucket-lock-body-background);
   box-shadow: var(--fi-shadow-ticket-recent-reflux-bucket-lock-body);
@@ -381,10 +349,10 @@ function isUnlocked(key: TicketWatchRecentRefluxBucketKey) {
 .recent-reflux-bucket-lock__body::after {
   content: '';
   position: absolute;
-  left: 11rpx;
-  top: 6rpx;
-  width: 4rpx;
-  height: 8rpx;
+  left: calc(var(--fi-space-10) + var(--fi-space-1));
+  top: var(--fi-space-6);
+  width: var(--fi-space-4);
+  height: var(--fi-space-8);
   border-radius: var(--fi-radius-round);
   background: var(
     --fi-color-ticket-recent-reflux-bucket-lock-body-background-2
@@ -395,10 +363,11 @@ function isUnlocked(key: TicketWatchRecentRefluxBucketKey) {
   position: relative;
   z-index: 1;
   display: inline-flex;
+  align-items: center;
   align-self: flex-start;
   max-width: 100%;
-  height: 30rpx;
-  line-height: 30rpx;
+  height: var(--fi-space-30);
+  line-height: var(--fi-leading-none);
   padding: 0 var(--fi-space-10);
   border-radius: var(--fi-radius-round);
   background: var(--fi-color-ticket-recent-reflux-bucket-lock-tag-background);
@@ -463,17 +432,12 @@ function isUnlocked(key: TicketWatchRecentRefluxBucketKey) {
   position: absolute;
   z-index: 0;
   pointer-events: none;
-  left: -72rpx;
-  top: -3rpx;
-  width: 72rpx;
-  height: 6rpx;
+  left: calc(var(--fi-space-72) * -1);
+  top: calc(var(--fi-space-3) * -1);
+  width: var(--fi-space-72);
+  height: var(--fi-space-6);
   border-radius: var(--fi-radius-round);
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(var(--recent-reflux-beam-rgb), 0.95),
-    transparent
-  );
+  background: rgba(var(--recent-reflux-beam-rgb), 0.95);
   --fi-component-ticket-beam-shadow: 0 0 var(--fi-space-18)
     rgba(var(--recent-reflux-beam-rgb), 0.38);
   box-shadow: var(--fi-component-ticket-beam-shadow);
@@ -511,60 +475,60 @@ function isUnlocked(key: TicketWatchRecentRefluxBucketKey) {
 
 @keyframes recent-reflux-item-border-beam {
   0% {
-    left: -72rpx;
-    top: -3rpx;
-    width: 72rpx;
-    height: 6rpx;
+    left: calc(var(--fi-space-72) * -1);
+    top: calc(var(--fi-space-3) * -1);
+    width: var(--fi-space-72);
+    height: var(--fi-space-6);
   }
   34% {
     left: 100%;
-    top: -3rpx;
-    width: 72rpx;
-    height: 6rpx;
+    top: calc(var(--fi-space-3) * -1);
+    width: var(--fi-space-72);
+    height: var(--fi-space-6);
   }
   35% {
     left: auto;
-    right: -3rpx;
-    top: -54rpx;
-    width: 6rpx;
-    height: 54rpx;
+    right: calc(var(--fi-space-3) * -1);
+    top: calc(calc(var(--fi-space-48) + var(--fi-space-6)) * -1);
+    width: var(--fi-space-6);
+    height: calc(var(--fi-space-48) + var(--fi-space-6));
   }
   50% {
     left: auto;
-    right: -3rpx;
+    right: calc(var(--fi-space-3) * -1);
     top: 100%;
-    width: 6rpx;
-    height: 54rpx;
+    width: var(--fi-space-6);
+    height: calc(var(--fi-space-48) + var(--fi-space-6));
   }
   51% {
-    right: -72rpx;
+    right: calc(var(--fi-space-72) * -1);
     left: auto;
     top: auto;
-    bottom: -3rpx;
-    width: 72rpx;
-    height: 6rpx;
+    bottom: calc(var(--fi-space-3) * -1);
+    width: var(--fi-space-72);
+    height: var(--fi-space-6);
   }
   84% {
     right: 100%;
     left: auto;
     top: auto;
-    bottom: -3rpx;
-    width: 72rpx;
-    height: 6rpx;
+    bottom: calc(var(--fi-space-3) * -1);
+    width: var(--fi-space-72);
+    height: var(--fi-space-6);
   }
   85% {
     right: auto;
-    left: -3rpx;
-    bottom: -54rpx;
-    width: 6rpx;
-    height: 54rpx;
+    left: calc(var(--fi-space-3) * -1);
+    bottom: calc(calc(var(--fi-space-48) + var(--fi-space-6)) * -1);
+    width: var(--fi-space-6);
+    height: calc(var(--fi-space-48) + var(--fi-space-6));
   }
   100% {
     right: auto;
-    left: -3rpx;
+    left: calc(var(--fi-space-3) * -1);
     bottom: 100%;
-    width: 6rpx;
-    height: 54rpx;
+    width: var(--fi-space-6);
+    height: calc(var(--fi-space-48) + var(--fi-space-6));
   }
 }
 </style>

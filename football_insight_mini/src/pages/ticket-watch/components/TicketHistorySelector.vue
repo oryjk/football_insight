@@ -106,7 +106,7 @@ onMounted(() => {
 }
 
 .history-chip {
-  min-width: 240rpx;
+  min-width: calc(var(--fi-space-100) + var(--fi-space-100) + var(--fi-space-40));
   border-radius: var(--fi-radius-ticket-20);
   padding: var(--fi-space-16) var(--fi-space-18);
   background: var(--fi-color-ticket-history-chip-background);

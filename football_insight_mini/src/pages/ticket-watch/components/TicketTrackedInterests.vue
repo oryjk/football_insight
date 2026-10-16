@@ -94,11 +94,7 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
 @import '../ticket-watch-shared.css';
 
 .tracked-interest-panel {
-  background: linear-gradient(
-    180deg,
-    var(--fi-color-ticket-tracked-interest-panel-background),
-    var(--fi-color-ticket-history-trend-summary-item-background-2)
-  );
+  background: var(--fi-color-ticket-tracked-interest-panel-background);
 }
 
 .tracked-interest-summary {
@@ -121,11 +117,7 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
 .tracked-interest-item {
   border-radius: var(--fi-radius-sm);
   padding: var(--fi-space-18) var(--fi-space-20);
-  background: linear-gradient(
-    180deg,
-    var(--fi-color-ticket-watch-metric-box-shadow),
-    var(--fi-color-ticket-tracked-interest-item-background)
-  );
+  background: var(--fi-color-ticket-watch-metric-box-shadow);
   border: var(--fi-border-width) solid
     var(--fi-color-ticket-tracked-interest-item-border);
 }

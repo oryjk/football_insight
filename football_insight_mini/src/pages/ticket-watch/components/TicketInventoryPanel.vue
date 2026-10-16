@@ -282,7 +282,7 @@ function cellClasses(item: TicketWatchGroupedInventoryItem) {
   border-radius: var(--fi-radius-sm);
   background: var(--fi-color-ticket-inventory-cell-background);
   padding: var(--fi-space-18) var(--fi-space-10) var(--fi-space-14);
-  min-height: 138rpx;
+  min-height: calc(var(--fi-space-100) + var(--fi-space-36) + var(--fi-space-2));
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -317,51 +317,31 @@ function cellClasses(item: TicketWatchGroupedInventoryItem) {
 }
 
 .inventory-cell--active {
-  background: linear-gradient(
-    180deg,
-    rgba(var(--fi-component-ticket-tone-rgb), 0.16),
-    rgba(var(--fi-component-ticket-tone-rgb), 0.07)
-  );
+  background: rgba(var(--fi-component-ticket-tone-rgb), 0.16);
   border: var(--fi-border-width) solid
     rgba(var(--fi-component-ticket-tone-rgb), 0.28);
 }
 
 .inventory-cell--heat-1 {
-  background: linear-gradient(
-    180deg,
-    rgba(var(--fi-component-ticket-tone-rgb), 0.12),
-    var(--fi-color-ticket-history-trend-summary-item-background-2)
-  );
+  background: rgba(var(--fi-component-ticket-tone-rgb), 0.12);
   border: var(--fi-border-width) solid
     rgba(var(--fi-component-ticket-tone-rgb), 0.32);
 }
 
 .inventory-cell--heat-2 {
-  background: linear-gradient(
-    180deg,
-    rgba(var(--fi-component-ticket-tone-rgb), 0.22),
-    var(--fi-color-ticket-history-trend-summary-item-background-2)
-  );
+  background: rgba(var(--fi-component-ticket-tone-rgb), 0.22);
   border: var(--fi-border-width) solid
     rgba(var(--fi-component-ticket-tone-rgb), 0.4);
 }
 
 .inventory-cell--heat-3 {
-  background: linear-gradient(
-    180deg,
-    rgba(var(--fi-component-ticket-tone-rgb), 0.34),
-    var(--fi-color-ticket-history-trend-summary-item-background-2)
-  );
+  background: rgba(var(--fi-component-ticket-tone-rgb), 0.34);
   border: var(--fi-border-width) solid
     rgba(var(--fi-component-ticket-tone-strong-rgb), 0.48);
 }
 
 .inventory-cell--heat-4 {
-  background: linear-gradient(
-    180deg,
-    rgba(var(--fi-component-ticket-tone-rgb), 0.48),
-    var(--fi-color-ticket-history-trend-summary-item-background-2)
-  );
+  background: rgba(var(--fi-component-ticket-tone-rgb), 0.48);
   border: var(--fi-border-width) solid
     rgba(var(--fi-component-ticket-tone-strong-rgb), 0.62);
   box-shadow: var(--fi-shadow-ticket-inventory-cell-heat-4);
@@ -394,7 +374,7 @@ function cellClasses(item: TicketWatchGroupedInventoryItem) {
 .inventory-cell__interest-strip {
   margin-top: auto;
   width: 100%;
-  min-height: 34rpx;
+  min-height: var(--fi-space-34);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -412,8 +392,8 @@ function cellClasses(item: TicketWatchGroupedInventoryItem) {
 }
 
 .inventory-cell__interest-bar {
-  width: 12rpx;
-  height: 5rpx;
+  width: var(--fi-space-12);
+  height: var(--fi-space-5);
   border-radius: var(--fi-radius-round);
   background: var(--fi-color-ticket-inventory-cell-interest-bar-background);
 }

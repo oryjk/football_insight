@@ -71,11 +71,7 @@ const emit = defineEmits<{ (e: 'select', matchId: number): void }>()
 @import '../ticket-watch-shared.css';
 
 .history-trend-panel {
-  background: linear-gradient(
-    180deg,
-    var(--fi-color-ticket-history-trend-summary-item-background-2),
-    var(--fi-color-ticket-history-trend-panel-background)
-  );
+  background: var(--fi-color-ticket-history-trend-panel-background);
   border-color: var(--fi-color-ticket-history-trend-panel-border-color);
 }
 
@@ -90,11 +86,7 @@ const emit = defineEmits<{ (e: 'select', matchId: number): void }>()
   min-width: 0;
   border-radius: var(--fi-radius-sm);
   padding: var(--fi-space-16) var(--fi-space-14);
-  background: linear-gradient(
-    180deg,
-    var(--fi-color-ticket-history-trend-summary-item-background),
-    var(--fi-color-ticket-history-trend-summary-item-background-2)
-  );
+  background: var(--fi-color-ticket-history-trend-summary-item-background);
   border: var(--fi-border-width) solid
     var(--fi-color-ticket-history-trend-summary-item-border);
 }
@@ -118,7 +110,7 @@ const emit = defineEmits<{ (e: 'select', matchId: number): void }>()
 .history-trend-scroll {
   width: 100%;
   margin-top: var(--fi-space-20);
-  max-height: 620rpx;
+  max-height: calc(var(--fi-space-600) + var(--fi-space-20));
 }
 
 .history-trend-list {
@@ -129,10 +121,13 @@ const emit = defineEmits<{ (e: 'select', matchId: number): void }>()
 
 .history-trend-row {
   display: grid;
-  grid-template-columns: minmax(0, 178rpx) minmax(90rpx, 1fr) 92rpx;
+  grid-template-columns:
+    minmax(0, calc(var(--fi-space-100) + var(--fi-space-78)))
+    minmax(calc(var(--fi-space-84) + var(--fi-space-6)), 1fr)
+    calc(var(--fi-space-84) + var(--fi-space-8));
   align-items: center;
   gap: var(--fi-space-14);
-  min-height: 84rpx;
+  min-height: var(--fi-space-84);
   padding: var(--fi-space-14) var(--fi-space-16);
   border-radius: var(--fi-radius-sm);
   background: var(--fi-color-ticket-history-trend-row-background);
@@ -141,11 +136,7 @@ const emit = defineEmits<{ (e: 'select', matchId: number): void }>()
 }
 
 .history-trend-row--selected {
-  background: linear-gradient(
-    180deg,
-    var(--fi-color-ticket-history-trend-row-selected-background),
-    var(--fi-color-ticket-history-trend-row-selected-background-2)
-  );
+  background: var(--fi-color-ticket-history-trend-row-selected-background);
   border-color: var(--fi-color-ticket-history-trend-summary-value-color);
   box-shadow: var(--fi-shadow-ticket-history-trend-row-selected);
 }
@@ -180,7 +171,7 @@ const emit = defineEmits<{ (e: 'select', matchId: number): void }>()
 .history-trend-row__track {
   position: relative;
   overflow: hidden;
-  height: 22rpx;
+  height: var(--fi-space-22);
   border-radius: var(--fi-radius-round);
   background: var(--fi-color-ticket-history-trend-row-track-background);
 }
@@ -188,48 +179,20 @@ const emit = defineEmits<{ (e: 'select', matchId: number): void }>()
 .history-trend-row__bar {
   height: 100%;
   border-radius: var(--fi-radius-round);
-  background: linear-gradient(
-    90deg,
-    var(--fi-color-ticket-history-trend-row-bar-background),
-    var(--fi-color-ticket-history-trend-row-bar-background-2)
-  );
+  background: var(--fi-color-ticket-history-trend-row-bar-background-2);
   transition: width 0.24s ease;
 }
 
 .history-trend-row--low .history-trend-row__bar {
-  background: linear-gradient(
-    90deg,
-    var(
-      --fi-color-ticket-history-trend-row-low-history-trend-row-bar-background
-    ),
-    var(
-      --fi-color-ticket-history-trend-row-low-history-trend-row-bar-background-2
-    )
-  );
+  background: var(--fi-color-ticket-history-trend-row-low-history-trend-row-bar-background-2);
 }
 
 .history-trend-row--mid .history-trend-row__bar {
-  background: linear-gradient(
-    90deg,
-    var(
-      --fi-color-ticket-history-trend-row-mid-history-trend-row-bar-background
-    ),
-    var(
-      --fi-color-ticket-history-trend-row-mid-history-trend-row-bar-background-2
-    )
-  );
+  background: var(--fi-color-ticket-history-trend-row-mid-history-trend-row-bar-background-2);
 }
 
 .history-trend-row--high .history-trend-row__bar {
-  background: linear-gradient(
-    90deg,
-    var(
-      --fi-color-ticket-history-trend-row-high-history-trend-row-bar-background
-    ),
-    var(
-      --fi-color-ticket-history-trend-row-high-history-trend-row-bar-background-2
-    )
-  );
+  background: var(--fi-color-ticket-history-trend-row-high-history-trend-row-bar-background-2);
 }
 
 .history-trend-row--empty .history-trend-row__bar {
@@ -243,13 +206,7 @@ const emit = defineEmits<{ (e: 'select', matchId: number): void }>()
 }
 
 .history-trend-row--selected .history-trend-row__bar {
-  background: linear-gradient(
-    90deg,
-    var(
-      --fi-color-ticket-history-trend-row-selected-history-trend-row-bar-background
-    ),
-    var(--fi-color-bg)
-  );
+  background: var(--fi-color-ticket-history-trend-row-selected-history-trend-row-bar-background);
 }
 
 .history-trend-row__value {

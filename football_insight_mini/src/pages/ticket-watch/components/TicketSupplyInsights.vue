@@ -111,11 +111,7 @@ const emit = defineEmits<{ (e: 'toggle', section: string): void }>()
 
 .insight-metric {
   border-radius: var(--fi-radius-sm);
-  background: linear-gradient(
-    180deg,
-    var(--fi-color-ticket-insight-metric-background),
-    var(--fi-color-ticket-watch-match-card-reference-background)
-  );
+  background: var(--fi-color-ticket-insight-metric-background);
   border: var(--fi-border-width) solid
     var(--fi-color-ticket-insight-metric-border);
   padding: var(--fi-space-16);
@@ -169,8 +165,8 @@ const emit = defineEmits<{ (e: 'toggle', section: string): void }>()
 }
 
 .decision-item__dot {
-  width: 14rpx;
-  height: 14rpx;
+  width: var(--fi-space-14);
+  height: var(--fi-space-14);
   margin-top: var(--fi-space-10);
   flex-shrink: 0;
   border-radius: var(--fi-radius-round);

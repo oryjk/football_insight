@@ -25,22 +25,12 @@ const emit = defineEmits<{ (e: 'upgrade'): void }>()
   position: relative;
   overflow: hidden;
   display: grid;
-  grid-template-columns: 108rpx minmax(0, 1fr);
+  grid-template-columns: calc(var(--fi-space-100) + var(--fi-space-8)) minmax(0, 1fr);
   gap: var(--fi-space-18);
   margin-top: var(--fi-space-18);
   padding: var(--fi-space-24);
   border-radius: var(--fi-radius-ticket-20);
-  background:
-    linear-gradient(
-      135deg,
-      var(--fi-color-ticket-recent-reflux-lock-background),
-      var(--fi-color-ticket-recent-reflux-lock-background-2)
-    ),
-    linear-gradient(
-      180deg,
-      var(--fi-color-ticket-recent-reflux-lock-background-3),
-      var(--fi-color-ticket-recent-reflux-lock-background-4)
-    );
+  background: var(--fi-color-page);
   border: var(--fi-border-width) solid
     var(--fi-color-ticket-recent-reflux-lock-border);
 }
@@ -48,22 +38,18 @@ const emit = defineEmits<{ (e: 'upgrade'): void }>()
 .recent-reflux-lock::after {
   content: '';
   position: absolute;
-  right: -38rpx;
-  top: -48rpx;
-  width: 190rpx;
-  height: 190rpx;
+  right: calc(calc(var(--fi-space-36) + var(--fi-space-2)) * -1);
+  top: calc(var(--fi-space-48) * -1);
+  width: calc(var(--fi-space-100) + var(--fi-space-84) + var(--fi-space-6));
+  height: calc(var(--fi-space-100) + var(--fi-space-84) + var(--fi-space-6));
   border-radius: var(--fi-radius-round);
-  background: radial-gradient(
-    circle,
-    var(--fi-color-ticket-recent-reflux-lock-background-5),
-    var(--fi-color-ticket-skeleton-panel-background) 68%
-  );
+  background: var(--fi-color-ticket-recent-reflux-lock-background-5);
   pointer-events: none;
 }
 .recent-reflux-lock__preview {
   position: relative;
   z-index: 1;
-  height: 112rpx;
+  height: calc(var(--fi-space-100) + var(--fi-space-12));
   border-radius: var(--fi-radius-sm);
   background: var(--fi-color-ticket-recent-reflux-lock-preview-background);
   border: var(--fi-border-width) solid
@@ -75,25 +61,25 @@ const emit = defineEmits<{ (e: 'upgrade'): void }>()
 }
 
 .recent-reflux-lock__bar {
-  width: 14rpx;
+  width: var(--fi-space-14);
   border-radius: var(--fi-radius-round);
   box-shadow: var(--fi-shadow-ticket-recent-reflux-lock-bar);
 }
 
 .recent-reflux-lock__bar--red {
-  height: 74rpx;
+  height: calc(var(--fi-space-72) + var(--fi-space-2));
   color: var(--fi-color-ticket-recent-reflux-lock-bar-red-color);
   background: var(--fi-color-ticket-recent-reflux-lock-bar-red-background);
 }
 
 .recent-reflux-lock__bar--middle {
-  height: 56rpx;
+  height: var(--fi-space-56);
   color: var(--fi-color-ticket-recent-reflux-lock-bar-middle-color);
   background: var(--fi-color-ticket-recent-reflux-lock-bar-middle-background);
 }
 
 .recent-reflux-lock__bar--green {
-  height: 42rpx;
+  height: calc(var(--fi-space-40) + var(--fi-space-2));
   color: var(--fi-color-ticket-recent-reflux-lock-bar-green-color);
   background: var(--fi-color-ticket-recent-reflux-lock-bar-green-background);
 }
@@ -124,14 +110,13 @@ const emit = defineEmits<{ (e: 'upgrade'): void }>()
   position: relative;
   z-index: 1;
   grid-column: 1 / -1;
-  height: 72rpx;
-  line-height: 72rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--fi-space-72);
+  line-height: var(--fi-leading-none);
   border-radius: var(--fi-radius-round);
-  background: linear-gradient(
-    135deg,
-    var(--fi-color-ticket-recent-reflux-lock-action-background),
-    var(--fi-color-ticket-recent-reflux-lock-action-background-2)
-  );
+  background: var(--fi-color-text-primary);
   color: var(--fi-color-bg);
   font-size: var(--fi-font-26);
   font-weight: var(--fi-weight-extrabold);

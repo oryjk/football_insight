@@ -2,12 +2,11 @@
 .panel,
 .state-card {
   animation: none;
-  background: var(--fi-color-ticket-watch-metric-box-shadow);
-  border-radius: var(--fi-radius-lg);
-  padding: var(--fi-space-24);
-  border: var(--fi-border-width) solid
-    var(--fi-color-ticket-watch-monitor-actions-button-ghost-border);
-  box-shadow: var(--fi-shadow-ticket-hero-card);
+  background: var(--fi-component-panel-bg);
+  border-radius: var(--fi-component-panel-radius);
+  padding: var(--fi-component-panel-padding);
+  border: var(--fi-component-panel-border);
+  box-shadow: var(--fi-component-panel-shadow);
 }
 
 .section-heading {
@@ -18,16 +17,16 @@
 }
 
 .inline-image-icon {
-  width: 20rpx;
-  height: 20rpx;
+  width: var(--fi-icon-sm);
+  height: var(--fi-icon-sm);
   margin-right: var(--fi-space-8);
   vertical-align: middle;
   flex-shrink: 0;
 }
 
 .inline-image-icon--small {
-  width: 18rpx;
-  height: 18rpx;
+  width: var(--fi-icon-sm);
+  height: var(--fi-icon-sm);
 }
 
 .section-heading__actions {
@@ -41,23 +40,19 @@
 .eyebrow,
 .section-kicker {
   margin: 0;
-  color: var(--fi-color-ticket-hero-card-summary-color);
-  font-size: var(--fi-font-20);
-  font-weight: var(--fi-weight-normal);
-  letter-spacing: 0;
+  color: var(--fi-component-kicker-text);
+  font-size: var(--fi-component-kicker-size);
+  font-weight: var(--fi-component-kicker-weight);
+  letter-spacing: var(--fi-component-kicker-tracking);
 }
 
 .section-title {
   display: block;
   margin-top: var(--fi-space-6);
-  color: var(--fi-color-text-strong);
-  font-size: var(--fi-font-32);
-  line-height: var(--fi-leading-ticket-1-18);
-  font-weight: var(--fi-weight-normal);
-}
-
-.section-title {
+  color: var(--fi-component-title-text);
   font-size: var(--fi-font-40);
+  line-height: var(--fi-component-title-leading);
+  font-weight: var(--fi-component-title-weight);
 }
 
 .section-title--match {
@@ -79,10 +74,9 @@
   line-height: var(--fi-leading-none);
   padding: var(--fi-space-12) var(--fi-space-20);
   border-radius: var(--fi-radius-round);
-  border: var(--fi-border-width) solid
-    var(--fi-color-ticket-watch-monitor-actions-button-ghost-border);
-  background: var(--fi-color-ticket-watch-metric-background-2);
-  color: var(--fi-color-ticket-hero-card-badge-color);
+  border: var(--fi-border-card);
+  background: var(--fi-color-page);
+  color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-22);
 }
 
@@ -91,7 +85,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  min-height: 48rpx;
+  min-height: var(--fi-space-48);
   padding: 0 var(--fi-space-20);
   border-radius: var(--fi-radius-round);
   border: var(--fi-border-width) solid
@@ -109,7 +103,7 @@
 }
 
 .collapse-pill--inventory {
-  min-height: 50rpx;
+  min-height: var(--fi-space-48);
   padding: 0 var(--fi-space-22);
 }
 
