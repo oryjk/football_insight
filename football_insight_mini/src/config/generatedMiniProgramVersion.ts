@@ -1,2 +1,2 @@
-export const MINI_PROGRAM_VERSION = "1.0.86";
-export const MINI_PROGRAM_VERSION_CODE = "10086";
+export const MINI_PROGRAM_VERSION = "1.0.87";
+export const MINI_PROGRAM_VERSION_CODE = "10087";
