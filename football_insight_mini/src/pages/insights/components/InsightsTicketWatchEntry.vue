@@ -1,22 +1,32 @@
 <template>
-  <FiPanel flush clip>
-    <view class="ticket-watch-entry" :class="{ 'ticket-watch-entry--locked': locked }" @click="emit('open')">
-      <FiSectionHeading kicker="Ticket Watch" title="回流看板">
-        <template #meta>
-          <text class="meta-pill">{{ locked ? '登录后' : '打开' }}</text>
-        </template>
-      </FiSectionHeading>
+  <FiPanel flush>
+    <view
+      class="ticket-watch-entry"
+      role="button"
+      aria-label="打开回流看板"
+      hover-class="ticket-watch-entry--pressed"
+      :hover-stay-time="80"
+      @tap="emit('open')"
+    >
+      <view class="ticket-watch-entry__icon">
+        <image :src="ticketIcon" class="ticket-watch-entry__icon-image" mode="aspectFit" />
+      </view>
+      <view class="ticket-watch-entry__copy">
+        <text class="ticket-watch-entry__title">回流看板</text>
+        <text class="ticket-watch-entry__caption">{{ locked ? '登录后查看实时余票与回流' : '实时余票监控 · 最近回流速览' }}</text>
+      </view>
+      <text v-if="locked" class="ticket-watch-entry__badge">登录后</text>
+      <image v-else :src="chevronIcon" class="ticket-watch-entry__chevron" mode="aspectFit" />
     </view>
-    <view v-if="locked" class="ticket-watch-entry__veil" />
   </FiPanel>
 </template>
 
 <script setup lang="ts">
 import FiPanel from '../../../components/FiPanel.vue'
-import FiSectionHeading from '../../../components/FiSectionHeading.vue'
-defineProps<{
-  locked: boolean
-}>()
+import ticketIcon from '../../../static/user/ticket.svg'
+import chevronIcon from '../../../static/rankings/chevron-right.svg'
+
+defineProps<{ locked: boolean }>()
 
 const emit = defineEmits<{
   (e: 'open'): void
@@ -25,37 +35,54 @@ const emit = defineEmits<{
 
 <style scoped lang="css">
 .ticket-watch-entry {
-  padding: var(--fi-component-panel-padding);
+  display: flex;
+  align-items: center;
+  gap: var(--fi-space-16);
+  padding: var(--fi-space-28) var(--fi-space-20);
 }
-
-.ticket-watch-entry--locked {
-  pointer-events: none;
-  filter: blur(5rpx);
-  opacity: 0.56;
-}
-
-/* 锁定态白色薄罩覆盖整张卡（含内边距），由 FiPanel clip 裁剪到圆角内。 */
-.ticket-watch-entry__veil {
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.26);
-  pointer-events: none;
-}
-
-.meta-pill {
-  display: inline-flex;
+.ticket-watch-entry--pressed { opacity: var(--fi-opacity-insights-pressed); }
+.ticket-watch-entry__icon {
+  flex-shrink: 0;
+  display: flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 auto;
+  width: var(--fi-space-64);
+  height: var(--fi-space-64);
+  border-radius: var(--fi-radius-insights-icon);
+  background: var(--fi-color-insights-entry-icon);
+}
+.ticket-watch-entry__icon-image,
+.ticket-watch-entry__chevron {
   flex-shrink: 0;
+  width: var(--fi-space-36);
+  height: var(--fi-space-36);
+}
+.ticket-watch-entry__copy { flex: 1; min-width: 0; }
+.ticket-watch-entry__title {
+  display: block;
+  color: var(--fi-color-text-strong);
+  font-size: var(--fi-font-32);
+  line-height: var(--fi-leading-snug);
+  font-weight: var(--fi-weight-extrabold);
+}
+.ticket-watch-entry__caption {
+  display: block;
+  margin-top: var(--fi-space-8);
+  overflow: hidden;
   white-space: nowrap;
-  line-height: var(--fi-leading-none);
-  box-sizing: border-box;
-  padding: var(--fi-space-14) var(--fi-space-24);
+  text-overflow: ellipsis;
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-24);
+  line-height: var(--fi-leading-normal);
+}
+.ticket-watch-entry__badge {
+  flex-shrink: 0;
+  padding: var(--fi-space-10) var(--fi-space-14);
   border-radius: var(--fi-radius-round);
-  border: var(--fi-primitive-border-width) solid var(--fi-color-border-chip);
   background: var(--fi-color-page);
   color: var(--fi-color-text-secondary);
-  font-size: var(--fi-font-24);
+  font-size: var(--fi-font-22);
+  line-height: var(--fi-leading-none);
+  white-space: nowrap;
 }
 </style>

@@ -93,12 +93,12 @@ const previewSections = computed(() => [
 <style scoped lang="css">
 .insights-locked {
   position: relative;
-  min-height: 820rpx;
+  min-height: var(--fi-space-insights-preview-height);
 }
 
 .insights-locked__preview {
   padding: var(--fi-space-20);
-  filter: blur(4rpx);
+  filter: blur(var(--fi-space-4));
   opacity: 0.9;
 }
 
@@ -111,7 +111,7 @@ const previewSections = computed(() => [
 .insights-locked__chips text {
   padding: var(--fi-space-14) var(--fi-space-22);
   border-radius: var(--fi-radius-round);
-  background: #f1f2f6;
+  background: var(--fi-color-page);
   color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-24);
 }
@@ -128,14 +128,14 @@ const previewSections = computed(() => [
   gap: var(--fi-space-10);
   padding: var(--fi-space-22);
   border-radius: var(--fi-radius-md);
-  background: linear-gradient(180deg, rgba(255, 241, 242, 0.95), rgba(255, 255, 255, 0.94));
-  color: #7c8089;
+  background: var(--fi-color-insights-preview-metric);
+  color: var(--fi-color-text-caption);
   font-size: var(--fi-font-22);
 }
 
 .insights-locked__metric-value {
-  color: var(--fi-primitive-ink);
-  font-size: 56rpx;
+  color: var(--fi-color-text-primary);
+  font-size: var(--fi-font-56);
   font-weight: var(--fi-weight-extrabold);
 }
 
@@ -150,38 +150,38 @@ const previewSections = computed(() => [
   gap: var(--fi-space-12);
   padding: var(--fi-space-22);
   border-radius: var(--fi-radius-md);
-  background: rgba(255, 255, 255, 0.82);
+  background: var(--fi-color-insights-preview-surface);
 }
 
 .insights-locked__section-title {
-  color: var(--fi-primitive-ink);
+  color: var(--fi-color-text-primary);
   font-size: var(--fi-font-24);
   font-weight: var(--fi-weight-bold);
 }
 
 .insights-locked__row {
   display: grid;
-  grid-template-columns: 180rpx 1fr;
+  grid-template-columns: var(--fi-space-insights-preview-column) 1fr;
   gap: var(--fi-space-16);
   align-items: center;
 }
 
 .insights-locked__row text {
-  color: #6b707b;
+  color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-22);
 }
 
 .insights-locked__row > view {
-  height: 14rpx;
+  height: var(--fi-space-14);
   border-radius: var(--fi-radius-round);
-  background: #edf0f5;
+  background: var(--fi-color-insights-track);
   overflow: hidden;
 }
 
 .insights-locked__row > view > view {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--fi-primitive-ink), #515563);
+  background: var(--fi-color-text-primary);
 }
 
 .insights-lock-overlay {
@@ -191,16 +191,16 @@ const previewSections = computed(() => [
   align-items: center;
   justify-content: center;
   padding: var(--fi-space-28);
-  background: linear-gradient(180deg, rgba(243, 243, 246, 0.18), rgba(243, 243, 246, 0.58));
+  background: var(--fi-color-insights-preview-overlay);
 }
 
 .insights-lock-overlay__card {
   width: 100%;
-  padding: 30rpx var(--fi-space-28);
-  border-radius: 32rpx;
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(18rpx);
-  box-shadow: 0 24rpx 50rpx rgba(18, 18, 18, 0.1);
+  padding: var(--fi-space-30) var(--fi-space-28);
+  border-radius: var(--fi-radius-insights-lock);
+  background: var(--fi-color-insights-lock-surface);
+  backdrop-filter: blur(var(--fi-space-18));
+  box-shadow: var(--fi-shadow-insights-lock);
   animation: fi-sheet-up 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -209,21 +209,21 @@ const previewSections = computed(() => [
   color: var(--fi-component-kicker-text);
   font-size: var(--fi-component-kicker-size);
   font-weight: var(--fi-weight-bold);
-  letter-spacing: 3rpx;
+  letter-spacing: var(--fi-space-insights-kicker-spacing);
 }
 
 .insights-lock-overlay__title {
   display: block;
   margin-top: var(--fi-space-10);
   color: var(--fi-color-text-strong);
-  font-size: 42rpx;
+  font-size: var(--fi-font-44);
   font-weight: var(--fi-weight-extrabold);
 }
 
 .insights-lock-overlay__copy {
   display: block;
   margin-top: var(--fi-space-18);
-  color: #6b707b;
+  color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-28);
   line-height: var(--fi-leading-relaxed);
 }
@@ -236,8 +236,8 @@ const previewSections = computed(() => [
   align-self: flex-start;
   padding: var(--fi-space-20) var(--fi-space-28);
   border-radius: var(--fi-radius-round);
-  background: var(--fi-primitive-ink);
-  color: var(--fi-primitive-white);
+  background: var(--fi-color-text-primary);
+  color: var(--fi-color-surface);
   font-size: var(--fi-font-28);
   white-space: nowrap;
   line-height: var(--fi-leading-none);

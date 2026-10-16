@@ -8,6 +8,10 @@ import {
   getVisibleInsightContributions,
   insightBarWidth,
   shouldShowInsightToggle,
+  INSIGHT_CONTRIBUTION_TABS,
+  INSIGHT_GOALS_FOR_DIMENSIONS,
+  INSIGHT_CONTRIBUTION_CAPTIONS,
+  resolveContributionViewKey,
 } from './helpers'
 
 describe('insights contribution helpers', () => {
@@ -72,5 +76,42 @@ describe('insights contribution helpers', () => {
     expect(rows[0].note).toBe('4 次')
     expect(rows[0].variant).toBe('green')
     expect(rows[0].instanceKey).toBe('5-assists-assist-3')
+  })
+})
+
+describe('insights contribution views', () => {
+  test('keeps the three tabs and two goals dimensions in the designed order', () => {
+    expect(INSIGHT_CONTRIBUTION_TABS).toEqual([
+      { key: 'goals-for', label: '进球' },
+      { key: 'assists', label: '助攻' },
+      { key: 'goals-against', label: '失球' },
+    ])
+    expect(INSIGHT_GOALS_FOR_DIMENSIONS).toEqual([
+      { key: 'opponent', label: '按对手' },
+      { key: 'player', label: '按球员' },
+    ])
+  })
+
+  test('resolves both goal dimensions and ignores the dimension for assists and conceded goals', () => {
+    expect(resolveContributionViewKey('goals-for', 'opponent')).toBe('goals-for-opponent')
+    expect(resolveContributionViewKey('goals-for', 'player')).toBe('goals-for-player')
+    expect(resolveContributionViewKey('assists', 'opponent')).toBe('assists-player')
+    expect(resolveContributionViewKey('assists', 'player')).toBe('assists-player')
+    expect(resolveContributionViewKey('goals-against', 'opponent')).toBe('goals-against-opponent')
+    expect(resolveContributionViewKey('goals-against', 'player')).toBe('goals-against-opponent')
+  })
+
+  test('uses the four approved, distinct and concise captions', () => {
+    expect(INSIGHT_CONTRIBUTION_CAPTIONS).toEqual({
+      'goals-for-opponent': '本队的进球主要打在哪些对手身上',
+      'goals-for-player': '本队的进球由哪些球员贡献',
+      'assists-player': '本队的助攻由哪些球员贡献',
+      'goals-against-opponent': '本队的失球主要来自哪些对手',
+    })
+    const captions = Object.values(INSIGHT_CONTRIBUTION_CAPTIONS)
+    expect(new Set(captions).size).toBe(4)
+    for (const caption of captions) {
+      expect(caption.length > 4 && caption.length < 30).toBe(true)
+    }
   })
 })

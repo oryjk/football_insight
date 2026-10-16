@@ -952,6 +952,56 @@ page {
   --fi-component-topic-crest-history-opacity: var(--fi-opacity-topic-history-crest);
 }
 
+/* 洞察页：纯色视图、锁定预览与现有尺寸的语义化。 */
+:root,
+page {
+  --fi-primitive-insights-green: #0dbd73;
+  --fi-primitive-insights-tab-idle: #7f8490;
+  --fi-primitive-insights-track: #edf0f5;
+  --fi-primitive-insights-red-soft: rgba(220, 38, 38, 0.1);
+  --fi-primitive-insights-red-faint: rgba(220, 38, 38, 0.06);
+  --fi-primitive-insights-red-action: rgba(220, 38, 38, 0.12);
+  --fi-primitive-insights-preview-overlay: rgba(243, 243, 246, 0.4);
+  --fi-primitive-insights-preview-surface: rgba(255, 255, 255, 0.82);
+  --fi-primitive-insights-lock-surface: rgba(255, 255, 255, 0.88);
+  --fi-primitive-insights-page-wash: rgba(247, 248, 250, 0.55);
+  --fi-primitive-insights-lock-shadow: 0 24rpx 50rpx rgba(18, 18, 18, 0.1);
+  --fi-primitive-space-48: 48rpx;
+  --fi-primitive-insights-bottom: 152rpx;
+  --fi-primitive-insights-backdrop-height: 600rpx;
+  --fi-primitive-insights-preview-height: 820rpx;
+  --fi-primitive-insights-preview-column: 180rpx;
+  --fi-primitive-insights-kicker-spacing: 3rpx;
+  --fi-primitive-insights-font-60: 60rpx;
+  --fi-primitive-insights-value-leading: 0.92;
+  --fi-primitive-insights-icon-radius: 20rpx;
+  --fi-primitive-insights-lock-radius: 32rpx;
+  --fi-primitive-insights-pressed: 0.7;
+
+  --fi-color-insights-assist: var(--fi-primitive-insights-green);
+  --fi-color-insights-tab-idle: var(--fi-primitive-insights-tab-idle);
+  --fi-color-insights-track: var(--fi-primitive-insights-track);
+  --fi-color-insights-entry-icon: var(--fi-primitive-insights-red-soft);
+  --fi-color-insights-preview-metric: var(--fi-primitive-insights-red-faint);
+  --fi-color-insights-toggle: var(--fi-primitive-insights-red-action);
+  --fi-color-insights-preview-overlay: var(--fi-primitive-insights-preview-overlay);
+  --fi-color-insights-preview-surface: var(--fi-primitive-insights-preview-surface);
+  --fi-color-insights-lock-surface: var(--fi-primitive-insights-lock-surface);
+  --fi-color-insights-page-wash: var(--fi-primitive-insights-page-wash);
+  --fi-shadow-insights-lock: var(--fi-primitive-insights-lock-shadow);
+  --fi-space-48: var(--fi-primitive-space-48);
+  --fi-space-insights-bottom: var(--fi-primitive-insights-bottom);
+  --fi-space-insights-backdrop-height: var(--fi-primitive-insights-backdrop-height);
+  --fi-space-insights-preview-height: var(--fi-primitive-insights-preview-height);
+  --fi-space-insights-preview-column: var(--fi-primitive-insights-preview-column);
+  --fi-space-insights-kicker-spacing: var(--fi-primitive-insights-kicker-spacing);
+  --fi-font-60: var(--fi-primitive-insights-font-60);
+  --fi-leading-insights-value: var(--fi-primitive-insights-value-leading);
+  --fi-radius-insights-icon: var(--fi-primitive-insights-icon-radius);
+  --fi-radius-insights-lock: var(--fi-primitive-insights-lock-radius);
+  --fi-opacity-insights-pressed: var(--fi-primitive-insights-pressed);
+}
+
 /* 赛事记分牌弹框（单场进球详情）：沿用话题 hero 深色底，金色仅用于帽子戏法 */
 :root {
   --fi-primitive-match-card-gold: #f5c451;

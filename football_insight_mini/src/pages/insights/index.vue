@@ -6,18 +6,14 @@
     <view class="page-bg-fade"></view>
     <view class="page-scroll">
       <view class="page">
-        <InsightsHeroCard />
-
         <InsightsTicketWatchEntry
           v-if="!systemConfigUnderReview"
           :locked="shouldLockTicketWatchEntry"
           @open="openTicketWatch"
         />
 
-        <FiLoading
+        <InsightsSkeleton
           v-if="!systemConfigUnderReview && userLoading"
-          title="账号状态确认中"
-          caption="正在确认你是否已经登录。"
         />
 
         <view v-else-if="systemConfigUnderReview" class="state-card">
@@ -28,10 +24,8 @@
 
         <InsightsLockedPanel v-else-if="membershipBenefitsLocked" mode="membership" @action="goToUserPage" />
 
-        <FiLoading
+        <InsightsSkeleton
           v-else-if="loading"
-          title="洞察生成中"
-          caption="正在整理球队归因结果。"
         />
 
         <view v-else-if="errorMessage" class="state-card state-card--error">
@@ -39,45 +33,32 @@
         </view>
 
         <template v-else-if="selectedInsight">
-          <InsightsTeamSelector
+          <InsightsTeamPanel
             v-model:selected-team-id="selectedTeamId"
             :teams="teams"
+            :insight="selectedInsight"
+            @open-board="goToTeamBoard"
           />
 
-          <InsightsSummaryPanel :insight="selectedInsight" />
-
-          <InsightsTeamBoardEntry @open="goToTeamBoard" />
-
-          <InsightsContributionPanel
-            kicker="进球贡献"
-            title="对手维度"
-            :rows="goalsForByOpponentRows"
-            :expanded="goalsForOpponentExpanded"
-            @toggle="goalsForOpponentExpanded = !goalsForOpponentExpanded"
-          />
-
-          <InsightsContributionPanel
-            kicker="进球贡献"
-            title="球员维度"
-            :rows="goalsForByPlayerRows"
-            :expanded="goalsForPlayerExpanded"
-            @toggle="goalsForPlayerExpanded = !goalsForPlayerExpanded"
-          />
-
-          <InsightsContributionPanel
-            kicker="助攻贡献"
-            title="球员维度"
-            :rows="assistsByPlayerRows"
-            :expanded="assistsForPlayerExpanded"
-            @toggle="assistsForPlayerExpanded = !assistsForPlayerExpanded"
-          />
-
-          <InsightsContributionPanel
-            kicker="失球贡献"
-            title="对手维度"
-            :rows="goalsAgainstByOpponentRows"
-            :expanded="goalsAgainstOpponentExpanded"
-            @toggle="goalsAgainstOpponentExpanded = !goalsAgainstOpponentExpanded"
+          <InsightsContributionSurface
+            :rows="{
+              'goals-for-opponent': goalsForByOpponentRows,
+              'goals-for-player': goalsForByPlayerRows,
+              'assists-player': assistsByPlayerRows,
+              'goals-against-opponent': goalsAgainstByOpponentRows,
+            }"
+            :expanded="{
+              'goals-for-opponent': goalsForOpponentExpanded,
+              'goals-for-player': goalsForPlayerExpanded,
+              'assists-player': assistsForPlayerExpanded,
+              'goals-against-opponent': goalsAgainstOpponentExpanded,
+            }"
+            @toggle="key => {
+              if (key === 'goals-for-opponent') goalsForOpponentExpanded = !goalsForOpponentExpanded
+              else if (key === 'goals-for-player') goalsForPlayerExpanded = !goalsForPlayerExpanded
+              else if (key === 'assists-player') assistsForPlayerExpanded = !assistsForPlayerExpanded
+              else if (key === 'goals-against-opponent') goalsAgainstOpponentExpanded = !goalsAgainstOpponentExpanded
+            }"
           />
         </template>
 
@@ -97,14 +78,11 @@ import { computed, ref, watch } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
-import FiLoading from '../../components/FiLoading.vue'
-import InsightsHeroCard from './components/InsightsHeroCard.vue'
+import InsightsSkeleton from './components/InsightsSkeleton.vue'
 import InsightsTicketWatchEntry from './components/InsightsTicketWatchEntry.vue'
 import InsightsLockedPanel from './components/InsightsLockedPanel.vue'
-import InsightsTeamSelector from './components/InsightsTeamSelector.vue'
-import InsightsSummaryPanel from './components/InsightsSummaryPanel.vue'
-import InsightsTeamBoardEntry from './components/InsightsTeamBoardEntry.vue'
-import InsightsContributionPanel from './components/InsightsContributionPanel.vue'
+import InsightsTeamPanel from './components/InsightsTeamPanel.vue'
+import InsightsContributionSurface from './components/InsightsContributionSurface.vue'
 import type { TeamInsight } from '../../types/insight'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
@@ -332,7 +310,7 @@ onShow(async () => {
 }
 
 .page {
-  padding: var(--fi-space-24) var(--fi-space-16) calc(152rpx + env(safe-area-inset-bottom));
+  padding: var(--fi-space-24) var(--fi-space-16) calc(var(--fi-space-insights-bottom) + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: var(--fi-space-card-gap);
@@ -342,7 +320,7 @@ onShow(async () => {
   top: 0;
   left: 0;
   width: 100%;
-  height: 600rpx;
+  height: var(--fi-space-insights-backdrop-height);
   pointer-events: none;
   z-index: 0;
 }
@@ -351,14 +329,14 @@ onShow(async () => {
   top: 0;
   left: 0;
   width: 100%;
-  height: 600rpx;
-  background: linear-gradient(180deg, transparent 45%, rgba(247, 248, 250, 0.55) 78%, var(--fi-color-page-soft) 100%);
+  height: var(--fi-space-insights-backdrop-height);
+  background: var(--fi-color-insights-page-wash);
   pointer-events: none;
   z-index: 0;
 }
 .state-card {
   position: relative;
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--fi-color-surface-panel);
   border-radius: var(--fi-radius-xl);
   border: var(--fi-border-card);
   box-shadow: var(--fi-shadow-card);
@@ -366,6 +344,6 @@ onShow(async () => {
 }
 .state-card--error text {
   font-size: var(--fi-font-28);
-  color: #c03a2b;
+  color: var(--fi-color-error);
 }
 </style>

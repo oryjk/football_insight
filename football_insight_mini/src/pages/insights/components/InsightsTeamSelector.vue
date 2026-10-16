@@ -1,11 +1,4 @@
 <template>
-  <FiPanel>
-    <FiSectionHeading kicker="球队列表" title="先选一个球队">
-      <template #meta>
-        <text class="meta-note">{{ teams.length }} 支球队</text>
-      </template>
-    </FiSectionHeading>
-
     <scroll-view
       scroll-x
       class="team-selector__scroll"
@@ -19,6 +12,7 @@
           :key="team.team_id"
           class="team-chip"
           :class="{ active: selectedTeamId === team.team_id }"
+          hover-class="team-chip--pressed"
           @click="emit('update:selectedTeamId', team.team_id)"
         >
           <image
@@ -34,12 +28,9 @@
         </button>
       </view>
     </scroll-view>
-  </FiPanel>
 </template>
 
 <script setup lang="ts">
-import FiPanel from '../../../components/FiPanel.vue'
-import FiSectionHeading from '../../../components/FiSectionHeading.vue'
 import { getCurrentInstance, nextTick, ref, watch } from 'vue'
 import type { TeamInsightTeam } from '../../../types/insight'
 
@@ -104,70 +95,47 @@ async function centerSelectedChip(): Promise<void> {
 </script>
 
 <style scoped lang="css">
-.meta-note {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex: 0 0 auto;
-  flex-shrink: 0;
-  max-width: 100%;
-  white-space: nowrap;
-  line-height: var(--fi-leading-none);
-  color: var(--fi-color-text-muted);
-  font-size: var(--fi-font-24);
-  font-weight: var(--fi-weight-bold);
-  letter-spacing: 1rpx;
-  padding: var(--fi-space-8) 0 0;
-}
-
-.team-selector__scroll {
-  margin-top: var(--fi-space-18);
-  white-space: nowrap;
-}
-
+.team-selector__scroll { width: 100%; min-width: 0; white-space: nowrap; }
 .team-selector__list {
   display: inline-flex;
-  gap: var(--fi-space-12);
-  padding-bottom: var(--fi-space-6);
+  gap: var(--fi-space-10);
+  padding-bottom: var(--fi-space-4);
 }
-
 .team-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--fi-space-12);
-  padding: var(--fi-space-16) var(--fi-space-22);
+  padding: var(--fi-space-18) var(--fi-space-22);
   border-radius: var(--fi-radius-round);
-  background: #f1f2f6;
+  background: var(--fi-color-page);
   color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-24);
   line-height: var(--fi-leading-none);
   flex-shrink: 0;
   white-space: nowrap;
   margin: 0;
-  transition: transform 220ms ease, box-shadow 220ms ease, background-color 220ms ease, color 220ms ease;
+  transition: background-color 220ms ease, color 220ms ease;
 }
-
+.team-chip::after { border: 0; }
 .team-chip.active {
-  background: var(--fi-primitive-ink);
-  color: var(--fi-primitive-white);
-  transform: translateY(-2rpx);
-  box-shadow: 0 10rpx 24rpx rgba(21, 22, 27, 0.14);
+  background: var(--fi-color-text-primary);
+  color: var(--fi-color-surface);
+  font-weight: var(--fi-weight-extrabold);
 }
-
-.team-chip__avatar {
-  width: 38rpx;
-  height: 38rpx;
-}
-
+.team-chip--pressed { opacity: var(--fi-opacity-insights-pressed); }
+.team-chip__avatar { width: var(--fi-space-36); height: var(--fi-space-36); flex-shrink: 0; }
 .team-chip__avatar--fallback {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--fi-color-primary), var(--fi-color-primary-deep));
-  color: var(--fi-primitive-white);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-primary);
+  color: var(--fi-color-surface);
   font-size: var(--fi-font-22);
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-none);
+}
+@media (prefers-reduced-motion: reduce) {
+  .team-chip { transition: none; }
 }
 </style>

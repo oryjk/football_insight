@@ -4,7 +4,7 @@ import type {
   PlayerContribution,
 } from '../../types/insight'
 
-/** 贡献结构的统一展示行模型：四张 breakdown 卡共用一个组件渲染。 */
+/** 贡献结构的统一展示行模型，由贡献卡的四个视图渲染。 */
 export interface InsightContributionRow {
   key: string
   instanceKey: string
@@ -14,6 +14,38 @@ export interface InsightContributionRow {
   avatarMode: 'fit' | 'fill'
   share: number
   variant: 'ink' | 'red' | 'green' | 'danger'
+}
+
+export type InsightContributionTab = 'goals-for' | 'assists' | 'goals-against'
+export type InsightGoalsForDimension = 'opponent' | 'player'
+export type InsightContributionViewKey =
+  'goals-for-opponent' | 'goals-for-player' | 'assists-player' | 'goals-against-opponent'
+
+export const INSIGHT_CONTRIBUTION_TABS: { key: InsightContributionTab; label: string }[] = [
+  { key: 'goals-for', label: '进球' },
+  { key: 'assists', label: '助攻' },
+  { key: 'goals-against', label: '失球' },
+]
+
+export const INSIGHT_GOALS_FOR_DIMENSIONS: { key: InsightGoalsForDimension; label: string }[] = [
+  { key: 'opponent', label: '按对手' },
+  { key: 'player', label: '按球员' },
+]
+
+export const INSIGHT_CONTRIBUTION_CAPTIONS: Record<InsightContributionViewKey, string> = {
+  'goals-for-opponent': '本队的进球主要打在哪些对手身上',
+  'goals-for-player': '本队的进球由哪些球员贡献',
+  'assists-player': '本队的助攻由哪些球员贡献',
+  'goals-against-opponent': '本队的失球主要来自哪些对手',
+}
+
+export function resolveContributionViewKey(
+  tab: InsightContributionTab,
+  goalsForDimension: InsightGoalsForDimension,
+): InsightContributionViewKey {
+  if (tab === 'assists') return 'assists-player'
+  if (tab === 'goals-against') return 'goals-against-opponent'
+  return goalsForDimension === 'player' ? 'goals-for-player' : 'goals-for-opponent'
 }
 
 export const INSIGHTS_PREVIEW_TEAMS = ['成都蓉城', '上海申花', '武汉三镇', '山东泰山']
