@@ -2,6 +2,13 @@
 
 > 按时间倒序记录用户可见变更。每条记录必须说明“原因”。
 
+## 2026-10-16 · 最佳盯盘时段上线（体验版 1.0.86）
+
+- 变更：monitor 离线快照与 football 聚合已部署到 peiqian，小程序体验版 1.0.86（robot 2）已上传，含最佳盯盘时段面板、获取比赛ID弹框防闪烁与用户昵称水印。
+- 变更：主包达到 2058KB 超过 2MB 上限，删除源码中无引用的 `app-logo.jpg`、`user/phoenix-stadium-bg.webp`（背景图本就走 minio），主包降到 1732KB；`src/static` 现仅约 100KB。
+- 部署：快照批处理与读接口是独立镜像 `ticket-restock-profiles`（容器 `ticket-restock-profile-server` 监听 127.0.0.1:4001），抢票容器未重启；football 用 `TICKET_RESTOCK_PROFILE_BASE_URL` 读取；peiqian 上 systemd timer 每两天北京时间 04:00 补算，已算的比赛自动跳过。
+- 原因：大图应放 minio 而非源码；不动线上抢票服务以隔离风险。
+
 ## 2026-10-16 · 最佳盯盘时段面板
 
 - 变更：当前比赛新增24小时补票分布、前三高峰与当前小时标记，preview仅首个高峰与升级入口；按会话缓存、请求静默降级，失败/不足/审核隐藏，新增付费位去重上报。
