@@ -1,5 +1,5 @@
 <template>
-  <view v-if="visible" class="match-id-mask" @touchmove.stop.prevent @tap="close">
+  <view v-if="visible && state !== 'loading'" class="match-id-mask" @touchmove.stop.prevent @tap="close">
     <view class="match-id-card" @touchmove.stop @tap.stop>
       <view class="match-id-card__head">
         <view>
@@ -15,10 +15,7 @@
 
       <text class="match-id-card__match">{{ matchLabel }}</text>
 
-      <view v-if="state === 'loading'" class="match-id-card__body match-id-card__body--loading">
-        <text class="match-id-card__copy">正在查询解锁状态…</text>
-      </view>
-      <view v-else-if="state === 'unlocked'" class="match-id-card__body">
+      <view v-if="state === 'unlocked'" class="match-id-card__body">
         <view class="match-id-value-panel">
           <text v-if="matchId !== null" class="match-id-value-panel__value">{{ matchId }}</text>
           <text v-else class="match-id-card__copy">业务 ID 暂不可用</text>
@@ -53,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, watch } from 'vue'
 import { buildMatchIdSourceLabel } from '../helpers'
 
 const props = defineProps<{
@@ -69,6 +66,26 @@ const emit = defineEmits<{
   (e: 'pay'): void
   (e: 'upgrade'): void
 }>()
+
+/**
+ * 权益查询期间不渲染弹层：先弹出「未解锁/查询中」再变成「已解锁」会闪一下。
+ * 查到结果后才一次性展示最终状态，查询期间只用系统 loading 反馈。
+ */
+const querying = computed(() => props.visible && props.state === 'loading')
+
+watch(querying, (value) => {
+  if (value) {
+    uni.showLoading({ title: '查询中', mask: true })
+  } else {
+    uni.hideLoading()
+  }
+})
+
+onBeforeUnmount(() => {
+  if (querying.value) {
+    uni.hideLoading()
+  }
+})
 
 const paying = computed(() => props.state === 'paying')
 
