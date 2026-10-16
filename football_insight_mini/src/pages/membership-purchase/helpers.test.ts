@@ -179,6 +179,26 @@ describe('resolveSelectedTier', () => {
   })
 })
 
+describe('default selection favors annual membership over passes', () => {
+  const pass = (tier: string) => ({ target_tier: tier, group_key: 'pass', is_pass: true })
+  const annual = (tier: string) => ({ target_tier: tier, group_key: 'annual' })
+
+  test('rank-sorted catalog starting with passes still defaults to the first annual tier', () => {
+    const options = [pass('V4'), pass('V5'), annual('V6'), annual('V7')] as never[]
+    expect(resolveSelectedTier('', options)).toBe('V6')
+    expect(resolveSelectedTier('V8', options)).toBe('V6')
+  })
+
+  test('keeps an explicit pass choice and falls back to a pass only when no annual is offered', () => {
+    expect(resolveSelectedTier('V5', [pass('V4'), pass('V5'), annual('V6')] as never[])).toBe('V5')
+    expect(resolveSelectedTier('', [pass('V4'), pass('V5')] as never[])).toBe('V4')
+  })
+
+  test('catalogs without pass metadata keep the first-option default', () => {
+    expect(resolveSelectedTier('', [{ target_tier: 'V6' }, { target_tier: 'V9' }] as never[])).toBe('V6')
+  })
+})
+
 describe('catalog-v2 pass metadata', () => {
   const pass = { ...backendProductOptions[0], target_tier: 'V4', price_cents: 900, membership_duration_months: 1, expiry_rule: 'end_of_next_day', duration_label: '次日 23:59 前有效', group_key: 'pass', is_pass: true }
 
@@ -203,10 +223,10 @@ describe('catalog-v2 pass metadata', () => {
     const annual = { ...backendProductOptions[0], group_key: 'annual' }
     const groups = groupMembershipProductOptions([pass, secondPass, annual, backendProductOptions[1]])
     expect(groups.map(group => [group.key, group.title, group.options.map(option => option.target_tier)])).toEqual([
-      ['pass', '场次体验卡', ['V4', 'V5']], ['annual', '年度会员', ['V6', 'V7']],
+      ['annual', '年度会员', ['V6', 'V7']], ['pass', '场次体验卡', ['V4', 'V5']],
     ])
     expect(resolveSelectedTier('V5', groups.flatMap(group => group.options))).toBe('V5')
-    expect(groups[0].options[0]).toBe(pass)
+    expect(groups[1].options[0]).toBe(pass)
   })
 
   test('old backend catalogs stay ungrouped and keep annual duration, prices and agreement', () => {

@@ -14,13 +14,20 @@ export function formatMembershipTierLabel(tier: string | null | undefined): stri
   return tier === 'V3' ? 'VIP3' : tier
 }
 
-/** 刷新数据后的选中档位：保留用户已选且仍可购买的档位，否则回到第一个可购买档位。 */
+function isPassOption(option: Partial<Pick<MembershipProductOption, 'is_pass' | 'group_key'>>): boolean {
+  return option.is_pass === true || option.group_key?.trim() === 'pass'
+}
+
+/**
+ * 刷新数据后的选中档位：保留用户已选且仍可购买的档位；否则默认第一个年度档位
+ * （体验卡只作为备选，不抢默认位），没有年度档位时才回到第一个可购买档位。
+ */
 export function resolveSelectedTier(
   current: string,
-  options: Pick<MembershipProductOption, 'target_tier'>[],
+  options: Pick<MembershipProductOption, 'target_tier' | 'is_pass' | 'group_key'>[],
 ): string {
   if (options.some(option => option.target_tier === current)) return current
-  return options[0]?.target_tier ?? ''
+  return (options.find(option => !isPassOption(option)) ?? options[0])?.target_tier ?? ''
 }
 
 type MembershipDurationInput = number | null | undefined | MembershipProductOption
@@ -62,7 +69,7 @@ export function groupMembershipProductOptions(options: MembershipProductOption[]
     if (!groups.has(key)) groups.set(key, { key, title: key === 'pass' ? '场次体验卡' : key === 'annual' ? '年度会员' : key, options: [] })
     groups.get(key)!.options.push(option)
   }
-  const rank = (key: string) => key === 'pass' ? 0 : key === 'annual' ? 1 : 2
+  const rank = (key: string) => key === 'annual' ? 0 : key === 'pass' ? 1 : 2
   return [...groups.values()].sort((left, right) => rank(left.key) - rank(right.key))
 }
 

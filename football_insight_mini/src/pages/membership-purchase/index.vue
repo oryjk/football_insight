@@ -175,8 +175,7 @@ const membershipRuleSummary = computed(() => {
 })
 
 const selectedProduct = computed(() =>
-  productOptions.value.find((option) => option.target_tier === selectedTier.value)
-  ?? productOptions.value[0]
+  productOptions.value.find((option) => option.target_tier === resolveSelectedTier(selectedTier.value, productOptions.value))
   ?? null,
 )
 
