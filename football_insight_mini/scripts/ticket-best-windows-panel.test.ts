@@ -33,7 +33,7 @@ const cleanups: Array<() => void> = []
 afterEach(() => { while (cleanups.length) cleanups.pop()!() })
 const full = { status: 'ok', access: 'full', sample_size: 5, generated_at: null,
  top_windows: [12, 11, 14].map(hour => ({ start_hour: hour, end_hour: hour + 1, avg_events: 10, hit_matches: 3 })),
- hours: Array.from({ length: 24 }, (_, hour) => ({ hour, avg_events: hour + 1, hit_matches: hour === 12 ? 4 : 2, share: 0 })) }
+ hours: Array.from({ length: 24 }, (_, hour) => ({ hour, avg_events: hour + 1, hit_matches: hour === 12 ? 4 : 2, share: hour === 12 ? 0.153 : 0.02 })) }
 function mount(overrides: Record<string, unknown> = {}) {
  const props = reactive({ data: full, loading: false, visible: true, onUpgrade: () => {}, ...overrides })
  const root = node(); const app = renderer.createApp({ render: () => h(Panel, props) }); app.mount(root)
@@ -47,6 +47,7 @@ test('full renders exactly 24 bars, top three and one current marker with exact 
  expect(byClass(panel.root, 'best-windows__now-line')).toHaveLength(1)
  expect(panel.text()).not.toContain('现在')
  expect(panel.text()).toContain('近 5 场主场的补票分布')
+ expect(panel.text()).toContain('柱子越高，这个钟点补票越频繁')
  expect(panel.text()).toContain('补票最集中在 12:00–13:00、11:00–12:00、14:00–15:00')
  // Chart spans x 0..240, so each hour column is 10 wide.
  const original = (globalThis as any).uni
@@ -55,11 +56,11 @@ test('full renders exactly 24 bars, top three and one current marker with exact 
  const chart = byClass(panel.root, 'best-windows__chart')[0]
  const touch = (type: string, x: number) => chart.props[type === 'touchstart' ? 'onTouchstart' : 'onTouchmove']({ type, touches: [{ clientX: x }] })
  touch('touchstart', 125); await nextTick()
- expect(panel.text()).toContain('12 点：近 5 场里有 4 场出现补票')
+ expect(panel.text()).toContain('12 点：近 5 场里有 4 场出现补票，占全天补票的 15.3%')
  expect(byClass(panel.root, 'best-windows__bar--selected')).toHaveLength(1)
  touch('touchmove', 145); await nextTick()
  expect(panel.text()).not.toContain('12 点：')
- expect(panel.text()).toContain('14 点：近 5 场里有 2 场出现补票')
+ expect(panel.text()).toContain('14 点：近 5 场里有 2 场出现补票，占全天补票的 2%')
  touch('touchmove', 999); await nextTick()
  expect(panel.text()).toContain('23 点：')
 })
@@ -70,6 +71,7 @@ test('preview has no distribution or secondary peaks and emits upgrade', () => {
  expect(panel.text()).toContain('最容易出票的时段：**:**–**:**')
  expect(panel.text()).not.toContain('12:00')
  expect(panel.text()).toContain('开通 V6 查看全天分布和前三个高峰时段')
+ expect(panel.text()).not.toContain('柱子越高')
  expect(panel.text()).not.toContain('11:00–12:00')
  byClass(panel.root, 'best-windows__upgrade')[0].props.onTap()
  expect(taps).toBe(1)

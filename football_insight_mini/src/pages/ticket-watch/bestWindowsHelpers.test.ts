@@ -54,3 +54,8 @@ test('touch x maps to the hour column and clamps outside the chart', () => {
  expect(hourFromChartX(5, 0, 0)).toBeNull()
  expect(hourFromChartX(Number.NaN, 0, 240)).toBeNull()
 })
+test('hour detail adds the share of the day and trims trailing zeros', () => {
+ expect(bestWindowsHourDetail(12, 8, 8, 0.153)).toBe('12 点：近 8 场里有 8 场出现补票，占全天补票的 15.3%')
+ expect(bestWindowsHourDetail(3, 8, 2, 0.1)).toBe('3 点：近 8 场里有 2 场出现补票，占全天补票的 10%')
+ expect(bestWindowsHourDetail(5, 8, 0, 0)).toBe('5 点：近 8 场里有 0 场出现补票，占全天补票的 0%')
+})

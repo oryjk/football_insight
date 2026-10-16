@@ -46,6 +46,11 @@ export function formatBestWindowsConclusion(windows: TicketWatchBestWindow[]): s
   return `补票最集中在 ${windows.slice(0, 3).map(formatBestWindow).join('、')}`
 }
 
-export function bestWindowsHourDetail(hour: number, sampleSize: number, hitMatches: number): string {
-  return `${hour} 点：近 ${sampleSize} 场里有 ${hitMatches} 场出现补票`
+export function formatShare(share: number): string {
+  return `${Number((share * 100).toFixed(1))}%`
+}
+
+export function bestWindowsHourDetail(hour: number, sampleSize: number, hitMatches: number, share?: number): string {
+  const base = `${hour} 点：近 ${sampleSize} 场里有 ${hitMatches} 场出现补票`
+  return typeof share === 'number' && Number.isFinite(share) ? `${base}，占全天补票的 ${formatShare(share)}` : base
 }

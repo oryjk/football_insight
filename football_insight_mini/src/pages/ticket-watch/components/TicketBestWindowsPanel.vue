@@ -8,6 +8,7 @@
     <view class="best-windows">
       <FiSectionHeading title="最佳盯盘时段" />
       <text class="best-windows__sample">近 {{ data.sample_size }} 场主场的补票分布</text>
+      <text v-if="data.access === 'full'" class="best-windows__sample">柱子越高，这个钟点补票越频繁</text>
       <template v-if="data.access === 'full'">
         <view
           class="best-windows__chart"
@@ -20,7 +21,7 @@
             class="best-windows__column"
             :class="{ 'best-windows__column--selected': bar.hour === selectedHour }"
             role="button"
-            :aria-label="bestWindowsHourDetail(bar.hour, data.sample_size, bar.hit_matches)"
+            :aria-label="bestWindowsHourDetail(bar.hour, data.sample_size, bar.hit_matches, bar.share)"
           >
             <view class="best-windows__track">
               <view v-if="bar.isNow" class="best-windows__now-line" />
@@ -37,7 +38,7 @@
           </view>
         </view>
         <text class="best-windows__conclusion">{{ formatBestWindowsConclusion(data.top_windows) }}</text>
-        <text v-if="selectedBar" class="best-windows__detail">{{ bestWindowsHourDetail(selectedBar.hour, data.sample_size, selectedBar.hit_matches) }}</text>
+        <text v-if="selectedBar" class="best-windows__detail">{{ bestWindowsHourDetail(selectedBar.hour, data.sample_size, selectedBar.hit_matches, selectedBar.share) }}</text>
         <text class="best-windows__note">按历史补票次数统计，仅供参考，不代表之后一定出票。</text>
       </template>
       <template v-else>
