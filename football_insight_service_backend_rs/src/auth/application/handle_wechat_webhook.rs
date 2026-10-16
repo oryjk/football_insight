@@ -4,6 +4,7 @@ use crate::auth::{
     domain::wechat::{WechatMessageMode, WechatTextReply},
     ports::{
         auth_repository::AuthRepository, current_standard_match_port::CurrentStandardMatchPort,
+        official_account_match_id_access_port::OfficialAccountMatchIdAccessPort,
         wechat_crypto_port::WechatCryptoPort,
     },
 };
@@ -34,6 +35,7 @@ pub struct HandleWechatWebhookUseCase {
     crypto_port: Arc<dyn WechatCryptoPort>,
     current_standard_match_port: Arc<dyn CurrentStandardMatchPort>,
     system_config_port: Arc<dyn SystemConfigPort>,
+    official_account_access_port: Arc<dyn OfficialAccountMatchIdAccessPort>,
 }
 
 impl HandleWechatWebhookUseCase {
@@ -42,12 +44,14 @@ impl HandleWechatWebhookUseCase {
         crypto_port: Arc<dyn WechatCryptoPort>,
         current_standard_match_port: Arc<dyn CurrentStandardMatchPort>,
         system_config_port: Arc<dyn SystemConfigPort>,
+        official_account_access_port: Arc<dyn OfficialAccountMatchIdAccessPort>,
     ) -> Self {
         Self {
             repository,
             crypto_port,
             current_standard_match_port,
             system_config_port,
+            official_account_access_port,
         }
     }
 
@@ -139,22 +143,7 @@ impl HandleWechatWebhookUseCase {
                     "wechat next match id text command received"
                 );
 
-                let reply_content = if !self.next_match_reply_enabled().await {
-                    next_match_missing_message()
-                } else {
-                    match self
-                        .current_standard_match_port
-                        .fetch_current_match_id()
-                        .await
-                    {
-                        Ok(Some(match_id)) => next_match_id_message(&match_id),
-                        Ok(None) => next_match_missing_message(),
-                        Err(error) => {
-                            tracing::warn!(error = %error, "failed to fetch current-standard match id");
-                            next_match_missing_message()
-                        }
-                    }
-                };
+                let reply_content = self.next_match_reply(&incoming.from_user_name).await;
 
                 let encrypted = self.build_text_reply(
                     message_mode,
@@ -269,6 +258,50 @@ impl HandleWechatWebhookUseCase {
         }
     }
 
+    async fn next_match_reply(&self, official_open_id: &str) -> String {
+        use crate::auth::domain::official_account_match_id_access::OfficialAccountMatchIdAccess;
+
+        let (decision, content) = if !self.next_match_reply_enabled().await {
+            ("disabled", next_match_missing_message())
+        } else {
+            match self
+                .current_standard_match_port
+                .fetch_current_match_id()
+                .await
+            {
+                Ok(Some(match_id)) => {
+                    match self
+                        .official_account_access_port
+                        .check(official_open_id, match_id.parse::<i64>().ok())
+                        .await
+                    {
+                        Ok(OfficialAccountMatchIdAccess::Granted) => {
+                            ("granted", next_match_id_message(&match_id))
+                        }
+                        Ok(OfficialAccountMatchIdAccess::NotMember) => {
+                            ("not_member", next_match_not_member_message())
+                        }
+                        Ok(OfficialAccountMatchIdAccess::Unrecognized) => {
+                            ("unrecognized", next_match_unrecognized_message())
+                        }
+                        Err(_) => {
+                            // Provider errors may contain identifiers; never log their raw text.
+                            tracing::warn!("failed to confirm official-account membership");
+                            ("error", next_match_identity_error_message())
+                        }
+                    }
+                }
+                Ok(None) => ("no_match", next_match_missing_message()),
+                Err(_) => {
+                    tracing::warn!("failed to fetch current-standard match id");
+                    ("no_match", next_match_missing_message())
+                }
+            }
+        };
+        tracing::info!(decision = %decision, "next_match_id_reply");
+        content
+    }
+
     async fn invite_code_message(&self, invite_code: &str) -> String {
         let custom_template = self
             .system_config_port
@@ -287,9 +320,8 @@ impl HandleWechatWebhookUseCase {
             .await
         {
             Ok(value) => parse_switch(value.as_deref()),
-            Err(error) => {
+            Err(_) => {
                 tracing::warn!(
-                    error = %error,
                     "failed to read wechat next match reply switch, treating as disabled"
                 );
                 false
@@ -344,6 +376,40 @@ fn next_match_id_message(match_id: &str) -> String {
     with_product_intro(format!(
         "【足球洞察】当前比赛信息\n\n当前下一场比赛 match_id：{match_id}\n\n常用指令：\n- 回复“邀请码”或“1”获取注册邀请码\n- 回复“下一场”或“2”再次查询\n- 回复“下一场id”或“3”再次查询"
     ))
+}
+
+fn next_match_not_member_message() -> String {
+    with_product_intro(
+        r#"【足球洞察】当前比赛信息
+
+下一场比赛 ID 是会员权益，V6 及以上会员可直接查询。
+
+开通方式：打开小程序「足球洞察」，在「我的」页点会员卡上的「升级」，选择 V6 及以上档位即可。
+
+常用指令：
+- 回复“邀请码”或“1”获取注册邀请码"#
+            .to_string(),
+    )
+}
+
+fn next_match_unrecognized_message() -> String {
+    with_product_intro(r#"【足球洞察】当前比赛信息
+
+下一场比赛 ID 是会员权益，V6 及以上会员可直接查询。
+
+暂未识别到你的会员账号。已是 V6 及以上会员的话，可以直接在小程序「余票监控」页点「获取比赛 ID」查看；还不是会员的话，在小程序「我的」页点会员卡上的「升级」即可开通。
+
+常用指令：
+- 回复“邀请码”或“1”获取注册邀请码"#.to_string())
+}
+
+fn next_match_identity_error_message() -> String {
+    with_product_intro(
+        r#"【足球洞察】当前比赛信息
+
+暂时无法确认你的会员身份，请稍后再回复“下一场”重试。"#
+            .to_string(),
+    )
 }
 
 fn next_match_missing_message() -> String {
@@ -542,15 +608,11 @@ mod tests {
             _nonce: &str,
             request_body: &str,
         ) -> anyhow::Result<WechatIncomingMessage> {
-            let content = if request_body.contains("<Content><![CDATA[邀请码]]></Content>") {
-                Some("邀请码".to_string())
-            } else if request_body.contains("<Content><![CDATA[下一场]]></Content>") {
-                Some("下一场".to_string())
-            } else if request_body.contains("<Content><![CDATA[你好]]></Content>") {
-                Some("你好".to_string())
-            } else {
-                None
-            };
+            let content = request_body
+                .split("<Content><![CDATA[")
+                .nth(1)
+                .and_then(|s| s.split("]]></Content>").next())
+                .map(str::to_owned);
 
             Ok(WechatIncomingMessage {
                 to_user_name: "gh_123".to_string(),
@@ -698,6 +760,7 @@ mod tests {
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
             Arc::new(FakeSystemConfigPort::default()),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -720,6 +783,7 @@ mod tests {
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
             Arc::new(FakeSystemConfigPort::default()),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -758,6 +822,7 @@ mod tests {
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
             Arc::new(FakeSystemConfigPort::default()),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -792,6 +857,7 @@ mod tests {
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
             Arc::new(next_match_enabled_config()),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -819,6 +885,7 @@ mod tests {
             Arc::new(FakeCryptoPort),
             Arc::new(FakeMissingCurrentStandardMatchPort),
             Arc::new(next_match_enabled_config()),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -843,6 +910,7 @@ mod tests {
             Arc::new(FakeCryptoPort),
             current_match_port.clone(),
             Arc::new(FakeSystemConfigPort::default()),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -872,6 +940,7 @@ mod tests {
                 next_match_reply_enabled: Some("false".to_string()),
                 ..FakeSystemConfigPort::default()
             }),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -899,6 +968,7 @@ mod tests {
                 next_match_reply_enabled: Some("1".to_string()),
                 ..FakeSystemConfigPort::default()
             }),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -923,6 +993,7 @@ mod tests {
             Arc::new(FakeCryptoPort),
             current_match_port.clone(),
             Arc::new(FailingSystemConfigPort),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -947,6 +1018,7 @@ mod tests {
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
             Arc::new(next_match_enabled_config()),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -970,6 +1042,7 @@ mod tests {
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
             Arc::new(next_match_enabled_config()),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -994,6 +1067,7 @@ mod tests {
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
             Arc::new(FakeSystemConfigPort::default()),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -1021,6 +1095,7 @@ mod tests {
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
             Arc::new(next_match_enabled_config()),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -1044,6 +1119,7 @@ mod tests {
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
             Arc::new(next_match_enabled_config()),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -1068,6 +1144,7 @@ mod tests {
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
             Arc::new(FakeSystemConfigPort::default()),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -1099,6 +1176,7 @@ mod tests {
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
             Arc::new(next_match_enabled_config()),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -1122,6 +1200,7 @@ mod tests {
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
             Arc::new(FakeSystemConfigPort::default()),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -1144,6 +1223,7 @@ mod tests {
             Arc::new(FakeCryptoPort),
             Arc::new(FakeCurrentStandardMatchPort),
             Arc::new(FakeSystemConfigPort::default()),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -1172,6 +1252,7 @@ mod tests {
                 ),
                 ..FakeSystemConfigPort::default()
             }),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -1200,6 +1281,7 @@ mod tests {
                 invite_reply_template: Some("只有入口，没有邀请码".to_string()),
                 ..FakeSystemConfigPort::default()
             }),
+            Arc::new(GateAccessFake::granted()),
         );
 
         let result = use_case
@@ -1216,5 +1298,342 @@ mod tests {
         assert!(result.contains("【足球洞察】专属邀请码"));
         assert!(result.contains("FI-TEST-01"));
         assert!(!result.contains("只有入口，没有邀请码"));
+    }
+    use crate::auth::{
+        domain::official_account_match_id_access::OfficialAccountMatchIdAccess,
+        ports::official_account_match_id_access_port::OfficialAccountMatchIdAccessPort,
+    };
+
+    struct GateAccessFake {
+        decision: OfficialAccountMatchIdAccess,
+        requires_match: bool,
+        fail: bool,
+        calls: Mutex<Vec<Option<i64>>>,
+    }
+
+    impl GateAccessFake {
+        fn granted() -> Self {
+            Self::result(OfficialAccountMatchIdAccess::Granted, false)
+        }
+        fn result(decision: OfficialAccountMatchIdAccess, requires_match: bool) -> Self {
+            Self {
+                decision,
+                requires_match,
+                fail: false,
+                calls: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl OfficialAccountMatchIdAccessPort for GateAccessFake {
+        async fn check(
+            &self,
+            official_open_id: &str,
+            match_id: Option<i64>,
+        ) -> anyhow::Result<OfficialAccountMatchIdAccess> {
+            assert_eq!(official_open_id, "openid_123");
+            self.calls.lock().unwrap().push(match_id);
+            if self.fail {
+                anyhow::bail!("provider failure: 987654321 openid_123");
+            }
+            Ok(if self.requires_match && match_id != Some(987654321) {
+                OfficialAccountMatchIdAccess::NotMember
+            } else {
+                self.decision
+            })
+        }
+    }
+
+    struct GateMatchFake {
+        id: Option<&'static str>,
+        fail: bool,
+    }
+    #[async_trait]
+    impl CurrentStandardMatchPort for GateMatchFake {
+        async fn fetch_current_match_id(&self) -> anyhow::Result<Option<String>> {
+            if self.fail {
+                anyhow::bail!("source failure: 987654321 openid_123");
+            }
+            Ok(self.id.map(str::to_owned))
+        }
+    }
+
+    #[derive(Clone)]
+    struct GateLogWriter(Arc<Mutex<Vec<u8>>>);
+    impl std::io::Write for GateLogWriter {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn next_match_gate_covers_all_commands_modes_decisions_and_never_leaks_id() {
+        let commands = ["下一场", "下一场id", "2", "3", " 下 一 场 ID ", "\t3\n"];
+        for command in commands {
+            for plain in [false, true] {
+                for (outcome, requires_match, fail, expected, decision) in [
+                    (
+                        OfficialAccountMatchIdAccess::NotMember,
+                        false,
+                        false,
+                        false,
+                        "not_member",
+                    ),
+                    (
+                        OfficialAccountMatchIdAccess::Granted,
+                        false,
+                        false,
+                        true,
+                        "granted",
+                    ),
+                    (
+                        OfficialAccountMatchIdAccess::Granted,
+                        true,
+                        false,
+                        true,
+                        "granted",
+                    ),
+                    (
+                        OfficialAccountMatchIdAccess::Unrecognized,
+                        false,
+                        false,
+                        false,
+                        "unrecognized",
+                    ),
+                    (
+                        OfficialAccountMatchIdAccess::Granted,
+                        false,
+                        true,
+                        false,
+                        "error",
+                    ),
+                ] {
+                    let mut access = GateAccessFake::result(outcome, requires_match);
+                    access.fail = fail;
+                    let access = Arc::new(access);
+                    let use_case = HandleWechatWebhookUseCase::new(
+                        Arc::new(FakeRepository::default()),
+                        Arc::new(FakeCryptoPort),
+                        Arc::new(GateMatchFake {
+                            id: Some("987654321"),
+                            fail: false,
+                        }),
+                        Arc::new(next_match_enabled_config()),
+                        access.clone(),
+                    );
+                    let body = if plain {
+                        format!("<xml><Content><![CDATA[{command}]]></Content></xml>")
+                    } else {
+                        command.to_owned()
+                    };
+                    let result = use_case
+                        .handle_message(WechatMessageInput {
+                            signature: "sig".into(),
+                            timestamp: "1".into(),
+                            nonce: "2".into(),
+                            body,
+                        })
+                        .await
+                        .unwrap()
+                        .unwrap();
+                    assert_eq!(
+                        result.contains("987654321"),
+                        expected,
+                        "{command} {decision}"
+                    );
+                    assert!(result.starts_with(if plain { "plain::" } else { "encrypted::" }));
+                    assert!(result.contains("产品介绍"));
+                    assert!(!result.contains("¥5"));
+                    if !expected {
+                        let expected_copy = match decision {
+                            "not_member" => {
+                                "【足球洞察】当前比赛信息\n\n下一场比赛 ID 是会员权益，V6 及以上会员可直接查询。\n\n开通方式：打开小程序「足球洞察」，在「我的」页点会员卡上的「升级」，选择 V6 及以上档位即可。\n\n常用指令：\n- 回复“邀请码”或“1”获取注册邀请码"
+                            }
+                            "unrecognized" => {
+                                "【足球洞察】当前比赛信息\n\n下一场比赛 ID 是会员权益，V6 及以上会员可直接查询。\n\n暂未识别到你的会员账号。已是 V6 及以上会员的话，可以直接在小程序「余票监控」页点「获取比赛 ID」查看；还不是会员的话，在小程序「我的」页点会员卡上的「升级」即可开通。\n\n常用指令：\n- 回复“邀请码”或“1”获取注册邀请码"
+                            }
+                            _ => {
+                                "【足球洞察】当前比赛信息\n\n暂时无法确认你的会员身份，请稍后再回复“下一场”重试。"
+                            }
+                        };
+                        let prefix = if plain { "plain::" } else { "encrypted::" };
+                        assert_eq!(
+                            result,
+                            format!(
+                                "{prefix}{}",
+                                super::with_product_intro(expected_copy.to_owned())
+                            )
+                        );
+                    }
+                    assert_eq!(*access.calls.lock().unwrap(), [Some(987654321)]);
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn next_match_gate_skips_identity_for_disabled_missing_and_fetch_failure() {
+        for scenario in ["disabled", "config_error", "missing", "fetch_error"] {
+            let access = Arc::new(GateAccessFake::granted());
+            let match_port = Arc::new(RecordingCurrentStandardMatchPort::new());
+            let current: Arc<dyn CurrentStandardMatchPort> = match scenario {
+                "missing" => Arc::new(GateMatchFake {
+                    id: None,
+                    fail: false,
+                }),
+                "fetch_error" => Arc::new(GateMatchFake {
+                    id: None,
+                    fail: true,
+                }),
+                _ => match_port.clone(),
+            };
+            let config: Arc<dyn SystemConfigPort> = match scenario {
+                "disabled" => Arc::new(FakeSystemConfigPort::default()),
+                "config_error" => Arc::new(FailingSystemConfigPort),
+                _ => Arc::new(next_match_enabled_config()),
+            };
+            let use_case = HandleWechatWebhookUseCase::new(
+                Arc::new(FakeRepository::default()),
+                Arc::new(FakeCryptoPort),
+                current,
+                config,
+                access.clone(),
+            );
+            let result = use_case
+                .handle_message(WechatMessageInput {
+                    signature: "sig".into(),
+                    timestamp: "1".into(),
+                    nonce: "2".into(),
+                    body: "2".into(),
+                })
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                result,
+                format!("encrypted::{}", super::next_match_missing_message())
+            );
+            assert!(!result.contains("987654321") && !result.contains("MATCH_2026_001"));
+            assert!(!result.contains("会员"));
+            assert!(access.calls.lock().unwrap().is_empty(), "{scenario}");
+            assert_eq!(match_port.calls(), 0, "{scenario}");
+        }
+    }
+
+    #[tokio::test]
+    async fn next_match_gate_unparseable_id_only_allows_membership_not_purchase() {
+        for (outcome, requires_match, allowed) in [
+            (OfficialAccountMatchIdAccess::Granted, false, true),
+            (OfficialAccountMatchIdAccess::Granted, true, false),
+            (OfficialAccountMatchIdAccess::NotMember, false, false),
+        ] {
+            let access = Arc::new(GateAccessFake::result(outcome, requires_match));
+            let use_case = HandleWechatWebhookUseCase::new(
+                Arc::new(FakeRepository::default()),
+                Arc::new(FakeCryptoPort),
+                Arc::new(GateMatchFake {
+                    id: Some("not-numeric-match"),
+                    fail: false,
+                }),
+                Arc::new(next_match_enabled_config()),
+                access.clone(),
+            );
+            let result = use_case
+                .handle_message(WechatMessageInput {
+                    signature: "sig".into(),
+                    timestamp: "1".into(),
+                    nonce: "2".into(),
+                    body: "3".into(),
+                })
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(result.contains("not-numeric-match"), allowed);
+            assert_eq!(*access.calls.lock().unwrap(), [None]);
+        }
+    }
+    // tracing's process-wide callsite cache changes while other webhook tests run without
+    // a subscriber. Exercise log capture explicitly in isolation, alongside the full suite.
+    #[tokio::test(flavor = "current_thread")]
+    #[ignore = "run log capture separately with --ignored --test-threads=1"]
+    async fn next_match_decision_logs_are_single_and_identifier_free() {
+        let bytes = Arc::new(Mutex::new(Vec::new()));
+        let sink = bytes.clone();
+        let _guard = tracing::subscriber::set_default(
+            tracing_subscriber::fmt()
+                .without_time()
+                .with_ansi(false)
+                .with_writer(move || GateLogWriter(sink.clone()))
+                .finish(),
+        );
+        for scenario in [
+            "granted",
+            "not_member",
+            "unrecognized",
+            "error",
+            "disabled",
+            "no_match",
+            "fetch_error",
+            "config_error",
+        ] {
+            bytes.lock().unwrap().clear();
+            let outcome = match scenario {
+                "not_member" => OfficialAccountMatchIdAccess::NotMember,
+                "unrecognized" => OfficialAccountMatchIdAccess::Unrecognized,
+                _ => OfficialAccountMatchIdAccess::Granted,
+            };
+            let mut access = GateAccessFake::result(outcome, false);
+            access.fail = scenario == "error";
+            let current = Arc::new(GateMatchFake {
+                id: if scenario == "no_match" {
+                    None
+                } else {
+                    Some("987654321")
+                },
+                fail: scenario == "fetch_error",
+            });
+            let config: Arc<dyn SystemConfigPort> = match scenario {
+                "disabled" => Arc::new(FakeSystemConfigPort::default()),
+                "config_error" => Arc::new(FailingSystemConfigPort),
+                _ => Arc::new(next_match_enabled_config()),
+            };
+            let use_case = HandleWechatWebhookUseCase::new(
+                Arc::new(FakeRepository::default()),
+                Arc::new(FakeCryptoPort),
+                current,
+                config,
+                Arc::new(access),
+            );
+            let reply = use_case.next_match_reply("openid_123").await;
+            assert_eq!(
+                reply.contains("987654321"),
+                scenario == "granted",
+                "{scenario}"
+            );
+            let logs = String::from_utf8(bytes.lock().unwrap().clone()).unwrap();
+            let decisions: Vec<_> = logs
+                .lines()
+                .filter(|l| l.contains("next_match_id_reply"))
+                .collect();
+            assert_eq!(decisions.len(), 1, "{logs}");
+            let expected = match scenario {
+                "fetch_error" => "no_match",
+                "config_error" => "disabled",
+                _ => scenario,
+            };
+            assert!(
+                decisions[0].contains(&format!("decision={expected}")),
+                "{logs}"
+            );
+            assert!(
+                !logs.contains("987654321") && !logs.contains("openid_123"),
+                "{logs}"
+            );
+        }
     }
 }

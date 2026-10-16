@@ -146,3 +146,11 @@ Offers with `requires_capability` are hidden unless declared. An attempt to buy 
 Membership virtual orders now store `grant_snapshot` with kind, grant_spec, catalog_product_id. Fulfillment reads that snapshot without looking up the mutable catalog; NULL snapshots retain the historical settlement path. A previously earned permanent V4+ entitlement acquired while a pass order is pending is preserved rather than converted into an expiring entitlement. Expired membership still follows the existing V3 fallback. Unknown qualified membership tiers now error; historical unqualified `membership` remains the documented V9 legacy product.
 
 The migration only adds catalog/snapshot fields, backfills new catalog metadata and widens the key CHECK to V3–V9; the V3 account restriction is retained. `kind` defaults to membership for existing Admin/SQL writers, which still insert the original columns. Legacy rows reconstruct their monthly grant from the current legacy tier/duration columns at checkout, so existing Admin edits remain effective in P1. Explicit new offer metadata uses grant_spec. No Web Admin form, generic catalog endpoint, annual table switch, shadow comparison or nonmembership pricing change is included in P1.
+
+## 公众号「下一场」被动回复
+
+`/football/wechat/webhook` 的路径、签名及明文/加密封装不变。文字命令去掉全部空白并转小写后，`下一场`、`下一场id`、数字 `2`/`3` 共用门控；`1` 仍为邀请码。
+
+顺序为现有开关 → current-standard 比赛 ID → 公众号身份判定。关闭、无比赛或获取失败继续原缺省回复且不查身份；身份出错 fail closed。有效等级达到 `MATCH_ID_UNLOCK_MINIMUM_TIER` 或已解锁本场才返回 ID，过期等级沿用现有回落规则。ID 解析失败仍可按等级授权，不能按解锁授权。
+
+身份端口仅执行一条按 active 账号公众号 openid 读取等级、到期时间及本场解锁的 SELECT；None 比赛 ID 使用 CASE 跳过解锁子查询。无迁移、配置键或系统配置值修改。每次命令记录 `next_match_id_reply decision=...`，不记录 ID/openid 或原始上游错误。

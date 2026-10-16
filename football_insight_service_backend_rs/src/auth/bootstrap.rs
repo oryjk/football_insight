@@ -5,6 +5,7 @@ use chrono::Duration;
 use sqlx::PgPool;
 
 use crate::{
+    auth::ports::official_account_match_id_access_port::OfficialAccountMatchIdAccessPort,
     auth::{
         adapters::{
             integration::{
@@ -21,8 +22,8 @@ use crate::{
             bind_wechat_mini_program_account::BindWechatMiniProgramAccountUseCase,
             get_current_user::GetCurrentUserUseCase,
             handle_wechat_webhook::HandleWechatWebhookUseCase,
-            login_with_mini_wechat::CompleteMiniWechatLoginUseCase,
             login_as_h5_test_user::LoginAsH5TestUserUseCase,
+            login_with_mini_wechat::CompleteMiniWechatLoginUseCase,
             login_with_password::LoginWithPasswordUseCase,
             login_with_wechat::CompleteWechatLoginUseCase, logout::LogoutUseCase,
             register_with_invite::RegisterWithInviteUseCase,
@@ -44,6 +45,7 @@ pub fn build_auth(
     pool: PgPool,
     config: &AppConfig,
     system_config_port: Arc<dyn SystemConfigPort>,
+    official_account_access_port: Arc<dyn OfficialAccountMatchIdAccessPort>,
 ) -> AuthBootstrap {
     let auth_repository = Arc::new(PostgresAuthRepository::new(pool));
     let password_port = Arc::new(Argon2PasswordPort);
@@ -123,6 +125,7 @@ pub fn build_auth(
         wechat_crypto_port,
         current_standard_match_port,
         system_config_port,
+        official_account_access_port,
     ));
     let auth_web_config = Arc::new(AuthWebConfig {
         wechat_app_id: config.wechat_app_id.clone(),

@@ -1,6 +1,7 @@
 pub mod auth_repository;
-pub mod h5_test_login_port;
 pub mod current_standard_match_port;
+pub mod h5_test_login_port;
+pub mod official_account_match_id_access_port;
 pub mod password_port;
 pub mod token_port;
 pub mod user_membership_port;

@@ -3,6 +3,8 @@ use std::sync::Arc;
 use axum::{Router, routing::get};
 use sqlx::PgPool;
 
+use crate::match_id_unlock::adapters::persistence::postgres_official_account_match_id_access::PostgresOfficialAccountMatchIdAccess;
+
 use crate::{
     activity::bootstrap::build_activity_routes, admin::bootstrap::build_admin_routes,
     ai::bootstrap::build_ai_routes, auth::bootstrap::build_auth,
@@ -28,6 +30,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         pool.clone(),
         config,
         system_config.system_config_port.clone(),
+        Arc::new(PostgresOfficialAccountMatchIdAccess::new(pool.clone())),
     );
     let activity_routes = build_activity_routes(pool.clone(), auth.token_port.clone());
     let ai_routes = build_ai_routes(
