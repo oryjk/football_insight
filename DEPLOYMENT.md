@@ -271,7 +271,7 @@ ssh peiqian 'curl -s http://127.0.0.1:8092/api/v1/ticket-watch/best-windows'
 
 ### 回滚与排查
 
-- 关闭功能：`systemctl disable --now ticket-restock-profiles.timer` 并 `docker stop ticket-restock-profile-server`；football 面板会因快照读取失败静默隐藏，其他功能不受影响。
+- 关闭功能：`systemctl disable --now ticket-restock-profiles.timer` 并 `docker stop ticket-restock-profile-server`；football 后端刷新失败时会保留上一次成功的聚合结果继续展示，重启 football 容器后（缓存清空且读不到快照）面板才会静默隐藏，其他功能不受影响。
 - 面板消失：先看 `best-windows` 接口的 `status`（`ok` / `insufficient` / `unavailable`），再看 4001 读接口和 `data/restock-profiles` 是否有最新比赛的快照；最近 8 场里没就绪的比赛会被跳过，不影响其余样本。
 - 批处理失败：单场失败只记录并继续，整轮结束时才以非零退出；`journalctl -u ticket-restock-profiles.service` 看是哪场、什么原因。
 
