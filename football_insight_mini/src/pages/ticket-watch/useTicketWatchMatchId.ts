@@ -1,3 +1,4 @@
+import { startPaymentAttempt } from '../../composables/paymentTelemetry'
 import { prepareVirtualPayment } from '../../composables/prepareVirtualPayment'
 import {
   createMatchIdOrder,
@@ -202,6 +203,9 @@ export function useTicketWatchMatchId(
       return
     }
 
+    const attempt = startPaymentAttempt('match_id_unlock', String(match.match_id))
+    attempt.report('purchase_tapped')
+    let telemetryStage: 'session' | 'order' | 'payment' = 'session'
     matchIdSheetState.value = 'paying'
     const requestRevision = session.revision.value
     const requestGeneration = currentBoardGeneration.value
@@ -217,19 +221,23 @@ export function useTicketWatchMatchId(
     try {
       await prepareVirtualPayment()
       if (isStale()) return
-      const order = await createMatchIdOrder(match.match_id)
+      telemetryStage = 'order'
+      attempt.report('order_create_requested')
+      const order = await createMatchIdOrder(match.match_id, attempt.attemptId)
+      attempt.bindOrder(order.order_no)
+      telemetryStage = 'payment'
 
       // 上下文（含 A→B→A 后的同名比赛）已失效的旧订单不得拉起微信支付。
       if (isStale()) {
         return
       }
-      await requestTicketWatchPayment(order.wx_pay_params)
+      await requestTicketWatchPayment(order.wx_pay_params, attempt)
       // 原生支付等待期间上下文可能已失效：已执行的真实支付不取消，
       // 但失效页面不再发起确认读与后续结果发布。
       if (isStale()) {
         return
       }
-      const paid = await waitForPaidOrder(order.order_no, () => !isStale())
+      const paid = await waitForPaidOrder(order.order_no, () => !isStale(), attempt)
       if (isStale()) {
         return
       }
@@ -244,6 +252,8 @@ export function useTicketWatchMatchId(
         })
       }
     } catch (error) {
+      if (telemetryStage === 'session') attempt.report('session_prepare_failed', { error_msg: extractApiErrorMessage(error, '下单失败') })
+      if (telemetryStage === 'order') attempt.report('order_create_failed', { error_msg: extractApiErrorMessage(error, '下单失败'), detail: error instanceof ApiRequestError ? { http_status: error.statusCode } : undefined })
       if (isStale()) {
         return
       }

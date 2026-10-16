@@ -1,3 +1,4 @@
+import { startPaymentAttempt } from '../../composables/paymentTelemetry'
 import { prepareVirtualPayment } from '../../composables/prepareVirtualPayment'
 import {
   createRefluxSubscriptionOrder,
@@ -5,7 +6,7 @@ import {
   getRefluxSubscriptionStatus,
 } from '../../api/ticketWatch'
 
-import { extractApiErrorMessage } from '../../utils/apiError'
+import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
 import { useAppSession, type AppSession } from '../../stores/appSession'
 import type { TicketWatchMatchSummary } from '../../types/ticketWatch'
 
@@ -243,29 +244,36 @@ export function useTicketWatchSubscription(
     const requestGeneration = currentBoardGeneration.value
     const teamCode = selectedTeam.value
     const owner = ++submitRequestOwner
+    const attempt = startPaymentAttempt('reflux_subscription', selectedRefluxSubscriptionPlanCode.value)
+    attempt.report('purchase_tapped')
+    let telemetryStage: 'session' | 'order' | 'payment' = 'session'
     refluxSubscriptionSubmitting.value = true
 
     try {
       await prepareVirtualPayment()
       if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) return
+      telemetryStage = 'order'
+      attempt.report('order_create_requested')
       const order = await createRefluxSubscriptionOrder({
         plan_code: selectedRefluxSubscriptionPlanCode.value,
         team_code: teamCode,
         match_id: match.match_id,
         email,
-      })
+      }, attempt.attemptId)
+      attempt.bindOrder(order.order_no)
+      telemetryStage = 'payment'
 
       // 上下文（含 A→B→A 后的同名比赛）已失效的旧订单不得拉起微信支付。
       if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) {
         return
       }
-      await requestTicketWatchPayment(order.params)
+      await requestTicketWatchPayment(order.params, attempt)
       // 原生支付等待期间上下文可能已失效（reset/换比赛/切账号）：
       // 已执行的真实支付不取消，但失效页面不再发起确认读与后续结果发布。
       if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) {
         return
       }
-      const paid = await waitForPaidOrder(order.order_no, () => isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode))
+      const paid = await waitForPaidOrder(order.order_no, () => isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode), attempt)
       if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) {
         return
       }
@@ -277,6 +285,8 @@ export function useTicketWatchSubscription(
         uni.showToast({ title: '支付成功，开通确认中', icon: 'none' })
       }
     } catch (error) {
+      if (telemetryStage === 'session') attempt.report('session_prepare_failed', { error_msg: extractApiErrorMessage(error, '订阅下单失败') })
+      if (telemetryStage === 'order') attempt.report('order_create_failed', { error_msg: extractApiErrorMessage(error, '订阅下单失败'), detail: error instanceof ApiRequestError ? { http_status: error.statusCode } : undefined })
       if (!isCurrentSnapshot(requestRevision, requestGeneration, match.match_id, teamCode)) {
         return
       }

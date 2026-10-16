@@ -38,6 +38,7 @@ interface RequestOptions {
   method?: HttpMethod
   data?: RequestBody
   auth?: boolean
+  headers?: Record<string, string>
   /** Background statistics must not interrupt reading with a network dialog. */
   silentNetworkError?: boolean
 }
@@ -76,6 +77,7 @@ export function request<TResponse>(
   return new Promise((resolve, reject) => {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      ...options.headers,
     }
 
     if (options.auth) {

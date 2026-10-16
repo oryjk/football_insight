@@ -1,7 +1,7 @@
 # 支付漏斗可观测化交付与验证
 
 日期：2026-10-16。设计：`docs/superpowers/specs/2026-10-16-payment-observability-design.md`。
-基线：main `38ea2c0`。后端与小程序分两个英文 subject 提交，均带 Co-Authored-By。
+基线：main `38ea2c0`。后端提交 `9c81a3e`；小程序为紧随其后的独立提交，均带 Co-Authored-By。
 
 ## 实现结果与发布边界
 

@@ -1,3 +1,5 @@
+import { classifyPaymentFailure, safelyReportPaymentEvent } from '../composables/paymentTelemetry'
+import type { PaymentAttempt } from '../types/paymentTelemetry'
 import type { DigitalPaymentParams, VirtualPayParams } from '../types/payment'
 
 type VirtualPaymentFailure = { errCode?: number; errMsg?: string }
@@ -14,7 +16,7 @@ export function canUseVirtualPayment(): boolean {
   return supported
 }
 
-export function requestDigitalPayment(params: DigitalPaymentParams): Promise<void> {
+export function requestDigitalPayment(params: DigitalPaymentParams, attempt?: PaymentAttempt): Promise<void> {
   if (!('mode' in params) || params.mode !== 'short_series_goods' || !params.signData || !params.paySig || !params.signature) {
     return Promise.reject(new Error('支付配置已更新，请更新小程序后重试'))
   }
@@ -23,11 +25,15 @@ export function requestDigitalPayment(params: DigitalPaymentParams): Promise<voi
     // #ifdef MP-WEIXIN
     // uni-app proxies unknown WeChat APIs to the underlying platform.
     const api = uni as unknown as VirtualPaymentApi
+    safelyReportPaymentEvent(attempt, 'pay_sheet_invoked')
     api.requestVirtualPayment!({
       mode: params.mode, signData: params.signData, paySig: params.paySig, signature: params.signature,
-      success: () => resolve(),
-      fail: (error) => reject(new Error(error.errCode === -2 || /cancel|取消/i.test(error.errMsg || '')
-        ? '支付已取消' : error.errCode === -15007 ? '支付会话已过期，请重新购买' : '支付未完成，请稍后重试')),
+      success: () => { safelyReportPaymentEvent(attempt, 'pay_success_client'); resolve() },
+      fail: (error) => {
+        if (attempt) { const failure = classifyPaymentFailure(error); safelyReportPaymentEvent(attempt, failure.event, { error_code: failure.error_code, error_msg: failure.error_msg }) }
+        reject(new Error(error.errCode === -2 || /cancel|取消/i.test(error.errMsg || '')
+        ? '支付已取消' : error.errCode === -15007 ? '支付会话已过期，请重新购买' : '支付未完成，请稍后重试'))
+      },
     })
     return
     // #endif

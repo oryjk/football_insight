@@ -44,4 +44,4 @@
    - [x] Restart local backend with deploy/local-test/up.sh; cargo test and cargo check (no production writes).
    - [x] bun run type-check, bun test, bun run check:boundaries, bun run verify:mp-components.
    - [x] Review full diff against spec section 11; record deviations, omitted DB tests, real command outcomes and file list in delivery report.
-   - [ ] Update FEATURES.md and CHANGELOG.md; create backend then mini commits, push main. No production migration/deployment/upload.
+   - [x] Update FEATURES.md and CHANGELOG.md; create backend then mini commits, push main. No production migration/deployment/upload.

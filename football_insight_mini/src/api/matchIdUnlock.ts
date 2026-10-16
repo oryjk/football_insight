@@ -19,9 +19,10 @@ export function getMatchIdEntitlement(matchId: number): Promise<MatchIdEntitleme
   })
 }
 
-export function createMatchIdOrder(matchId: number): Promise<CreateMatchIdOrderResponse> {
+export function createMatchIdOrder(matchId: number, attemptId?: string): Promise<CreateMatchIdOrderResponse> {
   return request<CreateMatchIdOrderResponse>({
     url: '/match-id/order',
+    ...(attemptId ? { headers: { 'X-Payment-Attempt-Id': attemptId } } : {}),
     method: 'POST',
     auth: true,
     data: {

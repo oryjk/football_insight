@@ -48,3 +48,27 @@ test('unsupported clients reject before calling any payment API', async () => {
   const error = await requestTicketWatchPayment(virtualParams).catch((error: Error) => error)
   expect((error as Error).message.includes('最新版微信')).toBe(true)
 })
+
+
+test('payment hooks retain raw failures and existing user-facing cancellation and expiry behavior', async () => {
+  for (const [failure, expectedEvent, expectedMessage] of [
+    [{ errCode: -2, errMsg: 'raw provider message' }, 'pay_cancelled', '支付已取消'],
+    [{ errCode: -3, errMsg: 'CANCEL' }, 'pay_cancelled', '支付已取消'],
+    [{ errCode: -15007, errMsg: 'expired' }, 'pay_failed', '支付会话已过期，请重新购买'],
+  ] as const) {
+    const events: any[] = []
+    testGlobal.uni = { canIUse: () => true, requestVirtualPayment: (options: any) => options.fail(failure) } as unknown as typeof uni
+    const attempt = { attemptId: 'id', report: (event: string, extra?: unknown) => { events.push({ event, ...extra as object }) }, bindOrder: () => {} }
+    expect((await requestTicketWatchPayment(virtualParams, attempt).catch(error => error)).message).toBe(expectedMessage)
+    expect(events).toEqual([{ event: 'pay_sheet_invoked' }, { event: expectedEvent, error_code: String(failure.errCode), error_msg: failure.errMsg }])
+    expect((await requestTicketWatchPayment(virtualParams).catch(error => error)).message).toBe(expectedMessage)
+  }
+})
+
+test('payment success reports invoked then success and swallowing observer errors preserves resolution', async () => {
+  const events: string[] = []
+  testGlobal.uni = { canIUse: () => true, requestVirtualPayment: (options: any) => options.success() } as unknown as typeof uni
+  await requestTicketWatchPayment(virtualParams, { attemptId: 'id', report: (event) => { events.push(event) }, bindOrder: () => {} })
+  expect(events).toEqual(['pay_sheet_invoked', 'pay_success_client'])
+  await expect(requestTicketWatchPayment(virtualParams, { attemptId: 'id', report: () => { throw new Error('observer failed') }, bindOrder: () => {} })).resolves.toBe(undefined)
+})

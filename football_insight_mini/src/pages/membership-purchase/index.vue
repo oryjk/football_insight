@@ -96,11 +96,12 @@ import MembershipTierList from './components/MembershipTierList.vue'
 import { buildMembershipBenefitPreview, buildMembershipTierSummary } from '../../utils/membershipBenefits'
 import { goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { getMembershipProduct, createMembershipOrder, getVirtualPaymentStatus } from '../../api/payment'
+import { startPaymentAttempt } from '../../composables/paymentTelemetry'
 import { prepareVirtualPayment } from '../../composables/prepareVirtualPayment'
 import { waitForPaidOrder } from '../../composables/confirmPaidOrder'
 import { canUseVirtualPayment, requestDigitalPayment } from '../../utils/virtualPayment'
 import { useRuntimeConfig } from '../../stores/runtimeConfig'
-import { extractApiErrorMessage } from '../../utils/apiError'
+import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
 import { reportPageActivity } from '../../utils/userActivity'
@@ -274,23 +275,31 @@ async function handlePurchase() {
   if (loading.value || !paymentAvailable.value) return
   if (!selectedProduct.value) return
   if (!agreementAccepted.value) {
+    startPaymentAttempt('membership', selectedProduct.value.target_tier).report('agreement_prompted')
     promptAgreement()
     return
   }
   const revision = session.revision.value
   const targetTier = selectedProduct.value.target_tier
   const isCurrent = () => session.revision.value === revision
+  const attempt = startPaymentAttempt('membership', targetTier)
+  attempt.report('purchase_tapped')
+  let telemetryStage: 'session' | 'order' | 'payment' = 'session'
   loading.value = true
   let paymentCompleted = false
   try {
     await prepareVirtualPayment()
     if (!isCurrent()) return
-    const order = await createMembershipOrder(targetTier)
+    telemetryStage = 'order'
+    attempt.report('order_create_requested')
+    const order = await createMembershipOrder(targetTier, attempt.attemptId)
+    attempt.bindOrder(order.order_no)
+    telemetryStage = 'payment'
     if (!isCurrent()) return
-    await requestDigitalPayment(order.params)
+    await requestDigitalPayment(order.params, attempt)
     paymentCompleted = true
     if (!isCurrent()) return
-    const confirmed = await waitForPaidOrder(order.order_no, isCurrent)
+    const confirmed = await waitForPaidOrder(order.order_no, isCurrent, attempt)
     if (!isCurrent()) return
     if (!confirmed) {
       uni.showToast({ title: '支付已完成，会员确认中，请稍后刷新', icon: 'none' })
@@ -308,6 +317,8 @@ async function handlePurchase() {
       },
     })
   } catch (error) {
+    if (telemetryStage === 'session') attempt.report('session_prepare_failed', { error_msg: extractApiErrorMessage(error, '购买未完成，请重试') })
+    if (telemetryStage === 'order') attempt.report('order_create_failed', { error_msg: extractApiErrorMessage(error, '购买未完成，请重试'), detail: error instanceof ApiRequestError ? { http_status: error.statusCode } : undefined })
     if (!isCurrent()) return
     uni.showToast({ title: paymentCompleted ? '支付已完成，请稍后刷新会员状态' : extractApiErrorMessage(error, '购买未完成，请重试'), icon: 'none' })
   } finally {

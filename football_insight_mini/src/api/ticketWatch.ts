@@ -205,9 +205,10 @@ export function createRefluxSubscriptionOrder(input: {
   team_code: string
   match_id?: number | null
   email: string
-}): Promise<CreateRefluxSubscriptionOrderResponse> {
+}, attemptId?: string): Promise<CreateRefluxSubscriptionOrderResponse> {
   return request<CreateRefluxSubscriptionOrderResponse>({
     url: '/ticket-watch/reflux-subscriptions/order',
+    ...(attemptId ? { headers: { 'X-Payment-Attempt-Id': attemptId } } : {}),
     method: 'POST',
     auth: true,
     data: input,

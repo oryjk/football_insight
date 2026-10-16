@@ -1,3 +1,4 @@
+import type { PaymentEventsPayload } from '../types/paymentTelemetry'
 import { request } from '../utils/request'
 import type { DigitalPaymentParams, MembershipProduct, MembershipProductOption } from '../types/payment'
 
@@ -25,9 +26,10 @@ export function getMembershipProduct(): Promise<MembershipProduct> {
   return request<MembershipProduct>({ url: '/payment/membership-product', auth: true })
 }
 
-export function createMembershipOrder(targetTier: string): Promise<CreateOrderResponse> {
+export function createMembershipOrder(targetTier: string, attemptId?: string): Promise<CreateOrderResponse> {
   return request<CreateOrderResponse>({
     url: '/payment/membership/order',
+    ...(attemptId ? { headers: { 'X-Payment-Attempt-Id': attemptId } } : {}),
     method: 'POST',
     auth: true,
     data: {
@@ -41,4 +43,8 @@ export function getOrderStatus(orderNo: string): Promise<OrderStatusResponse> {
     url: `/payment/order/${orderNo}`,
     auth: true,
   })
+}
+
+export function reportPaymentEvents(payload: PaymentEventsPayload): Promise<void> {
+  return request<void>({ url: '/payment/events', method: 'POST', auth: true, silentNetworkError: true, data: payload })
 }
