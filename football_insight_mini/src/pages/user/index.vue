@@ -117,7 +117,6 @@ import UserWechatBindSheet from './components/UserWechatBindSheet.vue'
 import UserNotificationEmailSheet from './components/UserNotificationEmailSheet.vue'
 import UserH5TestLoginPanel from './components/UserH5TestLoginPanel.vue'
 import badgeCheckIcon from '../../static/user/badge-check.svg'
-import calendarCheckIcon from '../../static/user/calendar-check.svg'
 import calendarDaysIcon from '../../static/user/calendar-days.svg'
 import logInIcon from '../../static/user/log-in.svg'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
@@ -132,7 +131,6 @@ import { createUserLoginFlow, type MiniWechatBindForm } from './loginFlow'
 import {
   buildUserAccountInfoItems,
   canShowMembershipPurchaseEntry,
-  formatMembershipExpiryLabel,
   formatNotificationEmailLabel,
   resolveCurrentUserInviteCode,
   resolveUserMembershipMeta,
@@ -212,7 +210,6 @@ const loginPresentation = resolveUserLoginPresentation(isH5)
 const accountInfoIconMap: Record<UserAccountInfoItem['iconName'], string> = {
   'badge-check': badgeCheckIcon,
   'calendar-days': calendarDaysIcon,
-  'calendar-check': calendarCheckIcon,
   'log-in': logInIcon,
 }
 
@@ -237,9 +234,6 @@ const joinedAtLabel = computed(() => {
   return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
 })
 
-const membershipExpiresAtLabel = computed(() =>
-  formatMembershipExpiryLabel(currentUser.value?.membership_expires_at),
-)
 const notificationEmailLabel = computed(() =>
   formatNotificationEmailLabel(notificationEmail.value),
 )
@@ -276,7 +270,6 @@ const accountInfoItems = computed<UserAccountInfoItem[]>(() => {
   return buildUserAccountInfoItems({
     hasWechatBinding: currentUser.value.has_wechat_binding,
     joinedAtLabel: joinedAtLabel.value,
-    membershipExpiresAtLabel: membershipExpiresAtLabel.value,
   })
 })
 function openSettingsPage() {

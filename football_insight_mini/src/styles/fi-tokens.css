@@ -22,6 +22,10 @@ page {
   --fi-primitive-hat-trick-bg: #fff4d6;
   --fi-primitive-ink: #15161b;
   --fi-primitive-ink-deep: #121212;
+  --fi-primitive-member-gold: #e9c477;
+  --fi-primitive-icon-sm: 32rpx;
+  --fi-primitive-icon-md: 40rpx;
+  --fi-primitive-avatar-md: 96rpx;
   --fi-primitive-grey-text: #8f9198;
   --fi-primitive-grey-text-deep: #6d7280;
   --fi-primitive-grey-text-soft: #7a7f8b;
@@ -40,6 +44,7 @@ page {
   --fi-primitive-topic-card-height: 420rpx;
   --fi-primitive-topic-gallery-height: 440rpx;
   --fi-primitive-ink-rgb: 21, 22, 27;
+  --fi-primitive-white-rgb: 255, 255, 255;
 
   /* ===== Primitive：间距（数字刻度，单位 rpx） ===== */
   --fi-primitive-space-4: 4rpx;
@@ -110,6 +115,11 @@ page {
   /* ===== Semantic：颜色 ===== */
   /* 兼容 uni.css 时代的既有语义名（值保持不变） */
   --fi-color-primary: var(--fi-primitive-red);
+  --fi-color-member-card-bg: var(--fi-primitive-ink);
+  --fi-color-member-card-accent: var(--fi-primitive-member-gold);
+  --fi-icon-sm: var(--fi-primitive-icon-sm);
+  --fi-icon-md: var(--fi-primitive-icon-md);
+  --fi-avatar-md: var(--fi-primitive-avatar-md);
   --fi-color-ranking-pressed: var(--fi-primitive-ranking-pressed);
   --fi-color-goal-bar: var(--fi-primitive-goal-bar);
   --fi-color-hat-trick-text: var(--fi-primitive-hat-trick-text);

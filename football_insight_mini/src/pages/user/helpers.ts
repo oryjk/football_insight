@@ -4,7 +4,7 @@ export function resolveCurrentUserInviteCode(inviteCode: string | null | undefin
 
 export interface UserAccountInfoItem {
   key: string
-  iconName: 'badge-check' | 'calendar-days' | 'calendar-check' | 'log-in'
+  iconName: 'badge-check' | 'calendar-days' | 'log-in'
   label: string
   value: string
 }
@@ -22,7 +22,6 @@ export interface UserUpgradeStep {
 interface BuildUserAccountInfoOptions {
   hasWechatBinding: boolean
   joinedAtLabel: string
-  membershipExpiresAtLabel: string
 }
 
 interface MembershipTierGuideLike {
@@ -48,12 +47,6 @@ export function buildUserAccountInfoItems(
       iconName: 'calendar-days',
       label: '加入时间',
       value: options.joinedAtLabel,
-    },
-    {
-      key: 'membership-expiry',
-      iconName: 'calendar-check',
-      label: '会员有效期',
-      value: options.membershipExpiresAtLabel,
     },
     {
       key: 'login',
@@ -121,6 +114,13 @@ export function formatMembershipExpiryLabel(
   }
 
   return `有效至 ${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
+}
+
+/** 会员卡上的有效期文案：会员有效期只在会员卡里展示一次，账户信息列表不再重复。 */
+export function formatMembershipCardExpiry(expiresAt: string | null | undefined): string {
+  const label = formatMembershipExpiryLabel(expiresAt)
+  if (label === '长期有效' || label === '已过期') return label
+  return `${label.replace(/^有效至\s*/, '')} 到期`
 }
 
 export function isValidNotificationEmail(email: string): boolean {

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   buildUserAccountInfoItems,
+  formatMembershipCardExpiry,
   buildUserUpgradeSteps,
   canShowMembershipPurchaseEntry,
   formatMembershipExpiryLabel,
@@ -29,13 +30,31 @@ describe('buildUserAccountInfoItems', () => {
     expect(buildUserAccountInfoItems({
       hasWechatBinding: true,
       joinedAtLabel: '2026-4-8',
-      membershipExpiresAtLabel: '有效至 2027-4-24',
     })).toEqual([
       { key: 'identity', iconName: 'badge-check', label: '身份状态', value: '微信会员' },
       { key: 'joined-at', iconName: 'calendar-days', label: '加入时间', value: '2026-4-8' },
-      { key: 'membership-expiry', iconName: 'calendar-check', label: '会员有效期', value: '有效至 2027-4-24' },
       { key: 'login', iconName: 'log-in', label: '登录状态', value: '已绑定微信' },
     ])
+  })
+
+  test('does not repeat the membership expiry, which the membership card already shows', () => {
+    const keys = buildUserAccountInfoItems({ hasWechatBinding: false, joinedAtLabel: '' }).map(item => item.key)
+    expect(keys.includes('membership-expiry')).toBe(false)
+  })
+})
+
+describe('formatMembershipCardExpiry', () => {
+  test('perpetual membership reads as long-term', () => {
+    expect(formatMembershipCardExpiry(null)).toBe('长期有效')
+    expect(formatMembershipCardExpiry(undefined)).toBe('长期有效')
+  })
+
+  test('a future expiration shows the date followed by 到期', () => {
+    expect(formatMembershipCardExpiry('2099-04-24T12:00:00Z')).toBe('2099-4-24 到期')
+  })
+
+  test('a past expiration reads as expired', () => {
+    expect(formatMembershipCardExpiry('2020-01-01T00:00:00Z')).toBe('已过期')
   })
 })
 

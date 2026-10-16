@@ -5,15 +5,11 @@
         <text class="info-panel__title">账户信息</text>
       </view>
 
-      <view class="account-info-grid">
+      <view class="account-info-list">
         <view v-for="item in items" :key="item.key" class="account-info-item">
-          <view class="account-info-item__icon">
-            <image class="account-info-item__icon-image" :src="iconMap[item.iconName]" mode="aspectFit" />
-          </view>
-          <view class="account-info-item__body">
-            <text class="account-info-item__label">{{ item.label }}</text>
-            <text class="account-info-item__value">{{ item.value }}</text>
-          </view>
+          <image class="account-info-item__icon" :src="iconMap[item.iconName]" mode="aspectFit" />
+          <text class="account-info-item__label">{{ item.label }}</text>
+          <text class="account-info-item__value">{{ item.value }}</text>
         </view>
       </view>
     </view>
@@ -137,57 +133,44 @@ const emit = defineEmits<{
   line-height: 1;
 }
 
-.account-info-grid {
-  margin-top: var(--fi-space-22);
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--fi-space-12);
+.account-info-list {
+  margin-top: var(--fi-space-8);
+  display: flex;
+  flex-direction: column;
 }
 
 .account-info-item {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--fi-space-14);
-  padding: var(--fi-space-18);
-  box-sizing: border-box;
-  border-radius: 22rpx;
-  border: 1rpx solid rgba(232, 235, 241, 0.98);
-  background: rgba(248, 249, 251, 0.78);
+  gap: var(--fi-space-16);
+  padding: var(--fi-space-20) 0;
+}
+
+.account-info-item + .account-info-item {
+  border-top: var(--fi-border-width) solid var(--fi-color-divider);
 }
 
 .account-info-item__icon {
-  width: 38rpx;
-  height: 38rpx;
+  width: var(--fi-icon-md);
+  height: var(--fi-icon-md);
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.account-info-item__icon-image {
-  width: 36rpx;
-  height: 36rpx;
-}
-
-.account-info-item__body {
-  min-width: 0;
-  flex: 1;
-  display: grid;
-  gap: var(--fi-space-10);
 }
 
 .account-info-item__label {
-  color: #969ca8;
-  font-size: var(--fi-font-22);
-  line-height: 1;
+  flex: 1;
+  min-width: 0;
+  color: var(--fi-color-text-secondary);
+  font-size: var(--fi-font-26);
+  line-height: var(--fi-leading-none);
 }
 
 .account-info-item__value {
-  color: #17181c;
-  font-size: 25rpx;
-  font-weight: 800;
-  line-height: 1.15;
-  word-break: break-word;
+  flex-shrink: 0;
+  color: var(--fi-color-text-primary);
+  font-size: var(--fi-font-26);
+  font-weight: var(--fi-weight-extrabold);
+  line-height: var(--fi-leading-none);
+  text-align: right;
 }
 </style>
