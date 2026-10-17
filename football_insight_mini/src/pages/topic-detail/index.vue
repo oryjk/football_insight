@@ -8,14 +8,17 @@
     <template v-else-if="item">
       <FiTopicTeamTags v-if="timeline.tags.value.length" :tags="timeline.tags.value" :selected-team-id="timeline.selectedTeamId.value" @select="selectTimelineTeam" />
       <text class="topic-detail__title">{{ item.title }}</text>
-      <text class="topic-detail__meta">{{ item.publishedLabel }} · 约 {{ item.readMinutes }} 分钟阅读</text>
+      <view class="topic-detail__meta-row">
+        <text class="topic-detail__meta">{{ item.publishedLabel }} · 约 {{ item.readMinutes }} 分钟阅读</text>
+        <view class="topic-detail__size" role="button" aria-label="调整文字大小" @tap="chooseReadingSize"><text>Aa</text></view>
+      </view>
       <view class="topic-detail__heat"><FiTopicHeat :value="topicHeatValue(item.id, item.heat)" /></view>
       <view class="topic-detail__audio"><FiTopicAudioEntry :ready="audio.availableIds.value.includes(item.id)" :playing="audio.status.value === 'playing'" :loading="audio.status.value === 'loading'" @play="audio.toggle(item.id)" /></view>
       <FiTopicAudioPlayer v-if="audio.activeId.value" :title="item.title" :status="audio.status.value" :current-time="audio.currentTime.value" :duration="audio.duration.value" :error-message="audio.errorMessage.value" @toggle="audio.toggle(item.id)" @seek="audio.seek" @close="audio.stop" />
       <view v-if="item.images?.length" class="topic-detail__gallery">
         <TopicImageGallery :key="item.id" :images="item.images" @preview="previewPhoto" />
       </view>
-      <text v-for="(paragraph, index) in item.paragraphs" :key="index" class="topic-detail__paragraph">{{ paragraph }}</text>
+      <text v-for="(paragraph, index) in item.paragraphs" :key="index" class="topic-detail__paragraph" :style="{ fontSize: `${bodyFontRpx}rpx` }">{{ paragraph }}</text>
       <view class="topic-detail__sources">
         <text class="topic-detail__sources-heading">来源</text>
         <view v-for="(source, index) in item.sources" :key="source.url" class="topic-detail__source">
@@ -51,6 +54,7 @@ import TopicImageGallery from './components/TopicImageGallery.vue'
 import TopicTimeline from './components/TopicTimeline.vue'
 import FiTopicTeamTags from '../../components/topics/FiTopicTeamTags.vue'
 import { useTopicTimeline } from './useTopicTimeline'
+import { READING_SIZES, loadReadingSize, readingSizeMenu, readingSizeRpx, saveReadingSize } from './readingSize'
 import type { DailyTopicItem } from '../../types/dailyTopic'
 import { DAILY_TOPICS_TEAM_ID, editionForTopic, isTopicSourceUrl, mapTopicDetail, topicDetailUrl } from '../../utils/dailyTopics'
 import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
@@ -122,6 +126,20 @@ onShareAppMessage(() => {
   return { ...fallback, promise: shareCard.prepare(article).then(imageUrl => buildTopicSharePayload(article, imageUrl)) }
 })
 onScopeDispose(() => { revision += 1 })
+
+const readingSize = ref(loadReadingSize())
+const bodyFontRpx = computed(() => readingSizeRpx(readingSize.value))
+function chooseReadingSize() {
+  uni.showActionSheet({
+    itemList: readingSizeMenu(readingSize.value),
+    success: ({ tapIndex }) => {
+      const chosen = READING_SIZES[tapIndex]
+      if (!chosen) return
+      readingSize.value = chosen.value
+      saveReadingSize(chosen.value)
+    },
+  })
+}
 </script>
 
 <style scoped>
@@ -130,11 +148,14 @@ onScopeDispose(() => { revision += 1 })
 .topic-detail { padding: var(--fi-space-28) var(--fi-space-28) var(--fi-space-40); background: var(--fi-color-page); }
 .topic-detail__timeline { margin-top: var(--fi-space-32); }
 .topic-detail__title { display: block; margin-top: var(--fi-space-16); color: var(--fi-color-text-primary); font-size: var(--fi-font-36); font-weight: var(--fi-weight-extrabold); line-height: var(--fi-leading-normal); }
+.topic-detail__meta-row { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-16); margin-top: var(--fi-space-18); }
+.topic-detail__meta-row .topic-detail__meta { margin-top: 0; }
+.topic-detail__size { flex-shrink: 0; padding: var(--fi-space-4) var(--fi-space-20); border: var(--fi-border-width) solid var(--fi-color-divider); border-radius: var(--fi-radius-round); color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); line-height: var(--fi-leading-normal); font-weight: var(--fi-weight-bold); }
 .topic-detail__meta { display: block; margin-top: var(--fi-space-18); color: var(--fi-color-text-caption); font-size: var(--fi-font-22); line-height: var(--fi-leading-normal); }
 .topic-detail__heat { margin-top: var(--fi-space-16); }
 .topic-detail__audio { margin: var(--fi-space-24) 0; }
 .topic-detail__gallery { margin-top: var(--fi-space-24); }
-.topic-detail__paragraph { display: block; margin-top: var(--fi-space-28); color: var(--fi-color-text-primary); font-size: var(--fi-font-30); line-height: var(--fi-leading-relaxed); white-space: pre-wrap; }
+.topic-detail__paragraph { display: block; margin-top: var(--fi-space-28); color: var(--fi-color-text-primary); font-size: var(--fi-font-32); line-height: var(--fi-leading-relaxed); white-space: pre-wrap; }
 .topic-detail__sources { margin-top: var(--fi-space-32); padding-top: var(--fi-space-24); border-top: var(--fi-border-divider); }
 .topic-detail__sources-heading { display: block; color: var(--fi-color-text-primary); font-size: var(--fi-font-26); font-weight: var(--fi-weight-bold); }
 .topic-detail__source { margin-top: var(--fi-space-24); }
