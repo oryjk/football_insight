@@ -76,7 +76,7 @@ watch(() => props.edition.items.length, length => { if (activeIndex.value >= len
 .daily-topics__refresh-error { color: var(--fi-color-text-secondary); font-size: var(--fi-font-22); margin-bottom: var(--fi-space-16); }
 .daily-topics__heading-copy { min-width: 0; }
 .daily-topics__title-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--fi-space-16); }
-.daily-topics__title { color: var(--fi-color-text-primary); font-size: var(--fi-font-44); font-weight: var(--fi-weight-extrabold); line-height: var(--fi-leading-snug); }
+.daily-topics__title { color: var(--fi-color-text-primary); font-size: var(--fi-component-title-size); font-weight: var(--fi-component-title-weight); line-height: var(--fi-component-title-leading); }
 .daily-topics__date { color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); }
 .daily-topics__all { margin: 0; padding: var(--fi-space-8) 0 var(--fi-space-8) var(--fi-space-16); background: transparent; color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); line-height: var(--fi-leading-normal); flex-shrink: 0; }
 .daily-topics__all::after { border: 0; }

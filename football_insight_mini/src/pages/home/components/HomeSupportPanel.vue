@@ -227,9 +227,9 @@ const awayRankLabel = computed(() => {
 .support-home-panel__title {
   color: var(--fi-color-text-strong);
   flex-shrink: 0;
-  font-weight: var(--fi-weight-extrabold);
-  font-size: var(--fi-font-36);
-  line-height: var(--fi-leading-tight);
+  font-weight: var(--fi-component-title-weight);
+  font-size: var(--fi-component-title-size);
+  line-height: var(--fi-component-title-leading);
 }
 .support-home-panel__countdown {
   margin-left: auto;

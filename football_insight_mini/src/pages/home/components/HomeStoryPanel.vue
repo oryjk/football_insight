@@ -107,9 +107,9 @@ function openTechStats(match: HomePulseLeadMatch): void {
 .story-headline {
   display: block;
   color: var(--fi-color-text-strong);
-  font-size: 44rpx;
-  line-height: 1.16;
-  font-weight: 800;
+  font-size: var(--fi-component-title-size);
+  line-height: var(--fi-component-title-leading);
+  font-weight: var(--fi-component-title-weight);
 }
 
 .meta-note {
