@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onLaunch, onShow, onHide } from "@dcloudio/uni-app";
+import { watch } from "vue";
 import { useAppSession } from "./stores/appSession";
 import { useRuntimeConfig } from "./stores/runtimeConfig";
 import { useMiniReviewStatus } from "./stores/miniReview";
@@ -15,6 +16,17 @@ const allowSilentWechat =
   // #ifndef MP-WEIXIN
   false
   // #endif
+
+// 审核豁免按登录账号判定：账号登录、切换或退出后，用新身份重新查询审核状态。
+const appSession = useAppSession();
+watch(
+  () => appSession.currentUser.value?.id ?? null,
+  (userId, previousUserId) => {
+    if (userId !== previousUserId) {
+      void useMiniReviewStatus().refreshForIdentityChange().catch(() => {});
+    }
+  },
+);
 
 onLaunch(() => {
   console.log("Football Insight mini launch");

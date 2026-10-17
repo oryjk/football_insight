@@ -9,3 +9,4 @@ pub mod admin_payment_service;
 pub mod admin_paywall_service;
 pub mod admin_support_bases_service;
 pub mod admin_topic_readers_service;
+pub mod admin_review_exempt_service;

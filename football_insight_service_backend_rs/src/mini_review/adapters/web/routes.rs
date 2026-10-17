@@ -14,7 +14,10 @@ use crate::{
             get_review_status::GetReviewStatusUseCase,
             set_review_status_by_project_version::SetReviewStatusByProjectVersionUseCase,
         },
-        ports::mini_review_repository::MiniReviewRepository,
+        ports::{
+            mini_review_repository::MiniReviewRepository,
+            review_exemption_port::{NoReviewExemption, ReviewExemptionPort},
+        },
     },
 };
 
@@ -27,6 +30,24 @@ pub fn mini_review_routes(
     token_port: Arc<dyn TokenPort>,
     control_user_ids: Vec<uuid::Uuid>,
 ) -> Router {
+    mini_review_routes_with_exemption(
+        repository,
+        api_key,
+        token_port,
+        control_user_ids,
+        Arc::new(NoReviewExemption),
+    )
+}
+
+/// 与 mini_review_routes 相同，另外让名单内账号在审核中也看到非审核态。
+pub fn mini_review_routes_with_exemption(
+    repository: Arc<dyn MiniReviewRepository>,
+    api_key: Option<String>,
+    token_port: Arc<dyn TokenPort>,
+    control_user_ids: Vec<uuid::Uuid>,
+    exemption: Arc<dyn ReviewExemptionPort>,
+) -> Router {
+    let get_token_port = token_port.clone();
     let get_use_case = Arc::new(GetReviewStatusUseCase::new(repository.clone()));
     let allocate_use_case = Arc::new(AllocateReviewVersionUseCase::new(repository.clone()));
     let set_use_case = Arc::new(SetReviewStatusByProjectVersionUseCase::new(repository));
@@ -39,7 +60,15 @@ pub fn mini_review_routes(
     Router::new()
         .route(
             "/api/v1/mini-review/review-status",
-            get(move |query| get_review_status_handler(get_use_case.clone(), query)),
+            get(move |headers, query| {
+                get_review_status_handler(
+                    get_use_case.clone(),
+                    get_token_port.clone(),
+                    exemption.clone(),
+                    headers,
+                    query,
+                )
+            }),
         )
         .route(
             "/api/v1/mini-review/review-status",
@@ -196,6 +225,90 @@ mod tests {
         .unwrap();
         assert_eq!(payload["is_reviewing"], false);
         assert_eq!(payload["status_text"], "未登记版本");
+    }
+
+    struct FakeExemption {
+        exempt: Vec<Uuid>,
+        fail: bool,
+    }
+
+    #[async_trait]
+    impl crate::mini_review::ports::review_exemption_port::ReviewExemptionPort for FakeExemption {
+        async fn is_exempt(&self, user_id: Uuid) -> anyhow::Result<bool> {
+            if self.fail {
+                anyhow::bail!("lookup failed");
+            }
+            Ok(self.exempt.contains(&user_id))
+        }
+    }
+
+    /// Returns `is_reviewing` as seen by a caller presenting `token` (or none).
+    async fn reviewing_status_for(token: Option<String>, exemption: FakeExemption) -> (bool, String) {
+        let repository = Arc::new(FakeRepository::default());
+        repository
+            .create(MiniReviewStatus {
+                id: 0,
+                project_code: "football_insight_mini".to_string(),
+                version: "1.0.98".to_string(),
+                version_code: Version::parse("1.0.98").unwrap().code(),
+                is_reviewing: true,
+                status_text: "正在审核".to_string(),
+                created_at: fixed_now(),
+                updated_at: fixed_now(),
+            })
+            .await
+            .unwrap();
+        let app = super::mini_review_routes_with_exemption(
+            repository,
+            None,
+            test_token_port(),
+            Vec::new(),
+            Arc::new(exemption),
+        );
+        let mut request = Request::builder()
+            .method(Method::GET)
+            .uri("/api/v1/mini-review/review-status?project_code=football_insight_mini&version=1.0.98");
+        if let Some(token) = token {
+            request = request.header("authorization", format!("Bearer {token}"));
+        }
+        let response = app.oneshot(request.body(Body::empty()).unwrap()).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let payload: serde_json::Value = serde_json::from_slice(
+            &axum::body::to_bytes(response.into_body(), 1024 * 64).await.unwrap(),
+        )
+        .unwrap();
+        (
+            payload["is_reviewing"].as_bool().unwrap(),
+            payload["status_text"].as_str().unwrap().to_string(),
+        )
+    }
+
+    #[tokio::test]
+    async fn exempt_user_sees_a_non_reviewing_status_while_the_version_is_in_review() {
+        let user_id = Uuid::new_v4();
+        let token = issue_user_token(&test_token_port(), user_id);
+        let (reviewing, text) =
+            reviewing_status_for(Some(token), FakeExemption { exempt: vec![user_id], fail: false }).await;
+        assert!(!reviewing);
+        assert_eq!(text, "审核豁免账号");
+    }
+
+    #[tokio::test]
+    async fn non_exempt_anonymous_and_invalid_token_callers_still_see_the_review_status() {
+        let other = issue_user_token(&test_token_port(), Uuid::new_v4());
+        let exempt_list = || FakeExemption { exempt: vec![Uuid::new_v4()], fail: false };
+        assert!(reviewing_status_for(Some(other), exempt_list()).await.0);
+        assert!(reviewing_status_for(None, exempt_list()).await.0);
+        assert!(reviewing_status_for(Some("not-a-token".to_string()), exempt_list()).await.0);
+    }
+
+    #[tokio::test]
+    async fn exemption_lookup_failure_keeps_the_review_status() {
+        let user_id = Uuid::new_v4();
+        let token = issue_user_token(&test_token_port(), user_id);
+        let (reviewing, _) =
+            reviewing_status_for(Some(token), FakeExemption { exempt: vec![user_id], fail: true }).await;
+        assert!(reviewing);
     }
 
     #[tokio::test]

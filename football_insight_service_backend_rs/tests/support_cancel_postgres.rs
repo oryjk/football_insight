@@ -200,3 +200,64 @@ async fn admin_can_set_support_bases_with_audit_and_reject_unknown_match() {
     sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin).await.unwrap();
     admin.close().await;
 }
+
+#[tokio::test]
+#[ignore = "requires SUPPORT_TEST_DATABASE_URL pointing to a disposable local *_test database"]
+async fn review_exempt_users_are_managed_by_admin_and_read_by_the_status_lookup() {
+    use football_insight_service_backend_rs::{
+        admin::{
+            adapters::persistence::postgres_admin_review_exempt_repository::PostgresAdminReviewExemptRepository,
+            domain::admin_review_exempt::AdminReviewExemptError,
+            ports::admin_review_exempt_repository::AdminReviewExemptRepository,
+        },
+        mini_review::{
+            adapters::persistence::postgres_review_exemption::PostgresReviewExemption,
+            ports::review_exemption_port::ReviewExemptionPort,
+        },
+    };
+    let url = std::env::var("SUPPORT_TEST_DATABASE_URL").expect("explicit test database required");
+    let parsed = url::Url::parse(&url).unwrap();
+    assert!(matches!(parsed.host_str(), Some("localhost" | "127.0.0.1" | "[::1]")));
+    assert!(parsed.path().ends_with("_test"));
+    let admin = PgPool::connect(&url).await.unwrap();
+    let schema = format!("review_exempt_{}", Uuid::new_v4().simple());
+    sqlx::query(&format!("CREATE SCHEMA {schema}")).execute(&admin).await.unwrap();
+    let options = url.parse::<PgConnectOptions>().unwrap().options([("search_path", schema.as_str())]);
+    let pool = PgPoolOptions::new().max_connections(2).connect_with(options).await.unwrap();
+    sqlx::raw_sql(
+        r#"
+        CREATE TABLE f_i_users (id UUID PRIMARY KEY, display_name TEXT NULL, account_identifier TEXT NOT NULL, avatar_url TEXT NULL);
+        CREATE TABLE f_i_admin_audit_logs (id UUID PRIMARY KEY, admin_user_id UUID NOT NULL, action VARCHAR(64) NOT NULL, target_type VARCHAR(32) NOT NULL, target_id TEXT, reason TEXT, before_json JSONB, after_json JSONB, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+        "#,
+    ).execute(&pool).await.unwrap();
+    sqlx::raw_sql(include_str!("../migrations/20261017140000_add_review_exempt_users.sql")).execute(&pool).await.unwrap();
+    let user = Uuid::new_v4();
+    let other = Uuid::new_v4();
+    for (id, name) in [(user, "测试号"), (other, "普通用户")] {
+        sqlx::query("INSERT INTO f_i_users(id, display_name, account_identifier) VALUES($1,$2,$3)")
+            .bind(id).bind(name).bind(id.to_string()).execute(&pool).await.unwrap();
+    }
+    let repository = PostgresAdminReviewExemptRepository::new(pool.clone());
+    let lookup = PostgresReviewExemption::new(pool.clone());
+    let actor = Uuid::new_v4();
+
+    assert!(!lookup.is_exempt(user).await.unwrap());
+    let added = repository.add(user, actor).await.unwrap();
+    assert_eq!(added.display_name.as_deref(), Some("测试号"));
+    repository.add(user, actor).await.unwrap(); // idempotent, no second audit row
+    assert!(lookup.is_exempt(user).await.unwrap());
+    assert!(!lookup.is_exempt(other).await.unwrap());
+    assert_eq!(repository.list().await.unwrap().len(), 1);
+    assert!(matches!(repository.add(Uuid::new_v4(), actor).await, Err(AdminReviewExemptError::NotFound)));
+
+    repository.remove(user, actor).await.unwrap();
+    repository.remove(user, actor).await.unwrap(); // removing a non-member is fine
+    assert!(!lookup.is_exempt(user).await.unwrap());
+    assert!(repository.list().await.unwrap().is_empty());
+    let audits: Vec<String> = sqlx::query_scalar("SELECT action FROM f_i_admin_audit_logs ORDER BY created_at")
+        .fetch_all(&pool).await.unwrap();
+    assert_eq!(audits, vec!["review_exempt.add", "review_exempt.remove"]);
+
+    pool.close().await;
+    sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin).await.unwrap();
+}

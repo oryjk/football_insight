@@ -1,5 +1,14 @@
 import { useState, type ReactNode } from "react";
-import { Eye, LogOut, Menu, Package, Settings, ThumbsUp, Trophy } from "lucide-react";
+import {
+  Eye,
+  LogOut,
+  Menu,
+  Package,
+  Settings,
+  ShieldCheck,
+  ThumbsUp,
+  Trophy,
+} from "lucide-react";
 import type { Admin } from "../api";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
@@ -14,6 +23,7 @@ export type AdminPage =
   | "products"
   | "topicReaders"
   | "supportBases"
+  | "reviewExempt"
   | "settings";
 const PAGE_TITLES: Record<AdminPage, { title: string; subtitle: string }> = {
   products: { title: "商品管理", subtitle: "会员微信道具映射" },
@@ -21,6 +31,10 @@ const PAGE_TITLES: Record<AdminPage, { title: string; subtitle: string }> = {
   supportBases: {
     title: "助力基础值",
     subtitle: "给比赛的助力数加运营基础值",
+  },
+  reviewExempt: {
+    title: "审核豁免",
+    subtitle: "审核期间仍能看到完整功能的测试账号",
   },
   settings: { title: "设置", subtitle: "管理员账号与密码" },
 };
@@ -85,6 +99,19 @@ export function AdminShell({
       >
         <ThumbsUp />
         助力基础值
+      </Button>
+      <Button
+        variant="ghost"
+        className="sidebar-nav-item"
+        aria-current={page === "reviewExempt" ? "page" : undefined}
+        disabled={navigationLocked}
+        onClick={() => {
+          onNavigate("reviewExempt");
+          setDrawer(false);
+        }}
+      >
+        <ShieldCheck />
+        审核豁免
       </Button>
       <Button
         variant="ghost"

@@ -16,6 +16,11 @@ export interface MiniReviewStore {
   readonly available: Readonly<Ref<boolean>>
   readonly errorMessage: Readonly<Ref<string>>
   ensureMiniReviewReady(options?: { force?: boolean }): Promise<MiniReviewStatus | null>
+  /**
+   * 登录账号变化（登录/切换/退出）后调用：审核豁免按账号判定，必须用新身份重新查询。
+   * 使在途的旧身份请求失效，不合并它的结果。
+   */
+  refreshForIdentityChange(): Promise<MiniReviewStatus | null>
   /** 管理员 PUT 成功后调用：立即发布新审核值，并使先前在途 GET 失效。 */
   setMiniReviewStatus(status: MiniReviewStatus): void
 }
@@ -73,7 +78,8 @@ export function createMiniReviewStore(
 
     const epoch = requestEpoch
     loading.value = true
-    inFlight = (async (): Promise<MiniReviewStatus | null> => {
+    let current: Promise<MiniReviewStatus | null> | null = null
+    current = (async (): Promise<MiniReviewStatus | null> => {
       try {
         const result = await source.getMiniReviewStatus()
         if (epoch !== requestEpoch) {
@@ -92,12 +98,22 @@ export function createMiniReviewStore(
         errorMessage.value = extractApiErrorMessage(error, '审核状态查询失败')
         return null
       } finally {
-        loading.value = false
-        inFlight = null
+        // 身份变化后可能已有更新的在途请求，只清理自己登记的那一个。
+        if (inFlight === current) {
+          loading.value = false
+          inFlight = null
+        }
       }
     })()
+    inFlight = current
 
-    return inFlight
+    return current
+  }
+
+  function refreshForIdentityChange(): Promise<MiniReviewStatus | null> {
+    requestEpoch += 1
+    inFlight = null
+    return ensureMiniReviewReady({ force: true })
   }
 
   return {
@@ -109,6 +125,7 @@ export function createMiniReviewStore(
     available: readonly(available),
     errorMessage: readonly(errorMessage),
     ensureMiniReviewReady,
+    refreshForIdentityChange,
     setMiniReviewStatus,
   }
 }

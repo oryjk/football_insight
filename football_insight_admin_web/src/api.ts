@@ -139,6 +139,13 @@ export interface TopicReader {
   avatar_url: string | null;
   first_read_at: string;
 }
+export interface ReviewExemptUser {
+  user_id: string;
+  display_name: string | null;
+  account_identifier: string;
+  avatar_url: string | null;
+  created_at: string;
+}
 export interface SupportBaseTeam {
   team_id: number;
   team_name: string;
@@ -221,6 +228,24 @@ export function createApi(client: ApiClient) {
           body: JSON.stringify({ home_base: homeBase, away_base: awayBase }),
           signal,
         },
+      ),
+    reviewExemptUsers: (token: string, signal?: AbortSignal) =>
+      client.request<{ items: ReviewExemptUser[] }>(
+        "/review-exempt-users",
+        token,
+        { signal },
+      ),
+    addReviewExemptUser: (token: string, userId: string) =>
+      client.request<ReviewExemptUser>(
+        `/review-exempt-users/${encodeURIComponent(userId)}`,
+        token,
+        { method: "PUT" },
+      ),
+    removeReviewExemptUser: (token: string, userId: string) =>
+      client.request<void>(
+        `/review-exempt-users/${encodeURIComponent(userId)}`,
+        token,
+        { method: "DELETE" },
       ),
     logout: (token: string) =>
       client.request<void>("/auth/logout", token, { method: "POST" }),

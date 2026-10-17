@@ -11,3 +11,4 @@ pub mod admin_payment_repository;
 pub mod admin_paywall_repository;
 pub mod admin_topic_readers_repository;
 pub mod admin_support_bases_repository;
+pub mod admin_review_exempt_repository;

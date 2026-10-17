@@ -161,6 +161,39 @@ describe('miniReview store 加载与缓存', () => {
   })
 })
 
+describe('miniReview store 账号变化', () => {
+  test('登录账号变化后重新查询，旧身份的在途结果不能覆盖新结果', async () => {
+    const stub = createSourceStub()
+    const anonymous = deferred<MiniReviewStatus>()
+    stub.handler = () => anonymous.promise
+    const store = createMiniReviewStore(stub.source)
+
+    const first = store.ensureMiniReviewReady()
+    stub.handler = () => Promise.resolve(buildStatus(false))
+    const refreshed = store.refreshForIdentityChange()
+    // 旧身份（匿名）的请求稍后才返回审核中，必须被丢弃。
+    anonymous.resolve(buildStatus(true))
+    await first
+    await refreshed
+
+    expect(stub.calls).toBe(2)
+    expect(store.isUnderReview.value).toBe(false)
+    expect(store.loading.value).toBe(false)
+  })
+
+  test('退出登录后重新查询回到审核中', async () => {
+    const stub = createSourceStub()
+    stub.handler = () => Promise.resolve(buildStatus(false))
+    const store = createMiniReviewStore(stub.source)
+    await store.ensureMiniReviewReady()
+    expect(store.isUnderReview.value).toBe(false)
+
+    stub.handler = () => Promise.resolve(buildStatus(true))
+    await store.refreshForIdentityChange()
+    expect(store.isUnderReview.value).toBe(true)
+  })
+})
+
 describe('miniReview store 失败语义', () => {
   test('查询失败返回 null、isUnderReview 为 false，下次调用可重试', async () => {
     const stub = createSourceStub()

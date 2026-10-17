@@ -21,3 +21,5 @@ pub mod support_bases_handlers;
 pub mod support_bases_routes;
 pub mod topic_readers_handlers;
 pub mod topic_readers_routes;
+pub mod review_exempt_handlers;
+pub mod review_exempt_routes;

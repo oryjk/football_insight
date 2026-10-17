@@ -11,6 +11,7 @@
 - 如果用户说"改版本号"或"指定版本号"，用显式覆盖：`MINI_PROGRAM_VERSION=x.y.z bun run build:mp-weixin`（作为指定版本传给登记接口）。
 - 纯本地离线构建（不登记、不递增版本）用 `MINI_REVIEW_SKIP=1 bun run build:mp-weixin`；正式 `mp:release` 强制登记，外层残留的 `MINI_REVIEW_SKIP=1` 不会跳过。验证已有产物用 `bun run verify:mp-release`，发布链路回归测试用 `bun run test:mp-release`。
 - `mp:release` 上传后版本保持「审核中」，不会自动标记过审；测试时要临时切到非审核态，可手动执行 `bun scripts/set-review-status.mjs approved`（改回审核中用 `reviewing`）。
+- 审核豁免：后台「审核豁免」页里的账号登录后，即使当前版本在审核中也看到完整功能（`GET /mini-review/review-status` 带 token 时按账号返回非审核态，名单表 `f_i_review_exempt_users`）。所以提审版本可以保持审核中并用豁免账号测试，不必来回切开关；审核人员的账号不要加入名单。
 - 微信审核结束后要调 `PUT /api/v1/mini-review/review-status` 把当前版本标记 `is_reviewing=false`，否则后续构建会一直复用审核中的版本号。
 - 若构建分配了新版本号，`src/manifest.json` 与 `src/config/generatedMiniProgramVersion.ts` 的变更需要单独提交。
 

@@ -18,7 +18,8 @@ export function getMiniReviewStatus(
   projectCode: string = MINI_REVIEW_PROJECT_CODE,
   version: string = MINI_PROGRAM_VERSION,
 ): Promise<MiniReviewStatus> {
-  return request<MiniReviewStatus>({ url: buildMiniReviewStatusUrl(projectCode, version) })
+  // 带上登录 token（有则带）：审核豁免账号在审核中也会得到非审核状态，匿名/普通账号不受影响。
+  return request<MiniReviewStatus>({ url: buildMiniReviewStatusUrl(projectCode, version), auth: true })
 }
 
 // 白名单用户（后端 env MINI_REVIEW_CONTROL_USER_IDS）在「我的 → 设置」切换当前版本审核状态。
