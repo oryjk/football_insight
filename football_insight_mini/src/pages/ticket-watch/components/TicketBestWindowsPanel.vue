@@ -155,7 +155,7 @@ onUnmounted(() => {
   background: var(--fi-color-divider);
 }
 .best-windows__bar--peak { background: var(--fi-color-text-primary); }
-.best-windows__bar--selected { background: var(--fi-color-text-primary); }
+.best-windows__bar--selected { background: var(--fi-color-primary); }
 .best-windows__column--selected .best-windows__track {
   border-radius: var(--fi-radius-sm);
   background: var(--fi-color-page);
@@ -180,6 +180,7 @@ onUnmounted(() => {
   background: var(--fi-color-primary);
   pointer-events: none;
 }
+.best-windows__column--selected .best-windows__now-line { background: var(--fi-color-bg); }
 .best-windows__conclusion,
 .best-windows__detail,
 .best-windows__lock-copy {
