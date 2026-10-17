@@ -325,11 +325,22 @@ impl SupportRepository for PostgresSupportRepository {
                    AND m.source_active = TRUE
             ),
             match_support_totals AS (
-                SELECT v.supported_team_id,
-                       COUNT(*)::BIGINT AS support_count
-                  FROM f_i_match_support_votes v
-                 WHERE v.match_id = $1
-                 GROUP BY v.supported_team_id
+                -- Real votes plus the operator-set base for this match.
+                SELECT counted.supported_team_id,
+                       SUM(counted.support_count)::BIGINT AS support_count
+                  FROM (
+                        SELECT v.supported_team_id,
+                               COUNT(*)::BIGINT AS support_count
+                          FROM f_i_match_support_votes v
+                         WHERE v.match_id = $1
+                         GROUP BY v.supported_team_id
+                        UNION ALL
+                        SELECT b.team_id AS supported_team_id,
+                               b.base_count AS support_count
+                          FROM f_i_match_support_bases b
+                         WHERE b.match_id = $1
+                       ) counted
+                 GROUP BY counted.supported_team_id
             ),
             season_support_totals AS (
                 SELECT v.supported_team_id,
