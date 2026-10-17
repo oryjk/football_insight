@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { mapDailyTopicEdition, topicPlaybackSignature, formatTopicAudioTime, homeTopicCategory } from './dailyTopics'
+import { mapDailyTopicEdition, topicPlaybackSignature, formatTopicAudioTime, homeTopicCategory, lastSlideOverscroll } from './dailyTopics'
 
 function article(id = 'immutable-content-a') {
   return { id, team_id: 77680, title: '蓉城备战下一轮', summary: '训练报道整理。', paragraphs: ['基于原文的新闻整理。'],
@@ -79,5 +79,15 @@ describe('今日话题接口转换', () => {
   test('播放器进度兼容异常值', () => {
     expect(formatTopicAudioTime(125.9)).toBe('2:05')
     for (const value of [-1, NaN, Infinity]) expect(formatTopicAudioTime(value)).toBe('0:00')
+  })
+})
+
+describe('lastSlideOverscroll', () => {
+  test('only leftward drags move the last card, damped and capped', () => {
+    expect(lastSlideOverscroll(40)).toBe(0)
+    expect(lastSlideOverscroll(0)).toBe(0)
+    expect(Math.round(lastSlideOverscroll(-100))).toBe(-35)
+    expect(lastSlideOverscroll(-1000)).toBe(-48)
+    expect(lastSlideOverscroll(Number.NaN)).toBe(0)
   })
 })
