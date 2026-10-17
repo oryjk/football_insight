@@ -10,7 +10,7 @@
       <text class="topic-detail__title">{{ item.title }}</text>
       <view class="topic-detail__meta-row">
         <text class="topic-detail__meta">{{ item.publishedLabel }} · 约 {{ item.readMinutes }} 分钟阅读</text>
-        <view class="topic-detail__size" role="button" aria-label="调整文字大小" @tap="chooseReadingSize"><text>Aa</text></view>
+        <view class="topic-detail__size"><FiSegmented compact :items="READING_SIZE_ITEMS" :model-value="readingSize" aria-label="文字大小" @update:model-value="setReadingSize" /></view>
       </view>
       <view class="topic-detail__heat"><FiTopicHeat :value="topicHeatValue(item.id, item.heat)" /></view>
       <view class="topic-detail__audio"><FiTopicAudioEntry :ready="audio.availableIds.value.includes(item.id)" :playing="audio.status.value === 'playing'" :loading="audio.status.value === 'loading'" @play="audio.toggle(item.id)" /></view>
@@ -54,7 +54,8 @@ import TopicImageGallery from './components/TopicImageGallery.vue'
 import TopicTimeline from './components/TopicTimeline.vue'
 import FiTopicTeamTags from '../../components/topics/FiTopicTeamTags.vue'
 import { useTopicTimeline } from './useTopicTimeline'
-import { READING_SIZES, loadReadingSize, readingSizeMenu, readingSizeRpx, saveReadingSize } from './readingSize'
+import FiSegmented from '../../components/FiSegmented.vue'
+import { READING_SIZE_ITEMS, loadReadingSize, normalizeReadingSize, readingSizeRpx, saveReadingSize } from './readingSize'
 import type { DailyTopicItem } from '../../types/dailyTopic'
 import { DAILY_TOPICS_TEAM_ID, editionForTopic, isTopicSourceUrl, mapTopicDetail, topicDetailUrl } from '../../utils/dailyTopics'
 import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
@@ -129,16 +130,10 @@ onScopeDispose(() => { revision += 1 })
 
 const readingSize = ref(loadReadingSize())
 const bodyFontRpx = computed(() => readingSizeRpx(readingSize.value))
-function chooseReadingSize() {
-  uni.showActionSheet({
-    itemList: readingSizeMenu(readingSize.value),
-    success: ({ tapIndex }) => {
-      const chosen = READING_SIZES[tapIndex]
-      if (!chosen) return
-      readingSize.value = chosen.value
-      saveReadingSize(chosen.value)
-    },
-  })
+function setReadingSize(key: string) {
+  const size = normalizeReadingSize(key)
+  readingSize.value = size
+  saveReadingSize(size)
 }
 </script>
 
@@ -150,7 +145,7 @@ function chooseReadingSize() {
 .topic-detail__title { display: block; margin-top: var(--fi-space-16); color: var(--fi-color-text-primary); font-size: var(--fi-font-36); font-weight: var(--fi-weight-extrabold); line-height: var(--fi-leading-normal); }
 .topic-detail__meta-row { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-16); margin-top: var(--fi-space-18); }
 .topic-detail__meta-row .topic-detail__meta { margin-top: 0; }
-.topic-detail__size { flex-shrink: 0; padding: var(--fi-space-4) var(--fi-space-20); border: var(--fi-border-width) solid var(--fi-color-divider); border-radius: var(--fi-radius-round); color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); line-height: var(--fi-leading-normal); font-weight: var(--fi-weight-bold); }
+.topic-detail__size { flex-shrink: 0; width: calc(var(--fi-space-100) * 2 + var(--fi-space-64)); }
 .topic-detail__meta { display: block; margin-top: var(--fi-space-18); color: var(--fi-color-text-caption); font-size: var(--fi-font-22); line-height: var(--fi-leading-normal); }
 .topic-detail__heat { margin-top: var(--fi-space-16); }
 .topic-detail__audio { margin: var(--fi-space-24) 0; }

@@ -1,5 +1,5 @@
 <template>
-  <view class="fi-segmented" role="group" :aria-label="ariaLabel">
+  <view class="fi-segmented" :class="{ 'fi-segmented--compact': compact }" role="group" :aria-label="ariaLabel">
     <view class="fi-segmented__thumb" :style="thumbStyle" />
     <view
       v-for="item in items"
@@ -37,6 +37,8 @@ const props = defineProps<{
   items: FiSegmentedItem[]
   modelValue: string
   ariaLabel?: string
+  /** 行内小尺寸：用于放在文字行旁边，不撑高所在行。 */
+  compact?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -105,6 +107,10 @@ function select(key: string): void {
   color: var(--fi-color-surface);
   font-weight: var(--fi-weight-black);
 }
+
+.fi-segmented--compact { padding: var(--fi-space-4); gap: var(--fi-space-4); }
+.fi-segmented--compact .fi-segmented__thumb { top: var(--fi-space-4); bottom: var(--fi-space-4); left: var(--fi-space-4); }
+.fi-segmented--compact .fi-segmented__button { min-height: var(--fi-space-44); padding: 0 var(--fi-space-8); font-size: var(--fi-font-22); }
 
 .fi-segmented__button--pressed {
   opacity: var(--fi-opacity-pressed);

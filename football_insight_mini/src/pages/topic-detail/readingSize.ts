@@ -1,3 +1,5 @@
+import type { FiSegmentedItem } from '../../types/segmented'
+
 const STORAGE_KEY = 'fi_topic_reading_size'
 
 export type ReadingSize = 'standard' | 'large' | 'xlarge'
@@ -16,10 +18,7 @@ export function readingSizeRpx(size: ReadingSize): number {
   return (READING_SIZES.find(item => item.value === size) ?? READING_SIZES[0]).rpx
 }
 
-// The current choice is marked in the action sheet, so the list stays self-explanatory.
-export function readingSizeMenu(current: ReadingSize): string[] {
-  return READING_SIZES.map(size => size.value === current ? `${size.label}（当前）` : size.label)
-}
+export const READING_SIZE_ITEMS: FiSegmentedItem[] = READING_SIZES.map(size => ({ key: size.value, label: size.label }))
 
 export function loadReadingSize(): ReadingSize {
   try { return normalizeReadingSize(uni.getStorageSync(STORAGE_KEY)) } catch { return 'standard' }
