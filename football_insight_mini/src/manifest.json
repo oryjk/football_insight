@@ -2,8 +2,8 @@
   "name": "足球洞察",
   "appid": "wxc61da17a97f6eb1b",
   "description": "Football Insight 微信小程序",
-  "versionName": "1.0.96",
-  "versionCode": "10096",
+  "versionName": "1.0.97",
+  "versionCode": "10097",
   "transformPx": false,
   "app-plus": {
     "usingComponents": true,
