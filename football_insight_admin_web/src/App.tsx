@@ -18,6 +18,7 @@ import { Label } from "./components/ui/label";
 import { Card, CardContent } from "./components/ui/card";
 import { AdminShell, type AdminPage } from "./layout/AdminShell";
 import { ProductsPage } from "./features/products/ProductsPage";
+import { TopicReadersPage } from "./features/topics/TopicReadersPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { completeCredentialsChange } from "./features/settings/credentialsModel";
 import { AdminSetupForm } from "./features/setup/AdminSetupForm";
@@ -270,6 +271,8 @@ export function App() {
             token={token}
             onBusyChange={onProductBusy}
           />
+        ) : page === "topicReaders" ? (
+          <TopicReadersPage key={token} api={api} token={token} />
         ) : (
           <SettingsPage
             key={token}

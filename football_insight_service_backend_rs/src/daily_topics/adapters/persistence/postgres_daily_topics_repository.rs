@@ -108,6 +108,10 @@ impl DailyTopicsRepository for PostgresDailyTopicsRepository {
         .fetch_one(&mut *tx)
         .await
         .map_err(storage_error)?;
+        if let Some(user_id) = visit.user_id {
+            sqlx::query("INSERT INTO f_i_daily_topic_readers(team_id,topic_id,user_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING")
+                .bind(team_id).bind(id).bind(user_id).execute(&mut *tx).await.map_err(storage_error)?;
+        }
         let counted = sqlx::query(r#"
             INSERT INTO f_i_daily_topic_visitors(team_id,topic_id,visitor_hash) VALUES($1,$2,$3)
             ON CONFLICT(team_id,topic_id,visitor_hash) DO UPDATE SET last_counted_at=clock_timestamp()

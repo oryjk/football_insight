@@ -8,3 +8,4 @@ pub mod admin_user;
 
 pub mod admin_payment;
 pub mod admin_paywall;
+pub mod admin_topic_readers;

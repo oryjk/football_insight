@@ -9,3 +9,4 @@ pub mod admin_user_repository;
 
 pub mod admin_payment_repository;
 pub mod admin_paywall_repository;
+pub mod admin_topic_readers_repository;

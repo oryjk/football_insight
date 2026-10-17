@@ -23,7 +23,6 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
     let insight = build_insight(pool.clone());
     let admin_routes = build_admin_routes(pool.clone(), config);
     let health_routes = build_health_routes(pool.clone());
-    let daily_topics_routes = build_daily_topics_routes(pool.clone());
     let system_config = build_system_config_routes(pool.clone(), insight.repository.clone());
 
     let auth = build_auth(
@@ -32,6 +31,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         system_config.system_config_port.clone(),
         Arc::new(PostgresOfficialAccountMatchIdAccess::new(pool.clone())),
     );
+    let daily_topics_routes = build_daily_topics_routes(pool.clone(), auth.token_port.clone());
     let activity_routes = build_activity_routes(pool.clone(), auth.token_port.clone());
     let ai_routes = build_ai_routes(
         config,

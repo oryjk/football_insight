@@ -17,6 +17,8 @@ impl TopicHeat {
 pub struct TopicVisit {
     pub topic: TopicDetailQuery,
     pub visitor_hash: String,
+    /// Set only when the visit carried a valid login; anonymous visits stay unattributed.
+    pub user_id: Option<uuid::Uuid>,
 }
 
 impl TopicVisit {
@@ -34,6 +36,12 @@ impl TopicVisit {
         Ok(Self {
             topic,
             visitor_hash,
+            user_id: None,
         })
+    }
+
+    pub fn with_user(mut self, user_id: Option<uuid::Uuid>) -> Self {
+        self.user_id = user_id;
+        self
     }
 }

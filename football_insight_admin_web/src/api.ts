@@ -126,6 +126,19 @@ export interface CredentialsPayload {
   current_password: string;
   new_password?: string;
 }
+export interface TopicReaderTopic {
+  team_id: number;
+  topic_id: string;
+  title: string;
+  edition_date: string;
+  reader_count: number;
+}
+export interface TopicReader {
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  first_read_at: string;
+}
 export function createApi(client: ApiClient) {
   return {
     setupStatus: async (signal?: AbortSignal): Promise<AdminSetupStatus> => {
@@ -156,6 +169,23 @@ export function createApi(client: ApiClient) {
       }),
     me: (token: string, signal?: AbortSignal) =>
       client.request<Admin>("/auth/me", token, { signal }),
+    topicReaderTopics: (token: string, signal?: AbortSignal) =>
+      client.request<{ items: TopicReaderTopic[] }>(
+        "/daily-topics/topics",
+        token,
+        { signal },
+      ),
+    topicReaders: (
+      token: string,
+      teamId: number,
+      topicId: string,
+      signal?: AbortSignal,
+    ) =>
+      client.request<{ items: TopicReader[] }>(
+        `/daily-topics/${teamId}/${encodeURIComponent(topicId)}/readers`,
+        token,
+        { signal },
+      ),
     logout: (token: string) =>
       client.request<void>("/auth/logout", token, { method: "POST" }),
     updateCredentials: (

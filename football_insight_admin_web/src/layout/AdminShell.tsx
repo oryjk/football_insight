@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { LogOut, Menu, Package, Settings, Trophy } from "lucide-react";
+import { Eye, LogOut, Menu, Package, Settings, Trophy } from "lucide-react";
 import type { Admin } from "../api";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
@@ -10,7 +10,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "../components/ui/sheet";
-export type AdminPage = "products" | "settings";
+export type AdminPage = "products" | "topicReaders" | "settings";
+const PAGE_TITLES: Record<AdminPage, { title: string; subtitle: string }> = {
+  products: { title: "商品管理", subtitle: "会员微信道具映射" },
+  topicReaders: { title: "话题读者", subtitle: "今日话题被哪些登录用户阅读过" },
+  settings: { title: "设置", subtitle: "管理员账号与密码" },
+};
 export function AdminShell({
   admin,
   themeControl,
@@ -46,6 +51,19 @@ export function AdminShell({
       >
         <Package />
         商品管理
+      </Button>
+      <Button
+        variant="ghost"
+        className="sidebar-nav-item"
+        aria-current={page === "topicReaders" ? "page" : undefined}
+        disabled={navigationLocked}
+        onClick={() => {
+          onNavigate("topicReaders");
+          setDrawer(false);
+        }}
+      >
+        <Eye />
+        话题读者
       </Button>
       <Button
         variant="ghost"
@@ -89,10 +107,8 @@ export function AdminShell({
               <Menu />
             </Button>
             <div>
-              <h1>{page === "products" ? "商品管理" : "设置"}</h1>
-              <p>
-                {page === "products" ? "会员微信道具映射" : "管理员账号与密码"}
-              </p>
+              <h1>{PAGE_TITLES[page].title}</h1>
+              <p>{PAGE_TITLES[page].subtitle}</p>
             </div>
           </div>
           <div className="header-actions">

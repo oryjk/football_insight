@@ -107,6 +107,8 @@ fn storage_failure(error: DailyTopicsRepositoryError) -> (StatusCode, &'static s
 
 pub(super) async fn record_topic_visit(
     State(use_case): State<Arc<GetDailyTopics>>,
+    token_port: Option<axum::Extension<Arc<dyn crate::auth::ports::token_port::TokenPort>>>,
+    headers: axum::http::HeaderMap,
     Path(id): Path<String>,
     parameters: Result<Query<TopicDetailParameters>, QueryRejection>,
     body: Result<Json<super::dto::TopicVisitBody>, axum::extract::rejection::JsonRejection>,
@@ -122,8 +124,18 @@ pub(super) async fn record_topic_visit(
         .into_query(id)
         .map_err(|_| invalid_parameters())?;
     let hash = format!("{:x}", Sha256::digest(visitor.as_bytes()));
+    // A missing or invalid token is not an error: the visit simply stays anonymous.
+    let user_id = token_port.and_then(|port| {
+        let token = headers
+            .get(axum::http::header::AUTHORIZATION)?
+            .to_str()
+            .ok()?
+            .strip_prefix("Bearer ")?;
+        port.verify_token(token).ok().map(|claims| claims.sub)
+    });
     let visit = crate::daily_topics::domain::heat::TopicVisit::new(query, hash)
-        .map_err(|_| invalid_parameters())?;
+        .map_err(|_| invalid_parameters())?
+        .with_user(user_id);
     let heat = use_case
         .record_visit(visit)
         .await

@@ -21,3 +21,11 @@ pub fn daily_topics_routes(use_case: Arc<GetDailyTopics>) -> Router {
         .route("/api/v1/daily-topics/{id}/visits", post(record_topic_visit))
         .with_state(use_case)
 }
+
+/// Same routes, plus login recognition so topic visits can record logged-in readers.
+pub fn daily_topics_routes_with_auth(
+    use_case: Arc<GetDailyTopics>,
+    token_port: Arc<dyn crate::auth::ports::token_port::TokenPort>,
+) -> Router {
+    daily_topics_routes(use_case).layer(axum::Extension(token_port))
+}

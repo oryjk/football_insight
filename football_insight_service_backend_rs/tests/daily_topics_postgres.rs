@@ -148,6 +148,17 @@ impl TestDatabase {
         .execute(&pool)
         .await
         .unwrap();
+        // Minimal stand-in for the users table that readers reference.
+        sqlx::raw_sql("CREATE TABLE f_i_users (id UUID PRIMARY KEY, display_name TEXT NULL, avatar_url TEXT NULL)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::raw_sql(include_str!(
+            "../migrations/20261017120000_add_daily_topic_readers.sql"
+        ))
+        .execute(&pool)
+        .await
+        .unwrap();
         Self {
             admin,
             pool,
@@ -546,5 +557,52 @@ async fn heat_preserves_manual_base_deduplicates_concurrent_visits_and_survives_
         .await
         .unwrap();
     assert_eq!(count, 1);
+    database.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires explicit disposable PostgreSQL database"]
+async fn logged_in_visits_are_listed_as_readers_and_anonymous_visits_are_not() {
+    use football_insight_service_backend_rs::admin::{
+        adapters::persistence::postgres_admin_topic_readers_repository::PostgresAdminTopicReadersRepository,
+        ports::admin_topic_readers_repository::AdminTopicReadersRepository,
+    };
+    use football_insight_service_backend_rs::daily_topics::domain::{
+        archive::TopicDetailQuery, heat::TopicVisit,
+    };
+    let database = TestDatabase::new().await;
+    let id = "ad0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    database
+        .insert("batch", 77680, "2026-10-13T08:30:00+08:00", "测试话题")
+        .await;
+    let user = Uuid::new_v4();
+    sqlx::query("INSERT INTO f_i_users(id, display_name, avatar_url) VALUES($1,'球迷小王','https://example.com/a.png')")
+        .bind(user)
+        .execute(&database.pool)
+        .await
+        .unwrap();
+    let repository = PostgresDailyTopicsRepository::new(database.pool.clone());
+    let visit = |hash: &str, user_id: Option<Uuid>| {
+        TopicVisit::new(
+            TopicDetailQuery::new(77680, id.into()).unwrap(),
+            hash.repeat(64),
+        )
+        .unwrap()
+        .with_user(user_id)
+    };
+    repository.record_visit(&visit("a", Some(user))).await.unwrap();
+    repository.record_visit(&visit("a", Some(user))).await.unwrap();
+    repository.record_visit(&visit("b", None)).await.unwrap();
+
+    let admin = PostgresAdminTopicReadersRepository::new(database.pool.clone());
+    let readers = admin.readers(77680, id).await.unwrap();
+    assert_eq!(readers.len(), 1);
+    assert_eq!(readers[0].user_id, user);
+    assert_eq!(readers[0].display_name.as_deref(), Some("球迷小王"));
+    assert!(readers[0].first_read_at <= chrono::Utc::now());
+    let topics = admin.recent_topics(10).await.unwrap();
+    assert_eq!(topics.len(), 1);
+    assert_eq!(topics[0].topic_id, id);
+    assert_eq!(topics[0].reader_count, 1);
     database.close().await;
 }
