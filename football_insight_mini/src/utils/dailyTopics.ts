@@ -8,6 +8,17 @@ export function isRongchengTopic(item: Pick<DailyTopicItem, 'teamTags'>): boolea
   return item.teamTags?.some(tag => tag.teamId === DAILY_TOPICS_TEAM_ID) ?? false
 }
 
+export type TopicTag = 'rongcheng' | 'other'
+export const TOPIC_TAGS: { value: TopicTag; label: string }[] = [
+  { value: 'rongcheng', label: '成都蓉城' },
+  { value: 'other', label: '其他' },
+]
+// Uses the same rule as the crest background, so a tag always matches what the card shows.
+export function filterTopicsByTag<T extends Pick<DailyTopicItem, 'teamTags'>>(items: T[], tag: TopicTag | null): T[] {
+  if (tag === null) return items
+  return items.filter(item => isRongchengTopic(item) === (tag === 'rongcheng'))
+}
+
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown> : null

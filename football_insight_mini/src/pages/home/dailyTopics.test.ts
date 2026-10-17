@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { mapDailyTopicEdition, topicPlaybackSignature, formatTopicAudioTime, homeTopicCategory, lastSlideOverscroll } from './dailyTopics'
+import { mapDailyTopicEdition, topicPlaybackSignature, formatTopicAudioTime, homeTopicCategory, lastSlideOverscroll, filterTopicsByTag } from './dailyTopics'
 
 function article(id = 'immutable-content-a') {
   return { id, team_id: 77680, title: '蓉城备战下一轮', summary: '训练报道整理。', paragraphs: ['基于原文的新闻整理。'],
@@ -89,5 +89,19 @@ describe('lastSlideOverscroll', () => {
     expect(Math.round(lastSlideOverscroll(-100))).toBe(-35)
     expect(lastSlideOverscroll(-1000)).toBe(-48)
     expect(lastSlideOverscroll(Number.NaN)).toBe(0)
+  })
+})
+
+describe('filterTopicsByTag', () => {
+  const rongcheng = { id: 'a', teamTags: [{ teamId: 77680, name: '成都蓉城' }] }
+  const other = { id: 'b', teamTags: [{ teamId: 1, name: '别队' }] }
+  const untagged: { id: string; teamTags?: { teamId: number; name: string }[] } = { id: 'c' }
+  const all: { id: string; teamTags?: { teamId: number; name: string }[] }[] = [rongcheng, other, untagged]
+  test('no tag keeps every topic in order', () => {
+    expect(filterTopicsByTag(all, null).map(item => item.id)).toEqual(['a', 'b', 'c'])
+  })
+  test('rongcheng matches the crest rule and other is its complement', () => {
+    expect(filterTopicsByTag(all, 'rongcheng').map(item => item.id)).toEqual(['a'])
+    expect(filterTopicsByTag(all, 'other').map(item => item.id)).toEqual(['b', 'c'])
   })
 })
