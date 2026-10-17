@@ -6,4 +6,5 @@ pub mod postgres_admin_user_repository;
 
 pub mod postgres_admin_payment_repository;
 pub mod postgres_admin_paywall_repository;
+pub mod postgres_admin_support_bases_repository;
 pub mod postgres_admin_topic_readers_repository;

@@ -99,3 +99,41 @@
   align-items: center;
   gap: 8px;
 }
+
+.support-bases {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.support-base-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.support-base-row {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.support-base-title {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+.support-base-teams {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+.support-base-team {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+}
+.support-base-shown {
+  color: var(--muted);
+}

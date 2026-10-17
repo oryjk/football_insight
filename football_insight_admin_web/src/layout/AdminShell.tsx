@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Eye, LogOut, Menu, Package, Settings, Trophy } from "lucide-react";
+import { Eye, LogOut, Menu, Package, Settings, ThumbsUp, Trophy } from "lucide-react";
 import type { Admin } from "../api";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
@@ -10,10 +10,18 @@ import {
   SheetHeader,
   SheetTitle,
 } from "../components/ui/sheet";
-export type AdminPage = "products" | "topicReaders" | "settings";
+export type AdminPage =
+  | "products"
+  | "topicReaders"
+  | "supportBases"
+  | "settings";
 const PAGE_TITLES: Record<AdminPage, { title: string; subtitle: string }> = {
   products: { title: "商品管理", subtitle: "会员微信道具映射" },
   topicReaders: { title: "话题读者", subtitle: "今日话题被哪些登录用户阅读过" },
+  supportBases: {
+    title: "助力基础值",
+    subtitle: "给比赛的助力数加运营基础值",
+  },
   settings: { title: "设置", subtitle: "管理员账号与密码" },
 };
 export function AdminShell({
@@ -64,6 +72,19 @@ export function AdminShell({
       >
         <Eye />
         话题读者
+      </Button>
+      <Button
+        variant="ghost"
+        className="sidebar-nav-item"
+        aria-current={page === "supportBases" ? "page" : undefined}
+        disabled={navigationLocked}
+        onClick={() => {
+          onNavigate("supportBases");
+          setDrawer(false);
+        }}
+      >
+        <ThumbsUp />
+        助力基础值
       </Button>
       <Button
         variant="ghost"

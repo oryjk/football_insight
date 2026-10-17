@@ -143,3 +143,60 @@ async fn match_support_totals_add_operator_base_to_real_votes() {
         .unwrap();
     admin.close().await;
 }
+
+#[tokio::test]
+#[ignore = "requires SUPPORT_TEST_DATABASE_URL pointing to a disposable local *_test database"]
+async fn admin_can_set_support_bases_with_audit_and_reject_unknown_match() {
+    use football_insight_service_backend_rs::admin::{
+        adapters::persistence::postgres_admin_support_bases_repository::PostgresAdminSupportBasesRepository,
+        domain::admin_support_bases::{AdminSupportBasesError, SupportBaseAudit, SupportBaseInput},
+        ports::admin_support_bases_repository::AdminSupportBasesRepository,
+    };
+    let url = std::env::var("SUPPORT_TEST_DATABASE_URL").expect("explicit test database required");
+    let parsed = url::Url::parse(&url).unwrap();
+    assert!(matches!(parsed.host_str(), Some("localhost" | "127.0.0.1" | "[::1]")));
+    assert!(parsed.path().ends_with("_test"));
+    let admin = PgPool::connect(&url).await.unwrap();
+    let schema = format!("support_admin_{}", Uuid::new_v4().simple());
+    sqlx::query(&format!("CREATE SCHEMA {schema}")).execute(&admin).await.unwrap();
+    let options = url.parse::<PgConnectOptions>().unwrap().options([("search_path", schema.as_str())]);
+    let pool = PgPoolOptions::new().max_connections(2).connect_with(options).await.unwrap();
+    sqlx::raw_sql(
+        r#"
+        CREATE TABLE f_i_teams (team_id BIGINT PRIMARY KEY);
+        CREATE TABLE f_i_matches (
+            match_id BIGINT PRIMARY KEY, season INT NOT NULL, round_number INT NOT NULL,
+            match_date DATE NOT NULL, match_time TEXT NOT NULL, status TEXT NOT NULL,
+            source_active BOOLEAN NOT NULL DEFAULT TRUE,
+            home_team_id BIGINT NOT NULL, home_team_name TEXT NOT NULL,
+            away_team_id BIGINT NOT NULL, away_team_name TEXT NOT NULL
+        );
+        CREATE TABLE f_i_match_support_votes (id UUID PRIMARY KEY, match_id BIGINT NOT NULL, user_id UUID NOT NULL, supported_team_id BIGINT NOT NULL, UNIQUE(match_id,user_id));
+        CREATE TABLE f_i_admin_audit_logs (id UUID PRIMARY KEY, admin_user_id UUID NOT NULL, action VARCHAR(64) NOT NULL, target_type VARCHAR(32) NOT NULL, target_id TEXT, reason TEXT, before_json JSONB, after_json JSONB, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+        INSERT INTO f_i_teams(team_id) VALUES (11), (22);
+        INSERT INTO f_i_matches(match_id, season, round_number, match_date, match_time, status, home_team_id, home_team_name, away_team_id, away_team_name)
+            VALUES (1, 2026, 28, (NOW() AT TIME ZONE 'Asia/Shanghai')::date + 1, '20:00', 'scheduled', 11, '主队', 22, '客队');
+        "#,
+    ).execute(&pool).await.unwrap();
+    sqlx::raw_sql(include_str!("../migrations/20261017130000_add_match_support_bases.sql")).execute(&pool).await.unwrap();
+    let support = PostgresSupportRepository::new(pool.clone());
+    support.create_vote(Uuid::new_v4(), 1, 22).await.unwrap();
+    let repository = PostgresAdminSupportBasesRepository::new(pool.clone());
+    let actor = SupportBaseAudit { admin_id: Uuid::new_v4() };
+
+    let listed = repository.list_matches(10).await.unwrap();
+    assert_eq!((listed[0].home_base, listed[0].away_base, listed[0].away_real_count), (0, 0, 1));
+    let updated = repository.set_bases(1, SupportBaseInput::new(2, 20).unwrap(), actor).await.unwrap();
+    assert_eq!((updated.home_base, updated.away_base), (2, 20));
+    let again = repository.set_bases(1, SupportBaseInput::new(0, 5).unwrap(), actor).await.unwrap();
+    assert_eq!((again.home_base, again.away_base, again.away_real_count), (0, 5, 1));
+    let missing = repository.set_bases(99, SupportBaseInput::new(1, 1).unwrap(), actor).await;
+    assert!(matches!(missing, Err(AdminSupportBasesError::NotFound)));
+    let audits: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM f_i_admin_audit_logs WHERE action='support.base.set' AND target_id='1'")
+        .fetch_one(&pool).await.unwrap();
+    assert_eq!(audits, 2);
+
+    pool.close().await;
+    sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin).await.unwrap();
+    admin.close().await;
+}

@@ -139,6 +139,22 @@ export interface TopicReader {
   avatar_url: string | null;
   first_read_at: string;
 }
+export interface SupportBaseTeam {
+  team_id: number;
+  team_name: string;
+  real_count: number;
+  base: number;
+  displayed_count: number;
+}
+export interface SupportBaseMatch {
+  match_id: number;
+  round_number: number;
+  match_date: string;
+  match_time: string;
+  status: string;
+  home_team: SupportBaseTeam;
+  away_team: SupportBaseTeam;
+}
 export function createApi(client: ApiClient) {
   return {
     setupStatus: async (signal?: AbortSignal): Promise<AdminSetupStatus> => {
@@ -185,6 +201,26 @@ export function createApi(client: ApiClient) {
         `/daily-topics/${teamId}/${encodeURIComponent(topicId)}/readers`,
         token,
         { signal },
+      ),
+    supportBaseMatches: (token: string, signal?: AbortSignal) =>
+      client.request<{ items: SupportBaseMatch[] }>("/support/matches", token, {
+        signal,
+      }),
+    setSupportBases: (
+      token: string,
+      matchId: number,
+      homeBase: number,
+      awayBase: number,
+      signal?: AbortSignal,
+    ) =>
+      client.request<SupportBaseMatch>(
+        `/support/matches/${matchId}/bases`,
+        token,
+        {
+          method: "PUT",
+          body: JSON.stringify({ home_base: homeBase, away_base: awayBase }),
+          signal,
+        },
       ),
     logout: (token: string) =>
       client.request<void>("/auth/logout", token, { method: "POST" }),

@@ -17,5 +17,7 @@ mod payment_tests;
 
 pub mod paywall_handlers;
 pub mod paywall_routes;
+pub mod support_bases_handlers;
+pub mod support_bases_routes;
 pub mod topic_readers_handlers;
 pub mod topic_readers_routes;

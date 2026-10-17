@@ -7,4 +7,5 @@ pub mod admin_user_service;
 
 pub mod admin_payment_service;
 pub mod admin_paywall_service;
+pub mod admin_support_bases_service;
 pub mod admin_topic_readers_service;
