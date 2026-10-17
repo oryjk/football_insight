@@ -340,7 +340,7 @@ describe("package.json release wiring", () => {
     expect(packageJson.scripts["mp:release"]).toBe("bun --no-env-file scripts/mini-release.mjs upload");
     expect(packageJson.scripts["mp:preview"]).toBe("bun --no-env-file scripts/mini-release.mjs preview");
     expect(packageJson.scripts["verify:mp-release"]).toBe("bun --no-env-file scripts/mini-release.mjs verify");
-    expect(packageJson.scripts["test:mp-release"]).toBe("bun test scripts/mini-release.test.mjs");
+    expect(packageJson.scripts["test:mp-release"]).toBe("bun test scripts/mini-release.test.mjs scripts/set-review-status.test.mjs");
     expect(packageJson.scripts["prebuild:mp-weixin"]).toBeUndefined();
     expect(packageJson.scripts["mp:upload"]).toBeUndefined();
   });
