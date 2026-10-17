@@ -2,10 +2,7 @@
 // 微信小程序唯一构建/发布入口：清理继承变量 → 生产构建 → 校验实际产物 → 上传。
 // 用法：
 //   bun run build:mp-weixin            # build：生产构建 + 校验（MINI_REVIEW_SKIP=1 时不登记版本）
-//   bun run mp:release -- [--robot 2] [--desc 文案] [--reviewing]
-//                                      # upload：Git 门禁 + 登记版本号 + 构建 + 上传；
-//                                      # 上传成功后默认把该版本标记为「已审核通过」，
-//                                      # 加 --reviewing 则保持「审核中」（用于准备提交微信审核的版本）
+//   bun run mp:release -- [--robot 2] [--desc 文案]   # upload：Git 门禁 + 登记版本号 + 构建 + 上传
 //   bun run mp:preview -- [--robot 2] [--desc 文案]   # preview：只上传已有生产产物为预览
 //   bun run verify:mp-release          # verify：只校验现有产物，无远程调用
 import { mkdtempSync, rmSync } from "node:fs";
@@ -23,26 +20,18 @@ import { verifyMiniProgramApiBase } from "./verify-mp-api-base.mjs";
 
 const defaultProjectRoot = fileURLToPath(new URL("..", import.meta.url));
 
-const REVIEWING_FLAG = "--reviewing";
-
 function validateArguments(command, args) {
   if (!["build", "upload", "preview", "verify"].includes(command)) {
-    throw new Error("用法: bun scripts/mini-release.mjs build|upload|preview|verify [--robot N] [--desc 文案] [--reviewing]");
+    throw new Error("用法: bun scripts/mini-release.mjs build|upload|preview|verify [--robot N] [--desc 文案]");
   }
-  const raw = args[0] === "--" ? args.slice(1) : [...args];
-  if ((command === "build" || command === "verify") && raw.length) {
+  const forwarded = args[0] === "--" ? args.slice(1) : [...args];
+  if ((command === "build" || command === "verify") && forwarded.length) {
     throw new Error(`${command} 不接受额外参数，生产 mode 与 API 由统一入口管理。`);
   }
-  const flagCount = raw.filter((arg) => arg === REVIEWING_FLAG).length;
-  if (flagCount > 1 || (flagCount === 1 && command !== "upload")) {
-    throw new Error(`${REVIEWING_FLAG} 只能在 upload 时使用一次。`);
-  }
-  // --reviewing 只由本入口消费，不转发给 mini-ci（它只认 --robot / --desc）。
-  const forwarded = raw.filter((arg) => arg !== REVIEWING_FLAG);
   if (command === "upload" || command === "preview") {
     parseMiniCiArgs(forwarded);
   }
-  return { forwarded, reviewing: flagCount === 1 };
+  return forwarded;
 }
 
 async function executeStep(cmd, options) {
@@ -56,7 +45,7 @@ export async function runMiniRelease(command, args = [], {
   runStep = executeStep,
   checkGitState = verifyUploadGitState,
 } = {}) {
-  const { forwarded, reviewing } = validateArguments(command, args);
+  const forwarded = validateArguments(command, args);
   const production = loadProductionEnvironment(projectRoot, env);
   // 上传必须走登记库，不能被上一次离线验证留下的 MINI_REVIEW_SKIP=1 意外跳过。
   if (command === "upload") production.MINI_REVIEW_SKIP = "0";
@@ -100,10 +89,6 @@ export async function runMiniRelease(command, args = [], {
         await checkGitState(projectRoot, { fetch: true });
       }
       await run(command === "upload" ? "上传微信开发版本" : "生成微信预览", "scripts/mini-ci.mjs", [command, ...forwarded]);
-      if (command === "upload" && !reviewing) {
-        // 放在上传成功之后：上传失败时版本仍保持「审核中」，重跑会复用同一个版本号。
-        await run("标记版本为已审核通过", "scripts/set-review-status.mjs", ["approved"]);
-      }
     }
   } finally {
     rmSync(releaseEnvDir, { recursive: true, force: true });

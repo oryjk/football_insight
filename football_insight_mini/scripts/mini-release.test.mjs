@@ -181,7 +181,6 @@ describe("Bun release pipeline", () => {
       "uni.js",
       "verify-mp-component-registrations.mjs",
       "mini-ci.mjs",
-      "set-review-status.mjs",
     ]);
     for (const { cmd, env } of runner.steps) {
       expect(cmd.slice(0, 3)).toEqual([process.execPath, "--no-env-file", "--bun"]);
@@ -193,49 +192,7 @@ describe("Bun release pipeline", () => {
     }
     expect(runner.steps[2].cmd.slice(4)).toEqual(["build", "-p", "mp-weixin", "--mode", "production"]);
     expect(runner.steps[4].cmd.slice(4)).toEqual(["upload", "--robot", "2", "--desc", "发布说明 with spaces"]);
-    // 默认上传成功后标记为已审核通过，不再需要手动切换。
-    expect(runner.steps[5].cmd.slice(4)).toEqual(["approved"]);
     expect(gitChecks).toEqual([{ fetch: true }, { fetch: false }, { fetch: true }]);
-  });
-
-  test("upload --reviewing keeps the version in review: no approval step and the flag never reaches mini-ci", async () => {
-    const root = fixture();
-    const runner = recordingRunner();
-    await runMiniRelease("upload", ["--robot", "1", "--reviewing", "--desc", "提审版"], {
-      projectRoot: root,
-      checkGitState: () => undefined,
-      ...runner,
-    });
-    expect(scriptNames(runner.steps)).not.toContain("set-review-status.mjs");
-    expect(runner.steps.at(-1).cmd.slice(4)).toEqual(["upload", "--robot", "1", "--desc", "提审版"]);
-  });
-
-  test("a failed sdk upload never marks the version approved, so a rerun reuses the in-review version", async () => {
-    const root = fixture();
-    const runner = recordingRunner("mini-ci.mjs");
-    await expect(
-      runMiniRelease("upload", [], { projectRoot: root, checkGitState: () => undefined, ...runner }),
-    ).rejects.toThrow();
-    expect(scriptNames(runner.steps).at(-1)).toBe("mini-ci.mjs");
-    expect(scriptNames(runner.steps)).not.toContain("set-review-status.mjs");
-  });
-
-  test("a failed approval step is reported after the upload instead of being swallowed", async () => {
-    const root = fixture();
-    const runner = recordingRunner("set-review-status.mjs");
-    await expect(
-      runMiniRelease("upload", [], { projectRoot: root, checkGitState: () => undefined, ...runner }),
-    ).rejects.toThrow("标记版本为已审核通过");
-  });
-
-  test("preview and build never touch the review status", async () => {
-    const root = fixture();
-    const preview = recordingRunner();
-    await runMiniRelease("preview", [], { projectRoot: root, ...preview });
-    expect(scriptNames(preview.steps)).not.toContain("set-review-status.mjs");
-    const build = recordingRunner();
-    await runMiniRelease("build", [], { projectRoot: root, env: { ...process.env, MINI_REVIEW_SKIP: "1" }, ...build });
-    expect(scriptNames(build.steps)).not.toContain("set-review-status.mjs");
   });
 
   test("points Vite at an isolated empty envDir during the run and cleans it up afterwards", async () => {
@@ -363,9 +320,6 @@ describe("Bun release pipeline", () => {
       ["upload", ["--robot", "3"]],
       ["upload", ["--robot"]],
       ["upload", ["--desc"]],
-      ["upload", ["--reviewing", "--reviewing"]],
-      ["build", ["--reviewing"]],
-      ["preview", ["--reviewing"]],
       ["build", ["--robot", "1"]],
       ["verify", ["--desc", "x"]],
     ]) {
@@ -386,7 +340,7 @@ describe("package.json release wiring", () => {
     expect(packageJson.scripts["mp:release"]).toBe("bun --no-env-file scripts/mini-release.mjs upload");
     expect(packageJson.scripts["mp:preview"]).toBe("bun --no-env-file scripts/mini-release.mjs preview");
     expect(packageJson.scripts["verify:mp-release"]).toBe("bun --no-env-file scripts/mini-release.mjs verify");
-    expect(packageJson.scripts["test:mp-release"]).toBe("bun test scripts/mini-release.test.mjs scripts/set-review-status.test.mjs");
+    expect(packageJson.scripts["test:mp-release"]).toBe("bun test scripts/mini-release.test.mjs");
     expect(packageJson.scripts["prebuild:mp-weixin"]).toBeUndefined();
     expect(packageJson.scripts["mp:upload"]).toBeUndefined();
   });
