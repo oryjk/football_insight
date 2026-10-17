@@ -1,7 +1,7 @@
 <template>
   <page-meta :page-style="navigationPageStyle + pageLockStyle" />
   <FiSecondaryNav :shareable="false" @back="goBackFromSecondaryPage('/pages/user/index')" />
-  <view class="page-root">
+  <view v-show="!reviewRestricted" class="page-root">
     <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
     <view class="page">
@@ -84,7 +84,7 @@
 
 <script setup lang="ts">
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
-import { onLoad, onShow } from '@dcloudio/uni-app'
+import { onShow } from '@dcloudio/uni-app'
 import { ref, computed, watch } from 'vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import FiPanel from '../../components/FiPanel.vue'
@@ -105,6 +105,7 @@ import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
 import { reportPageActivity } from '../../utils/userActivity'
+import { useMiniReviewStatus } from '../../stores/miniReview'
 import {
   buildMembershipTierGuides,
   type MembershipTierGuide,
@@ -129,6 +130,9 @@ const runtimeConfig = useRuntimeConfig()
 const publicConfig = runtimeConfig.config
 // 当前用户共享自 appSession；支付成功后强制刷新会话以拿到新会员等级。
 const session = useAppSession()
+const miniReview = useMiniReviewStatus()
+// 审核期间不展示任何付费入口；审核状态未确认前同样先隐藏，确认在审核中则退回上一页。
+const reviewRestricted = miniReview.shouldRestrictFeatures
 const currentUser = session.currentUser
 const loading = ref(false)
 const selectedTier = ref('')
@@ -204,13 +208,18 @@ const purchaseCaption = computed(() => {
   return selectedUpgradeNote.value ? `${base} · ${selectedUpgradeNote.value}` : base
 })
 
-onLoad(() => {
-  void loadPurchaseData()
-})
+async function enterPurchasePage() {
+  await miniReview.ensureMiniReviewReady()
+  if (miniReview.isUnderReview.value) {
+    goBackFromSecondaryPage('/pages/user/index')
+    return
+  }
+  reportPageActivity('membership_purchase')
+  await loadPurchaseData()
+}
 
 onShow(() => {
-  reportPageActivity('membership_purchase')
-  void loadPurchaseData()
+  void enterPurchasePage()
 })
 
 async function loadPurchaseData() {
