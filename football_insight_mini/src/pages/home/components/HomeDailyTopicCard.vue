@@ -29,7 +29,7 @@ const emit = defineEmits<{ (e: 'read', id: string): void; (e: 'play', id: string
 </script>
 
 <style scoped>
-.topic-card { position: relative; box-sizing: border-box; height: var(--fi-space-topic-card-height); padding: var(--fi-space-28); border-radius: var(--fi-component-topic-hero-radius); background: var(--fi-component-topic-hero-bg); display: flex; flex-direction: column; overflow: hidden; }
+.topic-card { position: relative; box-sizing: border-box; height: var(--fi-space-topic-card-height); padding: var(--fi-space-24); border-radius: var(--fi-component-topic-hero-radius); background: var(--fi-component-topic-hero-bg); display: flex; flex-direction: column; overflow: hidden; }
 .topic-card__top, .topic-card__reading, .topic-card__footer { position: relative; z-index: 1; }
 .topic-card__top { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-12); }
 .topic-card__category { padding: var(--fi-space-8) var(--fi-space-20); border-radius: var(--fi-radius-round); background: var(--fi-color-primary); color: var(--fi-color-topic-hero-text); font-size: var(--fi-font-24); line-height: var(--fi-leading-snug); font-weight: var(--fi-weight-bold); }
@@ -37,7 +37,7 @@ const emit = defineEmits<{ (e: 'read', id: string): void; (e: 'play', id: string
 .topic-card__reading { flex: 1; min-height: 0; overflow: hidden; margin-top: var(--fi-space-16); }
 .topic-card__reading--pressed { opacity: 0.75; }
 .topic-card__title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--fi-component-topic-hero-title); font-size: var(--fi-font-36); line-height: var(--fi-leading-normal); font-weight: var(--fi-weight-extrabold); }
-.topic-card__summary { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: var(--fi-space-12); color: var(--fi-component-topic-hero-copy); font-size: var(--fi-font-26); line-height: var(--fi-leading-normal); }
+.topic-card__summary { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; margin-top: var(--fi-space-12); color: var(--fi-component-topic-hero-copy); font-size: var(--fi-font-26); line-height: var(--fi-leading-normal); }
 .topic-card__footer { display: flex; align-items: center; gap: var(--fi-space-16); margin-top: var(--fi-space-16); }
 .topic-card__heat { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: stretch; }
 .topic-card__read, .topic-card__audio { flex-shrink: 0; }
