@@ -20,5 +20,5 @@ export function getTopicTimeline(teamId: number, anchorId: string, tagTeamId: nu
 
 export function recordTopicVisit(teamId: number, id: string, visitorId: string): Promise<{ heat: number }> {
   return request<{ heat: number }>({ url: `/daily-topics/${encodeURIComponent(id)}/visits?team_id=${teamId}`,
-    method: 'POST', data: { visitor_id: visitorId }, silentNetworkError: true })
+    method: 'POST', data: { visitor_id: visitorId }, auth: true, silentNetworkError: true })
 }
