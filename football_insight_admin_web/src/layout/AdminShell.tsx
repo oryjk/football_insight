@@ -4,6 +4,7 @@ import {
   LogOut,
   Menu,
   Package,
+  Type,
   Settings,
   ShieldCheck,
   ThumbsUp,
@@ -23,6 +24,7 @@ export type AdminPage =
   | "products"
   | "topicReaders"
   | "supportBases"
+  | "brand"
   | "reviewExempt"
   | "settings";
 const PAGE_TITLES: Record<AdminPage, { title: string; subtitle: string }> = {
@@ -32,6 +34,7 @@ const PAGE_TITLES: Record<AdminPage, { title: string; subtitle: string }> = {
     title: "助力基础值",
     subtitle: "给比赛的助力数加运营基础值",
   },
+  brand: { title: "品牌文案", subtitle: "小程序顶部品牌栏副标题" },
   reviewExempt: {
     title: "审核豁免",
     subtitle: "审核期间仍能看到完整功能的测试账号",
@@ -99,6 +102,19 @@ export function AdminShell({
       >
         <ThumbsUp />
         助力基础值
+      </Button>
+      <Button
+        variant="ghost"
+        className="sidebar-nav-item"
+        aria-current={page === "brand" ? "page" : undefined}
+        disabled={navigationLocked}
+        onClick={() => {
+          onNavigate("brand");
+          setDrawer(false);
+        }}
+      >
+        <Type />
+        品牌文案
       </Button>
       <Button
         variant="ghost"

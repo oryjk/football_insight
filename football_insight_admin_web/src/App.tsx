@@ -20,6 +20,7 @@ import { AdminShell, type AdminPage } from "./layout/AdminShell";
 import { ProductsPage } from "./features/products/ProductsPage";
 import { TopicReadersPage } from "./features/topics/TopicReadersPage";
 import { ReviewExemptPage } from "./features/review/ReviewExemptPage";
+import { BrandPage } from "./features/brand/BrandPage";
 import { SupportBasesPage } from "./features/support/SupportBasesPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { completeCredentialsChange } from "./features/settings/credentialsModel";
@@ -275,6 +276,13 @@ export function App() {
           />
         ) : page === "supportBases" ? (
           <SupportBasesPage
+            key={token}
+            api={api}
+            token={token}
+            onBusyChange={onProductBusy}
+          />
+        ) : page === "brand" ? (
+          <BrandPage
             key={token}
             api={api}
             token={token}

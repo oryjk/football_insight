@@ -146,6 +146,10 @@ export interface ReviewExemptUser {
   avatar_url: string | null;
   created_at: string;
 }
+export interface BrandSubtitle {
+  subtitle: string | null;
+}
+
 export interface SupportBaseTeam {
   team_id: number;
   team_name: string;
@@ -229,6 +233,18 @@ export function createApi(client: ApiClient) {
           signal,
         },
       ),
+    brandSubtitle: (token: string, signal?: AbortSignal) =>
+      client.request<BrandSubtitle>("/brand/subtitle", token, { signal }),
+    setBrandSubtitle: (
+      token: string,
+      subtitle: string,
+      signal?: AbortSignal,
+    ) =>
+      client.request<BrandSubtitle>("/brand/subtitle", token, {
+        method: "PUT",
+        body: JSON.stringify({ subtitle }),
+        signal,
+      }),
     reviewExemptUsers: (token: string, signal?: AbortSignal) =>
       client.request<{ items: ReviewExemptUser[] }>(
         "/review-exempt-users",
