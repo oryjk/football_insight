@@ -61,6 +61,23 @@
   padding: var(--shell-gutter) var(--shell-gutter) var(--shell-gutter) 0;
   min-width: 0;
 }
+/* Keep scrolled content behind the top gutter and the header's rounded corners. */
+.workspace-top-mask {
+  position: sticky;
+  top: var(--shell-gutter);
+  z-index: calc(var(--z-header) - 1);
+  height: 0;
+  pointer-events: none;
+}
+.workspace-top-mask::before {
+  content: "";
+  position: absolute;
+  top: calc(-1 * var(--shell-gutter));
+  left: 0;
+  right: 0;
+  height: calc(var(--shell-gutter) + var(--radius-panel));
+  background: var(--surface-canvas);
+}
 .workspace-header {
   position: sticky;
   top: var(--shell-gutter);

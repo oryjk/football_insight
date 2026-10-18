@@ -158,6 +158,7 @@ export function AdminShell({
         <p className="sidebar-footer">Football Insight</p>
       </aside>
       <div className="workspace">
+        <div className="workspace-top-mask" aria-hidden="true" />
         <header className="workspace-header">
           <div className="header-title">
             <Button
