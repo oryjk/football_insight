@@ -15,6 +15,7 @@ pub mod mini_review;
 pub mod payment;
 pub mod push_notification;
 pub mod reflux_subscription;
+pub mod season_recap;
 pub mod seat_swap;
 pub mod support;
 pub mod system_config;

@@ -1,5 +1,7 @@
 # Football Insight Admin API
 
+C端免费赛季总结新增接口见[赛季总结 API](season-recap-api.md)，与以下 Admin API 分离，不改变已有接口。
+
 认证请求新增的可选来源元数据另见[用户来源追踪](../../docs/acquisition-source-tracking.md)；这不是Admin API，不改变已有认证响应或鉴权规则。
 
 公开 ticket-watch 新接口另见 [最佳盯盘时段 API](best-watch-windows-api.md)，其可选用户鉴权与以下 Admin API 无关。
