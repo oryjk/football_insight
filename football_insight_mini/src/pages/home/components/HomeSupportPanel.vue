@@ -3,7 +3,11 @@
     <view class="support-home-panel__header">
       <view class="support-home-panel__heading">
         <text class="support-home-panel__title">我的主队</text>
-        <view v-if="daysRemaining !== null" class="support-home-panel__countdown">
+        <view
+          v-if="daysRemaining !== null"
+          class="support-home-panel__countdown"
+          :class="{ 'support-home-panel__countdown--clock': countdownClock }"
+        >
           <template v-if="daysRemaining === 0">
             <template v-if="countdownClock">
               <text>距比赛开始还有</text><text class="support-home-panel__countdown-clock">{{ countdownClock }}</text>
@@ -252,10 +256,16 @@ const awayRankLabel = computed(() => {
   line-height: var(--fi-leading-normal);
   white-space: nowrap;
 }
+/* Match-day clock: the label and HH:MM:SS share one size, only the digits are heavier. */
+.support-home-panel__countdown--clock {
+  align-items: center;
+  gap: var(--fi-space-8);
+  font-size: var(--fi-font-26);
+}
 .support-home-panel__countdown-clock {
-  font-size: var(--fi-font-30);
   font-weight: var(--fi-weight-extrabold);
   font-variant-numeric: tabular-nums;
+  letter-spacing: 1rpx;
 }
 .support-home-panel__countdown-days {
   font-size: var(--fi-font-30);
