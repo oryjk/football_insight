@@ -33,7 +33,14 @@ pub struct ReviewStatusDto {
     pub project_code: String,
     pub version: String,
     pub version_code: i64,
+    /// 兼容旧版小程序：恒等于 `viewer_is_reviewing`。
     pub is_reviewing: bool,
+    /// 登记库里该版本的真实审核状态，不受豁免影响（设置页展示与切换以它为准）。
+    pub registry_is_reviewing: bool,
+    /// 当前请求者被当作审核中处理，决定会员/支付等入口显隐；豁免账号为 false。
+    pub viewer_is_reviewing: bool,
+    /// 当前请求者是否因审核豁免名单而看到非审核态。
+    pub viewer_is_exempt: bool,
     pub status_text: String,
 }
 
@@ -44,6 +51,9 @@ impl From<MiniReviewStatus> for ReviewStatusDto {
             version: status.version,
             version_code: status.version_code,
             is_reviewing: status.is_reviewing,
+            registry_is_reviewing: status.is_reviewing,
+            viewer_is_reviewing: status.is_reviewing,
+            viewer_is_exempt: false,
             status_text: status.status_text,
         }
     }
@@ -71,6 +81,9 @@ mod tests {
         assert_eq!(payload["version"], "1.0.55");
         assert_eq!(payload["version_code"], 10055);
         assert_eq!(payload["is_reviewing"], true);
+        assert_eq!(payload["registry_is_reviewing"], true);
+        assert_eq!(payload["viewer_is_reviewing"], true);
+        assert_eq!(payload["viewer_is_exempt"], false);
         assert_eq!(payload["status_text"], "正在审核");
     }
 }

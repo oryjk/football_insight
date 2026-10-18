@@ -244,6 +244,14 @@ mod tests {
 
     /// Returns `is_reviewing` as seen by a caller presenting `token` (or none).
     async fn reviewing_status_for(token: Option<String>, exemption: FakeExemption) -> (bool, String) {
+        let payload = status_payload_for(token, exemption).await;
+        (
+            payload["is_reviewing"].as_bool().unwrap(),
+            payload["status_text"].as_str().unwrap().to_string(),
+        )
+    }
+
+    async fn status_payload_for(token: Option<String>, exemption: FakeExemption) -> serde_json::Value {
         let repository = Arc::new(FakeRepository::default());
         repository
             .create(MiniReviewStatus {
@@ -277,10 +285,7 @@ mod tests {
             &axum::body::to_bytes(response.into_body(), 1024 * 64).await.unwrap(),
         )
         .unwrap();
-        (
-            payload["is_reviewing"].as_bool().unwrap(),
-            payload["status_text"].as_str().unwrap().to_string(),
-        )
+        payload
     }
 
     #[tokio::test]
@@ -291,6 +296,24 @@ mod tests {
             reviewing_status_for(Some(token), FakeExemption { exempt: vec![user_id], fail: false }).await;
         assert!(!reviewing);
         assert_eq!(text, "审核豁免账号");
+    }
+
+    #[tokio::test]
+    async fn exempt_user_still_gets_the_real_registry_status_in_explicit_fields() {
+        let user_id = Uuid::new_v4();
+        let token = issue_user_token(&test_token_port(), user_id);
+        let payload =
+            status_payload_for(Some(token), FakeExemption { exempt: vec![user_id], fail: false }).await;
+        assert_eq!(payload["registry_is_reviewing"], true);
+        assert_eq!(payload["viewer_is_reviewing"], false);
+        assert_eq!(payload["viewer_is_exempt"], true);
+        assert_eq!(payload["is_reviewing"], false);
+
+        let anonymous =
+            status_payload_for(None, FakeExemption { exempt: vec![user_id], fail: false }).await;
+        assert_eq!(anonymous["registry_is_reviewing"], true);
+        assert_eq!(anonymous["viewer_is_reviewing"], true);
+        assert_eq!(anonymous["viewer_is_exempt"], false);
     }
 
     #[tokio::test]

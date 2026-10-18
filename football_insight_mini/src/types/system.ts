@@ -20,7 +20,14 @@ export interface PublicSystemConfig {
 export interface MiniReviewStatus {
   project_code: string
   version: string
+  /** 兼容字段，等同 viewer_is_reviewing。 */
   is_reviewing: boolean
+  /** 登记库里该版本的真实审核状态，不受审核豁免影响（旧后端无此字段）。 */
+  registry_is_reviewing?: boolean
+  /** 当前请求者被当作审核中处理，决定入口显隐（旧后端无此字段）。 */
+  viewer_is_reviewing?: boolean
+  /** 当前请求者是否因审核豁免名单而看到非审核态（旧后端无此字段）。 */
+  viewer_is_exempt?: boolean
   status_text: string
 }
 

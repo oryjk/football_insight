@@ -74,26 +74,31 @@ pub async fn get_review_status_handler(
     headers: HeaderMap,
     Query(query): Query<ReviewStatusQuery>,
 ) -> Result<Json<ReviewStatusDto>, (StatusCode, String)> {
-    let mut status = use_case
+    let status = use_case
         .execute(&query.project_code, &query.version)
         .await
         .map_err(map_use_case_error)?;
 
-    // 审核中才需要判断豁免：有效 token 且在豁免名单内的账号看到非审核态。
+    let mut dto = ReviewStatusDto::from(status);
+
+    // 审核中才需要判断豁免：有效 token 且在豁免名单内的账号看到非审核态，
+    // 但 registry_is_reviewing 仍是登记库真实状态。
     // token 缺失/无效、查询失败一律按未豁免处理，保证审核人员看到受限版本。
-    if status.is_reviewing {
+    if dto.registry_is_reviewing {
         let user_id = extract_bearer_token(&headers)
             .and_then(|token| token_port.verify_token(token).ok())
             .map(|claims| claims.sub);
         if let Some(user_id) = user_id {
             if exemption.is_exempt(user_id).await.unwrap_or(false) {
-                status.is_reviewing = false;
-                status.status_text = EXEMPT_STATUS_TEXT.to_string();
+                dto.is_reviewing = false;
+                dto.viewer_is_reviewing = false;
+                dto.viewer_is_exempt = true;
+                dto.status_text = EXEMPT_STATUS_TEXT.to_string();
             }
         }
     }
 
-    Ok(Json(status.into()))
+    Ok(Json(dto))
 }
 
 pub async fn allocate_handler(

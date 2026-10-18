@@ -71,6 +71,8 @@ import { canControlMiniReview, putMiniReviewReviewStatus } from '../../../api/mi
 import { MINI_PROGRAM_VERSION } from '../../../api/system'
 import { useMiniReviewStatus } from '../../../stores/miniReview'
 import { extractApiErrorMessage } from '../../../utils/apiError'
+import type { MiniReviewStatus } from '../../../types/system'
+import { resolveReviewStatusView } from './reviewStatusView'
 import type { H5TestLoginUser } from '../../../types/auth'
 
 // #ifdef H5
@@ -139,8 +141,14 @@ async function loadStatus() {
     statusText.value = '查询失败'
     return
   }
-  isReviewing.value = status.is_reviewing
-  statusText.value = status.status_text
+  applyStatusView(status)
+}
+
+// 设置页展示与切换以登记库真实状态为准；豁免账号的入口显隐由 store 的有效值决定。
+function applyStatusView(status: MiniReviewStatus) {
+  const view = resolveReviewStatusView(status)
+  isReviewing.value = view.registryReviewing
+  statusText.value = view.statusText
 }
 
 function handleToggle(nextReviewing: boolean) {
@@ -162,9 +170,10 @@ async function applyToggle(nextReviewing: boolean) {
     const status = await putMiniReviewReviewStatus(undefined, undefined, nextReviewing)
     // PUT 成功立即发布共享审核值，并使先前在途 GET 失效，所有页面观察同一值。
     miniReview.setMiniReviewStatus(status)
-    isReviewing.value = status.is_reviewing
-    statusText.value = status.status_text
+    applyStatusView(status)
     uni.showToast({ title: nextReviewing ? '已切为审核中' : '已切为已过审', icon: 'none' })
+    // PUT 响应不带当前账号的豁免视角；豁免管理员重新查询，才不会把自己也锁进审核态。
+    await miniReview.ensureMiniReviewReady({ force: true }).then((fresh) => fresh && applyStatusView(fresh))
   } catch (error) {
     uni.showToast({ title: extractApiErrorMessage(error, '切换失败'), icon: 'none' })
   }
