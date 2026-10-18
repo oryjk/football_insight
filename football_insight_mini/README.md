@@ -235,8 +235,8 @@ Python 负责采集新闻全文、LLM 整理、逐篇四川话 TTS 和上传，R
 发布小程序用一条命令（构建 + 向本项目后端登记版本号 + `miniprogram-ci` 上传），流程与 `registration_system_mini` 一致：
 
 ```bash
-bun run mp:release -- --desc "本次变更说明"           # robot=1：日常开发版
-bun run mp:release -- --robot 2 --desc "体验版说明"    # robot=2：体验版专用线
+bun run mp:release -- --desc "本次变更说明"           # robot=1：开发版（默认，用户看不到，不用于测试和提审）
+bun run mp:release -- --robot 2 --desc "体验版说明"    # robot=2：体验版（用户测试和提审用，发版默认用这一条）
 bun run mp:preview -- --desc "预览说明"               # 只传预览版，生成 dist/preview-qrcode.jpg
 ```
 

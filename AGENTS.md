@@ -135,7 +135,7 @@ bun run dev:mp-weixin
 bun run build:mp-weixin
 ```
 
-**小程序发版与审核版本号**：默认在 local233（Ubuntu，`/home/betalpha/projects/football_insight/football_insight_mini`）直接执行 `bun run mp:release`（构建 + 向生产后端 mini-review 登记库申请版本号 + `miniprogram-ci` 上传），无需连接 Mac 或 peiqian。local233 已配置上传私钥 `private.<appid>.key` 与 `.env.ci.local`，均为 0600 权限且被 Git 忽略；登记地址使用 `https://match.oryjk.cn/api/v1`，不可照搬 peiqian 的回环地址。发版前先把全部业务改动提交推送，从干净 main 构建。用户测试上传使用 `--robot 2`；peiqian 保留为备用上传环境。审核版本号由后端 `f_i_mini_review_statuses` 登记库统一分配，不要手动改 `manifest.json` 的 `versionName`；指定版本用 `MINI_PROGRAM_VERSION=x.y.z`，离线构建用 `MINI_REVIEW_SKIP=1`。完整步骤见 `football_insight_mini/README.md` 的「微信小程序发布」一节。
+**小程序发版与审核版本号**：默认在 local233（Ubuntu，`/home/betalpha/projects/football_insight/football_insight_mini`）直接执行 `bun run mp:release -- --robot 2 --desc "本次变更说明"`（构建 + 向生产后端 mini-review 登记库申请版本号 + `miniprogram-ci` 上传），无需连接 Mac 或 peiqian。local233 已配置上传私钥 `private.<appid>.key` 与 `.env.ci.local`，均为 0600 权限且被 Git 忽略；登记地址使用 `https://match.oryjk.cn/api/v1`，不可照搬 peiqian 的回环地址。发版前先把全部业务改动提交推送，从干净 main 构建。上传一律加 `--robot 2`：robot 2 上传后才是微信后台的「体验版」，用于测试和最终提审；不加参数默认 robot 1，只会出现在开发版，用户看不到。peiqian 保留为备用上传环境。审核版本号由后端 `f_i_mini_review_statuses` 登记库统一分配，不要手动改 `manifest.json` 的 `versionName`；指定版本用 `MINI_PROGRAM_VERSION=x.y.z`，离线构建用 `MINI_REVIEW_SKIP=1`。完整步骤见 `football_insight_mini/README.md` 的「微信小程序发布」一节。
 
 ### 抓取器
 
