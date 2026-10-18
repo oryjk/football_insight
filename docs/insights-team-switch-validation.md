@@ -38,3 +38,33 @@ H5 最初实测发现局部首元素 margin 折叠使慢请求期间下方位置
 - 修改 `useMatchOutlook.ts` / `.test.ts`、`matchOutlook.ts` / `.test.ts`；不改 useInsightsData、sessionEffects 或付费度量。
 - 同步设计、原验证报告、FEATURES/CHANGELOG；无新增生产组件或后端接口，无删除文件。
 - 球队选择沿用原 scroll-view / @click；比赛按钮用 @tap / hover-class，scroll-into-view 对齐当前比赛，比赛列表变化时重置局部滚动位置。使用 uni-app 跨端能力，没有浏览器 DOM API 写入产品代码；布局/颜色/字体/间距均复用现有 token。
+
+## 追加：切回球队后比赛双高亮
+
+2026-10-18，负责人在微信端反馈“成都蓉城 → 大连英博 → 成都蓉城”后两场比赛同时有深色边框。
+
+### 排查与修改
+
+`selectedMatchId` 始终是单个标量，H5 按同一顺序切换时也只有一个 active；不是后端返回双选。
+
+检查微信编译产物：父级 `scroll-view :key` 被编译成普通 `key` 属性，不能隔离内部 `wx:for` 的节点复用；按钮的 `wx:key` 原来只含 match_id。蓉城列表 `[A, B, C]` 中 B 是蓉城对大连，大连列表 `[B, D]` 中 B 是第一场。返回蓉城时，真实 uni 差量算法按索引发送比赛文字/ID/key 的变更，但原索引 0 的选中标志与索引 1 的未选中标志都没变，因此不发送这两个标志；原生按比赛 key 复用时，B 的旧高亮可能留下。
+
+修复仅修改 `InsightsMatchOutlook.vue`：把现有比赛列表标识提为 computed，并加入每个比赛按钮的 key，使跨列表共享比赛不复用原生节点。同一列表中选择比赛仍只更新原按钮；外层卡片、缓存、会话、会员与付费度量不改。样式、接口、token 和版本号均不变。同步 FEATURES/CHANGELOG；没有新增生产文件或删除文件。
+
+### 验证证据与限制
+
+- 先用现有微信编译产物的实际 render 函数与 `@dcloudio/uni-mp-vue` 的真实 diff 算法生成 setData 补丁，再用 keyed 节点/属性依赖模型重放。修复前：Chengdu `[101]` → Dalian `[102]` → Chengdu-return `[101,102]`，断言失败；修复后每步只有期望的一个 active。20 轮、每轮 6 种状态，共 120 次，包含共享比赛换位、列表长度变化、同长度列表切换、手动改选比赛。
+- 这个重放使用真实编译 render 和差量算法，**原生节点更新是模型，不是微信 SDK/真机运行**。H5 无法重现微信的原生复用故障。未把模拟结果写成真机已验收，仍需上传后验证负责人原步骤。
+- H5 全部 API mock、外部流量拦截，在 320/390px 各重复 8 次成都↔大连切换，逐步断言 active 数量和比赛 ID；另验证慢请求时布局不收缩、缓存不重发、卡片 DOM 不重建。
+- UI 修复未新增机械模板源码断言；实际编译产物重放脚本与日志放忽略目录 `.superpowers/sdd/2026-10-18-match-outlook/fixture-selection-*`，没有生产数据库操作。
+
+| 命令 | 实际输出结论 |
+|---|---|
+| `bun test` | 912 pass / 0 fail，5955 expect，85 文件，13.30s |
+| `bun run type-check` | vue-tsc --noEmit，exit 0 |
+| `bun run check:boundaries` | 依赖边界检查通过 |
+| `bun run build:h5` | DONE Build complete |
+| `MINI_REVIEW_SKIP=1 bun run build:mp-weixin` | DONE；组件注册及生产 API 产物检查通过 |
+| `bun run verify:mp-components` | All mini-program custom components are registered |
+
+微信/H5 仍使用原有 `@tap`、`hover-class` 和 `scroll-view`，没有浏览器专属 API 进入产品代码。没有上传小程序，没有重新部署或重启后端。

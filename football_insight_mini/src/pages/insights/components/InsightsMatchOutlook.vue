@@ -4,7 +4,7 @@
     <view class="outlook-match-picker">
       <scroll-view
         v-if="matches.length"
-        :key="matches.map(match => match.match_id).join(',')"
+        :key="fixtureListKey"
         scroll-x
         scroll-with-animation
         :scroll-into-view="selectedMatchId === null ? '' : `outlook-match-${selectedMatchId}`"
@@ -14,7 +14,7 @@
           ><button
             v-for="match in matches"
             :id="`outlook-match-${match.match_id}`"
-            :key="match.match_id"
+            :key="`${fixtureListKey}:${match.match_id}`"
             class="outlook-fixture"
             :class="{
               'outlook-fixture--active': match.match_id === selectedMatchId,
@@ -100,6 +100,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: 'select-match', id: number): void
 }>()
+// 微信端原生节点只认 wx:for 的 key；父 scroll-view 的 key 不会隔离跨列表复用。
+// 同一比赛在两个球队列表的位置不同，必须隔离节点，避免增量更新遗留选中样式。
+const fixtureListKey = computed(() =>
+  props.matches.map((match) => match.match_id).join(','),
+)
 const parts = computed(() =>
   props.outlook
     ? percentages([
