@@ -20,9 +20,18 @@ pub struct RegisterWithInviteUseCase {
     password_port: Arc<dyn PasswordPort>,
     token_port: Arc<dyn TokenPort>,
     session_ttl: Duration,
+    acquisition_recorder: Option<crate::auth::application::record_acquisition::RecordAcquisition>,
 }
 
 impl RegisterWithInviteUseCase {
+    pub fn with_acquisition_recorder(
+        mut self,
+        recorder: crate::auth::application::record_acquisition::RecordAcquisition,
+    ) -> Self {
+        self.acquisition_recorder = Some(recorder);
+        self
+    }
+
     pub fn new(
         repository: Arc<dyn AuthRepository>,
         password_port: Arc<dyn PasswordPort>,
@@ -34,10 +43,19 @@ impl RegisterWithInviteUseCase {
             password_port,
             token_port,
             session_ttl,
+            acquisition_recorder: None,
         }
     }
 
     pub async fn execute(&self, input: RegisterInput) -> anyhow::Result<AuthTokenBundle> {
+        self.execute_with_acquisition(input, None).await
+    }
+
+    pub async fn execute_with_acquisition(
+        &self,
+        input: RegisterInput,
+        acquisition: Option<crate::auth::domain::acquisition::AcquisitionSource>,
+    ) -> anyhow::Result<AuthTokenBundle> {
         let invite_code = input.invite_code.trim().to_string();
         let referral_code = input
             .referral_code
@@ -53,24 +71,23 @@ impl RegisterWithInviteUseCase {
         }
 
         let password_hash = self.password_port.hash_password(&password)?;
-        let user = if invite_code.is_empty() {
-            self.repository
-                .create_user_without_invite_with_referral(
-                    referral_code.as_deref(),
-                    &account_identifier,
-                    &password_hash,
-                )
-                .await?
-        } else {
-            self.repository
-                .create_user_with_invite_with_referral(
-                    &invite_code,
-                    referral_code.as_deref(),
-                    &account_identifier,
-                    &password_hash,
-                )
-                .await?
-        };
+        let registration = self
+            .repository
+            .register_user(crate::auth::domain::registration::UserRegistration {
+                invite_code: (!invite_code.is_empty()).then_some(invite_code.as_str()),
+                referral_code: referral_code.as_deref(),
+                identity: crate::auth::domain::registration::RegistrationIdentity::Password {
+                    account_identifier: &account_identifier,
+                    password_hash: &password_hash,
+                },
+            })
+            .await?;
+        let user = registration.user;
+        if registration.newly_created
+            && let Some(recorder) = &self.acquisition_recorder
+        {
+            recorder.record(user.id, acquisition);
+        }
 
         self.repository.record_user_login(user.id).await?;
 
@@ -89,6 +106,53 @@ impl RegisterWithInviteUseCase {
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn acquisition_does_not_attribute_reactivated_accounts_or_failed_registration() {
+        use crate::auth::{
+            application::{
+                acquisition_test_support::Sources, record_acquisition::RecordAcquisition,
+            },
+            domain::acquisition::AcquisitionSource,
+        };
+        for invite in ["invite", ""] {
+            let sources = Arc::new(Sources::default());
+            let repository = Arc::new(FakeRepository {
+                reactivated: true,
+                ..Default::default()
+            });
+            let uc = RegisterWithInviteUseCase::new(
+                repository,
+                Arc::new(FakePasswordPort),
+                Arc::new(FakeTokenPort),
+                Duration::days(30),
+            )
+            .with_acquisition_recorder(RecordAcquisition::new(sources.clone()));
+            let mut input = RegisterInput {
+                invite_code: invite.into(),
+                referral_code: None,
+                account_identifier: "tester".into(),
+                password: "secret123".into(),
+            };
+            let response = uc
+                .execute_with_acquisition(
+                    input.clone(),
+                    AcquisitionSource::new(Some("douyin"), None, None),
+                )
+                .await
+                .unwrap();
+            assert!(!response.access_token.is_empty());
+            tokio::task::yield_now().await;
+            assert!(sources.0.lock().unwrap().is_empty());
+            input.password = "x".into();
+            assert!(uc
+                .execute_with_acquisition(input, AcquisitionSource::new(Some("xhs"), None, None))
+                .await
+                .is_err());
+            tokio::task::yield_now().await;
+            assert!(sources.0.lock().unwrap().is_empty());
+        }
+    }
+
     use std::sync::{Arc, Mutex};
 
     use crate::auth::{
@@ -109,13 +173,96 @@ mod tests {
     use chrono::{Duration, Utc};
     use uuid::Uuid;
 
+    #[tokio::test]
+    async fn acquisition_registration_keeps_auth_result_when_source_storage_fails() {
+        use crate::auth::{
+            application::record_acquisition::RecordAcquisition,
+            domain::acquisition::AcquisitionSource,
+            ports::acquisition_repository::AcquisitionRepository,
+        };
+        struct FailingSource(std::sync::atomic::AtomicUsize);
+        #[async_trait]
+        impl AcquisitionRepository for FailingSource {
+            async fn insert_first(
+                &self,
+                user_id: Uuid,
+                source: AcquisitionSource,
+            ) -> anyhow::Result<()> {
+                assert_eq!(
+                    user_id,
+                    Uuid::parse_str("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa").unwrap()
+                );
+                assert_eq!(source.src, "douyin");
+                self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                anyhow::bail!("table missing")
+            }
+        }
+        let source = Arc::new(FailingSource(std::sync::atomic::AtomicUsize::new(0)));
+        let use_case = RegisterWithInviteUseCase::new(
+            Arc::new(FakeRepository::default()),
+            Arc::new(FakePasswordPort),
+            Arc::new(FakeTokenPort),
+            Duration::days(30),
+        )
+        .with_acquisition_recorder(RecordAcquisition::new(source.clone()));
+        let response = use_case
+            .execute_with_acquisition(
+                RegisterInput {
+                    invite_code: "invite".into(),
+                    referral_code: None,
+                    account_identifier: "tester".into(),
+                    password: "secret123".into(),
+                },
+                AcquisitionSource::new(Some("douyin"), Some("test1"), Some(1047)),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.user.account_identifier, "tester");
+        assert!(!response.access_token.is_empty());
+        tokio::task::yield_now().await;
+        assert_eq!(source.0.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
     #[derive(Default)]
     struct FakeRepository {
         events: Mutex<Vec<String>>,
+        reactivated: bool,
     }
 
     #[async_trait]
     impl AuthRepository for FakeRepository {
+        async fn register_user(
+            &self,
+            request: crate::auth::domain::registration::UserRegistration<'_>,
+        ) -> anyhow::Result<crate::auth::domain::registration::RegisteredUser> {
+            let crate::auth::domain::registration::RegistrationIdentity::Password {
+                account_identifier,
+                password_hash,
+            } = request.identity
+            else {
+                unreachable!()
+            };
+            let user = if let Some(code) = request.invite_code {
+                self.create_user_with_invite_with_referral(
+                    code,
+                    request.referral_code,
+                    account_identifier,
+                    password_hash,
+                )
+                .await?
+            } else {
+                self.create_user_without_invite_with_referral(
+                    request.referral_code,
+                    account_identifier,
+                    password_hash,
+                )
+                .await?
+            };
+            Ok(crate::auth::domain::registration::RegisteredUser {
+                user,
+                newly_created: !self.reactivated,
+            })
+        }
         async fn create_user_with_invite(
             &self,
             invite_code: &str,

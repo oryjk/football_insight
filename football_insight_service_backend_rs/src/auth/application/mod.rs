@@ -10,3 +10,8 @@ pub mod logout;
 pub mod official_bind;
 pub mod register_with_invite;
 pub mod reset_password_with_invite;
+
+#[cfg(test)]
+mod acquisition_test_support;
+
+pub mod record_acquisition;

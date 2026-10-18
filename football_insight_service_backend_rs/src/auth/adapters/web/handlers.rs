@@ -40,6 +40,11 @@ pub struct AuthWebConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct RegisterRequest {
+    #[serde(
+        default,
+        deserialize_with = "super::acquisition_dto::optional_acquisition"
+    )]
+    pub acquisition: Option<crate::auth::domain::acquisition::AcquisitionSource>,
     pub invite_code: Option<String>,
     pub referral_code: Option<String>,
     #[serde(alias = "phone_number")]
@@ -69,6 +74,11 @@ pub struct ResetPasswordRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct WechatBindRequest {
+    #[serde(
+        default,
+        deserialize_with = "super::acquisition_dto::optional_acquisition"
+    )]
+    pub acquisition: Option<crate::auth::domain::acquisition::AcquisitionSource>,
     pub bind_token: String,
     pub invite_code: Option<String>,
     pub referral_code: Option<String>,
@@ -83,6 +93,11 @@ pub struct MiniWechatLoginRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct MiniWechatBindRequest {
+    #[serde(
+        default,
+        deserialize_with = "super::acquisition_dto::optional_acquisition"
+    )]
+    pub acquisition: Option<crate::auth::domain::acquisition::AcquisitionSource>,
     pub bind_token: String,
     pub invite_code: Option<String>,
     pub referral_code: Option<String>,
@@ -101,12 +116,15 @@ pub async fn register_handler(
     use_case: Arc<RegisterWithInviteUseCase>,
 ) -> Result<(StatusCode, Json<AuthResponseDto>), (StatusCode, String)> {
     let result = use_case
-        .execute(RegisterInput {
-            invite_code: request.invite_code.unwrap_or_default(),
-            referral_code: request.referral_code,
-            account_identifier: request.account_identifier,
-            password: request.password,
-        })
+        .execute_with_acquisition(
+            RegisterInput {
+                invite_code: request.invite_code.unwrap_or_default(),
+                referral_code: request.referral_code,
+                account_identifier: request.account_identifier,
+                password: request.password,
+            },
+            request.acquisition,
+        )
         .await
         .map_err(map_auth_error)?;
 
@@ -252,13 +270,16 @@ pub async fn wechat_bind_handler(
     use_case: Arc<BindWechatAccountUseCase>,
 ) -> Result<Json<AuthResponseDto>, (StatusCode, String)> {
     let result = use_case
-        .execute(BindWechatAccountInput {
-            bind_token: request.bind_token,
-            invite_code: request.invite_code,
-            referral_code: request.referral_code,
-            phone_number: request.phone_number,
-            password: request.password,
-        })
+        .execute_with_acquisition(
+            BindWechatAccountInput {
+                bind_token: request.bind_token,
+                invite_code: request.invite_code,
+                referral_code: request.referral_code,
+                phone_number: request.phone_number,
+                password: request.password,
+            },
+            request.acquisition,
+        )
         .await
         .map_err(map_auth_error)?;
 
@@ -282,13 +303,16 @@ pub async fn mini_wechat_bind_handler(
     use_case: Arc<BindWechatMiniProgramAccountUseCase>,
 ) -> Result<Json<AuthResponseDto>, (StatusCode, String)> {
     let result = use_case
-        .execute(BindWechatMiniProgramAccountInput {
-            bind_token: request.bind_token,
-            invite_code: request.invite_code.unwrap_or_default(),
-            referral_code: request.referral_code,
-            display_name: request.display_name,
-            avatar_data_url: request.avatar_data_url,
-        })
+        .execute_with_acquisition(
+            BindWechatMiniProgramAccountInput {
+                bind_token: request.bind_token,
+                invite_code: request.invite_code.unwrap_or_default(),
+                referral_code: request.referral_code,
+                display_name: request.display_name,
+                avatar_data_url: request.avatar_data_url,
+            },
+            request.acquisition,
+        )
         .await
         .map_err(map_auth_error)?;
 

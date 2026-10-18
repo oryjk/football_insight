@@ -9,3 +9,4 @@ pub mod token_port;
 pub mod user_membership_port;
 pub mod wechat_crypto_port;
 pub mod wechat_oauth_port;
+pub mod acquisition_repository;

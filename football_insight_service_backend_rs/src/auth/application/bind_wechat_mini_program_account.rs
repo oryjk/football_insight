@@ -20,10 +20,96 @@ pub struct BindWechatMiniProgramAccountUseCase {
     repository: Arc<dyn AuthRepository>,
     token_port: Arc<dyn TokenPort>,
     session_ttl: Duration,
+    acquisition_recorder: Option<crate::auth::application::record_acquisition::RecordAcquisition>,
 }
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn acquisition_does_not_attribute_reactivated_accounts_or_failed_registration() {
+        use crate::auth::{
+            application::{
+                acquisition_test_support::Sources, record_acquisition::RecordAcquisition,
+            },
+            domain::acquisition::AcquisitionSource,
+        };
+        for invite in ["invite", ""] {
+            let sources = Arc::new(Sources::default());
+            let repository = Arc::new(FakeRepository {
+                reactivated: true,
+                ..Default::default()
+            });
+            let uc = BindWechatMiniProgramAccountUseCase::new(
+                repository,
+                Arc::new(FakeTokenPort),
+                Duration::days(30),
+            )
+            .with_acquisition_recorder(RecordAcquisition::new(sources.clone()));
+            let mut input = BindWechatMiniProgramAccountInput {
+                bind_token: "bind-token".into(),
+                invite_code: invite.into(),
+                referral_code: None,
+                display_name: "name".into(),
+                avatar_data_url: "data:image/png;base64,abcd".into(),
+            };
+            let response = uc
+                .execute_with_acquisition(
+                    input.clone(),
+                    AcquisitionSource::new(Some("douyin"), None, None),
+                )
+                .await
+                .unwrap();
+            assert!(!response.access_token.is_empty());
+            tokio::task::yield_now().await;
+            assert!(sources.0.lock().unwrap().is_empty());
+            input.avatar_data_url = "invalid".into();
+            assert!(uc
+                .execute_with_acquisition(input, AcquisitionSource::new(Some("xhs"), None, None))
+                .await
+                .is_err());
+            tokio::task::yield_now().await;
+            assert!(sources.0.lock().unwrap().is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn acquisition_is_recorded_for_new_wechat_account_only() {
+        use crate::auth::{
+            application::{
+                acquisition_test_support::Sources, record_acquisition::RecordAcquisition,
+            },
+            domain::acquisition::AcquisitionSource,
+        };
+        let sources = Arc::new(Sources::default());
+        let use_case = BindWechatMiniProgramAccountUseCase::new(
+            Arc::new(FakeRepository::default()),
+            Arc::new(FakeTokenPort),
+            Duration::days(30),
+        )
+        .with_acquisition_recorder(RecordAcquisition::new(sources.clone()));
+        let result = use_case
+            .execute_with_acquisition(
+                BindWechatMiniProgramAccountInput {
+                    bind_token: "bind-token".into(),
+                    invite_code: "invite".into(),
+                    referral_code: None,
+                    display_name: "name".into(),
+                    avatar_data_url: "data:image/png;base64,abcd".into(),
+                },
+                AcquisitionSource::new(Some("douyin"), Some("test1"), None),
+            )
+            .await
+            .unwrap();
+        tokio::task::yield_now().await;
+        assert_eq!(
+            *sources.0.lock().unwrap(),
+            vec![(
+                result.user.id,
+                AcquisitionSource::new(Some("douyin"), Some("test1"), None).unwrap()
+            )]
+        );
+    }
+
     use std::sync::{Arc, Mutex};
 
     use async_trait::async_trait;
@@ -49,10 +135,39 @@ mod tests {
     #[derive(Default)]
     struct FakeRepository {
         events: Mutex<Vec<String>>,
+        reactivated: bool,
     }
 
     #[async_trait]
     impl AuthRepository for FakeRepository {
+        async fn register_user(
+            &self,
+            request: crate::auth::domain::registration::UserRegistration<'_>,
+        ) -> anyhow::Result<crate::auth::domain::registration::RegisteredUser> {
+            let crate::auth::domain::registration::RegistrationIdentity::MiniWechat { profile } =
+                request.identity
+            else {
+                unreachable!()
+            };
+            let user = if let Some(code) = request.invite_code {
+                self.create_user_with_invite_and_mini_program_wechat_with_referral(
+                    code,
+                    request.referral_code,
+                    profile,
+                )
+                .await?
+            } else {
+                self.create_user_with_mini_program_wechat_without_invite_with_referral(
+                    request.referral_code,
+                    profile,
+                )
+                .await?
+            };
+            Ok(crate::auth::domain::registration::RegisteredUser {
+                user,
+                newly_created: !self.reactivated,
+            })
+        }
         async fn create_user_with_invite(
             &self,
             _invite_code: &str,
@@ -282,6 +397,14 @@ mod tests {
 }
 
 impl BindWechatMiniProgramAccountUseCase {
+    pub fn with_acquisition_recorder(
+        mut self,
+        recorder: crate::auth::application::record_acquisition::RecordAcquisition,
+    ) -> Self {
+        self.acquisition_recorder = Some(recorder);
+        self
+    }
+
     pub fn new(
         repository: Arc<dyn AuthRepository>,
         token_port: Arc<dyn TokenPort>,
@@ -291,12 +414,21 @@ impl BindWechatMiniProgramAccountUseCase {
             repository,
             token_port,
             session_ttl,
+            acquisition_recorder: None,
         }
     }
 
     pub async fn execute(
         &self,
         input: BindWechatMiniProgramAccountInput,
+    ) -> anyhow::Result<AuthTokenBundle> {
+        self.execute_with_acquisition(input, None).await
+    }
+
+    pub async fn execute_with_acquisition(
+        &self,
+        input: BindWechatMiniProgramAccountInput,
+        acquisition: Option<crate::auth::domain::acquisition::AcquisitionSource>,
     ) -> anyhow::Result<AuthTokenBundle> {
         if input.bind_token.trim().is_empty() {
             anyhow::bail!("bind token is required");
@@ -333,22 +465,22 @@ impl BindWechatMiniProgramAccountUseCase {
             avatar_url: Some(avatar_data_url.to_string()),
         };
 
-        let user = if invite_code.is_empty() {
-            self.repository
-                .create_user_with_mini_program_wechat_without_invite_with_referral(
-                    referral_code.as_deref(),
-                    &profile,
-                )
-                .await?
-        } else {
-            self.repository
-                .create_user_with_invite_and_mini_program_wechat_with_referral(
-                    invite_code,
-                    referral_code.as_deref(),
-                    &profile,
-                )
-                .await?
-        };
+        let registration = self
+            .repository
+            .register_user(crate::auth::domain::registration::UserRegistration {
+                invite_code: (!invite_code.is_empty()).then_some(invite_code),
+                referral_code: referral_code.as_deref(),
+                identity: crate::auth::domain::registration::RegistrationIdentity::MiniWechat {
+                    profile: &profile,
+                },
+            })
+            .await?;
+        let user = registration.user;
+        if registration.newly_created
+            && let Some(recorder) = &self.acquisition_recorder
+        {
+            recorder.record(user.id, acquisition);
+        }
 
         self.repository.record_user_login(user.id).await?;
 

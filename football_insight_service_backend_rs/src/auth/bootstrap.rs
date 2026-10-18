@@ -58,6 +58,14 @@ pub fn build_auth(
     system_config_port: Arc<dyn SystemConfigPort>,
     official_account_access_port: Arc<dyn OfficialAccountMatchIdAccessPort>,
 ) -> AuthBootstrap {
+    // Acquisition failures must not consume authentication's business connections.
+    let acquisition_pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(2)
+        .acquire_timeout(std::time::Duration::from_millis(100))
+        .connect_lazy_with((*pool.connect_options()).clone());
+    let acquisition_recorder = crate::auth::application::record_acquisition::RecordAcquisition::new(Arc::new(
+        crate::auth::adapters::persistence::postgres_acquisition_repository::PostgresAcquisitionRepository::new(acquisition_pool)
+    ));
     let official_bind_repository = Arc::new(PostgresOfficialBindRepository::new(pool.clone()));
     let auth_repository = Arc::new(PostgresAuthRepository::new(pool));
     let password_port = Arc::new(Argon2PasswordPort);
@@ -80,12 +88,16 @@ pub fn build_auth(
     let current_standard_match_port = Arc::new(HttpCurrentStandardMatchPort::new(
         config.ticket_monitor_base_url.clone(),
     ));
-    let register_with_invite_use_case = Arc::new(RegisterWithInviteUseCase::new(
-        auth_repository.clone(),
-        password_port.clone(),
-        token_port.clone(),
-        Duration::days(30),
-    ));
+    let register_with_invite_use_case = Arc::new(
+        RegisterWithInviteUseCase::new(
+            auth_repository.clone(),
+            password_port.clone(),
+            token_port.clone(),
+            Duration::days(30),
+        )
+        .with_acquisition_recorder(acquisition_recorder.clone()),
+    );
+
     let login_with_password_use_case = Arc::new(LoginWithPasswordUseCase::new(
         auth_repository.clone(),
         password_port,
@@ -110,17 +122,25 @@ pub fn build_auth(
         Duration::days(30),
         Duration::minutes(10),
     ));
-    let bind_wechat_account_use_case = Arc::new(BindWechatAccountUseCase::new(
-        auth_repository.clone(),
-        Arc::new(Argon2PasswordPort),
-        token_port.clone(),
-        Duration::days(30),
-    ));
-    let bind_mini_wechat_account_use_case = Arc::new(BindWechatMiniProgramAccountUseCase::new(
-        auth_repository.clone(),
-        token_port.clone(),
-        Duration::days(30),
-    ));
+    let bind_wechat_account_use_case = Arc::new(
+        BindWechatAccountUseCase::new(
+            auth_repository.clone(),
+            Arc::new(Argon2PasswordPort),
+            token_port.clone(),
+            Duration::days(30),
+        )
+        .with_acquisition_recorder(acquisition_recorder.clone()),
+    );
+
+    let bind_mini_wechat_account_use_case = Arc::new(
+        BindWechatMiniProgramAccountUseCase::new(
+            auth_repository.clone(),
+            token_port.clone(),
+            Duration::days(30),
+        )
+        .with_acquisition_recorder(acquisition_recorder.clone()),
+    );
+
     let get_current_user_use_case = Arc::new(GetCurrentUserUseCase::new(
         auth_repository.clone(),
         token_port.clone(),

@@ -2,12 +2,100 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::auth::domain::{
+    registration::{RegisteredUser, RegistrationIdentity, UserRegistration},
     user::{AuthUser, StoredAuthUser},
     wechat::{IssuedInviteCode, WechatOauthProfile},
 };
 
 #[async_trait]
 pub trait AuthRepository: Send + Sync {
+    /// Compatibility for existing repository implementations; persistence overrides this
+    /// to distinguish actual new rows from reactivated accounts.
+    async fn register_user(&self, request: UserRegistration<'_>) -> anyhow::Result<RegisteredUser> {
+        let user = match (request.identity, request.invite_code) {
+            (
+                RegistrationIdentity::Password {
+                    account_identifier,
+                    password_hash,
+                },
+                Some(code),
+            ) => {
+                self.create_user_with_invite_with_referral(
+                    code,
+                    request.referral_code,
+                    account_identifier,
+                    password_hash,
+                )
+                .await?
+            }
+            (
+                RegistrationIdentity::Password {
+                    account_identifier,
+                    password_hash,
+                },
+                None,
+            ) => {
+                self.create_user_without_invite_with_referral(
+                    request.referral_code,
+                    account_identifier,
+                    password_hash,
+                )
+                .await?
+            }
+            (
+                RegistrationIdentity::Wechat {
+                    phone_number,
+                    password_hash,
+                    profile,
+                },
+                Some(code),
+            ) => {
+                self.create_user_with_invite_and_wechat_with_referral(
+                    code,
+                    request.referral_code,
+                    phone_number,
+                    password_hash,
+                    profile,
+                )
+                .await?
+            }
+            (
+                RegistrationIdentity::Wechat {
+                    phone_number,
+                    password_hash,
+                    profile,
+                },
+                None,
+            ) => {
+                self.create_user_with_wechat_without_invite_with_referral(
+                    request.referral_code,
+                    phone_number,
+                    password_hash,
+                    profile,
+                )
+                .await?
+            }
+            (RegistrationIdentity::MiniWechat { profile }, Some(code)) => {
+                self.create_user_with_invite_and_mini_program_wechat_with_referral(
+                    code,
+                    request.referral_code,
+                    profile,
+                )
+                .await?
+            }
+            (RegistrationIdentity::MiniWechat { profile }, None) => {
+                self.create_user_with_mini_program_wechat_without_invite_with_referral(
+                    request.referral_code,
+                    profile,
+                )
+                .await?
+            }
+        };
+        Ok(RegisteredUser {
+            user,
+            newly_created: true,
+        })
+    }
     async fn create_user_with_invite(
         &self,
         invite_code: &str,

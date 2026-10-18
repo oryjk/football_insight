@@ -1,5 +1,7 @@
 # Football Insight Admin API
 
+认证请求新增的可选来源元数据另见[用户来源追踪](../../docs/acquisition-source-tracking.md)；这不是Admin API，不改变已有认证响应或鉴权规则。
+
 公开 ticket-watch 新接口另见 [最佳盯盘时段 API](best-watch-windows-api.md)，其可选用户鉴权与以下 Admin API 无关。
 
 管理端 API 与 C 端 API 完全分离，统一位于 `/api/v1/admin/**`。除登录外，请求必须携带：

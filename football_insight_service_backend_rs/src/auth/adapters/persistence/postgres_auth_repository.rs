@@ -1,3 +1,4 @@
+use crate::auth::domain::registration::{RegisteredUser, RegistrationIdentity, UserRegistration};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool, Postgres, Row, Transaction};
@@ -275,7 +276,7 @@ impl PostgresAuthRepository {
         referral_code: Option<&str>,
         account_identifier: &str,
         password_hash: &str,
-    ) -> anyhow::Result<AuthUser> {
+    ) -> anyhow::Result<RegisteredUser> {
         let mut tx = self.pool.begin().await?;
         Self::validate_unused_invite_code(&mut tx, invite_code).await?;
         let referrer_user_id = Self::resolve_referrer_user_id(&mut tx, referral_code).await?;
@@ -358,7 +359,10 @@ impl PostgresAuthRepository {
             }
 
             tx.commit().await?;
-            return Ok(user.into_auth_user(&membership_tier_rules));
+            return Ok(RegisteredUser {
+                user: user.into_auth_user(&membership_tier_rules),
+                newly_created: false,
+            });
         }
 
         let user = sqlx::query_as::<_, AuthUserRow>(
@@ -430,7 +434,10 @@ impl PostgresAuthRepository {
         }
 
         tx.commit().await?;
-        Ok(user.into_auth_user(&membership_tier_rules))
+        Ok(RegisteredUser {
+            user: user.into_auth_user(&membership_tier_rules),
+            newly_created: true,
+        })
     }
 
     async fn create_standard_user(
@@ -438,7 +445,7 @@ impl PostgresAuthRepository {
         referral_code: Option<&str>,
         account_identifier: &str,
         password_hash: &str,
-    ) -> anyhow::Result<AuthUser> {
+    ) -> anyhow::Result<RegisteredUser> {
         let mut tx = self.pool.begin().await?;
         let referrer_user_id = Self::resolve_referrer_user_id(&mut tx, referral_code).await?;
         let membership_tier_rules = Self::load_membership_tier_rules_in_tx(&mut tx).await?;
@@ -503,7 +510,10 @@ impl PostgresAuthRepository {
             }
 
             tx.commit().await?;
-            return Ok(user.into_auth_user(&membership_tier_rules));
+            return Ok(RegisteredUser {
+                user: user.into_auth_user(&membership_tier_rules),
+                newly_created: false,
+            });
         }
 
         let user = sqlx::query_as::<_, AuthUserRow>(
@@ -555,7 +565,10 @@ impl PostgresAuthRepository {
         }
 
         tx.commit().await?;
-        Ok(user.into_auth_user(&membership_tier_rules))
+        Ok(RegisteredUser {
+            user: user.into_auth_user(&membership_tier_rules),
+            newly_created: true,
+        })
     }
 
     async fn create_invited_wechat_user(
@@ -565,7 +578,7 @@ impl PostgresAuthRepository {
         phone_number: &str,
         password_hash: &str,
         profile: &WechatOauthProfile,
-    ) -> anyhow::Result<AuthUser> {
+    ) -> anyhow::Result<RegisteredUser> {
         let mut tx = self.pool.begin().await?;
         Self::validate_unused_invite_code(&mut tx, invite_code).await?;
         let referrer_user_id = Self::resolve_referrer_user_id(&mut tx, referral_code).await?;
@@ -659,7 +672,10 @@ impl PostgresAuthRepository {
             }
 
             tx.commit().await?;
-            return Ok(user.into_auth_user(&membership_tier_rules));
+            return Ok(RegisteredUser {
+                user: user.into_auth_user(&membership_tier_rules),
+                newly_created: false,
+            });
         }
 
         let user = sqlx::query_as::<_, AuthUserRow>(
@@ -742,7 +758,10 @@ impl PostgresAuthRepository {
         }
 
         tx.commit().await?;
-        Ok(user.into_auth_user(&membership_tier_rules))
+        Ok(RegisteredUser {
+            user: user.into_auth_user(&membership_tier_rules),
+            newly_created: true,
+        })
     }
 
     async fn create_standard_wechat_user(
@@ -751,7 +770,7 @@ impl PostgresAuthRepository {
         phone_number: &str,
         password_hash: &str,
         profile: &WechatOauthProfile,
-    ) -> anyhow::Result<AuthUser> {
+    ) -> anyhow::Result<RegisteredUser> {
         let mut tx = self.pool.begin().await?;
         let referrer_user_id = Self::resolve_referrer_user_id(&mut tx, referral_code).await?;
         let membership_tier_rules = Self::load_membership_tier_rules_in_tx(&mut tx).await?;
@@ -827,7 +846,10 @@ impl PostgresAuthRepository {
             }
 
             tx.commit().await?;
-            return Ok(user.into_auth_user(&membership_tier_rules));
+            return Ok(RegisteredUser {
+                user: user.into_auth_user(&membership_tier_rules),
+                newly_created: false,
+            });
         }
 
         let user = sqlx::query_as::<_, AuthUserRow>(
@@ -890,7 +912,10 @@ impl PostgresAuthRepository {
         }
 
         tx.commit().await?;
-        Ok(user.into_auth_user(&membership_tier_rules))
+        Ok(RegisteredUser {
+            user: user.into_auth_user(&membership_tier_rules),
+            newly_created: true,
+        })
     }
 
     async fn create_invited_mini_wechat_user(
@@ -898,7 +923,7 @@ impl PostgresAuthRepository {
         invite_code: &str,
         referral_code: Option<&str>,
         profile: &WechatOauthProfile,
-    ) -> anyhow::Result<AuthUser> {
+    ) -> anyhow::Result<RegisteredUser> {
         let mut tx = self.pool.begin().await?;
         Self::validate_unused_invite_code(&mut tx, invite_code).await?;
         let referrer_user_id = Self::resolve_referrer_user_id(&mut tx, referral_code).await?;
@@ -992,7 +1017,10 @@ impl PostgresAuthRepository {
             }
 
             tx.commit().await?;
-            return Ok(user.into_auth_user(&membership_tier_rules));
+            return Ok(RegisteredUser {
+                user: user.into_auth_user(&membership_tier_rules),
+                newly_created: false,
+            });
         }
 
         let user = sqlx::query_as::<_, AuthUserRow>(
@@ -1073,14 +1101,17 @@ impl PostgresAuthRepository {
         }
 
         tx.commit().await?;
-        Ok(user.into_auth_user(&membership_tier_rules))
+        Ok(RegisteredUser {
+            user: user.into_auth_user(&membership_tier_rules),
+            newly_created: true,
+        })
     }
 
     async fn create_standard_mini_wechat_user(
         &self,
         referral_code: Option<&str>,
         profile: &WechatOauthProfile,
-    ) -> anyhow::Result<AuthUser> {
+    ) -> anyhow::Result<RegisteredUser> {
         let mut tx = self.pool.begin().await?;
         let referrer_user_id = Self::resolve_referrer_user_id(&mut tx, referral_code).await?;
         let membership_tier_rules = Self::load_membership_tier_rules_in_tx(&mut tx).await?;
@@ -1156,7 +1187,10 @@ impl PostgresAuthRepository {
             }
 
             tx.commit().await?;
-            return Ok(user.into_auth_user(&membership_tier_rules));
+            return Ok(RegisteredUser {
+                user: user.into_auth_user(&membership_tier_rules),
+                newly_created: false,
+            });
         }
 
         let user = sqlx::query_as::<_, AuthUserRow>(
@@ -1217,7 +1251,10 @@ impl PostgresAuthRepository {
         }
 
         tx.commit().await?;
-        Ok(user.into_auth_user(&membership_tier_rules))
+        Ok(RegisteredUser {
+            user: user.into_auth_user(&membership_tier_rules),
+            newly_created: true,
+        })
     }
 }
 
@@ -1470,6 +1507,76 @@ impl StoredAuthUserRow {
 
 #[async_trait]
 impl AuthRepository for PostgresAuthRepository {
+    async fn register_user(&self, request: UserRegistration<'_>) -> anyhow::Result<RegisteredUser> {
+        match (request.identity, request.invite_code) {
+            (
+                RegistrationIdentity::Password {
+                    account_identifier,
+                    password_hash,
+                },
+                Some(code),
+            ) => {
+                self.create_invited_user(
+                    code,
+                    request.referral_code,
+                    account_identifier,
+                    password_hash,
+                )
+                .await
+            }
+            (
+                RegistrationIdentity::Password {
+                    account_identifier,
+                    password_hash,
+                },
+                None,
+            ) => {
+                self.create_standard_user(request.referral_code, account_identifier, password_hash)
+                    .await
+            }
+            (
+                RegistrationIdentity::Wechat {
+                    phone_number,
+                    password_hash,
+                    profile,
+                },
+                Some(code),
+            ) => {
+                self.create_invited_wechat_user(
+                    code,
+                    request.referral_code,
+                    phone_number,
+                    password_hash,
+                    profile,
+                )
+                .await
+            }
+            (
+                RegistrationIdentity::Wechat {
+                    phone_number,
+                    password_hash,
+                    profile,
+                },
+                None,
+            ) => {
+                self.create_standard_wechat_user(
+                    request.referral_code,
+                    phone_number,
+                    password_hash,
+                    profile,
+                )
+                .await
+            }
+            (RegistrationIdentity::MiniWechat { profile }, Some(code)) => {
+                self.create_invited_mini_wechat_user(code, request.referral_code, profile)
+                    .await
+            }
+            (RegistrationIdentity::MiniWechat { profile }, None) => {
+                self.create_standard_mini_wechat_user(request.referral_code, profile)
+                    .await
+            }
+        }
+    }
     async fn official_wechat_bound(&self, user_id: Uuid) -> anyhow::Result<Option<bool>> {
         Ok(sqlx::query_scalar::<_, bool>(OFFICIAL_BOUND_SQL)
             .bind(user_id)
@@ -1484,6 +1591,7 @@ impl AuthRepository for PostgresAuthRepository {
     ) -> anyhow::Result<AuthUser> {
         self.create_invited_user(invite_code, None, account_identifier, password_hash)
             .await
+            .map(|result| result.user)
     }
 
     async fn create_user_with_invite_with_referral(
@@ -1500,6 +1608,7 @@ impl AuthRepository for PostgresAuthRepository {
             password_hash,
         )
         .await
+        .map(|result| result.user)
     }
 
     async fn create_user_without_invite(
@@ -1509,6 +1618,7 @@ impl AuthRepository for PostgresAuthRepository {
     ) -> anyhow::Result<AuthUser> {
         self.create_standard_user(None, account_identifier, password_hash)
             .await
+            .map(|result| result.user)
     }
 
     async fn create_user_without_invite_with_referral(
@@ -1519,6 +1629,7 @@ impl AuthRepository for PostgresAuthRepository {
     ) -> anyhow::Result<AuthUser> {
         self.create_standard_user(referral_code, account_identifier, password_hash)
             .await
+            .map(|result| result.user)
     }
 
     async fn find_user_by_account_identifier(
@@ -1669,6 +1780,7 @@ impl AuthRepository for PostgresAuthRepository {
     ) -> anyhow::Result<AuthUser> {
         self.create_invited_wechat_user(invite_code, None, phone_number, password_hash, profile)
             .await
+            .map(|result| result.user)
     }
 
     async fn create_user_with_invite_and_wechat_with_referral(
@@ -1687,6 +1799,7 @@ impl AuthRepository for PostgresAuthRepository {
             profile,
         )
         .await
+        .map(|result| result.user)
     }
 
     async fn create_user_with_wechat_without_invite(
@@ -1697,6 +1810,7 @@ impl AuthRepository for PostgresAuthRepository {
     ) -> anyhow::Result<AuthUser> {
         self.create_standard_wechat_user(None, phone_number, password_hash, profile)
             .await
+            .map(|result| result.user)
     }
 
     async fn create_user_with_wechat_without_invite_with_referral(
@@ -1708,6 +1822,7 @@ impl AuthRepository for PostgresAuthRepository {
     ) -> anyhow::Result<AuthUser> {
         self.create_standard_wechat_user(referral_code, phone_number, password_hash, profile)
             .await
+            .map(|result| result.user)
     }
 
     async fn create_user_with_invite_and_mini_program_wechat(
@@ -1717,6 +1832,7 @@ impl AuthRepository for PostgresAuthRepository {
     ) -> anyhow::Result<AuthUser> {
         self.create_invited_mini_wechat_user(invite_code, None, profile)
             .await
+            .map(|result| result.user)
     }
 
     async fn create_user_with_invite_and_mini_program_wechat_with_referral(
@@ -1727,13 +1843,16 @@ impl AuthRepository for PostgresAuthRepository {
     ) -> anyhow::Result<AuthUser> {
         self.create_invited_mini_wechat_user(invite_code, referral_code, profile)
             .await
+            .map(|result| result.user)
     }
 
     async fn create_user_with_mini_program_wechat_without_invite(
         &self,
         profile: &WechatOauthProfile,
     ) -> anyhow::Result<AuthUser> {
-        self.create_standard_mini_wechat_user(None, profile).await
+        self.create_standard_mini_wechat_user(None, profile)
+            .await
+            .map(|result| result.user)
     }
 
     async fn create_user_with_mini_program_wechat_without_invite_with_referral(
@@ -1743,6 +1862,7 @@ impl AuthRepository for PostgresAuthRepository {
     ) -> anyhow::Result<AuthUser> {
         self.create_standard_mini_wechat_user(referral_code, profile)
             .await
+            .map(|result| result.user)
     }
 
     async fn get_user_by_id(&self, user_id: Uuid) -> anyhow::Result<Option<AuthUser>> {

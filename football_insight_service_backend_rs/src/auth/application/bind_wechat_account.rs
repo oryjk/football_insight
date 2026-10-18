@@ -24,9 +24,18 @@ pub struct BindWechatAccountUseCase {
     password_port: Arc<dyn PasswordPort>,
     token_port: Arc<dyn TokenPort>,
     session_ttl: Duration,
+    acquisition_recorder: Option<crate::auth::application::record_acquisition::RecordAcquisition>,
 }
 
 impl BindWechatAccountUseCase {
+    pub fn with_acquisition_recorder(
+        mut self,
+        recorder: crate::auth::application::record_acquisition::RecordAcquisition,
+    ) -> Self {
+        self.acquisition_recorder = Some(recorder);
+        self
+    }
+
     pub fn new(
         repository: Arc<dyn AuthRepository>,
         password_port: Arc<dyn PasswordPort>,
@@ -38,10 +47,19 @@ impl BindWechatAccountUseCase {
             password_port,
             token_port,
             session_ttl,
+            acquisition_recorder: None,
         }
     }
 
     pub async fn execute(&self, input: BindWechatAccountInput) -> anyhow::Result<AuthTokenBundle> {
+        self.execute_with_acquisition(input, None).await
+    }
+
+    pub async fn execute_with_acquisition(
+        &self,
+        input: BindWechatAccountInput,
+        acquisition: Option<crate::auth::domain::acquisition::AcquisitionSource>,
+    ) -> anyhow::Result<AuthTokenBundle> {
         if input.bind_token.trim().is_empty() {
             anyhow::bail!("bind token is required");
         }
@@ -62,7 +80,7 @@ impl BindWechatAccountUseCase {
             avatar_url: claims.avatar_url,
         };
 
-        let user = if let Some(stored_user) = self
+        let registration = if let Some(stored_user) = self
             .repository
             .find_user_by_account_identifier(&phone_number)
             .await?
@@ -75,9 +93,13 @@ impl BindWechatAccountUseCase {
                 anyhow::bail!("invalid phone number or password");
             }
 
-            self.repository
-                .bind_wechat_to_user(stored_user.user.id, &profile)
-                .await?
+            crate::auth::domain::registration::RegisteredUser {
+                user: self
+                    .repository
+                    .bind_wechat_to_user(stored_user.user.id, &profile)
+                    .await?,
+                newly_created: false,
+            }
         } else {
             let invite_code = input
                 .invite_code
@@ -91,27 +113,24 @@ impl BindWechatAccountUseCase {
                 .filter(|value| !value.is_empty());
             let password_hash = self.password_port.hash_password(&password)?;
 
-            if let Some(invite_code) = invite_code {
-                self.repository
-                    .create_user_with_invite_and_wechat_with_referral(
-                        invite_code,
-                        referral_code,
-                        &phone_number,
-                        &password_hash,
-                        &profile,
-                    )
-                    .await?
-            } else {
-                self.repository
-                    .create_user_with_wechat_without_invite_with_referral(
-                        referral_code,
-                        &phone_number,
-                        &password_hash,
-                        &profile,
-                    )
-                    .await?
-            }
+            self.repository
+                .register_user(crate::auth::domain::registration::UserRegistration {
+                    invite_code,
+                    referral_code,
+                    identity: crate::auth::domain::registration::RegistrationIdentity::Wechat {
+                        phone_number: &phone_number,
+                        password_hash: &password_hash,
+                        profile: &profile,
+                    },
+                })
+                .await?
         };
+        let user = registration.user;
+        if registration.newly_created
+            && let Some(recorder) = &self.acquisition_recorder
+        {
+            recorder.record(user.id, acquisition);
+        }
 
         self.repository.record_user_login(user.id).await?;
 
@@ -130,6 +149,79 @@ impl BindWechatAccountUseCase {
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn acquisition_existing_phone_binding_keeps_account_unattributed() {
+        use crate::auth::{
+            application::{
+                acquisition_test_support::Sources, record_acquisition::RecordAcquisition,
+            },
+            domain::acquisition::AcquisitionSource,
+        };
+        let sources = Arc::new(Sources::default());
+        let uc = BindWechatAccountUseCase::new(
+            Arc::new(FakeRepository::with_existing_user()),
+            Arc::new(FakePasswordPort),
+            Arc::new(FakeTokenPort),
+            Duration::days(30),
+        )
+        .with_acquisition_recorder(RecordAcquisition::new(sources.clone()));
+        let response = uc
+            .execute_with_acquisition(
+                BindWechatAccountInput {
+                    bind_token: "bind-token".into(),
+                    invite_code: None,
+                    referral_code: None,
+                    phone_number: "18602812970".into(),
+                    password: "secret123".into(),
+                },
+                AcquisitionSource::new(Some("douyin"), None, None),
+            )
+            .await
+            .unwrap();
+        assert!(response.user.has_wechat_binding);
+        tokio::task::yield_now().await;
+        assert!(sources.0.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn acquisition_is_recorded_for_new_wechat_account_only() {
+        use crate::auth::{
+            application::{
+                acquisition_test_support::Sources, record_acquisition::RecordAcquisition,
+            },
+            domain::acquisition::AcquisitionSource,
+        };
+        let sources = Arc::new(Sources::default());
+        let use_case = BindWechatAccountUseCase::new(
+            Arc::new(FakeRepository::without_existing_user()),
+            Arc::new(FakePasswordPort),
+            Arc::new(FakeTokenPort),
+            Duration::days(30),
+        )
+        .with_acquisition_recorder(RecordAcquisition::new(sources.clone()));
+        let result = use_case
+            .execute_with_acquisition(
+                BindWechatAccountInput {
+                    bind_token: "bind-token".into(),
+                    invite_code: None,
+                    referral_code: Some("REF-CODE-001".into()),
+                    phone_number: "18602812970".into(),
+                    password: "secret123".into(),
+                },
+                AcquisitionSource::new(Some("douyin"), Some("test1"), None),
+            )
+            .await
+            .unwrap();
+        tokio::task::yield_now().await;
+        assert_eq!(
+            *sources.0.lock().unwrap(),
+            vec![(
+                result.user.id,
+                AcquisitionSource::new(Some("douyin"), Some("test1"), None).unwrap()
+            )]
+        );
+    }
+
     use std::sync::Arc;
 
     use async_trait::async_trait;
