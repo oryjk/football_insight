@@ -8,6 +8,8 @@ Football Insight 的后端服务，采用 Rust + Axum + SQLx + PostgreSQL。
 - 六边形架构：`domain -> ports -> application -> adapters`
 - 数据库表统一使用 `f_i_` 前缀
 
+赛前数据倾向的两个公开只读接口与字段说明见 [match-outlook API](docs/match-outlook-api.md)。概率和赛后 RPS 全部由 Python 预计算，Rust 只读取及汇总；新表未迁移时返回明确暂无/零场记录。
+
 ## 本地开发
 
 ```bash

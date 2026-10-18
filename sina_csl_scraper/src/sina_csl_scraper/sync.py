@@ -174,8 +174,10 @@ class InsightSyncService:
         repository: InsightSyncRepository,
         source: str = "sina_csl_scraper",
         clock: Callable[[], datetime] | None = None,
+        after_sync: Callable[[int], None] | None = None,
     ) -> None:
         self.repository = repository
+        self.after_sync = after_sync
         self.source = source
         self.clock = clock or (lambda: datetime.now(UTC))
 
@@ -293,6 +295,15 @@ class InsightSyncService:
             run_id=run_id,
             finished_at=self.clock(),
         )
+
+        # Outlook is an independent post-commit capability; model/DDL/network failure cannot
+        # roll back an already successful core sync or change its result.
+        if self.after_sync is not None:
+            try:
+                self.after_sync(payload.season)
+            except Exception as error:
+                import logging
+                logging.getLogger(__name__).warning("match outlook unavailable after committed sync (%s)", type(error).__name__)
 
         return SyncResult(
             run_id=run_id,

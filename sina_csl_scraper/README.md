@@ -2,6 +2,25 @@
 
 基于新浪体育移动端 JSON 接口抓取中超数据的 Python 项目，使用 `uv` 管理。
 
+## 赛前数据倾向（Elo V2，待迁移/上线）
+
+`match_outlook/` 只使用比分、球队 ID、开赛时间和中立场地标记。每次 `scrape --write-db` 核心事务提交后，用独立连接重放历史、为未开赛比赛生成概率、为已冻结且完赛的记录计分；附加流程失败只记录错误类型，不改变核心同步结果。选参时 τ=1，最终重放用最近 150 场校准 τ；同一开赛时刻先统一预测再更新，避免同时比赛结果泄漏。
+
+生产迁移 `20261018140000_add_match_outlooks.sql` 必须先由负责人在 peiqian 手动执行。以下命令只是操作说明，本次开发未执行生产迁移、回填或刷新。
+
+```bash
+# 默认只下载、校验，不连库。按赛季/轮次原子缓存，中断后同命令续跑。
+uv run sina-csl-scraper match-outlook backfill --start-season 2014 --end-season 2025 --cache-dir data/outlook-history
+
+# 负责人确认迁移和校验后，沿用私有配置加载 DATABASE_URL；只写新增历史表。
+uv run --env-file .env.sync sina-csl-scraper match-outlook backfill --start-season 2014 --end-season 2025 --cache-dir data/outlook-history --write-db
+
+# 显式生成当前赛季的真实赛前记录；之后正常 scrape --write-db 自动维护。
+uv run --env-file .env.sync sina-csl-scraper match-outlook refresh --season 2026
+```
+
+请求间隔默认 0.3 秒，`--interval` 最少 0.1 秒；缓存是新浪原始轮次快照，写库前必须校验每个完整赛季数量、比分和 ID 唯一性。历史表与实时表重复时实时表优先；未知开赛时间不猜测，缺完整前序赛季拒绝生成，禁止为已开赛比赛补写预测。2027 年自动重选参数，需先补齐 2026 完整比分；离线模拟与回测数字见 [验证报告](../docs/match-outlook-validation.md)。
+
 ## 首页射手榜逐场进球
 
 Python 从中足联官网的 `players/find` 和 `players/player/played` 拉取真实比赛日志，严格校验同名球员的球队身份、完整分页、赛季、联赛、赛程、出场分钟与累计进球；不从累计快照做单场差分。每次 `scrape --write-db` 核心同步成功后，更新进球榜全部球员本赛季的出场记录到 `f_i_player_match_stats`，同时服务首页前五与榜单全榜。姓名搜索总数与返回数不符时，改用完整的赛季球队名册核实身份，并保留已核实球员在其他俱乐部的记录。来源失败、数据不全或已验证出场缺失时保留旧记录并报告，不影响核心赛季同步。

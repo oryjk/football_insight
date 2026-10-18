@@ -23,12 +23,15 @@ from .leisu import LeisuBrowserClient, LeisuCornerEnricher, load_leisu_match_map
 from .models import MatchResult
 from .postgres_repository import PostgresInsightSyncRepository
 from .player_goal_sync import refresh_scorer_goals
+from .match_outlook.cli import app as outlook_app
+from .match_outlook.service import refresh_match_outlooks
 from .schedule import fetch_reconciled_schedule
 from .sync import InsightSyncService, SyncPayload
 from .topics.cli import app as topics_app
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 app.add_typer(topics_app, name='topics')
+app.add_typer(outlook_app, name='match-outlook')
 
 
 def _write_json(path: Path, payload: dict[str, Any] | list[dict[str, Any]]) -> None:
@@ -148,7 +151,7 @@ def run_scrape(
 
         repository = PostgresInsightSyncRepository(database_url=database_url)
         try:
-            sync_service = InsightSyncService(repository=repository)
+            sync_service = InsightSyncService(repository=repository, after_sync=lambda season: refresh_match_outlooks(database_url, season))
             sync_result = sync_service.sync(
                 SyncPayload(
                     season=target_season,
