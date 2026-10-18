@@ -41,7 +41,7 @@ Python 用比分、球队 ID、北京时间与中立场地标记预计算 Elo V2
 | `MATCH_OUTLOOK_HISTORY_DIR=… uv run pytest tests/test_match_outlook_reproduction.py -q -s` | 1 passed，输出 `production V2 RPS=0.19877789036731; sample=1487; 2026 parameters=Params(K=10,H=60,s=150,c=.7,gexp=1,reg=.8,newstart=1450)` |
 | 原研究 `fix.py`（同一份快照，临时 scipy 环境） | exit0，V2 RPS 0.1988、命中率 54.5%；未给生产增加 scipy 依赖 |
 | `uv run sina-csl-scraper match-outlook --help` | exit0，正确登记 backfill / refresh 子命令 |
-| 小程序 `bun test` | **908 pass / 0 fail**，5939 expect，85 个文件，13.45s |
+| 小程序 `bun test` | **908 pass / 0 fail**，5941 expect，85 个文件，13.26s |
 | `bun run type-check` | vue-tsc --noEmit，exit0，0 错误 |
 | `bun run check:boundaries` | 依赖边界检查通过；组件无 api 导入、页面无互引、未改 ALLOWLIST、HTTP 仍收口 request |
 | `bun run build:h5` | DONE Build complete，exit0 |
@@ -73,7 +73,7 @@ isolated PostgreSQL container removed; production database never connected
 - 公开计分从功能实际运行后开始，不把研究回测当作公开战绩。赛季初提醒依据 rounds 中真实已完赛总数 `<30`，不按新表暂时为零的公开计分数判断，避免十月份误称“赛季初”。
 - 原共享球队选择器允许无排名球队显示名字，不伪造排名、不隐藏升班马；保留既有非空排名显示。贡献资料迟到时保留当前有效球队选择，是为共享选择所需的最小改动；会话、付费度量与 sessionEffects 逻辑未重写，原用例仍全通过。
 - 新模块/迁移命名由实现方决定。设计没有失效的具体文件路径；实际源码目录与本文 API 链接一致。没有改榜赛页、抢票统计、比赛 ID 门控或 Android 项目。
-- 一次独立全量审查发现球队切换竞态、后续轮次不可见、返回页重置选择、首页审核态入口；全部修复。补测另发现 auth intent 期间旧用户尚在内存，应等待新用户引用发布后再读关注球队，已同步失效旧请求。
+- 一次独立全量审查发现球队切换竞态、后续轮次不可见、返回页重置选择、首页审核态入口；全部修复，旧请求也不再拖住新球队的 loading。补测另发现 auth intent 期间旧用户尚在内存，应等待新用户引用发布后再读关注球队，已同步失效旧请求。
 
 TDD 的真实失败包括：原始概率取整总和 99；队伍切换只请求旧比赛；会员资料覆盖已选球队；未完赛历史被接纳；同刻第二场先读取第一场结果；账号 intent 期间读取旧关注资料。每项先复现失败，再实现/修复并通过回归。
 
@@ -109,3 +109,5 @@ TDD 的真实失败包括：原始概率取整总和 99；队伍切换只请求�
 **小程序修改：** `src/pages/home/index.vue`；`src/pages/insights/{index.vue,useInsightsData.ts,sessionEffects.test.ts}`；`src/pages/insights/components/InsightsTeamSelector.vue`。
 
 **公共文档：** 本报告、实施计划、根 `CHANGELOG.md` / `FEATURES.md`（数据后端与小程序条目分开提交）。设计和研究脚本保持负责人定稿内容。
+
+数据/后端提交：`13a793c`（先推送 main）；小程序展示层独立后续提交。同步 main 时保留已提交的首页深色卡片改动，未纳入本任务提交。

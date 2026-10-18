@@ -25,7 +25,7 @@
           <view v-else class="team-chip__avatar team-chip__avatar--fallback">
             {{ team.team_name.charAt(0) }}
           </view>
-          <text>#{{ team.rank_no }} {{ team.team_name }}</text>
+          <text>{{ team.rank_no === null ? '' : `#${team.rank_no} ` }}{{ team.team_name }}</text>
         </button>
       </view>
     </scroll-view>
@@ -34,10 +34,10 @@
 
 <script setup lang="ts">
 import { getCurrentInstance, nextTick, ref, watch } from 'vue'
-import type { TeamInsightTeam } from '../../../types/insight'
+import type { SupportTeam } from '../../../types/support'
 
 const props = defineProps<{
-  teams: TeamInsightTeam[]
+  teams: SupportTeam[]
   selectedTeamId: number | null
 }>()
 

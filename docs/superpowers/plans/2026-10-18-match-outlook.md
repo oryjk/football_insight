@@ -42,4 +42,4 @@ Files: typed api/types, insights panel/helpers/loader, index wiring, home lightw
 - [x] Put free panel above membership branch; reuse selector with common selectedTeamId. Load public teams/matches and user's favorite independently so paused accounts still have options.
 - [x] Home single neutral entry navigates insights; no added probability calls on home.
 - [x] Bun test/type-check/boundaries/components/H5/offlineMP; scraper pytest; independent final review, validation report and API docs; FEATURES/CHANGELOG per commit.
-- [ ] Pull --rebase, separate data/backend and mini commits, push main. Production rollout left to owner.
+- [x] Pull --rebase, separate data/backend and mini commits, push main. Production rollout left to owner.

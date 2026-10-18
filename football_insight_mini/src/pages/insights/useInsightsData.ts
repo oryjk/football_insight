@@ -132,7 +132,9 @@ export function useInsightsData(deps: InsightsDataDeps): InsightsData {
       }
       teams.value = response.teams
       insights.value = response.insights
-      selectedTeamId.value = response.teams[0]?.team_id ?? null
+      if (!response.teams.some(team => team.team_id === selectedTeamId.value)) {
+        selectedTeamId.value = response.teams[0]?.team_id ?? null
+      }
       resetExpandedState()
     } catch (error) {
       if (!isCurrent()) {

@@ -12,6 +12,21 @@
           @open="openTicketWatch"
         />
 
+        <InsightsMatchOutlook
+          v-if="outlookReviewReady && !systemConfigUnderReview && currentUser"
+          :teams="outlookTeams"
+          :selected-team-id="selectedTeamId"
+          :matches="outlookMatches"
+          :selected-match-id="outlookSelectedMatchId"
+          :outlook="matchOutlook"
+          :record="outlookRecord"
+          :loading="outlookLoading"
+          :error="outlookError"
+          :completed-matches="outlookCompletedMatches"
+          @select-team="outlookLoader.selectTeam"
+          @select-match="outlookLoader.selectMatch"
+        />
+
         <InsightsSkeleton
           v-if="!systemConfigUnderReview && userLoading"
         />
@@ -34,7 +49,8 @@
 
         <template v-else-if="selectedInsight">
           <InsightsTeamPanel
-            v-model:selected-team-id="selectedTeamId"
+            :selected-team-id="selectedTeamId"
+            @update:selected-team-id="outlookLoader.selectTeam"
             :teams="teams"
             :insight="selectedInsight"
             @open-board="goToTeamBoard"
@@ -75,12 +91,14 @@
 <script setup lang="ts">
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, ref, watch } from 'vue'
-import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
+import { onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
 import InsightsSkeleton from './components/InsightsSkeleton.vue'
 import InsightsTicketWatchEntry from './components/InsightsTicketWatchEntry.vue'
 import InsightsLockedPanel from './components/InsightsLockedPanel.vue'
+import InsightsMatchOutlook from './components/InsightsMatchOutlook.vue'
+import { createOutlookLoader } from './useMatchOutlook'
 import InsightsTeamPanel from './components/InsightsTeamPanel.vue'
 import InsightsContributionSurface from './components/InsightsContributionSurface.vue'
 import type { TeamInsight } from '../../types/insight'
@@ -107,6 +125,7 @@ const session = useAppSession()
 const currentUser = session.currentUser
 const ticketWatchNavigating = ref(false)
 const systemConfigUnderReview = ref(false)
+const outlookReviewReady = ref(false)
 const membershipBenefitsLocked = computed(() =>
   resolveMembershipBenefitsLocked(currentUser.value),
 )
@@ -133,6 +152,25 @@ const {
   isUnderReview: () => systemConfigUnderReview.value,
   isMembershipLocked: () => membershipBenefitsLocked.value,
 })
+const outlookLoader = createOutlookLoader({
+  authenticated: () => Boolean(currentUser.value),
+  identity: () => currentUser.value,
+  underReview: () => !outlookReviewReady.value || systemConfigUnderReview.value,
+  revision: session.revision,
+  selectedTeamId,
+})
+const {
+  teams: outlookTeams,
+  matches: outlookMatches,
+  outlook: matchOutlook,
+  record: outlookRecord,
+  selectedMatchId: outlookSelectedMatchId,
+  completedMatches: outlookCompletedMatches,
+  loading: outlookLoading,
+  error: outlookError,
+} = outlookLoader
+onUnload(outlookLoader.dispose)
+
 const showLoginFloat = computed(() => !userLoading.value && !currentUser.value)
 const shouldLockTicketWatchEntry = computed(() =>
   !userLoading.value && (!currentUser.value || membershipBenefitsLocked.value),
@@ -272,6 +310,7 @@ function goToTeamBoard(): void {
 }
 
 onShow(async () => {
+  outlookReviewReady.value = false
   reportPageActivity('insights')
   beginPaywallVisit()
   reportTicketWatchEntryImpression()
@@ -283,6 +322,7 @@ onShow(async () => {
   // 审核中立即切审核视图（清会员数据、使在途 insights owner 失效），不能丢弃 true
   // 让新账号的会员数据继续展示。
   systemConfigUnderReview.value = underReview
+  outlookReviewReady.value = true
   if (underReview) {
     applyUnderReviewView()
     return

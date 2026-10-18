@@ -191,6 +191,19 @@ function wireInsightsFixture(options: {
 }
 
 describe('insights 私有加载编排（真实 session + watch + 加载入口）', () => {
+  test('会员贡献资料迟到时保留免费倾向面板中已选的有效球队', async () => {
+    storage[AUTH_TOKEN_STORAGE_KEY] = 'token-a'
+    const fixture = wireInsightsFixture({ source: { getCurrentUser: async () => userA } })
+    await fixture.data.loadUser()
+    const pending = fixture.data.loadInsights()
+    fixture.data.selectedTeamId.value = 2
+    const response = buildTeamInsightsResponse(1)
+    response.teams.push(buildTeamInsightsResponse(2).teams[0]!)
+    fixture.insightRequests[0]!.resolve(response)
+    await pending
+    expect(fixture.data.selectedTeamId.value).toBe(2)
+    fixture.stop()
+  })
   test('onShow（loadUser→loadInsights）与恢复 watcher 同会话只发一次私有请求', async () => {
     storage[AUTH_TOKEN_STORAGE_KEY] = 'token-a'
     const meRequest = deferred<CurrentUser | null>()

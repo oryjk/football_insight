@@ -52,6 +52,13 @@
           @vote="handleHomeSupportVote"
         />
 
+        <button
+          v-if="hasAuthToken && !outlookRestricted && supportProfile?.next_match"
+          class="outlook-entry"
+          hover-class="outlook-entry--pressed"
+          @tap="openMatchOutlook"
+        >下一场的数据倾向 · 前往洞察查看</button>
+
         <!-- 回到页面的后台刷新沿用已有内容，只有还没有总览数据时才显示骨架 -->
         <HomeSkeleton v-if="loading && !overview" />
 
@@ -123,6 +130,7 @@
 
 <script setup lang="ts">
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { useMiniReviewStatus } from '../../stores/miniReview'
 import { computed, ref, watch } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
@@ -502,7 +510,15 @@ async function handleHomeSupportVote(teamId: number) {
   }
 }
 
+const outlookReview = useMiniReviewStatus()
+const outlookRestricted = outlookReview.shouldRestrictFeatures
+
+function openMatchOutlook() {
+  uni.switchTab({ url: '/pages/insights/index' })
+}
+
 onShow(() => {
+  void outlookReview.ensureMiniReviewReady()
   reportPageActivity('home')
   const pending = [loadPage(), loadDailyTopics(), loadSupportData()]
   if (!homeInitialSettled.value) {
@@ -512,6 +528,19 @@ onShow(() => {
 </script>
 
 <style scoped lang="css">
+.outlook-entry {
+  margin: 0;
+  padding: var(--fi-space-16) var(--fi-space-20);
+  background: var(--fi-color-surface-panel);
+  color: var(--fi-color-text-secondary);
+  font-size: var(--fi-font-24);
+  line-height: var(--fi-leading-normal);
+  border-radius: var(--fi-radius-round);
+  border: var(--fi-border-card);
+}
+.outlook-entry::after { border: 0; }
+.outlook-entry--pressed { opacity: var(--fi-opacity-pressed); }
+
 .home-page-shell {
   min-height: 100vh;
   position: relative;
