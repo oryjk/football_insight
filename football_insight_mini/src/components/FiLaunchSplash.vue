@@ -1,6 +1,7 @@
 <template>
   <view v-if="visible" class="fi-launch-splash" :class="{ 'fi-launch-splash--leaving': leaving }">
-    <view class="fi-launch-splash__body">
+    <!-- idle（宽限期）只铺深色底层；logo 与文案在确定要展示时才出现，动画从那一刻开始 -->
+    <view v-if="bodyShown" class="fi-launch-splash__body">
       <image class="fi-launch-splash__logo" :src="logo" mode="aspectFit" />
       <text class="fi-launch-splash__name">足球洞察</text>
       <text class="fi-launch-splash__tagline">{{ brandSubtitle }}</text>
@@ -10,13 +11,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import logo from '../static/app-logo-mark.png'
 import { brandSubtitle } from '../utils/brandSubtitle'
 import type { SplashPhase } from '../composables/useLaunchSplash'
 
 const props = defineProps<{ phase: SplashPhase }>()
-const visible = computed(() => props.phase === 'visible' || props.phase === 'leaving')
+const visible = computed(() => props.phase !== 'done')
+// 只要展示过一次就保持，淡出期间内容不能消失。
+const bodyShown = ref(props.phase === 'visible')
+watch(() => props.phase, (phase) => {
+  if (phase === 'visible') bodyShown.value = true
+})
 const leaving = computed(() => props.phase === 'leaving')
 </script>
 

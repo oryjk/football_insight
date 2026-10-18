@@ -21,12 +21,9 @@ export function useLaunchSplash(settled: Ref<boolean>) {
     if (tick !== undefined) clearInterval(tick)
     tick = undefined
   }
-  function finish(decision: 'skip' | 'hide') {
+  function finish() {
     stop()
-    if (decision === 'skip') {
-      phase.value = 'done'
-      return
-    }
+    // skip 也走淡出：宽限期内是深色底层，直接撤掉会闪一下，淡出看起来像启动过程的一部分。
     phase.value = 'leaving'
     fade = setTimeout(() => { phase.value = 'done' }, SPLASH_FADE_MS)
   }
@@ -41,7 +38,7 @@ export function useLaunchSplash(settled: Ref<boolean>) {
       shownAt = now
       phase.value = 'visible'
     } else if (decision === 'skip' || decision === 'hide') {
-      finish(decision)
+      finish()
     }
   }
 
