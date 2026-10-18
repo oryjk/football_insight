@@ -1,5 +1,5 @@
 <template>
-  <FiPanel class="support-home-panel">
+  <FiPanel tone="dark">
     <view class="support-home-panel__header">
       <view class="support-home-panel__heading">
         <text class="support-home-panel__title">我的主队</text>
@@ -214,13 +214,6 @@ const awayRankLabel = computed(() => {
 </script>
 
 <style scoped lang="css">
-/* 深色主卡：与「今日话题」共用同一渐变，内部的比赛卡片保持白底，投票按钮不用改色。 */
-.support-home-panel {
-  background: var(--fi-gradient-topic-hero);
-  border-color: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 10rpx 28rpx rgba(18, 20, 28, 0.18);
-}
-
 .state-card--error text {
   font-size: 28rpx;
   color: #c03a2b;

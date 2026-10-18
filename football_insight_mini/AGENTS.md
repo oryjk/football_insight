@@ -121,7 +121,8 @@ src/pages/<domain>/
 
 1. 不要用 `custom-class` + 父级 scoped 样式给子组件根节点做布局——父级选择器带作用域 id 且被组件样式隔离挡住，整条规则失效。布局类加在自己模板内的包裹 view 上。
 2. flex 行容器里子组件宿主节点会收缩为内容宽，子组件内部 `width: 100%` 无法撑满。由 flex 容器侧解决（`flex-direction: column` + `align-items: stretch`）。
-3. 通用原则：**H5 显示正常不代表小程序正常**，跨组件宽度/布局样式必须在 mp-weixin 端实际验证。
+3. 在自定义组件标签上写 `class`（如 `<FiPanel class="x">`）并期望改它根节点的背景/边框：小程序里这个 class 落在组件宿主节点，不在组件内部根 view 上，背景不生效。要改组件外观，给组件加 prop（如 `FiPanel` 的 `tone="dark"`），由组件自己的根节点承担。
+4. 通用原则：**H5 显示正常不代表小程序正常**，跨组件宽度/布局样式必须在 mp-weixin 端实际验证。
 
 ## 测试与验证
 

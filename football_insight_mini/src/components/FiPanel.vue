@@ -1,5 +1,5 @@
 <template>
-  <view class="fi-panel" :class="{ 'fi-panel--flush': flush, 'fi-panel--clip': clip }">
+  <view class="fi-panel" :class="{ 'fi-panel--flush': flush, 'fi-panel--clip': clip, 'fi-panel--dark': tone === 'dark' }">
     <slot />
   </view>
 </template>
@@ -15,6 +15,11 @@ defineProps<{
   flush?: boolean
   /** 裁剪溢出内容，用于卡内绝对定位的遮罩层。 */
   clip?: boolean
+  /**
+   * 深色主卡。外观必须由本组件自己的根节点承担：小程序里写在 <FiPanel class="..."> 上的 class
+   * 落在组件宿主节点而不是 .fi-panel 上，背景不会生效（H5 会合并，所以只在 H5 看不出问题）。
+   */
+  tone?: 'dark'
 }>()
 </script>
 
@@ -26,6 +31,12 @@ defineProps<{
   border: var(--fi-component-panel-border);
   background: var(--fi-component-panel-bg);
   box-shadow: var(--fi-component-panel-shadow);
+}
+
+.fi-panel--dark {
+  background: var(--fi-gradient-topic-hero);
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 10rpx 28rpx rgba(18, 20, 28, 0.18);
 }
 
 .fi-panel--flush {
