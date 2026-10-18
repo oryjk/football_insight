@@ -164,3 +164,8 @@ isolated PostgreSQL migration/insert/report checks PASS
 
 
 本次两项功能集成后的最终验证：`bun test` 968 通过 / 0 失败（90 文件）；`bun run type-check`、`bun run check:boundaries` 均通过；`MINI_REVIEW_SKIP=1 bun run build:mp-weixin` 与 `bun run build:h5` 均构建成功，小程序组件注册和生产 API 产物校验通过，保留登记库版本 1.0.99。独立审查确认来源功能符合设计；海报同场轮询清图问题已修复并回归。Canvas 使用占位二维码与模拟数据做浏览器布局检查，不能当作微信扫码验收。
+
+
+### 2026-10-19 发布更新
+
+`97b025f` 已合并推送 main；生产 peiqian 后端已部署并重启且 healthy，小程序 1.0.99 已从同一干净 main 经统一入口上传 robot 2。登记库复用审核中版本，未手改版本或审核状态。生产 `f_i_user_acquisitions` 与 `f_i_mini_review_statuses` 已确认存在，本次不运行迁移、不写测试用户。来源解析自动化及合并后全套 968 项测试通过；微信卡片/朋友圈参数透传与实际新注册来源仍待真机验收。部署证据及回滚见 [海报验证记录](reflux-board-share-poster-validation.md)。

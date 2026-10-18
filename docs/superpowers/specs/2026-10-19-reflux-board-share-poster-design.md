@@ -1,7 +1,7 @@
 # 回流看板分享图设计
 
 日期：2026-10-19
-状态：已实现，自动化与本地接口已验证；微信真机导出、相册与正式版扫码待验证（详见 `docs/reflux-board-share-poster-validation.md`）
+状态：已合并 main，生产后端已部署，小程序 1.0.99 robot 2 已上传；微信真机验收待执行
 前置：`2026-10-19-share-source-attribution-design.md`（分享来源参数，先做或同时做）
 
 ## 背景与目的
