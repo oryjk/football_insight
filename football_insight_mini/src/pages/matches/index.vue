@@ -46,6 +46,7 @@
 </template>
 
 <script setup lang="ts">
+import { buildSharePath } from '../../utils/shareSource'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
@@ -67,7 +68,7 @@ onShow(() => { void loadPage() })
 
 onShareAppMessage(() => ({
   title: '中超赛程和最近赛果，看看下一场对阵',
-  path: '/pages/matches/index',
+  path: buildSharePath('/pages/matches/index', 'matches'),
 }))
 </script>
 

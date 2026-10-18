@@ -28,6 +28,7 @@
 </template>
 
 <script setup lang="ts">
+import { buildSharePath } from '../../utils/shareSource'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, onScopeDispose, ref, watch } from 'vue'
 import { onLoad, onPullDownRefresh, onReachBottom, onShareAppMessage } from '@dcloudio/uni-app'
@@ -84,7 +85,7 @@ onPullDownRefresh(() => { void load(true) })
 function goBack() {
   goBackFromSecondaryPage()
 }
-onShareAppMessage(() => ({ title: '足球新闻，看看球迷正在关注的话题', path: '/pages/topics/index' }))
+onShareAppMessage(() => ({ title: '足球新闻，看看球迷正在关注的话题', path: buildSharePath('/pages/topics/index', 'topics') }))
 onScopeDispose(() => { revision += 1 })
 </script>
 

@@ -97,9 +97,16 @@
 </template>
 
 <script setup lang="ts">
+import { buildSharePath } from '../../utils/shareSource'
+
+onShareAppMessage(() => ({
+  title: '球迷换座位，看看有没有合适的位置',
+  path: buildSharePath('/pages/seat-swap/index', 'swap'),
+}))
+
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, nextTick, ref } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import SeatSwapManageSheet from './components/SeatSwapManageSheet.vue'
 import SeatSwapHero from './components/SeatSwapHero.vue'

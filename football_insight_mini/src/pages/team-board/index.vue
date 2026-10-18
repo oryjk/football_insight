@@ -55,6 +55,7 @@
 </template>
 
 <script setup lang="ts">
+import { buildSharePath } from '../../utils/shareSource'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import FiLoading from '../../components/FiLoading.vue'
@@ -78,7 +79,7 @@ onShareAppMessage(() => ({
   title: board.value
     ? `${board.value.team.team_name}战术板，来看看这支队的数据观点`
     : '球队战术板：把洞察卡变成观点',
-  path: teamId.value ? `/pages/team-board/index?teamId=${teamId.value}` : '/pages/insights/index',
+  path: buildSharePath(teamId.value ? `/pages/team-board/index?teamId=${teamId.value}` : '/pages/insights/index', 'team_board'),
 }))
 
 onLoad((query) => {

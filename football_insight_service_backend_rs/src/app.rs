@@ -51,6 +51,8 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         auth.token_port.clone(),
         config,
     );
+    let share_code_routes =
+        crate::share_code::bootstrap::build_share_code_routes(auth.token_port.clone(), config);
     let support_routes = build_support_routes(pool.clone(), auth.token_port.clone());
     let user_membership_port: Arc<
         dyn crate::auth::ports::user_membership_port::UserMembershipPort,
@@ -114,6 +116,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         .merge(ai_routes)
         .merge(support_routes)
         .merge(season_recap_routes)
+        .merge(share_code_routes)
         .merge(ticket_watch.routes)
         .merge(seat_swap_routes)
         .merge(insight.routes)

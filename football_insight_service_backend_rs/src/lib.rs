@@ -17,6 +17,7 @@ pub mod push_notification;
 pub mod reflux_subscription;
 pub mod season_recap;
 pub mod seat_swap;
+pub mod share_code;
 pub mod support;
 pub mod system_config;
 pub mod team_board;

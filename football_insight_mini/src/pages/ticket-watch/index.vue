@@ -197,7 +197,18 @@
           @select="handleHistoryMatchSelect"
         />
       </view>
+      <TicketSharePosterPanel
+        v-if="posterVisible"
+        :image-path="posterImagePath"
+        :generating="posterGenerating"
+        :loading="posterLoading"
+        :error="posterError"
+        @generate="generatePoster"
+        @preview="previewPoster"
+        @save="savePoster"
+      />
     </view>
+    <canvas canvas-id="ticketWatchSharePoster" class="share-poster-canvas" :style="posterCanvasStyle" />
     <TicketInterestConfirm
       v-if="pendingInterestSelection"
       :block-name="pendingInterestSelection.blockName"
@@ -233,6 +244,7 @@
 </template>
 
 <script setup lang="ts">
+import { buildSharePath, buildShareQuery } from '../../utils/shareSource'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, nextTick, watch } from 'vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
@@ -241,6 +253,7 @@ import {
   onHide,
   onReady,
   onShareAppMessage,
+  onShareTimeline,
   onShow,
   onUnload,
 } from '@dcloudio/uni-app'
@@ -268,6 +281,9 @@ import TicketSubscriptionSheet from './components/TicketSubscriptionSheet.vue'
 import TicketSupplyInsights from './components/TicketSupplyInsights.vue'
 import TicketTrackedInterests from './components/TicketTrackedInterests.vue'
 import TicketWatchHeader from './components/TicketWatchHeader.vue'
+import TicketSharePosterPanel from './components/TicketSharePosterPanel.vue'
+import { useTicketWatchSharePoster } from './useTicketWatchSharePoster'
+import { TICKET_POSTER } from './sharePoster'
 import { useTicketWatchState } from './useTicketWatchState'
 import { useTicketWatchBoards } from './useTicketWatchBoards'
 import { useTicketWatchInterests } from './useTicketWatchInterests'
@@ -280,6 +296,13 @@ import { syncVisibleHistorySelection } from './ticketWatchHistorySelection'
 const { navigationPageStyle } = useNavigationLayout()
 
 const state = useTicketWatchState()
+const {
+  imagePath: posterImagePath, generating: posterGenerating, error: posterError,
+  visible: posterVisible, loading: posterLoading, generate: generatePoster,
+  preview: previewPoster, save: savePoster,
+} = useTicketWatchSharePoster(state, goToUserPage)
+// Bitmap geometry is in pixels, matching the canvas drawing/export coordinates.
+const posterCanvasStyle = { width: `${TICKET_POSTER.width}px`, height: `${TICKET_POSTER.height}px` }
 const {
   activeTab,
   currentLoading,
@@ -501,27 +524,33 @@ watch([matchIdSheetVisible, matchIdSheetState], ([visible, sheetState]) => {
   }
 })
 
-onShareAppMessage(() => {
+function buildTicketSharePayload() {
   if (activeTab.value === 'history' && displayedHistoryMatch.value) {
     return {
       title: `${displayedHistoryMatch.value.home_team_name} VS ${displayedHistoryMatch.value.away_team_name} 回流复盘`,
-      path: '/pages/ticket-watch/index',
+      path: buildSharePath('/pages/ticket-watch/index', 'ticket_history'),
     }
   }
 
   if (currentMatch.value) {
     return {
       title: `${currentMatch.value.home_team_name} VS ${currentMatch.value.away_team_name} 回流看板`,
-      path: '/pages/ticket-watch/index',
+      path: buildSharePath('/pages/ticket-watch/index', 'ticket_current'),
     }
   }
 
   return {
     title: '回流看板：当前比赛盯实时，历史比赛看回流',
-    path: '/pages/ticket-watch/index',
+    path: buildSharePath('/pages/ticket-watch/index', 'ticket_current'),
   }
-})
+}
 
+onShareAppMessage(buildTicketSharePayload)
+onShareTimeline(() => ({
+  title: buildTicketSharePayload().title,
+  query: buildShareQuery(activeTab.value === 'history' && displayedHistoryMatch.value
+    ? 'ticket_history' : 'ticket_current'),
+}))
 onShow(() => {
   reportPageActivity('ticket_watch')
   beginPaywallVisit()
@@ -645,6 +674,8 @@ onUnload(() => {
   align-items: stretch;
   gap: var(--fi-space-card-gap);
 }
+
+.share-poster-canvas { position: fixed; left: -10000rpx; top: -10000rpx; pointer-events: none; }
 
 .board-content--history-stats {
   /* Remaining viewport after page padding, the segmented track and their gap. */

@@ -129,10 +129,11 @@
 </template>
 
 <script setup lang="ts">
+import { buildSharePath, buildShareQuery } from '../../utils/shareSource'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { useMiniReviewStatus } from '../../stores/miniReview'
 import { computed, ref, watch } from 'vue'
-import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
+import { onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
 import HomeDailyTopics from './components/HomeDailyTopics.vue'
@@ -336,7 +337,14 @@ onShareAppMessage(() => ({
   title: supportFavoriteTeam.value
     ? `${supportFavoriteTeam.value.team_name} 下一场先为谁站队？`
     : '足球洞察：今日话题，关注成都蓉城',
-  path: '/pages/home/index',
+  path: buildSharePath('/pages/home/index', 'home'),
+}))
+
+onShareTimeline(() => ({
+  title: supportFavoriteTeam.value
+    ? `${supportFavoriteTeam.value.team_name} 下一场先为谁站队？`
+    : '足球洞察：今日话题，关注成都蓉城',
+  query: buildShareQuery('home'),
 }))
 
 function openPulseMatchTechStats(match: HomePulseLeadMatch) {

@@ -148,3 +148,19 @@ isolated PostgreSQL migration/insert/report checks PASS
 - `docs/superpowers/specs/2026-10-18-acquisition-source-tracking-design.md`
 
 另外按各提交补充`FEATURES.md`和`CHANGELOG.md`；删除文件：无。
+
+
+## 分享来源参数统一（2026-10-19）
+
+普通页面转发统一追加 `src=share&cid=<分享点>`。cid 为 `home`、`matches`、`rankings`、`insights`、`team_board`、`support`、`topics`、`topic_detail`、`ticket_current`、`ticket_history`、`swap`。榜单已打开的积分榜海报同样保留原 `openPoster/table` 参数后追加 `rankings`；赛季海报原有 `recap<赛季>` 来源保持不变。换座位分享仅含公共页面路径及来源，无用户或座位信息。
+
+首页、回流看板、话题详情增加朋友圈分享。朋友圈仅传 query，话题保留合法文章 `id`；标题沿用页面普通转发标题。缺失/非法文章 ID 的普通分享仍回话题列表，来源标识分享出口 `topic_detail`；朋友圈留在原详情页并省略无效 ID。未增加其他页面的朋友圈入口。
+
+查看效果时，在 [来源汇总 SQL](sql/user-acquisition-summary.sql) 最终的 `FROM cohort AS c` 与 `GROUP BY` 之间加入 `WHERE c.src = 'share'`，按 `cid` 比较 `registered_users`、`d1_plus_return_users`、`d7_plus_return_users` 和 `paid_users`。注册时间范围仍在 `params` 设置，不要将累计回访标作严格自然日留存。该 SQL 只读，不新增表或记录转发/点击次数。
+
+边界：度量对象是实际新注册用户；老用户转发给已注册朋友不产生新来源记录，整体传播效果会被有意低估。曾无来源打开且尚未注册的用户，后续从转发热启动时可首次捕获来源；已有首次合法来源始终不覆盖。朋友圈单页模式进入完整版才可能由启动参数采集，微信不保证所有场景透传，不增加额外兼容逻辑。
+
+自动化覆盖工具函数的无/有 query、已有 src/cid（包括空值与编码键）、非法 cid、空路径、hash、64 字符边界；执行真实页面注册的分享回调，校验各分支 cid/原业务参数/赛季海报来源，串联 `parseAcquisitionLaunch` 和首次热启动 capture。微信真机或开发者工具的卡片打开、`getLaunchOptionsSync().query`、朋友圈进入完整版和热启动仍待人工验收，不能以纯函数测试代替。未进行微信上传或生产部署。
+
+
+本次两项功能集成后的最终验证：`bun test` 968 通过 / 0 失败（90 文件）；`bun run type-check`、`bun run check:boundaries` 均通过；`MINI_REVIEW_SKIP=1 bun run build:mp-weixin` 与 `bun run build:h5` 均构建成功，小程序组件注册和生产 API 产物校验通过，保留登记库版本 1.0.99。独立审查确认来源功能符合设计；海报同场轮询清图问题已修复并回归。Canvas 使用占位二维码与模拟数据做浏览器布局检查，不能当作微信扫码验收。

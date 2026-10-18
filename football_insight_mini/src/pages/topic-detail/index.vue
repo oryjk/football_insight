@@ -41,7 +41,7 @@
 <script setup lang="ts">
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, onScopeDispose, ref } from 'vue'
-import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
+import { onLoad, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import { topicVisitorId } from '../../utils/topicVisitor'
 import { topicHeatValue, setTopicHeat, syncTopicHeat } from '../../stores/topicHeat'
 import FiTopicHeat from '../../components/topics/FiTopicHeat.vue'
@@ -60,7 +60,7 @@ import type { DailyTopicItem } from '../../types/dailyTopic'
 import { DAILY_TOPICS_TEAM_ID, editionForTopic, isTopicSourceUrl, mapTopicDetail, topicDetailUrl } from '../../utils/dailyTopics'
 import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
-import { buildTopicSharePayload, TOPIC_SHARE_CARD } from './share'
+import { buildTopicTimelinePayload, buildTopicSharePayload, TOPIC_SHARE_CARD } from './share'
 import { TOPIC_SHARE_CANVAS_ID, useTopicShareCard } from './useTopicShareCard'
 
 const { navigationPageStyle } = useNavigationLayout()
@@ -126,6 +126,7 @@ onShareAppMessage(() => {
   if (!article || shareCard.imageUrl.value) return fallback
   return { ...fallback, promise: shareCard.prepare(article).then(imageUrl => buildTopicSharePayload(article, imageUrl)) }
 })
+onShareTimeline(() => buildTopicTimelinePayload(shareArticle.value, shareCard.imageUrl.value))
 onScopeDispose(() => { revision += 1 })
 
 const readingSize = ref(loadReadingSize())

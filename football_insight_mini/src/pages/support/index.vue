@@ -122,6 +122,7 @@
 </template>
 
 <script setup lang="ts">
+import { buildSharePath } from '../../utils/shareSource'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, ref } from 'vue'
 import { onHide, onLoad, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
@@ -286,7 +287,7 @@ onShareAppMessage(() => {
   if (!detail.value) {
     return {
       title: '来这场比赛里为你的主队站队',
-      path: '/pages/home/index',
+      path: buildSharePath('/pages/home/index', 'support'),
     }
   }
 
@@ -296,7 +297,7 @@ onShareAppMessage(() => {
 
   return {
     title: `${leadText}，${detail.value.home_team.team_name} vs ${detail.value.away_team.team_name}`,
-    path: `/pages/support/index?matchId=${detail.value.match_id}`,
+    path: buildSharePath(`/pages/support/index?matchId=${detail.value.match_id}`, 'support'),
   }
 })
 

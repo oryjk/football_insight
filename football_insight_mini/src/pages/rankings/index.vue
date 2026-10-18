@@ -17,6 +17,7 @@
 </template>
 
 <script setup lang="ts">
+import { buildSharePath } from '../../utils/shareSource'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, nextTick, ref } from 'vue'
 import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
@@ -55,12 +56,12 @@ onShareAppMessage(() => {
   const standingsPosterPayload = rankingsContentRef.value?.getStandingsPosterSharePayload()
 
   if (standingsPosterPayload) {
-    return standingsPosterPayload
+    return { ...standingsPosterPayload, path: buildSharePath(standingsPosterPayload.path, 'rankings') }
   }
 
   return {
     title: '中超榜单、赛程和最近赛果，看看现在谁在前面',
-    path: '/pages/rankings/index',
+    path: buildSharePath('/pages/rankings/index', 'rankings'),
   }
 })
 </script>

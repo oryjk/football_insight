@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { DailyTopicItem } from '../../types/dailyTopic'
-import { buildTopicSharePayload, containSharePhoto, topicShareExcerpt, topicShareSignature, wrapShareCardText } from './share'
+import { buildTopicTimelinePayload, buildTopicSharePayload, containSharePhoto, topicShareExcerpt, topicShareSignature, wrapShareCardText } from './share'
 
 const article: DailyTopicItem = { id: 'topic_2026-10-13', teamId: 77680, title: '蓉城争冠关键战', summary: '这是摘要',
   paragraphs: ['  正文第一段  ', '正文第二段'], publishedAt: '2026-10-13T00:00:00Z', publishedLabel: '2026/10/13 08:00',
@@ -9,11 +9,21 @@ const article: DailyTopicItem = { id: 'topic_2026-10-13', teamId: 77680, title: 
 describe('article sharing', () => {
   test('links to the current article with its title and generated cover', () => {
     expect(buildTopicSharePayload(article, '/tmp/topic.png')).toEqual({ title: article.title,
-      path: '/pages/topic-detail/index?id=topic_2026-10-13', imageUrl: '/tmp/topic.png' })
+      path: '/pages/topic-detail/index?id=topic_2026-10-13&src=share&cid=topic_detail', imageUrl: '/tmp/topic.png' })
   })
   test('missing and invalid articles lead to the public topic list', () => {
-    expect(buildTopicSharePayload(null).path).toBe('/pages/topics/index')
-    expect(buildTopicSharePayload({ ...article, id: '../private?token=secret' }).path).toBe('/pages/topics/index')
+    expect(buildTopicSharePayload(null).path).toBe('/pages/topics/index?src=share&cid=topic_detail')
+    expect(buildTopicSharePayload({ ...article, id: '../private?token=secret' }).path).toBe('/pages/topics/index?src=share&cid=topic_detail')
+  })
+  test('timeline sharing keeps the public article id and cover', () => {
+    expect(buildTopicTimelinePayload(article, '/tmp/topic.png')).toEqual({
+      title: article.title, query: 'id=topic_2026-10-13&src=share&cid=topic_detail', imageUrl: '/tmp/topic.png',
+    })
+    for (const item of [null, { ...article, id: '../private?token=secret' }]) {
+      expect(buildTopicTimelinePayload(item)).toEqual({
+        title: '足球洞察 · 足球新闻', query: 'src=share&cid=topic_detail',
+      })
+    }
   })
   test('the cover excerpt comes from full-text paragraphs', () => {
     expect(topicShareExcerpt(article)).toBe('正文第一段 正文第二段')

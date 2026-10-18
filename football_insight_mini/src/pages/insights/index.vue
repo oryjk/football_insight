@@ -88,6 +88,7 @@
 </template>
 
 <script setup lang="ts">
+import { buildSharePath } from '../../utils/shareSource'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, ref, watch } from 'vue'
 import { onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
@@ -214,7 +215,7 @@ onShareAppMessage(() => ({
   title: selectedInsight.value
     ? `${selectedInsight.value.team_name} 的贡献结构，看看这队靠谁赢球`
     : '球队洞察：不是榜单，而是贡献结构',
-  path: '/pages/insights/index',
+  path: buildSharePath('/pages/insights/index', 'insights'),
 }))
 
 watch(selectedTeamId, () => {
