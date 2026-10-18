@@ -1,5 +1,5 @@
 <template>
-  <FiPanel tone="dark">
+  <FiPanel>
     <view class="support-home-panel__header">
       <view class="support-home-panel__heading">
         <text class="support-home-panel__title">我的主队</text>
@@ -222,7 +222,7 @@ const awayRankLabel = computed(() => {
 .support-home-panel__summary {
   display: block;
   margin-top: 18rpx;
-  color: rgba(255, 255, 255, 0.72);
+  color: #6b707b;
   font-size: 28rpx;
   line-height: 1.7;
 }
@@ -237,7 +237,7 @@ const awayRankLabel = computed(() => {
   gap: var(--fi-space-12);
 }
 .support-home-panel__title {
-  color: var(--fi-primitive-white);
+  color: var(--fi-color-text-strong);
   flex-shrink: 0;
   font-weight: var(--fi-component-title-weight);
   font-size: var(--fi-component-title-size);
@@ -250,8 +250,8 @@ const awayRankLabel = computed(() => {
   gap: var(--fi-space-6);
   padding: var(--fi-space-6) var(--fi-space-12);
   border-radius: var(--fi-radius-round);
-  color: var(--fi-primitive-white);
-  background: rgba(255, 255, 255, 0.12);
+  color: var(--fi-color-primary);
+  background: var(--fi-color-topic-audio-surface);
   font-size: var(--fi-font-22);
   line-height: var(--fi-leading-normal);
   white-space: nowrap;
@@ -277,7 +277,7 @@ const awayRankLabel = computed(() => {
   flex-wrap: wrap;
   gap: 8rpx;
   padding-top: 14rpx;
-  border-top: 2rpx solid rgba(255, 255, 255, 0.12);
+  border-top: 2rpx solid rgba(236, 236, 241, 0.92);
 }
 .support-home-panel__context-dot {
   width: 10rpx;
@@ -287,13 +287,13 @@ const awayRankLabel = computed(() => {
   box-shadow: 0 0 0 6rpx rgba(38, 162, 105, 0.12);
 }
 .support-home-panel__context-label {
-  color: #5ad08a;
+  color: #2f7f5f;
   font-size: 24rpx;
   font-weight: 700;
   line-height: 1.2;
 }
 .support-home-panel__context-note {
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--fi-color-text-muted);
   font-size: 22rpx;
   line-height: 1.2;
 }
@@ -304,14 +304,14 @@ const awayRankLabel = computed(() => {
   justify-content: center;
   padding: 18rpx 30rpx;
   border-radius: 999rpx;
-  background: var(--fi-primitive-white);
-  color: var(--fi-primitive-ink);
+  background: var(--fi-primitive-ink);
+  color: var(--fi-primitive-white);
   font-size: 26rpx;
   line-height: 1;
 }
 .support-home-panel__action--ghost {
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.85);
+  background: #f5f6fa;
+  color: #5f6673;
 }
 .support-home-panel__favorite {
   position: relative;
@@ -321,8 +321,8 @@ const awayRankLabel = computed(() => {
   align-items: center;
   gap: 18rpx;
   padding: 22rpx 0 24rpx;
-  border-top: 2rpx solid rgba(255, 255, 255, 0.12);
-  border-bottom: 2rpx solid rgba(255, 255, 255, 0.12);
+  border-top: 2rpx solid rgba(231, 232, 238, 0.92);
+  border-bottom: 2rpx solid rgba(231, 232, 238, 0.92);
 }
 .support-home-panel__favorite::before {
   content: '';
@@ -339,8 +339,8 @@ const awayRankLabel = computed(() => {
   width: 88rpx;
   height: 88rpx;
   border-radius: 24rpx;
-  background: rgba(255, 255, 255, 0.92);
-  border: 2rpx solid rgba(255, 255, 255, 0.16);
+  background: #f7f9f8;
+  border: 2rpx solid rgba(223, 229, 226, 0.96);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -354,7 +354,7 @@ const awayRankLabel = computed(() => {
   min-width: 0;
 }
 .support-home-panel__favorite-name {
-  color: var(--fi-primitive-white);
+  color: var(--fi-color-text-strong);
   display: block;
   font-size: 36rpx;
   line-height: 1;
@@ -363,14 +363,14 @@ const awayRankLabel = computed(() => {
 .support-home-panel__favorite-note {
   display: block;
   margin-top: 6rpx;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--fi-color-text-muted);
   font-size: 22rpx;
 }
 .support-home-panel__switch {
   padding: 14rpx 22rpx;
   border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.85);
+  background: #f5f6fa;
+  color: #5f6673;
   font-size: 23rpx;
   font-weight: 700;
   line-height: 1;

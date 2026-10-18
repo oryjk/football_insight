@@ -379,16 +379,7 @@
 
 /* 高度取自 390px 视口实测（rpx = px × 750 / 390），内容多于骨架时仍可撑开。 */
 .skeleton-block--topics { min-height: 464rpx; }
-.skeleton-block--support {
-  min-height: 262rpx;
-  background: var(--fi-gradient-topic-hero);
-  border-color: rgba(255, 255, 255, 0.06);
-}
-
-.skeleton-block--support .skeleton-line {
-  background: var(--fi-color-topic-hero-control);
-  border-color: transparent;
-}
+.skeleton-block--support { min-height: 262rpx; }
 .skeleton-block--story { min-height: 1460rpx; }
 .skeleton-block--standings { min-height: 685rpx; }
 .skeleton-block--scorers { min-height: 729rpx; }
