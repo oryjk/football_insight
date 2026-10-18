@@ -2,6 +2,7 @@ import { readonly, ref, type Ref } from 'vue'
 import * as systemApi from '../api/system'
 import type { PublicSystemConfig } from '../types/system'
 import { extractApiErrorMessage } from '../utils/apiError'
+import { applyBrandSubtitle } from '../utils/brandSubtitle'
 
 const RUNTIME_CONFIG_CACHE_MS = 60_000
 
@@ -48,6 +49,7 @@ export function createRuntimeConfigStore(source: typeof systemApi = systemApi): 
       try {
         const result = await source.getPublicSystemConfig()
         config.value = result
+        applyBrandSubtitle(result.brand_subtitle)
         available.value = true
         ready.value = true
         errorMessage.value = ''

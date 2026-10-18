@@ -1,6 +1,7 @@
 <template>
   <page-meta :page-style="pageStyle" />
   <view class="home-page-shell">
+    <FiLaunchSplash :phase="splash.phase.value" />
     <FiBrandNav />
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
@@ -128,6 +129,8 @@ import HomeDailyTopics from './components/HomeDailyTopics.vue'
 import FiTopicAudioPlayer from '../../components/topics/FiTopicAudioPlayer.vue'
 import HomeSupportPanel from './components/HomeSupportPanel.vue'
 import HomeSkeleton from './components/HomeSkeleton.vue'
+import FiLaunchSplash from '../../components/FiLaunchSplash.vue'
+import { useLaunchSplash } from '../../composables/useLaunchSplash'
 import HomeStoryPanel from './components/HomeStoryPanel.vue'
 import HomeRankingPanel from './components/HomeRankingPanel.vue'
 import FiGoalMatchDialog from '../../components/FiGoalMatchDialog.vue'
@@ -178,6 +181,7 @@ let homeLoadRevision = 0
 const loading = ref(true)
 // 首屏三路加载（总览/话题/助力）首次全部落定后置 true，此后刷新不再回到骨架。
 const homeInitialSettled = ref(false)
+const splash = useLaunchSplash(homeInitialSettled)
 const errorMessage = ref('')
 const overview = ref<InsightOverviewResponse | null>(null)
 const liveMatches = ref<MatchCard[]>([])

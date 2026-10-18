@@ -13,7 +13,7 @@
                 />
                 <view class="fi-brand-nav__copy">
                     <text class="fi-brand-nav__name">足球洞察</text>
-                    <text class="fi-brand-nav__tagline">{{ subtitle }}</text>
+                    <text class="fi-brand-nav__tagline">{{ subtitle ?? brandSubtitle }}</text>
                 </view>
             </view>
         </view>
@@ -22,6 +22,7 @@
 
 <script setup lang="ts">
 import logo from "../static/app-logo-mark.png";
+import { brandSubtitle } from "../utils/brandSubtitle";
 
 withDefaults(
     defineProps<{
@@ -32,7 +33,6 @@ withDefaults(
     {
         transparent: false,
         showBack: false,
-        subtitle: "最懂球迷的工具",
     },
 );
 

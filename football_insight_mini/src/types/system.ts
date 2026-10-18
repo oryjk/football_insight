@@ -15,6 +15,8 @@ export interface PublicSystemConfig {
   wechat_login_enabled: boolean
   home_briefing_marquees?: HomeBriefingMarquees
   membership_tier_rules?: MembershipTierRule[]
+  /** 首页品牌栏副标题；null 或缺省表示使用内置默认文案。 */
+  brand_subtitle?: string | null
 }
 
 export interface MiniReviewStatus {
