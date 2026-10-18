@@ -16,12 +16,6 @@ export function percentages(probabilities: number[]): number[] {
   for (let i = 0; i < missing; i++) result[order[i]!.index]!++
   return result
 }
-export function confidenceText(tau: number | null): string {
-  if (tau === null) return ''
-  if (tau < 0.8) return '本赛季联赛较均衡，预测把握度偏低'
-  if (tau < 1.05) return '当前数据差异有限，预测仍有不确定性'
-  return '当前数据差异较明显，预测仍有不确定性'
-}
 export const outlookCopy = {
   title: '赛前数据倾向',
   disclaimer: '基于历史比赛结果的统计模型，仅供球迷参考，不代表比赛结果。',

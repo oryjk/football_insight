@@ -83,6 +83,127 @@ const emptyRecord = {
   rps_improvement: null,
 }
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+test('changing teams after kickoff excludes the now-started fixture', async () => {
+  let now = Date.parse('2099-01-01T11:00:00Z')
+  const loader = createOutlookLoader({
+    authenticated: () => true, underReview: () => false, revision: ref(0), selectedTeamId: ref(null),
+    now: () => now,
+    metadata: async () => metadata as any, record: async () => emptyRecord,
+    outlook: async () => ({status: 'unavailable', outlook: null}),
+  })
+  await loader.load()
+  expect(loader.matches.value.length).toBe(1)
+  now = Date.parse('2099-01-01T12:00:00Z')
+  loader.selectTeam(1)
+  expect(loader.matches.value).toEqual([])
+  expect(loader.selectedMatchId.value).toBe(null)
+  loader.dispose()
+})
+test('switching the shared fixture between teams uses the cache without a loading frame', async () => {
+  const t = setup()
+  t.authenticated.value = true
+  await t.loader.load()
+  t.loader.selectTeam(1)
+  expect(t.loader.loading.value).toBe(false)
+  expect(t.calls).toEqual([1])
+  t.loader.selectTeam(9)
+  expect(t.loader.loading.value).toBe(false)
+  expect(t.calls).toEqual([1])
+  t.loader.dispose()
+})
+
+test('prefetched next fixtures share in-flight requests and publish without reloading metadata', async () => {
+  const selectedTeamId = ref<number | null>(null)
+  const calls: number[] = []
+  let metadataCalls = 0,
+    recordCalls = 0
+  let resolveNext!: (value: any) => void
+  const next = new Promise<any>((resolve) => {
+    resolveNext = resolve
+  })
+  const data = {
+    ...metadata,
+    matches: [
+      { ...metadata.matches[0], away_team_id: 99 },
+      {
+        ...metadata.matches[0],
+        match_id: 2,
+        home_team_id: 1,
+        away_team_id: 98,
+      },
+    ],
+  }
+  const loader = createOutlookLoader({
+    authenticated: () => true,
+    underReview: () => false,
+    revision: ref(0),
+    selectedTeamId,
+    metadata: async () => {
+      metadataCalls++
+      return data as any
+    },
+    record: async () => {
+      recordCalls++
+      return emptyRecord
+    },
+    outlook: async (id) => {
+      calls.push(id)
+      return id === 2
+        ? next
+        : { status: 'ready', outlook: { match_id: 1 } as any }
+    },
+  })
+  await loader.load()
+  await flush()
+  expect(calls).toEqual([1, 2])
+  expect(loader.loading.value).toBe(false)
+  loader.selectTeam(1)
+  expect(loader.outlook.value).toBe(null) // never show another team's prediction
+  expect(calls).toEqual([1, 2])
+  resolveNext({ status: 'ready', outlook: { match_id: 2 } })
+  await flush()
+  expect(loader.outlook.value?.match_id).toBe(2)
+  loader.selectTeam(9)
+  expect(loader.outlook.value?.match_id).toBe(1)
+  expect(loader.loading.value).toBe(false)
+  expect(metadataCalls).toBe(1)
+  expect(recordCalls).toBe(1)
+  loader.dispose()
+})
+
+test('expired or previous-session forecast cache is not reused', async () => {
+  const review = ref(false),
+    selectedTeamId = ref<number | null>(null)
+  let now = 0,
+    calls = 0
+  const loader = createOutlookLoader({
+    authenticated: () => true,
+    underReview: () => review.value,
+    revision: ref(0),
+    selectedTeamId,
+    now: () => now,
+    metadata: async () => metadata as any,
+    record: async () => emptyRecord,
+    outlook: async () => {
+      calls++
+      return { status: 'unavailable', outlook: null }
+    },
+  })
+  await loader.load()
+  now = 59_999
+  loader.selectTeam(1)
+  await flush()
+  expect(calls).toBe(1)
+  now = 60_000
+  loader.selectTeam(9)
+  await flush()
+  expect(calls).toBe(2)
+  review.value = true
+  review.value = false
+  await loader.load()
+  expect(calls).toBe(3)
+  loader.dispose()
+})
 test('auth intent blocks private favorite reads until a replacement user is published', async () => {
   const revision = ref(0),
     identity = ref('A'),

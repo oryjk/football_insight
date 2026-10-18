@@ -1,5 +1,5 @@
 <template>
-  <view class="summary-panel">
+  <view :key="insight.team_id" class="summary-panel">
     <view class="summary-panel__header">
       <text class="summary-panel__name">{{ insight.team_name }}</text>
       <text class="summary-panel__rank">第 {{ insight.rank_no }} 名</text>
@@ -19,17 +19,11 @@
     <view class="summary-panel__grid">
       <view class="briefing-card">
         <text class="briefing-card__label">总进球</text>
-        <text
-          :key="`goals-for-${insight.team_id}-${animatedGoalsFor}`"
-          class="summary-value summary-value--animated"
-        >{{ animatedGoalsFor }}</text>
+        <text class="summary-value">{{ insight.goals_for_total ?? 0 }}</text>
       </view>
       <view class="briefing-card">
         <text class="briefing-card__label">总失球</text>
-        <text
-          :key="`goals-against-${insight.team_id}-${animatedGoalsAgainst}`"
-          class="summary-value summary-value--animated"
-        >{{ animatedGoalsAgainst }}</text>
+        <text class="summary-value">{{ insight.goals_against_total ?? 0 }}</text>
       </view>
     </view>
   </view>
@@ -37,18 +31,15 @@
 
 <script setup lang="ts">
 import type { TeamInsight } from '../../../types/insight'
-import { useAnimatedInteger } from '../../../composables/useAnimatedInteger'
 import chevronIcon from '../../../static/rankings/chevron-right.svg'
 
-const props = defineProps<{ insight: TeamInsight }>()
+defineProps<{ insight: TeamInsight }>()
 const emit = defineEmits<{ (e: 'open-board'): void }>()
 
-const animatedGoalsFor = useAnimatedInteger(() => props.insight.goals_for_total ?? 0)
-const animatedGoalsAgainst = useAnimatedInteger(() => props.insight.goals_against_total ?? 0)
 </script>
 
 <style scoped lang="css">
-.summary-panel { min-width: 0; }
+.summary-panel { min-width: 0; animation: insights-summary-fade 260ms ease both; }
 .summary-panel__header {
   display: flex;
   align-items: center;
@@ -96,6 +87,7 @@ const animatedGoalsAgainst = useAnimatedInteger(() => props.insight.goals_agains
   gap: var(--fi-space-12);
 }
 .briefing-card {
+  animation: none;
   display: grid;
   gap: var(--fi-space-20);
   padding: var(--fi-space-18) var(--fi-space-20);
@@ -110,11 +102,11 @@ const animatedGoalsAgainst = useAnimatedInteger(() => props.insight.goals_agains
   font-weight: var(--fi-weight-extrabold);
   line-height: var(--fi-leading-insights-value);
 }
-.summary-value--animated {
-  animation: fi-value-pop 420ms cubic-bezier(0.22, 1, 0.36, 1);
-  transform-origin: center bottom;
+@keyframes insights-summary-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .summary-value--animated { animation: none; }
+  .summary-panel { animation: none; }
 }
 </style>

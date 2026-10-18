@@ -1,59 +1,67 @@
 <template>
   <FiPanel>
     <FiSectionHeading kicker="主胜 / 平 / 客胜" :title="outlookCopy.title" />
-    <InsightsTeamSelector
-      v-if="teams.length"
-      :teams="teams"
-      :selected-team-id="selectedTeamId"
-      @update:selected-team-id="emit('select-team', $event)"
-    />
-    <view v-if="matches.length" class="outlook-fixtures"
-      ><button
-        v-for="match in matches"
-        :key="match.match_id"
-        class="outlook-fixture"
-        :class="{
-          'outlook-fixture--active': match.match_id === selectedMatchId,
-        }"
-        hover-class="outlook--pressed"
-        @tap="emit('select-match', match.match_id)"
+    <view class="outlook-match-picker">
+      <scroll-view
+        v-if="matches.length"
+        :key="matches.map(match => match.match_id).join(',')"
+        scroll-x
+        scroll-with-animation
+        :scroll-into-view="selectedMatchId === null ? '' : `outlook-match-${selectedMatchId}`"
+        class="outlook-fixtures"
       >
-        {{ match.match_date }} {{ match.home_team_name }} ·
-        {{ match.away_team_name }}
-      </button></view
-    >
-    <text v-if="loading" class="outlook-note">正在读取赛前资料</text>
-    <text v-else-if="error" class="outlook-note">{{ error }}</text>
-    <template v-else-if="outlook">
+        <view class="outlook-fixtures__list"
+          ><button
+            v-for="match in matches"
+            :id="`outlook-match-${match.match_id}`"
+            :key="match.match_id"
+            class="outlook-fixture"
+            :class="{
+              'outlook-fixture--active': match.match_id === selectedMatchId,
+            }"
+            hover-class="outlook--pressed"
+            @tap="emit('select-match', match.match_id)"
+          >
+            {{ match.match_date }} {{ match.home_team_name }} ·
+            {{ match.away_team_name }}
+          </button></view
+        >
+      </scroll-view>
+      <text v-else class="outlook-note">该球队暂无待赛比赛</text>
+    </view>
+    <view class="outlook-forecast" :aria-busy="loading">
       <view
-        class="outlook-bar"
-        role="img"
-        :aria-label="`主胜${parts[0]}%，平${parts[1]}%，客胜${parts[2]}%`"
-        ><view
-          v-for="(part, index) in parts"
-          :key="index"
-          class="outlook-part"
-          :class="`outlook-part--${index}`"
-          :style="{ width: `${part}%` }"
-      /></view>
-      <view class="outlook-labels"
-        ><text>主胜 {{ parts[0] }}%</text><text>平 {{ parts[1] }}%</text
-        ><text>客胜 {{ parts[2] }}%</text></view
+        :key="`${selectedMatchId}:${outlook?.generated_at ?? 'pending'}`"
+        class="outlook-forecast__body"
       >
-      <text v-if="outlook.tau !== null" class="outlook-note">{{
-        confidenceText(outlook.tau)
-      }}</text>
-      <text class="outlook-note"
-        >{{ outlook.frozen ? '赛前记录已冻结' : '数据随赛前同步更新'
-        }}{{
-          outlook.schedule_changed ? ' · 赛程已调整，保留原记录' : ''
-        }}</text
-      >
-      <text v-if="outlook.outcome !== null" class="outlook-note"
-        >实际结果：{{ ['主胜', '平', '客胜'][outlook.outcome] }}</text
-      >
-    </template>
-    <text v-else class="outlook-note">{{ outlookCopy.empty }}</text>
+        <text v-if="loading" class="outlook-note">正在读取赛前资料</text>
+        <text v-else-if="error" class="outlook-note">{{ error }}</text>
+        <template v-else-if="outlook">
+          <view
+            class="outlook-bar"
+            role="img"
+            :aria-label="`主胜${parts[0]}%，平${parts[1]}%，客胜${parts[2]}%`"
+            ><view
+              v-for="(part, index) in parts"
+              :key="index"
+              class="outlook-part"
+              :class="`outlook-part--${index}`"
+              :style="{ width: `${part}%` }"
+          /></view>
+          <view class="outlook-labels"
+            ><text>主胜 {{ parts[0] }}%</text><text>平 {{ parts[1] }}%</text
+            ><text>客胜 {{ parts[2] }}%</text></view
+          >
+          <text v-if="outlook.schedule_changed" class="outlook-note"
+            >赛程已调整，此处保留原赛前记录</text
+          >
+          <text v-if="outlook.outcome !== null" class="outlook-note"
+            >实际结果：{{ ['主胜', '平', '客胜'][outlook.outcome] }}</text
+          >
+        </template>
+        <text v-else class="outlook-note">{{ outlookCopy.empty }}</text>
+      </view>
+    </view>
     <view class="outlook-record"
       ><text class="outlook-record__title">{{ outlookCopy.record }}</text
       ><text class="outlook-note">{{
@@ -77,19 +85,10 @@
 import { computed } from 'vue'
 import FiPanel from '../../../components/FiPanel.vue'
 import FiSectionHeading from '../../../components/FiSectionHeading.vue'
-import InsightsTeamSelector from './InsightsTeamSelector.vue'
 import type { MatchCard } from '../../../types/insight'
-import type { SupportTeam } from '../../../types/support'
 import type { MatchOutlook, OutlookRecord } from '../../../types/matchOutlook'
-import {
-  percentages,
-  confidenceText,
-  outlookCopy,
-  recordSummary,
-} from '../matchOutlook'
+import { percentages, outlookCopy, recordSummary } from '../matchOutlook'
 const props = defineProps<{
-  teams: SupportTeam[]
-  selectedTeamId: number | null
   matches: MatchCard[]
   selectedMatchId: number | null
   outlook: MatchOutlook | null
@@ -99,7 +98,6 @@ const props = defineProps<{
   error: string
 }>()
 const emit = defineEmits<{
-  (event: 'select-team', id: number): void
   (event: 'select-match', id: number): void
 }>()
 const parts = computed(() =>
@@ -114,12 +112,46 @@ const parts = computed(() =>
 </script>
 <style scoped>
 .outlook-fixtures {
+  width: 100%;
+  height: var(--fi-space-72);
+  white-space: nowrap;
+}
+.outlook-match-picker {
+  height: var(--fi-space-72);
   display: flex;
-  flex-direction: column;
-  gap: var(--fi-space-8);
+  align-items: center;
   margin-top: var(--fi-space-16);
 }
+.outlook-fixtures__list {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fi-space-8);
+  height: 100%;
+}
+.outlook-forecast {
+  min-height: calc(var(--fi-space-24) * 5);
+}
+.outlook-forecast__body {
+  display: flex;
+  flex-direction: column;
+  animation: outlook-body-fade 260ms ease both;
+}
+@keyframes outlook-body-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .outlook-forecast__body {
+    animation: none;
+  }
+}
 .outlook-fixture {
+  flex-shrink: 0;
+  white-space: nowrap;
   margin: 0;
   padding: var(--fi-space-12) var(--fi-space-16);
   color: var(--fi-color-text-secondary);

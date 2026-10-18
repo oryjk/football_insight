@@ -1,10 +1,5 @@
 import { expect, test } from 'bun:test'
-import {
-  percentages,
-  confidenceText,
-  outlookCopy,
-  recordSummary,
-} from './matchOutlook'
+import { percentages, outlookCopy, recordSummary } from './matchOutlook'
 
 test('integer percentages always total100 without highlighting a favored outcome', () => {
   for (const p of [
@@ -21,9 +16,7 @@ test('integer percentages always total100 without highlighting a favored outcome
   expect(percentages([1 / 3, 1 / 3, 1 / 3])).toEqual([34, 33, 33])
   expect(() => percentages([-1, 1, 1])).toThrow()
 })
-test('confidence is absent for null and restrained for low tau', () => {
-  expect(confidenceText(null)).toBe('')
-  expect(confidenceText(0.64).includes('偏低')).toBe(true)
+test('public record states absence honestly and shows negative improvement', () => {
   expect(
     recordSummary({
       season: 2026,
@@ -55,13 +48,7 @@ test('rendered outlook copy and templates contain no prohibited promotional term
   ).Bun.file(
     new URL('./components/InsightsMatchOutlook.vue', import.meta.url),
   ).text()
-  const texts = [
-    ...Object.values(outlookCopy),
-    confidenceText(0.64),
-    confidenceText(1),
-    confidenceText(1.2),
-    source.split('<script')[0]!,
-  ]
+  const texts = [...Object.values(outlookCopy), source.split('<script')[0]!]
   for (const text of texts)
     expect(/赔率|盘口|投注|下注|推荐|稳|必中|保证/.test(text)).toBe(false)
 })

@@ -12,10 +12,15 @@
           @open="openTicketWatch"
         />
 
+        <InsightsTeamSelector
+          v-if="outlookReviewReady && !systemConfigUnderReview && currentUser && selectableTeams.length"
+          :teams="selectableTeams"
+          :selected-team-id="selectedTeamId"
+          @update:selected-team-id="outlookLoader.selectTeam"
+        />
+
         <InsightsMatchOutlook
           v-if="outlookReviewReady && !systemConfigUnderReview && currentUser"
-          :teams="outlookTeams"
-          :selected-team-id="selectedTeamId"
           :matches="outlookMatches"
           :selected-match-id="outlookSelectedMatchId"
           :outlook="matchOutlook"
@@ -23,7 +28,6 @@
           :loading="outlookLoading"
           :error="outlookError"
           :completed-matches="outlookCompletedMatches"
-          @select-team="outlookLoader.selectTeam"
           @select-match="outlookLoader.selectMatch"
         />
 
@@ -49,9 +53,6 @@
 
         <template v-else-if="selectedInsight">
           <InsightsTeamPanel
-            :selected-team-id="selectedTeamId"
-            @update:selected-team-id="outlookLoader.selectTeam"
-            :teams="teams"
             :insight="selectedInsight"
             @open-board="goToTeamBoard"
           />
@@ -100,6 +101,7 @@ import InsightsLockedPanel from './components/InsightsLockedPanel.vue'
 import InsightsMatchOutlook from './components/InsightsMatchOutlook.vue'
 import { createOutlookLoader } from './useMatchOutlook'
 import InsightsTeamPanel from './components/InsightsTeamPanel.vue'
+import InsightsTeamSelector from './components/InsightsTeamSelector.vue'
 import InsightsContributionSurface from './components/InsightsContributionSurface.vue'
 import type { TeamInsight } from '../../types/insight'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
@@ -169,6 +171,7 @@ const {
   loading: outlookLoading,
   error: outlookError,
 } = outlookLoader
+const selectableTeams = computed(() => outlookTeams.value.length ? outlookTeams.value : teams.value)
 onUnload(outlookLoader.dispose)
 
 const showLoginFloat = computed(() => !userLoading.value && !currentUser.value)

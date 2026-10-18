@@ -26,6 +26,7 @@ interface Dependencies {
   metadata?: () => Promise<Metadata>
   outlook?: (id: number) => Promise<OutlookResponse>
   record?: (year: number) => Promise<OutlookRecord>
+  now?: () => number
 }
 
 export async function loadOutlookFixtures(
@@ -88,22 +89,32 @@ export function createOutlookLoader(deps: Dependencies) {
     forecastLoading = ref(false),
     error = ref('')
   const loading = computed(() => metadataLoading.value || forecastLoading.value)
-  const matches = computed(() =>
+  const now = deps.now ?? Date.now
+  const upcomingMatches = () =>
     allMatches.value
       .filter(
         (match) =>
           match.status === 'scheduled' &&
           Date.parse(`${match.match_date}T${match.match_time}+08:00`) >
-            Date.now() &&
-          (match.home_team_id === deps.selectedTeamId.value ||
-            match.away_team_id === deps.selectedTeamId.value),
+            now(),
       )
       .sort((a, b) =>
         `${a.match_date} ${a.match_time}`.localeCompare(
           `${b.match_date} ${b.match_time}`,
         ),
-      ),
+      )
+  const matches = computed(() =>
+    upcomingMatches().filter(
+      (match) =>
+        match.home_team_id === deps.selectedTeamId.value ||
+        match.away_team_id === deps.selectedTeamId.value,
+    ),
   )
+  const forecastCache = new Map<
+    number,
+    { response: OutlookResponse; loadedAt: number }
+  >()
+  const pendingForecasts = new Map<number, Promise<OutlookResponse>>()
   let owner = 0,
     forecastOwner = 0,
     inFlight: Promise<void> | null = null
@@ -130,15 +141,70 @@ export function createOutlookLoader(deps: Dependencies) {
     metadataLoading.value = false
     forecastLoading.value = false
     error.value = ''
+    forecastCache.clear()
+    pendingForecasts.clear()
+  }
+  function cachedForecast(id: number): OutlookResponse | undefined {
+    const cached = forecastCache.get(id)
+    return cached && now() - cached.loadedAt < 60_000
+      ? cached.response
+      : undefined
+  }
+  function requestForecast(id: number): Promise<OutlookResponse> {
+    const cached = cachedForecast(id)
+    if (cached) return Promise.resolve(cached)
+    const pending = pendingForecasts.get(id)
+    if (pending) return pending
+    const scope = owner
+    const work = (deps.outlook ?? getMatchOutlook)(id)
+      .then((response) => {
+        if (scope === owner && allowed())
+          forecastCache.set(id, { response, loadedAt: now() })
+        return response
+      })
+      .finally(() => {
+        if (pendingForecasts.get(id) === work) pendingForecasts.delete(id)
+      })
+    pendingForecasts.set(id, work)
+    return work
+  }
+  async function warmNextFixtures(scope: number): Promise<void> {
+    const upcoming = upcomingMatches()
+    const nextIds = new Set(
+      teams.value.map(
+        (team) =>
+          upcoming.find(
+            (match) =>
+              match.home_team_id === team.team_id ||
+              match.away_team_id === team.team_id,
+          )?.match_id,
+      ),
+    )
+    // One background request at a time; foreground selection shares the same promise.
+    for (const id of nextIds) {
+      if (scope !== owner || !allowed()) return
+      if (id === undefined || id === selectedMatchId.value) continue
+      try {
+        await requestForecast(id)
+      } catch {
+        /* foreground selection can retry */
+      }
+    }
   }
   async function loadForecast(id: number) {
     const request = ++forecastOwner
-    outlook.value = null
     selectedMatchId.value = id
     error.value = ''
+    const cached = cachedForecast(id)
+    if (cached) {
+      outlook.value = cached.outlook
+      forecastLoading.value = false
+      return
+    }
+    outlook.value = null
     forecastLoading.value = true
     try {
-      const result = await (deps.outlook ?? getMatchOutlook)(id)
+      const result = await requestForecast(id)
       if (allowed() && request === forecastOwner) outlook.value = result.outlook
     } catch {
       if (allowed() && request === forecastOwner)
@@ -190,7 +256,9 @@ export function createOutlookLoader(deps: Dependencies) {
             if (allowed() && request === owner) record.value = result
           })
           .catch(() => {})
-        await Promise.all([chooseNext(), recordWork])
+        const initialForecast = chooseNext()
+        void warmNextFixtures(request)
+        await Promise.all([initialForecast, recordWork])
       } catch {
         if (allowed() && request === owner)
           error.value = '赛前资料暂不可用，请稍后再试'
