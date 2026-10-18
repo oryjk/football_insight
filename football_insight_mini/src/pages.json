@@ -8,6 +8,13 @@
 			}
 		},
 		{
+			"path": "pages/season-recap/index",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "赛季总结"
+			}
+		},
+		{
 			"path": "pages/rankings/index",
 			"style": {
 				"navigationBarTitleText": "榜单赛程",

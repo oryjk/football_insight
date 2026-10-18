@@ -40,6 +40,8 @@
             @bind-official="officialBind.open"
           />
 
+          <UserSeasonRecapEntry @open="openSeasonRecap" />
+
           <view class="account-actions">
             <view class="account-actions__body">
               <text class="account-actions__label">账号管理</text>
@@ -115,6 +117,7 @@
 </template>
 
 <script setup lang="ts">
+import UserSeasonRecapEntry from './components/UserSeasonRecapEntry.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { onHide, onShow } from '@dcloudio/uni-app'
@@ -159,6 +162,8 @@ import {
 import { resolveUserLoginPresentation } from './loginHelpers'
 
 const { navigationPageStyle } = useNavigationLayout()
+
+function openSeasonRecap() { uni.navigateTo({ url: '/pages/season-recap/index' }) }
 
 const session = useAppSession()
 // 当前用户与登录态共享自 appSession（唯一写入入口），本页只读。
