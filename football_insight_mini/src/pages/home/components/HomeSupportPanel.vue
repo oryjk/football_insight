@@ -18,7 +18,10 @@
         >
           <template v-if="daysRemaining === 0">
             <template v-if="countdownClock">
-              <text>距比赛开始还有</text><text class="support-home-panel__countdown-clock">{{ countdownClock }}</text>
+              <text>距比赛开始</text>
+              <template v-for="part in countdownParts" :key="part.unit">
+                <text class="support-home-panel__countdown-clock">{{ part.value }}</text><text>{{ part.unit }}</text>
+              </template>
             </template>
             <text v-else>今天比赛</text>
           </template>
@@ -167,6 +170,15 @@ const daysRemaining = computed(() => props.hasAuthToken && favoriteTeam.value &&
   ? resolveHomeSupportMatchDaysRemaining(nextMatch.value, props.now) : null)
 const countdownClock = computed(() => daysRemaining.value === 0
   ? resolveHomeSupportMatchCountdownClock(nextMatch.value, props.now) : null)
+// 同一天内的倒计时拆成「xx 小时 xx 分 xx 秒」；数字加粗，单位保持常规字重。
+const countdownParts = computed(() => {
+  const [hours, minutes, seconds] = (countdownClock.value ?? '').split(':')
+  return [
+    { value: hours, unit: '小时' },
+    { value: minutes, unit: '分' },
+    { value: seconds, unit: '秒' },
+  ]
+})
 const showLoading = computed(() =>
   shouldShowHomeSupportLoading({ loading: props.loading, hasCachedProfile: !!props.profile }),
 )
