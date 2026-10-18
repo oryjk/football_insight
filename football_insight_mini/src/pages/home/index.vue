@@ -158,6 +158,7 @@ import {
   resolveHomePulseLeadMatch,
   resolveHomePulseMatches,
   resolveHomePulseTechStats,
+  resolveHomeSupportMatchCountdownClock,
   resolveHomeTeamSeasonMatches,
   toHomeTeamSeasonPulseMatch,
   type HomePulseLeadMatch,
@@ -172,7 +173,6 @@ import { topicDetailUrl } from './dailyTopics'
 
 const { navigationPageStyle } = useNavigationLayout()
 
-const homeMatchNow = useHomeMatchClock()
 const currentSeason = new Date().getFullYear()
 let homeLoadRevision = 0
 const loading = ref(true)
@@ -214,6 +214,10 @@ const {
   loadSupportTeams,
   resetSessionScopedState: resetHomeSupportSessionState,
 } = useHomeSupportData({ session })
+// 比赛当天首页显示时分秒倒计时，此时按秒刷新时钟；其余时间每分钟刷新即可。
+const homeMatchNow = useHomeMatchClock(
+  (now) => resolveHomeSupportMatchCountdownClock(supportProfile.value?.next_match ?? null, now) !== null,
+)
 // 后台静默恢复/登录/退出发布 currentUser 后，助力面板（私有）随会话刷新，无需重新进入页面；
 // 会话身份变化（revision）先同步清掉旧账号私有缓存，跨账号不沿用。
 // 单一组合 watch 保证同一次发布里 reset 先于 load，且多次 revision 递增只触发一轮。

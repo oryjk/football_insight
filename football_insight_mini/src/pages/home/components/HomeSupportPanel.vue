@@ -4,7 +4,12 @@
       <view class="support-home-panel__heading">
         <text class="support-home-panel__title">我的主队</text>
         <view v-if="daysRemaining !== null" class="support-home-panel__countdown">
-          <text v-if="daysRemaining === 0">今天比赛</text>
+          <template v-if="daysRemaining === 0">
+            <template v-if="countdownClock">
+              <text>距比赛开始还有</text><text class="support-home-panel__countdown-clock">{{ countdownClock }}</text>
+            </template>
+            <text v-else>今天比赛</text>
+          </template>
           <template v-else>
             <text>距下场</text><text class="support-home-panel__countdown-days">{{ daysRemaining }}</text><text>天</text>
           </template>
@@ -120,6 +125,7 @@ import type { SupportProfile, SupportTeam } from '../../../types/support'
 import {
   resolveHomeSupportMatchWeekdayLabel,
   resolveHomeSupportVoteState,
+  resolveHomeSupportMatchCountdownClock,
   resolveHomeSupportMatchDaysRemaining,
   resolveHomeSupportTeamRankLabel,
   resolveHomeSupportWindowShortLabel,
@@ -147,6 +153,8 @@ const favoriteTeam = computed(() => props.profile?.favorite_team ?? null)
 const nextMatch = computed(() => props.profile?.next_match ?? null)
 const daysRemaining = computed(() => props.hasAuthToken && favoriteTeam.value && !props.errorMessage
   ? resolveHomeSupportMatchDaysRemaining(nextMatch.value, props.now) : null)
+const countdownClock = computed(() => daysRemaining.value === 0
+  ? resolveHomeSupportMatchCountdownClock(nextMatch.value, props.now) : null)
 const showLoading = computed(() =>
   shouldShowHomeSupportLoading({ loading: props.loading, hasCachedProfile: !!props.profile }),
 )
@@ -243,6 +251,11 @@ const awayRankLabel = computed(() => {
   font-size: var(--fi-font-22);
   line-height: var(--fi-leading-normal);
   white-space: nowrap;
+}
+.support-home-panel__countdown-clock {
+  font-size: var(--fi-font-30);
+  font-weight: var(--fi-weight-extrabold);
+  font-variant-numeric: tabular-nums;
 }
 .support-home-panel__countdown-days {
   font-size: var(--fi-font-30);

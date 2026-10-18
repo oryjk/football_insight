@@ -23,6 +23,7 @@ import {
   resolveHomePulseMatches,
   resolveHomeHasAuthToken,
   resolveHomeSupportNextMatchLabel,
+  resolveHomeSupportMatchCountdownClock,
   resolveHomeSupportMatchDaysRemaining,
   resolveHomeSupportTeamRankLabel,
   resolveHomeSupportMatchWeekdayLabel,
@@ -808,6 +809,25 @@ describe('主队下一场比赛北京时间天数倒计时', () => {
       expect(resolveHomeSupportMatchDaysRemaining(value, now)).toBeNull()
     }
     expect(resolveHomeSupportMatchDaysRemaining(match, NaN)).toBeNull()
+  })
+})
+
+describe('resolveHomeSupportMatchCountdownClock', () => {
+  const match = { kickoff_at: '2026-10-18T12:00:00Z', status: 'scheduled' }
+  test('比赛当天显示补零的时分秒', () => {
+    expect(resolveHomeSupportMatchCountdownClock(match, Date.parse('2026-10-18T08:34:50Z'))).toBe('03:25:10')
+    expect(resolveHomeSupportMatchCountdownClock(match, Date.parse('2026-10-18T11:59:59Z'))).toBe('00:00:01')
+    // 北京时间 00:00:00（UTC 前一天 16:00）已是比赛当天，最多 20 小时。
+    expect(resolveHomeSupportMatchCountdownClock(match, Date.parse('2026-10-17T16:00:00Z'))).toBe('20:00:00')
+  })
+  test('不足一秒按一秒显示，不提前跳到零', () => {
+    expect(resolveHomeSupportMatchCountdownClock(match, Date.parse('2026-10-18T11:59:59.400Z'))).toBe('00:00:01')
+  })
+  test('非比赛当天、已开球、非赛前状态都不显示时钟', () => {
+    expect(resolveHomeSupportMatchCountdownClock(match, Date.parse('2026-10-17T15:59:59Z'))).toBeNull()
+    expect(resolveHomeSupportMatchCountdownClock(match, Date.parse('2026-10-18T12:00:00Z'))).toBeNull()
+    expect(resolveHomeSupportMatchCountdownClock({ ...match, status: 'live' }, Date.parse('2026-10-18T08:00:00Z'))).toBeNull()
+    expect(resolveHomeSupportMatchCountdownClock(null, Date.parse('2026-10-18T08:00:00Z'))).toBeNull()
   })
 })
 

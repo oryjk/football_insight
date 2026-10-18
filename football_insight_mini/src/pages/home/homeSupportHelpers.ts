@@ -44,6 +44,17 @@ export function resolveHomeSupportMatchDaysRemaining(
   return Math.floor((kickoff + beijingOffset) / day) - Math.floor((now + beijingOffset) / day)
 }
 
+/** HH:MM:SS until kickoff, only on the Beijing match day itself (so the hour part is below 24). */
+export function resolveHomeSupportMatchCountdownClock(
+  match: Pick<SupportMatchDetail, 'kickoff_at' | 'status'> | null,
+  now: number = Date.now(),
+): string | null {
+  if (resolveHomeSupportMatchDaysRemaining(match, now) !== 0 || !match) return null
+  const totalSeconds = Math.max(0, Math.ceil((Date.parse(match.kickoff_at) - now) / 1000))
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${pad(Math.floor(totalSeconds / 3600))}:${pad(Math.floor((totalSeconds % 3600) / 60))}:${pad(totalSeconds % 60)}`
+}
+
 export function resolveHomeSupportTeamRankLabel(rankNo: number | null | undefined): string {
   return rankNo && rankNo > 0 ? `积分榜第 ${rankNo}` : '排名待同步'
 }
