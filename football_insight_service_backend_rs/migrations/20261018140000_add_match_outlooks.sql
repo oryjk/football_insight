@@ -35,21 +35,3 @@ CREATE TABLE f_i_match_outlooks (
     OR (outcome IS NOT NULL AND rps_model IS NOT NULL AND rps_baseline IS NOT NULL AND scored_at IS NOT NULL))
 );
 CREATE INDEX idx_match_outlooks_scored ON f_i_match_outlooks(scored_at) WHERE scored_at IS NOT NULL;
--- Guard even an unconditional direct UPDATE, in addition to writer predicates.
-CREATE FUNCTION f_i_guard_frozen_match_outlook() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
- IF OLD.scored_at IS NOT NULL THEN RETURN NULL; END IF;
- IF NEW.scored_at IS NOT NULL AND OLD.kickoff_at > clock_timestamp() THEN RETURN NULL; END IF;
- IF OLD.kickoff_at <= clock_timestamp() THEN
-  IF ROW(NEW.home_win,NEW.draw,NEW.away_win,NEW.baseline_home,NEW.baseline_draw,NEW.baseline_away,
-         NEW.tau,NEW.model_version,NEW.generated_at,NEW.kickoff_at)
-    IS DISTINCT FROM ROW(OLD.home_win,OLD.draw,OLD.away_win,OLD.baseline_home,OLD.baseline_draw,OLD.baseline_away,
-         OLD.tau,OLD.model_version,OLD.generated_at,OLD.kickoff_at) THEN RETURN NULL; END IF;
-  IF NEW.params IS DISTINCT FROM OLD.params AND NOT
-     ((NEW.params - 'schedule_changed' = OLD.params - 'schedule_changed'
-      AND NEW.params->'schedule_changed' = 'true'::jsonb) IS TRUE) THEN RETURN NULL; END IF;
- END IF;
- RETURN NEW;
-END $$;
-CREATE TRIGGER guard_frozen_match_outlook BEFORE UPDATE ON f_i_match_outlooks
- FOR EACH ROW EXECUTE FUNCTION f_i_guard_frozen_match_outlook();

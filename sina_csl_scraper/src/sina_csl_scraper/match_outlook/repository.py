@@ -1,4 +1,4 @@
-"""Persistence only: DB wall-clock predicates and a trigger protect frozen rows."""
+"""Persistence only: writer predicates use the DB wall clock for the forecast lifecycle."""
 
 from psycopg.types.json import Jsonb
 from .model import rps

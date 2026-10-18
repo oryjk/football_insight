@@ -30,7 +30,7 @@ Files: new `sina_csl_scraper/src/sina_csl_scraper/match_outlook/{model,history,r
 ## Task 2 — persistence, freezing and read API
 
 Files: migration20261018140000, Python repository/service tests, Rust `src/match_outlook` layered module and app/lib assembly.
-- [x] RED/GREEN actual isolated PostgreSQL statements: INSERT only future, conflict update only old+new future, immutable frozen probability, once-only score, reschedule annotation; migrations rollback cleanly.
+- [x] RED/GREEN actual isolated PostgreSQL statements: INSERT only future, conflict update only old+new future, writer SQL preserves frozen probability, once-only score, reschedule annotation; migrations rollback cleanly.
 - [x] Service reads a repeatable snapshot, checks complete prior seasons, replays in Python, publishes future fixtures and scores only frozen stored forecasts. Independent connection/transaction after core sync.
 - [x] Rust GET/live/match-outlook and record use domain/ports/application/adapters; normal/missing/invalid tests, stored aggregates only. Missing table gracefully unavailable, zero record explicit.
 - [x] Restart local backend then cargo test/check/build/clippy.
@@ -43,3 +43,7 @@ Files: typed api/types, insights panel/helpers/loader, index wiring, home lightw
 - [x] Home single neutral entry navigates insights; no added probability calls on home.
 - [x] Bun test/type-check/boundaries/components/H5/offlineMP; scraper pytest; independent final review, validation report and API docs; FEATURES/CHANGELOG per commit.
 - [x] Pull --rebase, separate data/backend and mini commits, push main. Production rollout left to owner.
+
+## Owner follow-up — remove defensive DB trigger
+
+The owner explicitly removed the additional unconditional-UPDATE trigger before production migration. Keep the original conditional publish/scoring SQL and normal constraints; add an isolated regression proving direct SQL is no longer intercepted. Production deployment, migration and history activation are now authorized.

@@ -51,4 +51,4 @@
 
 ## 数据生成与上线
 
-迁移：`20261018140000_add_match_outlooks.sql`，仅新增两张表、索引和新表冻结触发器；负责人审查后在 peiqian 手动执行。抓取器命令、断点缓存和显式写入开关见 [scraper README](../../sina_csl_scraper/README.md)。完整验证与限制见 [验证报告](../../docs/match-outlook-validation.md)。
+迁移：`20261018140000_add_match_outlooks.sql`，仅新增两张表与索引，不增加防御性 UPDATE 触发器；负责人审查后在 peiqian 手动执行。抓取器命令、断点缓存和显式写入开关见 [scraper README](../../sina_csl_scraper/README.md)。完整验证与限制见 [验证报告](../../docs/match-outlook-validation.md)。

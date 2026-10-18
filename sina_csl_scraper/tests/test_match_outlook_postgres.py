@@ -49,7 +49,24 @@ def insert_frozen(c):
       VALUES(2,.5,.25,.25,.46,.26,.28,.7,'elo-v2','{}',clock_timestamp()-interval '2h',clock_timestamp()-interval '1h')""")
 
 
-def test_future_only_and_direct_frozen_updates_are_rejected(connection):
+def test_migration_leaves_direct_updates_to_normal_sql_constraints(connection):
+    c = connection
+    insert_frozen(c)
+    assert (
+        c.execute(
+            "UPDATE f_i_match_outlooks SET home_win=.4,draw=.3,away_win=.3 WHERE match_id=2"
+        ).rowcount
+        == 1
+    )
+    assert (
+        c.execute(
+            "SELECT home_win FROM f_i_match_outlooks WHERE match_id=2"
+        ).fetchone()[0]
+        == 0.4
+    )
+
+
+def test_publish_only_updates_future_matches(connection):
     c = connection
     future = (datetime.now(UTC) + timedelta(hours=1)).replace(microsecond=0)
     c.execute(
@@ -63,12 +80,6 @@ def test_future_only_and_direct_frozen_updates_are_rejected(connection):
         "SELECT home_win,generated_at,kickoff_at,params FROM f_i_match_outlooks WHERE match_id=2"
     ).fetchone()
     assert publish(c, 2, (0.4, 0.3, 0.3), (0.46, 0.26, 0.28), 0.7, {}, future) == 0
-    assert (
-        c.execute(
-            "UPDATE f_i_match_outlooks SET home_win=.4,draw=.3,away_win=.3 WHERE match_id=2"
-        ).rowcount
-        == 0
-    )
     assert (
         c.execute(
             "SELECT home_win,generated_at,kickoff_at,params FROM f_i_match_outlooks WHERE match_id=2"
@@ -104,10 +115,6 @@ def test_scoring_is_once_only_and_uses_original_frozen_probabilities(connection)
     assert first[2] == pytest.approx((0.54**2 + 0.28**2) / 2)
     c.execute("UPDATE f_i_matches SET home_score='0',away_score='4' WHERE match_id=2")
     assert score_finished(c) == 0
-    assert (
-        c.execute("UPDATE f_i_match_outlooks SET rps_model=0 WHERE match_id=2").rowcount
-        == 0
-    )
     assert (
         c.execute(
             "SELECT outcome,rps_model,rps_baseline,scored_at FROM f_i_match_outlooks WHERE match_id=2"
