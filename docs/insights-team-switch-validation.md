@@ -2,6 +2,8 @@
 
 日期：2026-10-18。后续修正赛前倾向展示，只改小程序与文档。
 
+最新指令：已移除公开赛季战绩整块及其请求，后台计分保留；下文初次验证中“保留战绩”属于当时状态，最新验证见末尾追加记录。
+
 ## 原因与结果
 
 - 原倾向卡与进失球卡都内嵌球队选择，绑定同一 selectedTeamId，形成重复控制；现只在页面顶部保留一处选择，统一控制概率、进失球和贡献内容。
@@ -68,3 +70,25 @@ H5 最初实测发现局部首元素 margin 折叠使慢请求期间下方位置
 | `bun run verify:mp-components` | All mini-program custom components are registered |
 
 微信/H5 仍使用原有 `@tap`、`hover-class` 和 `scroll-view`，没有浏览器专属 API 进入产品代码。没有上传小程序，没有重新部署或重启后端。
+
+## 追加：移除公开赛季战绩展示与请求
+
+2026-10-18，负责人确认此区块当前价值有限、文字过多，因此移除公开赛季战绩标题、空状态、命中率/RPS/基线、赛季初样本说明和分隔线。保留比赛选择、主胜/平/客胜概率及原来的一句参考说明；仅异常改期时提示赛程变化。
+
+`InsightsMatchOutlook.vue` 去掉战绩 props/模板/样式，`index.vue` 去掉接线，`useMatchOutlook.ts` 停止请求战绩并删除相关状态与场次汇总，`matchOutlook.ts` 清理无用格式化函数和文案。原有 10 项 loader 测试保留，移除一个已删除功能的格式化测试及无用假数据。后端 API、数据库与赛后计分不改；客户端 API 模块/DTO 保留，避免扩大接口清理范围。
+
+### 验证
+
+- 修改前先在 H5 交互脚本断言区块不存在，实际失败：`removed season record is still visible`。修改后，320/390px 两种宽度均通过区块不存在和零次 `/match-outlook/record` 请求检查；保持单一球队选择，逐步切换 8 轮成都↔大连只选中一场，慢请求不折叠布局，卡片 DOM 保留。所有 API mock、拦截外部流量，没有生产写入。
+- 微信编译产物的原生 key 更新重放模型 120 次切换仍通过；这不替代微信真机，仍需负责人上传后验收。没有为纯删除 UI 新增机械源码测试。
+
+| 命令 | 真实输出结论 |
+|---|---|
+| `bun test` | 911 pass / 0 fail，5948 expect，85 文件，13.36s；相比上次少 1 项为删除的战绩格式化测试 |
+| `bun run type-check` | vue-tsc --noEmit，exit 0 |
+| `bun run check:boundaries` | 依赖边界检查通过，未改 ALLOWLIST |
+| `bun run build:h5` | DONE Build complete |
+| `MINI_REVIEW_SKIP=1 bun run build:mp-weixin` | DONE；组件注册与生产 API 产物校验通过 |
+| `bun run verify:mp-components` | All mini-program custom components are registered |
+
+展示改动之外只有上述无用读取/状态清理；未修改 useInsightsData、sessionEffects、付费度量、接口、版本号或 token。同步设计/FEATURES/CHANGELOG。未新增或删除生产文件，未上传小程序，未发布 H5，未重启本地后端，生产后端未重新部署或重启。

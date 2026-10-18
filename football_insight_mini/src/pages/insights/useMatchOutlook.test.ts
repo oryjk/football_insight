@@ -18,7 +18,6 @@ const metadata = {
   ],
   season: 2026,
   favorite: 9,
-  completedMatches: 221,
 }
 function setup() {
   const authenticated = ref(false),
@@ -36,15 +35,6 @@ function setup() {
       calls.push(id)
       return { status: 'unavailable', outlook: null }
     },
-    record: async () => ({
-      season: 2026,
-      matches: 0,
-      hits: 0,
-      accuracy: null,
-      rps_model: null,
-      rps_baseline: null,
-      rps_improvement: null,
-    }),
   })
   return { loader, authenticated, review, revision, selectedTeamId, calls }
 }
@@ -60,7 +50,6 @@ test('guest/review never loads and logged-in low-tier access is independent of m
   await t.loader.load()
   expect(t.selectedTeamId.value).toBe(9)
   expect(t.calls).toEqual([1])
-  expect(t.loader.completedMatches.value).toBe(221) // not the zero public scored count
   t.loader.dispose()
 })
 test('entering review or logging out clears results and late replies cannot restore them', async () => {
@@ -69,26 +58,16 @@ test('entering review or logging out clears results and late replies cannot rest
   await t.loader.load()
   t.review.value = true
   expect(t.loader.teams.value).toEqual([])
-  expect(t.loader.record.value).toBe(null)
   t.loader.dispose()
 })
 
-const emptyRecord = {
-  season: 2026,
-  matches: 0,
-  hits: 0,
-  accuracy: null,
-  rps_model: null,
-  rps_baseline: null,
-  rps_improvement: null,
-}
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 test('changing teams after kickoff excludes the now-started fixture', async () => {
   let now = Date.parse('2099-01-01T11:00:00Z')
   const loader = createOutlookLoader({
     authenticated: () => true, underReview: () => false, revision: ref(0), selectedTeamId: ref(null),
     now: () => now,
-    metadata: async () => metadata as any, record: async () => emptyRecord,
+    metadata: async () => metadata as any,
     outlook: async () => ({status: 'unavailable', outlook: null}),
   })
   await loader.load()
@@ -115,8 +94,7 @@ test('switching the shared fixture between teams uses the cache without a loadin
 test('prefetched next fixtures share in-flight requests and publish without reloading metadata', async () => {
   const selectedTeamId = ref<number | null>(null)
   const calls: number[] = []
-  let metadataCalls = 0,
-    recordCalls = 0
+  let metadataCalls = 0
   let resolveNext!: (value: any) => void
   const next = new Promise<any>((resolve) => {
     resolveNext = resolve
@@ -142,10 +120,6 @@ test('prefetched next fixtures share in-flight requests and publish without relo
       metadataCalls++
       return data as any
     },
-    record: async () => {
-      recordCalls++
-      return emptyRecord
-    },
     outlook: async (id) => {
       calls.push(id)
       return id === 2
@@ -167,7 +141,6 @@ test('prefetched next fixtures share in-flight requests and publish without relo
   expect(loader.outlook.value?.match_id).toBe(1)
   expect(loader.loading.value).toBe(false)
   expect(metadataCalls).toBe(1)
-  expect(recordCalls).toBe(1)
   loader.dispose()
 })
 
@@ -183,7 +156,6 @@ test('expired or previous-session forecast cache is not reused', async () => {
     selectedTeamId,
     now: () => now,
     metadata: async () => metadata as any,
-    record: async () => emptyRecord,
     outlook: async () => {
       calls++
       return { status: 'unavailable', outlook: null }
@@ -220,7 +192,6 @@ test('auth intent blocks private favorite reads until a replacement user is publ
       return metadata as any
     },
     outlook: async () => ({ status: 'unavailable', outlook: null }),
-    record: async () => emptyRecord,
   })
   await loader.load()
   revision.value++
@@ -286,7 +257,6 @@ test('switching teams during the first forecast drops the old result and preserv
         ? first
         : { status: 'ready', outlook: { match_id: id } as any }
     },
-    record: async () => emptyRecord,
   })
   const pending = loader.load()
   await flush()
@@ -322,7 +292,6 @@ test('a team chosen before metadata arrives is honored, including clubs without 
         resolveData = resolve
       }),
     outlook: async () => ({ status: 'unavailable', outlook: null }),
-    record: async () => emptyRecord,
   })
   const pending = loader.load()
   loader.selectTeam(1)

@@ -62,22 +62,6 @@
         <text v-else class="outlook-note">{{ outlookCopy.empty }}</text>
       </view>
     </view>
-    <view class="outlook-record"
-      ><text class="outlook-record__title">{{ outlookCopy.record }}</text
-      ><text class="outlook-note">{{
-        record ? recordSummary(record) : '暂无公开计分资料'
-      }}</text
-      ><text
-        v-if="record?.rps_model !== null && record?.rps_model !== undefined"
-        class="outlook-note"
-        >模型 RPS {{ record.rps_model.toFixed(4) }} · 基线
-        {{ record.rps_baseline?.toFixed(4) }}（越低越好）</text
-      ><text
-        v-if="completedMatches !== null && completedMatches < 30"
-        class="outlook-note"
-        >{{ outlookCopy.early }}</text
-      ></view
-    >
     <text class="outlook-note">{{ outlookCopy.disclaimer }}</text>
   </FiPanel>
 </template>
@@ -86,14 +70,12 @@ import { computed } from 'vue'
 import FiPanel from '../../../components/FiPanel.vue'
 import FiSectionHeading from '../../../components/FiSectionHeading.vue'
 import type { MatchCard } from '../../../types/insight'
-import type { MatchOutlook, OutlookRecord } from '../../../types/matchOutlook'
-import { percentages, outlookCopy, recordSummary } from '../matchOutlook'
+import type { MatchOutlook } from '../../../types/matchOutlook'
+import { percentages, outlookCopy } from '../matchOutlook'
 const props = defineProps<{
   matches: MatchCard[]
   selectedMatchId: number | null
   outlook: MatchOutlook | null
-  record: OutlookRecord | null
-  completedMatches: number | null
   loading: boolean
   error: string
 }>()
@@ -206,15 +188,5 @@ const parts = computed(() =>
   font-size: var(--fi-font-24);
   line-height: var(--fi-leading-normal);
   color: var(--fi-color-text-secondary);
-}
-.outlook-record {
-  margin-top: var(--fi-space-20);
-  padding-top: var(--fi-space-16);
-  border-top: var(--fi-border-width) solid var(--fi-color-divider);
-}
-.outlook-record__title {
-  font-size: var(--fi-font-28);
-  font-weight: var(--fi-weight-bold);
-  color: var(--fi-color-text-primary);
 }
 </style>

@@ -24,10 +24,8 @@
           :matches="outlookMatches"
           :selected-match-id="outlookSelectedMatchId"
           :outlook="matchOutlook"
-          :record="outlookRecord"
           :loading="outlookLoading"
           :error="outlookError"
-          :completed-matches="outlookCompletedMatches"
           @select-match="outlookLoader.selectMatch"
         />
 
@@ -165,9 +163,7 @@ const {
   teams: outlookTeams,
   matches: outlookMatches,
   outlook: matchOutlook,
-  record: outlookRecord,
   selectedMatchId: outlookSelectedMatchId,
-  completedMatches: outlookCompletedMatches,
   loading: outlookLoading,
   error: outlookError,
 } = outlookLoader

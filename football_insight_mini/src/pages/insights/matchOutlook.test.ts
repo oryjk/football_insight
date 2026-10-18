@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { percentages, outlookCopy, recordSummary } from './matchOutlook'
+import { percentages, outlookCopy } from './matchOutlook'
 
 test('integer percentages always total100 without highlighting a favored outcome', () => {
   for (const p of [
@@ -15,30 +15,6 @@ test('integer percentages always total100 without highlighting a favored outcome
   }
   expect(percentages([1 / 3, 1 / 3, 1 / 3])).toEqual([34, 33, 33])
   expect(() => percentages([-1, 1, 1])).toThrow()
-})
-test('public record states absence honestly and shows negative improvement', () => {
-  expect(
-    recordSummary({
-      season: 2026,
-      matches: 0,
-      hits: 0,
-      accuracy: null,
-      rps_model: null,
-      rps_baseline: null,
-      rps_improvement: null,
-    }).includes('尚无'),
-  ).toBe(true)
-  expect(
-    recordSummary({
-      season: 2026,
-      matches: 10,
-      hits: 3,
-      accuracy: 0.3,
-      rps_model: 0.3,
-      rps_baseline: 0.2,
-      rps_improvement: -0.1,
-    }).includes('变差'),
-  ).toBe(true)
 })
 test('rendered outlook copy and templates contain no prohibited promotional terms', async () => {
   const source = await (

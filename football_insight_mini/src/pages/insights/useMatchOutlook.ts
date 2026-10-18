@@ -1,13 +1,12 @@
 import { ref, computed, watch, type Ref } from 'vue'
 import { getAvailableRounds, getMatches } from '../../api/insight'
 import { listSupportTeams, getSupportProfile } from '../../api/support'
-import { getMatchOutlook, getOutlookRecord } from '../../api/matchOutlook'
+import { getMatchOutlook } from '../../api/matchOutlook'
 import type { MatchCard } from '../../types/insight'
 import type { SupportTeam } from '../../types/support'
 import type {
   MatchOutlook,
   OutlookResponse,
-  OutlookRecord,
 } from '../../types/matchOutlook'
 
 interface Metadata {
@@ -15,7 +14,6 @@ interface Metadata {
   matches: MatchCard[]
   season: number
   favorite: number | null
-  completedMatches?: number
 }
 interface Dependencies {
   authenticated: () => boolean
@@ -25,7 +23,6 @@ interface Dependencies {
   selectedTeamId: Ref<number | null>
   metadata?: () => Promise<Metadata>
   outlook?: (id: number) => Promise<OutlookResponse>
-  record?: (year: number) => Promise<OutlookRecord>
   now?: () => number
 }
 
@@ -71,10 +68,6 @@ async function loadMetadata(): Promise<Metadata> {
     matches,
     season: live.current_season,
     favorite: profile?.favorite_team?.team_id ?? null,
-    completedMatches: rounds.reduce(
-      (total, round) => total + round.completed_matches,
-      0,
-    ),
   }
 }
 
@@ -82,8 +75,6 @@ export function createOutlookLoader(deps: Dependencies) {
   const teams = ref<SupportTeam[]>([])
   const allMatches = ref<MatchCard[]>([])
   const outlook = ref<MatchOutlook | null>(null)
-  const record = ref<OutlookRecord | null>(null)
-  const completedMatches = ref<number | null>(null)
   const selectedMatchId = ref<number | null>(null)
   const metadataLoading = ref(false),
     forecastLoading = ref(false),
@@ -135,8 +126,6 @@ export function createOutlookLoader(deps: Dependencies) {
     teams.value = []
     allMatches.value = []
     outlook.value = null
-    record.value = null
-    completedMatches.value = null
     selectedMatchId.value = null
     metadataLoading.value = false
     forecastLoading.value = false
@@ -234,7 +223,6 @@ export function createOutlookLoader(deps: Dependencies) {
         if (!allowed() || request !== owner) return
         teams.value = data.teams
         allMatches.value = data.matches
-        completedMatches.value = data.completedMatches ?? null
         if (
           !choiceInitialized ||
           !data.teams.some((team) => team.team_id === deps.selectedTeamId.value)
@@ -251,14 +239,9 @@ export function createOutlookLoader(deps: Dependencies) {
         choiceInitialized = true
         // A superseded forecast must not keep the newly selected team's spinner active.
         metadataLoading.value = false
-        const recordWork = (deps.record ?? getOutlookRecord)(data.season)
-          .then((result) => {
-            if (allowed() && request === owner) record.value = result
-          })
-          .catch(() => {})
         const initialForecast = chooseNext()
         void warmNextFixtures(request)
-        await Promise.all([initialForecast, recordWork])
+        await initialForecast
       } catch {
         if (allowed() && request === owner)
           error.value = '赛前资料暂不可用，请稍后再试'
@@ -322,8 +305,6 @@ export function createOutlookLoader(deps: Dependencies) {
     teams,
     matches,
     outlook,
-    record,
-    completedMatches,
     selectedMatchId,
     loading,
     error,
