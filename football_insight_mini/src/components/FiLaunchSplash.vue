@@ -48,18 +48,18 @@ const leaving = computed(() => props.phase === 'leaving')
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--fi-space-20);
+  gap: 32rpx;
 }
 
 .fi-launch-splash__logo {
-  width: var(--fi-space-64);
-  height: var(--fi-space-64);
+  width: 180rpx;
+  height: 180rpx;
   animation: fi-launch-breathe 1.6s ease-in-out infinite;
 }
 
 .fi-launch-splash__name {
   color: var(--fi-color-bg);
-  font-size: var(--fi-font-32);
+  font-size: var(--fi-font-48);
   font-weight: var(--fi-weight-black);
   letter-spacing: 0.2em;
   animation: fi-launch-rise 0.7s ease both 0.1s;
@@ -67,7 +67,7 @@ const leaving = computed(() => props.phase === 'leaving')
 
 .fi-launch-splash__tagline {
   color: var(--fi-color-member-card-accent);
-  font-size: var(--fi-font-20);
+  font-size: var(--fi-font-28);
   letter-spacing: 0.12em;
   animation: fi-launch-rise 0.7s ease both 0.3s;
 }
@@ -75,8 +75,8 @@ const leaving = computed(() => props.phase === 'leaving')
 .fi-launch-splash__line {
   position: relative;
   overflow: hidden;
-  width: var(--fi-space-72);
-  height: 2px;
+  width: 144rpx;
+  height: 4rpx;
   border-radius: var(--fi-radius-round);
   background: var(--fi-color-brand-nav-border);
 }
