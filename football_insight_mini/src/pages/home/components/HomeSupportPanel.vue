@@ -225,12 +225,12 @@ const awayRankLabel = computed(() => {
 .support-home-panel__crest {
   position: absolute;
   z-index: 0;
-  top: -24rpx;
-  right: -54rpx;
-  width: 360rpx;
-  height: 360rpx;
+  top: 50%;
+  right: -90rpx;
+  width: 560rpx;
+  height: 560rpx;
   opacity: 0.1;
-  transform: rotate(12deg);
+  transform: translateY(-50%) rotate(12deg);
   pointer-events: none;
 }
 /* 水印在最底层，内容整体抬到它之上。 */
@@ -409,7 +409,8 @@ const awayRankLabel = computed(() => {
   padding: 22rpx 20rpx;
   border-radius: 24rpx;
   border: 2rpx solid rgba(229, 231, 236, 0.98);
-  background: var(--fi-primitive-white);
+  /* 半透明白底：让整张卡片的队徽水印能透出来。 */
+  background: rgba(255, 255, 255, 0.72);
   box-shadow: 0 10rpx 28rpx rgba(18, 20, 28, 0.04);
 }
 .support-home-match-card__meta,
