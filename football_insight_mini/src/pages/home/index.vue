@@ -2,9 +2,10 @@
   <page-meta :page-style="pageStyle" />
   <view class="home-page-shell">
     <FiLaunchSplash :phase="splash.phase.value" />
-    <FiBrandNav />
-    <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
-    <view class="page-bg-fade"></view>
+    <!-- 冷启动宽限期内（启动幕尚未决定是否出现）背景图和导航都不显示，免得先于启动幕闪现 -->
+    <FiBrandNav v-show="!launchPending" />
+    <image v-if="!launchPending" class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
+    <view v-if="!launchPending" class="page-bg-fade"></view>
     <view class="page-scroll">
       <view class="page">
         <!-- 首屏三路数据（话题/助力/总览）全部落定前只显示一个统一骨架，避免部分已出内容、部分仍是骨架 -->
@@ -183,6 +184,7 @@ const loading = ref(true)
 // 首屏三路加载（总览/话题/助力）首次全部落定后置 true，此后刷新不再回到骨架。
 const homeInitialSettled = ref(false)
 const splash = useLaunchSplash(homeInitialSettled)
+const launchPending = computed(() => splash.phase.value === 'idle')
 const showInitialSkeleton = computed(() => !homeInitialSettled.value && splash.phase.value === 'done')
 const errorMessage = ref('')
 const overview = ref<InsightOverviewResponse | null>(null)
