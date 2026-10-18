@@ -16,6 +16,7 @@
   --shell-gutter: var(--space-4);
   --page-content-padding: var(--space-4);
   --page-section-gap: var(--space-4);
+  --support-base-card-min-width: 420px;
   --page-content-min-height: calc(
     100dvh - var(--shell-header-height) - var(--shell-gutter) * 3
   );
