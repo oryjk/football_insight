@@ -1,4 +1,5 @@
 pub mod admin_audit_service;
+pub mod admin_brand_service;
 pub mod admin_auth_service;
 pub mod admin_credentials_service;
 pub mod admin_product_service;

@@ -6,7 +6,8 @@ use crate::system_config::{
     domain::{
         ai_chat_config::AiChatSystemConfig,
         public_system_config::{
-            AiChatMode, HomeBriefingMarquees, PublicSystemConfig, parse_membership_tier_rules,
+            AiChatMode, HomeBriefingMarquees, PublicSystemConfig, parse_brand_subtitle,
+            parse_membership_tier_rules,
         },
     },
     ports::system_config_port::SystemConfigPort,
@@ -88,7 +89,8 @@ impl SystemConfigPort for PostgresSystemConfigPort {
                 'wechat_login_enabled',
                 'ai_chat_mode',
                 'home_briefing_marquees',
-                'membership_tier_rules'
+                'membership_tier_rules',
+                'brand_subtitle'
             )
             "#,
         )
@@ -129,12 +131,20 @@ impl SystemConfigPort for PostgresSystemConfigPort {
             })
             .and_then(|item| item.try_get::<String, _>("config_value").ok());
 
+        let brand_subtitle = rows
+            .iter()
+            .find(|item| {
+                item.try_get::<String, _>("config_key").ok().as_deref() == Some("brand_subtitle")
+            })
+            .and_then(|item| item.try_get::<String, _>("config_value").ok());
+
         Ok(PublicSystemConfig::new(
             wechat_login_enabled,
             parse_ai_chat_mode(ai_chat_mode.as_deref()),
             parse_home_briefing_marquees(home_briefing_marquees.as_deref()),
             parse_membership_tier_rules(membership_tier_rules.as_deref()),
-        ))
+        )
+        .with_brand_subtitle(parse_brand_subtitle(brand_subtitle.as_deref())))
     }
 
     async fn get_ai_chat_config(&self) -> anyhow::Result<AiChatSystemConfig> {

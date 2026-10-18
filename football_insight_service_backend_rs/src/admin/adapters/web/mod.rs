@@ -1,3 +1,5 @@
+pub mod brand_handlers;
+pub mod brand_routes;
 pub mod credentials_handlers;
 pub mod credentials_routes;
 pub mod dto;

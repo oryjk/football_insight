@@ -26,6 +26,7 @@ pub struct PublicSystemConfigDto {
     pub ai_chat_mode: String,
     pub home_briefing_marquees: HomeBriefingMarqueesDto,
     pub membership_tier_rules: Vec<MembershipTierRuleDto>,
+    pub brand_subtitle: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -59,6 +60,7 @@ impl From<PublicSystemConfig> for PublicSystemConfigDto {
             wechat_login_enabled: value.wechat_login_enabled,
             ai_chat_mode: value.ai_chat_mode.to_string(),
             home_briefing_marquees: value.home_briefing_marquees.into(),
+            brand_subtitle: value.brand_subtitle,
             membership_tier_rules: value
                 .membership_tier_rules
                 .into_iter()

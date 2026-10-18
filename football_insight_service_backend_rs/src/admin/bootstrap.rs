@@ -10,6 +10,7 @@ use crate::{
             persistence::{
                 postgres_admin_audit_repository::PostgresAdminAuditRepository,
                 postgres_admin_auth_repository::PostgresAdminAuthRepository,
+                postgres_admin_brand_repository::PostgresAdminBrandRepository,
                 postgres_admin_credentials_repository::PostgresAdminCredentialsRepository,
                 postgres_admin_payment_repository::PostgresAdminPaymentRepository,
                 postgres_admin_paywall_repository::PostgresAdminPaywallRepository,
@@ -24,6 +25,7 @@ use crate::{
                 role_based_admin_authorization::RoleBasedAdminAuthorization,
             },
             web::{
+                brand_routes::admin_brand_routes,
                 credentials_routes::admin_credentials_routes,
                 payment_routes::admin_payment_routes,
                 paywall_routes::admin_paywall_routes,
@@ -37,6 +39,7 @@ use crate::{
         },
         application::{
             admin_audit_service::AdminAuditService, admin_auth_service::AdminAuthService,
+            admin_brand_service::AdminBrandService,
             admin_credentials_service::AdminCredentialsService,
             admin_payment_service::AdminPaymentService,
             admin_paywall_service::AdminPaywallService, admin_product_service::AdminProductService,
@@ -98,6 +101,10 @@ pub fn build_admin_routes(pool: PgPool, config: &AppConfig) -> Router {
         PostgresAdminReviewExemptRepository::new(pool.clone()),
     )));
 
+    let brand_service = Arc::new(AdminBrandService::new(Arc::new(
+        PostgresAdminBrandRepository::new(pool.clone()),
+    )));
+
     let audit_service = Arc::new(AdminAuditService::new(Arc::new(
         PostgresAdminAuditRepository::new(pool),
     )));
@@ -120,6 +127,7 @@ pub fn build_admin_routes(pool: PgPool, config: &AppConfig) -> Router {
             review_exempt_service,
             auth_service.clone(),
         ))
+        .merge(admin_brand_routes(brand_service, auth_service.clone()))
         .merge(admin_topic_readers_routes(
             topic_readers_service,
             auth_service.clone(),

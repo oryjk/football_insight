@@ -1,4 +1,5 @@
 pub mod admin_audit;
+pub mod admin_brand;
 pub mod admin_auth;
 pub mod admin_credentials;
 pub mod admin_product;

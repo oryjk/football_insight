@@ -130,9 +130,27 @@ pub struct PublicSystemConfig {
     pub ai_chat_mode: AiChatMode,
     pub home_briefing_marquees: HomeBriefingMarquees,
     pub membership_tier_rules: Vec<MembershipTierRuleConfig>,
+    /// 首页品牌栏副标题；未配置时为 None，由客户端使用内置默认文案。
+    pub brand_subtitle: Option<String>,
+}
+
+pub const MAX_BRAND_SUBTITLE_CHARS: usize = 20;
+
+/// 清洗后台配置的副标题：去首尾空白，空值或超长视为未配置。
+pub fn parse_brand_subtitle(value: Option<&str>) -> Option<String> {
+    let value = value?.trim();
+    if value.is_empty() || value.chars().count() > MAX_BRAND_SUBTITLE_CHARS {
+        return None;
+    }
+    Some(value.to_string())
 }
 
 impl PublicSystemConfig {
+    pub fn with_brand_subtitle(mut self, brand_subtitle: Option<String>) -> Self {
+        self.brand_subtitle = brand_subtitle;
+        self
+    }
+
     pub fn new(
         wechat_login_enabled: bool,
         ai_chat_mode: AiChatMode,
@@ -144,6 +162,21 @@ impl PublicSystemConfig {
             ai_chat_mode,
             home_briefing_marquees,
             membership_tier_rules,
+            brand_subtitle: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod brand_subtitle_tests {
+    use super::*;
+
+    #[test]
+    fn brand_subtitle_trims_and_ignores_blank_or_overlong_values() {
+        assert_eq!(parse_brand_subtitle(Some(" 球迷的数据主场 ")).as_deref(), Some("球迷的数据主场"));
+        assert_eq!(parse_brand_subtitle(Some("   ")), None);
+        assert_eq!(parse_brand_subtitle(None), None);
+        assert_eq!(parse_brand_subtitle(Some(&"蓉".repeat(MAX_BRAND_SUBTITLE_CHARS + 1))), None);
+        assert!(parse_brand_subtitle(Some(&"蓉".repeat(MAX_BRAND_SUBTITLE_CHARS))).is_some());
     }
 }
