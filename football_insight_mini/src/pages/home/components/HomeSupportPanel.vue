@@ -235,9 +235,15 @@ const awayRankLabel = computed(() => {
   align-items: center;
   justify-content: space-between;
   gap: var(--fi-space-12);
+  /* 标题行做成贴边的深色横条：负外边距抵消卡片内边距，顶部圆角与卡片一致。 */
+  margin: calc(-1 * var(--fi-component-panel-padding) - 2rpx) calc(-1 * var(--fi-component-panel-padding) - 2rpx) 4rpx;
+  padding: calc(var(--fi-component-panel-padding) + 2rpx);
+  border-radius: calc(var(--fi-component-panel-radius) - 2rpx) calc(var(--fi-component-panel-radius) - 2rpx) 0 0;
+  background: linear-gradient(135deg, #131418 0%, #1d1e24 100%);
+  box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, 0.07);
 }
 .support-home-panel__title {
-  color: var(--fi-color-text-strong);
+  color: var(--fi-primitive-white);
   flex-shrink: 0;
   font-weight: var(--fi-component-title-weight);
   font-size: var(--fi-component-title-size);
@@ -250,8 +256,8 @@ const awayRankLabel = computed(() => {
   gap: var(--fi-space-6);
   padding: var(--fi-space-6) var(--fi-space-12);
   border-radius: var(--fi-radius-round);
-  color: var(--fi-color-primary);
-  background: var(--fi-color-topic-audio-surface);
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.1);
   font-size: var(--fi-font-22);
   line-height: var(--fi-leading-normal);
   white-space: nowrap;
@@ -276,8 +282,7 @@ const awayRankLabel = computed(() => {
   align-items: center;
   flex-wrap: wrap;
   gap: 8rpx;
-  padding-top: 14rpx;
-  border-top: 2rpx solid rgba(236, 236, 241, 0.92);
+  padding-top: 8rpx;
 }
 .support-home-panel__context-dot {
   width: 10rpx;
@@ -320,15 +325,14 @@ const awayRankLabel = computed(() => {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 18rpx;
-  padding: 22rpx 0 24rpx;
-  border-top: 2rpx solid rgba(231, 232, 238, 0.92);
+  padding: 14rpx 0 24rpx;
   border-bottom: 2rpx solid rgba(231, 232, 238, 0.92);
 }
 .support-home-panel__favorite::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 22rpx;
+  top: 14rpx;
   bottom: 22rpx;
   width: 4rpx;
   border-radius: 999rpx;

@@ -379,7 +379,21 @@
 
 /* 高度取自 390px 视口实测（rpx = px × 750 / 390），内容多于骨架时仍可撑开。 */
 .skeleton-block--topics { min-height: 464rpx; }
-.skeleton-block--support { min-height: 262rpx; }
+.skeleton-block--support {
+  min-height: 279rpx;
+  padding-top: 118rpx;
+}
+
+/* 与真实卡片一致的深色标题横条 */
+.skeleton-block--support::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 94rpx;
+  background: linear-gradient(135deg, #131418 0%, #1d1e24 100%);
+}
 .skeleton-block--story { min-height: 1460rpx; }
 .skeleton-block--standings { min-height: 685rpx; }
 .skeleton-block--scorers { min-height: 729rpx; }
