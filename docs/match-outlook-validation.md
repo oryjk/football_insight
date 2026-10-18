@@ -2,7 +2,7 @@
 
 日期：2026-10-18。设计：`superpowers/specs/2026-10-18-match-outlook-design.md`；计划：`superpowers/plans/2026-10-18-match-outlook.md`；接口：`../football_insight_service_backend_rs/docs/match-outlook-api.md`。
 
-**本地后端已重启；生产后端未部署/未重启；生产迁移、历史回填及预测刷新均未执行；未上传小程序。** 所有数据库写测试在专用一次性 PostgreSQL 容器进行，没有读取项目 `.env`，没有对生产创建测试数据、支付或发送消息。
+**本地后端已重启；生产后端已部署并重启（镜像 2e1b840，北京时间 2026-10-18 15:27:47）；生产迁移、历史回填和首次预测刷新已完成；小程序未上传。** 所有数据库写测试在专用一次性 PostgreSQL 容器进行，没有读取项目 `.env`，没有对生产创建测试数据、支付或发送消息。
 
 ## 实现范围
 
@@ -27,7 +27,7 @@ Python 用比分、球队 ID、北京时间与中立场地标记预计算 Elo V2
 
 ## 命令与真实输出
 
-会话日志：`.superpowers/sdd/2026-10-18-match-outlook/`（忽略目录，不提交研究原始快照或运行凭据）。下列命令实际通过，均使用 rtk 包装。
+会话日志：`.superpowers/sdd/2026-10-18-match-outlook/`（忽略目录，不提交研究原始快照或运行凭据）。下列为首次交付验证，后续移除触发器后的复验与真实部署结果见末尾；命令均使用 rtk 包装。
 
 | 命令 | 真实结论 |
 |---|---|
@@ -88,9 +88,9 @@ TDD 的真实失败包括：原始概率取整总和 99；队伍切换只请求�
 ## 未做与上线步骤
 
 - 未执行 73 个存量 Rust ignored 测试与 5 个存量 Python 外部依赖测试，避免依赖生产或未配置服务；本功能新增 SQL 和回测测试已在显式隔离环境全部运行，默认 skip 不是未验证。
-- 未对生产迁移/回填、未真实刷新预测，未执行真实网络下载 12 个赛季（已有同源研究快照作数值核验）；断点下载逻辑用 fake 客户端验证。未执行 H5 浏览器交互或微信真机视觉验收，只有纯函数/状态/接口自动化和双端构建证据。
+- 开发测试阶段未对生产迁移/回填或真实刷新预测；后续已按负责人新指令部署启用，见末尾。未执行真实网络下载 12 个赛季（已有同源研究快照作数值核验）；断点下载逻辑用 fake 客户端验证。未执行 H5 浏览器交互或微信真机视觉验收，只有纯函数/状态/接口自动化和双端构建证据。
 - 已用纯离线模拟完成 2027 目标年重选、新球队 newstart、未来结果不进入轨迹的演练；缺完整 2026 时拒绝提前生成 2027。2026 完整赛季结束后、2027 上线前仍需用真实完整数据再演练，不伪造剩余赛果。
-- 上线须负责人审查并另行指令：① peiqian 手动执行 `20261018140000_add_match_outlooks.sql`；② 更新 scraper 依赖并按 README 先 dry-run 下载校验，再显式 backfill --write-db；③ 发布后端及 scraper、显式 refresh 或正常 scrape --write-db，核对真实赛前记录；④ 上传/审核小程序并真机检查登录、审核隐藏、球队切换、百分比和负战绩。禁止用已开赛比赛补造公开记录。
+- 初次交付的上线顺序如下；负责人本轮已授权并完成服务端步骤，小程序仍待上传：① peiqian 手动执行 `20261018140000_add_match_outlooks.sql`；② 更新 scraper 依赖并按 README 先 dry-run 下载校验，再显式 backfill --write-db；③ 发布后端及 scraper、显式 refresh 或正常 scrape --write-db，核对真实赛前记录；④ 上传/审核小程序并真机检查登录、审核隐藏、球队切换、百分比和负战绩。禁止用已开赛比赛补造公开记录。
 
 ## 改动文件
 
@@ -108,7 +108,7 @@ TDD 的真实失败包括：原始概率取整总和 99；队伍切换只请求�
 
 **小程序修改：** `src/pages/home/index.vue`；`src/pages/insights/{index.vue,useInsightsData.ts,sessionEffects.test.ts}`；`src/pages/insights/components/InsightsTeamSelector.vue`。
 
-**公共文档：** 本报告、实施计划、根 `CHANGELOG.md` / `FEATURES.md`（数据后端与小程序条目分开提交）。设计和研究脚本保持负责人定稿内容。
+**公共文档：** 本报告、实施计划、根 `CHANGELOG.md` / `FEATURES.md`（数据后端与小程序条目分开提交）。设计按负责人移除触发器的新指令同步修正验收；研究脚本不变。
 
 数据/后端提交：`13a793c`（先推送 main）；小程序展示层独立后续提交。同步 main 时保留已提交的首页深色卡片改动，未纳入本任务提交。
 
@@ -120,4 +120,29 @@ TDD 的真实失败包括：原始概率取整总和 99；队伍切换只请求�
 
 先修改真实隔离库测试，让手工 UPDATE 成功的断言失败（rowcount 实际为 0），再删除触发器，复验 **214 passed / 5 skipped**（4.63s，全部 8 项新 SQL 与真实回测通过）。本地后端重新编译并重启，健康回执 2026-10-18T07:23:02Z；`cargo test` 545 passed/0 failed/73 ignored，`cargo check` exit0。小程序代码没有改动，无需重跑前端测试。
 
-历史比分缓存 dry-run：`Validated 2802 scores across 12 seasons (dry run=True)`，使用与研究相同的真实新浪快照，不伪造公开战绩。生产部署与新表启用已获本轮指令，实际结果后续补记。
+历史比分缓存 dry-run：`Validated 2802 scores across 12 seasons (dry run=True)`，使用与研究相同的真实新浪快照，不伪造公开战绩。生产部署与新表启用已获本轮指令，实际结果如下。
+
+### 生产部署实际结果
+
+- 修改提交：`2e1b840`，已推送 main；local233 构建镜像并传送到 peiqian，未在 peiqian 构建。镜像内二进制与迁移文件的 SHA-256 在两端逐一匹配。
+- peiqian 通过镜像内 `run_migrations` 正常迁移（SQLx 记账），输出 `migrations applied successfully`；只有本次 20261018140000 未应用，没有执行其他新迁移。
+- 已写入 2802 条真实历史比分，首次刷新输出 `{'published': 19, 'scored': 0, 'reschedules_marked': 0}`。只写新历史/预测表和迁移账，不创建测试用户，不改真实用户、订单、会员数据，未真实支付或发消息。
+- 生产容器重启时间 `2026-10-18T07:27:47.569054578Z`，镜像 `football-insight-service-backend-rs:2e1b840`；健康回执 `2026-10-18T07:27:49Z`，Docker 健康状态 healthy。旧镜像 `f00a8f1` 保留可回滚，未改 Nginx。
+- 生产只读核验及公网烟测输出：
+
+```text
+migration: (20261018140000, True)
+defensive trigger/function: absent
+historical scores: 2802
+outlooks total/before kickoff/scored/valid probabilities: (19, 19, 0, 19)
+public GET /api/v1/live/match-outlook 200
+public GET /api/v1/live/match-outlook/record 200
+public GET /api/v1/live/match-outlook 200
+public GET /api/v1/live/overview 200
+public invalid ID: 400
+production smoke checks passed; only new feature tables were written
+```
+
+- 真实单场返回 ready、三项概率和为 1；不存在 ID 返回 unavailable；公开战绩为 0 场且 RPS=null，没有用回测冒充公开战绩。原 overview 正常。
+- local233 现有每分钟 cron 通过相对路径执行 auto_sync_latest.sh，读取当前已更新源码；后续正常赛后同步会继续生成与计分，没有新增 cron 或定时器。未手工触发核心 scrape 写入其他数据。
+- 本轮仅部署服务端与数据能力，没有上传小程序，也没有发布 H5 静态资源；对应终端界面仍需单独发版。
