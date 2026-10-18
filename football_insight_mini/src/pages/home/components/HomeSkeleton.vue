@@ -1,38 +1,36 @@
 <template>
+  <!-- 骨架与真实首屏逐块对齐（今日话题 / 我的主队 / 最近赛果 / 积分榜 / 射手榜），
+       高度取自 390px 宽真机视口的实测值，数据落定后内容不再整体跳动。 -->
   <view class="skeleton-stack">
-    <view class="skeleton-topic skeleton-panel">
-      <view class="skeleton-line skeleton-line--kicker" />
-      <view class="skeleton-line skeleton-line--title" />
+    <view class="skeleton-panel-card skeleton-panel skeleton-block--topics">
+      <view class="skeleton-heading">
+        <view class="skeleton-line skeleton-line--section" />
+        <view class="skeleton-line skeleton-line--kicker" />
+      </view>
+      <view class="skeleton-topic skeleton-panel">
+        <view class="skeleton-line skeleton-line--kicker" />
+        <view class="skeleton-line skeleton-line--title" />
+        <view class="skeleton-line skeleton-line--body" />
+        <view class="skeleton-topic__footer">
+          <view class="skeleton-line skeleton-line--topic-heat" />
+          <view class="skeleton-line skeleton-line--topic-action" />
+        </view>
+      </view>
+    </view>
+
+    <view class="skeleton-panel-card skeleton-panel skeleton-block--support">
+      <view class="skeleton-line skeleton-line--section" />
       <view class="skeleton-line skeleton-line--body" />
       <view class="skeleton-line skeleton-line--body skeleton-line--body-short" />
-      <view class="skeleton-topic__footer">
-        <view class="skeleton-line skeleton-line--topic-heat" />
-        <view class="skeleton-line skeleton-line--topic-action" />
-      </view>
     </view>
 
-    <view class="skeleton-panel-card skeleton-panel">
-      <view class="skeleton-heading">
-        <view class="skeleton-copy-group">
-          <view class="skeleton-line skeleton-line--kicker" />
-          <view class="skeleton-line skeleton-line--section" />
-        </view>
-        <view class="skeleton-pill skeleton-pill--short" />
-      </view>
+    <view class="skeleton-panel-card skeleton-panel skeleton-block--story">
+      <view class="skeleton-line skeleton-line--kicker" />
+      <view class="skeleton-line skeleton-line--title" />
+      <view class="skeleton-line skeleton-line--title skeleton-line--title-short" />
       <view class="skeleton-line skeleton-line--body" />
-      <view class="skeleton-button" />
-    </view>
-
-    <view class="skeleton-panel-card skeleton-panel">
-      <view class="skeleton-heading">
-        <view class="skeleton-copy-group">
-          <view class="skeleton-line skeleton-line--kicker" />
-          <view class="skeleton-line skeleton-line--title" />
-        </view>
-        <view class="skeleton-pill" />
-      </view>
-      <view class="skeleton-line skeleton-line--body" />
-      <view class="skeleton-score-strip">
+      <view class="skeleton-line skeleton-line--body skeleton-line--body-short" />
+      <view v-for="i in 3" :key="`skeleton-match-${i}`" class="skeleton-score-strip">
         <view class="skeleton-line skeleton-line--meta skeleton-line--meta-wide" />
         <view class="skeleton-score-body">
           <view class="skeleton-line skeleton-line--score-team" />
@@ -40,25 +38,25 @@
           <view class="skeleton-line skeleton-line--score-team" />
         </view>
       </view>
-      <view class="skeleton-score-strip">
-        <view class="skeleton-line skeleton-line--meta skeleton-line--meta-wide" />
-        <view class="skeleton-score-body">
-          <view class="skeleton-line skeleton-line--score-team" />
-          <view class="skeleton-line skeleton-line--score-value" />
-          <view class="skeleton-line skeleton-line--score-team" />
-        </view>
-      </view>
+      <view class="skeleton-line skeleton-line--body" />
+      <view class="skeleton-line skeleton-line--body skeleton-line--body-short" />
     </view>
 
-    <view v-for="list in 2" :key="`skeleton-ranking-panel-${list}`" class="skeleton-panel-card skeleton-panel" :class="{ 'skeleton-standings': list === 1 }">
+    <view
+      v-for="list in 2"
+      :key="`skeleton-ranking-panel-${list}`"
+      class="skeleton-panel-card skeleton-panel"
+      :class="list === 1 ? 'skeleton-standings skeleton-block--standings' : 'skeleton-block--scorers'"
+    >
       <view class="skeleton-heading">
         <view class="skeleton-copy-group">
           <view class="skeleton-line skeleton-line--kicker" />
           <view class="skeleton-line skeleton-line--section" />
+          <view class="skeleton-line skeleton-line--meta" />
         </view>
       </view>
       <view class="skeleton-ranking-list">
-        <view v-for="i in 4" :key="`skeleton-standing-${list}-${i}`" class="skeleton-ranking-row">
+        <view v-for="i in (list === 1 ? 4 : 5)" :key="`skeleton-standing-${list}-${i}`" class="skeleton-ranking-row">
           <view class="skeleton-line skeleton-line--rank" />
           <view class="skeleton-line skeleton-line--avatar" />
           <view class="skeleton-ranking-body">
@@ -377,6 +375,38 @@
   width: var(--fi-space-72);
   height: var(--fi-font-36);
   justify-self: end;
+}
+
+/* 高度取自 390px 视口实测（rpx = px × 750 / 390），内容多于骨架时仍可撑开。 */
+.skeleton-block--topics { min-height: 464rpx; }
+.skeleton-block--support { min-height: 262rpx; }
+.skeleton-block--story { min-height: 1460rpx; }
+.skeleton-block--standings { min-height: 685rpx; }
+.skeleton-block--scorers { min-height: 729rpx; }
+
+.skeleton-block--topics .skeleton-topic {
+  margin-top: var(--fi-space-16);
+  min-height: 320rpx;
+}
+
+.skeleton-block--story .skeleton-score-strip { min-height: 244rpx; align-content: center; }
+
+.skeleton-block--standings .skeleton-ranking-row { min-height: 104rpx; }
+.skeleton-block--scorers .skeleton-ranking-row { min-height: 100rpx; }
+
+.skeleton-block--scorers .skeleton-line--name,
+.skeleton-block--scorers .skeleton-line--note {
+  width: 100%;
+}
+
+.skeleton-block--scorers .skeleton-ranking-body {
+  align-content: center;
+  align-self: stretch;
+}
+
+.skeleton-line--title-short {
+  width: 300rpx;
+  margin-top: var(--fi-space-12);
 }
 
 @keyframes skeleton-shimmer {

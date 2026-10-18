@@ -1,10 +1,10 @@
 /**
  * 品牌启动幕只在「首屏数据迟迟未到」时出现，不为展示而额外等待：
- * - 数据在宽限时间内到达：完全不显示；
+ * - 数据在宽限时间内到达：完全不显示（宽限期内首页也不渲染骨架屏，避免「骨架→启动幕→骨架」）；
  * - 一旦显示：至少停留 MIN_VISIBLE 让动画能读完，数据到达后立即淡出；
  * - 兜底：无论数据状态，超过 MAX 一律收起，启动幕永远不会卡住页面。
  */
-export const SPLASH_SHOW_AFTER_MS = 250
+export const SPLASH_SHOW_AFTER_MS = 600
 export const SPLASH_MIN_VISIBLE_MS = 900
 export const SPLASH_MAX_MS = 3500
 export const SPLASH_FADE_MS = 350

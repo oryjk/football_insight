@@ -8,9 +8,10 @@
     <view class="page-scroll">
       <view class="page">
         <!-- 首屏三路数据（话题/助力/总览）全部落定前只显示一个统一骨架，避免部分已出内容、部分仍是骨架 -->
-        <HomeSkeleton v-if="!homeInitialSettled" />
+        <!-- 冷启动时，启动幕宽限期与展示期内不渲染骨架屏；启动幕收起后数据仍未落定才显示骨架 -->
+        <HomeSkeleton v-if="showInitialSkeleton" />
 
-        <template v-else>
+        <template v-else-if="homeInitialSettled">
         <HomeDailyTopics
           :edition="topicEdition"
           :loading="topicsLoading"
@@ -182,6 +183,7 @@ const loading = ref(true)
 // 首屏三路加载（总览/话题/助力）首次全部落定后置 true，此后刷新不再回到骨架。
 const homeInitialSettled = ref(false)
 const splash = useLaunchSplash(homeInitialSettled)
+const showInitialSkeleton = computed(() => !homeInitialSettled.value && splash.phase.value === 'done')
 const errorMessage = ref('')
 const overview = ref<InsightOverviewResponse | null>(null)
 const liveMatches = ref<MatchCard[]>([])
