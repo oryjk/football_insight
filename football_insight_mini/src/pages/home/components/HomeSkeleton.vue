@@ -392,7 +392,7 @@
   left: 0;
   right: 0;
   height: 94rpx;
-  background: linear-gradient(135deg, #131418 0%, #1d1e24 100%);
+  background: var(--fi-gradient-topic-hero);
 }
 .skeleton-block--story { min-height: 1460rpx; }
 .skeleton-block--standings { min-height: 685rpx; }

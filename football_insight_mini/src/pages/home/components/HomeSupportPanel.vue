@@ -239,7 +239,8 @@ const awayRankLabel = computed(() => {
   margin: calc(-1 * var(--fi-component-panel-padding) - 2rpx) calc(-1 * var(--fi-component-panel-padding) - 2rpx) 4rpx;
   padding: calc(var(--fi-component-panel-padding) + 2rpx);
   border-radius: calc(var(--fi-component-panel-radius) - 2rpx) calc(var(--fi-component-panel-radius) - 2rpx) 0 0;
-  background: linear-gradient(135deg, #131418 0%, #1d1e24 100%);
+  /* 与「今日话题」卡片共用同一个黑红渐变，首屏风格统一。 */
+  background: var(--fi-gradient-topic-hero);
   box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, 0.07);
 }
 .support-home-panel__title {
