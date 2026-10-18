@@ -58,4 +58,4 @@ Files: new migration, `docs/sql/user-acquisition-summary.sql`, operational/API d
 - [x] Mini bun test/type-check/check:boundaries/verify:mp-components; H5/offline MP builds without allocating a version.
 - [x] Fresh whole-change review, address important findings with regression tests.
 - [x] Update FEATURES/CHANGELOG and docs/acquisition-source-tracking-validation.md with six acceptance items, limitations and outputs.
-- [ ] Commit/push backend and mini separately on main, Co-Authored-By trailers. Production remains unchanged.
+- [x] Commit/push backend and mini separately on main, Co-Authored-By trailers. Production remains unchanged.

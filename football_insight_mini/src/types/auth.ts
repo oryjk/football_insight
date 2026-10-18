@@ -1,3 +1,9 @@
+export interface AcquisitionSource {
+  src: string
+  cid?: string
+  landing_scene?: number
+}
+
 export interface CurrentUser {
   id: string
   display_name: string
@@ -42,6 +48,7 @@ export type MiniWechatLoginResponse =
   | MiniWechatBindingRequiredResponse
 
 export interface RegisterPayload {
+  acquisition?: AcquisitionSource
   invite_code?: string | null
   referral_code?: string | null
   account_identifier: string
@@ -49,6 +56,7 @@ export interface RegisterPayload {
 }
 
 export interface LoginPayload {
+  acquisition?: AcquisitionSource
   account_identifier: string
   password: string
 }
@@ -60,6 +68,7 @@ export interface ResetPasswordPayload {
 }
 
 export interface MiniWechatBindPayload {
+  acquisition?: AcquisitionSource
   bind_token: string
   invite_code?: string | null
   referral_code?: string | null

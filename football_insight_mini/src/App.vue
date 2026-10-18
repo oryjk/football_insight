@@ -4,6 +4,7 @@ import { watch } from "vue";
 import { useAppSession } from "./stores/appSession";
 import { useRuntimeConfig } from "./stores/runtimeConfig";
 import { useMiniReviewStatus } from "./stores/miniReview";
+import { captureAcquisitionSource } from "./utils/acquisitionSource";
 // #ifdef MP-WEIXIN
 import { setupMiniProgramUpdatePrompt } from "./utils/miniProgramUpdate";
 // #endif
@@ -30,6 +31,8 @@ watch(
 
 onLaunch(() => {
   console.log("Football Insight mini launch");
+  // Capture before silent login; malformed launch data/storage failures are best effort.
+  captureAcquisitionSource();
   // #ifdef MP-WEIXIN
   // 冷启动检查到新版本并下载完成后，询问是否立即重启到新版本。
   setupMiniProgramUpdatePrompt();
@@ -41,8 +44,10 @@ onLaunch(() => {
   // 公共配置与审核状态后台预加载；失败不阻断首页，页面 onShow 会复用缓存或重试。
   void useRuntimeConfig().ensureRuntimeConfig();
 });
-onShow(() => {
+onShow((options) => {
   console.log("Football Insight mini show");
+  // A warm scan/share can be the first attributed entry after an organic cold launch.
+  captureAcquisitionSource(options);
 });
 onHide(() => {
   console.log("Football Insight mini hide");

@@ -3,6 +3,7 @@
  * token 与当前用户的发布/清除统一由 stores/appSession 在核对 revision 后执行。
  */
 import type {
+  AcquisitionSource,
   AuthResponse,
   CurrentUser,
   H5TestLoginUser,
@@ -15,7 +16,6 @@ import type {
 } from '../types/auth'
 import { isUnauthorizedError } from '../utils/apiError'
 import { request } from '../utils/request'
-
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   try {
     return await request<CurrentUser>({ url: '/auth/me', auth: true })
@@ -63,11 +63,11 @@ export function loginAsH5TestUser(userId: string): Promise<AuthResponse> {
   })
 }
 
-export function loginWithMiniWechat(code: string): Promise<MiniWechatLoginResponse> {
+export function loginWithMiniWechat(code: string, acquisition?: AcquisitionSource): Promise<MiniWechatLoginResponse> {
   return request<MiniWechatLoginResponse>({
     url: '/auth/mini-wechat/login',
     method: 'POST',
-    data: { code },
+    data: { code, ...(acquisition ? { acquisition } : {}) },
   })
 }
 

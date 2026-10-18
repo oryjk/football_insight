@@ -9,6 +9,7 @@ import type {
   RegisterPayload,
 } from '../types/auth'
 import { extractApiErrorMessage } from '../utils/apiError'
+import { readAcquisitionSource } from '../utils/acquisitionSource'
 import {
   clearManualLogout,
   getAccessToken,
@@ -68,6 +69,11 @@ export interface AppSessionDeps {
 }
 
 const ENSURE_SUCCESS_CACHE_MS = 60_000
+
+function withAcquisition<T extends object>(payload: T): T {
+  const acquisition = readAcquisitionSource()
+  return acquisition ? { ...payload, acquisition } : payload
+}
 
 function defaultGetMiniWechatCode(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -384,12 +390,12 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
 
   function loginWithPassword(payload: LoginPayload): Promise<AuthResponse> {
     const intentRevision = beginAuthIntent()
-    return runAuthIntent(intentRevision, () => source.login(payload), '登录失败')
+    return runAuthIntent(intentRevision, () => source.login(withAcquisition(payload)), '登录失败')
   }
 
   function registerAccount(payload: RegisterPayload): Promise<AuthResponse> {
     const intentRevision = beginAuthIntent()
-    return runAuthIntent(intentRevision, () => source.register(payload), '注册失败')
+    return runAuthIntent(intentRevision, () => source.register(withAcquisition(payload)), '注册失败')
   }
 
   function loginAsTestUser(userId: string): Promise<AuthResponse> {
@@ -406,7 +412,10 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
     try {
       const code = await getMiniWechatCode()
       assertRevisionCurrent(intentRevision)
-      const response = await source.loginWithMiniWechat(code)
+      const acquisition = readAcquisitionSource()
+      const response = await (acquisition
+        ? source.loginWithMiniWechat(code, acquisition)
+        : source.loginWithMiniWechat(code))
       assertRevisionCurrent(intentRevision)
       if (response.status === 'authenticated') {
         publishAuthResponse(response, intentRevision)
@@ -434,7 +443,7 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
 
   function bindWechatAccount(payload: MiniWechatBindPayload): Promise<AuthResponse> {
     const intentRevision = beginAuthIntent()
-    return runAuthIntent(intentRevision, () => source.bindMiniWechatAccount(payload), '绑定失败')
+    return runAuthIntent(intentRevision, () => source.bindMiniWechatAccount(withAcquisition(payload)), '绑定失败')
   }
 
   async function logoutSession(): Promise<void> {

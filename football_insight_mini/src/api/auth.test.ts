@@ -15,6 +15,8 @@ import {
 import { ApiRequestError } from '../utils/apiError'
 import { AUTH_TOKEN_STORAGE_KEY } from '../utils/authStorage'
 import type { AuthResponse, MiniWechatLoginResponse } from '../types/auth'
+import { captureAcquisitionSource } from '../utils/acquisitionSource'
+import { createAppSession } from '../stores/appSession'
 
 interface FakeRequestCall {
   url: string
@@ -230,5 +232,28 @@ describe('resetPassword 与邮箱 API 契约保持', () => {
     expect(requestCalls[1]?.method).toBe('PUT')
     expect(requestCalls[1]?.data).toEqual({ email: 'b@example.com' })
     expect(storage[AUTH_TOKEN_STORAGE_KEY]).toBe('token-existing')
+  })
+})
+
+describe('first source through real session and API transport', () => {
+  test('attaches the same first source through login and binding without changing auth payloads otherwise', async () => {
+    responder = () => ({ statusCode: 200, data: { status: 'authenticated', ...authResponseData('token') } })
+    await loginWithMiniWechat('old-client')
+    expect(requestCalls[0]?.data).toEqual({ code: 'old-client' })
+    captureAcquisitionSource({ query: { src: 'douyin', cid: 'first' }, scene: 1047 })
+    const session = createAppSession(undefined, { getMiniWechatCode: async () => 'new-client' })
+    await session.loginWithMiniWechat()
+    await session.bindWechatAccount({ bind_token: 'bind', display_name: 'name', avatar_data_url: 'avatar' })
+    await session.registerAccount({ account_identifier: 'a', password: 'secret' })
+    await session.loginWithPassword({ account_identifier: 'a', password: 'secret' })
+    for (const call of requestCalls.slice(1)) {
+      expect((call.data as Record<string, unknown>).acquisition).toEqual({ src: 'douyin', cid: 'first', landing_scene: 1047 })
+    }
+    expect((requestCalls[2]?.data as Record<string, unknown>).bind_token).toBe('bind')
+    await session.logoutSession()
+    captureAcquisitionSource({ query: { src: 'xhs', cid: 'second' } })
+    await session.loginWithPassword({ account_identifier: 'b', password: 'secret' })
+    expect((requestCalls[requestCalls.length - 1]?.data as Record<string, unknown>).acquisition)
+      .toEqual({ src: 'douyin', cid: 'first', landing_scene: 1047 })
   })
 })
