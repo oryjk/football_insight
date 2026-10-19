@@ -285,6 +285,13 @@ ssh peiqian 'curl -s http://127.0.0.1:8092/api/v1/ticket-watch/best-windows'
 - 失败隔离：每队独立；某队请求失败、结构异常或返回空名单时跳过该队，不改它的任何数据，摘要 JSON 的 `teams_failed` 列出失败球队。只有当前赛季成功拿到非空名单，才把缺席者置为前队员（`active=false`，不删除）。
 - 只读核对：`curl -s http://127.0.0.1:18092/api/v1/lineups/squads/77680`，看 `active` / `former` 人数；接口返回 503 表示表不存在或库不可用。
 
+## 战术板阵容（`f_i_lineups`）
+
+- 迁移：`20261019130000_add_lineups.sql`（2026-10-19 已在 peiqian 执行；加载 env 文件后 `cargo run --release --bin run_migrations`，注意 peiqian 后端目录没有 `.env`）。迁移必须先于新后端发布。
+- 接口：`GET/PUT /api/v1/lineups/me/{team_id}` 需要登录；`GET /api/v1/lineups/squads/{team_id}` 公开。
+- 部署：沿用 local233 构建镜像 → `docker save | gzip | ssh peiqian 'gunzip | docker load'` → 用现有运行参数重启容器；回滚用上一个镜像 tag（当前 `97b025f`）。
+- 核对：只读 `curl https://match.oryjk.cn/api/v1/lineups/squads/77680`；`/lineups/me/…` 未登录应为 401。验证写入需要登录令牌，不要用真实用户令牌。
+
 ## 日志查看
 
 应用代码会把 tracing 日志写入 `logs/` 目录，并按 10MB 滚动；这是排查业务日志时的优先入口（线上流量在 `peiqian`，排查线上问题优先看 peiqian；jd 备用容器同理把 `ssh peiqian` 换成 `ssh jd`）：
