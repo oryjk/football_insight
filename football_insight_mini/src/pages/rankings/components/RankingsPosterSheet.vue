@@ -515,7 +515,7 @@ function savePosterImage(): void {
 .standings-sheet__metric {
   display: grid;
   justify-items: end;
-  gap: 4rpx;
+  gap: var(--fi-space-4);
   min-width: 0;
 }
 

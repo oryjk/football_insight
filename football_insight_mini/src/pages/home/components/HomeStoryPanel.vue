@@ -99,7 +99,7 @@ function openTechStats(match: HomePulseLeadMatch): void {
   display: block;
   margin: 0;
   color: var(--fi-color-text-muted);
-  font-size: 22rpx;
+  font-size: var(--fi-font-22);
   font-weight: 700;
   letter-spacing: 3rpx;
 }
@@ -122,10 +122,10 @@ function openTechStats(match: HomePulseLeadMatch): void {
   white-space: nowrap;
   line-height: 1;
   color: var(--fi-color-text-muted);
-  font-size: 24rpx;
+  font-size: var(--fi-font-24);
   font-weight: 700;
   letter-spacing: 1rpx;
-  padding: 8rpx 0 0;
+  padding: var(--fi-space-8) 0 0;
 }
 
 .meta-note::before {
@@ -133,7 +133,7 @@ function openTechStats(match: HomePulseLeadMatch): void {
   width: 12rpx;
   height: 12rpx;
   margin-right: 10rpx;
-  border-radius: 999rpx;
+  border-radius: var(--fi-radius-round);
   background: #9aa0aa;
   box-shadow: 0 0 0 6rpx rgba(154, 160, 170, 0.12);
 }
@@ -142,7 +142,7 @@ function openTechStats(match: HomePulseLeadMatch): void {
   display: block;
   margin-top: 18rpx;
   color: #555863;
-  font-size: 28rpx;
+  font-size: var(--fi-font-28);
   line-height: 1.65;
 }
 
@@ -160,16 +160,16 @@ function openTechStats(match: HomePulseLeadMatch): void {
 .score-strip-stack {
   margin-top: 16rpx;
   display: grid;
-  gap: 12rpx;
+  gap: var(--fi-space-12);
 }
 
 .score-strip {
   position: relative;
   overflow: hidden;
-  padding: 18rpx 16rpx;
+  padding: var(--fi-space-18) var(--fi-space-16);
   display: grid;
-  gap: 10rpx;
-  border-radius: 28rpx;
+  gap: var(--fi-space-10);
+  border-radius: var(--fi-radius-lg);
   border: 2rpx solid #ececf1;
   background-color: var(--fi-primitive-white);
 }
@@ -203,14 +203,14 @@ function openTechStats(match: HomePulseLeadMatch): void {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18rpx;
+  gap: var(--fi-space-18);
 }
 
 .score-strip__meta-trailing {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12rpx;
+  gap: var(--fi-space-12);
   flex-wrap: wrap;
 }
 
@@ -220,8 +220,8 @@ function openTechStats(match: HomePulseLeadMatch): void {
 }
 
 .score-strip__meta-pill {
-  padding: 10rpx 16rpx;
-  border-radius: 999rpx;
+  padding: var(--fi-space-10) var(--fi-space-16);
+  border-radius: var(--fi-radius-round);
   background: rgba(var(--fi-primitive-red-rgb), 0.1);
   color: var(--fi-color-primary) !important;
   font-weight: 700;
@@ -231,7 +231,7 @@ function openTechStats(match: HomePulseLeadMatch): void {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 18rpx;
+  gap: var(--fi-space-18);
 }
 
 .score-strip__team {
@@ -247,7 +247,7 @@ function openTechStats(match: HomePulseLeadMatch): void {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 30rpx;
+  font-size: var(--fi-font-30);
   font-weight: 700;
 }
 
@@ -265,7 +265,7 @@ function openTechStats(match: HomePulseLeadMatch): void {
 
 .score-strip__hint-text {
   color: var(--fi-color-primary);
-  font-size: 22rpx;
+  font-size: var(--fi-font-22);
   line-height: 1.2;
   font-weight: 700;
 }
@@ -273,14 +273,14 @@ function openTechStats(match: HomePulseLeadMatch): void {
 .watch-list {
   margin-top: 16rpx;
   display: grid;
-  gap: 12rpx;
+  gap: var(--fi-space-12);
 }
 
 .watch-list__item {
   position: relative;
   padding-left: 26rpx;
   color: #151515;
-  font-size: 26rpx;
+  font-size: var(--fi-font-26);
   line-height: 1.55;
 }
 
@@ -291,7 +291,7 @@ function openTechStats(match: HomePulseLeadMatch): void {
   left: 0;
   width: 10rpx;
   height: 10rpx;
-  border-radius: 999rpx;
+  border-radius: var(--fi-radius-round);
   background: #131313;
 }
 </style>

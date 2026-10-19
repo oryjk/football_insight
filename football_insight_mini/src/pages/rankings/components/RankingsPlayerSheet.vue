@@ -129,7 +129,7 @@ function formatAbilityScore(value: number | undefined): string {
 
 .player-sheet__name {
   color: var(--fi-color-text-strong);
-  font-size: 40rpx;
+  font-size: var(--fi-font-40);
   line-height: 1.1;
   font-weight: var(--fi-weight-extrabold);
   overflow: hidden;
@@ -196,7 +196,7 @@ function formatAbilityScore(value: number | undefined): string {
 
 /* 给顶点标注预留空间，避免文字被裁切 */
 .player-sheet__ability-chart {
-  padding: 40rpx 64rpx;
+  padding: var(--fi-space-40) var(--fi-space-64);
 }
 
 .player-sheet__legend {

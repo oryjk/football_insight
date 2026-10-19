@@ -196,7 +196,7 @@ loadStatus()
 
 .settings-item {
   padding: var(--fi-space-24);
-  border-radius: 24rpx;
+  border-radius: var(--fi-radius-md);
   border: 2rpx solid rgba(232, 233, 238, 0.95);
   background: var(--fi-primitive-white);
   display: grid;
@@ -214,19 +214,19 @@ loadStatus()
 
 .settings-item__label {
   color: var(--fi-color-text-strong);
-  font-size: 28rpx;
+  font-size: var(--fi-font-28);
   font-weight: 700;
 }
 
 .settings-item__caption {
   color: var(--fi-color-text-muted);
-  font-size: 22rpx;
+  font-size: var(--fi-font-22);
   line-height: 1.4;
 }
 
 .settings-item__value {
   color: var(--fi-color-primary);
-  font-size: 26rpx;
+  font-size: var(--fi-font-26);
   font-weight: 700;
 }
 
@@ -249,11 +249,11 @@ loadStatus()
   align-items: center;
   justify-content: center;
   padding: var(--fi-space-20) var(--fi-space-24);
-  border-radius: 999rpx;
+  border-radius: var(--fi-radius-round);
   border: 2rpx solid rgba(232, 233, 238, 0.95);
   background: var(--fi-color-page);
   color: var(--fi-color-text-secondary);
-  font-size: 26rpx;
+  font-size: var(--fi-font-26);
   font-weight: 700;
   line-height: 1;
 }

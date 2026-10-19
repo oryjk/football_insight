@@ -212,7 +212,7 @@ async function centerActiveCategory(): Promise<void> {
   display: inline-flex;
   gap: var(--fi-space-10);
   min-width: max-content;
-  padding: 0 0 4rpx;
+  padding: 0 0 var(--fi-space-4);
 }
 
 .pill-row__item {

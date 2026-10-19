@@ -36,9 +36,9 @@ const emit = defineEmits<{ (e: 'back'): void }>()
   white-space: nowrap;
   line-height: 1;
   padding: var(--fi-space-10) var(--fi-space-18);
-  border-radius: 999rpx;
+  border-radius: var(--fi-radius-round);
   background: #f6f7fb;
   color: #6d7280;
-  font-size: 24rpx;
+  font-size: var(--fi-font-24);
 }
 </style>

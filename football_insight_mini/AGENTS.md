@@ -103,6 +103,7 @@ src/pages/<domain>/
 - 新增页面、组件、共享壳层的颜色**必须引用 token**（`var(--fi-color-*)`），不要新增散落 hex；需要新色值时先加 primitive，再建 semantic 别名。
 - 存量约 900 处散落 hex 按「触碰哪个文件就顺手迁移哪个」增量替换，不要求一次性重写；高频色（白、墨色、灰阶、红系、浅底）已有对应 token。
 - 间距、字号、行高、圆角、边框、阴影、字重同样必须引用 token（刻度内取值优先；`--fi-space-*`/`--fi-font-*` 数字刻度覆盖高频值），不要在页面里硬编码这些值；刻度外的值先评估就近归档（视觉差 ≤2rpx 可并入相邻刻度），确需新值再进 token 文件。
+- 字号、内边距、`gap`、圆角这四类由 `scripts/style-token-audit.test.mjs`（随 `bun test` 运行）机器检查：值在通用刻度上（`--fi-space-N`、`--fi-font-N`、`--fi-radius-xs…round`）的不许写死数字；刻度外的存量值按文件登记在 `LEGACY_OFF_SCALE`，只许减不许增，清理掉后要同步调小名额。新增刻度外的值先进 token 文件，不要往名额里加。安全区 `calc(… env(safe-area-inset-*))` 和 0 不检查。
 - **颜色例外**：球队/球衣等业务数据值、插画装饰色（如球场图、海报绘制色）不是视觉 token，保留原样，可在相邻注释标注 decorative。
 
 ## 跨端约束（H5 与小程序兼容）

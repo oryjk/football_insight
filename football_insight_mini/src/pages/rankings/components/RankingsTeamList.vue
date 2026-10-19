@@ -136,9 +136,9 @@ function resolveTeamAbilityValues(teamId: number): number[] {
 .standings-mode-toggle {
   display: inline-grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2rpx;
+  gap: var(--fi-space-2);
   flex: 0 0 auto;
-  padding: 3rpx;
+  padding: var(--fi-space-3);
   border-radius: var(--fi-radius-round);
   background: rgba(242, 243, 247, 0.92);
 }

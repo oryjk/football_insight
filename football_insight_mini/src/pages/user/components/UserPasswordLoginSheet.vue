@@ -84,7 +84,7 @@ function submit(): void {
 .auth-input {
   width: 100%;
   height: 92rpx;
-  padding: 0 24rpx;
+  padding: 0 var(--fi-space-24);
   border-radius: 22rpx;
   border: 2rpx solid var(--page-border);
   background: #f7f8fb;
@@ -96,7 +96,7 @@ function submit(): void {
   align-items: center;
   justify-content: center;
   align-self: flex-start;
-  padding: 20rpx 30rpx;
+  padding: var(--fi-space-20) var(--fi-space-30);
   border-radius: var(--fi-radius-round);
   background: var(--fi-primitive-ink);
   color: var(--fi-primitive-white);
@@ -118,12 +118,12 @@ function submit(): void {
   margin-top: 22rpx;
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
 }
 
 .sheet-actions {
   width: 100%;
   display: flex;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
 }
 </style>

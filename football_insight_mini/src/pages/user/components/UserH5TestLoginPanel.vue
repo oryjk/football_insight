@@ -87,7 +87,7 @@ function handleSelect(user: H5TestLoginUser): void {
   z-index: 1;
   background: rgba(255,255,255,0.72);
   border-radius: var(--fi-radius-xl);
-  padding: 20rpx;
+  padding: var(--fi-space-20);
   border: 2rpx solid rgba(255,255,255,0.55);
   box-shadow: 0 20rpx 48rpx rgba(26,28,36,0.06);
   backdrop-filter: blur(18rpx);
@@ -95,7 +95,7 @@ function handleSelect(user: H5TestLoginUser): void {
 }
 
 .h5-test-login-panel {
-  padding: 22rpx;
+  padding: var(--fi-space-22);
   border-radius: var(--fi-radius-lg);
   border: 1rpx dashed rgba(214, 158, 46, 0.72);
   background: rgba(255, 250, 235, 0.9);
@@ -103,7 +103,7 @@ function handleSelect(user: H5TestLoginUser): void {
 
 .h5-test-login-panel__header {
   display: grid;
-  gap: 8rpx;
+  gap: var(--fi-space-8);
 }
 
 .h5-test-login-panel__title {
@@ -125,7 +125,7 @@ function handleSelect(user: H5TestLoginUser): void {
 
 .h5-test-login-panel__search-input {
   height: 64rpx;
-  padding: 0 24rpx;
+  padding: 0 var(--fi-space-24);
   box-sizing: border-box;
   border-radius: var(--fi-radius-round);
   border: 1rpx solid rgba(232, 226, 208, 0.98);
@@ -143,7 +143,7 @@ function handleSelect(user: H5TestLoginUser): void {
 .h5-test-login-panel__list {
   margin-top: 18rpx;
   display: grid;
-  gap: 10rpx;
+  gap: var(--fi-space-10);
 }
 
 .h5-test-login-panel__empty {
@@ -159,8 +159,8 @@ function handleSelect(user: H5TestLoginUser): void {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14rpx;
-  padding: 18rpx;
+  gap: var(--fi-space-14);
+  padding: var(--fi-space-18);
   box-sizing: border-box;
   border-radius: 22rpx;
   border: 1rpx solid rgba(232, 226, 208, 0.98);
@@ -180,7 +180,7 @@ function handleSelect(user: H5TestLoginUser): void {
   min-width: 0;
   flex: 1;
   display: grid;
-  gap: 8rpx;
+  gap: var(--fi-space-8);
 }
 
 .h5-test-login-panel__item-name {
@@ -201,14 +201,14 @@ function handleSelect(user: H5TestLoginUser): void {
 .h5-test-login-panel__item-arrow {
   flex-shrink: 0;
   color: #b7a877;
-  font-size: 36rpx;
+  font-size: var(--fi-font-36);
   line-height: 1;
   font-weight: 700;
 }
 
 .h5-test-login-panel__item-badge {
   flex-shrink: 0;
-  padding: 8rpx 18rpx;
+  padding: var(--fi-space-8) var(--fi-space-18);
   border-radius: var(--fi-radius-round);
   background: rgba(214, 158, 46, 0.16);
   color: #a0751c;

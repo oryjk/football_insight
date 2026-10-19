@@ -48,7 +48,7 @@ const leaving = computed(() => props.phase === 'leaving')
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 32rpx;
+  gap: var(--fi-space-32);
 }
 
 .fi-launch-splash__logo {

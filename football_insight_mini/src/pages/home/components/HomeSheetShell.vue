@@ -60,9 +60,9 @@ const emit = defineEmits<{
 .sheet-card {
   width: 100%;
   max-height: 78vh;
-  border-radius: 36rpx 36rpx 0 0;
+  border-radius: var(--fi-radius-xl) var(--fi-radius-xl) 0 0;
   background: rgba(255, 255, 255, 0.98);
-  padding: 28rpx 24rpx 40rpx;
+  padding: var(--fi-space-28) var(--fi-space-24) var(--fi-space-40);
   box-shadow: 0 -24rpx 56rpx rgba(12, 14, 20, 0.12);
   overflow-y: auto;
 }
@@ -75,12 +75,12 @@ const emit = defineEmits<{
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12rpx;
+  gap: var(--fi-space-12);
 }
 
 .section-heading__copy {
   display: grid;
-  gap: 8rpx;
+  gap: var(--fi-space-8);
   min-width: 0;
 }
 
@@ -88,7 +88,7 @@ const emit = defineEmits<{
   display: block;
   margin: 0;
   color: var(--fi-color-text-muted);
-  font-size: 22rpx;
+  font-size: var(--fi-font-22);
   font-weight: 700;
   letter-spacing: 3rpx;
 }
@@ -96,7 +96,7 @@ const emit = defineEmits<{
 .section-title {
   display: block;
   color: var(--fi-color-text-strong);
-  font-size: 44rpx;
+  font-size: var(--fi-font-44);
   line-height: 1.16;
   font-weight: 800;
 }

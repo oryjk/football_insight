@@ -145,7 +145,7 @@ const isHatTrick = computed(() => props.match.goals === 3)
 
 .goal-card__badge {
   margin-left: var(--fi-space-20);
-  padding: 4rpx var(--fi-space-16);
+  padding: var(--fi-space-4) var(--fi-space-16);
   border-radius: var(--fi-radius-round);
   background: var(--fi-color-match-card-gold-soft);
   border: 1rpx solid var(--fi-color-match-card-gold);

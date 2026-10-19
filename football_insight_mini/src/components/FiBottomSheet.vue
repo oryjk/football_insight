@@ -151,7 +151,7 @@ function handleMaskTap() {
   max-height: var(--fi-sheet-height);
   display: flex;
   flex-direction: column;
-  border-radius: 36rpx 36rpx 0 0;
+  border-radius: var(--fi-radius-xl) var(--fi-radius-xl) 0 0;
   background: #ffffff;
   border-top: 1rpx solid rgba(232, 233, 238, 0.95);
   box-shadow: 0 -24rpx 56rpx rgba(12, 14, 20, 0.12);
@@ -167,7 +167,7 @@ function handleMaskTap() {
   flex-shrink: 0;
   width: 56rpx;
   height: 6rpx;
-  border-radius: 999rpx;
+  border-radius: var(--fi-radius-round);
   background: rgba(145, 150, 160, 0.32);
   margin: 18rpx auto 6rpx;
 }
@@ -177,8 +177,8 @@ function handleMaskTap() {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16rpx;
-  padding: 12rpx 30rpx 18rpx;
+  gap: var(--fi-space-16);
+  padding: var(--fi-space-12) var(--fi-space-30) var(--fi-space-18);
 }
 
 .fi-sheet-card__heading {
@@ -189,7 +189,7 @@ function handleMaskTap() {
 .fi-sheet-card__eyebrow {
   display: block;
   color: #8f9198;
-  font-size: 20rpx;
+  font-size: var(--fi-font-20);
   font-weight: 400;
   margin-bottom: 4rpx;
   letter-spacing: 0;
@@ -198,7 +198,7 @@ function handleMaskTap() {
 .fi-sheet-card__title {
   display: block;
   color: #121212;
-  font-size: 34rpx;
+  font-size: var(--fi-font-34);
   font-weight: 400;
   line-height: 1.2;
 }
@@ -213,7 +213,7 @@ function handleMaskTap() {
   background: #f6f7fb;
   border: 1rpx solid rgba(232, 233, 238, 0.95);
   color: #6d7280;
-  font-size: 24rpx;
+  font-size: var(--fi-font-24);
   font-weight: 400;
   display: flex;
   align-items: center;
@@ -229,7 +229,7 @@ function handleMaskTap() {
   flex: 1;
   min-height: 0;
   height: 100%;
-  padding: 6rpx 30rpx 20rpx;
+  padding: var(--fi-space-6) var(--fi-space-30) var(--fi-space-20);
   box-sizing: border-box;
 }
 
@@ -246,12 +246,12 @@ function handleMaskTap() {
   border-top: 1rpx solid rgba(232, 233, 238, 0.95);
   background: #ffffff;
   display: flex;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
 }
 
 .fi-sheet-card__footer--compact {
-  padding-top: 14rpx;
-  padding-bottom: 18rpx;
+  padding-top: var(--fi-space-14);
+  padding-bottom: var(--fi-space-18);
 }
 
 @keyframes fi-overlay-fade-in {

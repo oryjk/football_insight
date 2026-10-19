@@ -205,7 +205,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   border-radius: var(--fi-radius-xs);
   box-sizing: border-box;
   margin: 0;
-  padding: 2rpx 3rpx;
+  padding: var(--fi-space-2) var(--fi-space-3);
   background-image: none;
   color: var(--fi-color-text-strong);
   font: inherit;
@@ -262,7 +262,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 7rpx 8rpx;
+  gap: 7rpx var(--fi-space-8);
   pointer-events: none;
 }
 
@@ -284,7 +284,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   left: 36%;
   width: 9rpx;
   height: 9rpx;
-  border-radius: 999rpx;
+  border-radius: var(--fi-radius-round);
   background: var(--fi-color-page);
   content: '';
   transform: translateX(-50%);

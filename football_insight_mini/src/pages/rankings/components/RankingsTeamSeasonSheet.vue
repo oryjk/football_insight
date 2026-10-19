@@ -276,7 +276,7 @@ async function centerMatch(matchId: number): Promise<void> {
 .section-title {
   display: block;
   color: var(--fi-color-text-strong);
-  font-size: 44rpx;
+  font-size: var(--fi-font-44);
   line-height: 1.08;
   font-weight: var(--fi-weight-extrabold);
 }
@@ -395,7 +395,7 @@ async function centerMatch(matchId: number): Promise<void> {
 
 /* 给顶点标注预留空间，避免左右两侧文字被裁切 */
 .team-season-ability__chart {
-  padding: 34rpx 62rpx;
+  padding: var(--fi-space-34) 62rpx;
   flex-shrink: 0;
 }
 
@@ -463,7 +463,7 @@ async function centerMatch(matchId: number): Promise<void> {
 }
 
 .team-season-sheet__empty {
-  padding: var(--fi-space-28) 12rpx;
+  padding: var(--fi-space-28) var(--fi-space-12);
   color: var(--fi-color-text-muted);
   font-size: var(--fi-font-26);
   text-align: center;
@@ -588,7 +588,7 @@ async function centerMatch(matchId: number): Promise<void> {
 
 .team-season-match-row__score {
   color: #fff;
-  font-size: 40rpx;
+  font-size: var(--fi-font-40);
   line-height: var(--fi-leading-none);
   font-weight: var(--fi-weight-extrabold);
 }

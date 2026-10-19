@@ -89,6 +89,6 @@ const commentary = computed({
   display: block;
   margin-top: var(--fi-space-12);
   color: #c03a2b;
-  font-size: 24rpx;
+  font-size: var(--fi-font-24);
 }
 </style>

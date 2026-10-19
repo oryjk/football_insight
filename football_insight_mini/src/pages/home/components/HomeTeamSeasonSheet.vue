@@ -138,7 +138,7 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
 .team-season-sheet__title {
   display: flex;
   align-items: center;
-  gap: 14rpx;
+  gap: var(--fi-space-14);
   min-width: 0;
   margin-top: 8rpx;
 }
@@ -152,7 +152,7 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
 .team-season-sheet__title-name {
   min-width: 0;
   color: var(--fi-color-text-strong);
-  font-size: 44rpx;
+  font-size: var(--fi-font-44);
   line-height: 1.16;
   font-weight: 800;
   overflow: hidden;
@@ -162,8 +162,8 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
 
 .team-season-sheet__summary {
   margin-top: 18rpx;
-  padding: 22rpx 24rpx;
-  border-radius: 24rpx;
+  padding: var(--fi-space-22) var(--fi-space-24);
+  border-radius: var(--fi-radius-md);
   border: 2rpx solid rgba(232, 233, 238, 0.95);
   background: var(--fi-primitive-white);
   display: block;
@@ -178,15 +178,15 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(160rpx, 1.45fr);
   align-items: center;
-  gap: 12rpx;
+  gap: var(--fi-space-12);
   min-width: 0;
 }
 
 .team-season-sheet__summary-metric {
   display: grid;
-  gap: 6rpx;
+  gap: var(--fi-space-6);
   min-width: 0;
-  padding-left: 14rpx;
+  padding-left: var(--fi-space-14);
   border-left: 2rpx solid rgba(235, 236, 241, 0.95);
 }
 
@@ -197,7 +197,7 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
 
 .team-season-sheet__summary-value {
   color: var(--fi-color-text-strong);
-  font-size: 28rpx;
+  font-size: var(--fi-font-28);
   line-height: 1.1;
   font-weight: 800;
   white-space: nowrap;
@@ -207,7 +207,7 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
 
 .team-season-sheet__summary-label {
   color: var(--fi-color-text-muted);
-  font-size: 20rpx;
+  font-size: var(--fi-font-20);
   line-height: 1.15;
   white-space: nowrap;
   overflow: hidden;
@@ -225,17 +225,17 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
 }
 
 .team-season-sheet__empty {
-  padding: 28rpx 12rpx;
+  padding: var(--fi-space-28) var(--fi-space-12);
   color: var(--fi-color-text-muted);
-  font-size: 26rpx;
+  font-size: var(--fi-font-26);
   text-align: center;
 }
 
 .team-season-match-row {
-  padding: 20rpx 0;
+  padding: var(--fi-space-20) 0;
   border-top: 2rpx solid #f0f1f5;
   display: grid;
-  gap: 14rpx;
+  gap: var(--fi-space-14);
   opacity: 0;
   transform: translateY(14rpx);
   animation: team-season-row-enter 320ms cubic-bezier(0.24, 0.88, 0.28, 1) both;
@@ -250,23 +250,23 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
   color: var(--fi-color-text-muted);
-  font-size: 22rpx;
+  font-size: var(--fi-font-22);
 }
 .team-season-match-row__meta-right {
   display: inline-flex;
   align-items: center;
-  gap: 8rpx;
+  gap: var(--fi-space-8);
 }
 .team-season-match-row__venue {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 56rpx;
-  padding: 4rpx 12rpx;
-  border-radius: 999rpx;
-  font-size: 20rpx;
+  padding: var(--fi-space-4) var(--fi-space-12);
+  border-radius: var(--fi-radius-round);
+  font-size: var(--fi-font-20);
   font-weight: 800;
 }
 .team-season-match-row__venue--home {
@@ -283,9 +283,9 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
   align-items: center;
   justify-content: center;
   min-width: 56rpx;
-  padding: 4rpx 12rpx;
-  border-radius: 999rpx;
-  font-size: 20rpx;
+  padding: var(--fi-space-4) var(--fi-space-12);
+  border-radius: var(--fi-radius-round);
+  font-size: var(--fi-font-20);
   font-weight: 800;
 }
 
@@ -318,13 +318,13 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 18rpx;
+  gap: var(--fi-space-18);
 }
 
 .team-season-match-row__side {
   display: flex;
   align-items: center;
-  gap: 12rpx;
+  gap: var(--fi-space-12);
 }
 .team-season-match-row__side--left {
   justify-content: flex-start;
@@ -341,7 +341,7 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
 
 .team-season-match-row__team {
   color: #7b818d;
-  font-size: 28rpx;
+  font-size: var(--fi-font-28);
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -354,7 +354,7 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
 
 .team-season-match-row__score {
   color: var(--fi-color-text-strong);
-  font-size: 40rpx;
+  font-size: var(--fi-font-40);
   line-height: 1;
   font-weight: 800;
 }

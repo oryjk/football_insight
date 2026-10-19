@@ -130,7 +130,7 @@ onShow(() => {
 }
 .page-scroll { height: 100vh; padding-top: var(--fi-brand-nav-height); }
 .page { position: relative; z-index: 1; padding: var(--fi-space-28) var(--fi-space-24) var(--fi-space-40); }
-.state-card--error text { font-size: 28rpx; color: #c03a2b; }
-.state-card--empty text { color: #767a84; font-size: 26rpx; }
+.state-card--error text { font-size: var(--fi-font-28); color: #c03a2b; }
+.state-card--empty text { color: #767a84; font-size: var(--fi-font-26); }
 .page-content { display: flex; flex-direction: column; gap: var(--fi-space-card-gap); }
 </style>

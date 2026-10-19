@@ -259,7 +259,7 @@ const awayRankLabel = computed(() => {
   display: block;
   margin-top: 18rpx;
   color: #6b707b;
-  font-size: 28rpx;
+  font-size: var(--fi-font-28);
   line-height: 1.7;
 }
 .support-home-panel__header {
@@ -311,26 +311,26 @@ const awayRankLabel = computed(() => {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8rpx;
-  padding-top: 14rpx;
+  gap: var(--fi-space-8);
+  padding-top: var(--fi-space-14);
   border-top: 2rpx solid rgba(236, 236, 241, 0.92);
 }
 .support-home-panel__context-dot {
   width: 10rpx;
   height: 10rpx;
-  border-radius: 999rpx;
+  border-radius: var(--fi-radius-round);
   background: var(--fi-color-success-accent);
   box-shadow: 0 0 0 6rpx rgba(38, 162, 105, 0.12);
 }
 .support-home-panel__context-label {
   color: #2f7f5f;
-  font-size: 24rpx;
+  font-size: var(--fi-font-24);
   font-weight: 700;
   line-height: 1.2;
 }
 .support-home-panel__context-note {
   color: var(--fi-color-text-muted);
-  font-size: 22rpx;
+  font-size: var(--fi-font-22);
   line-height: 1.2;
 }
 .support-home-panel__action {
@@ -338,11 +338,11 @@ const awayRankLabel = computed(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 18rpx 30rpx;
-  border-radius: 999rpx;
+  padding: var(--fi-space-18) var(--fi-space-30);
+  border-radius: var(--fi-radius-round);
   background: var(--fi-primitive-ink);
   color: var(--fi-primitive-white);
-  font-size: 26rpx;
+  font-size: var(--fi-font-26);
   line-height: 1;
 }
 .support-home-panel__action--ghost {
@@ -355,8 +355,8 @@ const awayRankLabel = computed(() => {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 18rpx;
-  padding: 22rpx 0 24rpx;
+  gap: var(--fi-space-18);
+  padding: var(--fi-space-22) 0 var(--fi-space-24);
   border-top: 2rpx solid rgba(231, 232, 238, 0.92);
   border-bottom: 2rpx solid rgba(231, 232, 238, 0.92);
 }
@@ -367,14 +367,14 @@ const awayRankLabel = computed(() => {
   top: 22rpx;
   bottom: 22rpx;
   width: 4rpx;
-  border-radius: 999rpx;
+  border-radius: var(--fi-radius-round);
   background: var(--fi-color-success-accent);
 }
 .support-home-panel__favorite-avatar-shell {
   margin-left: 18rpx;
   width: 88rpx;
   height: 88rpx;
-  border-radius: 24rpx;
+  border-radius: var(--fi-radius-md);
   background: #f7f9f8;
   border: 2rpx solid rgba(223, 229, 226, 0.96);
   display: flex;
@@ -392,7 +392,7 @@ const awayRankLabel = computed(() => {
 .support-home-panel__favorite-name {
   color: var(--fi-color-text-strong);
   display: block;
-  font-size: 36rpx;
+  font-size: var(--fi-font-36);
   line-height: 1;
   font-weight: 800;
 }
@@ -400,21 +400,21 @@ const awayRankLabel = computed(() => {
   display: block;
   margin-top: 6rpx;
   color: var(--fi-color-text-muted);
-  font-size: 22rpx;
+  font-size: var(--fi-font-22);
 }
 .support-home-panel__switch {
-  padding: 14rpx 22rpx;
-  border-radius: 999rpx;
+  padding: var(--fi-space-14) var(--fi-space-22);
+  border-radius: var(--fi-radius-round);
   background: #f5f6fa;
   color: #5f6673;
-  font-size: 23rpx;
+  font-size: var(--fi-font-23);
   font-weight: 700;
   line-height: 1;
 }
 .support-home-match-card {
   margin-top: 18rpx;
-  padding: 22rpx 20rpx;
-  border-radius: 24rpx;
+  padding: var(--fi-space-22) var(--fi-space-20);
+  border-radius: var(--fi-radius-md);
   border: 2rpx solid rgba(229, 231, 236, 0.98);
   /* 半透明白底：让整张卡片的队徽水印能透出来。 */
   background: rgba(255, 255, 255, 0.72);
@@ -426,45 +426,45 @@ const awayRankLabel = computed(() => {
   align-items: center;
   justify-content: space-between;
   color: var(--fi-color-text-muted);
-  font-size: 22rpx;
+  font-size: var(--fi-font-22);
 }
 .support-home-match-card__meta {
-  gap: 12rpx;
+  gap: var(--fi-space-12);
 }
 .support-home-match-card__meta-pill {
   min-height: 44rpx;
-  border-radius: 999rpx;
+  border-radius: var(--fi-radius-round);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  font-size: 22rpx;
+  font-size: var(--fi-font-22);
   line-height: 1;
   font-weight: 800;
 }
 .support-home-match-card__meta-pill--round {
-  padding: 0 18rpx;
+  padding: 0 var(--fi-space-18);
   background: var(--fi-primitive-ink);
   color: var(--fi-primitive-white);
 }
 .support-home-match-card__meta-pill--time {
   margin-left: auto;
-  gap: 10rpx;
-  padding: 6rpx 14rpx 6rpx 8rpx;
+  gap: var(--fi-space-10);
+  padding: var(--fi-space-6) var(--fi-space-14) var(--fi-space-6) var(--fi-space-8);
   background: #f5f6fa;
   color: #5d6673;
 }
 .support-home-match-card__weekday {
   min-width: 58rpx;
-  padding: 9rpx 12rpx;
-  border-radius: 999rpx;
+  padding: var(--fi-space-9) var(--fi-space-12);
+  border-radius: var(--fi-radius-round);
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: var(--fi-primitive-ink);
   color: var(--fi-primitive-white);
-  font-size: 24rpx;
+  font-size: var(--fi-font-24);
   font-weight: 950;
   line-height: 1;
 }
@@ -472,20 +472,20 @@ const awayRankLabel = computed(() => {
   min-width: 0;
   display: inline-flex;
   align-items: center;
-  gap: 8rpx;
+  gap: var(--fi-space-8);
   white-space: nowrap;
 }
 .support-home-match-card__teams {
   margin-top: 18rpx;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 16rpx;
+  gap: var(--fi-space-16);
   align-items: center;
 }
 .support-home-match-card__team-block {
   min-width: 0;
   display: grid;
-  gap: 8rpx;
+  gap: var(--fi-space-8);
 }
 .support-home-match-card__team-block--away {
   justify-items: end;
@@ -501,7 +501,7 @@ const awayRankLabel = computed(() => {
 }
 .support-home-match-card__team {
   color: var(--fi-color-text-strong);
-  font-size: 32rpx;
+  font-size: var(--fi-font-32);
   line-height: 1.12;
   font-weight: 800;
   white-space: nowrap;
@@ -517,11 +517,11 @@ const awayRankLabel = computed(() => {
   justify-content: center;
   justify-self: start;
   min-height: 32rpx;
-  padding: 0 12rpx;
-  border-radius: 999rpx;
+  padding: 0 var(--fi-space-12);
+  border-radius: var(--fi-radius-round);
   background: #f5f6fa;
   color: var(--fi-color-text-secondary);
-  font-size: 20rpx;
+  font-size: var(--fi-font-20);
   font-weight: 800;
   line-height: 1;
 }
@@ -530,17 +530,17 @@ const awayRankLabel = computed(() => {
 }
 .support-home-match-card__vs {
   color: var(--fi-color-primary);
-  font-size: 24rpx;
+  font-size: var(--fi-font-24);
   font-weight: 900;
   line-height: 1;
-  padding: 8rpx 14rpx;
-  border-radius: 999rpx;
+  padding: var(--fi-space-8) var(--fi-space-14);
+  border-radius: var(--fi-radius-round);
   background: rgba(var(--fi-primitive-red-rgb), 0.08);
 }
 .support-home-match-card__bar {
   margin-top: 18rpx;
   height: 12rpx;
-  border-radius: 999rpx;
+  border-radius: var(--fi-radius-round);
   overflow: hidden;
   background: #eef0f4;
   display: flex;

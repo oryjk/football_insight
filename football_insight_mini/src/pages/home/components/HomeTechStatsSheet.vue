@@ -150,7 +150,7 @@ const techStats = computed(() => resolveHomePulseTechStats(props.match))
 }
 
 .tech-board__ft {
-  padding: 2rpx var(--fi-space-12);
+  padding: var(--fi-space-2) var(--fi-space-12);
   border-radius: var(--fi-radius-round);
   background: var(--fi-color-topic-hero-control);
   color: var(--fi-color-topic-hero-muted);

@@ -53,12 +53,12 @@ defineProps<{ snapshot: TeamBoardSnapshot; composer?: boolean }>()
 .team-board-snapshot {
   margin-top: var(--fi-space-18);
   padding: var(--fi-space-22);
-  border-radius: 28rpx;
+  border-radius: var(--fi-radius-lg);
   background: #f7f8fb;
 }
 .team-board-snapshot__summary-value {
   color: #121212;
-  font-size: 48rpx;
+  font-size: var(--fi-font-48);
   font-weight: 800;
 }
 .team-board-snapshot__section {

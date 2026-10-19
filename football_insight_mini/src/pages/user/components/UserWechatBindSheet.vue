@@ -183,7 +183,7 @@ async function submit(): Promise<void> {
   font-size: var(--fi-font-24);
   font-weight: 700;
   letter-spacing: 1rpx;
-  padding: 8rpx 0 0;
+  padding: var(--fi-space-8) 0 0;
 }
 
 .meta-note::before {
@@ -196,12 +196,12 @@ async function submit(): Promise<void> {
   box-shadow: 0 0 0 6rpx rgba(154, 160, 170, 0.12);
 }
 
-.meta-note--hero { padding-top: 14rpx; }
+.meta-note--hero { padding-top: var(--fi-space-14); }
 
 .auth-input {
   width: 100%;
   height: 92rpx;
-  padding: 0 24rpx;
+  padding: 0 var(--fi-space-24);
   border-radius: 22rpx;
   border: 2rpx solid var(--page-border);
   background: #f7f8fb;
@@ -213,7 +213,7 @@ async function submit(): Promise<void> {
   align-items: center;
   justify-content: center;
   align-self: flex-start;
-  padding: 20rpx 30rpx;
+  padding: var(--fi-space-20) var(--fi-space-30);
   border-radius: var(--fi-radius-round);
   background: var(--fi-primitive-ink);
   color: var(--fi-primitive-white);
@@ -235,7 +235,7 @@ async function submit(): Promise<void> {
   margin-top: 22rpx;
   display: flex;
   flex-direction: column;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
 }
 
 .avatar-picker {
@@ -264,6 +264,6 @@ async function submit(): Promise<void> {
 .sheet-actions {
   width: 100%;
   display: flex;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
 }
 </style>

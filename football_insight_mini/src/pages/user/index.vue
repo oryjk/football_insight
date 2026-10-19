@@ -591,7 +591,7 @@ onShow(() => {
   display: block;
   margin-top: var(--fi-space-8);
   color: #7a808d;
-  font-size: 23rpx;
+  font-size: var(--fi-font-23);
   line-height: 1.55;
 }
 
@@ -626,7 +626,7 @@ onShow(() => {
 
 .settings-entry-panel__arrow {
   color: var(--fi-color-text-muted);
-  font-size: 40rpx;
+  font-size: var(--fi-font-40);
   line-height: 1;
   font-weight: 700;
 }

@@ -396,11 +396,11 @@ function formatSupportCount(value: number): string {
   align-items: center;
   justify-content: center;
   padding: var(--fi-space-14) var(--fi-space-24);
-  border-radius: 999rpx;
+  border-radius: var(--fi-radius-round);
   border: 2rpx solid rgba(232, 233, 238, 0.95);
   background: #f6f7fb;
   color: #6d7280;
-  font-size: 24rpx;
+  font-size: var(--fi-font-24);
   white-space: nowrap;
 }
 .hero-summary,
@@ -409,13 +409,13 @@ function formatSupportCount(value: number): string {
   display: block;
   margin-top: var(--fi-space-18);
   color: #6b707b;
-  font-size: 28rpx;
+  font-size: var(--fi-font-28);
   line-height: 1.7;
 }
 .support-scoreboard__meta,
 .support-scoreboard__footer {
   color: #8f9198;
-  font-size: 24rpx;
+  font-size: var(--fi-font-24);
 }
 .support-scoreboard__teams {
   margin-top: var(--fi-space-22);
@@ -426,7 +426,7 @@ function formatSupportCount(value: number): string {
 }
 .support-team-card {
   padding: var(--fi-space-20);
-  border-radius: 28rpx;
+  border-radius: var(--fi-radius-lg);
   border: 2rpx solid #ececf1;
   background: #ffffff;
   display: grid;
@@ -444,19 +444,19 @@ function formatSupportCount(value: number): string {
 }
 .support-team-card__name {
   color: #121212;
-  font-size: 28rpx;
+  font-size: var(--fi-font-28);
   font-weight: 700;
   text-align: center;
 }
 .support-team-card__count {
   color: #121212;
-  font-size: 48rpx;
+  font-size: var(--fi-font-48);
   font-weight: 800;
   line-height: 1;
 }
 .support-team-card__share {
   color: #8f9198;
-  font-size: 22rpx;
+  font-size: var(--fi-font-22);
 }
 .support-scoreboard__vs {
   display: grid;
@@ -466,17 +466,17 @@ function formatSupportCount(value: number): string {
 }
 .support-scoreboard__vs-mark {
   color: #121212;
-  font-size: 28rpx;
+  font-size: var(--fi-font-28);
   font-weight: 800;
 }
 .support-scoreboard__vs-state {
   color: #8f9198;
-  font-size: 22rpx;
+  font-size: var(--fi-font-22);
 }
 .support-bar {
   margin-top: var(--fi-space-20);
   height: 18rpx;
-  border-radius: 999rpx;
+  border-radius: var(--fi-radius-round);
   overflow: hidden;
   background: #ececf1;
   display: flex;
@@ -506,8 +506,8 @@ function formatSupportCount(value: number): string {
   align-items: center;
   justify-content: center;
   padding: var(--fi-space-18) var(--fi-space-28);
-  border-radius: 999rpx;
-  font-size: 26rpx;
+  border-radius: var(--fi-radius-round);
+  font-size: var(--fi-font-26);
   line-height: 1;
   white-space: nowrap;
 }
@@ -528,14 +528,14 @@ function formatSupportCount(value: number): string {
 .poster-panel__image {
   margin-top: var(--fi-space-18);
   width: 100%;
-  border-radius: 28rpx;
+  border-radius: var(--fi-radius-lg);
 }
 .poster-panel__save {
   margin-top: var(--fi-space-18);
 }
 .state-error {
   color: #c03a2b;
-  font-size: 28rpx;
+  font-size: var(--fi-font-28);
 }
 .support-poster-canvas {
   position: fixed;

@@ -53,9 +53,9 @@ function handleAction(): void {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 20rpx;
-  padding: 22rpx 24rpx;
-  border-radius: 28rpx;
+  gap: var(--fi-space-20);
+  padding: var(--fi-space-22) var(--fi-space-24);
+  border-radius: var(--fi-radius-lg);
   background: rgba(21, 23, 29, 0.96);
   box-shadow: 0 20rpx 46rpx rgba(16, 18, 24, 0.24);
 }
@@ -63,7 +63,7 @@ function handleAction(): void {
 .fi-login-float__copy {
   min-width: 0;
   display: grid;
-  gap: 6rpx;
+  gap: var(--fi-space-6);
 }
 
 .fi-login-float__title,
@@ -73,13 +73,13 @@ function handleAction(): void {
 
 .fi-login-float__title {
   color: #ffffff;
-  font-size: 28rpx;
+  font-size: var(--fi-font-28);
   font-weight: 800;
 }
 
 .fi-login-float__desc {
   color: rgba(255, 255, 255, 0.72);
-  font-size: 22rpx;
+  font-size: var(--fi-font-22);
   line-height: 1.35;
 }
 
@@ -89,10 +89,10 @@ function handleAction(): void {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999rpx;
+  border-radius: var(--fi-radius-round);
   background: #ffffff;
   color: #15171d;
-  font-size: 26rpx;
+  font-size: var(--fi-font-26);
   font-weight: 800;
   line-height: 1;
 }

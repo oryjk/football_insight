@@ -87,7 +87,7 @@ const draft = computed({
 }
 .team-board-post__actions text {
   color: #8f9198;
-  font-size: 24rpx;
+  font-size: var(--fi-font-24);
 }
 .team-board-post__action {
   display: inline-flex;
@@ -96,10 +96,10 @@ const draft = computed({
   white-space: nowrap;
   line-height: 1;
   padding: var(--fi-space-12) var(--fi-space-20);
-  border-radius: 999rpx;
+  border-radius: var(--fi-radius-round);
   background: #f6f7fb;
   color: #6d7280;
-  font-size: 24rpx;
+  font-size: var(--fi-font-24);
 }
 .team-board-post__action.active {
   background: rgba(220, 38, 38, 0.12);
@@ -116,7 +116,7 @@ const draft = computed({
   display: block;
   margin-top: var(--fi-space-8);
   color: #565b67;
-  font-size: 26rpx;
+  font-size: var(--fi-font-26);
   line-height: 1.65;
 }
 .team-board-comment-form {

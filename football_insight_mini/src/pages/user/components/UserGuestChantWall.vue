@@ -157,7 +157,7 @@ const meterBars = [18, 34, 24, 48, 30, 62, 38, 74, 44, 58, 32, 46, 26, 36]
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 10rpx;
+  gap: var(--fi-space-10);
   opacity: 0.52;
 }
 

@@ -56,7 +56,7 @@ const emit = defineEmits<{ (e: 'open-composer', kind: TeamBoardInsightKind): voi
   justify-content: space-between;
   gap: var(--fi-space-12);
 }
-.team-board-launcher__meta text { font-size: 24rpx; color: #121212; font-weight: 700; }
-.team-board-launcher__value { font-size: 34rpx !important; }
-.team-board-launcher__note { color: #8f9198; font-size: 22rpx; }
+.team-board-launcher__meta text { font-size: var(--fi-font-24); color: #121212; font-weight: 700; }
+.team-board-launcher__value { font-size: var(--fi-font-34) !important; }
+.team-board-launcher__note { color: #8f9198; font-size: var(--fi-font-22); }
 </style>

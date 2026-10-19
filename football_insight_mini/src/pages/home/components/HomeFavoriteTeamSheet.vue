@@ -54,10 +54,10 @@ const emit = defineEmits<{
   white-space: nowrap;
   line-height: 1;
   color: var(--fi-color-text-muted);
-  font-size: 24rpx;
+  font-size: var(--fi-font-24);
   font-weight: 700;
   letter-spacing: 1rpx;
-  padding: 8rpx 0 0;
+  padding: var(--fi-space-8) 0 0;
 }
 
 .favorite-team-sheet__list {
@@ -65,10 +65,10 @@ const emit = defineEmits<{
   max-height: 52vh;
 }
 .favorite-team-sheet__row {
-  padding: 18rpx 0;
+  padding: var(--fi-space-18) 0;
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
   border-bottom: 2rpx solid #f0f1f5;
 }
 .favorite-team-sheet__row--active {
@@ -85,7 +85,7 @@ const emit = defineEmits<{
 .favorite-team-sheet__name {
   color: var(--fi-color-text-strong);
   display: block;
-  font-size: 36rpx;
+  font-size: var(--fi-font-36);
   line-height: 1;
   font-weight: 800;
 }
@@ -93,23 +93,23 @@ const emit = defineEmits<{
   display: block;
   margin-top: 6rpx;
   color: var(--fi-color-text-muted);
-  font-size: 22rpx;
+  font-size: var(--fi-font-22);
 }
 .sheet-actions {
   margin-top: 24rpx;
   display: flex;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
 }
 .primary-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 1;
-  padding: 20rpx 30rpx;
-  border-radius: 999rpx;
+  padding: var(--fi-space-20) var(--fi-space-30);
+  border-radius: var(--fi-radius-round);
   background: var(--fi-primitive-ink);
   color: var(--fi-primitive-white);
-  font-size: 28rpx;
+  font-size: var(--fi-font-28);
   white-space: nowrap;
   line-height: 1;
 }

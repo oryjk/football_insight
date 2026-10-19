@@ -164,7 +164,7 @@ function facts(table: StandingsTable) {
   border-radius: var(--fi-radius-round);
   background: #9ca3af;
   color: #ffffff;
-  font-size: 20rpx;
+  font-size: var(--fi-font-20);
   font-weight: var(--fi-weight-extrabold);
   line-height: 1;
 }

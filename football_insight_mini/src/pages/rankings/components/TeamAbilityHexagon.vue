@@ -115,7 +115,7 @@ const ariaLabel = computed(() =>
 .ability-hex__axis-label {
   position: absolute;
   color: #5c616b;
-  font-size: 20rpx;
+  font-size: var(--fi-font-20);
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
