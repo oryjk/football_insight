@@ -1,9 +1,10 @@
 use crate::lineup::{
-    domain::{LineupReadError, Position, SquadPlayer, SquadTeam},
-    ports::SquadRepository,
+    domain::{Lineup, LineupReadError, LineupSlot, Position, SquadPlayer, SquadTeam},
+    ports::{LineupRepository, SquadRepository, StoreError},
 };
 use async_trait::async_trait;
-use sqlx::PgPool;
+use sqlx::{PgPool, types::Json};
+use uuid::Uuid;
 
 pub struct PostgresSquadRepository {
     pool: PgPool,
@@ -77,5 +78,99 @@ impl SquadRepository for PostgresSquadRepository {
                 .collect()
         })
         .map_err(read_error)
+    }
+}
+
+pub struct PostgresLineupRepository {
+    pool: PgPool,
+}
+
+impl PostgresLineupRepository {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+fn store_error(e: sqlx::Error) -> StoreError {
+    if let Some(db) = e.as_database_error()
+        && db.code().as_deref() == Some("23505")
+        && db.constraint() == Some("uq_f_i_lineups_share_code")
+    {
+        return StoreError::ShareCodeTaken;
+    }
+    tracing::warn!("lineup store unavailable");
+    StoreError::Unavailable
+}
+
+type LineupRow = (
+    String,
+    Json<Vec<LineupSlot>>,
+    String,
+    chrono::DateTime<chrono::Utc>,
+);
+
+fn to_lineup((formation, Json(slots), share_code, updated_at): LineupRow) -> Lineup {
+    Lineup {
+        formation,
+        slots,
+        share_code,
+        updated_at,
+    }
+}
+
+#[async_trait]
+impl LineupRepository for PostgresLineupRepository {
+    async fn find(&self, user_id: Uuid, team_id: i64) -> Result<Option<Lineup>, StoreError> {
+        sqlx::query_as::<_, LineupRow>(
+            "SELECT formation, slots, share_code, updated_at FROM f_i_lineups WHERE user_id = $1 AND team_id = $2",
+        )
+        .bind(user_id)
+        .bind(team_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map(|row| row.map(to_lineup))
+        .map_err(store_error)
+    }
+
+    async fn squad_members(
+        &self,
+        team_id: i64,
+        player_ids: &[i64],
+    ) -> Result<Vec<i64>, StoreError> {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT player_id FROM f_i_squad_players WHERE team_id = $1 AND player_id = ANY($2)",
+        )
+        .bind(team_id)
+        .bind(player_ids)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(store_error)
+    }
+
+    async fn upsert(
+        &self,
+        user_id: Uuid,
+        team_id: i64,
+        formation: &str,
+        slots: &[LineupSlot],
+        share_code: &str,
+    ) -> Result<Lineup, StoreError> {
+        sqlx::query_as::<_, LineupRow>(
+            "INSERT INTO f_i_lineups (id, user_id, team_id, formation, slots, share_code)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (user_id, team_id) DO UPDATE
+                SET formation = EXCLUDED.formation, slots = EXCLUDED.slots, updated_at = NOW()
+             RETURNING formation, slots, share_code, updated_at",
+        )
+        .bind(Uuid::new_v4())
+        .bind(user_id)
+        .bind(team_id)
+        .bind(formation)
+        .bind(Json(slots.to_vec()))
+        .bind(share_code)
+        .fetch_one(&self.pool)
+        .await
+        .map(to_lineup)
+        .map_err(store_error)
     }
 }
