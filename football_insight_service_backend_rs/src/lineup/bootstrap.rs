@@ -16,7 +16,7 @@ pub fn build_lineup_routes(pool: PgPool, token_port: Arc<dyn TokenPort>) -> Rout
     let lineups = Arc::new(PostgresLineupRepository::new(pool));
     routes(Arc::new(LineupService::new(squads.clone()))).merge(my_routes(Arc::new(
         MyLineupWebState {
-            service: Arc::new(MyLineupService::new(squads, lineups)),
+            service: Arc::new(MyLineupService::new(squads, lineups.clone(), lineups)),
             token_port,
         },
     )))

@@ -22,7 +22,7 @@ export interface LineupPageDeps {
   draftDelayMs: number
 }
 
-export type SaveResult = 'saved' | 'need-login' | 'failed'
+export type SaveResult = 'saved' | 'need-login' | 'failed' | 'cancelled'
 export type SaveState = 'idle' | 'saved' | 'dirty' | 'error'
 
 /** 战术板数据层：加载名单与我的阵容、草稿、保存。唯一调用 api/lineup 的地方。 */
@@ -64,7 +64,8 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
   let disposed = false
 
   function persistDraft(): void {
-    if (!teamId.value) return
+    // 加载中的编辑器不属于目标球队，不能把它写入目标球队的草稿。
+    if (disposed || loading.value || !squad.value || !teamId.value) return
     writeDraft(
       { teamId: teamId.value, formation: editor.formation.value, slots: editor.slots.value, savedAt: deps.now() },
       deps.storage,
@@ -80,7 +81,7 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
   watch(
     [editor.slots, editor.formation],
     () => {
-      if (disposed || !editor.dirty.value) return
+      if (disposed || loading.value || !squad.value || !editor.dirty.value) return
       cancelDraftTimer()
       draftTimer = setTimeout(persistDraft, deps.draftDelayMs)
     },
@@ -88,12 +89,17 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
   )
 
   async function load(nextTeamId: number): Promise<void> {
+    // 必须在换 teamId 前落盘；取消 debounce 本身不能保证最后一次改动已保存。
+    if (editor.dirty.value) persistDraft()
     const seq = ++loadSeq
-    const current = () => seq === loadSeq
+    const current = () => !disposed && seq === loadSeq
     disposed = false
     cancelDraftTimer()
     teamId.value = nextTeamId
     loading.value = true
+    squad.value = null
+    saving.value = false
+    editor.load(DEFAULT_FORMATION, emptyLineup(DEFAULT_FORMATION))
     errorMessage.value = ''
     notice.value = ''
     failed.value = false
@@ -133,33 +139,43 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
   }
 
   async function save(): Promise<SaveResult> {
+    if (disposed || loading.value || !squad.value || saving.value) return 'cancelled'
     if (!deps.isLoggedIn()) {
       cancelDraftTimer()
       persistDraft()
       return 'need-login'
     }
-    if (!editor.dirty.value && !failed.value) return 'saved'
+    if (savedOnce.value && !editor.dirty.value && !failed.value) return 'saved'
     cancelDraftTimer()
     saving.value = true
+    const teamAtStart = teamId.value
+    const contextAtStart = loadSeq
     const revisionAtStart = editor.revision.value
+    const current = () => !disposed && loadSeq === contextAtStart && teamId.value === teamAtStart
     try {
-      await deps.saveMyLineup(teamId.value, { formation: editor.formation.value, slots: editor.slots.value })
+      await deps.saveMyLineup(teamAtStart, {
+        formation: editor.formation.value,
+        slots: editor.slots.value.map((slot) => ({ ...slot })),
+      })
+      if (!current()) return 'cancelled'
       failed.value = false
       savedOnce.value = true
       if (editor.revision.value === revisionAtStart) {
         editor.markSaved()
-        clearDraft(teamId.value, deps.storage)
+        cancelDraftTimer()
+        clearDraft(teamAtStart, deps.storage)
       } else {
         // 保存期间又改了位置：这次保存没有覆盖最新改动，保持未保存并保留草稿。
         persistDraft()
       }
       return 'saved'
     } catch {
+      if (!current()) return 'cancelled'
       persistDraft()
       failed.value = true
       return 'failed'
     } finally {
-      saving.value = false
+      if (current()) saving.value = false
     }
   }
 
@@ -176,6 +192,7 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
     // 离开时若还有没来得及写草稿的改动（系统返回手势没有确认框），先写下来再停定时器。
     if (!disposed && editor.dirty.value) persistDraft()
     disposed = true
+    loadSeq += 1
     cancelDraftTimer()
   }
 

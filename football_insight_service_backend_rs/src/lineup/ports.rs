@@ -14,6 +14,12 @@ pub enum StoreError {
     Unavailable,
 }
 
+/// 阵容应用需要的账号状态能力；不依赖认证模块的持久化实现或 Web handler。
+#[async_trait]
+pub trait LineupUserAccess: Send + Sync {
+    async fn is_active(&self, user_id: Uuid) -> Result<bool, StoreError>;
+}
+
 #[async_trait]
 pub trait LineupRepository: Send + Sync {
     async fn find(&self, user_id: Uuid, team_id: i64) -> Result<Option<Lineup>, StoreError>;

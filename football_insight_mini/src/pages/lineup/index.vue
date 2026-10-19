@@ -12,20 +12,21 @@
 
     <!-- #ifndef H5 -->
     <view class="page">
+      <view v-if="teams.length" class="team-picker">
+        <LineupTeamPicker :teams="teams" :model-value="teamId" @update:model-value="switchTeam" />
+      </view>
       <FiLoading
-        v-if="loading && !teams.length"
+        v-if="loading"
         title="战术板加载中"
         caption="正在准备球队名单和你的阵容。"
       />
 
-      <view v-else-if="errorMessage && !squad" class="state-card state-card--error">
+      <view v-else-if="errorMessage" class="state-card state-card--error">
         <text>{{ errorMessage }}</text>
         <button class="ghost-action" @tap="reload">重试</button>
       </view>
 
-      <view v-else class="page-content">
-        <LineupTeamPicker v-if="teams.length" :teams="teams" :model-value="teamId" @update:model-value="switchTeam" />
-
+      <view v-else-if="squad" class="page-content">
         <view v-if="notice" class="notice"><text>{{ notice }}</text></view>
 
         <view class="status-row">
@@ -189,6 +190,7 @@ async function switchTeam(nextTeamId: number): Promise<void> {
 
 async function handleSave(): Promise<void> {
   const result = await save()
+  if (result === 'cancelled') return
   if (result === 'saved') {
     uni.showToast({ title: '已保存', icon: 'success' })
     return
@@ -298,6 +300,10 @@ onBeforeUnmount(dispose)
   display: flex;
   flex-direction: column;
   gap: var(--fi-space-card-gap);
+}
+
+.team-picker {
+  margin-bottom: var(--fi-space-card-gap);
 }
 
 .state-card {

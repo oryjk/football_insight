@@ -1,8 +1,9 @@
 use crate::lineup::{
     domain::{Lineup, LineupReadError, LineupSlot, Position, SquadPlayer, SquadTeam},
-    ports::{LineupRepository, SquadRepository, StoreError},
+    ports::{LineupRepository, LineupUserAccess, SquadRepository, StoreError},
 };
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, types::Json};
 use uuid::Uuid;
 
@@ -91,6 +92,19 @@ impl PostgresLineupRepository {
     }
 }
 
+#[async_trait]
+impl LineupUserAccess for PostgresLineupRepository {
+    async fn is_active(&self, user_id: Uuid) -> Result<bool, StoreError> {
+        sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM f_i_users WHERE id = $1 AND status = 'active')",
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(store_error)
+    }
+}
+
 fn store_error(e: sqlx::Error) -> StoreError {
     if let Some(db) = e.as_database_error()
         && db.code().as_deref() == Some("23505")
@@ -104,15 +118,45 @@ fn store_error(e: sqlx::Error) -> StoreError {
 
 type LineupRow = (
     String,
-    Json<Vec<LineupSlot>>,
+    Json<Vec<StoredSlot>>,
     String,
     chrono::DateTime<chrono::Utc>,
 );
 
+#[derive(Serialize, Deserialize)]
+struct StoredSlot {
+    slot: u8,
+    player_id: Option<i64>,
+    x: f64,
+    y: f64,
+}
+
+impl From<StoredSlot> for LineupSlot {
+    fn from(slot: StoredSlot) -> Self {
+        Self {
+            slot: slot.slot,
+            player_id: slot.player_id,
+            x: slot.x,
+            y: slot.y,
+        }
+    }
+}
+
+impl From<&LineupSlot> for StoredSlot {
+    fn from(slot: &LineupSlot) -> Self {
+        Self {
+            slot: slot.slot,
+            player_id: slot.player_id,
+            x: slot.x,
+            y: slot.y,
+        }
+    }
+}
+
 fn to_lineup((formation, Json(slots), share_code, updated_at): LineupRow) -> Lineup {
     Lineup {
         formation,
-        slots,
+        slots: slots.into_iter().map(Into::into).collect(),
         share_code,
         updated_at,
     }
@@ -166,7 +210,7 @@ impl LineupRepository for PostgresLineupRepository {
         .bind(user_id)
         .bind(team_id)
         .bind(formation)
-        .bind(Json(slots.to_vec()))
+        .bind(Json(slots.iter().map(StoredSlot::from).collect::<Vec<_>>()))
         .bind(share_code)
         .fetch_one(&self.pool)
         .await

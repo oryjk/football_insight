@@ -1,6 +1,6 @@
 use crate::lineup::{
     domain::{Lineup, LineupSaveError, LineupSlot, validate_lineup_input},
-    ports::{LineupRepository, SquadRepository, StoreError},
+    ports::{LineupRepository, LineupUserAccess, SquadRepository, StoreError},
 };
 use std::sync::Arc;
 use uuid::Uuid;
@@ -8,6 +8,7 @@ use uuid::Uuid;
 pub struct MyLineupService {
     squads: Arc<dyn SquadRepository>,
     lineups: Arc<dyn LineupRepository>,
+    users: Arc<dyn LineupUserAccess>,
 }
 
 pub fn generate_share_code() -> String {
@@ -26,8 +27,23 @@ fn store_error(_: StoreError) -> LineupSaveError {
 const SHARE_CODE_ATTEMPTS: usize = 5;
 
 impl MyLineupService {
-    pub fn new(squads: Arc<dyn SquadRepository>, lineups: Arc<dyn LineupRepository>) -> Self {
-        Self { squads, lineups }
+    pub fn new(
+        squads: Arc<dyn SquadRepository>,
+        lineups: Arc<dyn LineupRepository>,
+        users: Arc<dyn LineupUserAccess>,
+    ) -> Self {
+        Self {
+            squads,
+            lineups,
+            users,
+        }
+    }
+
+    async fn authorize(&self, user_id: Uuid) -> Result<(), LineupSaveError> {
+        if !self.users.is_active(user_id).await.map_err(store_error)? {
+            return Err(LineupSaveError::Unauthorized);
+        }
+        Ok(())
     }
 
     pub async fn get(
@@ -35,6 +51,7 @@ impl MyLineupService {
         user_id: Uuid,
         team_id: i64,
     ) -> Result<Option<Lineup>, LineupSaveError> {
+        self.authorize(user_id).await?;
         if team_id <= 0 {
             return Err(LineupSaveError::TeamNotFound);
         }
@@ -51,6 +68,7 @@ impl MyLineupService {
         formation: &str,
         slots: Vec<LineupSlot>,
     ) -> Result<Lineup, LineupSaveError> {
+        self.authorize(user_id).await?;
         validate_lineup_input(formation, &slots)?;
         self.squads
             .find_team(team_id)
@@ -89,6 +107,31 @@ pub(crate) mod tests {
     use crate::lineup::application::tests::FakeSquads;
     use async_trait::async_trait;
     use std::sync::Mutex;
+
+    pub(crate) struct FakeUserAccess {
+        pub active: bool,
+        pub unavailable: bool,
+    }
+
+    impl Default for FakeUserAccess {
+        fn default() -> Self {
+            Self {
+                active: true,
+                unavailable: false,
+            }
+        }
+    }
+
+    #[async_trait]
+    impl LineupUserAccess for FakeUserAccess {
+        async fn is_active(&self, _: Uuid) -> Result<bool, StoreError> {
+            if self.unavailable {
+                Err(StoreError::Unavailable)
+            } else {
+                Ok(self.active)
+            }
+        }
+    }
 
     #[derive(Default)]
     pub(crate) struct FakeLineups {
@@ -167,6 +210,7 @@ pub(crate) mod tests {
                 missing_table: false,
             }),
             lineups.clone(),
+            Arc::new(FakeUserAccess::default()),
         );
         (svc, lineups)
     }
@@ -274,9 +318,62 @@ pub(crate) mod tests {
                 fail: true,
                 ..Default::default()
             }),
+            Arc::new(FakeUserAccess::default()),
         );
         assert_eq!(
             broken.get(u, TEAM).await.unwrap_err(),
+            LineupSaveError::Unavailable
+        );
+    }
+
+    #[tokio::test]
+    async fn disabled_or_deleted_users_cannot_read_or_save_even_with_a_verified_user_id() {
+        let repo = Arc::new(FakeLineups::default());
+        let svc = MyLineupService::new(
+            Arc::new(FakeSquads {
+                players: vec![],
+                missing_table: false,
+            }),
+            repo.clone(),
+            Arc::new(FakeUserAccess {
+                active: false,
+                unavailable: false,
+            }),
+        );
+        assert_eq!(
+            svc.get(user(), TEAM).await.unwrap_err(),
+            LineupSaveError::Unauthorized
+        );
+        assert_eq!(
+            svc.save(user(), TEAM, "4-3-3", slots(&[]))
+                .await
+                .unwrap_err(),
+            LineupSaveError::Unauthorized
+        );
+        assert!(repo.upserts.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn account_lookup_failure_denies_read_and_save_as_unavailable() {
+        let svc = MyLineupService::new(
+            Arc::new(FakeSquads {
+                players: vec![],
+                missing_table: false,
+            }),
+            Arc::new(FakeLineups::default()),
+            Arc::new(FakeUserAccess {
+                active: true,
+                unavailable: true,
+            }),
+        );
+        assert_eq!(
+            svc.get(user(), TEAM).await.unwrap_err(),
+            LineupSaveError::Unavailable
+        );
+        assert_eq!(
+            svc.save(user(), TEAM, "4-3-3", slots(&[]))
+                .await
+                .unwrap_err(),
             LineupSaveError::Unavailable
         );
     }

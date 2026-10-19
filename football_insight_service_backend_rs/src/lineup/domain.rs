@@ -1,6 +1,4 @@
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Position {
     GK,
     DF,
@@ -31,14 +29,14 @@ impl Position {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SquadTeam {
     pub team_id: i64,
     pub team_name: String,
     pub avatar_url: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SquadPlayer {
     pub player_id: i64,
     pub name: String,
@@ -46,15 +44,7 @@ pub struct SquadPlayer {
     pub position: Option<Position>,
     pub avatar_url: Option<String>,
     pub last_season: i32,
-    #[serde(skip)]
     pub active: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct SquadResponse {
-    pub team: SquadTeam,
-    pub active: Vec<SquadPlayer>,
-    pub former: Vec<SquadPlayer>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -73,7 +63,7 @@ pub const FORMATIONS: [&str; 7] = [
     "4-3-3", "4-4-2", "4-2-3-1", "3-5-2", "3-4-3", "5-3-2", "4-1-4-1",
 ];
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LineupSlot {
     pub slot: u8,
     pub player_id: Option<i64>,
@@ -81,7 +71,7 @@ pub struct LineupSlot {
     pub y: f64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Lineup {
     pub formation: String,
     pub slots: Vec<LineupSlot>,
@@ -91,6 +81,8 @@ pub struct Lineup {
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum LineupSaveError {
+    #[error("账号不可用，请重新登录")]
+    Unauthorized,
     #[error("阵型无效")]
     InvalidFormation,
     #[error("站位数据无效")]

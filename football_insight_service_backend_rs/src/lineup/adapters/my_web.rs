@@ -1,9 +1,7 @@
+use super::dto::{LineupResponse, SaveRequest};
 use crate::{
     auth::ports::token_port::TokenPort,
-    lineup::{
-        application::my_lineup::MyLineupService,
-        domain::{Lineup, LineupSaveError, LineupSlot},
-    },
+    lineup::{application::my_lineup::MyLineupService, domain::LineupSaveError},
 };
 use axum::{
     Json, Router,
@@ -11,7 +9,6 @@ use axum::{
     http::{HeaderMap, StatusCode, header::AUTHORIZATION},
     routing::get,
 };
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -19,17 +16,6 @@ use uuid::Uuid;
 pub struct MyLineupWebState {
     pub service: Arc<MyLineupService>,
     pub token_port: Arc<dyn TokenPort>,
-}
-
-#[derive(Serialize)]
-struct LineupResponse {
-    lineup: Option<Lineup>,
-}
-
-#[derive(Deserialize)]
-struct SaveRequest {
-    formation: String,
-    slots: Vec<LineupSlot>,
 }
 
 pub fn my_routes(state: Arc<MyLineupWebState>) -> Router {
@@ -56,6 +42,7 @@ fn authenticate(
 
 fn map_error(e: LineupSaveError) -> (StatusCode, String) {
     let status = match e {
+        LineupSaveError::Unauthorized => StatusCode::UNAUTHORIZED,
         LineupSaveError::InvalidFormation
         | LineupSaveError::InvalidSlots
         | LineupSaveError::PlayerNotInSquad
@@ -75,7 +62,11 @@ async fn get_mine(
     s.service
         .get(user, team_id)
         .await
-        .map(|lineup| Json(LineupResponse { lineup }))
+        .map(|lineup| {
+            Json(LineupResponse {
+                lineup: lineup.map(Into::into),
+            })
+        })
         .map_err(map_error)
 }
 
@@ -87,11 +78,16 @@ async fn save_mine(
 ) -> Result<Json<LineupResponse>, (StatusCode, String)> {
     let user = authenticate(&headers, s.token_port.as_ref())?;
     s.service
-        .save(user, team_id, &req.formation, req.slots)
+        .save(
+            user,
+            team_id,
+            &req.formation,
+            req.slots.into_iter().map(Into::into).collect(),
+        )
         .await
         .map(|lineup| {
             Json(LineupResponse {
-                lineup: Some(lineup),
+                lineup: Some(lineup.into()),
             })
         })
         .map_err(map_error)
@@ -102,7 +98,10 @@ mod tests {
     use super::*;
     use crate::{
         auth::ports::token_port::{AuthTokenClaims, WechatBindTokenClaims, WechatBindTokenPayload},
-        lineup::application::{my_lineup::tests::FakeLineups, tests::FakeSquads},
+        lineup::application::{
+            my_lineup::tests::{FakeLineups, FakeUserAccess},
+            tests::FakeSquads,
+        },
     };
     use axum::{
         body::{Body, to_bytes},
@@ -144,6 +143,10 @@ mod tests {
     }
 
     fn app(members: Vec<i64>) -> Router {
+        app_with_access(members, FakeUserAccess::default())
+    }
+
+    fn app_with_access(members: Vec<i64>, access: FakeUserAccess) -> Router {
         let lineups = Arc::new(FakeLineups {
             members,
             ..Default::default()
@@ -154,6 +157,7 @@ mod tests {
                 missing_table: false,
             }),
             lineups,
+            Arc::new(access),
         ));
         my_routes(Arc::new(MyLineupWebState {
             service,
@@ -213,6 +217,30 @@ mod tests {
     }
 
     const URI: &str = "/api/v1/lineups/me/77680";
+
+    #[tokio::test]
+    async fn valid_jwt_does_not_authorize_a_disabled_user() {
+        let app = app_with_access(
+            vec![],
+            FakeUserAccess {
+                active: false,
+                unavailable: false,
+            },
+        );
+        assert_eq!(send(&app, "GET", URI, Some("good"), None).await.0, 401);
+        assert_eq!(
+            send(
+                &app,
+                "PUT",
+                URI,
+                Some("good"),
+                Some(body_with("4-3-3", None))
+            )
+            .await
+            .0,
+            401
+        );
+    }
 
     #[tokio::test]
     async fn requires_login_for_get_and_put() {

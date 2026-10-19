@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { nextTick } from 'vue'
 import type { SavedLineup, SquadResponse } from '../../types/lineup'
 import { assignPlayer, emptyLineup } from './helpers'
 import { readDraft } from './lineupDraft'
@@ -18,8 +19,8 @@ const saved: SavedLineup = { formation: '4-4-2', slots: emptyLineup('4-4-2'), sh
 function memoryStorage() {
   const map = new Map<string, unknown>()
   return {
-    getStorageSync: (k: string) => map.get(k) ?? '',
-    setStorageSync: (k: string, v: unknown) => { map.set(k, v) },
+    getStorageSync: (k: string) => JSON.parse(JSON.stringify(map.get(k) ?? null)),
+    setStorageSync: (k: string, v: unknown) => { map.set(k, JSON.parse(JSON.stringify(v))) },
     removeStorageSync: (k: string) => { map.delete(k) },
   }
 }
@@ -197,6 +198,109 @@ describe('useLineupPage', () => {
     expect(page.editor.dirty.value).toBe(false)
   })
 
+  test('switching teams flushes the outgoing draft before its debounce fires', async () => {
+    const { page, storage } = build({ draftDelayMs: 1000 })
+    await page.load(1)
+    page.editor.setFormation('4-4-2', () => null)
+    await nextTick()
+    await page.load(2)
+    expect(readDraft(1, storage)?.formation).toBe('4-4-2')
+    await page.load(1)
+    expect(page.editor.formation.value).toBe('4-4-2')
+    page.dispose()
+  })
+
+  test('edits during a slow team switch cannot replace the incoming saved lineup with an outgoing draft', async () => {
+    let finish: () => void = () => {}
+    const { page, storage } = build({
+      getSquad: async (id) => id === 2
+        ? new Promise((resolve) => { finish = () => resolve(squad) })
+        : squad,
+      getMyLineup: async (id) => ({ lineup: id === 2 ? { ...saved, formation: '5-3-2', slots: emptyLineup('5-3-2') } : null }),
+    })
+    await page.load(1)
+    const pending = page.load(2)
+    page.editor.setFormation('4-4-2', () => null)
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(readDraft(2, storage)).toBeNull()
+    finish()
+    await pending
+    expect(page.editor.formation.value).toBe('5-3-2')
+    expect(page.editor.dirty.value).toBe(false)
+    page.dispose()
+  })
+
+  test('a failed team switch exposes an error and cannot save the previous squad as the new team', async () => {
+    const { page, storage, calls } = build({
+      getSquad: async (id) => {
+        if (id === 2) throw new Error('offline')
+        return squad
+      },
+    })
+    await page.load(1)
+    page.editor.pick(0, null)
+    await page.load(2)
+    expect(page.squad.value).toBeNull()
+    expect(page.errorMessage.value).toBe('offline')
+    expect(await page.save()).toBe('cancelled')
+    expect(calls).toEqual([])
+    page.dispose()
+    expect(readDraft(2, storage)).toBeNull()
+  })
+
+  for (const outcome of ['success', 'failure'] as const) {
+    test(`a previous team save ${outcome} cannot update the current team state or draft`, async () => {
+      let finish: () => void = () => {}
+      const { page, storage } = build({
+        saveMyLineup: (_id, payload) => new Promise((resolve, reject) => {
+          finish = () => outcome === 'success'
+            ? resolve({ lineup: { ...saved, ...payload } })
+            : reject(new Error('offline'))
+        }),
+      })
+      await page.load(1)
+      page.editor.pick(0, null)
+      const pending = page.save()
+      await page.load(2)
+      finish()
+      expect(await pending).toBe('cancelled')
+      expect(page.saveState.value).toBe('idle')
+      expect(page.saving.value).toBe(false)
+      expect(readDraft(2, storage)).toBeNull()
+      page.dispose()
+    })
+  }
+
+  test('an old save finishing cannot release a newer team save lock', async () => {
+    const finishes: Array<() => void> = []
+    const { page } = build({ saveMyLineup: (_id, payload) => new Promise((resolve) => {
+      finishes.push(() => resolve({ lineup: { ...saved, ...payload } }))
+    }) })
+    await page.load(1)
+    page.editor.pick(0, null)
+    const first = page.save()
+    await page.load(2)
+    page.editor.pick(0, null)
+    const second = page.save()
+    finishes[0]()
+    await first
+    expect(page.saving.value).toBe(true)
+    finishes[1]()
+    await second
+    expect(page.saving.value).toBe(false)
+    page.dispose()
+  })
+
+  test('unmount invalidates pending loads so they cannot restore stale state', async () => {
+    let finish: () => void = () => {}
+    const { page } = build({ getSquad: () => new Promise((resolve) => { finish = () => resolve(squad) }) })
+    const pending = page.load(1)
+    page.dispose()
+    finish()
+    await pending
+    expect(page.squad.value).toBeNull()
+  })
+
   test('a slow response for a previous team never overwrites the team the user switched to (A→B→C)', async () => {
     const gates: Record<number, () => void> = {}
     const lineups: Record<number, SavedLineup> = {
@@ -297,11 +401,14 @@ describe('useLineupPage', () => {
   test('an automatically filled lineup is saved like any other when the user taps save', async () => {
     const { page, calls } = build({ getSquad: async () => fullSquad })
     await page.load(1)
-    expect(await page.save()).toBe('saved') // 没有改动，不重复请求
-    expect(calls).toEqual([])
-    page.editor.pick(0, 11)
     expect(await page.save()).toBe('saved')
     expect(calls).toEqual(['save'])
+    expect(page.saveState.value).toBe('saved')
+    await page.save() // 已经保存且无改动才不重复请求
+    expect(calls).toEqual(['save'])
+    page.editor.pick(0, 11)
+    expect(await page.save()).toBe('saved')
+    expect(calls).toEqual(['save', 'save'])
   })
 
   test('a saved lineup or a draft is never replaced by the automatic starting eleven', async () => {

@@ -2,7 +2,7 @@
 use football_insight_service_backend_rs::lineup::{
     adapters::persistence::PostgresLineupRepository,
     domain::LineupSlot,
-    ports::{LineupRepository, StoreError},
+    ports::{LineupRepository, LineupUserAccess, StoreError},
 };
 use sqlx::{
     PgPool,
@@ -40,10 +40,12 @@ async fn setup() -> Db {
         .connect_with(options)
         .await
         .unwrap();
-    sqlx::raw_sql("CREATE TABLE f_i_users (id UUID PRIMARY KEY)")
-        .execute(&pool)
-        .await
-        .unwrap();
+    sqlx::raw_sql(
+        "CREATE TABLE f_i_users (id UUID PRIMARY KEY, status TEXT NOT NULL DEFAULT 'active')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
     sqlx::raw_sql(
         "CREATE TABLE f_i_squad_players (team_id BIGINT NOT NULL, player_id BIGINT NOT NULL, active BOOLEAN NOT NULL DEFAULT FALSE, PRIMARY KEY (team_id, player_id))",
     )
@@ -222,5 +224,27 @@ async fn deleting_the_user_cascades_to_the_lineup() {
         .await
         .unwrap();
     assert!(repo.find(user, 1).await.unwrap().is_none());
+    teardown(db).await;
+}
+
+#[tokio::test]
+#[ignore = "requires LINEUP_TEST_DATABASE_URL pointing to a disposable local *_test database"]
+async fn only_existing_active_users_have_lineup_access() {
+    let db = setup().await;
+    let repo = PostgresLineupRepository::new(db.pool.clone());
+    let user = add_user(&db.pool).await;
+    assert!(repo.is_active(user).await.unwrap());
+    sqlx::query("UPDATE f_i_users SET status = 'disabled' WHERE id = $1")
+        .bind(user)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    assert!(!repo.is_active(user).await.unwrap());
+    sqlx::query("DELETE FROM f_i_users WHERE id = $1")
+        .bind(user)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    assert!(!repo.is_active(user).await.unwrap());
     teardown(db).await;
 }

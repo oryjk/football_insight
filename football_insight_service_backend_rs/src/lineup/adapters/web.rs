@@ -1,7 +1,5 @@
-use crate::lineup::{
-    application::LineupService,
-    domain::{LineupReadError, SquadResponse},
-};
+use super::dto::SquadResponse;
+use crate::lineup::{application::LineupService, domain::LineupReadError};
 use axum::{
     Json, Router,
     extract::{Path, State},
@@ -29,7 +27,10 @@ async fn get_squad(
     State(s): State<Arc<LineupService>>,
     Path(team_id): Path<i64>,
 ) -> Result<Json<SquadResponse>, (StatusCode, String)> {
-    s.squad(team_id).await.map(Json).map_err(map_error)
+    s.squad(team_id)
+        .await
+        .map(|squad| Json(squad.into()))
+        .map_err(map_error)
 }
 
 #[cfg(test)]

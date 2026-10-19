@@ -1,10 +1,17 @@
 use super::{
-    domain::{LineupReadError, Position, SquadPlayer, SquadResponse},
+    domain::{LineupReadError, Position, SquadPlayer, SquadTeam},
     ports::SquadRepository,
 };
 pub mod my_lineup;
 
 use std::sync::Arc;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Squad {
+    pub team: SquadTeam,
+    pub active: Vec<SquadPlayer>,
+    pub former: Vec<SquadPlayer>,
+}
 
 pub struct LineupService {
     squads: Arc<dyn SquadRepository>,
@@ -17,7 +24,7 @@ impl LineupService {
 
     /// 球队名单：现役按位置（门将、后卫、中场、前锋、未知）再按号码（空号排最后）排序；
     /// 前队员先按最后在队赛季倒序，再按同样的位置与号码规则排序。
-    pub async fn squad(&self, team_id: i64) -> Result<SquadResponse, LineupReadError> {
+    pub async fn squad(&self, team_id: i64) -> Result<Squad, LineupReadError> {
         if team_id <= 0 {
             return Err(LineupReadError::Invalid);
         }
@@ -34,7 +41,7 @@ impl LineupService {
             .partition(|player| player.active);
         active.sort_by(by_role);
         former.sort_by(|a, b| b.last_season.cmp(&a.last_season).then(by_role(a, b)));
-        Ok(SquadResponse {
+        Ok(Squad {
             team,
             active,
             former,
