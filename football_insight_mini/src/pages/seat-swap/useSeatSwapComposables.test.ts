@@ -108,7 +108,7 @@ describe('useSeatSwapBrowse', () => {
     browse.applyMapTap(key, true)
     browse.clearFilter()
     expect(browse.browsingFilterKey.value).toBe('')
-    expect(browse.mapFabLabel.value).toEqual({ text: '地图', clearable: false })
+    expect(browse.mapFabLabel.value).toEqual({ text: '球场图', clearable: false })
   })
 
   test('falls back to the region key when the filtered region is unknown', () => {

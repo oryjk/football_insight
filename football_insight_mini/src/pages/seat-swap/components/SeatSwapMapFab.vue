@@ -3,7 +3,7 @@
     class="map-fab"
     :class="{ 'map-fab--visible': visible }"
     role="button"
-    :aria-label="clearable ? `当前筛选 ${label}，打开球场地图` : '打开球场地图'"
+    :aria-label="clearable ? `当前筛选 ${label}，打开球场图` : '打开球场图'"
     :aria-hidden="!visible"
   >
     <view class="map-fab__main" hover-class="map-fab__main--pressed" @tap="emit('open')">

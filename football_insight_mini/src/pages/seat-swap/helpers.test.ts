@@ -564,8 +564,8 @@ describe('seat swap stadium selection flow', () => {
 
 describe('seat swap map floating button', () => {
   const labelCases: Array<[string, { text: string; clearable: boolean }]> = [
-    ['', { text: '地图', clearable: false }],
-    ['   ', { text: '地图', clearable: false }],
+    ['', { text: '球场图', clearable: false }],
+    ['   ', { text: '球场图', clearable: false }],
     ['112 区', { text: '112 区', clearable: true }],
     [' 112 区 ', { text: '112 区', clearable: true }],
   ]

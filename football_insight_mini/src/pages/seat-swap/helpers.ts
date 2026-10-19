@@ -125,10 +125,10 @@ export interface SeatSwapMapFabLabel {
   clearable: boolean
 }
 
-/** 浮窗文案：无筛选显示"地图"；有筛选显示分区名并允许清除。 */
+/** 浮窗文案：无筛选显示"球场图"；有筛选显示分区名并允许清除。 */
 export function resolveSeatSwapMapFabLabel(filterName: string): SeatSwapMapFabLabel {
   const name = filterName.trim()
-  return name ? { text: name, clearable: true } : { text: '地图', clearable: false }
+  return name ? { text: name, clearable: true } : { text: '球场图', clearable: false }
 }
 
 /** 列表逐张入场的延迟：每张错开 step 毫秒，最多错开 maxSteps 张。 */
