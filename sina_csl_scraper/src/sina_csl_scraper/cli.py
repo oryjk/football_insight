@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import psycopg
 import typer
 
 from .auto_sync import (
@@ -26,6 +27,7 @@ from .player_goal_sync import refresh_scorer_goals
 from .match_outlook.cli import app as outlook_app
 from .match_outlook.service import refresh_match_outlooks
 from .schedule import fetch_reconciled_schedule
+from .squad_sync import PostgresSquadStore, make_avatar_uploader, sync_squads
 from .sync import InsightSyncService, SyncPayload
 from .topics.cli import app as topics_app
 
@@ -249,6 +251,52 @@ def sync_player_goals(
     typer.echo(json.dumps(result, ensure_ascii=False))
     if result["failed_players"]:
         raise typer.Exit(1)
+
+
+@app.command("sync-squads")
+def sync_squads_command(
+    season: int | None = typer.Option(None, help="Current season; defaults to Sina league current season."),
+    backfill_seasons: int = typer.Option(0, help="Also import N past seasons as former players (first run: 3)."),
+    upload_avatars: bool = typer.Option(False, "--upload-avatars", help="Upload missing avatars to MinIO."),
+    database_url: str | None = typer.Option(None, envvar=["FI_DATABASE_URL", "DATABASE_URL"]),
+    minio_endpoint: str = typer.Option(_env_default("FI_MINIO_ENDPOINT", "https://oryjk.cn:82/minio")),
+    minio_access_key: str = typer.Option(_env_default("FI_MINIO_ACCESS_KEY", "") or ""),
+    minio_secret_key: str = typer.Option(_env_default("FI_MINIO_SECRET_KEY", "") or ""),
+    minio_bucket: str = typer.Option(_env_default("FI_MINIO_BUCKET", "football-insight") or "football-insight"),
+    minio_region: str = typer.Option(_env_default("FI_MINIO_REGION", "us-east-1") or "us-east-1"),
+    minio_prefix: str = typer.Option(_env_default("FI_MINIO_PREFIX", "summary") or "summary"),
+    minio_public_base_url: str | None = typer.Option(_env_default("FI_MINIO_PUBLIC_BASE_URL")),
+) -> None:
+    """Sync full team squads (current + former players) into f_i_squad_players."""
+    if not database_url:
+        raise typer.BadParameter("PostgreSQL database_url is required")
+    client = SinaCslClient()
+    target_season = season or client.fetch_league_info().current_season
+    avatars = None
+    if upload_avatars:
+        if not minio_access_key or not minio_secret_key:
+            raise typer.BadParameter("upload_avatars enabled but MinIO credentials are missing")
+        avatars = make_avatar_uploader(
+            HttpAssetFetcher(),
+            MinioAssetTarget.from_credentials(
+                endpoint=minio_endpoint,
+                access_key=minio_access_key,
+                secret_key=minio_secret_key,
+                bucket=minio_bucket,
+                region=minio_region,
+                public_base_url=minio_public_base_url,
+            ),
+            minio_prefix,
+        )
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        summary = sync_squads(
+            fetch=lambda team_id, s: client.fetch_team_squad(team_id, season=s),
+            store=PostgresSquadStore(connection),
+            season=target_season,
+            backfill_seasons=backfill_seasons,
+            avatars=avatars,
+        )
+    typer.echo(json.dumps({"season": target_season, **summary}, ensure_ascii=False))
 
 
 @app.command()

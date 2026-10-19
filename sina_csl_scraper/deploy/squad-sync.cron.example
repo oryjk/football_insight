@@ -1,0 +1,6 @@
+# Football Insight daily squad sync (current-season rosters; former players are kept).
+# Install on the machine responsible for writing production football_data (current runner: local233).
+# Required local file, not tracked by git: sina_csl_scraper/.env.sync (MinIO credentials).
+# First run must be done manually: FI_SQUAD_SYNC_BACKFILL=3 ./sync_squads_daily.sh
+# Runs every day at 03:45 local machine time (after avatar sync at 03:30).
+45 3 * * * /bin/zsh -lc 'cd /home/betalpha/projects/football_insight/sina_csl_scraper && ./sync_squads_daily.sh >> /home/betalpha/projects/football_insight/sina_csl_scraper/squad_sync.log 2>&1'

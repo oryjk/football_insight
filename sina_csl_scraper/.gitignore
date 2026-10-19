@@ -20,3 +20,5 @@ data/
 data_test/
 data_upload_test/
 data_db_test/
+.squad_sync.lock
+squad_sync.log
