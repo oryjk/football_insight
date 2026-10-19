@@ -125,3 +125,26 @@ def test_chengdu_portrait_override_does_not_apply_to_another_team():
     updated = AssetUploader(fetcher, target).upload_player_avatars([profile], "summary")[0]
     assert fetcher.calls == [source]
     assert updated.avatar_object_name == "summary/players/184911.png"
+
+
+@pytest.mark.parametrize("team_id,player_id", [(136,617722),(178,508435),(41300,7712350),(500,536482),(501,113139),(123380,6936990)])
+def test_other_teams_use_reviewed_portraits_in_both_sync_paths(team_id, player_id):
+    fetcher, target = FakeFetcher(), FakeTarget()
+    source = f"https://provider/players/{player_id}.png"
+    profile = PlayerProfile(player_id, "球员", team_id, "球队", source)
+    updated = AssetUploader(fetcher, target).upload_player_avatars([profile], "summary")[0]
+    assert ".itc.cn/" in fetcher.calls[0]
+    assert updated.avatar_source_url == fetcher.calls[0]
+    assert f"{player_id}-team{team_id}-2026" in updated.avatar_object_name
+    squad = SquadPlayer(team_id, player_id, "球员", 7, "MF", "中国", source)
+    assert make_avatar_uploader(fetcher, target, "summary")(squad) == updated.avatar_storage_url
+    assert fetcher.calls[1] == fetcher.calls[0]
+
+
+def test_unconfirmed_standard_portrait_keeps_existing_source():
+    fetcher, target = FakeFetcher(), FakeTarget()
+    source = "https://provider/players/86364.png"
+    profile = PlayerProfile(86364, "李可", 144, "上海申花", source)
+    updated = AssetUploader(fetcher, target).upload_player_avatars([profile], "summary")[0]
+    assert fetcher.calls == [source]
+    assert updated.avatar_object_name == "summary/players/86364.png"
