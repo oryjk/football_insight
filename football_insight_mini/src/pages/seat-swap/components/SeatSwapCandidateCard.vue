@@ -39,7 +39,14 @@
         hover-class="candidate__action--pressed"
         @tap.stop="emit('confirm', candidate.request_id)"
       >
-        {{ candidate.status === 'display_only' ? '我要换到这' : '确认换座' }}
+        <!-- lucide arrow-left-right：带互换图标，一眼看出是可点的换座操作。 -->
+        <image
+          class="candidate__action-icon"
+          :src="candidate.status === 'display_only' ? '/static/seat-swap/arrow-left-right-ink.svg' : '/static/seat-swap/arrow-left-right-white.svg'"
+          mode="aspectFit"
+          aria-hidden="true"
+        />
+        <text>{{ candidate.status === 'display_only' ? '换到这' : '确认换座' }}</text>
       </button>
       <button
         v-else-if="action === 'cancel_confirmation'"
@@ -269,6 +276,13 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 
 .candidate__action::after {
   border: 0;
+}
+
+.candidate__action-icon {
+  flex-shrink: 0;
+  width: var(--fi-space-28);
+  height: var(--fi-space-28);
+  margin-right: var(--fi-space-8);
 }
 
 .candidate__action--pressed {
