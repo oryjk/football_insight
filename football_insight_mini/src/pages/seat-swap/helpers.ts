@@ -114,6 +114,57 @@ export function resolveSeatSwapBrowseFilterKey(currentKey: string, tappedKey: st
   return currentKey === tappedKey ? '' : tappedKey
 }
 
+export interface SeatSwapMapFabLabel {
+  text: string
+  clearable: boolean
+}
+
+/** 浮窗文案：无筛选显示"地图"；有筛选显示分区名并允许清除。 */
+export function resolveSeatSwapMapFabLabel(filterName: string): SeatSwapMapFabLabel {
+  const name = filterName.trim()
+  return name ? { text: name, clearable: true } : { text: '地图', clearable: false }
+}
+
+/** 列表逐张入场的延迟：每张错开 step 毫秒，最多错开 maxSteps 张。 */
+export function resolveSeatSwapStaggerDelayMs(index: number, step = 40, maxSteps = 5): number {
+  if (!Number.isFinite(index) || index <= 0) return 0
+  return Math.min(Math.floor(index), maxSteps) * step
+}
+
+/** 地图划出视口、本场开放、且没有任何弹层打开时才显示浮窗。 */
+export function shouldShowSeatSwapMapFab(input: {
+  available: boolean
+  mapInViewport: boolean
+  sheetOpen: boolean
+}): boolean {
+  return input.available && !input.mapInViewport && !input.sheetOpen
+}
+
+export interface SeatSwapMapTapOutcome {
+  filterKey: string
+  closeSheet: boolean
+  scrollTo: string | null
+}
+
+/**
+ * 首屏地图与地图弹层共用的点击规则：
+ * 有意向的分区被选中 → 滚动到该分组（来自弹层时先关闭弹层）；其余情况只切换筛选。
+ */
+export function resolveSeatSwapMapTap(input: {
+  currentFilterKey: string
+  tappedKey: string
+  hasBadge: boolean
+  fromSheet: boolean
+}): SeatSwapMapTapOutcome {
+  const filterKey = resolveSeatSwapBrowseFilterKey(input.currentFilterKey, input.tappedKey)
+  const jump = input.hasBadge && filterKey !== ''
+  return {
+    filterKey,
+    closeSheet: jump && input.fromSheet,
+    scrollTo: jump ? input.tappedKey : null,
+  }
+}
+
 export function resolveDefaultExpandedSeatSwapRegionKeys(availableKeys: string[]): string[] {
   return [...availableKeys]
 }

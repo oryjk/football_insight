@@ -15,6 +15,10 @@ import {
   resolveDefaultExpandedSeatSwapRegionKeys,
   shouldDimSeatSwapRegion,
   resolveSeatSwapCandidateAction,
+  resolveSeatSwapMapFabLabel,
+  resolveSeatSwapMapTap,
+  resolveSeatSwapStaggerDelayMs,
+  shouldShowSeatSwapMapFab,
   toggleDesiredSeatRegion,
   validateSeatSwapForm,
   type SeatSwapDesiredSeatFormState,
@@ -545,5 +549,67 @@ describe('seat swap stadium selection flow', () => {
   test('returns to my seat instead of editing the fixed peer seat when confirming a candidate', () => {
     expect(previousSeatSwapStep('ready_to_publish', true)).toBe('select_current')
     expect(previousSeatSwapStep('select_current', true)).toBe('select_current')
+  })
+})
+
+describe('seat swap map floating button', () => {
+  test.each([
+    ['', { text: '地图', clearable: false }],
+    ['   ', { text: '地图', clearable: false }],
+    ['112 区', { text: '112 区', clearable: true }],
+    [' 112 区 ', { text: '112 区', clearable: true }],
+  ])('labels %p', (filterName, expected) => {
+    expect(resolveSeatSwapMapFabLabel(filterName)).toEqual(expected)
+  })
+
+  const fabCases: Array<[boolean, boolean, boolean, boolean]> = [
+    // available, mapInViewport, sheetOpen, expected
+    [true, false, false, true],
+    [true, true, false, false],
+    [true, false, true, false],
+    [true, true, true, false],
+    [false, false, false, false],
+    [false, true, false, false],
+    [false, false, true, false],
+    [false, true, true, false],
+  ]
+  test.each(fabCases)('available=%p mapInViewport=%p sheetOpen=%p → %p', (available, mapInViewport, sheetOpen, expected) => {
+    expect(shouldShowSeatSwapMapFab({ available, mapInViewport, sheetOpen })).toBe(expected)
+  })
+})
+
+describe('seat swap list stagger', () => {
+  test.each([
+    [0, 0], [1, 40], [5, 200], [9, 200], [-1, 0], [Number.NaN, 0], [Number.POSITIVE_INFINITY, 0],
+  ])('index %p → %pms', (index, expected) => {
+    expect(resolveSeatSwapStaggerDelayMs(index)).toBe(expected)
+  })
+
+  test('honours custom step and cap', () => {
+    expect(resolveSeatSwapStaggerDelayMs(3, 30, 2)).toBe(60)
+  })
+})
+
+describe('seat swap map tap outcome', () => {
+  test('main map: tapping a region with candidates filters and scrolls without a sheet', () => {
+    expect(resolveSeatSwapMapTap({ currentFilterKey: '', tappedKey: '112', hasBadge: true, fromSheet: false }))
+      .toEqual({ filterKey: '112', closeSheet: false, scrollTo: '112' })
+  })
+
+  test('sheet: tapping a region with candidates filters, closes the sheet and scrolls', () => {
+    expect(resolveSeatSwapMapTap({ currentFilterKey: '', tappedKey: '112', hasBadge: true, fromSheet: true }))
+      .toEqual({ filterKey: '112', closeSheet: true, scrollTo: '112' })
+  })
+
+  test('tapping the active region again clears the filter and stays put', () => {
+    expect(resolveSeatSwapMapTap({ currentFilterKey: '112', tappedKey: '112', hasBadge: true, fromSheet: true }))
+      .toEqual({ filterKey: '', closeSheet: false, scrollTo: null })
+  })
+
+  test('tapping a region without candidates only switches the filter', () => {
+    expect(resolveSeatSwapMapTap({ currentFilterKey: '', tappedKey: '113', hasBadge: false, fromSheet: true }))
+      .toEqual({ filterKey: '113', closeSheet: false, scrollTo: null })
+    expect(resolveSeatSwapMapTap({ currentFilterKey: '', tappedKey: '113', hasBadge: false, fromSheet: false }))
+      .toEqual({ filterKey: '113', closeSheet: false, scrollTo: null })
   })
 })
