@@ -29,6 +29,21 @@ component（--fi-component-*）   组件级复合契约（卡片、kicker/标题
 
 **颜色例外**：球队/球衣等业务数据值、插画装饰色（球场图、海报绘制色）不是视觉 token，保留原样，可在相邻注释标注 decorative。
 
+### 动效 token
+
+新增或修改动效优先引用 `--fi-motion-*`，取值收拢自 `FiBottomSheet` / `FiSegmented` 现有动画：
+
+| token | 值 | 用途 |
+|---|---|---|
+| `--fi-motion-duration-fast` | 120ms | 按压反馈 |
+| `--fi-motion-duration-base` | 220ms | 列表入场、文案切换、箭头旋转 |
+| `--fi-motion-duration-slow` | 280ms | 浮层（如浮窗按钮）入场 |
+| `--fi-motion-ease-out` | `cubic-bezier(0.22, 1, 0.36, 1)` | 入场 |
+| `--fi-motion-ease-in` | `cubic-bezier(0.4, 0, 1, 1)` | 退场 |
+| `--fi-motion-ease-spring` | `cubic-bezier(0.3, 0.9, 0.3, 1)` | 滑块类位移 |
+
+动画只动 `transform` 与 `opacity`，避免小程序重排卡顿；存量页面的动画不强制迁移。
+
 ## 布局责任
 
 跨组件布局由**父级 wrapper** 负责，子组件不自我布局。小程序端 uni-app 组件编译为微信自定义组件，存在宿主节点与样式隔离，以下写法 H5 正常、小程序静默失效（勿再犯）：
@@ -110,7 +125,13 @@ const pageScrollLocked = ref(false)
 const pageLockStyle = computed(() => pageScrollLocked.value ? 'overflow: hidden;' : '')
 ```
 
-子组件不自己写 `page-meta`，通过 `emit` 通知父页面切换锁状态；普通 `view` 的 `height: 100vh; overflow: hidden` 锁不住页面级滚动，只能作辅助。参考实现：`rankings/index.vue`、`seat-swap/index.vue` 的球队赛季弹框。
+子组件不自己写 `page-meta`，通过 `emit` 通知父页面切换锁状态；普通 `view` 的 `height: 100vh; overflow: hidden` 锁不住页面级滚动，只能作辅助。参考实现：`rankings/index.vue` 的球队赛季弹框，`seat-swap/index.vue` 的发布、管理与地图弹层。
+
+### 换座页
+
+- 座位语义色：`--fi-color-seat-current(-bg)` 表示"当前座位"（红），`--fi-color-seat-desired(-bg)` 表示"目标座位"（绿），地图图例、候选卡、Dock、发布弹层共用。
+- 票价分区配色（蓝、绿、紫、黄、藏青、红、VIP）是业务数据色，用 `/* decorative:start … */ … /* decorative:end */` 包裹保留原值。`scripts/seat-swap-style-audit.test.mjs` 会扫描 `src/pages/seat-swap` 下全部 `.vue`，decorative 块之外出现渐变、hex 或数字字重即测试失败。
+- 地图不吸顶：首屏展示，划出视口后由 `SeatSwapMapFab` 浮窗唤起 `SeatSwapMapSheet` 弹层；点击规则由 `resolveSeatSwapMapTap` 统一。设计见 `docs/superpowers/specs/2026-10-19-seat-swap-page-refactor-design.md`。
 
 ## 动效与 reduced-motion
 

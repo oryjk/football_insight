@@ -6,23 +6,8 @@ import { fileURLToPath } from 'node:url'
 // 换座页样式规范的机器检查：无渐变、无散落 hex、无数字字重（decorative 块除外）。
 const ROOT = fileURLToPath(new URL('../src/pages/seat-swap', import.meta.url))
 
-// 逐任务纳入；全部组件迁移完成后改为 'ALL'。
 /** @type {string[] | 'ALL'} */
-const AUDITED_FILES = [
-  'index.vue',
-  'components/SeatSwapMatchCard.vue',
-  'components/SeatSwapNotice.vue',
-  'components/SeatSwapSkeleton.vue',
-  'components/SeatSwapPoolList.vue',
-  'components/SeatSwapCandidateCard.vue',
-  'components/SeatSwapDock.vue',
-  'components/SeatSwapMapFab.vue',
-  'components/SeatSwapRegionPanel.vue',
-  'components/StadiumMap.vue',
-  'components/SeatSwapMapSheet.vue',
-  'components/SeatSwapPublishSheet.vue',
-  'components/SeatSwapManageSheet.vue',
-]
+const AUDITED_FILES = 'ALL'
 
 function listVueFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
