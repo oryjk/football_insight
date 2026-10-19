@@ -54,8 +54,15 @@ WHERE team_id = %s AND active AND NOT (player_id = ANY(%s))
 """
 
 
+# 当前赛季名单的合理性下限：解析出的人数过少，或不到已知现役的一半，一律视为接口异常、不写库，
+# 否则被截断或字段改名的名单会把真实现役球员批量标成离队。
+MIN_CURRENT_SQUAD = 11
+MIN_CURRENT_RATIO = 0.5
+
+
 class SquadStore(Protocol):
     def team_ids(self) -> list[int]: ...
+    def active_count(self, team_id: int) -> int: ...
     def avatar_urls(self, team_id: int) -> dict[int, str]: ...
     def apply(self, team_id: int, season: int, rows: list[dict[str, Any]], current: bool) -> None: ...
 
@@ -67,10 +74,22 @@ class PostgresSquadStore:
     def team_ids(self) -> list[int]:
         return [row[0] for row in self.connection.execute("SELECT team_id FROM f_i_teams ORDER BY team_id").fetchall()]
 
+    def active_count(self, team_id: int) -> int:
+        return int(self.connection.execute(
+            "SELECT COUNT(*) FROM f_i_squad_players WHERE team_id=%s AND active", (team_id,)
+        ).fetchone()[0])
+
     def avatar_urls(self, team_id: int) -> dict[int, str]:
+        """已转存到 MinIO 的头像：本表任意球队（转会球员复用）与旧头像同步写入的 f_i_players。
+
+        对象名只由球员 id 决定（players/{pid}.*），所以同一球员在哪支队的记录都可复用。
+        """
         rows = self.connection.execute(
-            "SELECT player_id, avatar_storage_url FROM f_i_squad_players WHERE team_id=%s AND avatar_storage_url IS NOT NULL",
-            (team_id,),
+            """
+            SELECT player_id, avatar_storage_url FROM f_i_squad_players WHERE avatar_storage_url IS NOT NULL
+            UNION
+            SELECT player_id, avatar_storage_url FROM f_i_players WHERE avatar_storage_url IS NOT NULL
+            """,
         ).fetchall()
         return {int(pid): url for pid, url in rows}
 
@@ -141,6 +160,9 @@ def sync_squads(*, fetch: Callable[[int, int | None], list[SquadPlayer]], store:
             players = fetch(team_id, season)
             if not players:
                 raise ValueError("empty current squad")
+            known_active = store.active_count(team_id)
+            if len(players) < MIN_CURRENT_SQUAD or len(players) < known_active * MIN_CURRENT_RATIO:
+                raise ValueError(f"suspicious current squad: {len(players)} players, {known_active} known active")
             known = _with_avatars(players, known, avatars, uploaded)
             store.apply(team_id, season, build_squad_rows(players, season, known), current=True)
             summary["teams_ok"] += 1
