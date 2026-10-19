@@ -140,7 +140,7 @@ const { navigationPageStyle } = useNavigationLayout()
 // 登录用户共享自 appSession：读取走会话缓存，401 清理由 session 统一处理。
 const session = useAppSession()
 const currentUser = session.currentUser
-const mainTab = ref<'data' | 'tactics'>('tactics')
+const mainTab = ref<'data' | 'tactics'>('data')
 const mainTabs = [{ key: 'data', label: '数据洞察' }, { key: 'tactics', label: '战术' }]
 function changeMainTab(value: string): void {
   if (value === 'data' || value === 'tactics') mainTab.value = value
