@@ -69,11 +69,14 @@ const emit = defineEmits<{
 </script>
 
 <style scoped>
-/* 外部布局由页面的 seat-map-section 包裹节点负责。 */
+/* 与页面其他卡片同一套 FiPanel 外观（圆角、描边、底色、阴影），不再左右出血。 */
 .seat-map-panel {
   padding: var(--fi-space-10) var(--fi-space-24) var(--fi-space-6);
-  background: var(--fi-color-surface-frosted);
-  box-shadow: var(--fi-shadow-soft);
+  border-radius: var(--fi-component-panel-radius);
+  border: var(--fi-component-panel-border);
+  background: var(--fi-component-panel-bg);
+  box-shadow: var(--fi-component-panel-shadow);
+  overflow: hidden;
 }
 
 .seat-map-panel--embedded {

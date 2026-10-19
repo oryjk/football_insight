@@ -401,8 +401,8 @@ onShow(() => {
 </script>
 
 <style scoped>
-/* 地图不再吸顶；划出视口后由浮窗唤起地图弹层。横向出血由页面包裹节点负责。 */
-.seat-map-section { margin: 0 calc(-1 * var(--fi-space-24)); }
+/* 地图不再吸顶；划出视口后由浮窗唤起地图弹层。地图面板与其他卡片同宽，不再横向出血。 */
+.seat-map-section { display: flex; flex-direction: column; align-items: stretch; }
 .page-root {
   position: relative;
   min-height: 100vh;
