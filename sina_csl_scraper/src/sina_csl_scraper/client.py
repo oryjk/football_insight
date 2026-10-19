@@ -19,6 +19,7 @@ from .models import (
     MatchResult,
     PlayerRankingEntry,
     RankingDataset,
+    SquadPlayer,
     StandingEntry,
     TeamRankingEntry,
 )
@@ -26,6 +27,32 @@ from .models import (
 
 class SinaApiError(RuntimeError):
     """Raised when Sina APIs return a non-success status."""
+
+
+_SQUAD_POSITIONS = {"守门员": "GK", "后卫": "DF", "中场": "MF", "前锋": "FW"}
+
+
+def map_squad_position(raw: str | None) -> str | None:
+    return _SQUAD_POSITIONS.get((raw or "").strip())
+
+
+def parse_squad_player(team_id: int, item: dict[str, Any]) -> SquadPlayer | None:
+    pid = str(item.get("pid") or "").strip()
+    name = str(item.get("name_cn") or "").strip() or str(item.get("name") or "").strip()
+    if not pid.isdigit() or not name:
+        return None
+    number = str(item.get("number") or "").strip()
+    logo = str(item.get("logo") or "").strip()
+    country = str(item.get("country") or "").strip()
+    return SquadPlayer(
+        team_id=team_id,
+        player_id=int(pid),
+        player_name=name,
+        shirt_number=int(number) if number.isdigit() else None,
+        position=map_squad_position(item.get("position")),
+        country=country or None,
+        avatar_source_url=logo or None,
+    )
 
 
 def _to_int(value: str | int | None) -> int:
@@ -68,6 +95,15 @@ class SinaCslClient:
         if status["code"] != 0:
             raise SinaApiError(status["msg"])
         return payload["result"]["data"]
+
+    def fetch_team_squad(self, team_id: int, season: int | None = None) -> list[SquadPlayer]:
+        params: dict[str, Any] = {"tid": team_id}
+        if season is not None:
+            params["season"] = season
+        data = self._request("/op/api/team/player", params)
+        items = data.get("players") if isinstance(data, dict) else None
+        players = [parse_squad_player(team_id, item) for item in items or [] if isinstance(item, dict)]
+        return [player for player in players if player is not None]
 
     def fetch_league_info(self) -> LeagueInfo:
         data = self._request("/op/api/league", {"lid": self.league_id})

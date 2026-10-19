@@ -146,3 +146,17 @@ class RankingDataset:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class SquadPlayer:
+    team_id: int
+    player_id: int
+    player_name: str
+    shirt_number: int | None
+    position: str | None
+    country: str | None
+    avatar_source_url: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
