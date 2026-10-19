@@ -51,12 +51,13 @@ const cleanups: Array<() => void> = []
 afterEach(() => { while (cleanups.length) cleanups.pop()!() })
 const flush = async () => { for (let i = 0; i < 6; i++) await nextTick() }
 
-function setup(readonly = false) {
+function setup(readonly = false, windowApis: Record<string, unknown> = {}) {
   const previous = globalThis.uni
   const requests: Array<{ selector: string; reply: (rect: unknown) => void }> = []
   let resize: (() => void) | undefined
   globalThis.uni = {
     getWindowInfo: () => ({ windowWidth: 375 }),
+    ...windowApis,
     onWindowResize: (fn: () => void) => { resize = fn },
     offWindowResize: () => { resize = undefined },
     createSelectorQuery() {
@@ -179,4 +180,37 @@ test('read-only public pitches use the same initial layout while disabling dragg
   await flush()
   expect(pitch.movers()).toHaveLength(11)
   expect(pitch.movers().every(n => n.props.disabled === true)).toBe(true)
+})
+
+for (const width of [undefined, 0, NaN, Infinity, -1]) {
+  test(`invalid getWindowInfo width (${String(width)}) cannot turn all formation coordinates into NaN`, async () => {
+    const pitch = setup(false, {
+      getWindowInfo: () => ({ windowWidth: width }),
+      upx2px: (rpx: number) => rpx * 430 / 750,
+    })
+    await flush()
+    pitch.requests.shift()!.reply({ width: 404, height: 484 })
+    await flush()
+    pitch.requests.shift()!.reply({ width: 404, height: 484 })
+    await flush()
+    const actual = pitch.movers().map(n => ({ x: n.props.x, y: n.props.y }))
+    expect(actual.every(({ x, y }) => Number.isFinite(x) && Number.isFinite(y))).toBe(true)
+    expect(actual).toEqual(pitch.props.players.map(p => boxPositionPx(p, { width: 404, height: 484 }, 430)))
+    expect(new Set(actual.map(({ x, y }) => `${x}:${y}`)).size).toBe(11)
+  })
+}
+
+test('legacy window information is used if both the new API and rpx conversion are unavailable', async () => {
+  const pitch = setup(false, {
+    getWindowInfo: () => ({}), upx2px: () => { throw new Error('unavailable') },
+    getSystemInfoSync: () => ({ windowWidth: 430 }),
+  })
+  await flush()
+  pitch.requests.shift()!.reply({ width: 404, height: 484 })
+  await flush()
+  pitch.requests.shift()!.reply({ width: 404, height: 484 })
+  await flush()
+  expect(pitch.movers().map(n => ({ x: n.props.x, y: n.props.y }))).toEqual(
+    pitch.props.players.map(p => boxPositionPx(p, { width: 404, height: 484 }, 430)),
+  )
 })

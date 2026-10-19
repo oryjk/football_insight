@@ -110,11 +110,20 @@ const pressedFrom: Record<number, Px> = {}
 let suppressTap = false
 
 function readWindowWidth(): number {
-  try {
-    return uni.getWindowInfo ? uni.getWindowInfo().windowWidth : uni.getSystemInfoSync().windowWidth
-  } catch {
-    return 375
+  // 接口存在但缺少 windowWidth 时不会抛错；不能让 undefined 进入 rpx/px 换算。
+  // upx2px 与原生 rpx 尺寸使用同一比例，旧接口仅作为最后的 API 兜底。
+  const readers = [
+    () => uni.getWindowInfo?.().windowWidth,
+    () => uni.upx2px(750),
+    () => uni.getSystemInfoSync().windowWidth,
+  ]
+  for (const read of readers) {
+    try {
+      const width = read()
+      if (typeof width === 'number' && Number.isFinite(width) && width > 0) return width
+    } catch { /* Continue with the next source. */ }
   }
+  return windowWidthPx.value
 }
 
 function currentMeasure(epoch: number): boolean {
