@@ -2,6 +2,8 @@ use super::{
     domain::{LineupReadError, Position, SquadPlayer, SquadResponse},
     ports::SquadRepository,
 };
+pub mod my_lineup;
+
 use std::sync::Arc;
 
 pub struct LineupService {
