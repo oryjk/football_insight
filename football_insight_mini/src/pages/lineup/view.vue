@@ -44,9 +44,9 @@ import LineupShareSheet from './components/LineupShareSheet.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { useAppSession } from '../../stores/appSession'
 import { buildLineupListUrl, buildLineupPageUrl, buildLineupViewUrl, parseLineupShareCode } from '../../utils/lineupLinks'
-import { createLineupDetail } from './lineupCommunity'
+import { createLineupDetail } from '../../composables/useLineupCommunity'
 import { publicPitch, lineupSharePayload } from './lineupPoster'
-import { lineupDateLabel } from './lineupPresentation'
+import { lineupDateLabel } from '../../utils/lineupPresentation'
 import { useLineupShare } from './useLineupShare'
 const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()

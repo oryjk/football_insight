@@ -3,7 +3,7 @@ import { getLineupCode } from '../../api/lineup'
 import type { PublicLineup } from '../../types/lineup'
 import { extractApiErrorMessage, isUnauthorizedError } from '../../utils/apiError'
 import { exportCanvasToTempFile, flushCanvas, materializePosterCode, savePosterWithPermission } from '../../utils/canvasPoster'
-import { communityDeps } from './lineupCommunity'
+import { communityDeps } from '../../composables/useLineupCommunity'
 import { useAppSession } from '../../stores/appSession'
 import { drawLineupPoster, LINEUP_CARD, LINEUP_POSTER, lineupSharePayload, type LineupSharer } from './lineupPoster'
 

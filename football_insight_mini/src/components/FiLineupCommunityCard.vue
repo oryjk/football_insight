@@ -1,13 +1,18 @@
 <template>
-  <view class="lineup-card" @tap="emit('open')">
+  <view class="lineup-card" :class="{ 'lineup-card--compact': compact }" @tap="emit('open')">
     <view class="card-row">
-      <text v-if="rank" class="rank">#{{ rank }}</text>
+      <text v-if="rank && !compact" class="rank">#{{ rank }}</text>
       <image v-if="item.author.avatar_url" :src="item.author.avatar_url" class="avatar" mode="aspectFill" />
       <view v-else class="avatar avatar--fallback">{{ item.author.display_name.charAt(0) }}</view>
       <view class="identity"><text class="name">{{ item.author.display_name }}</text><text class="date">{{ createdLabel }}</text></view>
       <text class="formation">{{ item.formation }}</text>
+      <button v-if="compact" class="like like--compact" :class="{ 'like--active': item.liked_by_me }" :disabled="pending" :aria-label="pending ? '点赞处理中' : item.liked_by_me ? '取消点赞' : '点赞'" @tap.stop="emit('like')">
+        <!-- Rasterized from static/home/support-thumbs-up.svg; Lucide ISC license remains in static/home. -->
+        <image class="like-icon" src="/static/lineup/like.png" mode="aspectFit" />
+        <text>{{ item.likes_count }}</text>
+      </button>
     </view>
-    <view class="card-row card-row--footer">
+    <view v-if="!compact" class="card-row card-row--footer">
       <text class="caption">查看完整 11 人阵容 ›</text>
       <button class="like" :class="{ 'like--active': item.liked_by_me }" :disabled="pending" @tap.stop="emit('like')">{{ pending ? '处理中…' : item.liked_by_me ? '♥ 已赞' : '♡ 点赞' }} {{ item.likes_count }}</button>
     </view>
@@ -15,9 +20,9 @@
 </template>
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { PublicLineupSummary } from '../../../types/lineup'
-import { lineupDateLabel } from '../lineupPresentation'
-const props = defineProps<{ item: PublicLineupSummary; rank?: number; pending: boolean }>()
+import type { PublicLineupSummary } from '../types/lineup'
+import { lineupDateLabel } from '../utils/lineupPresentation'
+const props = withDefaults(defineProps<{ item: PublicLineupSummary; rank?: number; pending: boolean; compact?: boolean }>(), { compact: false })
 const emit = defineEmits<{ (e: 'open'): void; (e: 'like'): void }>()
 const createdLabel = computed(() => lineupDateLabel(props.item.created_at))
 </script>
@@ -34,4 +39,13 @@ const createdLabel = computed(() => lineupDateLabel(props.item.created_at))
 .like { margin: 0; padding: var(--fi-space-12) var(--fi-space-20); border-radius: var(--fi-radius-round); background: var(--fi-color-page-soft); color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); line-height: var(--fi-leading-normal); }
 .like::after { border: 0; }
 .like--active { color: var(--fi-color-primary); }
+.lineup-card--compact { padding: var(--fi-space-16) 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.lineup-card--compact .avatar { width: var(--fi-space-48); height: var(--fi-space-48); }
+.lineup-card--compact .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fi-font-26); }
+.lineup-card--compact .date { font-size: var(--fi-font-20); }
+.lineup-card--compact .identity { gap: var(--fi-space-4); }
+.lineup-card--compact .formation { flex-shrink: 0; font-size: var(--fi-font-26); }
+.like--compact { display: flex; flex-shrink: 0; align-items: center; justify-content: center; gap: var(--fi-space-8); min-width: var(--fi-space-64); padding: var(--fi-space-8) var(--fi-space-12); background: transparent; }
+.like-icon { width: var(--fi-space-28); height: var(--fi-space-28); opacity: 0.55; }
+.like--active .like-icon { opacity: 1; }
 </style>

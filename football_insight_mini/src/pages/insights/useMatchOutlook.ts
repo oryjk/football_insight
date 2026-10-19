@@ -21,6 +21,8 @@ interface Dependencies {
   underReview: () => boolean
   revision: Readonly<Ref<number>>
   selectedTeamId: Ref<number | null>
+  /** 共用球队选择由页面维护，赛前元数据不能覆盖用户已选球队。 */
+  externalTeamSelection?: boolean
   metadata?: () => Promise<Metadata>
   outlook?: (id: number) => Promise<OutlookResponse>
   now?: () => number
@@ -224,8 +226,10 @@ export function createOutlookLoader(deps: Dependencies) {
         teams.value = data.teams
         allMatches.value = data.matches
         if (
-          !choiceInitialized ||
-          !data.teams.some((team) => team.team_id === deps.selectedTeamId.value)
+          !deps.externalTeamSelection && (
+            !choiceInitialized ||
+            !data.teams.some((team) => team.team_id === deps.selectedTeamId.value)
+          )
         ) {
           applyingMetadata = true
           deps.selectedTeamId.value =

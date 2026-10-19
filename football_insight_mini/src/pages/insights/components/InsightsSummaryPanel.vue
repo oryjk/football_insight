@@ -3,17 +3,7 @@
     <view class="summary-panel__header">
       <text class="summary-panel__name">{{ insight.team_name }}</text>
       <text class="summary-panel__rank">第 {{ insight.rank_no }} 名</text>
-      <view
-        class="summary-panel__board"
-        role="button"
-        aria-label="打开当前球队战术板"
-        hover-class="summary-panel__board--pressed"
-        :hover-stay-time="80"
-        @tap="emit('open-board')"
-      >
-        <text>战术板</text>
-        <image :src="chevronIcon" class="summary-panel__chevron" mode="aspectFit" />
-      </view>
+
     </view>
 
     <view class="summary-panel__grid">
@@ -31,10 +21,8 @@
 
 <script setup lang="ts">
 import type { TeamInsight } from '../../../types/insight'
-import chevronIcon from '../../../static/rankings/chevron-right.svg'
 
 defineProps<{ insight: TeamInsight }>()
-const emit = defineEmits<{ (e: 'open-board'): void }>()
 
 </script>
 
@@ -66,20 +54,6 @@ const emit = defineEmits<{ (e: 'open-board'): void }>()
   line-height: var(--fi-leading-none);
   white-space: nowrap;
 }
-.summary-panel__board {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  margin-left: auto;
-  min-height: var(--fi-space-64);
-  color: var(--fi-color-primary);
-  font-size: var(--fi-font-26);
-  line-height: var(--fi-leading-none);
-  font-weight: var(--fi-weight-bold);
-  white-space: nowrap;
-}
-.summary-panel__board--pressed { opacity: var(--fi-opacity-insights-pressed); }
-.summary-panel__chevron { width: var(--fi-space-32); height: var(--fi-space-32); }
 .summary-panel__grid {
   margin-top: var(--fi-space-18);
   display: grid;

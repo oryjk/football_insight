@@ -6,77 +6,90 @@
     <view class="page-bg-fade"></view>
     <view class="page-scroll">
       <view class="page">
-        <InsightsTicketWatchEntry
-          v-if="!systemConfigUnderReview"
-          :locked="shouldLockTicketWatchEntry"
-          @open="openTicketWatch"
-        />
-
         <InsightsTeamSelector
-          v-if="outlookReviewReady && currentUser && selectableTeams.length"
+          v-if="selectableTeams.length"
           :teams="selectableTeams"
           :selected-team-id="selectedTeamId"
-          @update:selected-team-id="outlookLoader.selectTeam"
+          @update:selected-team-id="teamBrowser.selectTeam"
         />
-
-        <InsightsMatchOutlook
-          v-if="outlookReviewReady && !systemConfigUnderReview && currentUser"
-          :matches="outlookMatches"
-          :selected-match-id="outlookSelectedMatchId"
-          :outlook="matchOutlook"
-          :loading="outlookLoading"
-          :error="outlookError"
-          @select-match="outlookLoader.selectMatch"
-        />
-
-        <InsightsSkeleton
-          v-if="userLoading"
-        />
-
-        <InsightsLockedPanel v-else-if="!currentUser" mode="guest" />
-
-        <InsightsLockedPanel v-else-if="membershipBenefitsLocked" mode="membership" @action="goToUserPage" />
-
-        <InsightsSkeleton
-          v-else-if="loading"
-        />
-
-        <view v-else-if="errorMessage" class="state-card state-card--error">
-          <text>{{ errorMessage }}</text>
+        <view v-else class="state-card team-loading">
+          <text>{{ teamError || '正在加载球队…' }}</text>
+          <button v-if="teamError" @tap="teamBrowser.load()">重试</button>
         </view>
-
-        <template v-else-if="selectedInsight">
-          <InsightsTeamPanel
-            :insight="selectedInsight"
-            @open-board="goToTeamBoard"
+        <InsightsMainTabs v-model="mainTab" />
+        <InsightsTacticsPanel
+          v-if="mainTab === 'tactics'"
+          :authenticated="tacticsAuthenticated"
+          :mine-loading="mineLoading" :mine-error="mineError" :draft="mineDraft" :published="minePublished"
+          :items="communityItems" :total="communityTotal" :sort="communitySort"
+          :loading="communityLoading || teamLoading" :error="teamError || communityError" :pending-likes="communityPendingLikes"
+          @edit="goToTeamBoard" @retry-mine="tactics.retryMine()" @retry-list="retryTacticsList"
+          @sort="tactics.changeSort" @like="tactics.like" @open="openPublicTactics" @more="tactics.more()"
+        />
+        <template v-else>
+          <InsightsTicketWatchEntry
+            v-if="!systemConfigUnderReview"
+            :locked="shouldLockTicketWatchEntry"
+            @open="openTicketWatch"
+          />
+          <InsightsMatchOutlook
+            v-if="outlookReviewReady && !systemConfigUnderReview && currentUser"
+            :matches="outlookMatches"
+            :selected-match-id="outlookSelectedMatchId"
+            :outlook="matchOutlook"
+            :loading="outlookLoading"
+            :error="outlookError"
+            @select-match="outlookLoader.selectMatch"
           />
 
-          <InsightsContributionSurface
-            :rows="{
-              'goals-for-opponent': goalsForByOpponentRows,
-              'goals-for-player': goalsForByPlayerRows,
-              'assists-player': assistsByPlayerRows,
-              'goals-against-opponent': goalsAgainstByOpponentRows,
-            }"
-            :expanded="{
-              'goals-for-opponent': goalsForOpponentExpanded,
-              'goals-for-player': goalsForPlayerExpanded,
-              'assists-player': assistsForPlayerExpanded,
-              'goals-against-opponent': goalsAgainstOpponentExpanded,
-            }"
-            @toggle="key => {
-              if (key === 'goals-for-opponent') goalsForOpponentExpanded = !goalsForOpponentExpanded
-              else if (key === 'goals-for-player') goalsForPlayerExpanded = !goalsForPlayerExpanded
-              else if (key === 'assists-player') assistsForPlayerExpanded = !assistsForPlayerExpanded
-              else if (key === 'goals-against-opponent') goalsAgainstOpponentExpanded = !goalsAgainstOpponentExpanded
-            }"
+          <InsightsSkeleton
+            v-if="userLoading"
           />
+
+          <InsightsLockedPanel v-else-if="!currentUser" mode="guest" />
+
+          <InsightsLockedPanel v-else-if="membershipBenefitsLocked" mode="membership" @action="goToUserPage" />
+
+          <InsightsSkeleton
+            v-else-if="loading"
+          />
+
+          <view v-else-if="errorMessage" class="state-card state-card--error">
+            <text>{{ errorMessage }}</text>
+          </view>
+
+          <template v-else-if="selectedInsight">
+            <InsightsTeamPanel
+              :insight="selectedInsight"
+            />
+
+            <InsightsContributionSurface
+              :rows="{
+                'goals-for-opponent': goalsForByOpponentRows,
+                'goals-for-player': goalsForByPlayerRows,
+                'assists-player': assistsByPlayerRows,
+                'goals-against-opponent': goalsAgainstByOpponentRows,
+              }"
+              :expanded="{
+                'goals-for-opponent': goalsForOpponentExpanded,
+                'goals-for-player': goalsForPlayerExpanded,
+                'assists-player': assistsForPlayerExpanded,
+                'goals-against-opponent': goalsAgainstOpponentExpanded,
+              }"
+              @toggle="key => {
+                if (key === 'goals-for-opponent') goalsForOpponentExpanded = !goalsForOpponentExpanded
+                else if (key === 'goals-for-player') goalsForPlayerExpanded = !goalsForPlayerExpanded
+                else if (key === 'assists-player') assistsForPlayerExpanded = !assistsForPlayerExpanded
+                else if (key === 'goals-against-opponent') goalsAgainstOpponentExpanded = !goalsAgainstOpponentExpanded
+              }"
+            />
+          </template>
+
+          <view v-else class="state-card">
+            <text>当前还没有可展示的球队洞察数据。</text>
+          </view>
         </template>
-
-        <view v-else class="state-card">
-          <text>当前还没有可展示的球队洞察数据。</text>
-        </view>
-    </view>
+      </view>
     </view>
 
     <FiLoginFloat v-if="showLoginFloat" :desc="systemConfigUnderReview ? '登录后，可以关注主队并参与赛前助力。' : undefined" @action="goToLogin" />
@@ -87,9 +100,13 @@
 import { buildSharePath } from '../../utils/shareSource'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, ref, watch } from 'vue'
-import { onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
+import { onHide, onReachBottom, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
+import InsightsMainTabs from './components/InsightsMainTabs.vue'
+import InsightsTacticsPanel from './components/InsightsTacticsPanel.vue'
+import { useInsightsTeams } from './useInsightsTeams'
+import { useInsightsTactics } from './useInsightsTactics'
 import InsightsSkeleton from './components/InsightsSkeleton.vue'
 import InsightsTicketWatchEntry from './components/InsightsTicketWatchEntry.vue'
 import InsightsLockedPanel from './components/InsightsLockedPanel.vue'
@@ -112,7 +129,7 @@ import {
   buildOpponentContributionRows,
   buildPlayerContributionRows,
 } from './helpers'
-import { buildLineupPageUrl } from '../../utils/lineupLinks'
+import { buildLineupPageUrl, buildLineupViewUrl } from '../../utils/lineupLinks'
 import { createInsightsSessionSync, runInsightsShow } from './sessionEffects'
 import { useInsightsData } from './useInsightsData'
 
@@ -121,6 +138,13 @@ const { navigationPageStyle } = useNavigationLayout()
 // 登录用户共享自 appSession：读取走会话缓存，401 清理由 session 统一处理。
 const session = useAppSession()
 const currentUser = session.currentUser
+const mainTab = ref<'data' | 'tactics'>('tactics')
+const pageVisible = ref(false)
+const teamBrowser = useInsightsTeams(session)
+const { teams: selectableTeams, selectedTeamId, loading: teamLoading, error: teamError } = teamBrowser
+const tactics = useInsightsTactics({ session, selectedTeamId, active: computed(() => pageVisible.value && mainTab.value === 'tactics') })
+const { mineLoading, mineError, mineDraft, minePublished, authenticated: tacticsAuthenticated } = tactics
+const { items: communityItems, total: communityTotal, sort: communitySort, loading: communityLoading, error: communityError, pendingLikes: communityPendingLikes } = tactics.community
 const ticketWatchNavigating = ref(false)
 const systemConfigUnderReview = ref(false)
 const outlookReviewReady = ref(false)
@@ -133,9 +157,7 @@ const {
   userLoading,
   loading,
   errorMessage,
-  teams,
   insights,
-  selectedTeamId,
   goalsForOpponentExpanded,
   goalsForPlayerExpanded,
   assistsForPlayerExpanded,
@@ -147,6 +169,7 @@ const {
 } = useInsightsData({
   session,
   isMembershipLocked: () => membershipBenefitsLocked.value,
+  selectedTeamId,
 })
 const outlookLoader = createOutlookLoader({
   authenticated: () => Boolean(currentUser.value),
@@ -154,19 +177,20 @@ const outlookLoader = createOutlookLoader({
   underReview: () => !outlookReviewReady.value || systemConfigUnderReview.value,
   revision: session.revision,
   selectedTeamId,
+  externalTeamSelection: true,
 })
 const {
-  teams: outlookTeams,
   matches: outlookMatches,
   outlook: matchOutlook,
   selectedMatchId: outlookSelectedMatchId,
   loading: outlookLoading,
   error: outlookError,
 } = outlookLoader
-const selectableTeams = computed(() => outlookTeams.value.length ? outlookTeams.value : teams.value)
-onUnload(outlookLoader.dispose)
+onUnload(() => { outlookLoader.dispose(); tactics.dispose(); teamBrowser.dispose() })
+onHide(() => { pageVisible.value = false })
+onReachBottom(() => { if (mainTab.value === 'tactics') void tactics.more() })
 
-const showLoginFloat = computed(() => !userLoading.value && !currentUser.value)
+const showLoginFloat = computed(() => mainTab.value === 'data' && !userLoading.value && !currentUser.value)
 const shouldLockTicketWatchEntry = computed(() =>
   !userLoading.value && (!currentUser.value || membershipBenefitsLocked.value),
 )
@@ -207,7 +231,7 @@ const goalsAgainstByOpponentRows = computed(() =>
 )
 
 onShareAppMessage(() => ({
-  title: selectedInsight.value
+  title: mainTab.value === 'tactics' ? `${selectableTeams.value.find(team => team.team_id === selectedTeamId.value)?.team_name ?? '球队'}战术，看看大家怎么排` : selectedInsight.value
     ? `${selectedInsight.value.team_name} 的贡献结构，看看这队靠谁赢球`
     : '球队洞察：不是榜单，而是贡献结构',
   path: buildSharePath('/pages/insights/index', 'insights'),
@@ -237,7 +261,10 @@ watch([session.revision, currentUser], ([revision, user], [previousRevision, pre
 
 // 付费引导度量：只统计登录、权益未暂停且尚未达到 V6 的用户，这类用户才会在回流看板里遇到升级引导。
 function shouldMeasureTicketWatchEntry(): boolean {
-  return Boolean(currentUser.value)
+  return pageVisible.value
+    && mainTab.value === 'data'
+    && outlookReviewReady.value
+    && Boolean(currentUser.value)
     && !userLoading.value
     && !systemConfigUnderReview.value
     && !membershipBenefitsLocked.value
@@ -248,7 +275,7 @@ function reportTicketWatchEntryImpression(): void {
   if (shouldMeasureTicketWatchEntry()) reportPaywallImpression('insights_ticket_watch_entry')
 }
 
-watch([currentUser, userLoading], reportTicketWatchEntryImpression)
+watch([currentUser, userLoading, mainTab, pageVisible, outlookReviewReady], reportTicketWatchEntryImpression)
 
 function openTicketWatch(): void {
   if (!currentUser.value) {
@@ -294,17 +321,21 @@ function goToLogin(): void {
 }
 
 function goToTeamBoard(): void {
-  if (!selectedInsight.value) {
-    return
-  }
-
-  // 「战术板」入口现在进入排阵页；旧的观点帖页面保留但不再提供入口。
-  uni.navigateTo({
-    url: buildLineupPageUrl(selectedInsight.value.team_id),
-  })
+  if (selectedTeamId.value === null) return
+  uni.navigateTo({ url: buildLineupPageUrl(selectedTeamId.value) })
+}
+function openPublicTactics(code: string): void {
+  uni.navigateTo({ url: buildLineupViewUrl(code) })
+}
+function retryTacticsList(): void {
+  if (teamError.value) void teamBrowser.load()
+  else void tactics.refresh()
 }
 
 onShow(async () => {
+  pageVisible.value = true
+  void teamBrowser.load()
+  void tactics.refresh()
   outlookReviewReady.value = false
   reportPageActivity('insights')
   beginPaywallVisit()
@@ -325,6 +356,7 @@ onShow(async () => {
 </script>
 
 <style scoped lang="css">
+.team-loading { color:var(--fi-color-text-caption); font-size:var(--fi-font-24); }
 .page-root { position: relative; }
 .page-scroll {
   padding-top: var(--fi-brand-nav-height);

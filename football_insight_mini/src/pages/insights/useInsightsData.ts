@@ -10,6 +10,8 @@ export interface InsightsDataDeps {
   isMembershipLocked: () => boolean
   /** 测试注入可控的私有读取；默认走真实 api 层。 */
   getLiveTeamInsights?: () => Promise<TeamInsightsResponse>
+  /** 页面共用的公开球队选择；私有数据刷新不拥有其默认值或会话重置。 */
+  selectedTeamId?: Ref<number | null>
 }
 
 export interface InsightsData {
@@ -54,7 +56,7 @@ export function useInsightsData(deps: InsightsDataDeps): InsightsData {
   const errorMessage = ref('')
   const teams = ref<TeamInsightTeam[]>([])
   const insights = ref<TeamInsight[]>([])
-  const selectedTeamId = ref<number | null>(null)
+  const selectedTeamId = deps.selectedTeamId ?? ref<number | null>(null)
   const goalsForOpponentExpanded = ref(false)
   const goalsForPlayerExpanded = ref(false)
   const assistsForPlayerExpanded = ref(false)
@@ -75,7 +77,7 @@ export function useInsightsData(deps: InsightsDataDeps): InsightsData {
     // 正常同账号刷新不触发本方法（revision 不变），缓存保留。
     teams.value = []
     insights.value = []
-    selectedTeamId.value = null
+    if (!deps.selectedTeamId) selectedTeamId.value = null
     resetExpandedState()
     errorMessage.value = ''
     loading.value = false
@@ -117,7 +119,7 @@ export function useInsightsData(deps: InsightsDataDeps): InsightsData {
       }
       teams.value = response.teams
       insights.value = response.insights
-      if (!response.teams.some(team => team.team_id === selectedTeamId.value)) {
+      if (!deps.selectedTeamId && !response.teams.some(team => team.team_id === selectedTeamId.value)) {
         selectedTeamId.value = response.teams[0]?.team_id ?? null
       }
       resetExpandedState()

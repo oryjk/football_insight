@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { ApiRequestError } from '../../utils/apiError'
-import type { PublicLineup, PublicLineupSummary, TeamLineups } from '../../types/lineup'
-import { createLineupList, createLineupDetail, createLineupLikes, communityDeps, publicRead } from './lineupCommunity'
+import { ApiRequestError } from '../utils/apiError'
+import { POST_LOGIN_REDIRECT_STORAGE_KEY, type PostLoginRedirectTarget } from '../utils/authStorage'
+import type { PublicLineup, PublicLineupSummary, TeamLineups } from '../types/lineup'
+import { createLineupList, createLineupDetail, createLineupLikes, communityDeps, publicRead } from './useLineupCommunity'
 
 const item: PublicLineupSummary = { share_code: 'Ab12Cd34', formation: '4-3-3', author: { display_name: '球迷', avatar_url: null }, created_at: '2026-10-19T00:00:00Z', updated_at: '2026-10-19T00:00:00Z', likes_count: 2, liked_by_me: false }
 function response(id: number, page = 1): TeamLineups { return { team: { team_id: id, team_name: String(id), avatar_url: null }, items: [{ ...item, share_code: page === 1 ? 'Ab12Cd34' : 'Ef56Gh78' }], total: 3, page, page_size: 20 } }
@@ -55,6 +56,40 @@ describe('public list ownership', () => {
     const pending = list.load(1); list.dispose(); next.resolve(response(1)); await pending
     expect(list.items.value).toEqual([])
   })
+  test('pausing cancels a pending page, preserves cached rows, and allows pagination after resume', async () => {
+    const gate = deferred<TeamLineups>(); let calls = 0
+    const list = createLineupList({ ...deps(), list: async (id, _sort, page = 1) => { calls++; return calls === 2 ? gate.promise : response(id, page) } })
+    await list.load(1)
+    const pending = list.more(); list.invalidatePending()
+    expect(list.loading.value).toBe(false); expect(list.page.value).toBe(1); expect(list.items.value.length).toBe(1)
+    gate.resolve({ ...response(1, 2), total: 50 }); await pending
+    expect(list.page.value).toBe(1); expect(list.total.value).toBe(3); expect(list.items.value.length).toBe(1)
+    await list.more()
+    expect(list.page.value).toBe(2); expect(list.items.value.length).toBe(2)
+  })
+})
+
+describe('login return navigation', () => {
+  for (const [url, type] of [
+    ['/pages/insights/index', 'switchTab'],
+    ['/pages/lineup/list?team_id=1', 'navigateTo'],
+    ['/pages/lineup/view?code=Ab12Cd34', 'navigateTo'],
+  ] as const) {
+    test(`returns to ${url} with ${type}`, () => {
+      const globals = globalThis as unknown as { uni?: unknown }, previous = globals.uni
+      const stored: Array<[string, unknown]> = [], navigated: string[] = []
+      globals.uni = {
+        setStorageSync: (key: string, value: unknown) => stored.push([key, value]),
+        showToast: () => {},
+        switchTab: ({ url }: { url: string }) => navigated.push(url),
+      }
+      try {
+        communityDeps({ revision: () => 0 }).login(url)
+        expect(stored).toEqual([[POST_LOGIN_REDIRECT_STORAGE_KEY, { type, url } satisfies PostLoginRedirectTarget]])
+        expect(navigated).toEqual(['/pages/user/index'])
+      } finally { globals.uni = previous }
+    })
+  }
 })
 
 describe('likes and active auth', () => {

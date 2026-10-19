@@ -28,7 +28,9 @@ test('all public page share callbacks retain their target and correct attributio
     ['home', 'home', '/pages/home/index', { supportFavoriteTeam: ref(null) }],
     ['matches', 'matches', '/pages/matches/index', {}],
     ['rankings', 'rankings', '/pages/rankings/index', { rankingsContentRef: ref(null) }],
-    ['insights', 'insights', '/pages/insights/index', { selectedInsight: ref(null) }],
+    ...(['data', 'tactics'] as const).map(tab => ['insights', 'insights', '/pages/insights/index', {
+      selectedInsight: ref(null), mainTab: ref(tab), selectableTeams: ref([]), selectedTeamId: ref(null),
+    }] as [string, string, string, Record<string, unknown>]),
     ['team-board', 'team_board', '/pages/team-board/index?teamId=77680', { board: ref(null), teamId: ref(77680) }],
     ['team-board', 'team_board', '/pages/insights/index', { board: ref(null), teamId: ref(null) }],
     ['support', 'support', '/pages/support/index?matchId=42', { detail: ref({ match_id: 42, home_team: { team_name: '主队' }, away_team: { team_name: '客队' } }), supportedTeam: ref(null) }],

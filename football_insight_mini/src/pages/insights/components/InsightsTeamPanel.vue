@@ -1,6 +1,6 @@
 <template>
   <FiPanel>
-    <InsightsSummaryPanel :insight="insight" @open-board="emit('open-board')" />
+    <InsightsSummaryPanel :insight="insight" />
   </FiPanel>
 </template>
 
@@ -13,7 +13,4 @@ defineProps<{
   insight: TeamInsight
 }>()
 
-const emit = defineEmits<{
-  (e: 'open-board'): void
-}>()
 </script>

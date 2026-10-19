@@ -1,9 +1,9 @@
 import { ref } from 'vue'
-import { getSharedLineup, getTeamLineups, setLineupLike } from '../../api/lineup'
-import { useAppSession } from '../../stores/appSession'
-import type { LineupLikes, LineupSort, PublicLineup, PublicLineupSummary, TeamLineups } from '../../types/lineup'
-import { extractApiErrorMessage, isUnauthorizedError } from '../../utils/apiError'
-import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
+import { getSharedLineup, getTeamLineups, setLineupLike } from '../api/lineup'
+import { useAppSession } from '../stores/appSession'
+import type { LineupLikes, LineupSort, PublicLineup, PublicLineupSummary, TeamLineups } from '../types/lineup'
+import { extractApiErrorMessage, isUnauthorizedError } from '../utils/apiError'
+import { rememberPostLoginRedirect } from '../utils/postLoginRedirect'
 
 export interface CommunityDeps {
   list: typeof getTeamLineups
@@ -21,7 +21,7 @@ export function communityDeps(overrides: Partial<CommunityDeps> = {}): Community
     loggedIn: () => Boolean(session?.hasAccessToken.value), revision: () => session?.revision.value ?? 0,
     invalidate: revision => session?.invalidateSession(revision),
     login: returnUrl => {
-      rememberPostLoginRedirect({ type: 'navigateTo', url: returnUrl })
+      rememberPostLoginRedirect({ type: returnUrl === '/pages/insights/index' ? 'switchTab' : 'navigateTo', url: returnUrl })
       uni.showToast({ title: '请登录后继续', icon: 'none' })
       uni.switchTab({ url: '/pages/user/index' })
     }, ...overrides,
@@ -120,8 +120,10 @@ export function createLineupList(overrides: Partial<CommunityDeps> = {}) {
     if (message) error.value = message
     else if (updated && sort.value === 'likes') await load(teamId.value, 'likes')
   }
-  function dispose(): void { disposed = true; generation++; likes.reset() }
-  return { teamId, sort, page, total, team, items, loading, error, pendingLikes: likes.pending, load, more, like, dispose }
+  /** Pause an embedded list without discarding its last successfully loaded page. */
+  function invalidatePending(): void { generation++; likes.reset(); loading.value = false }
+  function dispose(): void { disposed = true; invalidatePending() }
+  return { teamId, sort, page, total, team, items, loading, error, pendingLikes: likes.pending, load, more, like, invalidatePending, dispose }
 }
 
 export function createLineupDetail(overrides: Partial<CommunityDeps> = {}) {

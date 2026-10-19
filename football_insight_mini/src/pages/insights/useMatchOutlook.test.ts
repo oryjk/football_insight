@@ -305,6 +305,70 @@ test('a team chosen before metadata arrives is honored, including clubs without 
   loader.dispose()
 })
 
+test('external selection survives slow metadata even when the chosen public team is absent from private metadata', async () => {
+  const selectedTeamId = ref<number | null>(9)
+  let resolveData!: (value: any) => void
+  const loader = createOutlookLoader({
+    authenticated: () => true, underReview: () => false, revision: ref(0), selectedTeamId,
+    externalTeamSelection: true,
+    metadata: () => new Promise(resolve => { resolveData = resolve }),
+    outlook: async () => ({ status: 'unavailable', outlook: null }),
+  })
+  const pending = loader.load()
+  selectedTeamId.value = 3
+  resolveData(metadata)
+  await pending
+  expect(selectedTeamId.value).toBe(3)
+  expect(loader.matches.value).toEqual([])
+  expect(loader.selectedMatchId.value).toBe(null)
+  expect(loader.loading.value).toBe(false)
+  loader.dispose()
+  expect(selectedTeamId.value).toBe(3)
+})
+
+test('external null selection waits for the public chooser and private resets preserve its later choice', async () => {
+  const selectedTeamId = ref<number | null>(null), review = ref(false), authenticated = ref(true)
+  const calls: number[] = []
+  const loader = createOutlookLoader({
+    authenticated: () => authenticated.value, underReview: () => review.value,
+    revision: ref(0), selectedTeamId, externalTeamSelection: true,
+    metadata: async () => metadata as any,
+    outlook: async id => { calls.push(id); return { status: 'unavailable', outlook: null } },
+  })
+  await loader.load()
+  expect(selectedTeamId.value).toBe(null); expect(loader.selectedMatchId.value).toBe(null)
+  selectedTeamId.value = 1; await flush()
+  expect(loader.selectedMatchId.value).toBe(1)
+  review.value = true
+  expect(loader.teams.value).toEqual([]); expect(selectedTeamId.value).toBe(1)
+  review.value = false; await loader.load()
+  expect(selectedTeamId.value).toBe(1)
+  authenticated.value = false
+  expect(loader.teams.value).toEqual([]); expect(selectedTeamId.value).toBe(1)
+  loader.dispose()
+})
+
+test('external choice and new loading survive a previous-account late metadata response', async () => {
+  const selectedTeamId = ref<number | null>(1), revision = ref(0), identity = ref('A')
+  let resolveOld!: (value: any) => void, resolveCurrent!: (value: any) => void, calls = 0
+  const loader = createOutlookLoader({
+    authenticated: () => true, underReview: () => false, identity: () => identity.value,
+    revision, selectedTeamId, externalTeamSelection: true,
+    metadata: () => new Promise(resolve => { if (++calls === 1) resolveOld = resolve; else resolveCurrent = resolve }),
+    outlook: async () => ({ status: 'unavailable', outlook: null }),
+  })
+  const old = loader.load()
+  revision.value++; identity.value = 'B'
+  const current = loader.load()
+  resolveOld({ ...metadata, favorite: 9 }); await old
+  expect(loader.teams.value).toEqual([]); expect(loader.loading.value).toBe(true)
+  expect(selectedTeamId.value).toBe(1)
+  resolveCurrent({ ...metadata, favorite: 9 }); await current
+  expect(loader.teams.value.length).toBe(2); expect(loader.loading.value).toBe(false)
+  expect(selectedTeamId.value).toBe(1)
+  loader.dispose()
+})
+
 // 回归证据：outlookLoading 只在 reset() 里被强制清零，而 reset() 由 underReview/authenticated/revision 的变化触发。
 // 页面每次 onShow 把 outlookReviewReady 打回 false 再置 true，正是让 underReview 抖动一次、从而 reset() 一次的原因；
 // 若把它改成"保持 true"，一次被打断的加载就没有任何路径把 forecastLoading 清掉。
