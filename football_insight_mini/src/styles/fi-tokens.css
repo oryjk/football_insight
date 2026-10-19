@@ -309,6 +309,9 @@ page {
   /* 换座卡球场缩略图：宽高比与大图球场区域一致（750×560） */
   --fi-component-seat-swap-thumb-width: 176rpx;
   --fi-component-seat-swap-thumb-height: 132rpx;
+  /* 座位大图"想换到"列表：价格与差价两列固定宽度（容纳 1288元 / 省1108元） */
+  --fi-component-seat-swap-price-width: 96rpx;
+  --fi-component-seat-swap-delta-width: 112rpx;
   --fi-component-loading-gap: var(--fi-space-12);
   --fi-component-loading-padding: var(--fi-space-40) var(--fi-space-32);
   --fi-component-loading-title-color: var(--fi-color-text-primary);

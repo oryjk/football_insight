@@ -34,8 +34,11 @@
               <text class="swap__row-region">{{ regionLabel(item.region) }}</text>
               <text v-if="item.seat" class="swap__row-seat">{{ item.seat }}</text>
             </view>
-            <text v-if="item.price" class="swap__row-price">{{ item.price }}</text>
-            <text v-if="item.delta" class="swap__delta" :class="`swap__delta--${item.deltaKind}`">{{ item.delta }}</text>
+            <!-- 价格与差价是两列固定宽度，缺值时保留空位，保证各行对齐 -->
+            <text class="swap__row-price">{{ item.price }}</text>
+            <view class="swap__delta-cell">
+              <text v-if="item.delta" class="swap__delta" :class="`swap__delta--${item.deltaKind}`">{{ item.delta }}</text>
+            </view>
           </view>
         </view>
       </view>
@@ -143,12 +146,13 @@ function regionLabel(region: string): string {
   gap: var(--fi-space-10);
 }
 
+/* 排号放在分区名下方，避免与价格列抢宽度被截断 */
 .swap__row-main {
   flex: 1;
   min-width: 0;
   display: flex;
-  align-items: baseline;
-  gap: var(--fi-space-8);
+  flex-direction: column;
+  gap: var(--fi-space-2);
 }
 
 .swap__row-region {
@@ -169,13 +173,21 @@ function regionLabel(region: string): string {
 
 .swap__row-price {
   flex-shrink: 0;
+  width: var(--fi-component-seat-swap-price-width);
+  text-align: right;
   color: var(--fi-color-text-strong);
   font-size: var(--fi-font-24);
   font-weight: var(--fi-weight-bold);
 }
 
-.swap__delta {
+.swap__delta-cell {
   flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  width: var(--fi-component-seat-swap-delta-width);
+}
+
+.swap__delta {
   padding: var(--fi-space-4) var(--fi-space-10);
   border-radius: var(--fi-radius-round);
   font-size: var(--fi-font-20);
