@@ -19,6 +19,12 @@
 
 ## 发布及边界
 
-本地 Cargo 后端已通过 deploy/local-test/up.sh 编译并重启，健康检查通过。生产迁移与上线将在提交推送后执行；新迁移为 20261019140000_add_lineup_likes.sql，新增点赞表和索引，不改历史阵容。镜像按项目约定 local233 构建后传至 peiqian。小程序从干净且同步 main 用统一入口 robot 2 上传。实际版本、镜像、健康状态及回滚记录待发布后补录。
+本地 Cargo 后端已通过 deploy/local-test/up.sh 编译并重启，健康检查通过。代码提交 `b131306` 已推送 main。peiqian 同步后通过 `cargo run --bin run_migrations` 无参数执行，新迁移 `20261019140000_add_lineup_likes.sql` 已在 `_sqlx_migrations` 登记成功，新增点赞表和索引，不改历史阵容。
+
+镜像 `football-insight-service-backend-rs:b131306` 在 local233 构建后 save/load 到 peiqian。两端后端二进制 SHA-256 均为 `3a9d150edaf8ad200e63e07dc914ab511dfccffa77abcd2b0dbf55d509c38478`。生产容器沿用 host 网络、原 env、8092 和日志卷启动，已重启，health=healthy、RestartCount=0。旧镜像 `68c19f3` 和停止容器 `football-insight-service-backend-rs-rollback-68c19f3-20261019-community` 保留；需要回滚时停止并移走新容器，将旧容器恢复原名再启动，新增点赞表可保留兼容旧后端。未改 Nginx。
+
+公网验收：latest/likes 榜单 200 且 no-store、真实满员公开详情 200、非法排序 400、不存在的有效格式码 404、匿名点赞/二维码/我的阵容 401，名单/换座/首页均为 200 JSON。没有在生产创建测试用户或写点赞。
+
+小程序从干净且同步 main `b131306` 经统一入口上传 **1.1.0 robot 2**，微信返回成功，生产 API 与组件注册校验通过。完整包 2,085,123 字节：主包 1,549,021、回流分包 363,300、战术板分包 172,802；压缩上传 1,054,943 字节。版本登记沿用当前审核版本。
 
 微信真机的好友发送/扫码回跳、相册权限与拖拽手感尚未人工验收；浏览器模拟不能替代这些微信原生能力验收。未提交微信审核。

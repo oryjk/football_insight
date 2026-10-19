@@ -395,3 +395,10 @@ local233 管理联调后端经 SSH 隧道连接 peiqian 上的生产 `football_d
 - 后端部署前如果忘了 push，服务器拉不到最新代码
 - 有 migration 时，如果只重启服务不跑迁移，接口可能变成 `500`
 - 如果后端代码改了，本地验证前必须先重启本地后端，不要在旧进程上验证新逻辑
+
+## 战术板分享、点赞与公开榜单（2026-10-19）
+
+- `20261019140000_add_lineup_likes.sql` 已在 peiqian 用 `cargo run --bin run_migrations` 无参数执行并登记；新增 `f_i_lineup_likes` 与查询索引。
+- 满 11 人保存即公开，不足员隐藏。公开读：`GET /api/v1/lineups/teams/{team_id}?sort=latest|likes&page=1&page_size=20`、`GET /api/v1/lineups/shared/{code}`；点赞 `PUT/DELETE .../like` 与二维码 `GET .../wxacode` 需要活跃账号。
+- 上线镜像 `b131306` 在 local233 构建，传输到 peiqian 后启动，healthy、重启次数 0。保留旧镜像 `68c19f3` 和容器 `football-insight-service-backend-rs-rollback-68c19f3-20261019-community`。回滚旧容器不需要删除新增表。
+- 小程序 1.1.0 robot 2 已从干净 main `b131306` 上传；完整验证见 `docs/lineup-sharing-community-validation.md`。
