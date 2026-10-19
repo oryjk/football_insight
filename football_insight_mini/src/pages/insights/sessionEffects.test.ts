@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, test } from 'bun:test'
 import { effectScope, nextTick, ref, watch } from 'vue'
-import { createInsightsSessionSync, runInsightsShow } from './sessionEffects'
+import { createInsightsSessionSync, resolveOutlookReadyOnShow, runInsightsShow } from './sessionEffects'
 import { useInsightsData, type InsightsData } from './useInsightsData'
 import { createAppSession, type AppSession } from '../../stores/appSession'
 import type * as authApi from '../../api/auth'
@@ -557,5 +557,48 @@ describe('insights 私有加载编排（真实 session + watch + 加载入口）
     expect(data.loading.value).toBe(false)
     expect(data.errorMessage.value).toBe('')
     fixture.stop()
+  })
+
+  test('回到页面（已加载过用户）再次 loadUser：userLoading 全程保持 false，不会把已显示的洞察换成骨架屏', async () => {
+    storage[AUTH_TOKEN_STORAGE_KEY] = 'token-a'
+    const fixture = wireInsightsFixture({ source: { getCurrentUser: async () => userA } })
+    await fixture.data.loadUser()
+    expect(fixture.session.currentUser.value === null).toBe(false)
+
+    const seen: boolean[] = []
+    const stopWatching = watch(fixture.data.userLoading, (value) => { seen.push(value) }, { flush: 'sync' })
+    expect(await fixture.data.loadUser()).toBe(true)
+    stopWatching()
+
+    expect(seen).toEqual([]) // 一次变化都没有：既没置 true，也没置回 false
+    expect(fixture.data.userLoading.value).toBe(false)
+    fixture.stop()
+  })
+
+  test('首次进入（还没有用户）loadUser 仍然显示加载态，结束后恢复', async () => {
+    storage[AUTH_TOKEN_STORAGE_KEY] = 'token-a'
+    const meRequest = deferred<CurrentUser | null>()
+    const fixture = wireInsightsFixture({ source: { getCurrentUser: () => meRequest.promise } })
+    const pending = fixture.data.loadUser()
+    expect(fixture.data.userLoading.value).toBe(true)
+    meRequest.resolve(userA)
+    await pending
+    expect(fixture.data.userLoading.value).toBe(false)
+    fixture.stop()
+  })
+})
+
+
+describe('onShow 时赛前倾向区域的就绪状态', () => {
+  test('首次进入（还不知道审核状态）要先隐藏，等审核状态确认后再显示', () => {
+    expect(resolveOutlookReadyOnShow({ alreadyConfirmed: false, underReview: false })).toBe(false)
+  })
+
+  test('回到页面（审核状态已确认且不在审核）保持显示，后台静默更新，不让球队胶囊和倾向卡片消失再出现', () => {
+    expect(resolveOutlookReadyOnShow({ alreadyConfirmed: true, underReview: false })).toBe(true)
+  })
+
+  test('审核优先：已知处于审核中时回到页面仍先隐藏，不为了防闪烁而冒险暴露审核期内容', () => {
+    expect(resolveOutlookReadyOnShow({ alreadyConfirmed: true, underReview: true })).toBe(false)
   })
 })
