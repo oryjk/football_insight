@@ -1,4 +1,4 @@
-import type { LineupSlotDto, SavedLineup, SquadResponse, LineupSort, TeamLineups, PublicLineup, LineupLikes, LineupCodeImage } from '../types/lineup'
+import type { LineupSlotDto, SavedLineupDraft, LineupEditorResponse, SavedLineup, SquadResponse, LineupSort, TeamLineups, PublicLineup, LineupLikes, LineupCodeImage } from '../types/lineup'
 import { request } from '../utils/request'
 
 export function getSquad(teamId: number): Promise<SquadResponse> {
@@ -33,4 +33,15 @@ export function setLineupLike(code: string, liked: boolean): Promise<LineupLikes
 }
 export function getLineupCode(code: string): Promise<LineupCodeImage> {
   return request({ url: `/lineups/shared/${encodeURIComponent(code)}/wxacode`, auth: true })
+}
+
+/** 私密编辑器与公开快照分别读取，保存草稿不会更新公开版本。 */
+export function getMyLineupEditor(teamId: number): Promise<LineupEditorResponse> {
+  return request({ url: `/lineups/me/${teamId}/editor`, auth: true })
+}
+export function saveMyLineupDraft(teamId: number, payload: { formation: string; slots: LineupSlotDto[] }): Promise<{ draft: SavedLineupDraft }> {
+  return request({ url: `/lineups/me/${teamId}/draft`, method: 'PUT', auth: true, data: payload })
+}
+export function publishMyLineup(teamId: number, payload: { formation: string; slots: LineupSlotDto[] }): Promise<{ lineup: SavedLineup; draft: SavedLineupDraft }> {
+  return request({ url: `/lineups/me/${teamId}/publish`, method: 'PUT', auth: true, data: payload })
 }

@@ -1,206 +1,202 @@
 import { computed, ref, watch } from 'vue'
-import { getMyLineup, getSquad, saveMyLineup } from '../../api/lineup'
+import { getMyLineupEditor, getSquad, publishMyLineup, saveMyLineupDraft } from '../../api/lineup'
 import { useAppSession } from '../../stores/appSession'
-import type { SavedLineup, SquadResponse } from '../../types/lineup'
+import type { LineupEditorResponse, SavedLineup, SavedLineupDraft, SquadResponse } from '../../types/lineup'
 import { extractApiErrorMessage, isUnauthorizedError } from '../../utils/apiError'
 import { DEFAULT_FORMATION } from './formations'
 import { autoFillStartingEleven, emptyLineup, type LineupSlots } from './helpers'
-import { clearDraft, readDraft, sanitizeDraftSlots, writeDraft, type DraftStorage } from './lineupDraft'
+import { clearDraft, consumeGuestDraft, markGuestDraftIntent, readDraft, sameLineup, sanitizeDraftSlots, writeDraft, type DraftStorage } from './lineupDraft'
+import { canShareLineup } from './lineupPoster'
 import { useLineupEditor } from './useLineupEditor'
 
+interface Payload { formation: string; slots: LineupSlots }
 export interface LineupPageDeps {
   getSquad: (teamId: number) => Promise<SquadResponse>
-  getMyLineup: (teamId: number) => Promise<{ lineup: SavedLineup | null }>
-  saveMyLineup: (
-    teamId: number,
-    payload: { formation: string; slots: LineupSlots },
-  ) => Promise<{ lineup: SavedLineup }>
+  getMyLineupEditor: (teamId: number) => Promise<LineupEditorResponse>
+  saveMyLineupDraft: (teamId: number, payload: Payload) => Promise<{ draft: SavedLineupDraft }>
+  publishMyLineup: (teamId: number, payload: Payload) => Promise<{ lineup: SavedLineup; draft: SavedLineupDraft }>
   isLoggedIn: () => boolean
+  userId: () => string | null
   storage: DraftStorage
   now: () => number
-  /** 改动后多久写草稿（毫秒）。 */
   draftDelayMs: number
   sessionRevision: () => number
   invalidateSession: (revision: number) => void
 }
+export type SaveResult = 'saved' | 'need-login' | 'failed' | 'cancelled' | 'incomplete'
+export type SaveState = 'idle' | 'dirty' | 'draft' | 'published' | 'error'
 
-export type SaveResult = 'saved' | 'need-login' | 'failed' | 'cancelled'
-export type SaveState = 'idle' | 'saved' | 'dirty' | 'error'
-
-/** 战术板数据层：加载名单与我的阵容、草稿、保存。唯一调用 api/lineup 的地方。 */
+/** 编辑草稿、云端私密草稿和已发布快照分别管理。 */
 export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
   const session = overrides.isLoggedIn ? null : useAppSession()
   const deps: LineupPageDeps = {
-    getSquad,
-    getMyLineup,
-    saveMyLineup,
+    getSquad, getMyLineupEditor, saveMyLineupDraft, publishMyLineup,
     isLoggedIn: () => Boolean(session?.hasAccessToken.value),
-    // uni 只在小程序运行时存在；测试注入内存存储时不能提前引用它。
+    userId: () => session?.currentUser.value?.id ?? null,
     storage: overrides.storage ?? uni,
-    now: Date.now,
-    draftDelayMs: 300,
+    now: Date.now, draftDelayMs: 300,
     sessionRevision: () => session?.revision.value ?? 0,
-    invalidateSession: (revision) => session?.invalidateSession(revision),
+    invalidateSession: revision => session?.invalidateSession(revision),
     ...overrides,
   }
-
   const editor = useLineupEditor()
   const teamId = ref(0)
   const squad = ref<SquadResponse | null>(null)
   const loading = ref(false)
   const errorMessage = ref('')
-  const saving = ref(false)
-  const failed = ref(false)
-  const savedOnce = ref(false)
-  const savedLineup = ref<SavedLineup | null>(null)
-  /** 加载时发现的需要告诉用户的情况（如阵容里的球员已不在名单）。 */
   const notice = ref('')
-  // 乱序响应保护：连续切换球队时只采用最后一次 load 的结果。
-  let loadSeq = 0
-
+  const savingDraft = ref(false)
+  const publishing = ref(false)
+  const saving = computed(() => savingDraft.value || publishing.value)
+  const failed = ref(false)
+  const savedLineup = ref<SavedLineup | null>(null)
+  const cloudDraft = ref<SavedLineupDraft | null>(null)
+  const content = (): Payload => ({ formation: editor.formation.value, slots: editor.slots.value })
+  const hasUnpublishedChanges = computed(() => !sameLineup(content(), savedLineup.value))
   const saveState = computed<SaveState>(() => {
     if (failed.value) return 'error'
     if (editor.dirty.value) return 'dirty'
-    return savedOnce.value ? 'saved' : 'idle'
+    if (cloudDraft.value && sameLineup(content(), cloudDraft.value) && hasUnpublishedChanges.value) return 'draft'
+    if (savedLineup.value && !hasUnpublishedChanges.value) return 'published'
+    return 'idle'
   })
-
-  let draftTimer: ReturnType<typeof setTimeout> | null = null
-  // 页面卸载后（或卸载的同一时刻仍有待触发的 watch）不再创建草稿定时器。
+  let loadSeq = 0
   let disposed = false
-
-  function persistDraft(): void {
-    // 加载中的编辑器不属于目标球队，不能把它写入目标球队的草稿。
-    if (disposed || loading.value || !squad.value || !teamId.value) return
-    writeDraft(
-      { teamId: teamId.value, formation: editor.formation.value, slots: editor.slots.value, savedAt: deps.now() },
-      deps.storage,
-    )
-  }
-
+  let loadedOwner: string | null = null
+  let loadedAuthRevision = 0
+  let draftTimer: ReturnType<typeof setTimeout> | null = null
+  // 未解析身份时禁止使用共享的 authenticated 缓存。
+  const owner = () => deps.isLoggedIn() ? (deps.userId() ? `user:${deps.userId()}` : null) : 'guest'
   function cancelDraftTimer(): void {
     if (draftTimer) clearTimeout(draftTimer)
     draftTimer = null
   }
+  function persistDraft(): void {
+    if (disposed || loading.value || !squad.value || !teamId.value || !loadedOwner) return
+    // 本地编辑发生在当前已知远端之后，避免设备时钟略慢导致未同步改动被误判为过期。
+    const remoteAt = Date.parse(cloudDraft.value?.updated_at ?? savedLineup.value?.updated_at ?? '')
+    const savedAt = Math.max(deps.now(), Number.isFinite(remoteAt) ? remoteAt + 1 : 0)
+    writeDraft({ teamId: teamId.value, ...content(), savedAt }, deps.storage, loadedOwner)
+  }
+  watch([editor.slots, editor.formation], () => {
+    if (disposed || loading.value || !squad.value || !editor.dirty.value) return
+    cancelDraftTimer()
+    draftTimer = setTimeout(persistDraft, deps.draftDelayMs)
+  }, { deep: true })
 
-  // 每次改动 debounce 后写草稿：不管有没有登录，系统返回手势退出也不丢改动。
-  watch(
-    [editor.slots, editor.formation],
-    () => {
-      if (disposed || loading.value || !squad.value || !editor.dirty.value) return
-      cancelDraftTimer()
-      draftTimer = setTimeout(persistDraft, deps.draftDelayMs)
-    },
-    { deep: true },
-  )
-
-  async function load(nextTeamId: number): Promise<void> {
-    // 必须在换 teamId 前落盘；取消 debounce 本身不能保证最后一次改动已保存。
+  async function load(nextTeamId: number, options: { restoreGuestDraft?: boolean } = {}): Promise<void> {
     if (editor.dirty.value) persistDraft()
     const seq = ++loadSeq
     let authRevision = deps.sessionRevision()
     const current = () => !disposed && seq === loadSeq && authRevision === deps.sessionRevision()
     disposed = false
     cancelDraftTimer()
+    loadedOwner = owner()
+    loadedAuthRevision = authRevision
+    const ownerAtStart = loadedOwner
     teamId.value = nextTeamId
     loading.value = true
     squad.value = null
-    saving.value = false
+    savingDraft.value = false
+    publishing.value = false
     editor.load(DEFAULT_FORMATION, emptyLineup(DEFAULT_FORMATION))
-    errorMessage.value = ''
-    notice.value = ''
-    failed.value = false
-    savedOnce.value = false
-    savedLineup.value = null
+    errorMessage.value = ''; notice.value = ''; failed.value = false
+    savedLineup.value = null; cloudDraft.value = null
     try {
       const [loadedSquad, mine] = await Promise.all([
         deps.getSquad(nextTeamId),
-        deps.isLoggedIn() ? deps.getMyLineup(nextTeamId).catch(error => {
+        deps.isLoggedIn() ? deps.getMyLineupEditor(nextTeamId).catch(error => {
           if (!current() || !isUnauthorizedError(error)) throw error
           deps.invalidateSession(authRevision)
           authRevision = deps.sessionRevision()
-          return { lineup: null }
-        }) : Promise.resolve({ lineup: null }),
+          loadedAuthRevision = authRevision
+          loadedOwner = owner()
+          return { lineup: null, draft: null }
+        }) : Promise.resolve({ lineup: null, draft: null }),
       ])
       if (!current()) return
       savedLineup.value = mine.lineup
+      cloudDraft.value = mine.draft
       squad.value = loadedSquad
-      const known = new Set([...loadedSquad.active, ...loadedSquad.former].map((p) => p.player_id))
-      const draft = readDraft(nextTeamId, deps.storage)
-      if (draft) {
-        editor.load(draft.formation, sanitizeDraftSlots(draft.slots, known), true)
-      } else if (mine.lineup) {
-        const slots = mine.lineup.slots as LineupSlots
-        const clean = sanitizeDraftSlots(slots, known)
-        const removed = clean.some((s, i) => s.player_id !== slots[i].player_id)
-        // 阵容里有球员已不在名单：置空、标记未保存，否则每次保存都会被后端 400 拒绝且没有任何解释。
-        editor.load(mine.lineup.formation, clean, removed)
-        if (removed) notice.value = '阵容里有球员已不在球队名单，已从阵容中移出，请重新选择后保存。'
-        savedOnce.value = !removed
+      const known = new Set([...loadedSquad.active, ...loadedSquad.former].map(p => p.player_id))
+      let local = loadedOwner ? readDraft(nextTeamId, deps.storage, loadedOwner) : null
+      const guest = options.restoreGuestDraft && deps.isLoggedIn() && ownerAtStart && ownerAtStart !== 'guest'
+        ? consumeGuestDraft(nextTeamId, deps.storage) : null
+      if (guest) {
+        // 显式操作优先于云端，立即以新账号持有，之后登录其他账号不能再导入。
+        local = { ...guest, savedAt: deps.now() }
+        writeDraft(local, deps.storage, ownerAtStart!)
+      }
+      const remote = mine.draft ?? mine.lineup
+      const remoteAt = remote ? Date.parse(remote.updated_at) : 0
+      const useLocal = local && (Boolean(guest) || local.savedAt > (Number.isFinite(remoteAt) ? remoteAt : 0))
+      if (local && !useLocal && loadedOwner) clearDraft(nextTeamId, deps.storage, loadedOwner)
+      const initial = useLocal ? local : remote
+      if (initial) {
+        const clean = sanitizeDraftSlots(initial.slots, known)
+        const removed = !sameLineup(initial, { formation: initial.formation, slots: clean })
+        editor.load(initial.formation, clean, Boolean(useLocal) || removed)
+        if (removed) notice.value = '阵容里有球员已不在球队名单，已从草稿中移出，请重新选择。'
       } else {
-        // 第一次进来（没有已保存阵容也没有草稿）：给一套按位置与号码推出的初始首发，不算"改动"，用户再自己换。
-        editor.load(
-          DEFAULT_FORMATION,
-          autoFillStartingEleven(emptyLineup(DEFAULT_FORMATION), DEFAULT_FORMATION, loadedSquad.active),
-        )
+        editor.load(DEFAULT_FORMATION, autoFillStartingEleven(emptyLineup(DEFAULT_FORMATION), DEFAULT_FORMATION, loadedSquad.active))
       }
     } catch (error) {
-      if (!current()) return
-      errorMessage.value = extractApiErrorMessage(error, '战术板加载失败')
+      if (current()) errorMessage.value = extractApiErrorMessage(error, '战术板加载失败')
     } finally {
       if (!disposed && seq === loadSeq) loading.value = false
     }
   }
 
-  async function save(): Promise<SaveResult> {
+  async function submit(kind: 'draft' | 'publish'): Promise<SaveResult> {
     if (disposed || loading.value || !squad.value || saving.value) return 'cancelled'
+    if (loadedAuthRevision !== deps.sessionRevision() || loadedOwner !== owner()) return 'cancelled'
+    if (kind === 'publish' && !canShareLineup(editor.slots.value)) return 'incomplete'
     if (!deps.isLoggedIn()) {
-      cancelDraftTimer()
-      persistDraft()
+      cancelDraftTimer(); persistDraft()
+      markGuestDraftIntent(teamId.value, deps.storage)
       return 'need-login'
     }
-    if (savedOnce.value && !editor.dirty.value && !failed.value) return 'saved'
+    if (kind === 'draft' && !editor.dirty.value && sameLineup(content(), cloudDraft.value) && !failed.value) return 'saved'
     cancelDraftTimer()
-    saving.value = true
-    const teamAtStart = teamId.value
-    const contextAtStart = loadSeq
-    const revisionAtStart = editor.revision.value
+    const lock = kind === 'draft' ? savingDraft : publishing
+    lock.value = true
+    const teamAtStart = teamId.value, contextAtStart = loadSeq, revisionAtStart = editor.revision.value
     const authRevision = deps.sessionRevision()
-    const current = () => !disposed && loadSeq === contextAtStart && teamId.value === teamAtStart && deps.sessionRevision() === authRevision
+    const current = () => !disposed && loadSeq === contextAtStart && teamId.value === teamAtStart && deps.sessionRevision() === authRevision && owner() === loadedOwner
+    const payload = { formation: editor.formation.value, slots: editor.slots.value.map(s => ({ ...s })) }
     try {
-      const response = await deps.saveMyLineup(teamAtStart, {
-        formation: editor.formation.value,
-        slots: editor.slots.value.map((slot) => ({ ...slot })),
-      })
-      if (!current()) return 'cancelled'
-      savedLineup.value = response.lineup
-      failed.value = false
-      savedOnce.value = true
-      if (editor.revision.value === revisionAtStart) {
-        editor.markSaved()
-        cancelDraftTimer()
-        clearDraft(teamAtStart, deps.storage)
-      } else {
-        // 保存期间又改了位置：这次保存没有覆盖最新改动，保持未保存并保留草稿。
-        persistDraft()
+      let draft: SavedLineupDraft
+      let publication: SavedLineup | undefined
+      if (kind === 'draft') draft = (await deps.saveMyLineupDraft(teamAtStart, payload)).draft
+      else {
+        const response = await deps.publishMyLineup(teamAtStart, payload)
+        draft = response.draft
+        publication = response.lineup
       }
+      if (!current()) return 'cancelled'
+      cloudDraft.value = draft
+      if (publication) savedLineup.value = publication
+      failed.value = false
+      if (editor.revision.value === revisionAtStart) {
+        editor.markSaved(); cancelDraftTimer()
+        if (loadedOwner) clearDraft(teamAtStart, deps.storage, loadedOwner)
+      } else persistDraft()
       return 'saved'
     } catch (error) {
       if (!current()) return 'cancelled'
+      persistDraft()
       if (isUnauthorizedError(error)) {
-        persistDraft()
-        saving.value = false
         deps.invalidateSession(authRevision)
         return 'need-login'
       }
-      persistDraft()
       failed.value = true
       return 'failed'
     } finally {
-      if (!disposed && loadSeq === contextAtStart && teamId.value === teamAtStart) saving.value = false
+      if (!disposed && loadSeq === contextAtStart && teamId.value === teamAtStart) lock.value = false
     }
   }
-
-  /** 一键填入首发：只填空位、不动已排的球员；球员名单还没加载时不做任何事。 */
+  const saveDraft = () => submit('draft')
+  const publish = () => submit('publish')
   function fillStartingEleven(): void {
     if (!squad.value) return
     const filled = autoFillStartingEleven(editor.slots.value, editor.formation.value, squad.value.active)
@@ -208,14 +204,9 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
       if (slot.player_id === null && filled[index].player_id !== null) editor.pick(slot.slot, filled[index].player_id)
     })
   }
-
   function dispose(): void {
-    // 离开时若还有没来得及写草稿的改动（系统返回手势没有确认框），先写下来再停定时器。
     if (!disposed && editor.dirty.value) persistDraft()
-    disposed = true
-    loadSeq += 1
-    cancelDraftTimer()
+    disposed = true; loadSeq += 1; cancelDraftTimer()
   }
-
-  return { teamId, squad, loading, errorMessage, notice, saving, saveState, savedLineup, editor, load, save, fillStartingEleven, dispose }
+  return { teamId, squad, loading, errorMessage, notice, saving, savingDraft, publishing, saveState, savedLineup, cloudDraft, hasUnpublishedChanges, editor, load, saveDraft, publish, save: saveDraft, fillStartingEleven, dispose }
 }

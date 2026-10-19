@@ -7,38 +7,34 @@ import { prepareEditorShare, type EditorShareSource } from './lineupEditorShare'
 const slots = emptyLineup('4-3-3').map((slot, index) => ({ ...slot, player_id: index + 1 }))
 const saved: SavedLineup = { slots, formation: '4-3-3', share_code: 'Ab12Cd34', updated_at: '2026-10-19T00:00:00Z' }
 const lineup: PublicLineup = { ...saved, team: { team_id: 1, team_name: '成都蓉城', avatar_url: null }, author: { display_name: '球迷', avatar_url: null }, created_at: saved.updated_at, likes_count: 0, liked_by_me: false, players: slots.map(slot => ({ player_id: slot.player_id, name: `球员${slot.player_id}`, shirt_number: slot.player_id, avatar_url: null, position: 'MF', last_season: 2026, former: false })) }
-function source(overrides: Partial<EditorShareSource> = {}): EditorShareSource { return { context: () => 'team1:revision1', slots: () => slots, save: async () => 'saved', saved: () => saved, dirty: () => false, detail: async () => lineup, ...overrides } }
+function source(overrides: Partial<EditorShareSource> = {}): EditorShareSource { return { context: () => 'team1:revision1', saved: () => saved, dirty: () => false, detail: async () => lineup, ...overrides } }
 
 describe('editor sharing gates', () => {
-  test('requires exactly eleven distinct players before any save or public request', async () => {
+  test('only reads the published version and never calls save', async () => {
+    const calls: string[] = []
+    const result = await prepareEditorShare(source({ detail: async code => { calls.push(code); return lineup } }))
+    expect(calls).toEqual(['Ab12Cd34']); expect(result.lineup?.share_code).toBe(saved.share_code)
+  })
+  test('missing publication and unpublished changes require explicit publication without requests', async () => {
+    for (const change of [{ saved: () => null }, { dirty: () => true }]) {
+      let calls = 0
+      const result = await prepareEditorShare(source({ ...change, detail: async () => { calls++; return lineup } }))
+      expect(result.result).toBe('needs-publish'); expect(calls).toBe(0)
+    }
+  })
+  test('rejects invalid incomplete published snapshots', async () => {
     let calls = 0
-    const outcome = await prepareEditorShare(source({ slots: () => slots.slice(0, 10), save: async () => { calls++; return 'saved' } }))
+    const outcome = await prepareEditorShare(source({ saved: () => ({ ...saved, slots: slots.slice(0, 10) }), detail: async () => { calls++; return lineup } }))
     expect(outcome.result).toBe('incomplete'); expect(calls).toBe(0)
     expect(canShareLineup(slots)).toBe(true)
     expect(canShareLineup(slots.map(slot => ({ ...slot, player_id: 1 })))).toBe(false)
   })
-  test('saves current edits first and shares the code returned by that save', async () => {
-    const calls: string[] = []; let metadata: SavedLineup | null = null
-    const result = await prepareEditorShare(source({ save: async () => { calls.push('save'); metadata = saved; return 'saved' }, saved: () => metadata, detail: async code => { calls.push(code); return lineup } }))
-    expect(calls).toEqual(['save', 'Ab12Cd34']); expect(result.lineup?.share_code).toBe(saved.share_code)
-  })
-  test('login and failed save never request a public object', async () => {
-    for (const result of ['need-login', 'failed'] as const) {
-      let calls = 0
-      expect((await prepareEditorShare(source({ save: async () => result, detail: async () => { calls++; return lineup } }))).result).toBe(result)
-      expect(calls).toBe(0)
-    }
-  })
-  test('edits during save or a team switch during detail cannot publish an obsolete lineup', async () => {
-    let context = 'A'
-    const edited = await prepareEditorShare(source({ context: () => context, save: async () => { context = 'B'; return 'saved' } }))
-    expect(edited.result).toBe('cancelled')
-    context = 'A'
+  test('team switches or new editor changes while detail loads cancel obsolete sharing', async () => {
+    let context = 'A', dirty = false
     const switched = await prepareEditorShare(source({ context: () => context, detail: async () => { context = 'B'; return lineup } }))
-    expect(switched.result).toBe('cancelled'); expect(switched.lineup).toBe(undefined)
-  })
-  test('a save of an earlier revision cannot share while current edits are still dirty', async () => {
-    expect((await prepareEditorShare(source({ dirty: () => true }))).result).toBe('cancelled')
+    expect(switched.result).toBe('cancelled')
+    const edited = await prepareEditorShare(source({ dirty: () => dirty, detail: async () => { dirty = true; return lineup } }))
+    expect(edited.result).toBe('cancelled'); expect(edited.lineup).toBe(undefined)
   })
 })
 

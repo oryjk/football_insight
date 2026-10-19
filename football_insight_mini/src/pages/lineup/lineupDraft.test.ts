@@ -14,7 +14,9 @@ function memoryStorage() {
 describe('lineup draft', () => {
   test('is stored per team', () => {
     expect(draftKey(1) === draftKey(2)).toBe(false)
-    expect(draftKey(1)).toBe('fi-lineup-draft-1')
+    expect(draftKey(1)).toBe('fi-lineup-draft-v2-guest-1')
+    expect(draftKey(1, 'user:A') === draftKey(1, 'user:B')).toBe(false)
+    expect(draftKey(1, 'user:A') === draftKey(1)).toBe(false)
   })
 
   test('round trips and clears', () => {

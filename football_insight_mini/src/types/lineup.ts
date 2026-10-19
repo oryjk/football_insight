@@ -22,6 +22,17 @@ export interface LineupSlotDto {
   y: number
 }
 
+export interface SavedLineupDraft {
+  formation: string
+  slots: LineupSlotDto[]
+  updated_at: string
+}
+
+export interface LineupEditorResponse {
+  lineup: SavedLineup | null
+  draft: SavedLineupDraft | null
+}
+
 export interface SavedLineup {
   formation: string
   slots: LineupSlotDto[]

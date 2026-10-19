@@ -17,14 +17,22 @@ describe('buildLineupPageUrl', () => {
 
 describe('parseLineupPageQuery', () => {
   test('reads teamId and autosave from page options', () => {
-    expect(parseLineupPageQuery({ teamId: '77680', autosave: '1' })).toEqual({ teamId: 77680, autosave: true })
-    expect(parseLineupPageQuery({ teamId: '77680' })).toEqual({ teamId: 77680, autosave: false })
+    expect(parseLineupPageQuery({ teamId: '77680', autosave: '1' })).toEqual({ teamId: 77680, autosave: true, resumeAction: 'draft' })
+    expect(parseLineupPageQuery({ teamId: '77680' })).toEqual({ teamId: 77680, autosave: false, resumeAction: null })
+  })
+
+  test('explicit post-login actions remain distinct and old autosave cannot publish', () => {
+    expect(buildLineupPageUrl(1, { resumeAction: 'draft' })).toBe('/pages/lineup/index?teamId=1&resumeAction=draft')
+    expect(buildLineupPageUrl(1, { resumeAction: 'publish' })).toBe('/pages/lineup/index?teamId=1&resumeAction=publish')
+    expect(parseLineupPageQuery({ teamId: '1', resumeAction: 'publish' }).resumeAction).toBe('publish')
+    expect(parseLineupPageQuery({ autosave: '1' }).resumeAction).toBe('draft')
+    expect(parseLineupPageQuery({ resumeAction: 'bad' }).resumeAction).toBe(null)
   })
 
   test('ignores missing or malformed values', () => {
-    expect(parseLineupPageQuery(undefined)).toEqual({ teamId: 0, autosave: false })
-    expect(parseLineupPageQuery({ teamId: 'abc', autosave: 'yes' })).toEqual({ teamId: 0, autosave: false })
-    expect(parseLineupPageQuery({ teamId: '-3' })).toEqual({ teamId: 0, autosave: false })
+    expect(parseLineupPageQuery(undefined)).toEqual({ teamId: 0, autosave: false, resumeAction: null })
+    expect(parseLineupPageQuery({ teamId: 'abc', autosave: 'yes' })).toEqual({ teamId: 0, autosave: false, resumeAction: null })
+    expect(parseLineupPageQuery({ teamId: '-3' })).toEqual({ teamId: 0, autosave: false, resumeAction: null })
   })
 })
 

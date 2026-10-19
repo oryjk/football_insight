@@ -1,4 +1,4 @@
-use super::dto::{LineupResponse, SaveRequest};
+use super::dto::{DraftResponse, EditorResponse, LineupResponse, PublishResponse, SaveRequest};
 use crate::{
     auth::ports::token_port::TokenPort,
     lineup::{application::my_lineup::MyLineupService, domain::LineupSaveError},
@@ -7,7 +7,7 @@ use axum::{
     Json, Router,
     extract::{Path, State},
     http::{HeaderMap, StatusCode, header::AUTHORIZATION},
-    routing::get,
+    routing::{get, put},
 };
 use std::sync::Arc;
 use uuid::Uuid;
@@ -21,6 +21,9 @@ pub struct MyLineupWebState {
 pub fn my_routes(state: Arc<MyLineupWebState>) -> Router {
     Router::new()
         .route("/api/v1/lineups/me/{team_id}", get(get_mine).put(save_mine))
+        .route("/api/v1/lineups/me/{team_id}/editor", get(get_editor))
+        .route("/api/v1/lineups/me/{team_id}/draft", put(save_draft))
+        .route("/api/v1/lineups/me/{team_id}/publish", put(publish))
         .with_state(state)
 }
 
@@ -44,6 +47,7 @@ fn map_error(e: LineupSaveError) -> (StatusCode, String) {
     let status = match e {
         LineupSaveError::Unauthorized => StatusCode::UNAUTHORIZED,
         LineupSaveError::InvalidFormation
+        | LineupSaveError::IncompleteLineup
         | LineupSaveError::InvalidSlots
         | LineupSaveError::PlayerNotInSquad
         | LineupSaveError::DuplicatePlayer => StatusCode::BAD_REQUEST,
@@ -93,6 +97,61 @@ async fn save_mine(
         .map_err(map_error)
 }
 
+async fn get_editor(
+    State(s): State<Arc<MyLineupWebState>>,
+    headers: HeaderMap,
+    Path(team_id): Path<i64>,
+) -> Result<Json<EditorResponse>, (StatusCode, String)> {
+    let user = authenticate(&headers, s.token_port.as_ref())?;
+    s.service
+        .editor(user, team_id)
+        .await
+        .map(|editor| Json(editor.into()))
+        .map_err(map_error)
+}
+
+async fn save_draft(
+    State(s): State<Arc<MyLineupWebState>>,
+    headers: HeaderMap,
+    Path(team_id): Path<i64>,
+    Json(req): Json<SaveRequest>,
+) -> Result<Json<DraftResponse>, (StatusCode, String)> {
+    let user = authenticate(&headers, s.token_port.as_ref())?;
+    s.service
+        .save_draft(
+            user,
+            team_id,
+            &req.formation,
+            req.slots.into_iter().map(Into::into).collect(),
+        )
+        .await
+        .map(|draft| {
+            Json(DraftResponse {
+                draft: draft.into(),
+            })
+        })
+        .map_err(map_error)
+}
+
+async fn publish(
+    State(s): State<Arc<MyLineupWebState>>,
+    headers: HeaderMap,
+    Path(team_id): Path<i64>,
+    Json(req): Json<SaveRequest>,
+) -> Result<Json<PublishResponse>, (StatusCode, String)> {
+    let user = authenticate(&headers, s.token_port.as_ref())?;
+    s.service
+        .publish(
+            user,
+            team_id,
+            &req.formation,
+            req.slots.into_iter().map(Into::into).collect(),
+        )
+        .await
+        .map(|published| Json(published.into()))
+        .map_err(map_error)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,9 +179,13 @@ mod tests {
             unimplemented!()
         }
         fn verify_token(&self, token: &str) -> anyhow::Result<AuthTokenClaims> {
-            if token == "good" {
+            if token == "good" || token == "other" {
                 Ok(AuthTokenClaims {
-                    sub: USER,
+                    sub: if token == "other" {
+                        Uuid::from_u128(0x2222)
+                    } else {
+                        USER
+                    },
                     account_identifier: "tester".into(),
                     exp: Utc::now() + chrono::Duration::hours(1),
                 })
@@ -307,6 +370,110 @@ mod tests {
                 .await
                 .0;
             assert!((400..500).contains(&status), "{body} -> {status}");
+        }
+    }
+    #[tokio::test]
+    async fn editor_draft_and_publish_contracts_keep_private_edits_and_users_separate() {
+        let app = app((1..=11).collect());
+        let editor_uri = format!("{URI}/editor");
+        let draft_uri = format!("{URI}/draft");
+        let publish_uri = format!("{URI}/publish");
+        let (_, initial) = send(&app, "GET", &editor_uri, Some("good"), None).await;
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&initial).unwrap(),
+            serde_json::json!({"lineup":null,"draft":null})
+        );
+        let (status, saved) = send(
+            &app,
+            "PUT",
+            &draft_uri,
+            Some("good"),
+            Some(body_with("4-4-2", Some(1))),
+        )
+        .await;
+        assert_eq!(status, 200, "{saved}");
+        let saved: serde_json::Value = serde_json::from_str(&saved).unwrap();
+        assert_eq!(saved["draft"]["formation"], "4-4-2");
+        assert!(saved["draft"].get("share_code").is_none());
+        assert_eq!(
+            send(
+                &app,
+                "PUT",
+                &publish_uri,
+                Some("good"),
+                Some(body_with("4-4-2", Some(1)))
+            )
+            .await
+            .0,
+            400
+        );
+        let (_, other) = send(&app, "GET", &editor_uri, Some("other"), None).await;
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&other).unwrap(),
+            serde_json::json!({"lineup":null,"draft":null})
+        );
+        let slots: Vec<_> = (0..11)
+            .map(|i| serde_json::json!({"slot":i,"player_id":i+1,"x":0.5,"y":0.5}))
+            .collect();
+        let full = serde_json::json!({"formation":"4-3-3","slots":slots}).to_string();
+        let (status, published) = send(&app, "PUT", &publish_uri, Some("good"), Some(full)).await;
+        assert_eq!(status, 200, "{published}");
+        let published: serde_json::Value = serde_json::from_str(&published).unwrap();
+        assert_eq!(published["lineup"]["formation"], "4-3-3");
+        assert_eq!(published["draft"]["formation"], "4-3-3");
+        send(
+            &app,
+            "PUT",
+            &draft_uri,
+            Some("good"),
+            Some(body_with("3-5-2", None)),
+        )
+        .await;
+        let (_, editor) = send(&app, "GET", &editor_uri, Some("good"), None).await;
+        let editor: serde_json::Value = serde_json::from_str(&editor).unwrap();
+        assert_eq!(editor["lineup"], published["lineup"]);
+        assert_eq!(editor["draft"]["formation"], "3-5-2");
+    }
+
+    #[tokio::test]
+    async fn new_endpoints_require_authenticated_active_users() {
+        let authenticated_app = app(vec![]);
+        for (method, suffix) in [("GET", "editor"), ("PUT", "draft"), ("PUT", "publish")] {
+            let uri = format!("{URI}/{suffix}");
+            let body = (method == "PUT").then(|| body_with("4-3-3", None));
+            assert_eq!(
+                send(&authenticated_app, method, &uri, None, body.clone())
+                    .await
+                    .0,
+                401
+            );
+            assert_eq!(
+                send(&authenticated_app, method, &uri, Some("bad"), body)
+                    .await
+                    .0,
+                401
+            );
+        }
+        let app = app_with_access(
+            vec![],
+            FakeUserAccess {
+                active: false,
+                unavailable: false,
+            },
+        );
+        for (method, suffix) in [("GET", "editor"), ("PUT", "draft"), ("PUT", "publish")] {
+            assert_eq!(
+                send(
+                    &app,
+                    method,
+                    &format!("{URI}/{suffix}"),
+                    Some("good"),
+                    (method == "PUT").then(|| body_with("4-3-3", None))
+                )
+                .await
+                .0,
+                401
+            );
         }
     }
 }

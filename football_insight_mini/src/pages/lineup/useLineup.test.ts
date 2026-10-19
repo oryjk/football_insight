@@ -3,7 +3,7 @@ import { nextTick } from 'vue'
 import type { SavedLineup, SquadResponse } from '../../types/lineup'
 import { assignPlayer, emptyLineup } from './helpers'
 import { ApiRequestError } from '../../utils/apiError'
-import { readDraft } from './lineupDraft'
+import { readDraft, writeDraft } from './lineupDraft'
 import { useLineupEditor } from './useLineupEditor'
 import { useLineupPage } from './useLineupPage'
 
@@ -72,416 +72,224 @@ describe('useLineupEditor', () => {
   })
 })
 
-describe('useLineupPage', () => {
-  function build(overrides: Partial<NonNullable<Parameters<typeof useLineupPage>[0]>> = {}) {
-    const storage = memoryStorage()
+describe('useLineupPage private drafts and publication', () => {
+  const fullSlots = emptyLineup('4-3-3').map((s, i) => ({ ...s, player_id: i + 1 }))
+  const publicSnapshot: SavedLineup = { ...saved, formation: '4-3-3', slots: fullSlots }
+  const fullSquad: SquadResponse = { ...squad, active: fullSlots.map(s => ({ ...squad.active[0], player_id: s.player_id, position: 'MF' })) }
+  function build(overrides: Partial<NonNullable<Parameters<typeof useLineupPage>[0]>> = {}, storage = memoryStorage()) {
     const calls: string[] = []
     const page = useLineupPage({
-      getSquad: async () => squad,
-      getMyLineup: async () => ({ lineup: null }),
-      saveMyLineup: async (_teamId, payload) => {
-        calls.push('save')
-        return { lineup: { ...saved, formation: payload.formation, slots: payload.slots } }
-      },
-      isLoggedIn: () => true,
-      storage,
-      now: () => 1,
-      draftDelayMs: 5,
+      getSquad: async () => fullSquad,
+      getMyLineupEditor: async () => ({ lineup: null, draft: null }),
+      saveMyLineupDraft: async (_teamId, payload) => { calls.push('draft'); return { draft: { ...payload, updated_at: '2026-10-19T01:00:00Z' } } },
+      publishMyLineup: async (_teamId, payload) => { calls.push('publish'); return { lineup: { ...publicSnapshot, ...payload }, draft: { ...payload, updated_at: '2026-10-19T01:00:00Z' } } },
+      isLoggedIn: () => true, userId: () => 'A', storage,
+      now: () => Date.parse('2026-10-19T02:00:00Z'), draftDelayMs: 5,
       ...overrides,
     })
     return { page, storage, calls }
   }
-
-  test('loads the saved lineup when there is one, otherwise a default 4-3-3 starting eleven', async () => {
-    const { page } = build({ getMyLineup: async () => ({ lineup: saved }) })
+  test('loads cloud private draft before public snapshot without marking it published', async () => {
+    const draft = { formation: '4-4-2', slots: emptyLineup('4-4-2'), updated_at: saved.updated_at }
+    const { page } = build({ getMyLineupEditor: async () => ({ lineup: publicSnapshot, draft }) })
     await page.load(1)
     expect(page.editor.formation.value).toBe('4-4-2')
-    const first = build()
-    await first.page.load(1)
-    expect(first.page.editor.formation.value).toBe('4-3-3')
-    // 测试名单只有 1 名门将和 1 名后卫，初始首发就只能填这两个
-    expect(first.page.editor.filled.value).toBe(2)
-    expect(first.page.editor.dirty.value).toBe(false)
+    expect(page.editor.dirty.value).toBe(false)
+    expect(page.hasUnpublishedChanges.value).toBe(true)
+    expect(page.saveState.value).toBe('draft')
+    expect(page.savedLineup.value?.share_code).toBe(publicSnapshot.share_code)
   })
-
-  test('anonymous visitors can still load and edit without calling my-lineup', async () => {
-    let myCalls = 0
-    const { page } = build({ isLoggedIn: () => false, getMyLineup: async () => { myCalls += 1; return { lineup: null } } })
+  test('local unsynchronized draft wins only when newer than cloud', async () => {
+    const draft = { ...publicSnapshot, formation: '4-4-2', slots: emptyLineup('4-4-2') }
+    const { page, storage } = build({ getMyLineupEditor: async () => ({ lineup: publicSnapshot, draft }) })
+    writeDraft({ teamId: 1, formation: '3-5-2', slots: emptyLineup('3-5-2'), savedAt: Date.parse(saved.updated_at) - 1 }, storage, 'user:A')
     await page.load(1)
-    expect(myCalls).toBe(0)
-    expect(page.errorMessage.value).toBe('')
-  })
-
-  test('saving while logged out stores a draft and reports need-login', async () => {
-    const { page, storage, calls } = build({ isLoggedIn: () => false })
-    await page.load(1)
-    page.editor.pick(0, 1)
-    expect(await page.save()).toBe('need-login')
-    expect(calls).toEqual([])
-    expect(readDraft(1, storage)?.slots[0].player_id).toBe(1)
-  })
-
-  test('a stored draft wins over the saved lineup, is sanitized, and is saved once then cleared', async () => {
-    const { page, storage, calls } = build({ getMyLineup: async () => ({ lineup: saved }) })
-    const bad = assignPlayer(assignPlayer(emptyLineup('3-5-2'), 0, 1), 1, 999)
-    storage.setStorageSync('fi-lineup-draft-1', { teamId: 1, formation: '3-5-2', slots: bad, savedAt: 1 })
+    expect(page.editor.formation.value).toBe('4-4-2')
+    writeDraft({ teamId: 1, formation: '3-5-2', slots: emptyLineup('3-5-2'), savedAt: Date.parse(saved.updated_at) + 1 }, storage, 'user:A')
     await page.load(1)
     expect(page.editor.formation.value).toBe('3-5-2')
-    expect(page.editor.slots.value[0].player_id).toBe(1)
-    expect(page.editor.slots.value[1].player_id).toBeNull()
     expect(page.editor.dirty.value).toBe(true)
-    expect(await page.save()).toBe('saved')
-    expect(await page.save()).toBe('saved')
-    expect(calls).toEqual(['save'])
-    expect(readDraft(1, storage)).toBeNull()
   })
-
-  test('save failure keeps the draft and reports failed', async () => {
-    const { page, storage } = build({ saveMyLineup: async () => { throw new Error('offline') } })
-    await page.load(1)
-    page.editor.pick(0, 1)
-    expect(await page.save()).toBe('failed')
-    expect(page.saveState.value).toBe('error')
-    expect(readDraft(1, storage) === null).toBe(false)
-  })
-
-  test('loading failure surfaces an error message', async () => {
-    const { page } = build({ getSquad: async () => { throw new Error('boom') } })
-    await page.load(1)
-    expect(page.errorMessage.value).toBe('boom')
-    expect(page.loading.value).toBe(false)
-  })
-
-  test('save state follows the editor: dirty after an edit, saved after a successful save', async () => {
-    const { page } = build()
-    await page.load(1)
-    expect(page.saveState.value).toBe('idle')
-    page.editor.pick(0, 1)
-    expect(page.saveState.value).toBe('dirty')
-    await page.save()
-    expect(page.saveState.value).toBe('saved')
-  })
-
-  test('edits are written to the draft after the debounce even when logged out', async () => {
-    const { page, storage } = build({ isLoggedIn: () => false })
-    await page.load(1)
-    page.editor.pick(0, 1)
-    await new Promise((resolve) => setTimeout(resolve, 30))
-    expect(readDraft(1, storage)?.slots[0].player_id).toBe(1)
-  })
-
-  test('dispose writes a still-pending edit to the draft instead of losing it (system back right after an edit)', async () => {
-    const { page, storage } = build({ isLoggedIn: () => false, draftDelayMs: 1000 })
-    await page.load(1)
-    page.editor.pick(0, 1)
-    page.dispose()
-    expect(readDraft(1, storage)?.slots[0].player_id).toBe(1)
-  })
-
-  test('dispose with nothing dirty writes no draft and later edits are not persisted', async () => {
-    const { page, storage } = build({ isLoggedIn: () => false })
-    await page.load(1)
-    page.dispose()
-    expect(readDraft(1, storage)).toBeNull()
-    page.editor.pick(0, 1)
-    await new Promise((resolve) => setTimeout(resolve, 30))
-    expect(readDraft(1, storage)).toBeNull()
-  })
-
-  test('loading another team does not carry the previous team draft or state over', async () => {
-    const { page } = build()
-    await page.load(1)
-    page.editor.pick(0, 1)
-    await page.load(2)
-    expect(page.teamId.value).toBe(2)
-    // 新球队没有上一队的改动：回到该队自己的初始首发，且不算"未保存"
-    expect(page.editor.filled.value).toBe(2)
+  test('draft save permits incomplete eleven and leaves published code and content unchanged', async () => {
+    const { page, calls } = build({ getMyLineupEditor: async () => ({ lineup: publicSnapshot, draft: null }) })
+    await page.load(1); page.editor.pick(0, null)
+    expect(await page.saveDraft()).toBe('saved')
+    expect(calls).toEqual(['draft'])
+    expect(page.savedLineup.value).toEqual(publicSnapshot)
     expect(page.editor.dirty.value).toBe(false)
+    expect(page.hasUnpublishedChanges.value).toBe(true)
+    expect(page.saveState.value).toBe('draft')
+    expect(await page.publish()).toBe('incomplete')
+    expect(calls).toEqual(['draft'])
   })
-
-  test('switching teams flushes the outgoing draft before its debounce fires', async () => {
-    const { page, storage } = build({ draftDelayMs: 1000 })
+  test('explicit publication updates snapshot and cloud draft; code is retained', async () => {
+    const { page, calls } = build()
     await page.load(1)
-    page.editor.setFormation('4-4-2', () => null)
-    await nextTick()
-    await page.load(2)
-    expect(readDraft(1, storage)?.formation).toBe('4-4-2')
-    await page.load(1)
-    expect(page.editor.formation.value).toBe('4-4-2')
-    page.dispose()
+    expect(await page.publish()).toBe('saved')
+    expect(calls).toEqual(['publish'])
+    expect(page.hasUnpublishedChanges.value).toBe(false)
+    expect(page.saveState.value).toBe('published')
+    expect(page.savedLineup.value?.share_code).toBe(saved.share_code)
   })
-
-  test('edits during a slow team switch cannot replace the incoming saved lineup with an outgoing draft', async () => {
-    let finish: () => void = () => {}
-    const { page, storage } = build({
-      getSquad: async (id) => id === 2
-        ? new Promise((resolve) => { finish = () => resolve(squad) })
-        : squad,
-      getMyLineup: async (id) => ({ lineup: id === 2 ? { ...saved, formation: '5-3-2', slots: emptyLineup('5-3-2') } : null }),
-    })
-    await page.load(1)
-    const pending = page.load(2)
-    page.editor.setFormation('4-4-2', () => null)
-    await new Promise((resolve) => setTimeout(resolve, 30))
-    expect(readDraft(2, storage)).toBeNull()
-    finish()
-    await pending
-    expect(page.editor.formation.value).toBe('5-3-2')
-    expect(page.editor.dirty.value).toBe(false)
-    page.dispose()
+  test('reverting an edit to published content is shareable even when editor is dirty', async () => {
+    const { page } = build({ getMyLineupEditor: async () => ({ lineup: publicSnapshot, draft: null }) })
+    await page.load(1); page.editor.pick(0, null); page.editor.pick(0, 1)
+    expect(page.editor.dirty.value).toBe(true)
+    expect(page.hasUnpublishedChanges.value).toBe(false)
   })
-
-  test('a failed team switch exposes an error and cannot save the previous squad as the new team', async () => {
-    const { page, storage, calls } = build({
-      getSquad: async (id) => {
-        if (id === 2) throw new Error('offline')
-        return squad
-      },
-    })
-    await page.load(1)
-    page.editor.pick(0, null)
-    await page.load(2)
-    expect(page.squad.value).toBeNull()
-    expect(page.errorMessage.value).toBe('offline')
-    expect(await page.save()).toBe('cancelled')
-    expect(calls).toEqual([])
-    page.dispose()
-    expect(readDraft(2, storage)).toBeNull()
+  test('saving an unchanged cloud draft avoids duplicate requests', async () => {
+    const { page, calls } = build()
+    await page.load(1); await page.saveDraft(); await page.saveDraft()
+    expect(calls).toEqual(['draft'])
+    expect(page.savedLineup.value).toBeNull()
   })
-
-  for (const outcome of ['success', 'failure'] as const) {
-    test(`a previous team save ${outcome} cannot update the current team state or draft`, async () => {
+  test('new edits during either request retain dirty state and local draft', async () => {
+    for (const kind of ['draft', 'publish'] as const) {
       let finish: () => void = () => {}
       const { page, storage } = build({
-        saveMyLineup: (_id, payload) => new Promise((resolve, reject) => {
-          finish = () => outcome === 'success'
-            ? resolve({ lineup: { ...saved, ...payload } })
-            : reject(new Error('offline'))
-        }),
+        saveMyLineupDraft: async (_id, payload) => { await new Promise<void>(resolve => { finish = resolve }); return { draft: { ...payload, updated_at: saved.updated_at } } },
+        publishMyLineup: async (_id, payload) => { await new Promise<void>(resolve => { finish = resolve }); return { lineup: { ...publicSnapshot, ...payload }, draft: { ...payload, updated_at: saved.updated_at } } },
       })
       await page.load(1)
-      page.editor.pick(0, null)
-      const pending = page.save()
-      await page.load(2)
-      finish()
-      expect(await pending).toBe('cancelled')
-      expect(page.saveState.value).toBe('idle')
-      expect(page.saving.value).toBe(false)
-      expect(readDraft(2, storage)).toBeNull()
+      const pending = kind === 'draft' ? page.saveDraft() : page.publish()
+      page.editor.pick(0, null); finish()
+      expect(await pending).toBe('saved')
+      expect(page.editor.dirty.value).toBe(true)
+      expect(readDraft(1, storage, 'user:A')?.slots[0].player_id).toBeNull()
+      expect(page.hasUnpublishedChanges.value).toBe(true)
       page.dispose()
-    })
-  }
-
-  test('an old save finishing cannot release a newer team save lock', async () => {
-    const finishes: Array<() => void> = []
-    const { page } = build({ saveMyLineup: (_id, payload) => new Promise((resolve) => {
-      finishes.push(() => resolve({ lineup: { ...saved, ...payload } }))
-    }) })
-    await page.load(1)
-    page.editor.pick(0, null)
-    const first = page.save()
-    await page.load(2)
-    page.editor.pick(0, null)
-    const second = page.save()
-    finishes[0]()
-    await first
-    expect(page.saving.value).toBe(true)
-    finishes[1]()
-    await second
-    expect(page.saving.value).toBe(false)
-    page.dispose()
+    }
   })
-
-  test('unmount invalidates pending loads so they cannot restore stale state', async () => {
-    let finish: () => void = () => {}
-    const { page } = build({ getSquad: () => new Promise((resolve) => { finish = () => resolve(squad) }) })
-    const pending = page.load(1)
-    page.dispose()
-    finish()
-    await pending
+  test('team switch ignores old responses and does not clear the new request lock', async () => {
+    let finishA: () => void = () => {}, finishB: () => void = () => {}
+    const { page } = build({ saveMyLineupDraft: async (id, payload) => { await new Promise<void>(resolve => { if (id === 1) finishA = resolve; else finishB = resolve }); return { draft: { ...payload, updated_at: saved.updated_at } } } })
+    await page.load(1); const a = page.saveDraft(); await page.load(2); const b = page.saveDraft()
+    finishA(); expect(await a).toBe('cancelled')
+    expect(page.savingDraft.value).toBe(true); expect(page.cloudDraft.value).toBeNull()
+    finishB(); await b; expect(page.saving.value).toBe(false)
+  })
+  test('prior account response cannot update metadata and in-memory prior edits cannot save to new account', async () => {
+    let revision = 1, user = 'A', finish: () => void = () => {}
+    const { page, storage } = build({ userId: () => user, sessionRevision: () => revision, saveMyLineupDraft: async (_id, payload) => { await new Promise<void>(resolve => { finish = resolve }); return { draft: { ...payload, updated_at: saved.updated_at } } } })
+    await page.load(1); page.editor.pick(0, null); const pending = page.saveDraft()
+    revision++; user = 'B'; finish()
+    expect(await pending).toBe('cancelled'); expect(page.cloudDraft.value).toBeNull(); expect(page.saving.value).toBe(false)
+    expect(await page.saveDraft()).toBe('cancelled')
+    await page.load(1)
+    expect(page.editor.filled.value).toBe(11)
+    expect(readDraft(1, storage, 'user:B')).toBeNull()
+    expect(readDraft(1, storage, 'user:A')?.slots[0].player_id).toBeNull()
+  })
+  test('guest data is imported once only after a deliberate save intent and explicit resume', async () => {
+    let loggedIn = false, user: string | null = null, revision = 1
+    const { page, storage } = build({ isLoggedIn: () => loggedIn, userId: () => user, sessionRevision: () => revision })
+    await page.load(1); page.editor.pick(0, null)
+    expect(await page.saveDraft()).toBe('need-login')
+    loggedIn = true; user = 'A'; revision++
+    await page.load(1, { restoreGuestDraft: true })
+    expect(page.editor.filled.value).toBe(10)
+    expect(readDraft(1, storage)).toBeNull()
+    expect(await page.saveDraft()).toBe('saved')
+    user = 'B'; revision++
+    await page.load(1, { restoreGuestDraft: true })
+    expect(page.editor.filled.value).toBe(11)
+  })
+  test('ordinary login and old unscoped cache never import guest or another account', async () => {
+    const { page, storage } = build()
+    writeDraft({ teamId: 1, formation: '4-4-2', slots: emptyLineup('4-4-2'), savedAt: Date.now() }, storage)
+    storage.setStorageSync('fi-lineup-draft-1', { teamId: 1, formation: '4-4-2', slots: emptyLineup('4-4-2'), savedAt: Date.now() })
+    await page.load(1); expect(page.editor.filled.value).toBe(11)
+    await page.load(1, { restoreGuestDraft: true }); expect(page.editor.filled.value).toBe(11)
+  })
+  test('unresolved authenticated identity neither reads nor writes shared account cache', async () => {
+    const { page, storage } = build({ userId: () => null })
+    writeDraft({ teamId: 1, formation: '4-4-2', slots: emptyLineup('4-4-2'), savedAt: Date.now() }, storage)
+    await page.load(1); page.editor.pick(0, null); await nextTick(); page.dispose()
+    expect(readDraft(1, storage)?.formation).toBe('4-4-2')
+    expect(readDraft(1, storage, 'user:null')).toBeNull()
+  })
+  test('401 saves authenticated draft under its original owner before invalidating session', async () => {
+    let revision = 1, loggedIn = true
+    const { page, storage } = build({ sessionRevision: () => revision, isLoggedIn: () => loggedIn, invalidateSession: () => { revision++; loggedIn = false }, saveMyLineupDraft: async () => { throw new ApiRequestError('expired', 401) } })
+    await page.load(1); page.editor.pick(0, null)
+    expect(await page.saveDraft()).toBe('need-login')
+    expect(readDraft(1, storage, 'user:A')?.slots[0].player_id).toBeNull()
+    expect(readDraft(1, storage)).toBeNull()
+    expect(page.saving.value).toBe(false)
+  })
+  test('failed saves retain local edits and never mutate published snapshot', async () => {
+    const { page, storage } = build({ getMyLineupEditor: async () => ({ lineup: publicSnapshot, draft: null }), saveMyLineupDraft: async () => { throw new Error('network') } })
+    await page.load(1); page.editor.pick(0, null)
+    expect(await page.saveDraft()).toBe('failed')
+    expect(page.saveState.value).toBe('error')
+    expect(page.savedLineup.value).toEqual(publicSnapshot)
+    expect(readDraft(1, storage, 'user:A') === null).toBe(false)
+  })
+  test('out of order loads and disposal cannot publish obsolete data', async () => {
+    const gates: Record<number, () => void> = {}
+    const { page } = build({ getSquad: async id => { await new Promise<void>(resolve => { gates[id] = resolve }); return { ...fullSquad, team: { ...fullSquad.team, team_id: id } } } })
+    const a = page.load(1), b = page.load(2); gates[2](); await b; gates[1](); await a
+    expect(page.squad.value?.team.team_id).toBe(2)
+    const c = page.load(3); page.dispose(); gates[3](); await c
     expect(page.squad.value).toBeNull()
   })
-
-  test('a slow response for a previous team never overwrites the team the user switched to (A→B→C)', async () => {
-    const gates: Record<number, () => void> = {}
-    const lineups: Record<number, SavedLineup> = {
-      2: { ...saved, formation: '3-5-2', slots: assignPlayer(emptyLineup('3-5-2'), 0, 1) },
-      3: { ...saved, formation: '4-2-3-1', slots: emptyLineup('4-2-3-1') },
-    }
-    const { page } = build({
-      getSquad: async (teamId) => {
-        await new Promise<void>((resolve) => { gates[teamId] = resolve })
-        return { ...squad, team: { ...squad.team, team_id: teamId } }
-      },
-      getMyLineup: async (teamId) => ({ lineup: lineups[teamId] ?? null }),
-    })
-    const toB = page.load(2)
-    const toC = page.load(3)
-    gates[3]()
-    await toC
-    gates[2]() // B 的响应最后才到
-    await toB
-    expect(page.teamId.value).toBe(3)
-    expect(page.squad.value?.team.team_id).toBe(3)
-    expect(page.editor.formation.value).toBe('4-2-3-1')
-    expect(page.loading.value).toBe(false)
-  })
-
-  test('edits made while a save is in flight keep the lineup dirty and the draft', async () => {
-    let finish: () => void = () => {}
-    const { page, storage } = build({
-      saveMyLineup: (_teamId, payload) =>
-        new Promise((resolve) => {
-          finish = () => resolve({ lineup: { ...saved, formation: payload.formation, slots: payload.slots } })
-        }),
-    })
+  test('missing squad players are cleared from editor with notice without mutating public snapshot', async () => {
+    const stale = { ...publicSnapshot, slots: assignPlayer(publicSnapshot.slots, 0, 999) }
+    const { page } = build({ getMyLineupEditor: async () => ({ lineup: stale, draft: null }) })
     await page.load(1)
-    page.editor.pick(0, 1)
-    const pending = page.save()
-    page.editor.pick(1, 2) // 保存请求在途时又改了一个位置
-    finish()
-    expect(await pending).toBe('saved')
-    expect(page.editor.dirty.value).toBe(true)
-    expect(page.saveState.value).toBe('dirty')
-    expect(readDraft(1, storage)?.slots[1].player_id).toBe(2)
+    expect(page.editor.slots.value[0].player_id).toBeNull()
+    expect(page.notice.value === '').toBe(false)
+    expect(page.savedLineup.value).toEqual(stale)
+    expect(page.hasUnpublishedChanges.value).toBe(true)
   })
-
-  test('a save without edits in between still clears the dirty flag and the draft', async () => {
-    const { page, storage } = build()
-    await page.load(1)
-    page.editor.pick(0, 1)
-    await page.save()
-    expect(page.editor.dirty.value).toBe(false)
-    expect(readDraft(1, storage)).toBeNull()
-  })
-
-  test('a saved lineup that names players no longer in the squad is cleaned, marked dirty and explained', async () => {
-    const stale: SavedLineup = {
-      ...saved,
-      formation: '4-3-3',
-      slots: assignPlayer(assignPlayer(emptyLineup('4-3-3'), 0, 1), 1, 999),
-    }
-    const { page, calls } = build({ getMyLineup: async () => ({ lineup: stale }) })
-    await page.load(1)
-    expect(page.editor.slots.value[0].player_id).toBe(1)
-    expect(page.editor.slots.value[1].player_id).toBeNull()
-    expect(page.editor.dirty.value).toBe(true)
-    expect(page.notice.value.length > 0).toBe(true)
-    expect(await page.save()).toBe('saved') // 清理后可以正常保存，不再被后端拒绝
-    expect(calls).toEqual(['save'])
-  })
-
-  test('no notice for a clean saved lineup', async () => {
-    const { page } = build({ getMyLineup: async () => ({ lineup: saved }) })
-    await page.load(1)
-    expect(page.notice.value).toBe('')
-    expect(page.editor.dirty.value).toBe(false)
-  })
-
-  const fullSquad: SquadResponse = {
-    team: { team_id: 1, team_name: '成都蓉城', avatar_url: null },
-    active: [
-      ...[1, 15].map((n, i) => ({ player_id: 10 + i, name: `G${n}`, shirt_number: n, position: 'GK' as const, avatar_url: null, last_season: 2026 })),
-      ...[2, 3, 4, 5, 22].map((n, i) => ({ player_id: 20 + i, name: `D${n}`, shirt_number: n, position: 'DF' as const, avatar_url: null, last_season: 2026 })),
-      ...[6, 8, 10, 14].map((n, i) => ({ player_id: 30 + i, name: `M${n}`, shirt_number: n, position: 'MF' as const, avatar_url: null, last_season: 2026 })),
-      ...[9, 11, 19].map((n, i) => ({ player_id: 40 + i, name: `F${n}`, shirt_number: n, position: 'FW' as const, avatar_url: null, last_season: 2026 })),
-    ],
-    former: [{ player_id: 99, name: 'Old', shirt_number: 7, position: 'FW', avatar_url: null, last_season: 2024 }],
-  }
-
-  test('a first visit with no saved lineup and no draft starts from a filled starting eleven (not dirty, not saved)', async () => {
-    const { page } = build({ getSquad: async () => fullSquad })
+  test('first automatically filled eleven is clean and may be saved to the private cloud', async () => {
+    const { page, calls } = build()
     await page.load(1)
     expect(page.editor.filled.value).toBe(11)
-    expect(page.editor.slots.value.find((s) => s.slot === 0)!.player_id).toBe(10) // 1 号门将
-    expect(page.editor.slots.value.every((s) => s.player_id !== 99)).toBe(true) // 前队员不会自动入选
     expect(page.editor.dirty.value).toBe(false)
     expect(page.saveState.value).toBe('idle')
+    expect(await page.saveDraft()).toBe('saved')
+    expect(calls).toEqual(['draft'])
+    expect(page.savedLineup.value).toBeNull()
   })
-
-  test('an automatically filled lineup is saved like any other when the user taps save', async () => {
-    const { page, calls } = build({ getSquad: async () => fullSquad })
-    await page.load(1)
-    expect(await page.save()).toBe('saved')
-    expect(calls).toEqual(['save'])
-    expect(page.saveState.value).toBe('saved')
-    await page.save() // 已经保存且无改动才不重复请求
-    expect(calls).toEqual(['save'])
-    page.editor.pick(0, 11)
-    expect(await page.save()).toBe('saved')
-    expect(calls).toEqual(['save', 'save'])
-  })
-
-  test('a saved lineup or a draft is never replaced by the automatic starting eleven', async () => {
-    const mine: SavedLineup = { ...saved, formation: '4-4-2', slots: assignPlayer(emptyLineup('4-4-2'), 0, 11) }
-    const { page } = build({ getSquad: async () => fullSquad, getMyLineup: async () => ({ lineup: mine }) })
-    await page.load(1)
-    expect(page.editor.filled.value).toBe(1)
-    const drafted = build({ getSquad: async () => fullSquad })
-    drafted.storage.setStorageSync('fi-lineup-draft-1', { teamId: 1, formation: '3-5-2', slots: assignPlayer(emptyLineup('3-5-2'), 0, 11), savedAt: 1 })
-    await drafted.page.load(1)
-    expect(drafted.page.editor.filled.value).toBe(1)
-  })
-
-  test('fillStartingEleven fills the empty slots and marks the lineup dirty; it never moves players already placed', async () => {
-    const { page } = build({ getSquad: async () => fullSquad })
-    await page.load(1)
-    page.editor.pick(0, null)
-    page.editor.pick(1, null)
-    page.editor.pick(2, 40)
-    page.fillStartingEleven()
-    expect(page.editor.slots.value.find((s) => s.slot === 2)!.player_id).toBe(40)
+  test('switching teams flushes the prior dirty lineup before resetting editor', async () => {
+    const { page, storage } = build()
+    await page.load(1); page.editor.pick(0, null)
+    await page.load(2)
+    expect(readDraft(1, storage, 'user:A')?.slots[0].player_id).toBeNull()
     expect(page.editor.filled.value).toBe(11)
+    expect(readDraft(2, storage, 'user:A')).toBeNull()
+    page.dispose()
+  })
+  test('dispose flushes final changes and pending watchers cannot recreate timers or drafts', async () => {
+    const { page, storage } = build()
+    await page.load(1); page.editor.pick(0, null); page.dispose()
+    expect(readDraft(1, storage, 'user:A')?.slots[0].player_id).toBeNull()
+    storage.removeStorageSync('fi-lineup-draft-v2-user%3AA-1')
+    await nextTick(); await new Promise(resolve => setTimeout(resolve, 15))
+    expect(readDraft(1, storage, 'user:A')).toBeNull()
+  })
+  test('fill starting eleven only fills empty places and does nothing before loading', async () => {
+    const { page } = build()
+    page.fillStartingEleven(); expect(page.editor.filled.value).toBe(0)
+    await page.load(1); page.editor.pick(0, null); const retained = page.editor.slots.value[1].player_id
+    page.fillStartingEleven()
+    expect(page.editor.filled.value).toBe(11); expect(page.editor.slots.value[1].player_id).toBe(retained)
     expect(page.editor.dirty.value).toBe(true)
   })
-
-  test('fillStartingEleven before the squad is loaded does nothing', () => {
-    const { page } = build()
-    page.fillStartingEleven()
-    expect(page.editor.filled.value).toBe(0)
-    expect(page.editor.dirty.value).toBe(false)
-  })
-  test('saved metadata comes from the last successful save and is cleared for the next team', async () => {
-    const { page } = build()
-    await page.load(1)
-    expect(page.savedLineup.value).toBeNull()
-    await page.save()
-    expect(page.savedLineup.value?.share_code).toBe('ABCDEFGH')
-    await page.load(2)
-    expect(page.savedLineup.value).toBeNull()
-  })
-
-  test('an expired active session during save keeps a draft and returns a login intent', async () => {
+  test('optional editor 401 still loads squad anonymously', async () => {
     let revision = 1, loggedIn = true
-    const { page, storage } = build({
-      sessionRevision: () => revision, isLoggedIn: () => loggedIn,
-      invalidateSession: expected => { if (expected === revision) { revision++; loggedIn = false } },
-      saveMyLineup: async () => { throw new ApiRequestError('disabled', 401) },
-    })
-    await page.load(1); page.editor.pick(0, null)
-    expect(await page.save()).toBe('need-login')
-    expect(loggedIn).toBe(false); expect(page.saving.value).toBe(false)
-    expect(readDraft(1, storage) === null).toBe(false)
-  })
-
-  test('an expired optional editor session still loads the squad anonymously', async () => {
-    let revision = 1
-    const { page } = build({
-      sessionRevision: () => revision,
-      invalidateSession: expected => { if (expected === revision) revision++ },
-      getMyLineup: async () => { throw new ApiRequestError('expired', 401) },
-    })
+    const { page } = build({ sessionRevision: () => revision, isLoggedIn: () => loggedIn, invalidateSession: expected => { if (expected === revision) { revision++; loggedIn = false } }, getMyLineupEditor: async () => { throw new ApiRequestError('expired', 401) } })
     await page.load(1)
-    expect(page.squad.value?.team.team_id).toBe(1); expect(page.loading.value).toBe(false)
-    expect(page.errorMessage.value).toBe(''); expect(revision).toBe(2)
+    expect(page.squad.value?.team.team_id).toBe(1); expect(page.errorMessage.value).toBe('')
+    expect(page.loading.value).toBe(false); expect(revision).toBe(2)
   })
-
-  test('a response from the prior account cannot publish saved metadata or strand its save lock', async () => {
-    let revision = 1, finish: () => void = () => {}
-    const { page } = build({ sessionRevision: () => revision, saveMyLineup: (_id, payload) => new Promise(resolve => { finish = () => resolve({ lineup: { ...saved, ...payload } }) }) })
-    await page.load(1); const saving = page.save(); revision++
-    finish(); expect(await saving).toBe('cancelled'); expect(page.savedLineup.value).toBeNull(); expect(page.saving.value).toBe(false)
+  test('late old-account 401 cannot invalidate a newer session', async () => {
+    let revision = 1, invalidations = 0, reject: (error: Error) => void = () => {}
+    const { page } = build({ sessionRevision: () => revision, invalidateSession: () => { invalidations++; revision++ }, saveMyLineupDraft: async () => new Promise((_resolve, fail) => { reject = fail }) })
+    await page.load(1); const pending = page.saveDraft(); revision++
+    reject(new ApiRequestError('expired', 401))
+    expect(await pending).toBe('cancelled'); expect(invalidations).toBe(0); expect(revision).toBe(2)
   })
 
 })
-

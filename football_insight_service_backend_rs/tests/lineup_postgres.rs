@@ -54,6 +54,12 @@ async fn setup() -> Db {
     .unwrap();
     let migration = include_str!("../migrations/20261019130000_add_lineups.sql");
     sqlx::raw_sql(migration).execute(&pool).await.unwrap();
+    sqlx::raw_sql(include_str!(
+        "../migrations/20261019150000_add_lineup_drafts.sql"
+    ))
+    .execute(&pool)
+    .await
+    .unwrap();
     Db {
         admin,
         pool,
@@ -224,6 +230,7 @@ async fn deleting_the_user_cascades_to_the_lineup() {
         .await
         .unwrap();
     assert!(repo.find(user, 1).await.unwrap().is_none());
+    assert!(repo.find_draft(user, 1).await.unwrap().is_none());
     teardown(db).await;
 }
 

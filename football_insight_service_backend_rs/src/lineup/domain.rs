@@ -87,6 +87,8 @@ pub enum LineupSaveError {
     InvalidFormation,
     #[error("站位数据无效")]
     InvalidSlots,
+    #[error("发布阵容需要选满11名球员")]
+    IncompleteLineup,
     #[error("球员不属于这支球队")]
     PlayerNotInSquad,
     #[error("同一球员不能重复上场")]
@@ -331,4 +333,35 @@ mod public_validation_tests {
             assert!(!valid_share_code(code));
         }
     }
+}
+
+/// 私密编辑快照；没有分享码，也不参与任何公开查询。
+#[derive(Debug, Clone, PartialEq)]
+pub struct LineupDraft {
+    pub formation: String,
+    pub slots: Vec<LineupSlot>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LineupEditor {
+    pub lineup: Option<Lineup>,
+    pub draft: Option<LineupDraft>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PublishedLineup {
+    pub lineup: Lineup,
+    pub draft: LineupDraft,
+}
+
+pub fn validate_publish_input(
+    formation: &str,
+    slots: &[LineupSlot],
+) -> Result<(), LineupSaveError> {
+    validate_lineup_input(formation, slots)?;
+    if slots.iter().any(|slot| slot.player_id.is_none()) {
+        return Err(LineupSaveError::IncompleteLineup);
+    }
+    Ok(())
 }

@@ -54,22 +54,21 @@
           <text v-if="editor.filled.value < 11" class="hint-link" @tap="fillStartingEleven">一键填入首发</text>
         </view>
 
-        <text class="hint">满 11 人保存后自动公开，球迷可查看和点赞</text>
+        <text class="hint">草稿仅自己可见，满 11 人可发布并参与排名</text>
 
-        <view class="actions">
-          <button
-            class="actions__reset"
-            hover-class="actions__reset--pressed"
-            :disabled="saving"
-            @tap="requestConfirmation('reset')"
-          >重置</button>
-          <button
-            class="actions__primary"
-            hover-class="actions__primary--pressed"
-            :disabled="saving"
-            @tap="requestConfirmation('save')"
-          >{{ saving ? '保存中…' : '保存' }}</button>
-          <button class="actions__ghost" :disabled="saving || sharePreparing" @tap="handleShare">{{ sharePreparing ? '准备中…' : '分享' }}</button>
+        <view class="action-slot">
+          <LineupActionBar
+            :busy="saving"
+            :saving-draft="savingDraft"
+            :publishing="publishing"
+            :share-preparing="sharePreparing"
+            :complete="editor.filled.value === 11"
+            :published="Boolean(savedLineup)"
+            @reset="requestConfirmation('reset')"
+            @share="handleShare"
+            @draft="handleDraft"
+            @publish="requestConfirmation('publish')"
+          />
         </view>
       </view>
     </view>
@@ -85,7 +84,7 @@
 
     <LineupConfirmDialog
       :visible="confirmAction !== null"
-      :title="confirmAction === 'reset' ? '确认重置？' : '确认保存？'"
+      :title="confirmAction === 'reset' ? '确认重置？' : savedLineup ? '确认更新发布？' : '确认发布？'"
       :message="confirmationMessage"
       @cancel="confirmAction = null"
       @confirm="confirmPendingAction"
@@ -119,18 +118,19 @@ import LineupFormationBar from './components/LineupFormationBar.vue'
 import LineupPitch from './components/LineupPitch.vue'
 import LineupPlayerSheet from './components/LineupPlayerSheet.vue'
 import LineupTeamPicker from './components/LineupTeamPicker.vue'
+import LineupActionBar from './components/LineupActionBar.vue'
 
 const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
 
-const { teamId, squad, loading, errorMessage, notice, saving, saveState, savedLineup, editor, load, save, fillStartingEleven, dispose } = useLineupPage()
+const { teamId, squad, loading, errorMessage, notice, saving, savingDraft, publishing, saveState, savedLineup, hasUnpublishedChanges, editor, load, saveDraft, publish, fillStartingEleven, dispose } = useLineupPage()
 
 const teams = ref<Array<{ team_id: number; team_name: string; avatar_url: string | null }>>([])
 const sheetVisible = ref(false)
-const confirmAction = ref<'save' | 'reset' | null>(null)
+const confirmAction = ref<'publish' | 'reset' | null>(null)
 const sharePreparing = ref(false)
 const shareContext = () => JSON.stringify([teamId.value, editor.revision.value, session.revision.value, loading.value])
-const share = useLineupShare(shareContext, () => buildLineupPageUrl(teamId.value, { autosave: true }))
+const share = useLineupShare(shareContext, () => buildLineupPageUrl(teamId.value))
 const { visible: shareVisible, busy: shareBusy, error: shareError, imagePath, payload: sharePayload, generate, preview, save: saveImage } = share
 watch(sharePayload, payload => {
   // #ifdef MP-WEIXIN
@@ -145,11 +145,22 @@ let started = false
 const pageLockStyle = computed(() => (sheetVisible.value || confirmAction.value !== null || shareVisible.value ? 'overflow: hidden;' : ''))
 const confirmationMessage = computed(() => {
   if (confirmAction.value === 'reset') return '所有球员将恢复为当前阵型的默认站位，已选球员保持不变。'
-  return editor.filled.value === 11
-    ? '保存当前战术阵容？满 11 人的阵容保存后将公开展示，球迷可查看和点赞。'
-    : '保存当前战术阵容？未满 11 人的阵容仅自己可见。'
+  return savedLineup.value
+    ? '用当前阵容更新已发布的战术？分享链接和已有点赞会保留。'
+    : '发布当前战术阵容？发布后将在球队榜单公开展示，球迷可查看和点赞。'
 })
 watch([teamId, loading, saving, session.revision], () => { confirmAction.value = null })
+watch(
+  () => [session.currentUser.value?.id ?? null, session.hasAccessToken.value] as const,
+  ([userId, loggedIn], previous) => {
+    if (!started || !teamId.value || (previous?.[0] === userId && previous?.[1] === loggedIn)) return
+    sheetVisible.value = false
+    shareVisible.value = false
+    // 后台登录、退出或换账号后重新装载该身份的云草稿；普通身份变化不移交游客稿。
+    // load 会先把旧编辑落回旧 owner，旧请求由 loadSeq 与 session revision 作废。
+    void load(teamId.value)
+  },
+)
 
 const pitchPlayers = computed(() => buildPitchPlayers(editor.slots.value, editor.formation.value, squad.value))
 
@@ -163,10 +174,12 @@ const sheetGroups = computed(() => {
 
 const saveStateText = computed(() => {
   switch (saveState.value) {
-    case 'saved':
-      return '已保存'
+    case 'published':
+      return '已发布'
+    case 'draft':
+      return '草稿已保存'
     case 'dirty':
-      return '未保存'
+      return savedLineup.value ? '有未发布改动' : '未保存草稿'
     case 'error':
       return '保存失败'
     default:
@@ -180,8 +193,8 @@ function goBack(): void {
     return
   }
   uni.showModal({
-    title: '还没保存',
-    content: '改动已存为草稿，下次进来会恢复。确定先离开吗？',
+    title: '草稿尚未存云端',
+    content: '当前改动只保留在本机，下次进来可继续编辑。确定先离开吗？',
     confirmText: '离开',
     cancelText: '继续排',
     success: (res) => {
@@ -219,8 +232,9 @@ function changeFormation(code: string): void {
   editor.setFormation(code, positionIndex(squad.value))
 }
 
-function requestConfirmation(action: 'save' | 'reset'): void {
+function requestConfirmation(action: 'publish' | 'reset'): void {
   if (loading.value || !squad.value || saving.value || sharePreparing.value) return
+  if (action === 'publish' && editor.filled.value < 11) return
   uni.hideToast()
   confirmAction.value = action
 }
@@ -230,7 +244,7 @@ function confirmPendingAction(): void {
   confirmAction.value = null
   if (!action || loading.value || !squad.value || saving.value || sharePreparing.value) return
   if (action === 'reset') editor.reset()
-  else void handleSave()
+  else void handlePublish()
 }
 
 async function switchTeam(nextTeamId: number): Promise<void> {
@@ -241,7 +255,7 @@ async function switchTeam(nextTeamId: number): Promise<void> {
   }
   uni.showModal({
     title: '切换球队',
-    content: '当前改动已存为草稿，切换后可以回来继续。',
+    content: '当前改动只保留在本机，切换后可以回来继续。',
     confirmText: '切换',
     cancelText: '取消',
     success: (res) => {
@@ -250,20 +264,33 @@ async function switchTeam(nextTeamId: number): Promise<void> {
   })
 }
 
-async function handleSave(): Promise<void> {
-  const result = await save()
+function loginForAction(action: 'draft' | 'publish'): void {
+  rememberPostLoginRedirect({ type: 'navigateTo', url: buildLineupPageUrl(teamId.value, { resumeAction: action }) })
+  uni.showToast({ title: action === 'draft' ? '登录后可将草稿存云端' : '登录后即可发布', icon: 'none' })
+  uni.switchTab({ url: '/pages/user/index' })
+}
+
+async function handleDraft(): Promise<void> {
+  const result = await saveDraft()
   if (result === 'cancelled') return
   if (result === 'saved') {
-    uni.showToast({ title: '已保存', icon: 'success' })
+    uni.showToast({ title: '草稿已保存', icon: 'success' })
     return
   }
   if (result === 'need-login') {
-    rememberPostLoginRedirect({ type: 'navigateTo', url: buildLineupPageUrl(teamId.value, { autosave: true }) })
-    uni.showToast({ title: '登录后即可保存', icon: 'none' })
-    uni.switchTab({ url: '/pages/user/index' })
+    loginForAction('draft')
     return
   }
-  uni.showToast({ title: '保存失败，已存为草稿，稍后重试', icon: 'none' })
+  uni.showToast({ title: '云端保存失败，已保留本机草稿', icon: 'none' })
+}
+
+async function handlePublish(): Promise<void> {
+  const result = await publish()
+  if (result === 'cancelled') return
+  if (result === 'saved') uni.showToast({ title: '已发布', icon: 'success' })
+  else if (result === 'need-login') loginForAction('publish')
+  else if (result === 'incomplete') uni.showToast({ title: '排满 11 人后再发布', icon: 'none' })
+  else uni.showToast({ title: '发布失败，已保留本机草稿', icon: 'none' })
 }
 
 function openCommunity(): void { uni.navigateTo({ url: buildLineupListUrl(teamId.value) }) }
@@ -272,16 +299,12 @@ async function handleShare(): Promise<void> {
   sharePreparing.value = true
   try {
     const prepared = await prepareEditorShare({
-      context: shareContext, slots: () => editor.slots.value, save, saved: () => savedLineup.value,
-      dirty: () => editor.dirty.value, detail: getSharedLineup,
+      context: shareContext, saved: () => savedLineup.value,
+      dirty: () => hasUnpublishedChanges.value, detail: getSharedLineup,
     })
     if (prepared.lineup) { await share.open(prepared.lineup); return }
-    if (prepared.result === 'incomplete') uni.showToast({ title: '排满 11 人后再分享', icon: 'none' })
-    else if (prepared.result === 'need-login') {
-      rememberPostLoginRedirect({ type: 'navigateTo', url: buildLineupPageUrl(teamId.value, { autosave: true }) })
-      uni.showToast({ title: '登录并保存后即可分享', icon: 'none' })
-      uni.switchTab({ url: '/pages/user/index' })
-    } else if (prepared.result === 'failed') uni.showToast({ title: '保存失败，稍后重试分享', icon: 'none' })
+    if (prepared.result === 'needs-publish') uni.showToast({ title: '请先发布当前战术再分享', icon: 'none' })
+    else if (prepared.result === 'incomplete') uni.showToast({ title: '排满 11 人并发布后再分享', icon: 'none' })
   } catch (error) { uni.showToast({ title: extractApiErrorMessage(error, '分享准备失败，请重试'), icon: 'none' }) }
   finally { sharePreparing.value = false }
 }
@@ -303,12 +326,13 @@ async function resolveDefaultTeamId(list: Array<{ team_id: number }>): Promise<n
 async function start(): Promise<void> {
   loading.value = true
   try {
+    if (session.hasAccessToken.value) await session.ensureSessionReady()
     const list = await listSupportTeams()
     teams.value = list.map((t) => ({ team_id: t.team_id, team_name: t.team_name, avatar_url: t.avatar_storage_url }))
     const initial = await resolveDefaultTeamId(teams.value)
     if (initial) {
-      await load(initial)
-      await autosaveRestoredDraft()
+      await load(initial, { restoreGuestDraft: resumeAfterLogin !== null })
+      await resumeRequestedAction()
     }
   } catch (error) {
     errorMessage.value = error instanceof Error && error.message ? error.message : '战术板加载失败'
@@ -322,28 +346,28 @@ async function reload(): Promise<void> {
   else await start()
 }
 
-let autosaveAfterLoad = false
+let resumeAfterLogin: 'draft' | 'publish' | null = null
 
 onLoad((query) => {
   const parsed = parseLineupPageQuery(query as Record<string, unknown> | undefined)
   requestedTeamId = parsed.teamId
-  autosaveAfterLoad = parsed.autosave
+  resumeAfterLogin = parsed.resumeAction
 })
 
 onShow(() => {
   // 只在首次进入时加载。登录页回跳会新建本页（switchTab 会关闭非 Tab 页），
-  // 此时 URL 带一次性的 autosave 标记，草稿恢复后自动保存一次，不依赖页面实例存活。
+  // 登录回跳的一次性意图只恢复私密草稿；发布仍须再次确认。
   if (started) return
   started = true
   void start()
 })
 
-async function autosaveRestoredDraft(): Promise<void> {
-  if (!autosaveAfterLoad) return
-  autosaveAfterLoad = false // 一次性：之后的 onShow、回到前台都不会再自动保存
-  if (!session.hasAccessToken.value || !editor.dirty.value) return
-  const result = await save()
-  if (result === 'saved') uni.showToast({ title: '已保存', icon: 'success' })
+async function resumeRequestedAction(): Promise<void> {
+  const action = resumeAfterLogin
+  resumeAfterLogin = null
+  if (!action || !session.hasAccessToken.value || loading.value || !squad.value) return
+  if (action === 'draft') await handleDraft()
+  else requestConfirmation('publish')
 }
 
 onBeforeUnmount(dispose)
@@ -481,7 +505,8 @@ onBeforeUnmount(dispose)
   color: var(--fi-color-primary);
 }
 
-.status-row__state--saved {
+.status-row__state--published,
+.status-row__state--draft {
   color: var(--fi-color-seat-desired);
 }
 
@@ -515,78 +540,6 @@ onBeforeUnmount(dispose)
   font-weight: var(--fi-weight-bold);
 }
 
-.actions {
-  display: flex;
-  align-items: center;
-  gap: var(--fi-space-16);
-}
-
-.actions__ghost,
-.actions__primary,
-.actions__reset {
-  margin: 0;
-  padding: var(--fi-space-16) var(--fi-space-28);
-  border-radius: var(--fi-radius-round);
-  font-size: var(--fi-font-28);
-  font-weight: var(--fi-weight-bold);
-  line-height: var(--fi-leading-snug);
-  transition: transform var(--fi-motion-duration-fast) var(--fi-motion-ease-out);
-}
-
-.actions__ghost::after,
-.actions__primary::after,
-.actions__reset::after {
-  border: 0;
-}
-
-.actions__ghost {
-  flex-shrink: 0;
-  border: var(--fi-border-width) solid var(--fi-color-border-chip);
-  background: var(--fi-color-surface);
-  color: var(--fi-color-text-secondary);
-}
-
-.actions__ghost--disabled {
-  opacity: 0.5;
-}
-
-.actions__reset {
-  flex-shrink: 0;
-  border: var(--fi-border-width) solid var(--fi-color-primary-deep);
-  background: var(--fi-color-primary);
-  color: var(--fi-color-surface);
-  box-shadow: var(--fi-shadow-soft);
-}
-
-.actions__reset[disabled] {
-  opacity: var(--fi-opacity-pressed);
-}
-
-.actions__primary {
-  flex: 1;
-  background: var(--fi-color-text-strong);
-  color: var(--fi-color-surface);
-  box-shadow: var(--fi-shadow-soft);
-}
-
-.actions__primary[disabled] {
-  background: var(--fi-color-text-caption);
-  box-shadow: none;
-}
-
-.actions__ghost--pressed,
-.actions__primary--pressed,
-.actions__reset--pressed {
-  transform: scale(0.97);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .actions__ghost,
-  .actions__primary,
-  .actions__reset {
-    transition: none;
-  }
-}
 </style>
 
 <style scoped>

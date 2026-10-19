@@ -63,6 +63,12 @@ async fn setup() -> Db {
     .execute(&pool)
     .await
     .unwrap();
+    sqlx::raw_sql(include_str!(
+        "../migrations/20261019150000_add_lineup_drafts.sql"
+    ))
+    .execute(&pool)
+    .await
+    .unwrap();
     Db {
         admin,
         pool,
@@ -467,6 +473,162 @@ async fn missing_team_blocks_shared_reads_and_like_writes_consistently() {
     assert_eq!(
         repo.set_like("TEAMDEL1", author, true).await.unwrap_err(),
         LineupPublicError::NotFound
+    );
+    teardown(db).await;
+}
+
+#[tokio::test]
+#[ignore = "requires explicit disposable local LINEUP_TEST_DATABASE_URL"]
+async fn private_drafts_do_not_change_public_snapshots_likes_identity_or_other_users() {
+    let db = setup().await;
+    let repo = PostgresLineupRepository::new(db.pool.clone());
+    let public = PostgresPublicLineupRepository::new(db.pool.clone());
+    let author = user(&db.pool).await;
+    let other = user(&db.pool).await;
+    repo.save_draft(author, 1, "4-4-2", &slots(false))
+        .await
+        .unwrap();
+    assert!(repo.find(author, 1).await.unwrap().is_none());
+    assert!(repo.find_draft(other, 1).await.unwrap().is_none());
+    assert!(repo.find_draft(author, 2).await.unwrap().is_none());
+    assert_eq!(
+        public
+            .list(1, query("latest", 1, 20), None)
+            .await
+            .unwrap()
+            .1,
+        0
+    );
+    let first = repo
+        .publish(author, 1, "4-3-3", &slots(true), "DRAFT001")
+        .await
+        .unwrap();
+    assert_eq!(first.lineup.updated_at, first.draft.updated_at);
+    public.set_like("DRAFT001", other, true).await.unwrap();
+    let before = public
+        .shared("DRAFT001", Some(other))
+        .await
+        .unwrap()
+        .unwrap();
+    repo.save_draft(author, 1, "3-5-2", &slots(false))
+        .await
+        .unwrap();
+    assert_eq!(
+        public
+            .shared("DRAFT001", Some(other))
+            .await
+            .unwrap()
+            .unwrap(),
+        before
+    );
+    assert_eq!(
+        repo.find_draft(author, 1).await.unwrap().unwrap().formation,
+        "3-5-2"
+    );
+    assert_eq!(
+        public
+            .list(1, query("latest", 1, 20), None)
+            .await
+            .unwrap()
+            .1,
+        1
+    );
+    let mut modified = slots(true);
+    modified[0].x = 0.25;
+    let second = repo
+        .publish(author, 1, "4-4-2", &modified, "IGNORED9")
+        .await
+        .unwrap();
+    assert_eq!(second.lineup.share_code, "DRAFT001");
+    assert_eq!(second.lineup.slots, second.draft.slots);
+    let after = public
+        .shared("DRAFT001", Some(other))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(after.item.created_at, before.item.created_at);
+    assert_eq!(after.item.likes, before.item.likes);
+    assert_eq!(after.slots[0].x, 0.25);
+    assert_eq!(after.item.formation, "4-4-2");
+    assert!(repo.find(other, 1).await.unwrap().is_none());
+    assert!(repo.find_draft(other, 1).await.unwrap().is_none());
+    teardown(db).await;
+}
+
+#[tokio::test]
+#[ignore = "requires explicit disposable local LINEUP_TEST_DATABASE_URL"]
+async fn failed_draft_write_rolls_back_first_publish_and_republish_in_full() {
+    let db = setup().await;
+    let repo = PostgresLineupRepository::new(db.pool.clone());
+    let author = user(&db.pool).await;
+    repo.save_draft(author, 1, "4-3-3", &slots(false))
+        .await
+        .unwrap();
+    let old_draft = repo.find_draft(author, 1).await.unwrap().unwrap();
+    sqlx::raw_sql("CREATE FUNCTION reject_test_draft() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+        BEGIN IF NEW.formation = '3-5-2' THEN RAISE EXCEPTION 'test draft write failure'; END IF; RETURN NEW; END $$;
+        CREATE TRIGGER reject_draft BEFORE INSERT OR UPDATE ON f_i_lineup_drafts FOR EACH ROW EXECUTE FUNCTION reject_test_draft();")
+        .execute(&db.pool).await.unwrap();
+    assert_eq!(
+        repo.publish(author, 1, "3-5-2", &slots(true), "ATOMIC01")
+            .await
+            .unwrap_err(),
+        football_insight_service_backend_rs::lineup::ports::StoreError::Unavailable
+    );
+    assert!(repo.find(author, 1).await.unwrap().is_none());
+    assert_eq!(
+        repo.find_draft(author, 1).await.unwrap().unwrap(),
+        old_draft
+    );
+    let first = repo
+        .publish(author, 1, "4-4-2", &slots(true), "ATOMIC01")
+        .await
+        .unwrap();
+    assert!(
+        repo.publish(author, 1, "3-5-2", &slots(true), "IGNORED1")
+            .await
+            .is_err()
+    );
+    assert_eq!(repo.find(author, 1).await.unwrap().unwrap(), first.lineup);
+    assert_eq!(
+        repo.find_draft(author, 1).await.unwrap().unwrap(),
+        first.draft
+    );
+    teardown(db).await;
+}
+
+#[tokio::test]
+#[ignore = "requires explicit disposable local LINEUP_TEST_DATABASE_URL"]
+async fn draft_migration_backfills_legacy_edits_without_overwriting_newer_private_edits() {
+    let db = setup().await;
+    let repo = PostgresLineupRepository::new(db.pool.clone());
+    let author = user(&db.pool).await;
+    save(&db.pool, author, 1, "LEGACY01", false).await;
+    sqlx::query("DELETE FROM f_i_lineup_drafts WHERE user_id = $1")
+        .bind(author)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    let migration = include_str!("../migrations/20261019150000_add_lineup_drafts.sql");
+    sqlx::raw_sql(migration).execute(&db.pool).await.unwrap();
+    let legacy = repo.find(author, 1).await.unwrap().unwrap();
+    let backfill = repo.find_draft(author, 1).await.unwrap().unwrap();
+    assert_eq!(backfill.formation, legacy.formation);
+    assert_eq!(backfill.slots, legacy.slots);
+    assert_eq!(backfill.updated_at, legacy.updated_at);
+    repo.save_draft(author, 1, "3-5-2", &slots(false))
+        .await
+        .unwrap();
+    let private = repo.find_draft(author, 1).await.unwrap().unwrap();
+    sqlx::raw_sql(migration).execute(&db.pool).await.unwrap();
+    assert_eq!(repo.find_draft(author, 1).await.unwrap().unwrap(), private);
+    // A legacy client save keeps the draft in sync with its successful public-table update.
+    repo.upsert(author, 1, "4-4-2", &slots(false), "IGNORED1")
+        .await
+        .unwrap();
+    assert_eq!(
+        repo.find_draft(author, 1).await.unwrap().unwrap().formation,
+        "4-4-2"
     );
     teardown(db).await;
 }

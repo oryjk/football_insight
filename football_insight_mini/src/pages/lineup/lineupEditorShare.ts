@@ -4,24 +4,20 @@ import type { SaveResult } from './useLineupPage'
 
 export interface EditorShareSource {
   context: () => string
-  slots: () => Array<{ player_id: number | null }>
-  save: () => Promise<SaveResult>
   saved: () => SavedLineup | null
+  /** 当前内容是否与公开快照有差异，不能用 editor.dirty。 */
   dirty: () => boolean
   detail: (code: string) => Promise<PublicLineup>
 }
-/** Capture identity before saving, then confirm the exact editor revision before publishing. */
-export async function prepareEditorShare(source: EditorShareSource): Promise<{ result: SaveResult | 'incomplete'; lineup?: PublicLineup }> {
-  if (!canShareLineup(source.slots())) return { result: 'incomplete' }
-  const context = source.context()
-  const saved = await source.save()
-  if (saved !== 'saved') return { result: saved }
-  if (source.context() !== context) return { result: 'cancelled' }
+/** 只读取已明确发布的版本；分享不会保存或发布编辑内容。 */
+export async function prepareEditorShare(source: EditorShareSource): Promise<{ result: SaveResult | 'needs-publish'; lineup?: PublicLineup }> {
   const snapshot = source.saved()
-  if (!snapshot || source.dirty() || !canShareLineup(snapshot.slots)) return { result: 'cancelled' }
+  if (!snapshot || source.dirty()) return { result: 'needs-publish' }
+  if (!canShareLineup(snapshot.slots)) return { result: 'incomplete' }
+  const context = source.context()
   let lineup: PublicLineup
   try { lineup = await source.detail(snapshot.share_code) }
   catch (error) { if (source.context() !== context) return { result: 'cancelled' }; throw error }
-  if (source.context() !== context || source.dirty()) return { result: 'cancelled' }
+  if (source.context() !== context || source.dirty() || source.saved()?.share_code !== snapshot.share_code) return { result: 'cancelled' }
   return { result: 'saved', lineup }
 }

@@ -1,7 +1,10 @@
 //! HTTP contracts belong to the inbound adapter, independently of domain and JSONB storage.
 use crate::lineup::{
     application::Squad,
-    domain::{Lineup, LineupSlot, Position, SquadPlayer, SquadTeam},
+    domain::{
+        Lineup, LineupDraft, LineupEditor, LineupSlot, Position, PublishedLineup, SquadPlayer,
+        SquadTeam,
+    },
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -124,6 +127,58 @@ impl From<Lineup> for LineupDto {
             slots: lineup.slots.into_iter().map(Into::into).collect(),
             share_code: lineup.share_code,
             updated_at: lineup.updated_at,
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub(super) struct DraftDto {
+    formation: String,
+    slots: Vec<SlotDto>,
+    updated_at: DateTime<Utc>,
+}
+
+impl From<LineupDraft> for DraftDto {
+    fn from(draft: LineupDraft) -> Self {
+        Self {
+            formation: draft.formation,
+            slots: draft.slots.into_iter().map(Into::into).collect(),
+            updated_at: draft.updated_at,
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub(super) struct DraftResponse {
+    pub draft: DraftDto,
+}
+
+#[derive(Serialize)]
+pub(super) struct EditorResponse {
+    lineup: Option<LineupDto>,
+    draft: Option<DraftDto>,
+}
+
+impl From<LineupEditor> for EditorResponse {
+    fn from(editor: LineupEditor) -> Self {
+        Self {
+            lineup: editor.lineup.map(Into::into),
+            draft: editor.draft.map(Into::into),
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub(super) struct PublishResponse {
+    lineup: LineupDto,
+    draft: DraftDto,
+}
+
+impl From<PublishedLineup> for PublishResponse {
+    fn from(published: PublishedLineup) -> Self {
+        Self {
+            lineup: published.lineup.into(),
+            draft: published.draft.into(),
         }
     }
 }

@@ -1,5 +1,8 @@
 use crate::lineup::{
-    domain::{Lineup, LineupReadError, LineupSlot, Position, SquadPlayer, SquadTeam},
+    domain::{
+        Lineup, LineupDraft, LineupReadError, LineupSlot, Position, PublishedLineup, SquadPlayer,
+        SquadTeam,
+    },
     ports::{LineupRepository, LineupUserAccess, SquadRepository, StoreError},
 };
 use async_trait::async_trait;
@@ -162,8 +165,91 @@ fn to_lineup((formation, Json(slots), share_code, updated_at): LineupRow) -> Lin
     }
 }
 
+type DraftRow = (String, Json<Vec<StoredSlot>>, chrono::DateTime<chrono::Utc>);
+
+fn to_draft((formation, Json(slots), updated_at): DraftRow) -> LineupDraft {
+    LineupDraft {
+        formation,
+        slots: slots.into_iter().map(Into::into).collect(),
+        updated_at,
+    }
+}
+
+const SAVE_DRAFT: &str = "INSERT INTO f_i_lineup_drafts (user_id, team_id, formation, slots)
+    VALUES ($1, $2, $3, $4)
+    ON CONFLICT (user_id, team_id) DO UPDATE
+       SET formation = EXCLUDED.formation, slots = EXCLUDED.slots, updated_at = NOW()
+    RETURNING formation, slots, updated_at";
+
 #[async_trait]
 impl LineupRepository for PostgresLineupRepository {
+    async fn find_draft(
+        &self,
+        user_id: Uuid,
+        team_id: i64,
+    ) -> Result<Option<LineupDraft>, StoreError> {
+        sqlx::query_as::<_, DraftRow>("SELECT formation, slots, updated_at FROM f_i_lineup_drafts WHERE user_id = $1 AND team_id = $2")
+            .bind(user_id).bind(team_id).fetch_optional(&self.pool).await
+            .map(|row| row.map(to_draft)).map_err(store_error)
+    }
+
+    async fn save_draft(
+        &self,
+        user_id: Uuid,
+        team_id: i64,
+        formation: &str,
+        slots: &[LineupSlot],
+    ) -> Result<LineupDraft, StoreError> {
+        sqlx::query_as::<_, DraftRow>(SAVE_DRAFT)
+            .bind(user_id)
+            .bind(team_id)
+            .bind(formation)
+            .bind(Json(slots.iter().map(StoredSlot::from).collect::<Vec<_>>()))
+            .fetch_one(&self.pool)
+            .await
+            .map(to_draft)
+            .map_err(store_error)
+    }
+
+    async fn publish(
+        &self,
+        user_id: Uuid,
+        team_id: i64,
+        formation: &str,
+        slots: &[LineupSlot],
+        share_code: &str,
+    ) -> Result<PublishedLineup, StoreError> {
+        let mut tx = self.pool.begin().await.map_err(store_error)?;
+        let stored_slots = Json(slots.iter().map(StoredSlot::from).collect::<Vec<_>>());
+        let lineup = sqlx::query_as::<_, LineupRow>(
+            "INSERT INTO f_i_lineups (id, user_id, team_id, formation, slots, share_code)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (user_id, team_id) DO UPDATE
+                SET formation = EXCLUDED.formation, slots = EXCLUDED.slots, updated_at = NOW()
+             RETURNING formation, slots, share_code, updated_at",
+        )
+        .bind(Uuid::new_v4())
+        .bind(user_id)
+        .bind(team_id)
+        .bind(formation)
+        .bind(&stored_slots)
+        .bind(share_code)
+        .fetch_one(&mut *tx)
+        .await
+        .map(to_lineup)
+        .map_err(store_error)?;
+        let draft = sqlx::query_as::<_, DraftRow>(SAVE_DRAFT)
+            .bind(user_id)
+            .bind(team_id)
+            .bind(formation)
+            .bind(&stored_slots)
+            .fetch_one(&mut *tx)
+            .await
+            .map(to_draft)
+            .map_err(store_error)?;
+        tx.commit().await.map_err(store_error)?;
+        Ok(PublishedLineup { lineup, draft })
+    }
     async fn find(&self, user_id: Uuid, team_id: i64) -> Result<Option<Lineup>, StoreError> {
         sqlx::query_as::<_, LineupRow>(
             "SELECT formation, slots, share_code, updated_at FROM f_i_lineups WHERE user_id = $1 AND team_id = $2",
@@ -199,22 +285,8 @@ impl LineupRepository for PostgresLineupRepository {
         slots: &[LineupSlot],
         share_code: &str,
     ) -> Result<Lineup, StoreError> {
-        sqlx::query_as::<_, LineupRow>(
-            "INSERT INTO f_i_lineups (id, user_id, team_id, formation, slots, share_code)
-             VALUES ($1, $2, $3, $4, $5, $6)
-             ON CONFLICT (user_id, team_id) DO UPDATE
-                SET formation = EXCLUDED.formation, slots = EXCLUDED.slots, updated_at = NOW()
-             RETURNING formation, slots, share_code, updated_at",
-        )
-        .bind(Uuid::new_v4())
-        .bind(user_id)
-        .bind(team_id)
-        .bind(formation)
-        .bind(Json(slots.iter().map(StoredSlot::from).collect::<Vec<_>>()))
-        .bind(share_code)
-        .fetch_one(&self.pool)
-        .await
-        .map(to_lineup)
-        .map_err(store_error)
+        self.publish(user_id, team_id, formation, slots, share_code)
+            .await
+            .map(|result| result.lineup)
     }
 }
