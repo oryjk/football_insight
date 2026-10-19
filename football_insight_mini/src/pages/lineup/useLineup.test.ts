@@ -158,16 +158,30 @@ describe('useLineupPage', () => {
     expect(page.saveState.value).toBe('saved')
   })
 
-  test('edits are written to the draft after the debounce even when logged out, and dispose stops the timer', async () => {
+  test('edits are written to the draft after the debounce even when logged out', async () => {
     const { page, storage } = build({ isLoggedIn: () => false })
     await page.load(1)
     page.editor.pick(0, 1)
     await new Promise((resolve) => setTimeout(resolve, 30))
     expect(readDraft(1, storage)?.slots[0].player_id).toBe(1)
-    page.editor.pick(1, 2)
+  })
+
+  test('dispose writes a still-pending edit to the draft instead of losing it (system back right after an edit)', async () => {
+    const { page, storage } = build({ isLoggedIn: () => false, draftDelayMs: 1000 })
+    await page.load(1)
+    page.editor.pick(0, 1)
     page.dispose()
+    expect(readDraft(1, storage)?.slots[0].player_id).toBe(1)
+  })
+
+  test('dispose with nothing dirty writes no draft and later edits are not persisted', async () => {
+    const { page, storage } = build({ isLoggedIn: () => false })
+    await page.load(1)
+    page.dispose()
+    expect(readDraft(1, storage)).toBeNull()
+    page.editor.pick(0, 1)
     await new Promise((resolve) => setTimeout(resolve, 30))
-    expect(readDraft(1, storage)?.slots[1].player_id).toBeNull()
+    expect(readDraft(1, storage)).toBeNull()
   })
 
   test('loading another team does not carry the previous team draft or state over', async () => {
@@ -179,4 +193,81 @@ describe('useLineupPage', () => {
     expect(page.editor.filled.value).toBe(0)
     expect(page.editor.dirty.value).toBe(false)
   })
+
+  test('a slow response for a previous team never overwrites the team the user switched to (A→B→C)', async () => {
+    const gates: Record<number, () => void> = {}
+    const lineups: Record<number, SavedLineup> = {
+      2: { ...saved, formation: '3-5-2', slots: assignPlayer(emptyLineup('3-5-2'), 0, 1) },
+      3: { ...saved, formation: '4-2-3-1', slots: emptyLineup('4-2-3-1') },
+    }
+    const { page } = build({
+      getSquad: async (teamId) => {
+        await new Promise<void>((resolve) => { gates[teamId] = resolve })
+        return { ...squad, team: { ...squad.team, team_id: teamId } }
+      },
+      getMyLineup: async (teamId) => ({ lineup: lineups[teamId] ?? null }),
+    })
+    const toB = page.load(2)
+    const toC = page.load(3)
+    gates[3]()
+    await toC
+    gates[2]() // B 的响应最后才到
+    await toB
+    expect(page.teamId.value).toBe(3)
+    expect(page.squad.value?.team.team_id).toBe(3)
+    expect(page.editor.formation.value).toBe('4-2-3-1')
+    expect(page.loading.value).toBe(false)
+  })
+
+  test('edits made while a save is in flight keep the lineup dirty and the draft', async () => {
+    let finish: () => void = () => {}
+    const { page, storage } = build({
+      saveMyLineup: (_teamId, payload) =>
+        new Promise((resolve) => {
+          finish = () => resolve({ lineup: { ...saved, formation: payload.formation, slots: payload.slots } })
+        }),
+    })
+    await page.load(1)
+    page.editor.pick(0, 1)
+    const pending = page.save()
+    page.editor.pick(1, 2) // 保存请求在途时又改了一个位置
+    finish()
+    expect(await pending).toBe('saved')
+    expect(page.editor.dirty.value).toBe(true)
+    expect(page.saveState.value).toBe('dirty')
+    expect(readDraft(1, storage)?.slots[1].player_id).toBe(2)
+  })
+
+  test('a save without edits in between still clears the dirty flag and the draft', async () => {
+    const { page, storage } = build()
+    await page.load(1)
+    page.editor.pick(0, 1)
+    await page.save()
+    expect(page.editor.dirty.value).toBe(false)
+    expect(readDraft(1, storage)).toBeNull()
+  })
+
+  test('a saved lineup that names players no longer in the squad is cleaned, marked dirty and explained', async () => {
+    const stale: SavedLineup = {
+      ...saved,
+      formation: '4-3-3',
+      slots: assignPlayer(assignPlayer(emptyLineup('4-3-3'), 0, 1), 1, 999),
+    }
+    const { page, calls } = build({ getMyLineup: async () => ({ lineup: stale }) })
+    await page.load(1)
+    expect(page.editor.slots.value[0].player_id).toBe(1)
+    expect(page.editor.slots.value[1].player_id).toBeNull()
+    expect(page.editor.dirty.value).toBe(true)
+    expect(page.notice.value.length > 0).toBe(true)
+    expect(await page.save()).toBe('saved') // 清理后可以正常保存，不再被后端拒绝
+    expect(calls).toEqual(['save'])
+  })
+
+  test('no notice for a clean saved lineup', async () => {
+    const { page } = build({ getMyLineup: async () => ({ lineup: saved }) })
+    await page.load(1)
+    expect(page.notice.value).toBe('')
+    expect(page.editor.dirty.value).toBe(false)
+  })
 })
+

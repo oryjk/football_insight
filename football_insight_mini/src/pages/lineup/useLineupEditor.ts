@@ -17,6 +17,8 @@ export function useLineupEditor() {
   const formation = ref<string>(DEFAULT_FORMATION)
   const slots = ref<LineupSlots>(emptyLineup(DEFAULT_FORMATION))
   const dirty = ref(false)
+  // 每次改动自增：保存请求在途时用户继续编辑，返回后据此判断这次保存是否已覆盖全部改动。
+  const revision = ref(0)
   const selectedSlot = ref<number | null>(null)
   const filled = computed(() => countFilled(slots.value))
 
@@ -25,6 +27,7 @@ export function useLineupEditor() {
     slots.value = nextSlots
     selectedSlot.value = null
     dirty.value = markDirty
+    revision.value += 1
   }
 
   function setFormation(next: string, positionOf: (playerId: number) => LineupPosition | null): void {
@@ -32,27 +35,31 @@ export function useLineupEditor() {
     slots.value = reassignPlayersToFormation(slots.value, next, positionOf)
     formation.value = next
     dirty.value = true
+    revision.value += 1
   }
 
   function pick(slot: number, playerId: number | null): void {
     slots.value = assignPlayer(slots.value, slot, playerId)
     dirty.value = true
+    revision.value += 1
   }
 
   function applyDrag(slot: number, outcome: DragOutcome): void {
     if (outcome.kind === 'tap') return
     slots.value = applyDragOutcome(slots.value, slot, outcome)
     dirty.value = true
+    revision.value += 1
   }
 
   function reset(): void {
     slots.value = resetPositions(slots.value, formation.value)
     dirty.value = true
+    revision.value += 1
   }
 
   function markSaved(): void {
     dirty.value = false
   }
 
-  return { formation, slots, dirty, selectedSlot, filled, load, setFormation, pick, applyDrag, reset, markSaved }
+  return { formation, slots, dirty, revision, selectedSlot, filled, load, setFormation, pick, applyDrag, reset, markSaved }
 }

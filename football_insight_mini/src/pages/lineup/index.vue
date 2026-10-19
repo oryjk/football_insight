@@ -26,6 +26,8 @@
       <view v-else class="page-content">
         <LineupTeamPicker v-if="teams.length" :teams="teams" :model-value="teamId" @update:model-value="switchTeam" />
 
+        <view v-if="notice" class="notice"><text>{{ notice }}</text></view>
+
         <view class="status-row">
           <text class="status-row__title">我心中的最佳阵容</text>
           <text class="status-row__state" :class="`status-row__state--${saveState}`">{{ saveStateText }}</text>
@@ -75,7 +77,7 @@ import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { getSupportProfile, listSupportTeams } from '../../api/support'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { useAppSession } from '../../stores/appSession'
-import { buildLineupPageUrl } from '../../utils/lineupLinks'
+import { buildLineupPageUrl, parseLineupPageQuery } from '../../utils/lineupLinks'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
 import { buildPitchPlayers, buildSheetGroups, positionIndex } from './lineupViewModel'
 import { useLineupPage } from './useLineupPage'
@@ -87,7 +89,7 @@ import LineupTeamPicker from './components/LineupTeamPicker.vue'
 const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
 
-const { teamId, squad, loading, errorMessage, saving, saveState, editor, load, save, dispose } = useLineupPage()
+const { teamId, squad, loading, errorMessage, notice, saving, saveState, editor, load, save, dispose } = useLineupPage()
 
 const teams = ref<Array<{ team_id: number; team_name: string; avatar_url: string | null }>>([])
 const sheetVisible = ref(false)
@@ -189,7 +191,7 @@ async function handleSave(): Promise<void> {
     return
   }
   if (result === 'need-login') {
-    rememberPostLoginRedirect({ type: 'navigateTo', url: buildLineupPageUrl(teamId.value) })
+    rememberPostLoginRedirect({ type: 'navigateTo', url: buildLineupPageUrl(teamId.value, { autosave: true }) })
     uni.showToast({ title: '登录后即可保存', icon: 'none' })
     uni.switchTab({ url: '/pages/user/index' })
     return
@@ -221,7 +223,10 @@ async function start(): Promise<void> {
     const list = await listSupportTeams()
     teams.value = list.map((t) => ({ team_id: t.team_id, team_name: t.team_name, avatar_url: t.avatar_storage_url }))
     const initial = await resolveDefaultTeamId(teams.value)
-    if (initial) await load(initial)
+    if (initial) {
+      await load(initial)
+      await autosaveRestoredDraft()
+    }
   } catch (error) {
     errorMessage.value = error instanceof Error && error.message ? error.message : '战术板加载失败'
     loading.value = false
@@ -234,27 +239,28 @@ async function reload(): Promise<void> {
   else await start()
 }
 
+let autosaveAfterLoad = false
+
 onLoad((query) => {
-  const raw = query?.teamId
-  requestedTeamId = typeof raw === 'string' ? Number(raw) || 0 : 0
+  const parsed = parseLineupPageQuery(query as Record<string, unknown> | undefined)
+  requestedTeamId = parsed.teamId
+  autosaveAfterLoad = parsed.autosave
 })
 
 onShow(() => {
-  // 首次进入加载；从登录页回来（teamId 已有）时重新加载：草稿会被恢复并自动保存一次。
-  if (!started) {
-    started = true
-    void start()
-    return
-  }
-  if (teamId.value) void resumeAfterLogin()
+  // 只在首次进入时加载。登录页回跳会新建本页（switchTab 会关闭非 Tab 页），
+  // 此时 URL 带一次性的 autosave 标记，草稿恢复后自动保存一次，不依赖页面实例存活。
+  if (started) return
+  started = true
+  void start()
 })
 
-async function resumeAfterLogin(): Promise<void> {
-  const wasDirty = editor.dirty.value
-  if (wasDirty && session.hasAccessToken.value) {
-    const result = await save()
-    if (result === 'saved') uni.showToast({ title: '已保存', icon: 'success' })
-  }
+async function autosaveRestoredDraft(): Promise<void> {
+  if (!autosaveAfterLoad) return
+  autosaveAfterLoad = false // 一次性：之后的 onShow、回到前台都不会再自动保存
+  if (!session.hasAccessToken.value || !editor.dirty.value) return
+  const result = await save()
+  if (result === 'saved') uni.showToast({ title: '已保存', icon: 'success' })
 }
 
 onBeforeUnmount(dispose)
@@ -317,6 +323,15 @@ onBeforeUnmount(dispose)
 
 .ghost-action::after {
   border: 0;
+}
+
+.notice {
+  padding: var(--fi-space-18) var(--fi-space-22);
+  border-radius: var(--fi-radius-md);
+  background: rgba(var(--fi-primitive-red-rgb), 0.06);
+  color: var(--fi-color-primary-deep);
+  font-size: var(--fi-font-24);
+  line-height: var(--fi-leading-normal);
 }
 
 .status-row {

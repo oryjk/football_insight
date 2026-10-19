@@ -19,8 +19,8 @@
           :key="entry.slot"
           class="pitch__mover"
           direction="all"
-          :x="position[entry.slot]?.x ?? 0"
-          :y="position[entry.slot]?.y ?? 0"
+          :x="bound[entry.slot]?.x ?? 0"
+          :y="bound[entry.slot]?.y ?? 0"
           :inertia="false"
           :out-of-bounds="false"
           :damping="40"
@@ -38,7 +38,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, getCurrentInstance, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { boxCentreRpx, boxPositionPx, DOT_DIAMETER_RPX, useDragRebind, type Px } from '../dragGeometry'
 import { resolveDragRelease, type DragOutcome, type LineupSlots } from '../helpers'
 import type { PitchPlayer } from '../lineupViewModel'
 import LineupPlayerDot from './LineupPlayerDot.vue'
@@ -61,39 +62,32 @@ const emit = defineEmits<{
   (e: 'drag', slot: number, outcome: DragOutcome): void
 }>()
 
-// 圆点直径（rpx），与 --fi-component-lineup-dot-size 保持一致；movable-view 的 x/y 与
-// createSelectorQuery 只接受 px，所以内部用 px 计算，对外的判定（resolveDragRelease）统一用 rpx。
-const DOT_DIAMETER_RPX = 84
-const DOT_BOX_PADDING_RPX = 32 // 圆点下方姓名所需的额外宽度，与 .dot 的宽度一致
-
 const instance = getCurrentInstance()
 const measured = ref(false)
 const fieldPx = reactive({ width: 0, height: 0 })
-let windowWidthPx = 375
+const windowWidthPx = ref(375)
+const MEASURE_RETRIES = 6
+const MEASURE_RETRY_MS = 120
 
-const rpxPerPx = computed(() => 750 / windowWidthPx)
-const dotPx = computed(() => (DOT_DIAMETER_RPX * windowWidthPx) / 750)
-const boxPx = computed(() => ((DOT_DIAMETER_RPX + DOT_BOX_PADDING_RPX) * windowWidthPx) / 750)
-
-// 每个位置当前应显示的左上角（px）：圆点中心减去半个容器。
-const position = computed<Record<number, { x: number; y: number }>>(() => {
-  const result: Record<number, { x: number; y: number }> = {}
+// 每个位置当前应显示的左上角（px），已钳制在 movable-area 内（见 dragGeometry.boxPositionPx）。
+const position = computed<Record<number, Px>>(() => {
+  const result: Record<number, Px> = {}
+  if (!measured.value) return result
   for (const entry of props.players) {
-    result[entry.slot] = {
-      x: entry.x * fieldPx.width - boxPx.value / 2,
-      // 容器高度 = 圆点 + 姓名；纵向以圆点中心对齐位置点
-      y: entry.y * fieldPx.height - dotPx.value / 2,
-    }
+    result[entry.slot] = boxPositionPx(entry, fieldPx, windowWidthPx.value)
   }
   return result
 })
 
+// 松手后先绑定到手指位置、下个 tick 再回到已提交位置，保证互换时被拖的点位真的回到自己的坐标。
+const { bound, release } = useDragRebind(() => position.value)
+
 // 拖动中的实时位置：非响应式，避免把原生拖动的 change 回写成 x/y 而互相打架。
-const live: Record<number, { x: number; y: number }> = {}
-const pressedFrom: Record<number, { x: number; y: number }> = {}
+const live: Record<number, Px> = {}
+const pressedFrom: Record<number, Px> = {}
 let suppressTap = false
 
-function windowWidth(): number {
+function readWindowWidth(): number {
   try {
     return uni.getWindowInfo ? uni.getWindowInfo().windowWidth : uni.getSystemInfoSync().windowWidth
   } catch {
@@ -101,33 +95,36 @@ function windowWidth(): number {
   }
 }
 
-function measure(): void {
-  windowWidthPx = windowWidth()
+// 量球场区域（px）。首次可能还没完成布局而量到 0，最多重试几次；窗口变化（iPad、PC 微信）时重量。
+function measure(attempt = 0): void {
+  windowWidthPx.value = readWindowWidth()
   if (!instance) return
   uni.createSelectorQuery()
     .in(instance)
     .select('#lineup-pitch-field')
     .boundingClientRect((rect) => {
       const box = Array.isArray(rect) ? rect[0] : rect
-      if (!box || !box.width || !box.height) return
-      fieldPx.width = box.width
-      fieldPx.height = box.height
-      measured.value = true
+      if (box && box.width && box.height) {
+        fieldPx.width = box.width
+        fieldPx.height = box.height
+        measured.value = true
+        return
+      }
+      if (attempt < MEASURE_RETRIES) setTimeout(() => measure(attempt + 1), MEASURE_RETRY_MS)
     })
     .exec()
 }
 
-onMounted(() => {
-  void nextTick(measure)
-})
-watch(() => props.players.length, () => void nextTick(measure))
+const onResize = () => measure()
 
-function centreRpx(slot: number, point: { x: number; y: number }): { x: number; y: number } {
-  return {
-    x: (point.x + boxPx.value / 2) * rpxPerPx.value,
-    y: (point.y + dotPx.value / 2) * rpxPerPx.value,
-  }
-}
+onMounted(() => {
+  void nextTick(() => measure())
+  uni.onWindowResize?.(onResize)
+})
+onBeforeUnmount(() => {
+  uni.offWindowResize?.(onResize)
+})
+watch(() => props.players.length, () => void nextTick(() => measure()))
 
 function onStart(slot: number): void {
   const origin = position.value[slot]
@@ -137,7 +134,7 @@ function onStart(slot: number): void {
 }
 
 function onChange(slot: number, event: MovableChangeEvent): void {
-  // 只记录用户手指拖动产生的位置；程序设置 x/y 引起的变化（source 为空或 'touch-out-of-bounds' 之外）忽略。
+  // 只记录用户手指拖动产生的位置；程序设置 x/y 引起的变化忽略。
   if (event.detail.source === 'touch' || event.detail.source === 'touch-out-of-bounds') {
     live[slot] = { x: event.detail.x, y: event.detail.y }
   }
@@ -157,19 +154,22 @@ function onEnd(slot: number): void {
     x: p.x,
     y: p.y,
   }))
-  const a = centreRpx(slot, from)
-  const b = centreRpx(slot, to)
+  const rpxPerPx = 750 / windowWidthPx.value
+  const a = boxCentreRpx(from, windowWidthPx.value)
+  const b = boxCentreRpx(to, windowWidthPx.value)
   const outcome = resolveDragRelease({
     slot,
     fromX: a.x,
     fromY: a.y,
     toX: b.x,
     toY: b.y,
-    areaWidthRpx: fieldPx.width * rpxPerPx.value,
-    areaHeightRpx: fieldPx.height * rpxPerPx.value,
+    areaWidthRpx: fieldPx.width * rpxPerPx,
+    areaHeightRpx: fieldPx.height * rpxPerPx,
     dotDiameterRpx: DOT_DIAMETER_RPX,
     slots,
   })
+  // 无论结果如何都强制重新绑定：轻点（位移 < 阈值）时手指的微小偏移要被拉回原位，互换时被拖的点位要回到自己的坐标。
+  void release(slot, to)
   if (outcome.kind === 'tap') return
   // movable-view 在拖动后仍可能触发 tap，用标记吞掉紧随其后的那一次，避免松手后又弹出选人弹层。
   suppressTap = true
