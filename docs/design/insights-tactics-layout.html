@@ -1,0 +1,171 @@
+<div id="fi-insights-layout" class="viz-carousel viz-dotted-background" aria-label="洞察页布局方案" data-previous-label="上一方案" data-next-label="下一方案">
+  <section data-variant="战术双区同屏 · 推荐" aria-label="我的战术和球队战术同屏">
+    <div class="fi-layout-stage"><div class="fi-layout-phone" data-layout="combined" aria-label="双区同屏布局"></div></div>
+  </section>
+  <section data-variant="我的与球队分栏" aria-label="我的战术与球队战术使用二级切换" hidden>
+    <div class="fi-layout-stage"><div class="fi-layout-phone" data-layout="split" aria-label="分栏布局"></div></div>
+  </section>
+</div>
+<style>
+#fi-insights-layout { color-scheme: light dark; }
+#fi-insights-layout .fi-layout-stage { min-height: 770px; display: flex; align-items: flex-start; justify-content: center; padding: 22px 12px 30px; box-sizing: border-box; }
+#fi-insights-layout .fi-layout-phone {
+  --fi-m-bg: light-dark(#f6f5f2, #17171b);
+  --fi-m-surface: light-dark(#ffffff, #25252a);
+  --fi-m-text: light-dark(#18191e, #f4f3f2);
+  --fi-m-muted: light-dark(#777b86, #adb0bb);
+  --fi-m-line: light-dark(#e9e9ee, #3b3b43);
+  --fi-m-red: light-dark(#dc2626, #fb7777);
+  --fi-m-on-red: light-dark(#ffffff, #241515);
+  --fi-m-soft: light-dark(#f7eaea, #392728);
+  --fi-m-pitch: light-dark(#e8f0e9, #263c30);
+  --fi-m-pitch-line: light-dark(#aec5b4, #678474);
+  --fi-m-pitch-dot: light-dark(#52755d, #b3d2bd);
+  --fi-m-chip: light-dark(#efeff2, #313139);
+  width: 390px; max-width: 100%; min-height: 715px; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--fi-m-bg); color: var(--fi-m-text); border: 1px solid var(--fi-m-line); border-radius: 28px;
+  box-shadow: 0 12px 38px light-dark(#11121a14, #00000036);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+#fi-insights-layout .fi-layout-phone * { box-sizing: border-box; }
+#fi-insights-layout .fi-layout-phone button { font: inherit; cursor: inherit; color: inherit; }
+#fi-insights-layout .fi-layout-phone button:focus-visible { outline: 2px solid var(--fi-m-red); outline-offset: 3px; }
+#fi-insights-layout .fi-layout-phone svg { width: 18px; height: 18px; flex-shrink: 0; }
+#fi-insights-layout .m-nav { min-height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; background: var(--fi-m-surface); }
+#fi-insights-layout .m-brand { display: flex; align-items: center; gap: 7px; font-size: 17px; font-weight: 700; }
+#fi-insights-layout .m-brand svg { color: var(--fi-m-red); width: 23px; height: 23px; }
+#fi-insights-layout .m-capsule { display: flex; align-items: center; gap: 12px; border: 1px solid var(--fi-m-line); border-radius: 24px; padding: 5px 10px; }
+#fi-insights-layout .m-capsule svg { width: 16px; height: 16px; }
+#fi-insights-layout .m-teams { display: flex; gap: 6px; padding: 12px 14px 8px; flex-wrap: wrap; }
+#fi-insights-layout .m-team { border: 0; background: transparent; border-radius: 24px; padding: 7px 10px; display: flex; align-items: center; gap: 6px; font-size: 12px; min-height: 36px; }
+#fi-insights-layout .m-team[aria-pressed="true"] { background: var(--fi-m-text); color: var(--fi-m-surface); }
+#fi-insights-layout .m-team-mark { width: 22px; height: 22px; border-radius: 50%; background: var(--fi-m-soft); color: var(--fi-m-red); display: grid; place-items: center; font-size: 11px; font-weight: 700; }
+#fi-insights-layout .m-tabs { display: flex; padding: 0 18px; gap: 30px; border-bottom: 1px solid var(--fi-m-line); }
+#fi-insights-layout .m-tab { background: transparent; border: 0; position: relative; padding: 10px 0 12px; color: var(--fi-m-muted); display: flex; align-items: center; gap: 6px; min-height: 44px; }
+#fi-insights-layout .m-tab[aria-selected="true"] { font-weight: 700; color: var(--fi-m-red); }
+#fi-insights-layout .m-tab[aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; border-radius: 3px; background: var(--fi-m-red); }
+#fi-insights-layout .m-content { padding: 15px 14px 8px; display: flex; flex-direction: column; gap: 16px; flex: 1; }
+#fi-insights-layout .m-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+#fi-insights-layout .m-section-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+#fi-insights-layout .m-small { font-size: 11px; color: var(--fi-m-muted); }
+#fi-insights-layout .m-badge { padding: 3px 7px; border-radius: 7px; background: var(--fi-m-soft); color: var(--fi-m-red); font-size: 11px; white-space: nowrap; }
+#fi-insights-layout .m-mine { background: var(--fi-m-surface); border: 1px solid var(--fi-m-line); border-radius: 18px; padding: 13px; }
+#fi-insights-layout .m-mine-row { display: flex; align-items: center; gap: 13px; }
+#fi-insights-layout .m-pitch { position: relative; width: 82px; height: 102px; border-radius: 9px; padding: 7px; background: var(--fi-m-pitch); flex-shrink: 0; overflow: hidden; }
+#fi-insights-layout .m-pitch-mark { position: absolute; inset: 7px; border: 1px solid var(--fi-m-pitch-line); }
+#fi-insights-layout .m-pitch-mark::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--fi-m-pitch-line); }
+#fi-insights-layout .m-pitch-mark::after { content: ""; position: absolute; width: 22px; height: 22px; border: 1px solid var(--fi-m-pitch-line); border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+#fi-insights-layout .m-dot { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--fi-m-pitch-dot); transform: translate(-50%,-50%); }
+#fi-insights-layout .m-mine-info { flex: 1; min-width: 0; }
+#fi-insights-layout .m-formation { font-size: 21px; font-weight: 700; letter-spacing: 1px; }
+#fi-insights-layout .m-mine-info p { margin: 3px 0 10px; }
+#fi-insights-layout .m-primary { border: 0; background: var(--fi-m-red); color: var(--fi-m-on-red) !important; border-radius: 22px; padding: 9px 14px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; font-weight: 600; min-height: 36px; }
+#fi-insights-layout .m-primary svg { width: 14px; height: 14px; }
+#fi-insights-layout .m-text-button { background: transparent; border: 0; color: var(--fi-m-muted); font-size: 11px; padding: 5px 0; display: flex; align-items: center; gap: 4px; }
+#fi-insights-layout .m-section-end { text-align: center; }
+#fi-insights-layout .m-section-end .m-text-button { margin: 0 auto; min-height: 36px; }
+#fi-insights-layout .m-sort { display: flex; gap: 4px; background: var(--fi-m-chip); border-radius: 20px; padding: 3px; }
+#fi-insights-layout .m-sort button { border: 0; background: transparent; border-radius: 16px; padding: 4px 10px; font-size: 11px; min-height: 28px; }
+#fi-insights-layout .m-sort button[aria-pressed="true"] { background: var(--fi-m-surface); font-weight: 600; }
+#fi-insights-layout .m-community { display: flex; flex-direction: column; gap: 8px; }
+#fi-insights-layout .m-lineup { display: flex; gap: 10px; align-items: center; padding: 11px 12px; border-radius: 14px; background: var(--fi-m-surface); border: 1px solid var(--fi-m-line); }
+#fi-insights-layout .m-avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--fi-m-chip); color: var(--fi-m-muted); flex-shrink: 0; }
+#fi-insights-layout .m-lineup-body { flex: 1; min-width: 0; }
+#fi-insights-layout .m-lineup-name { font-size: 13px; font-weight: 600; }
+#fi-insights-layout .m-lineup-meta { font-size: 11px; color: var(--fi-m-muted); display: flex; gap: 8px; margin-top: 3px; }
+#fi-insights-layout .m-like { display: flex; flex-direction: column; align-items: center; gap: 2px; background: transparent; border: 0; padding: 5px; font-size: 11px; color: var(--fi-m-muted); min-width: 36px; }
+#fi-insights-layout .m-like[aria-pressed="true"] { color: var(--fi-m-red); }
+#fi-insights-layout .m-like svg { width: 17px; height: 17px; }
+#fi-insights-layout .m-subtabs { display: flex; gap: 18px; margin-bottom: 14px; }
+#fi-insights-layout .m-subtabs button { padding: 3px 0 8px; background: transparent; border: 0; color: var(--fi-m-muted); min-height: 36px; }
+#fi-insights-layout .m-subtabs button[aria-pressed="true"] { color: var(--fi-m-text); font-weight: 700; border-bottom: 2px solid var(--fi-m-text); }
+#fi-insights-layout .m-large-pitch { width: 100%; height: 235px; margin: 12px 0; }
+#fi-insights-layout .m-large-pitch .m-dot { width: 15px; height: 15px; background: var(--fi-m-surface); box-shadow: 0 1px 3px light-dark(#00000019,#00000040); }
+#fi-insights-layout .m-outlook { padding: 12px; background: var(--fi-m-surface); border: 1px solid var(--fi-m-line); border-radius: 14px; }
+#fi-insights-layout .m-fixture { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 7px; font-size: 13px; }
+#fi-insights-layout .m-metrics { display: flex; justify-content: space-between; gap: 10px; margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--fi-m-line); }
+#fi-insights-layout .m-metric { display: flex; flex-direction: column; gap: 2px; }
+#fi-insights-layout .m-metric strong { font-size: 24px; font-weight: 650; }
+#fi-insights-layout .m-contribution { padding: 13px; background: var(--fi-m-surface); border-radius: 16px; border: 1px solid var(--fi-m-line); }
+#fi-insights-layout .m-bar-row { display: grid; grid-template-columns: 56px 1fr 32px; align-items: center; gap: 10px; margin-top: 16px; font-size: 12px; }
+#fi-insights-layout .m-track { height: 7px; border-radius: 4px; background: var(--fi-m-chip); overflow: hidden; }
+#fi-insights-layout .m-bar { height: 100%; background: var(--fi-m-red); border-radius: 4px; }
+#fi-insights-layout .m-bottom { display: flex; justify-content: space-around; padding: 11px 8px 14px; margin-top: 10px; border-top: 1px solid var(--fi-m-line); background: var(--fi-m-surface); }
+#fi-insights-layout .m-bottom span { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--fi-m-muted); }
+#fi-insights-layout .m-bottom .m-active { color: var(--fi-m-red); font-weight: 600; }
+#fi-insights-layout .m-toast { padding: 10px 12px; border-radius: 10px; color: var(--fi-m-text); background: var(--fi-m-chip); font-size: 12px; }
+#fi-insights-layout .m-edit-actions { display: flex; gap: 8px; margin-top: 12px; }
+#fi-insights-layout .m-edit-actions > button { flex: 1; }
+#fi-insights-layout .m-secondary { border: 1px solid var(--fi-m-line); background: var(--fi-m-surface); color: var(--fi-m-text); border-radius: 22px; padding: 8px 12px; }
+@media(max-width:380px) { #fi-insights-layout .fi-layout-stage { padding: 14px 0 28px; } #fi-insights-layout .m-teams { padding-left: 10px; padding-right: 10px; gap: 3px; } #fi-insights-layout .m-team { padding: 6px 8px; } #fi-insights-layout .m-content { padding-left: 11px; padding-right: 11px; } }
+</style>
+<script>
+(function () {
+  const root = document.getElementById('fi-insights-layout');
+  const teams = ['成都蓉城', '上海海港', '北京国安'];
+  const marks = ['蓉', '港', '京'];
+  const layouts = ['combined', 'split'];
+  const dots = [[50,86],[17,67],[39,67],[61,67],[83,67],[25,46],[50,46],[75,46],[20,22],[50,16],[80,22]];
+  const settings = { firstTab: 'tactics', myState: 'draft' };
+  const restored = window.openai?.widgetState?.privateContent;
+  const states = layouts.map((layout,index) => ({ layout, team: 0, tab: restored?.[layout]?.tab === 'data' ? 'data' : 'tactics', sub: 'mine', sort: 'latest', liked: {}, editing: false, showMore: false, toast: '' }));
+  const icon = name => '<i data-lucide="'+name+'" aria-hidden="true"></i>';
+  const pitch = large => '<div class="m-pitch '+(large?'m-large-pitch':'')+'" role="img" aria-label="4-4-2 阵容缩略图"><div class="m-pitch-mark"></div>'+dots.map(([x,y])=>'<span class="m-dot" style="left:'+x+'%;top:'+y+'%"></span>').join('')+'</div>';
+  function saveState() {
+    const privateContent = Object.fromEntries(states.map(s=>[s.layout,{ tab:s.tab,team:s.team,sort:s.sort }]));
+    window.openai?.setWidgetState?.({ modelContent: { design: '球队下方一级tab，战术中展示我的与球队战术', firstTab:settings.firstTab }, privateContent }).catch(()=>{});
+  }
+  function mine(s,large=false) {
+    const status=settings.myState==='draft'?'有未发布草稿':'已发布';
+    return '<section class="m-mine"><div class="m-section-heading"><span class="m-section-title">我的战术</span><span class="m-badge">'+status+'</span></div>'+(large?'<div class="m-small">4-4-2 · 11/11 人</div>'+pitch(true)+'<button class="m-primary cursor-interaction" data-action="edit">'+icon('pencil-line')+'编辑我的战术</button>':'<div class="m-mine-row">'+pitch(false)+'<div class="m-mine-info"><div class="m-formation">4-4-2</div><p class="m-small">已排 11 人 · '+(settings.myState==='draft'?'草稿仅自己可见':'已发布，球迷可点赞')+'</p><button class="m-primary cursor-interaction" data-action="edit">'+icon('pencil-line')+'继续编辑</button></div></div>')+'</section>';
+  }
+  function community(s) {
+    let rows=[{id:'north',name:'北看台球迷',formation:'4-3-3',time:'刚刚发布',likes:18},{id:'twelve',name:'蓉城第12人',formation:'3-4-3',time:'2 小时前',likes:42}];
+    if(s.showMore)rows.push({id:'phoenix',name:'凤凰山球迷',formation:'4-2-3-1',time:'昨天发布',likes:6},{id:'weekend',name:'周末踢球的阿川',formation:'4-4-2',time:'昨天发布',likes:11});
+    if(s.sort==='likes')rows.sort((a,b)=>(b.likes+!!s.liked[b.id])-(a.likes+!!s.liked[a.id]));
+    return '<section><div class="m-section-heading"><span class="m-section-title">球队战术</span><div class="m-sort" role="group" aria-label="排序"><button class="cursor-interaction" data-sort="latest" aria-pressed="'+(s.sort==='latest')+'">最新</button><button class="cursor-interaction" data-sort="likes" aria-pressed="'+(s.sort==='likes')+'">点赞榜</button></div></div><div class="m-community">'+rows.map((r,i)=>'<article class="m-lineup"><span class="m-avatar">'+(s.sort==='likes'?i+1:icon('user-round'))+'</span><div class="m-lineup-body"><div class="m-lineup-name">'+r.name+'</div><div class="m-lineup-meta"><span>'+r.formation+'</span><span>'+r.time+'</span></div></div><button class="m-like cursor-interaction" data-like="'+r.id+'" aria-label="点赞 '+r.name+' 的战术" aria-pressed="'+!!s.liked[r.id]+'">'+icon('thumbs-up')+'<span>'+(r.likes+!!s.liked[r.id])+'</span></button></article>').join('')+'</div><div class="m-section-end"><button class="m-text-button cursor-interaction" data-action="all">'+(s.showMore?'已展示全部示例战术':'加载更多战术')+' '+icon('arrow-right')+'</button></div></section>';
+  }
+  function statistics(s) {
+    return '<section class="m-outlook"><div class="m-section-heading"><span class="m-section-title">赛前参考</span><span class="m-small">示例</span></div><div class="m-fixture"><span>'+teams[s.team]+'</span><span class="m-small">VS</span><span>上海申花</span></div><div class="m-metrics"><span class="m-metric"><strong>56</strong><span class="m-small">赛季进球</span></span><span class="m-metric"><strong>41</strong><span class="m-small">赛季助攻</span></span><span class="m-metric"><strong>28</strong><span class="m-small">赛季失球</span></span></div></section><section class="m-contribution"><div class="m-section-heading"><span class="m-section-title">进球贡献</span><div class="m-sort"><button data-action="goals" class="cursor-interaction" aria-pressed="true">进球</button><button data-action="assists" class="cursor-interaction" aria-pressed="false">助攻</button></div></div>'+[['费利佩',36],['韦世豪',28],['罗慕洛',18]].map(([n,p])=>'<div class="m-bar-row"><span>'+n+'</span><div class="m-track"><div class="m-bar" style="width:'+p+'%"></div></div><span>'+p+'%</span></div>').join('')+'<button class="m-text-button cursor-interaction" data-action="attribution">按对手看贡献 '+icon('arrow-right')+'</button></section><button class="m-text-button cursor-interaction" data-action="ticket">'+icon('ticket')+'回流看板 '+icon('arrow-up-right')+'</button>';
+  }
+  function editor(s) {
+    return '<section class="m-mine"><div class="m-section-heading"><span class="m-section-title">我的最佳阵容</span><button class="m-text-button cursor-interaction" data-action="back">返回战术首页</button></div><div class="m-small">'+teams[s.team]+' · 4-4-2</div>'+pitch(true)+'<div class="m-edit-actions"><button class="m-secondary cursor-interaction" data-action="draft">存草稿</button><button class="m-primary cursor-interaction" data-action="publish">更新发布</button></div></section>';
+  }
+  function render(index) {
+    const s=states[index],phone=root.querySelector('[data-layout="'+s.layout+'"]');
+    const tacticContent=s.layout==='combined'?mine(s)+community(s):'<div class="m-subtabs" role="group" aria-label="战术分类"><button class="cursor-interaction" data-sub="mine" aria-pressed="'+(s.sub==='mine')+'">我的战术</button><button class="cursor-interaction" data-sub="team" aria-pressed="'+(s.sub==='team')+'">球队战术</button></div>'+(s.sub==='mine'?mine(s,true):community(s));
+    phone.innerHTML='<header class="m-nav"><span class="m-brand">'+icon('circle-dot')+'足球洞察</span><span class="m-capsule" aria-label="微信胶囊">'+icon('ellipsis')+icon('circle-dot')+'</span></header><div class="m-teams" role="group" aria-label="选择球队">'+teams.map((team,i)=>'<button class="m-team cursor-interaction" data-team="'+i+'" aria-pressed="'+(s.team===i)+'"><span class="m-team-mark">'+marks[i]+'</span>'+team+'</button>').join('')+'</div><nav class="m-tabs" role="tablist" aria-label="洞察内容"><button class="m-tab cursor-interaction" data-tab="data" role="tab" id="'+s.layout+'-data-tab" aria-controls="'+s.layout+'-panel" aria-selected="'+(s.tab==='data')+'">'+icon('chart-no-axes-column-increasing')+'数据洞察</button><button class="m-tab cursor-interaction" data-tab="tactics" role="tab" id="'+s.layout+'-tactics-tab" aria-controls="'+s.layout+'-panel" aria-selected="'+(s.tab==='tactics')+'">'+icon('waypoints')+'战术</button></nav><main class="m-content" id="'+s.layout+'-panel" role="tabpanel" aria-labelledby="'+s.layout+'-'+s.tab+'-tab">'+(s.editing?editor(s):s.tab==='tactics'?tacticContent:statistics(s))+(s.toast?'<div class="m-toast" role="status">'+s.toast+'</div>':'')+'</main><footer class="m-bottom" aria-label="底部导航">'+[['house','首页'],['calendar-days','赛程'],['chart-column','榜单'],['chart-pie','洞察'],['user-round','我的']].map(([i,n])=>'<span class="'+(n==='洞察'?'m-active':'')+'">'+icon(i)+n+'</span>').join('')+'</footer>';
+    if(globalThis.lucide)lucide.createIcons({attrs:{width:18,height:18}});
+    phone.onclick=e=>{
+      const b=e.target.closest('button');if(!b||!phone.contains(b))return;
+      s.toast='';
+      if(b.dataset.team!==undefined){s.team=Number(b.dataset.team);s.editing=false;}
+      if(b.dataset.tab){s.tab=b.dataset.tab;s.editing=false;}
+      if(b.dataset.sub)s.sub=b.dataset.sub;
+      if(b.dataset.sort)s.sort=b.dataset.sort;
+      if(b.dataset.like)s.liked[b.dataset.like]=!s.liked[b.dataset.like];
+      if(b.dataset.action==='edit')s.editing=true;
+      if(b.dataset.action==='back')s.editing=false;
+      if(b.dataset.action==='draft'){settings.myState='draft';s.toast='草稿已存云端，仅自己可见';}
+      if(b.dataset.action==='publish'){settings.myState='published';s.toast='已更新发布，分享链接与点赞保留';s.editing=false;}
+      if(b.dataset.action==='all'){s.showMore=true;}
+      if(b.dataset.action==='ticket')s.toast='回流看板';
+      if(b.dataset.action==='attribution')s.toast='按对手展示进球贡献';
+      if(['goals','assists'].includes(b.dataset.action)){
+        const section=b.closest('.m-contribution');section.querySelector('.m-section-title').textContent=b.dataset.action==='goals'?'进球贡献':'助攻贡献';section.querySelectorAll('.m-sort button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));return;
+      }
+      render(index);saveState();
+    };
+  }
+  states.forEach((_,i)=>render(i));
+  window.addEventListener('openai:set_globals',event=>{
+    const saved=event.detail?.globals?.widgetState?.privateContent;if(!saved)return;
+    states.forEach((s,i)=>{if(saved[s.layout]?.tab){s.tab=saved[s.layout].tab==='data'?'data':'tactics';render(i);}});
+  });
+  if(globalThis.Tweak){
+    const tweak=new Tweak({container:root,onChange:()=>{states.forEach((s,i)=>{s.tab=settings.firstTab;render(i);});}});
+    tweak.addSelect(settings,'firstTab',{label:'首次进入的默认内容',options:[{label:'战术（推荐）',value:'tactics'},{label:'数据洞察',value:'data'}]});
+    tweak.addSelect(settings,'myState',{label:'我的战术状态',options:[{label:'有未发布草稿',value:'draft'},{label:'已发布',value:'published'}]});
+  }
+})();
+</script>
