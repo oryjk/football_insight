@@ -13,9 +13,9 @@
       <view class="pitch__box pitch__box--top" />
       <view class="pitch__box pitch__box--bottom" />
 
-      <movable-area v-if="measured" class="pitch__area">
+      <movable-area v-if="measured" class="pitch__area" :style="areaStyle">
         <movable-view
-          v-for="entry in players"
+          v-for="entry in visiblePlayers"
           :key="entry.slot"
           class="pitch__mover"
           direction="all"
@@ -66,10 +66,19 @@ const emit = defineEmits<{
 
 const instance = getCurrentInstance()
 const measured = ref(false)
+const areaReady = ref(false)
 const fieldPx = reactive({ width: 0, height: 0 })
 const windowWidthPx = ref(375)
 const MEASURE_RETRIES = 6
 const MEASURE_RETRY_MS = 120
+let measureEpoch = 0
+let measureTimer: ReturnType<typeof setTimeout> | null = null
+let disposed = false
+
+// 原生区域先以明确的 px 尺寸建立，量到真实布局后才放入球员。
+// 与 movable-view 同批创建时，微信可能先按尚未布局的区域把所有 x/y 钳制为 0。
+const areaStyle = computed(() => ({ width: `${fieldPx.width}px`, height: `${fieldPx.height}px` }))
+const visiblePlayers = computed(() => areaReady.value ? props.players : [])
 
 // 每个位置当前应显示的左上角（px），已钳制在 movable-area 内（见 dragGeometry.boxPositionPx）。
 const position = computed<Record<number, Px>>(() => {
@@ -97,22 +106,54 @@ function readWindowWidth(): number {
   }
 }
 
-// 量球场区域（px）。首次可能还没完成布局而量到 0，最多重试几次；窗口变化（iPad、PC 微信）时重量。
-function measure(attempt = 0): void {
+function currentMeasure(epoch: number): boolean {
+  return !disposed && epoch === measureEpoch
+}
+
+function retryMeasure(epoch: number, action: () => void): void {
+  if (!currentMeasure(epoch)) return
+  if (measureTimer) clearTimeout(measureTimer)
+  measureTimer = setTimeout(() => {
+    measureTimer = null
+    if (currentMeasure(epoch)) action()
+  }, MEASURE_RETRY_MS)
+}
+
+function measureArea(epoch: number, attempt = 0): void {
+  if (!instance || !currentMeasure(epoch)) return
+  uni.createSelectorQuery().in(instance).select('.pitch__area').boundingClientRect((rect) => {
+    if (!currentMeasure(epoch)) return
+    const box = Array.isArray(rect) ? rect[0] : rect
+    if (box && box.width && box.height
+      && Math.abs(box.width - fieldPx.width) < 1 && Math.abs(box.height - fieldPx.height) < 1) {
+      areaReady.value = true
+      return
+    }
+    if (attempt < MEASURE_RETRIES) retryMeasure(epoch, () => measureArea(epoch, attempt + 1))
+  }).exec()
+}
+
+// 外层有尺寸不代表原生 movable-area 已完成布局，分两阶段测量。
+function measure(attempt = 0, epoch = ++measureEpoch): void {
+  if (!currentMeasure(epoch)) return
   windowWidthPx.value = readWindowWidth()
   if (!instance) return
   uni.createSelectorQuery()
     .in(instance)
     .select('#lineup-pitch-field')
     .boundingClientRect((rect) => {
+      if (!currentMeasure(epoch)) return
       const box = Array.isArray(rect) ? rect[0] : rect
       if (box && box.width && box.height) {
+        if (areaReady.value && fieldPx.width === box.width && fieldPx.height === box.height) return
+        areaReady.value = false
         fieldPx.width = box.width
         fieldPx.height = box.height
         measured.value = true
+        void nextTick(() => measureArea(epoch))
         return
       }
-      if (attempt < MEASURE_RETRIES) setTimeout(() => measure(attempt + 1), MEASURE_RETRY_MS)
+      if (attempt < MEASURE_RETRIES) retryMeasure(epoch, () => measure(attempt + 1, epoch))
     })
     .exec()
 }
@@ -124,6 +165,9 @@ onMounted(() => {
   uni.onWindowResize?.(onResize)
 })
 onBeforeUnmount(() => {
+  disposed = true
+  measureEpoch += 1
+  if (measureTimer) clearTimeout(measureTimer)
   uni.offWindowResize?.(onResize)
 })
 watch(() => props.players.length, () => void nextTick(() => measure()))
