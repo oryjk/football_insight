@@ -49,7 +49,12 @@
         </view>
 
         <view class="actions">
-          <button class="actions__ghost" hover-class="actions__ghost--pressed" @tap="editor.reset()">重置站位</button>
+          <button
+            class="actions__reset"
+            hover-class="actions__reset--pressed"
+            :disabled="saving"
+            @tap="resetConfirmVisible = true"
+          >重置</button>
           <button
             class="actions__primary"
             hover-class="actions__primary--pressed"
@@ -69,6 +74,22 @@
       @pick="handlePick"
       @remove="handleRemove"
     />
+
+    <FiBottomSheet v-model:visible="resetConfirmVisible" title="确认重置？" height="45vh" :z-index="100" fit-content>
+      <text class="reset-confirm__copy">所有球员将恢复为当前阵型的默认站位，已选球员保持不变。</text>
+      <template #footer>
+        <button
+          class="reset-confirm__action reset-confirm__action--cancel"
+          hover-class="actions__ghost--pressed"
+          @tap="resetConfirmVisible = false"
+        >取消</button>
+        <button
+          class="reset-confirm__action reset-confirm__action--confirm"
+          hover-class="actions__reset--pressed"
+          @tap="confirmReset"
+        >确认重置</button>
+      </template>
+    </FiBottomSheet>
     <!-- #endif -->
   </view>
 </template>
@@ -78,6 +99,7 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
+import FiBottomSheet from '../../components/FiBottomSheet.vue'
 import { getSupportProfile, listSupportTeams } from '../../api/support'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { useAppSession } from '../../stores/appSession'
@@ -97,11 +119,12 @@ const { teamId, squad, loading, errorMessage, notice, saving, saveState, editor,
 
 const teams = ref<Array<{ team_id: number; team_name: string; avatar_url: string | null }>>([])
 const sheetVisible = ref(false)
+const resetConfirmVisible = ref(false)
 let requestedTeamId = 0
 let started = false
 
 // 弹层打开时锁页面滚动（沿用换座页的 page-meta 约定）。
-const pageLockStyle = computed(() => (sheetVisible.value ? 'overflow: hidden;' : ''))
+const pageLockStyle = computed(() => (sheetVisible.value || resetConfirmVisible.value ? 'overflow: hidden;' : ''))
 
 const pitchPlayers = computed(() => buildPitchPlayers(editor.slots.value, editor.formation.value, squad.value))
 
@@ -169,6 +192,12 @@ function handleRemove(): void {
 
 function changeFormation(code: string): void {
   editor.setFormation(code, positionIndex(squad.value))
+}
+
+function confirmReset(): void {
+  resetConfirmVisible.value = false
+  if (loading.value || !squad.value || saving.value) return
+  editor.reset()
 }
 
 async function switchTeam(nextTeamId: number): Promise<void> {
@@ -404,7 +433,8 @@ onBeforeUnmount(dispose)
 }
 
 .actions__ghost,
-.actions__primary {
+.actions__primary,
+.actions__reset {
   margin: 0;
   padding: var(--fi-space-20) var(--fi-space-28);
   border-radius: var(--fi-radius-round);
@@ -415,7 +445,8 @@ onBeforeUnmount(dispose)
 }
 
 .actions__ghost::after,
-.actions__primary::after {
+.actions__primary::after,
+.actions__reset::after {
   border: 0;
 }
 
@@ -428,6 +459,51 @@ onBeforeUnmount(dispose)
 
 .actions__ghost--disabled {
   opacity: 0.5;
+}
+
+.actions__reset {
+  flex-shrink: 0;
+  border: var(--fi-border-width) solid var(--fi-color-primary-deep);
+  background: var(--fi-color-primary);
+  color: var(--fi-color-surface);
+  box-shadow: var(--fi-shadow-soft);
+}
+
+.actions__reset[disabled] {
+  opacity: var(--fi-opacity-pressed);
+}
+
+.reset-confirm__copy {
+  display: block;
+  color: var(--fi-color-text-secondary);
+  font-size: var(--fi-font-28);
+  line-height: var(--fi-leading-relaxed);
+}
+
+.reset-confirm__action {
+  flex: 1;
+  margin: 0;
+  padding: var(--fi-space-20) var(--fi-space-24);
+  border-radius: var(--fi-radius-round);
+  font-size: var(--fi-font-28);
+  font-weight: var(--fi-weight-bold);
+  line-height: var(--fi-leading-snug);
+}
+
+.reset-confirm__action::after {
+  border: 0;
+}
+
+.reset-confirm__action--cancel {
+  border: var(--fi-border-width) solid var(--fi-color-border-chip);
+  background: var(--fi-color-page-soft);
+  color: var(--fi-color-text-primary);
+}
+
+.reset-confirm__action--confirm {
+  border: var(--fi-border-width) solid var(--fi-color-primary-deep);
+  background: var(--fi-color-primary);
+  color: var(--fi-color-surface);
 }
 
 .actions__primary {
@@ -443,13 +519,15 @@ onBeforeUnmount(dispose)
 }
 
 .actions__ghost--pressed,
-.actions__primary--pressed {
+.actions__primary--pressed,
+.actions__reset--pressed {
   transform: scale(0.97);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .actions__ghost,
-  .actions__primary {
+  .actions__primary,
+  .actions__reset {
     transition: none;
   }
 }
