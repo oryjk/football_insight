@@ -13,14 +13,6 @@
       </view>
 
       <view v-else class="page-content">
-        <view>
-          <SeatSwapMatchCard
-            :match-title="matchTitle"
-            :match-summary="matchSummary"
-            :candidates-count="candidatesCount"
-          />
-        </view>
-
         <SeatSwapNotice v-if="!currentView?.available" text="换座撮合只在成都蓉城当前比赛开放。" />
         <SeatSwapNotice
           v-else-if="!isLoggedIn"
@@ -38,6 +30,9 @@
             :current-key="currentView?.my_request?.current_region_key || ''"
             :desired-keys="myDesiredKeys"
             :has-my-request="!!currentView?.my_request"
+            :headline="matchTitle"
+            :headline-meta="matchSummary"
+            :badge="`${candidatesCount} 条意向`"
             @region-tap="handleMainMapTap"
           />
         </view>
@@ -122,7 +117,6 @@ import { computed, getCurrentInstance, nextTick, onBeforeUnmount, ref, watch } f
 import { onHide, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import SeatSwapManageSheet from './components/SeatSwapManageSheet.vue'
-import SeatSwapMatchCard from './components/SeatSwapMatchCard.vue'
 import SeatSwapNotice from './components/SeatSwapNotice.vue'
 import SeatSwapSkeleton from './components/SeatSwapSkeleton.vue'
 import SeatSwapRegionPanel from './components/SeatSwapRegionPanel.vue'

@@ -1,14 +1,18 @@
 <template>
   <FiPanel>
-    <FiSectionHeading v-if="filterKey" kicker="目标座位" :title="filterName || filterKey" align="center">
-      <template #meta>
-        <view class="filter-meta">
-          <text class="filter-meta__count">{{ filteredCandidates.length }} 条</text>
-          <button class="filter-meta__clear" hover-class="filter-meta__clear--pressed" @tap="emit('clear-filter')">✕ 清除</button>
-        </view>
-      </template>
-    </FiSectionHeading>
-    <FiSectionHeading v-else kicker="换座池" title="按分区浏览" />
+    <!-- 紧凑标题行：不用 FiSectionHeading 的 44rpx 大标题，避免与地图首行争抢层级。 -->
+    <view class="pool-head">
+      <view class="pool-head__main">
+        <text class="pool-head__title">{{ filterKey ? `想换到 ${filterName || filterKey}` : '换座池' }}</text>
+        <text class="pool-head__count">{{ filterKey ? filteredCandidates.length : totalCount }} 条</text>
+      </view>
+      <button
+        v-if="filterKey"
+        class="filter-meta__clear"
+        hover-class="filter-meta__clear--pressed"
+        @tap="emit('clear-filter')"
+      >✕ 清除</button>
+    </view>
 
     <template v-if="!filterKey">
       <view v-if="!groups.length" class="empty-row">
@@ -80,7 +84,6 @@
 
 <script setup lang="ts">
 import FiPanel from '../../../components/FiPanel.vue'
-import FiSectionHeading from '../../../components/FiSectionHeading.vue'
 import SeatSwapCandidateCard from './SeatSwapCandidateCard.vue'
 import type { SeatSwapCandidate } from '../../../types/seatSwap'
 import {
@@ -131,13 +134,33 @@ function candidateAction(candidate: SeatSwapCandidate): ReturnType<typeof resolv
   animation: fi-rise-in var(--fi-motion-duration-base) var(--fi-motion-ease-out) both;
 }
 
-.filter-meta {
+.pool-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: var(--fi-space-16);
+}
+
+.pool-head__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
   gap: var(--fi-space-12);
 }
 
-.filter-meta__count {
+.pool-head__title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fi-color-text-strong);
+  font-size: var(--fi-font-30);
+  font-weight: var(--fi-weight-extrabold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pool-head__count {
+  flex-shrink: 0;
   color: var(--fi-color-text-muted);
   font-size: var(--fi-font-22);
 }

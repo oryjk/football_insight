@@ -140,6 +140,15 @@ export function shouldShowSeatSwapMapFab(input: {
   return input.available && !input.mapInViewport && !input.sheetOpen
 }
 
+/** 地图面板首行用的紧凑开球时间：MM/DD HH:mm（本地时间）；无效输入返回空串。 */
+export function formatSeatSwapKickoffShort(iso: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 /** 换座池外层锚点：筛选态与分组态都存在，用作地图点击后的滚动目标。 */
 export const SEAT_SWAP_POOL_ANCHOR_ID = 'seat-swap-pool-anchor'
 

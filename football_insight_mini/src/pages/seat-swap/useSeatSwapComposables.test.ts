@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { buildSeatSwapMockCurrentResponse, buildSeatSwapMockRegions } from './fixtures'
 import { useSeatSwapBrowse } from './useSeatSwapBrowse'
 import { useSeatSwapPage } from './useSeatSwapPage'
-import { SEAT_SWAP_POOL_ANCHOR_ID } from './helpers'
+import { SEAT_SWAP_POOL_ANCHOR_ID, formatSeatSwapKickoffShort } from './helpers'
 import type { SeatSwapCurrentResponse } from '../../types/seatSwap'
 
 function setupBrowse(
@@ -77,6 +77,14 @@ describe('useSeatSwapPage', () => {
 })
 
 describe('useSeatSwapBrowse', () => {
+  test('summarises the match as a compact one-line headline', () => {
+    const { currentView, browse } = setupBrowse()
+    const kickoff = currentView.value?.current_match?.kickoff_at || ''
+    expect(browse.matchTitle.value).toBe('成都蓉城 VS 上海申花')
+    expect(browse.matchSummary.value).toBe(formatSeatSwapKickoffShort(kickoff))
+    expect(browse.matchSummary.value.includes('凤凰山')).toBe(false)
+  })
+
   test('hides my own request from the pool', () => {
     const { currentView, browse } = setupBrowse()
     const myId = currentView.value?.my_request?.request_id

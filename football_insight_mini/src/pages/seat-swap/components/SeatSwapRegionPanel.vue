@@ -1,8 +1,12 @@
 <template>
   <view class="seat-map-panel" :class="{ 'seat-map-panel--embedded': embedded }">
-    <view class="seat-map-panel__head">
-      <text class="seat-map-panel__title">座位区域</text>
-      <text class="seat-map-panel__hint">点分区可切换</text>
+    <!-- 首行即本场比赛：对阵 · 开球时间 + 意向数；不再单独放比赛卡。 -->
+    <view v-if="headline" class="seat-map-panel__head">
+      <view class="seat-map-panel__match">
+        <text class="seat-map-panel__title">{{ headline }}</text>
+        <text v-if="headlineMeta" class="seat-map-panel__meta">{{ headlineMeta }}</text>
+      </view>
+      <text v-if="badge" class="seat-map-panel__badge">{{ badge }}</text>
     </view>
     <view class="stadium-wrap">
       <StadiumMap
@@ -51,6 +55,12 @@ defineProps<{
   hasMyRequest: boolean
   /** 用于地图弹层内部：去掉自身背景、阴影与横向出血。 */
   embedded?: boolean
+  /** 首行标题（对阵），为空时不显示首行。 */
+  headline?: string
+  /** 首行副信息（开球时间）。 */
+  headlineMeta?: string
+  /** 首行右侧徽标（意向数）。 */
+  badge?: string
 }>()
 
 const emit = defineEmits<{
@@ -74,21 +84,49 @@ const emit = defineEmits<{
 
 .seat-map-panel__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--fi-space-16);
-  padding: 0 var(--fi-space-4) var(--fi-space-2);
+  padding: var(--fi-space-10) var(--fi-space-4) var(--fi-space-4);
+}
+
+.seat-map-panel__match {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--fi-space-12);
 }
 
 .seat-map-panel__title {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
   color: var(--fi-color-text-strong);
-  font-size: var(--fi-font-26);
-  font-weight: var(--fi-weight-bold);
+  font-size: var(--fi-font-30);
+  font-weight: var(--fi-weight-extrabold);
+  line-height: var(--fi-leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.seat-map-panel__hint {
+.seat-map-panel__meta {
+  flex-shrink: 0;
   color: var(--fi-color-text-muted);
   font-size: var(--fi-font-22);
+  white-space: nowrap;
+}
+
+.seat-map-panel__badge {
+  flex-shrink: 0;
+  padding: var(--fi-space-8) var(--fi-space-16);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-page);
+  color: var(--fi-color-text-secondary);
+  font-size: var(--fi-font-22);
+  font-weight: var(--fi-weight-bold);
+  line-height: var(--fi-leading-none);
+  white-space: nowrap;
 }
 
 .stadium-wrap {

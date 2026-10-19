@@ -1,12 +1,12 @@
 import { computed, ref, type Ref } from 'vue'
 import type { SeatSwapCandidate, SeatSwapCurrentResponse } from '../../types/seatSwap'
 import type { TicketWatchRegion } from '../../types/ticketWatch'
-import { formatDatetime } from '../../utils/format'
 import { formatSeatSwapSeatLabel, seatSwapStatusLabel } from '../../utils/stadiumRegions'
 import {
   countSeatSwapDesiredRegions,
   filterOutMySeatSwapRequest,
   filterSeatSwapRequestsByDesiredRegion,
+  formatSeatSwapKickoffShort,
   groupSeatSwapRequestsByRegion,
   resolveDefaultExpandedSeatSwapRegionKeys,
   resolveSeatSwapMapFabLabel,
@@ -31,10 +31,7 @@ export function useSeatSwapBrowse(input: {
     const m = currentView.value?.current_match
     return m ? `${m.home_team_name} VS ${m.away_team_name}` : '暂无当前比赛'
   })
-  const matchSummary = computed(() => {
-    const raw = currentView.value?.current_match?.kickoff_at
-    return raw ? `${formatDatetime(raw)} · 凤凰山专业足球场` : ''
-  })
+  const matchSummary = computed(() => formatSeatSwapKickoffShort(currentView.value?.current_match?.kickoff_at || ''))
   const candidatesCount = computed(() => currentView.value?.candidates.length || 0)
   const displayCandidates = computed<SeatSwapCandidate[]>(() =>
     filterOutMySeatSwapRequest(currentView.value?.candidates || [], currentView.value?.my_request?.request_id),

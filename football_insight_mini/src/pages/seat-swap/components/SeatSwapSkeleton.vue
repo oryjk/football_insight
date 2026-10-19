@@ -2,15 +2,9 @@
   <view class="fi-skeleton-stack" role="status" aria-label="换座池加载中">
     <view class="fi-skeleton-panel" aria-hidden="true">
       <view class="fi-skeleton-heading">
-        <view class="fi-skeleton-block seat-skeleton__icon" />
-        <view class="fi-skeleton-copy">
-          <view class="fi-skeleton-block fi-skeleton-kicker" />
-          <view class="fi-skeleton-block fi-skeleton-title" />
-        </view>
+        <view class="fi-skeleton-block seat-skeleton__headline" />
         <view class="fi-skeleton-block seat-skeleton__pill" />
       </view>
-    </view>
-    <view class="fi-skeleton-panel" aria-hidden="true">
       <view class="fi-skeleton-block seat-skeleton__map" />
     </view>
     <view class="fi-skeleton-panel" aria-hidden="true">
@@ -32,11 +26,9 @@
 </template>
 
 <style scoped>
-.seat-skeleton__icon {
-  flex-shrink: 0;
-  width: var(--fi-space-64);
-  height: var(--fi-space-64);
-  border-radius: var(--fi-radius-md);
+.seat-skeleton__headline {
+  width: 56%;
+  height: var(--fi-space-32);
 }
 
 .seat-skeleton__pill {
@@ -48,6 +40,7 @@
 /* 约 384rpx，与首屏地图高度接近 */
 .seat-skeleton__map {
   width: 100%;
+  margin-top: var(--fi-space-16);
   height: calc(var(--fi-space-64) * 6);
   border-radius: var(--fi-radius-md);
 }

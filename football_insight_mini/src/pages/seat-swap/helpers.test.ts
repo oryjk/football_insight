@@ -15,6 +15,7 @@ import {
   resolveDefaultExpandedSeatSwapRegionKeys,
   shouldDimSeatSwapRegion,
   SEAT_SWAP_POOL_ANCHOR_ID,
+  formatSeatSwapKickoffShort,
   isSeatSwapMapRectInViewport,
   resolveSeatSwapCandidateAction,
   resolveSeatSwapMapFabLabel,
@@ -647,4 +648,16 @@ describe('seat swap map initial visibility', () => {
       expect(isSeatSwapMapRectInViewport(rect, 64, 800)).toBe(expected)
     })
   }
+})
+
+describe('seat swap compact kickoff label', () => {
+  test('formats local kickoff as MM/DD HH:mm', () => {
+    expect(formatSeatSwapKickoffShort(new Date(2026, 9, 25, 19, 35).toISOString())).toBe('10/25 19:35')
+    expect(formatSeatSwapKickoffShort(new Date(2026, 0, 3, 9, 5).toISOString())).toBe('01/03 09:05')
+  })
+
+  test('returns empty text for missing or invalid input', () => {
+    expect(formatSeatSwapKickoffShort('')).toBe('')
+    expect(formatSeatSwapKickoffShort('not-a-date')).toBe('')
+  })
 })
