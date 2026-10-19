@@ -1,7 +1,10 @@
 use super::public_dto::{CodeDto, LikeDto, ListDto, ListQuery, SharedDto};
 use crate::{
     auth::ports::token_port::TokenPort,
-    lineup::{application::public_lineup::PublicLineupService, domain::LineupPublicError},
+    lineup::{
+        application::public_lineup::PublicLineupService,
+        domain::{LineupPublicError, LineupReaction},
+    },
 };
 use axum::{
     Json, Router,
@@ -33,6 +36,10 @@ pub fn public_routes(state: Arc<PublicLineupWebState>) -> Router {
             put(like).delete(unlike),
         )
         .route("/api/v1/lineups/shared/{share_code}/wxacode", get(image))
+        .route(
+            "/api/v1/lineups/shared/{share_code}/dislike",
+            put(dislike).delete(undislike),
+        )
         .layer(middleware::from_fn(no_store))
         .with_state(state)
 }
@@ -138,6 +145,34 @@ async fn image(
         .image(&code, user)
         .await
         .map(|image| Json(image.into()))
+        .map_err(map_error)
+}
+
+async fn dislike(
+    State(state): State<Arc<PublicLineupWebState>>,
+    headers: HeaderMap,
+    Path(code): Path<String>,
+) -> Result<Json<LikeDto>, WebError> {
+    let user = required_viewer(&headers, state.token_port.as_ref())?;
+    state
+        .service
+        .set_reaction(&code, user, Some(LineupReaction::Dislike))
+        .await
+        .map(|state| Json(state.into()))
+        .map_err(map_error)
+}
+
+async fn undislike(
+    State(state): State<Arc<PublicLineupWebState>>,
+    headers: HeaderMap,
+    Path(code): Path<String>,
+) -> Result<Json<LikeDto>, WebError> {
+    let user = required_viewer(&headers, state.token_port.as_ref())?;
+    state
+        .service
+        .set_reaction(&code, user, None)
+        .await
+        .map(|state| Json(state.into()))
         .map_err(map_error)
 }
 
@@ -256,7 +291,13 @@ mod tests {
     }
     #[tokio::test]
     async fn like_and_image_require_login_and_hidden_targets_are_404() {
-        for (method, suffix) in [("PUT", "like"), ("DELETE", "like"), ("GET", "wxacode")] {
+        for (method, suffix) in [
+            ("PUT", "like"),
+            ("DELETE", "like"),
+            ("PUT", "dislike"),
+            ("DELETE", "dislike"),
+            ("GET", "wxacode"),
+        ] {
             let path = format!("/api/v1/lineups/shared/ABCD1234/{suffix}");
             assert_eq!(
                 call(true, method, &path, None).await.0,

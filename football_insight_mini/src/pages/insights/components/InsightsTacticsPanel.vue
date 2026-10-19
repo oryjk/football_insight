@@ -9,7 +9,7 @@
       <view v-if="error" class="community__state"><text>{{ error }}</text><button class="community__retry" @tap="emit('retry-list')">重试</button></view>
       <view v-else-if="!loading && !items.length" class="community__state"><text>还没有人发布战术，来做第一个排阵的人。</text></view>
       <view v-for="(item, index) in items" :key="item.share_code" class="community__item">
-        <FiLineupCommunityCard :item="item" :rank="sort === 'likes' ? index + 1 : undefined" :pending="pendingLikes.includes(item.share_code)" compact @open="emit('open', item.share_code)" @like="emit('like', item)" />
+        <FiLineupCommunityCard :item="item" :rank="sort === 'likes' ? index + 1 : undefined" :pending="pendingLikes.includes(item.share_code)" compact @open="emit('open', item.share_code)" @like="emit('like', item)" @dislike="emit('dislike', item)" />
       </view>
       <button v-if="items.length && items.length < total" class="community__more" :disabled="loading" @tap="emit('more')">{{ loading ? '加载中…' : '查看更多战术' }}</button>
     </view>
@@ -21,7 +21,7 @@ import FiLineupCommunityCard from '../../../components/FiLineupCommunityCard.vue
 import InsightsMyTacticsCard from './InsightsMyTacticsCard.vue'
 import type { LineupSort, PublicLineupSummary, SavedLineup, SavedLineupDraft } from '../../../types/lineup'
 defineProps<{ authenticated: boolean; mineLoading: boolean; mineError: string; draft: SavedLineupDraft | null; published: SavedLineup | null; items: PublicLineupSummary[]; total: number; sort: LineupSort; loading: boolean; error: string; pendingLikes: string[] }>()
-const emit = defineEmits<{ (e: 'edit' | 'retry-mine' | 'retry-list' | 'more'): void; (e: 'open', code: string): void; (e: 'like', item: PublicLineupSummary): void; (e: 'sort', order: LineupSort): void }>()
+const emit = defineEmits<{ (e: 'edit' | 'retry-mine' | 'retry-list' | 'more'): void; (e: 'open', code: string): void; (e: 'like' | 'dislike', item: PublicLineupSummary): void; (e: 'sort', order: LineupSort): void }>()
 const sortItems = [{ key: 'latest', label: '最新' }, { key: 'likes', label: '点赞榜' }]
 function changeSort(value: string) { if (value === 'latest' || value === 'likes') emit('sort', value) }
 </script>

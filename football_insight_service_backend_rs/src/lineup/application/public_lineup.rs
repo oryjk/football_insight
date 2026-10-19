@@ -1,7 +1,7 @@
 use crate::lineup::{
     domain::{
-        LineupCodeImage, LineupLikeState, LineupPublicError, PublicLineupPage, PublicLineupQuery,
-        SharedLineup, valid_share_code,
+        LineupCodeImage, LineupLikeState, LineupPublicError, LineupReaction, PublicLineupPage,
+        PublicLineupQuery, SharedLineup, valid_share_code,
     },
     ports::{LineupCodePort, LineupUserAccess, PublicLineupRepository, SquadRepository},
 };
@@ -116,11 +116,21 @@ impl PublicLineupService {
         user: Uuid,
         liked: bool,
     ) -> Result<LineupLikeState, LineupPublicError> {
+        self.set_reaction(code, user, liked.then_some(LineupReaction::Like))
+            .await
+    }
+
+    pub async fn set_reaction(
+        &self,
+        code: &str,
+        user: Uuid,
+        reaction: Option<LineupReaction>,
+    ) -> Result<LineupLikeState, LineupPublicError> {
         self.authorize(Some(user)).await?;
         if !valid_share_code(code) {
             return Err(LineupPublicError::Invalid);
         }
-        self.lineups.set_like(code, user, liked).await
+        self.lineups.set_reaction(code, user, reaction).await
     }
 
     pub async fn image(
@@ -147,7 +157,7 @@ pub(crate) mod tests {
     #[derive(Default)]
     pub(crate) struct FakePublicLineups {
         pub shared: Mutex<Option<SharedLineup>>,
-        pub liked: Mutex<bool>,
+        pub reaction: Mutex<Option<LineupReaction>>,
     }
     #[async_trait]
     impl PublicLineupRepository for FakePublicLineups {
@@ -166,19 +176,21 @@ pub(crate) mod tests {
         ) -> Result<Option<SharedLineup>, LineupPublicError> {
             Ok(self.shared.lock().unwrap().clone())
         }
-        async fn set_like(
+        async fn set_reaction(
             &self,
             _: &str,
             _: Uuid,
-            liked: bool,
+            reaction: Option<LineupReaction>,
         ) -> Result<LineupLikeState, LineupPublicError> {
             if self.shared.lock().unwrap().is_none() {
                 return Err(LineupPublicError::NotFound);
             }
-            *self.liked.lock().unwrap() = liked;
+            *self.reaction.lock().unwrap() = reaction;
+            let liked = reaction == Some(LineupReaction::Like);
             Ok(LineupLikeState {
                 likes_count: i64::from(liked),
                 liked_by_me: liked,
+                disliked_by_me: reaction == Some(LineupReaction::Dislike),
             })
         }
     }

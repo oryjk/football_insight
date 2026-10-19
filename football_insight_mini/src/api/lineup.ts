@@ -31,6 +31,9 @@ export function getSharedLineup(code: string): Promise<PublicLineup> {
 export function setLineupLike(code: string, liked: boolean): Promise<LineupLikes> {
   return request({ url: `/lineups/shared/${encodeURIComponent(code)}/like`, method: liked ? 'PUT' : 'DELETE', auth: true })
 }
+export function setLineupDislike(code: string, disliked: boolean): Promise<LineupLikes> {
+  return request({ url: `/lineups/shared/${encodeURIComponent(code)}/dislike`, method: disliked ? 'PUT' : 'DELETE', auth: true })
+}
 export function getLineupCode(code: string): Promise<LineupCodeImage> {
   return request({ url: `/lineups/shared/${encodeURIComponent(code)}/wxacode`, auth: true })
 }

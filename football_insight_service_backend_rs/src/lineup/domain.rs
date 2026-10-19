@@ -277,6 +277,13 @@ pub struct LineupAuthor {
 pub struct LineupLikeState {
     pub likes_count: i64,
     pub liked_by_me: bool,
+    pub disliked_by_me: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LineupReaction {
+    Like,
+    Dislike,
 }
 
 #[derive(Debug, Clone, PartialEq)]

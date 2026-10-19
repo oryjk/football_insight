@@ -1,7 +1,7 @@
 use crate::lineup::{
     domain::{
-        LineupAuthor, LineupLikeState, LineupPublicError, LineupSlot, LineupSort, PublicLineupItem,
-        PublicLineupQuery, SharedLineup, SquadTeam,
+        LineupAuthor, LineupLikeState, LineupPublicError, LineupReaction, LineupSlot, LineupSort,
+        PublicLineupItem, PublicLineupQuery, SharedLineup, SquadTeam,
     },
     ports::PublicLineupRepository,
 };
@@ -32,6 +32,9 @@ const LIKES: &str = "(SELECT COUNT(*) FROM f_i_lineup_likes ll
 const LIKED: &str = "EXISTS(SELECT 1 FROM f_i_lineup_likes me
     JOIN f_i_users mu ON mu.id = me.user_id AND mu.status = 'active'
     WHERE me.lineup_id = l.id AND me.user_id = $2)";
+const DISLIKED: &str = "EXISTS(SELECT 1 FROM f_i_lineup_dislikes me
+    JOIN f_i_users mu ON mu.id = me.user_id AND mu.status = 'active'
+    WHERE me.lineup_id = l.id AND me.user_id = $2)";
 
 #[derive(FromRow)]
 struct ItemRow {
@@ -43,6 +46,7 @@ struct ItemRow {
     updated_at: chrono::DateTime<chrono::Utc>,
     likes_count: i64,
     liked_by_me: bool,
+    disliked_by_me: bool,
 }
 
 impl From<ItemRow> for PublicLineupItem {
@@ -59,6 +63,7 @@ impl From<ItemRow> for PublicLineupItem {
             likes: LineupLikeState {
                 likes_count: row.likes_count,
                 liked_by_me: row.liked_by_me,
+                disliked_by_me: row.disliked_by_me,
             },
         }
     }
@@ -67,7 +72,7 @@ impl From<ItemRow> for PublicLineupItem {
 fn columns() -> String {
     format!(
         "l.share_code, l.formation, COALESCE(NULLIF(u.display_name, ''), '球迷') AS display_name,
-        u.avatar_url, l.created_at, l.updated_at, {LIKES} AS likes_count, {LIKED} AS liked_by_me"
+        u.avatar_url, l.created_at, l.updated_at, {LIKES} AS likes_count, {LIKED} AS liked_by_me, {DISLIKED} AS disliked_by_me"
     )
 }
 
@@ -151,11 +156,11 @@ impl PublicLineupRepository for PostgresPublicLineupRepository {
         }))
     }
 
-    async fn set_like(
+    async fn set_reaction(
         &self,
         code: &str,
         user_id: Uuid,
-        liked: bool,
+        reaction: Option<LineupReaction>,
     ) -> Result<LineupLikeState, LineupPublicError> {
         let mut tx = self.pool.begin().await.map_err(unavailable)?;
         // Lock actor state until commit so a concurrent account disable cannot authorize a write.
@@ -180,10 +185,8 @@ impl PublicLineupRepository for PostgresPublicLineupRepository {
         .await
         .map_err(unavailable)?
         .ok_or(LineupPublicError::NotFound)?;
-        if liked {
-            sqlx::query("INSERT INTO f_i_lineup_likes(lineup_id,user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING")
-                .bind(id).bind(user_id).execute(&mut *tx).await.map_err(unavailable)?;
-        } else {
+        // Delete the opposite vote (or both for neutral) under the lineup lock.
+        if reaction != Some(LineupReaction::Like) {
             sqlx::query("DELETE FROM f_i_lineup_likes WHERE lineup_id = $1 AND user_id = $2")
                 .bind(id)
                 .bind(user_id)
@@ -191,9 +194,28 @@ impl PublicLineupRepository for PostgresPublicLineupRepository {
                 .await
                 .map_err(unavailable)?;
         }
-        let (likes_count, liked_by_me) = sqlx::query_as::<_, (i64, bool)>(&format!(
-            "SELECT {LIKES}, {LIKED} FROM f_i_lineups l WHERE l.id = $1"
-        ))
+        if reaction != Some(LineupReaction::Dislike) {
+            sqlx::query("DELETE FROM f_i_lineup_dislikes WHERE lineup_id = $1 AND user_id = $2")
+                .bind(id)
+                .bind(user_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(unavailable)?;
+        }
+        if reaction == Some(LineupReaction::Like) {
+            sqlx::query("INSERT INTO f_i_lineup_likes(lineup_id,user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING")
+                .bind(id).bind(user_id).execute(&mut *tx).await.map_err(unavailable)?;
+        } else if reaction == Some(LineupReaction::Dislike) {
+            sqlx::query("INSERT INTO f_i_lineup_dislikes(lineup_id,user_id) VALUES ($1,$2) ON CONFLICT DO NOTHING")
+                .bind(id)
+                .bind(user_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(unavailable)?;
+        }
+        let (likes_count, liked_by_me, disliked_by_me) = sqlx::query_as::<_, (i64, bool, bool)>(
+            &format!("SELECT {LIKES}, {LIKED}, {DISLIKED} FROM f_i_lineups l WHERE l.id = $1"),
+        )
         .bind(id)
         .bind(user_id)
         .fetch_one(&mut *tx)
@@ -203,6 +225,7 @@ impl PublicLineupRepository for PostgresPublicLineupRepository {
         Ok(LineupLikeState {
             likes_count,
             liked_by_me,
+            disliked_by_me,
         })
     }
 }

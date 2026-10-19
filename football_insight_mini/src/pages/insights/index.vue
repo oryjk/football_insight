@@ -34,7 +34,7 @@
                 :items="communityItems" :total="communityTotal" :sort="communitySort"
                 :loading="communityLoading || teamLoading" :error="teamError || communityError" :pending-likes="communityPendingLikes"
                 @edit="goToTeamBoard" @retry-mine="tactics.retryMine()" @retry-list="retryTacticsList"
-                @sort="tactics.changeSort" @like="tactics.like" @open="openPublicTactics" @more="tactics.more()"
+                @sort="tactics.changeSort" @like="tactics.like" @dislike="tactics.dislike" @open="openPublicTactics" @more="tactics.more()"
               />
               <template v-else>
                 <view v-if="outlookReviewReady && !systemConfigUnderReview && currentUser" class="workspace-section">

@@ -1,8 +1,8 @@
 import { computed, ref, watch, type Ref } from 'vue'
-import { getMyLineupEditor, getTeamLineups, setLineupLike } from '../../api/lineup'
+import { getMyLineupEditor, getTeamLineups, setLineupLike, setLineupDislike } from '../../api/lineup'
 import { createLineupList, type CommunityDeps } from '../../composables/useLineupCommunity'
 import type { AppSession } from '../../stores/appSession'
-import type { LineupSort, PublicLineupSummary, SavedLineup, SavedLineupDraft } from '../../types/lineup'
+import type { LineupReaction, LineupSort, PublicLineupSummary, SavedLineup, SavedLineupDraft } from '../../types/lineup'
 import { extractApiErrorMessage, isUnauthorizedError } from '../../utils/apiError'
 
 export interface InsightsTacticsOptions {
@@ -28,6 +28,7 @@ export function useInsightsTactics(options: InsightsTacticsOptions) {
   const authenticated = computed(() => Boolean(privateUser()))
   const list = options.deps?.community?.list ?? getTeamLineups
   const writeLike = options.deps?.community?.like ?? setLineupLike
+  const writeDislike = options.deps?.community?.dislike ?? setLineupDislike
   let pendingWrites = 0, interruptedLikes = 0
   const community = createLineupList({
     revision: () => session.revision.value,
@@ -41,12 +42,17 @@ export function useInsightsTactics(options: InsightsTacticsOptions) {
       if (args[2] === 1) beforeListReplace()
       const result = await list(...args)
       return privateUser() ? result : {
-        ...result, items: result.items.map(item => ({ ...item, liked_by_me: false })),
+        ...result, items: result.items.map(item => ({ ...item, liked_by_me: false, disliked_by_me: false })),
       }
     },
     like: async (...args) => {
       pendingWrites++
       try { return await writeLike(...args) }
+      finally { pendingWrites-- }
+    },
+    dislike: async (...args) => {
+      pendingWrites++
+      try { return await writeDislike(...args) }
       finally { pendingWrites-- }
     },
   })
@@ -163,12 +169,12 @@ export function useInsightsTactics(options: InsightsTacticsOptions) {
     return enabled() ? community.more() : Promise.resolve()
   }
 
-  function like(item: PublicLineupSummary): Promise<void> {
+  function like(item: PublicLineupSummary, kind: LineupReaction = 'like'): Promise<void> {
     reconcileContext()
     const target = community.items.value.find(entry => entry.share_code === item.share_code)
     if (!enabled() || !target || session.status.value === 'loading') return Promise.resolve()
     const key = contextKey(), interruption = interruptedLikes
-    return community.like(target, '/pages/insights/index').then(() => {
+    return community.like(target, '/pages/insights/index', kind).then(() => {
       // The user may return before the canceled write finishes; refresh its final server state too.
       if (interruption !== interruptedLikes && enabled() && contextKey() === key) return loadPublic(teamId())
     })
@@ -181,5 +187,6 @@ export function useInsightsTactics(options: InsightsTacticsOptions) {
     community.dispose()
   }
 
-  return { authenticated, mineLoading, mineError, mineDraft, minePublished, community, refresh, retryMine, changeSort, more, like, dispose }
+  const dislike = (item: PublicLineupSummary) => like(item, 'dislike')
+  return { authenticated, mineLoading, mineError, mineDraft, minePublished, community, refresh, retryMine, changeSort, more, like, dislike, dispose }
 }

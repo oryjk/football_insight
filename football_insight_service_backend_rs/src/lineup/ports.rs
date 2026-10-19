@@ -63,8 +63,8 @@ pub trait LineupRepository: Send + Sync {
 }
 
 use super::domain::{
-    LineupCodeImage, LineupLikeState, LineupPublicError, PublicLineupItem, PublicLineupQuery,
-    SharedLineup,
+    LineupCodeImage, LineupLikeState, LineupPublicError, LineupReaction, PublicLineupItem,
+    PublicLineupQuery, SharedLineup,
 };
 
 #[async_trait]
@@ -85,11 +85,21 @@ pub trait PublicLineupRepository: Send + Sync {
         code: &str,
         viewer: Option<Uuid>,
     ) -> Result<Option<SharedLineup>, LineupPublicError>;
-    /// Atomically check public visibility and active actor, set or remove the unique like, and read counts.
+    /// Atomically check visibility/actor, replace the mutually exclusive reaction and read its state.
+    async fn set_reaction(
+        &self,
+        code: &str,
+        user_id: Uuid,
+        reaction: Option<LineupReaction>,
+    ) -> Result<LineupLikeState, LineupPublicError>;
+
     async fn set_like(
         &self,
         code: &str,
         user_id: Uuid,
         liked: bool,
-    ) -> Result<LineupLikeState, LineupPublicError>;
+    ) -> Result<LineupLikeState, LineupPublicError> {
+        self.set_reaction(code, user_id, liked.then_some(LineupReaction::Like))
+            .await
+    }
 }

@@ -93,6 +93,49 @@ describe('login return navigation', () => {
 })
 
 describe('likes and active auth', () => {
+  test('dislike replaces a like and a second dislike cancels it using explicit intent', async () => {
+    const intents: boolean[] = []
+    const state = { ...item, liked_by_me: true, disliked_by_me: false }
+    const flow = createLineupLikes({ ...deps(), dislike: async (_code, enabled) => {
+      intents.push(enabled)
+      return { likes_count: 1, liked_by_me: false, disliked_by_me: enabled }
+    } })
+    await flow.apply(state, '/return', () => true, result => Object.assign(state, result), 'dislike')
+    expect(state.liked_by_me).toBe(false); expect(state.disliked_by_me).toBe(true); expect(state.likes_count).toBe(1)
+    await flow.apply(state, '/return', () => true, result => Object.assign(state, result), 'dislike')
+    expect(state.disliked_by_me).toBe(false); expect(intents).toEqual([true, false])
+  })
+  test('like and dislike share one pending write; failures preserve both flags and count', async () => {
+    const gate = deferred<{ likes_count: number; liked_by_me: boolean; disliked_by_me: boolean }>()
+    let positive = 0, publishes = 0
+    const flow = createLineupLikes({ ...deps(), like: async () => { positive++; return item }, dislike: () => gate.promise })
+    const pending = flow.apply(item, '/return', () => true, () => publishes++, 'dislike')
+    await flow.apply(item, '/return', () => true, () => publishes++)
+    expect(positive).toBe(0)
+    gate.reject(new Error('offline')); expect(await pending).toBe('offline')
+    expect(publishes).toBe(0); expect(flow.pending.value).toEqual([])
+  })
+  test('an old account dislike response cannot publish into the new identity', async () => {
+    const gate = deferred<{ likes_count: number; liked_by_me: boolean; disliked_by_me: boolean }>()
+    let revision = 1, publishes = 0
+    const flow = createLineupLikes({ ...deps(), revision: () => revision, dislike: () => gate.promise })
+    const pending = flow.apply(item, '/return', () => true, () => publishes++, 'dislike')
+    revision++
+    gate.resolve({ likes_count: 2, liked_by_me: false, disliked_by_me: true }); await pending
+    expect(publishes).toBe(0)
+  })
+  test('a dislike updates the detail and a guest dislike requests login without writing', async () => {
+    let writes = 0, loggedIn = true, logins = 0
+    const detail: PublicLineup = { ...item, team: response(1).team, players: [], slots: [] }
+    const page = createLineupDetail({ ...deps(), detail: async () => detail, loggedIn: () => loggedIn, login: () => logins++,
+      dislike: async () => { writes++; return { likes_count: 2, liked_by_me: false, disliked_by_me: true } },
+    })
+    await page.load(item.share_code); await page.dislike('/return')
+    expect(page.detail.value?.disliked_by_me).toBe(true)
+    loggedIn = false; await page.dislike('/return')
+    expect(writes).toBe(1); expect(logins).toBe(1)
+    page.dispose()
+  })
   test('duplicate taps issue one intent; failures leave prior count and liked state intact', async () => {
     const pending = deferred<{ likes_count: number; liked_by_me: boolean }>(); let calls = 0
     const flow = createLineupLikes({ ...deps(), like: () => { calls++; return pending.promise } })

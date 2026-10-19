@@ -15,7 +15,7 @@
     <text class="community-caption">{{ total }} 套完整阵容 · {{ sort === 'likes' ? '按点赞数排序，同赞按发布时间排序' : '按首次发布时间排序' }}</text>
     <text v-if="error" class="community-error">{{ error }}</text>
     <FiLoading v-if="loading && !items.length" title="战术板加载中" caption="正在读取球队的球迷阵容。" />
-    <FiLineupCommunityCard v-for="(item, index) in items" :key="item.share_code" :item="item" :rank="sort === 'likes' ? index + 1 : undefined" :pending="pendingLikes.includes(item.share_code)" @open="open(item.share_code)" @like="like(item, returnUrl)" />
+    <FiLineupCommunityCard v-for="(item, index) in items" :key="item.share_code" :item="item" :rank="sort === 'likes' ? index + 1 : undefined" :pending="pendingLikes.includes(item.share_code)" @open="open(item.share_code)" @like="like(item, returnUrl)" @dislike="dislike(item, returnUrl)" />
     <text v-if="!loading && !error && !items.length" class="community-caption">还没有完整阵容，来排出第一套吧。</text>
     <button v-if="error || items.length < total" class="community-action" :disabled="loading" @tap="retry">{{ loading ? '加载中…' : error ? '重试加载' : '加载更多' }}</button>
     <button class="community-action community-action--active" @tap="edit">我也排一套</button>
@@ -36,7 +36,7 @@ import { buildLineupListUrl, buildLineupPageUrl, buildLineupViewUrl, parseLineup
 import { createLineupList } from '../../composables/useLineupCommunity'
 const { navigationPageStyle } = useNavigationLayout()
 const state = createLineupList()
-const { teamId, sort, items, total, loading, error, pendingLikes, more, like } = state
+const { teamId, sort, items, total, loading, error, pendingLikes, more, like, dislike } = state
 const teams = ref<Array<SquadResponse['team']>>([])
 const returnUrl = computed(() => buildLineupListUrl(teamId.value, sort.value))
 let requested = 0, requestedSort: LineupSort = 'latest', started = false, disposed = false

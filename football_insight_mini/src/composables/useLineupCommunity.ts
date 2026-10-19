@@ -1,7 +1,7 @@
 import { ref } from 'vue'
-import { getSharedLineup, getTeamLineups, setLineupLike } from '../api/lineup'
+import { getSharedLineup, getTeamLineups, setLineupLike, setLineupDislike } from '../api/lineup'
 import { useAppSession } from '../stores/appSession'
-import type { LineupLikes, LineupSort, PublicLineup, PublicLineupSummary, TeamLineups } from '../types/lineup'
+import type { LineupLikes, LineupReaction, LineupSort, PublicLineup, PublicLineupSummary, TeamLineups } from '../types/lineup'
 import { extractApiErrorMessage, isUnauthorizedError } from '../utils/apiError'
 import { rememberPostLoginRedirect } from '../utils/postLoginRedirect'
 
@@ -9,6 +9,7 @@ export interface CommunityDeps {
   list: typeof getTeamLineups
   detail: typeof getSharedLineup
   like: typeof setLineupLike
+  dislike: typeof setLineupDislike
   loggedIn: () => boolean
   revision: () => number
   invalidate: (revision: number) => void
@@ -17,7 +18,7 @@ export interface CommunityDeps {
 export function communityDeps(overrides: Partial<CommunityDeps> = {}): CommunityDeps {
   const session = overrides.revision ? null : useAppSession()
   return {
-    list: getTeamLineups, detail: getSharedLineup, like: setLineupLike,
+    list: getTeamLineups, detail: getSharedLineup, like: setLineupLike, dislike: setLineupDislike,
     loggedIn: () => Boolean(session?.hasAccessToken.value), revision: () => session?.revision.value ?? 0,
     invalidate: revision => session?.invalidateSession(revision),
     login: returnUrl => {
@@ -54,7 +55,7 @@ export function createLineupLikes(deps: CommunityDeps) {
   const pending = ref<string[]>([])
   let generation = 0
   function reset(): void { generation++; pending.value = [] }
-  async function apply(item: PublicLineupSummary, returnUrl: string, current: () => boolean, publish: (likes: LineupLikes) => void): Promise<string> {
+  async function apply(item: PublicLineupSummary, returnUrl: string, current: () => boolean, publish: (likes: LineupLikes) => void, kind: LineupReaction = 'like'): Promise<string> {
     if (pending.value.includes(item.share_code)) return ''
     if (!deps.loggedIn()) { deps.login(returnUrl); return '' }
     const owner = generation
@@ -64,13 +65,15 @@ export function createLineupLikes(deps: CommunityDeps) {
     pending.value = [...pending.value, code]
     try {
       // Publish server-confirmed state; a failed write keeps the previous count and intent.
-      const result = await deps.like(code, !item.liked_by_me)
-      if (valid()) publish(result)
+      const result = kind === 'like'
+        ? await deps.like(code, !item.liked_by_me)
+        : await deps.dislike(code, !item.disliked_by_me)
+      if (valid()) publish({ ...result, disliked_by_me: result.disliked_by_me ?? false })
       return ''
     } catch (error) {
       if (!valid()) return ''
       if (isUnauthorizedError(error)) { deps.invalidate(revision); deps.login(returnUrl); return '' }
-      return extractApiErrorMessage(error, '点赞失败，请重试')
+      return extractApiErrorMessage(error, kind === 'like' ? '点赞失败，请重试' : '点踩失败，请重试')
     } finally {
       if (owner === generation) pending.value = pending.value.filter(value => value !== code)
     }
@@ -107,7 +110,7 @@ export function createLineupList(overrides: Partial<CommunityDeps> = {}) {
   function more(): Promise<void> {
     return page.value === 0 || items.value.length < total.value ? fetchPage(page.value + 1) : Promise.resolve()
   }
-  async function like(item: PublicLineupSummary, returnUrl: string): Promise<void> {
+  async function like(item: PublicLineupSummary, returnUrl: string, kind: LineupReaction = 'like'): Promise<void> {
     const owner = generation
     if (likes.pending.value.includes(item.share_code)) return
     error.value = ''
@@ -115,7 +118,7 @@ export function createLineupList(overrides: Partial<CommunityDeps> = {}) {
     const message = await likes.apply(item, returnUrl, () => !disposed && generation === owner, result => {
       const target = items.value.find(entry => entry.share_code === item.share_code)
       if (target) { Object.assign(target, result); updated = true }
-    })
+    }, kind)
     if (owner !== generation || disposed) return
     if (message) error.value = message
     else if (updated && sort.value === 'likes') await load(teamId.value, 'likes')
@@ -123,7 +126,8 @@ export function createLineupList(overrides: Partial<CommunityDeps> = {}) {
   /** Pause an embedded list without discarding its last successfully loaded page. */
   function invalidatePending(): void { generation++; likes.reset(); loading.value = false }
   function dispose(): void { disposed = true; invalidatePending() }
-  return { teamId, sort, page, total, team, items, loading, error, pendingLikes: likes.pending, load, more, like, invalidatePending, dispose }
+  const dislike = (item: PublicLineupSummary, returnUrl: string) => like(item, returnUrl, 'dislike')
+  return { teamId, sort, page, total, team, items, loading, error, pendingLikes: likes.pending, load, more, like, dislike, invalidatePending, dispose }
 }
 
 export function createLineupDetail(overrides: Partial<CommunityDeps> = {}) {
@@ -139,13 +143,14 @@ export function createLineupDetail(overrides: Partial<CommunityDeps> = {}) {
     catch (cause) { if (current()) error.value = extractApiErrorMessage(cause, '阵容不可用，可能尚未排满或已取消公开') }
     finally { if (current()) loading.value = false }
   }
-  async function like(returnUrl: string): Promise<void> {
+  async function like(returnUrl: string, kind: LineupReaction = 'like'): Promise<void> {
     const target = detail.value, owner = generation
     if (!target || likes.pending.value.includes(target.share_code)) return
     error.value = ''
-    const message = await likes.apply(target, returnUrl, () => !disposed && generation === owner, result => Object.assign(target, result))
+    const message = await likes.apply(target, returnUrl, () => !disposed && generation === owner, result => Object.assign(target, result), kind)
     if (message && owner === generation) error.value = message
   }
   function dispose(): void { disposed = true; generation++; likes.reset() }
-  return { detail, loading, error, pendingLikes: likes.pending, load, like, dispose }
+  const dislike = (returnUrl: string) => like(returnUrl, 'dislike')
+  return { detail, loading, error, pendingLikes: likes.pending, load, like, dislike, dispose }
 }

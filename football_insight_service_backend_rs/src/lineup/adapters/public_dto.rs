@@ -43,12 +43,14 @@ impl From<LineupAuthor> for AuthorDto {
 pub(super) struct LikeDto {
     likes_count: i64,
     liked_by_me: bool,
+    disliked_by_me: bool,
 }
 impl From<LineupLikeState> for LikeDto {
     fn from(likes: LineupLikeState) -> Self {
         Self {
             likes_count: likes.likes_count,
             liked_by_me: likes.liked_by_me,
+            disliked_by_me: likes.disliked_by_me,
         }
     }
 }
@@ -164,6 +166,7 @@ mod tests {
                 likes: LineupLikeState {
                     likes_count: 3,
                     liked_by_me: true,
+                    disliked_by_me: false,
                 },
             },
             team: SquadTeam {
@@ -202,6 +205,7 @@ mod tests {
             vec![
                 "author",
                 "created_at",
+                "disliked_by_me",
                 "formation",
                 "liked_by_me",
                 "likes_count",

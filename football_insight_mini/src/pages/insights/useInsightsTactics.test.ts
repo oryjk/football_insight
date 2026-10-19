@@ -59,6 +59,20 @@ function setup(overrides: Partial<InsightsTacticsOptions> = {}) {
 }
 
 describe('insights tactics loading and identity ownership', () => {
+  test('dislike publishes both flags and logout removes the personalized dislike', async () => {
+    let disliked = false
+    const { api, auth } = setup({ deps: { community: {
+      list: async id => ({ ...response(id), items: [{ ...card, liked_by_me: !disliked, disliked_by_me: disliked }] }),
+      dislike: async (_code, enabled) => { disliked = enabled; return { likes_count: 1, liked_by_me: false, disliked_by_me: enabled } },
+    } } })
+    await flush(); await api.dislike(api.community.items.value[0])
+    expect(api.community.items.value[0].liked_by_me).toBe(false)
+    expect(api.community.items.value[0].disliked_by_me).toBe(true)
+    auth.currentUser.value = null; auth.hasAccessToken.value = false; auth.status.value = 'guest'; auth.revision.value++
+    await flush()
+    expect(api.community.items.value[0].disliked_by_me).toBe(false)
+    api.dispose()
+  })
   test('waits for an active valid team; guests read public tactics without private requests', async () => {
     const selectedTeamId = ref<number | null>(null), active = ref(false)
     const { api, lists, mines } = setup({ session: session(false), selectedTeamId, active })

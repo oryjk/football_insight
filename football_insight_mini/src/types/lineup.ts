@@ -43,7 +43,8 @@ export interface SavedLineup {
 
 export type LineupSort = 'latest' | 'likes'
 export interface LineupAuthor { display_name: string; avatar_url: string | null }
-export interface LineupLikes { likes_count: number; liked_by_me: boolean }
+export interface LineupLikes { likes_count: number; liked_by_me: boolean; disliked_by_me?: boolean }
+export type LineupReaction = 'like' | 'dislike'
 export interface PublicLineupSummary extends LineupLikes {
   share_code: string
   formation: string

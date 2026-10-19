@@ -51,6 +51,10 @@ page {
   --fi-primitive-topic-gallery-height: 440rpx;
   --fi-primitive-ink-rgb: 21, 22, 27;
   --fi-primitive-white-rgb: 255, 255, 255;
+  --fi-primitive-reaction-charcoal: #303030;
+  --fi-primitive-reaction-gloss: rgba(255, 255, 255, 0.06);
+  --fi-primitive-reaction-divider: rgba(255, 255, 255, 0.24);
+  --fi-primitive-reaction-selected: rgba(255, 255, 255, 0.14);
 
   /* ===== Primitive：间距（数字刻度，单位 rpx） ===== */
   --fi-primitive-space-4: 4rpx;
@@ -196,6 +200,11 @@ page {
   --fi-color-pitch: var(--fi-primitive-pitch);
   --fi-color-pitch-line: var(--fi-primitive-pitch-line);
   --fi-color-lineup-grass: var(--fi-primitive-pitch-grass);
+  --fi-color-reaction-bg: var(--fi-primitive-reaction-charcoal);
+  --fi-color-reaction-gloss: var(--fi-primitive-reaction-gloss);
+  --fi-color-reaction-divider: var(--fi-primitive-reaction-divider);
+  --fi-color-reaction-selected: var(--fi-primitive-reaction-selected);
+  --fi-color-reaction-text: var(--fi-primitive-white);
   --fi-color-lineup-grass-alt: var(--fi-primitive-pitch-grass-alt);
   --fi-color-lineup-markings: var(--fi-primitive-pitch-markings);
   --fi-motion-duration-fast: var(--fi-primitive-motion-fast);

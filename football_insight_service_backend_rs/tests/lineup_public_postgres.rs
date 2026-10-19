@@ -6,7 +6,7 @@ use football_insight_service_backend_rs::lineup::{
         public_persistence::PostgresPublicLineupRepository,
     },
     application::public_lineup::PublicLineupService,
-    domain::{LineupCodeImage, LineupPublicError, LineupSlot, PublicLineupQuery},
+    domain::{LineupCodeImage, LineupPublicError, LineupReaction, LineupSlot, PublicLineupQuery},
     ports::{LineupCodePort, LineupRepository, PublicLineupRepository},
 };
 use sqlx::{
@@ -69,6 +69,12 @@ async fn setup() -> Db {
     .execute(&pool)
     .await
     .unwrap();
+    sqlx::raw_sql(include_str!(
+        "../migrations/20261019160000_add_lineup_dislikes.sql"
+    ))
+    .execute(&pool)
+    .await
+    .unwrap();
     Db {
         admin,
         pool,
@@ -107,6 +113,106 @@ async fn save(pool: &PgPool, actor: Uuid, team: i64, code: &str, full: bool) {
         .upsert(actor, team, "4-3-3", &slots(full), code)
         .await
         .unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires explicit disposable local LINEUP_TEST_DATABASE_URL"]
+async fn reactions_switch_cancel_and_remain_private_and_idempotent() {
+    let db = setup().await;
+    let author = user(&db.pool).await;
+    let actor = user(&db.pool).await;
+    let other = user(&db.pool).await;
+    save(&db.pool, author, 1, "REACT001", true).await;
+    let repo = PostgresPublicLineupRepository::new(db.pool.clone());
+    for (reaction, count, liked, disliked) in [
+        (Some(LineupReaction::Like), 1, true, false),
+        (Some(LineupReaction::Like), 1, true, false),
+        (Some(LineupReaction::Dislike), 0, false, true),
+        (Some(LineupReaction::Dislike), 0, false, true),
+        (None, 0, false, false),
+        (Some(LineupReaction::Dislike), 0, false, true),
+        (Some(LineupReaction::Like), 1, true, false),
+    ] {
+        let state = repo
+            .set_reaction("REACT001", actor, reaction)
+            .await
+            .unwrap();
+        assert_eq!(
+            (state.likes_count, state.liked_by_me, state.disliked_by_me),
+            (count, liked, disliked)
+        );
+    }
+    repo.set_reaction("REACT001", other, Some(LineupReaction::Dislike))
+        .await
+        .unwrap();
+    for (viewer, liked, disliked) in [
+        (None, false, false),
+        (Some(actor), true, false),
+        (Some(other), false, true),
+    ] {
+        let detail = repo.shared("REACT001", viewer).await.unwrap().unwrap();
+        assert_eq!(
+            (
+                detail.item.likes.likes_count,
+                detail.item.likes.liked_by_me,
+                detail.item.likes.disliked_by_me
+            ),
+            (1, liked, disliked)
+        );
+        let (items, _) = repo.list(1, query("likes", 1, 20), viewer).await.unwrap();
+        assert_eq!(items[0].likes, detail.item.likes);
+    }
+    // A legacy production server inserting a like must also replace a newer dislike.
+    sqlx::query("INSERT INTO f_i_lineup_likes(lineup_id,user_id) SELECT id,$1 FROM f_i_lineups WHERE share_code='REACT001' ON CONFLICT DO NOTHING")
+        .bind(other).execute(&db.pool).await.unwrap();
+    let detail = repo.shared("REACT001", Some(other)).await.unwrap().unwrap();
+    assert_eq!(detail.item.likes.likes_count, 2);
+    assert!(detail.item.likes.liked_by_me);
+    assert!(!detail.item.likes.disliked_by_me);
+    sqlx::query("UPDATE f_i_users SET status='disabled' WHERE id=$1")
+        .bind(other)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        repo.set_reaction("REACT001", other, Some(LineupReaction::Dislike))
+            .await
+            .unwrap_err(),
+        LineupPublicError::Unauthorized
+    );
+    teardown(db).await;
+}
+
+#[tokio::test]
+#[ignore = "requires explicit disposable local LINEUP_TEST_DATABASE_URL"]
+async fn concurrent_opposing_reactions_never_leave_both_votes() {
+    let db = setup().await;
+    let author = user(&db.pool).await;
+    let actor = user(&db.pool).await;
+    save(&db.pool, author, 1, "REACT002", true).await;
+    let mut tasks = Vec::new();
+    for index in 0..16 {
+        let repo = PostgresPublicLineupRepository::new(db.pool.clone());
+        tasks.push(tokio::spawn(async move {
+            let reaction = if index % 2 == 0 {
+                LineupReaction::Like
+            } else {
+                LineupReaction::Dislike
+            };
+            let state = repo
+                .set_reaction("REACT002", actor, Some(reaction))
+                .await
+                .unwrap();
+            assert_ne!(state.liked_by_me, state.disliked_by_me);
+        }));
+    }
+    for task in tasks {
+        task.await.unwrap();
+    }
+    let rows: i64 = sqlx::query_scalar("SELECT (SELECT COUNT(*) FROM f_i_lineup_likes) + (SELECT COUNT(*) FROM f_i_lineup_dislikes)")
+        .fetch_one(&db.pool).await.unwrap();
+    assert_eq!(rows, 1);
+    teardown(db).await;
 }
 fn query(sort: &str, page: u32, size: u32) -> PublicLineupQuery {
     PublicLineupQuery::parse(sort, page, size).unwrap()

@@ -20,7 +20,7 @@
       </view>
       <LineupPitch :players="pitchPlayers" readonly />
       <view class="community-row">
-        <button class="community-action" :class="{ 'community-action--active': detail.liked_by_me }" :disabled="pendingLikes.length > 0" @tap="like(returnUrl)">{{ detail.liked_by_me ? '♥ 已赞' : '♡ 点赞' }} {{ detail.likes_count }}</button>
+        <view class="reaction-slot"><FiLineupReactionBar :count="detail.likes_count" :liked="detail.liked_by_me" :disliked="detail.disliked_by_me" :pending="pendingLikes.length > 0" @like="like(returnUrl)" @dislike="dislike(returnUrl)" /></view>
         <button class="community-action" @tap="openShare">分享阵容</button>
       </view>
       <view class="community-row">
@@ -39,6 +39,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import FiLoading from '../../components/FiLoading.vue'
+import FiLineupReactionBar from '../../components/FiLineupReactionBar.vue'
 import LineupPitch from './components/LineupPitch.vue'
 import LineupShareSheet from './components/LineupShareSheet.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
@@ -51,7 +52,7 @@ import { useLineupShare } from './useLineupShare'
 const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
 const state = createLineupDetail()
-const { detail, loading, error, pendingLikes, like } = state
+const { detail, loading, error, pendingLikes, like, dislike } = state
 const code = ref('')
 const returnUrl = computed(() => buildLineupViewUrl(code.value))
 const share = useLineupShare(() => JSON.stringify([code.value, detail.value?.updated_at, session.revision.value]), () => returnUrl.value)
@@ -82,4 +83,5 @@ onBeforeUnmount(state.dispose)
 
 <style scoped>
 .author-avatar { width: var(--fi-space-48); height: var(--fi-space-48); border-radius: var(--fi-radius-round); }
+.reaction-slot { flex-shrink: 0; }
 </style>
