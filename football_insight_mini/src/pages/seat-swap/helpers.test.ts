@@ -553,14 +553,17 @@ describe('seat swap stadium selection flow', () => {
 })
 
 describe('seat swap map floating button', () => {
-  test.each([
+  const labelCases: Array<[string, { text: string; clearable: boolean }]> = [
     ['', { text: '地图', clearable: false }],
     ['   ', { text: '地图', clearable: false }],
     ['112 区', { text: '112 区', clearable: true }],
     [' 112 区 ', { text: '112 区', clearable: true }],
-  ])('labels %p', (filterName, expected) => {
-    expect(resolveSeatSwapMapFabLabel(filterName)).toEqual(expected)
-  })
+  ]
+  for (const [filterName, expected] of labelCases) {
+    test(`labels ${JSON.stringify(filterName)}`, () => {
+      expect(resolveSeatSwapMapFabLabel(filterName)).toEqual(expected)
+    })
+  }
 
   const fabCases: Array<[boolean, boolean, boolean, boolean]> = [
     // available, mapInViewport, sheetOpen, expected
@@ -573,17 +576,22 @@ describe('seat swap map floating button', () => {
     [false, false, true, false],
     [false, true, true, false],
   ]
-  test.each(fabCases)('available=%p mapInViewport=%p sheetOpen=%p → %p', (available, mapInViewport, sheetOpen, expected) => {
-    expect(shouldShowSeatSwapMapFab({ available, mapInViewport, sheetOpen })).toBe(expected)
-  })
+  for (const [available, mapInViewport, sheetOpen, expected] of fabCases) {
+    test(`available=${available} mapInViewport=${mapInViewport} sheetOpen=${sheetOpen} → ${expected}`, () => {
+      expect(shouldShowSeatSwapMapFab({ available, mapInViewport, sheetOpen })).toBe(expected)
+    })
+  }
 })
 
 describe('seat swap list stagger', () => {
-  test.each([
+  const staggerCases: Array<[number, number]> = [
     [0, 0], [1, 40], [5, 200], [9, 200], [-1, 0], [Number.NaN, 0], [Number.POSITIVE_INFINITY, 0],
-  ])('index %p → %pms', (index, expected) => {
-    expect(resolveSeatSwapStaggerDelayMs(index)).toBe(expected)
-  })
+  ]
+  for (const [index, expected] of staggerCases) {
+    test(`index ${index} → ${expected}ms`, () => {
+      expect(resolveSeatSwapStaggerDelayMs(index)).toBe(expected)
+    })
+  }
 
   test('honours custom step and cap', () => {
     expect(resolveSeatSwapStaggerDelayMs(3, 30, 2)).toBe(60)
