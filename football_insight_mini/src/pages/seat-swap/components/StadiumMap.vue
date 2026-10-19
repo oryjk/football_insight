@@ -174,11 +174,10 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
 
 .stadium-map__hint {
   display: block;
-  margin-bottom: 10rpx;
+  margin-bottom: var(--fi-space-10);
   text-align: center;
-  color: #8f9198;
-  font-size: 22rpx;
-  font-weight: 400;
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-22);
 }
 
 .stadium-map__field {
@@ -198,16 +197,18 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   justify-content: center;
   /* 百分比布局已定义区域高度，避免最小高度撑大色块而重叠。 */
   min-height: 0;
-  border-radius: 12rpx;
+  border-radius: var(--fi-radius-sm);
   box-sizing: border-box;
   margin: 0;
   padding: 2rpx 3rpx;
   background-image: none;
-  color: #17191f;
+  color: var(--fi-color-text-strong);
   font: inherit;
-  line-height: 1.1;
-  box-shadow: 0 8rpx 18rpx rgba(18, 25, 20, 0.18);
-  transition: box-shadow 0.16s ease, opacity 0.16s ease, filter 0.16s ease;
+  line-height: var(--fi-leading-none);
+  box-shadow: var(--fi-shadow-soft);
+  transition:
+    box-shadow var(--fi-motion-duration-base) var(--fi-motion-ease-out),
+    opacity var(--fi-motion-duration-base) var(--fi-motion-ease-out);
 }
 
 .stadium-region::after {
@@ -223,7 +224,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   max-width: 100%;
   overflow: hidden;
   font-size: var(--fi-font-20);
-  font-weight: 900;
+  font-weight: var(--fi-weight-black);
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -236,6 +237,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   display: none;
 }
 
+/* decorative:start 票价分区配色（业务数据色，按设计系统颜色例外保留原值） */
 .stadium-region--blue { background: #336fbd; color: #fff; }
 .stadium-region--green { background: #46ab59; color: #fff; }
 .stadium-region--purple { background: #6c369b; color: #fff; }
@@ -244,6 +246,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
 .stadium-region--red { background: #ec3b20; color: #fff; }
 .stadium-region--vip { background: #b90000; color: #fff; }
 .stadium-region--muted { background: #d9dee7; }
+/* decorative:end */
 
 .stadium-price-legend {
   position: absolute;
@@ -266,8 +269,8 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   min-width: 106rpx;
   overflow: hidden;
   border-radius: 7rpx;
-  color: #fff;
-  box-shadow: 0 6rpx 12rpx rgba(18, 25, 20, 0.12);
+  color: var(--fi-primitive-white);
+  box-shadow: var(--fi-shadow-soft);
 }
 
 .stadium-price-legend__ticket::before,
@@ -277,7 +280,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   width: 9rpx;
   height: 9rpx;
   border-radius: 999rpx;
-  background: #f3f2ef;
+  background: var(--fi-color-page);
   content: '';
   transform: translateX(-50%);
 }
@@ -296,20 +299,21 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   height: 100%;
   align-items: center;
   justify-content: center;
-  border-right: 1rpx solid rgba(255, 255, 255, 0.38);
-  font-size: 18rpx;
-  font-weight: 900;
+  border-right: 1rpx solid rgba(var(--fi-primitive-white-rgb), 0.38);
+  font-size: var(--fi-font-18);
+  font-weight: var(--fi-weight-black);
 }
 
 .stadium-price-legend__price {
   flex: 1;
   padding: 0 11rpx;
-  font-size: 18rpx;
-  font-weight: 800;
+  font-size: var(--fi-font-18);
+  font-weight: var(--fi-weight-extrabold);
   text-align: center;
   white-space: nowrap;
 }
 
+/* decorative:start 票价图例配色，与分区一致 */
 .stadium-price-legend__ticket--blue { background: #336fbd; }
 .stadium-price-legend__ticket--green { background: #46ab59; }
 .stadium-price-legend__ticket--purple { background: #6c369b; }
@@ -317,6 +321,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
 .stadium-price-legend__ticket--navy { background: #0f215e; }
 .stadium-price-legend__ticket--red { background: #ec3b20; }
 .stadium-price-legend__ticket--vip { background: #b90000; }
+/* decorative:end */
 
 /* 高亮只改变描边、阴影和层级，保持点击矩形不侵入相邻区域。 */
 .stadium-region--current {
@@ -345,9 +350,9 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
 .stadium-map--review .stadium-region {
   transform: none;
   border-color: transparent;
-  background: #d9dee7;
-  box-shadow: 0 6rpx 14rpx rgba(98, 107, 122, 0.12);
-  color: #6f7683;
+  background: var(--fi-color-divider);
+  box-shadow: var(--fi-shadow-soft);
+  color: var(--fi-color-text-secondary);
 }
 
 .stadium-map--review .stadium-region--review-muted {
@@ -356,19 +361,19 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
 
 .stadium-map--review .stadium-region--review-current,
 .stadium-map--review .stadium-region--review-desired {
-  border-color: rgba(23, 25, 31, 0.34);
-  color: #17191f;
+  border-color: rgba(var(--fi-primitive-ink-rgb), 0.34);
+  color: var(--fi-color-text-strong);
   opacity: 1;
-  box-shadow: 0 14rpx 28rpx rgba(18, 25, 20, 0.28);
+  box-shadow: var(--fi-shadow-card-strong);
 }
 
 .stadium-map--review .stadium-region--review-current {
-  background: #fff1f0;
-  outline: 6rpx solid rgba(226, 59, 46, 0.34);
+  background: var(--fi-color-seat-current-bg);
+  outline: 6rpx solid rgba(var(--fi-primitive-red-rgb), 0.34);
 }
 
 .stadium-map--review .stadium-region--review-desired {
-  background: #eef8f2;
-  outline: 6rpx solid rgba(29, 138, 85, 0.45);
+  background: var(--fi-color-seat-desired-bg);
+  outline: 6rpx solid var(--fi-color-seat-desired);
 }
 </style>

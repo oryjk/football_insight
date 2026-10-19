@@ -1,5 +1,5 @@
 <template>
-  <view class="seat-map-panel">
+  <view class="seat-map-panel" :class="{ 'seat-map-panel--embedded': embedded }">
     <view class="seat-map-panel__head">
       <text class="seat-map-panel__title">座位区域</text>
       <text class="seat-map-panel__hint">点分区可切换</text>
@@ -49,6 +49,8 @@ defineProps<{
   currentKey: string
   desiredKeys: string[]
   hasMyRequest: boolean
+  /** 用于地图弹层内部：去掉自身背景、阴影与横向出血。 */
+  embedded?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -57,11 +59,17 @@ const emit = defineEmits<{
 </script>
 
 <style scoped>
-/* sticky 与全宽布局由页面的 seat-map-section 包裹节点负责。 */
+/* 外部布局由页面的 seat-map-section 包裹节点负责。 */
 .seat-map-panel {
   padding: var(--fi-space-10) var(--fi-space-24) var(--fi-space-6);
-  background: rgba(255, 255, 255, 0.97);
+  background: var(--fi-color-surface-frosted);
   box-shadow: var(--fi-shadow-soft);
+}
+
+.seat-map-panel--embedded {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .seat-map-panel__head {
@@ -74,17 +82,21 @@ const emit = defineEmits<{
 
 .seat-map-panel__title {
   color: var(--fi-color-text-strong);
-  font-size: var(--fi-font-24);
-  font-weight: 500;
+  font-size: var(--fi-font-26);
+  font-weight: var(--fi-weight-bold);
 }
 
 .seat-map-panel__hint {
   color: var(--fi-color-text-muted);
-  font-size: var(--fi-font-20);
+  font-size: var(--fi-font-22);
 }
 
 .stadium-wrap {
-  margin: 0 -24rpx;
+  margin: 0 calc(-1 * var(--fi-space-24));
+}
+
+.seat-map-panel--embedded .stadium-wrap {
+  margin: 0;
 }
 
 .legend {
@@ -110,17 +122,17 @@ const emit = defineEmits<{
 
 .legend__dot {
   display: inline-block;
-  width: 16rpx;
-  height: 16rpx;
-  border-radius: 50%;
+  width: var(--fi-space-16);
+  height: var(--fi-space-16);
+  border-radius: var(--fi-radius-round);
 }
 
 .legend__dot--current {
-  background: #e23b2e;
+  background: var(--fi-color-seat-current);
 }
 
 .legend__dot--desired {
-  background: #1d8a55;
+  background: var(--fi-color-seat-desired);
 }
 
 .legend__dot--hot {

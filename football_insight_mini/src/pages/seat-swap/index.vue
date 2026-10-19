@@ -29,7 +29,7 @@
           @action="goToUserPage"
         />
 
-        <view class="seat-map-section">
+        <view id="seat-swap-map-anchor" class="seat-map-section">
           <SeatSwapRegionPanel
             :mode="mainMapMode"
             :regions="regions"
@@ -71,6 +71,27 @@
       @manage="openManageSheet"
     />
 
+    <SeatSwapMapFab
+      v-if="!loading && !errorMessage"
+      :visible="mapFabVisible"
+      :label="mapFabLabel.text"
+      :clearable="mapFabLabel.clearable"
+      @open="openMapSheet"
+      @clear="clearFilter"
+    />
+
+    <SeatSwapMapSheet
+      v-model:visible="mapSheetVisible"
+      :mode="mainMapMode"
+      :regions="regions"
+      :badges="regionBadgeCounts"
+      :filter-key="browsingFilterKey"
+      :current-key="currentView?.my_request?.current_region_key || ''"
+      :desired-keys="myDesiredKeys"
+      :has-my-request="!!currentView?.my_request"
+      @region-tap="handleSheetMapTap"
+    />
+
     <SeatSwapPublishSheet
       v-model:visible="publishSheetVisible"
       :regions="regions"
@@ -95,8 +116,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
-import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { onHide, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import SeatSwapManageSheet from './components/SeatSwapManageSheet.vue'
 import SeatSwapMatchCard from './components/SeatSwapMatchCard.vue'
@@ -106,6 +127,8 @@ import SeatSwapRegionPanel from './components/SeatSwapRegionPanel.vue'
 import SeatSwapPoolList from './components/SeatSwapPoolList.vue'
 import SeatSwapDock from './components/SeatSwapDock.vue'
 import SeatSwapPublishSheet from './components/SeatSwapPublishSheet.vue'
+import SeatSwapMapFab from './components/SeatSwapMapFab.vue'
+import SeatSwapMapSheet from './components/SeatSwapMapSheet.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
@@ -121,7 +144,7 @@ onShareAppMessage(() => ({
   path: buildSharePath('/pages/seat-swap/index', 'swap'),
 }))
 
-const { navigationPageStyle } = useNavigationLayout()
+const { navigationPageStyle, navigationHeightPx } = useNavigationLayout()
 
 const USE_SEAT_SWAP_MOCK_LARGE_DATA =
   import.meta.env.DEV && String(import.meta.env.VITE_SEAT_SWAP_MOCK_LARGE_DATA || '').trim() === '1'
@@ -136,7 +159,9 @@ const pendingMatchedCancelTargetId = ref('')
 const miniProgramNoticeEnabled = ref(false)
 const cancelReason = ref('')
 
-const anySheetOpen = computed(() => publishSheetVisible.value || manageSheetVisible.value)
+const mapSheetVisible = ref(false)
+// 任一弹层打开：锁页面滚动，并隐藏地图浮窗。
+const anySheetOpen = computed(() => publishSheetVisible.value || manageSheetVisible.value || mapSheetVisible.value)
 const pageLockStyle = computed(() => anySheetOpen.value ? 'overflow: hidden;' : '')
 
 const { loading, errorMessage, currentView, regions, loadPage } = useSeatSwapPage({
@@ -159,6 +184,8 @@ const {
   myRequestSeatLabel,
   myRequestStatusLabel,
   mainMapMode,
+  mapFabLabel,
+  mapFabVisible,
   toggleRegionGroup,
   clearFilter,
 } = browse
@@ -181,12 +208,83 @@ function handleMainMapTap(key: string): void {
   if (outcome.scrollTo) void scrollToSeatSwapRegion(outcome.scrollTo)
 }
 
+const SHEET_CLOSE_MS = 220 // 与 FiBottomSheet 关闭动画一致
+const REGION_HIGHLIGHT_MS = 120
+const SCROLL_MS = 300
+const MAP_VISIBILITY_DEBOUNCE_MS = 150
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function openMapSheet(): void {
+  mapSheetVisible.value = true
+}
+
+// 弹层里点有意向的分区：高亮 → 关闭弹层 → 关闭动画结束后再滚动，串行执行；关闭期间忽略连点。
+let mapTapBusy = false
+async function handleSheetMapTap(key: string): Promise<void> {
+  if (mapTapBusy) return
+  const outcome = browse.applyMapTap(key, true)
+  if (!outcome.closeSheet) return
+  mapTapBusy = true
+  try {
+    await wait(REGION_HIGHLIGHT_MS)
+    mapSheetVisible.value = false
+    await wait(SHEET_CLOSE_MS)
+    if (outcome.scrollTo) await scrollToSeatSwapRegion(outcome.scrollTo)
+  } finally {
+    mapTapBusy = false
+  }
+}
+
+// 地图是否在视口内：每次加载成功后重新挂载 observer（加载中地图节点尚未渲染）。
+const pageInstance = getCurrentInstance()
+let mapObserver: UniNamespace.IntersectionObserver | null = null
+let mapVisibilityTimer: ReturnType<typeof setTimeout> | null = null
+
+function detachMapObserver(): void {
+  mapObserver?.disconnect()
+  mapObserver = null
+  if (mapVisibilityTimer) clearTimeout(mapVisibilityTimer)
+  mapVisibilityTimer = null
+}
+
+function attachMapObserver(): void {
+  detachMapObserver()
+  browse.mapInViewport.value = true
+  if (!pageInstance || !currentView.value?.available) return
+  const observer = uni.createIntersectionObserver(pageInstance.proxy)
+  mapObserver = observer
+  // 扣除被品牌导航遮挡的顶部区域
+  observer.relativeToViewport({ top: -navigationHeightPx.value })
+  observer.observe('#seat-swap-map-anchor', (res) => {
+    const visible = (res.intersectionRatio ?? 0) > 0
+    if (mapVisibilityTimer) clearTimeout(mapVisibilityTimer)
+    mapVisibilityTimer = setTimeout(() => {
+      browse.mapInViewport.value = visible
+    }, MAP_VISIBILITY_DEBOUNCE_MS)
+  })
+}
+
+watch(loading, (isLoading) => {
+  if (!isLoading && !errorMessage.value) {
+    void nextTick(attachMapObserver)
+  } else if (isLoading) {
+    detachMapObserver()
+  }
+}, { flush: 'post' })
+
+onHide(detachMapObserver)
+onUnload(detachMapObserver)
+onBeforeUnmount(detachMapObserver)
+
 async function scrollToSeatSwapRegion(regionKey: string): Promise<void> {
   await new Promise<void>((resolve) => {
     nextTick(() => {
       uni.pageScrollTo({
         selector: `#${buildSeatSwapRegionAnchorId(regionKey)}`,
-        duration: 220,
+        duration: SCROLL_MS,
         success: () => resolve(),
         fail: () => resolve(),
       })
@@ -244,7 +342,8 @@ onShow(() => {
 </script>
 
 <style scoped>
-.seat-map-section { position: sticky; top: var(--fi-brand-nav-height); z-index: 5; margin: 0 calc(-1 * var(--fi-space-24)); }
+/* 地图不再吸顶；划出视口后由浮窗唤起地图弹层。横向出血由页面包裹节点负责。 */
+.seat-map-section { margin: 0 calc(-1 * var(--fi-space-24)); }
 .page-root {
   position: relative;
   min-height: 100vh;

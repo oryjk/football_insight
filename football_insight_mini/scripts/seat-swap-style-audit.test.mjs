@@ -17,6 +17,9 @@ const AUDITED_FILES = [
   'components/SeatSwapCandidateCard.vue',
   'components/SeatSwapDock.vue',
   'components/SeatSwapMapFab.vue',
+  'components/SeatSwapRegionPanel.vue',
+  'components/StadiumMap.vue',
+  'components/SeatSwapMapSheet.vue',
 ]
 
 function listVueFiles(dir) {
