@@ -2,6 +2,7 @@
   <view class="stadium-map" :class="{ 'stadium-map--review': mode === 'review' }">
     <view v-if="hint" class="stadium-map__hint">{{ hint }}</view>
     <view class="stadium-map__field">
+      <view v-if="mode === 'review'" class="stadium-pitch" :style="pitchStyle" aria-hidden="true" />
       <!-- review 模式只突出当前/目标座位，彩色价格图例会喧宾夺主，不显示。 -->
       <view v-if="mode !== 'review'" class="stadium-price-legend" aria-hidden="true">
         <view
@@ -33,6 +34,7 @@ import { computed } from 'vue'
 import type { TicketWatchRegion } from '../../../types/ticketWatch'
 import {
   canInteractSeatSwapMap,
+  resolveSeatSwapPitchBox,
   shouldDimSeatSwapRegion,
 } from '../helpers'
 import {
@@ -75,6 +77,8 @@ const emit = defineEmits<{
 }>()
 
 const hasStagedDesiredKeys = computed(() => props.stagedDesiredKeys.length > 0)
+const pitchBox = resolveSeatSwapPitchBox()
+const pitchStyle = `left:${pitchBox.left}%;top:${pitchBox.top}%;width:${pitchBox.width}%;height:${pitchBox.height}%;`
 const priceLegendItems = [
   { grade: 'VIP', price: '1288元', colorGroup: 'vip' },
   { grade: 'S类', price: '400元', colorGroup: 'red' },
@@ -348,11 +352,15 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   z-index: 3;
 }
 
+/*
+ * review 模式只回答"在哪"：其余分区极浅、无编号、无阴影，只保留球场轮廓；
+ * 当前/目标座位用实心色块 + 白字并略放大，整张图只有它们带文字。
+ */
 .stadium-map--review .stadium-region {
   transform: none;
   border-color: transparent;
-  background: var(--fi-color-divider);
-  box-shadow: var(--fi-shadow-soft);
+  background: var(--fi-color-divider-soft);
+  box-shadow: none;
   color: var(--fi-color-text-secondary);
 }
 
@@ -360,21 +368,57 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   opacity: 1;
 }
 
+.stadium-map--review .stadium-region--review-muted .stadium-region__name {
+  opacity: 0;
+}
+
 .stadium-map--review .stadium-region--review-current,
 .stadium-map--review .stadium-region--review-desired {
-  border-color: rgba(var(--fi-primitive-ink-rgb), 0.34);
-  color: var(--fi-color-text-strong);
+  z-index: 5;
+  color: var(--fi-primitive-white);
   opacity: 1;
   box-shadow: var(--fi-shadow-card-strong);
+  transform: scale(1.12);
 }
 
 .stadium-map--review .stadium-region--review-current {
-  background: var(--fi-color-seat-current-bg);
-  outline: 6rpx solid var(--fi-color-seat-current);
+  z-index: 6;
+  background: var(--fi-color-seat-current);
 }
 
 .stadium-map--review .stadium-region--review-desired {
-  background: var(--fi-color-seat-desired-bg);
-  outline: 6rpx solid var(--fi-color-seat-desired);
+  background: var(--fi-color-seat-desired);
+}
+
+/* 草坪：浅绿底 + 中线 + 中圈，帮助判断看台朝向与远近。 */
+.stadium-pitch {
+  position: absolute;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: var(--fi-radius-sm);
+  background: var(--fi-color-pitch);
+  pointer-events: none;
+}
+
+.stadium-pitch::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--fi-border-width);
+  background: var(--fi-color-pitch-line);
+}
+
+.stadium-pitch::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--fi-space-64);
+  height: var(--fi-space-64);
+  border: var(--fi-border-width) solid var(--fi-color-pitch-line);
+  border-radius: var(--fi-radius-round);
+  transform: translate(-50%, -50%);
 }
 </style>

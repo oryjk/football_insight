@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 560" width="750" height="560">
+  <rect class="pitch" x="162" y="136.64" width="426" height="232.96" rx="10" fill="#e3f1e7" />
   <g fill="#dde1e8">
     <rect x="610.5" y="346.64" width="54" height="36.96" rx="6" />
     <rect x="610.5" y="308.93" width="54" height="36.96" rx="6" />

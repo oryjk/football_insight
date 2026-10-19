@@ -15,6 +15,8 @@ import {
   resolveDefaultExpandedSeatSwapRegionKeys,
   shouldDimSeatSwapRegion,
   SEAT_SWAP_POOL_ANCHOR_ID,
+  buildSeatSwapSwapSummary,
+  resolveSeatSwapPitchBox,
   buildSeatSwapSeatPriceRows,
   formatSeatSwapRegionPrice,
   SEAT_SWAP_STADIUM_REGION_NAMES,
@@ -705,7 +707,7 @@ describe('seat swap seat thumbnail', () => {
   test('builds a text-free base svg with one block per region', () => {
     const svg = buildSeatSwapThumbSvg()
     expect(svg.startsWith('<svg')).toBe(true)
-    expect((svg.match(/<rect /g) || []).length).toBe(71)
+    expect((svg.match(/<rect x=/g) || []).length).toBe(71)
     expect(svg.includes('<text')).toBe(false)
   })
 })
@@ -749,5 +751,68 @@ describe('seat swap seat sheet price rows', () => {
       { kind: 'desired', label: '109 1排 1号', price: '220元' },
       { kind: 'desired', label: '999', price: '' },
     ])
+  })
+})
+
+describe('seat swap pitch box', () => {
+  test('sits inside the 100-level ring without overlapping any inner region', () => {
+    const pitch = resolveSeatSwapPitchBox()
+    expect(pitch.width > 20 && pitch.height > 20).toBe(true)
+    for (let n = 101; n <= 132; n += 1) {
+      const r = resolveSeatSwapRegionLayout(String(n))
+      if (!r) continue
+      const overlaps = r.left < pitch.left + pitch.width && r.left + r.width > pitch.left
+        && r.top < pitch.top + pitch.height && r.top + r.height > pitch.top
+      expect(`${n}:${overlaps}`).toBe(`${n}:false`)
+    }
+  })
+
+  test('the thumbnail base svg draws the pitch too', () => {
+    expect(buildSeatSwapThumbSvg().includes('class="pitch"')).toBe(true)
+  })
+})
+
+describe('seat swap swap summary', () => {
+  const regions = [
+    { block_key: '104', block_name: '104', price: '180.00' },
+    { block_key: '503', block_name: '503', price: '100.00' },
+    { block_key: '110', block_name: '110', price: '220.00' },
+    { block_key: '108', block_name: '108', price: '180.00' },
+  ]
+  const request = {
+    current_region_key: '104',
+    current_region_name: '104',
+    current_row: '21',
+    current_seat_no: '40',
+    desired_seats: [
+      { region_key: '503', region_name: '503', desired_row: null, desired_seat_no: null },
+      { region_key: '110', region_name: '110', desired_row: '1', desired_seat_no: '1' },
+      { region_key: '108', region_name: '108', desired_row: null, desired_seat_no: null },
+      { region_key: '999', region_name: '999', desired_row: null, desired_seat_no: null },
+    ],
+  }
+
+  test('splits the current seat into region and row/seat with its price', () => {
+    expect(buildSeatSwapSwapSummary(request, regions).current).toEqual({
+      region: '104',
+      seat: '21排 40号',
+      price: '180元',
+    })
+  })
+
+  test('lists each desired region with price and the difference against the current seat', () => {
+    expect(buildSeatSwapSwapSummary(request, regions).desired).toEqual([
+      { key: '503', region: '503', seat: '', price: '100元', delta: '省80元', deltaKind: 'cheaper' },
+      { key: '110', region: '110', seat: '1排 1号', price: '220元', delta: '贵40元', deltaKind: 'pricier' },
+      { key: '108', region: '108', seat: '', price: '180元', delta: '同价', deltaKind: 'same' },
+      { key: '999', region: '999', seat: '', price: '', delta: '', deltaKind: 'unknown' },
+    ])
+  })
+
+  test('omits the difference when the current price is unknown', () => {
+    const summary = buildSeatSwapSwapSummary({ ...request, current_region_key: 'x', current_region_name: 'x' }, regions)
+    expect(summary.current.price).toBe('')
+    expect(summary.desired[0].delta).toBe('')
+    expect(summary.desired[0].deltaKind).toBe('unknown')
   })
 })

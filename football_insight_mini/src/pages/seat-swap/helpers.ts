@@ -363,6 +363,40 @@ export function resolveSeatSwapThumbHighlights(currentKey: string, desiredKeys: 
   return highlights
 }
 
+export interface SeatSwapPitchBox {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+/**
+ * 球场草坪位置（百分比，与分区同一坐标系）：取 100 层内圈四边分区围出的空白，再向内留 3% 边距。
+ * 大图与缩略图共用，帮助判断看台朝向与远近。
+ */
+export function resolveSeatSwapPitchBox(): SeatSwapPitchBox {
+  let left = 0
+  let right = 100
+  let top = 0
+  let bottom = 100
+  for (let n = 101; n <= 132; n += 1) {
+    const r = resolveSeatSwapRegionLayout(String(n))
+    if (!r) continue
+    if (r.side === 'left') left = Math.max(left, r.left + r.width)
+    if (r.side === 'right') right = Math.min(right, r.left)
+    if (r.side === 'top') top = Math.max(top, r.top + r.height)
+    if (r.side === 'bottom') bottom = Math.min(bottom, r.top)
+  }
+  const pad = 3
+  const round = (n: number) => Math.round(n * 100) / 100
+  return {
+    left: round(left + pad),
+    top: round(top + pad),
+    width: round(right - left - pad * 2),
+    height: round(bottom - top - pad * 2),
+  }
+}
+
 /** 缩略图底图的画布比例与大图球场区域一致（750×560rpx）。 */
 export const SEAT_SWAP_THUMB_VIEWBOX = { width: 750, height: 560 }
 
@@ -382,8 +416,11 @@ export function buildSeatSwapThumbSvg(): string {
     const h = round((layout.height / 100) * height)
     return [`  <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" />`]
   })
+  const pitch = resolveSeatSwapPitchBox()
+  const pitchRect = `  <rect class="pitch" x="${round((pitch.left / 100) * width)}" y="${round((pitch.top / 100) * height)}" width="${round((pitch.width / 100) * width)}" height="${round((pitch.height / 100) * height)}" rx="10" fill="#e3f1e7" />`
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">`,
+    pitchRect,
     '  <g fill="#dde1e8">',
     ...rects.map((r) => `  ${r}`),
     '  </g>',
@@ -440,4 +477,69 @@ export function buildSeatSwapSeatPriceRows(
       price: formatSeatSwapRegionPrice(regions, seat.region_key),
     })),
   ]
+}
+
+export type SeatSwapPriceDeltaKind = 'cheaper' | 'pricier' | 'same' | 'unknown'
+
+export interface SeatSwapSwapSummary {
+  current: { region: string; seat: string; price: string }
+  desired: Array<{
+    key: string
+    region: string
+    seat: string
+    price: string
+    delta: string
+    deltaKind: SeatSwapPriceDeltaKind
+  }>
+}
+
+function parseSeatSwapRegionPrice(regions: SeatSwapPricedRegion[], key: string): number | null {
+  const region = regions.find((item) => (item.block_key || item.block_name) === key)
+  const value = Number.parseFloat(region?.price ?? '')
+  return Number.isFinite(value) ? value : null
+}
+
+function formatSeatSwapRowSeat(row?: string | null, seatNo?: string | null): string {
+  return [row?.trim() ? `${row.trim()}排` : '', seatNo?.trim() ? `${seatNo.trim()}号` : ''].filter(Boolean).join(' ')
+}
+
+/** 座位大图下方"现在 → 想换到"：当前座位票价，以及每个目标分区票价与差价（省/贵/同价）。 */
+export function buildSeatSwapSwapSummary(
+  request: Parameters<typeof buildSeatSwapSeatPriceRows>[0],
+  regions: SeatSwapPricedRegion[],
+): SeatSwapSwapSummary {
+  const currentPrice = parseSeatSwapRegionPrice(regions, request.current_region_key)
+  return {
+    current: {
+      region: request.current_region_name,
+      seat: formatSeatSwapRowSeat(request.current_row, request.current_seat_no),
+      price: formatSeatSwapRegionPrice(regions, request.current_region_key),
+    },
+    desired: request.desired_seats.map((seat) => {
+      const price = parseSeatSwapRegionPrice(regions, seat.region_key)
+      let delta = ''
+      let deltaKind: SeatSwapPriceDeltaKind = 'unknown'
+      if (price !== null && currentPrice !== null) {
+        const diff = Number((price - currentPrice).toFixed(2))
+        if (diff < 0) {
+          delta = `省${-diff}元`
+          deltaKind = 'cheaper'
+        } else if (diff > 0) {
+          delta = `贵${diff}元`
+          deltaKind = 'pricier'
+        } else {
+          delta = '同价'
+          deltaKind = 'same'
+        }
+      }
+      return {
+        key: seat.region_key,
+        region: seat.region_name,
+        seat: formatSeatSwapRowSeat(seat.desired_row, seat.desired_seat_no),
+        price: formatSeatSwapRegionPrice(regions, seat.region_key),
+        delta,
+        deltaKind,
+      }
+    }),
+  }
 }
