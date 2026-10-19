@@ -409,45 +409,26 @@ onShow(() => {
   background: var(--fi-color-page-soft);
 }
 
+/* 背景与首页同一手法：顶部 600rpx 球场图随页面滚动，渐变从透明过渡到页面底色，不再有硬边。 */
 .page-bg-img {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* 背景遮罩（spec 第 7 节）：照片区 32vh 为半透明白，以下为页面底色，纯色替代原渐变。 */
-.page-bg-fade {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.page-bg-fade::before,
-.page-bg-fade::after {
-  content: '';
   position: absolute;
-  left: 0;
-  right: 0;
-}
-
-.page-bg-fade::before {
   top: 0;
-  height: 32vh;
-  background: rgba(var(--fi-primitive-white-rgb), 0.5);
+  left: 0;
+  width: 100%;
+  height: var(--fi-space-600);
+  pointer-events: none;
+  z-index: 0;
 }
 
-.page-bg-fade::after {
-  top: 32vh;
-  bottom: 0;
-  background: var(--fi-color-page-soft);
+.page-bg-fade {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--fi-space-600);
+  background: var(--fi-color-page-backdrop-fade);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .page {
