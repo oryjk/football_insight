@@ -10,62 +10,44 @@
       <text>移出这个位置</text>
     </view>
 
-    <view v-for="group in groups" :key="group.key" class="group">
-      <view
-        v-if="group.key === 'former'"
-        class="group__head group__head--toggle"
-        hover-class="group__head--pressed"
-        @tap="formerOpen = !formerOpen"
-      >
-        <text class="group__title">{{ group.title }}</text>
-        <text class="group__count">{{ group.players.length }} 人</text>
-        <image
-          class="group__chevron"
-          :class="{ 'group__chevron--open': formerOpen }"
-          src="/static/seat-swap/chevron-down.svg"
-          mode="aspectFit"
-        />
-      </view>
-      <view v-else class="group__head">
-        <text class="group__title">{{ group.title }}</text>
-        <text class="group__count">{{ group.players.length }} 人</text>
-      </view>
+    <!-- 现役 / 前队员用胶囊切换（共享 FiSegmented），不再把前队员折叠在列表最下面 -->
+    <view v-if="tabs.length" class="tabs">
+      <FiSegmented :items="tabs" :model-value="activeGroup?.key ?? 'active'" aria-label="球员分组" @update:model-value="tab = $event" />
+    </view>
 
-      <template v-if="group.key === 'active' || formerOpen">
-        <view
-          v-for="item in group.players"
-          :key="item.player_id"
-          class="row"
-          :class="{ 'row--on-pitch': item.onPitch }"
-          hover-class="row--pressed"
-          @tap="emit('pick', item.player_id)"
-        >
-          <image v-if="item.avatar_url" class="row__avatar" :src="item.avatar_url" mode="aspectFill" />
-          <view v-else class="row__avatar row__avatar--fallback">
-            <text>{{ item.shirt_number ?? item.name.slice(0, 1) }}</text>
-          </view>
-          <view class="row__body">
-            <text class="row__name">{{ item.name }}</text>
-            <text class="row__meta">
-              {{ item.shirt_number !== null ? `${item.shirt_number} 号` : '无号码' }}
-              <template v-if="item.position"> · {{ POSITION_NAMES[item.position] }}</template>
-              <template v-if="item.former"> · {{ item.last_season }} 赛季在队</template>
-            </text>
-          </view>
-          <text v-if="item.onPitch" class="row__tag">已上场</text>
-        </view>
-      </template>
+    <view
+      v-for="item in activeGroup?.players ?? []"
+      :key="item.player_id"
+      class="row"
+      :class="{ 'row--on-pitch': item.onPitch }"
+      hover-class="row--pressed"
+      @tap="emit('pick', item.player_id)"
+    >
+      <image v-if="item.avatar_url" class="row__avatar" :src="item.avatar_url" mode="aspectFill" />
+      <view v-else class="row__avatar row__avatar--fallback">
+        <text>{{ item.shirt_number ?? item.name.slice(0, 1) }}</text>
+      </view>
+      <view class="row__body">
+        <text class="row__name">{{ item.name }}</text>
+        <text class="row__meta">
+          {{ item.shirt_number !== null ? `${item.shirt_number} 号` : '无号码' }}
+          <template v-if="item.position"> · {{ POSITION_NAMES[item.position] }}</template>
+          <template v-if="item.former"> · {{ item.last_season }} 赛季在队</template>
+        </text>
+      </view>
+      <text v-if="item.onPitch" class="row__tag">已上场</text>
     </view>
   </FiBottomSheet>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import FiBottomSheet from '../../../components/FiBottomSheet.vue'
+import FiSegmented from '../../../components/FiSegmented.vue'
 import type { LineupPosition } from '../../../types/lineup'
-import type { SheetGroup } from '../lineupViewModel'
+import { buildSheetTabs, resolveSheetTab, type SheetGroup } from '../lineupViewModel'
 
-defineProps<{
+const props = defineProps<{
   visible: boolean
   slotLabel: string
   occupied: boolean
@@ -79,8 +61,13 @@ const emit = defineEmits<{
 }>()
 
 const POSITION_NAMES: Record<LineupPosition, string> = { GK: '门将', DF: '后卫', MF: '中场', FW: '前锋' }
-// 前队员默认折叠，点标题展开。
-const formerOpen = ref(false)
+// 当前选中的分组；每次重新打开弹层都回到"现役"，避免停在上次的前队员页造成困惑。
+const tab = ref('active')
+const tabs = computed(() => buildSheetTabs(props.groups))
+const activeGroup = computed(() => resolveSheetTab(props.groups, tab.value))
+watch(() => props.visible, (open) => {
+  if (open) tab.value = 'active'
+})
 </script>
 
 <style scoped>
@@ -102,41 +89,8 @@ const formerOpen = ref(false)
   opacity: var(--fi-primitive-opacity-pressed);
 }
 
-.group__head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--fi-space-12);
-  padding: var(--fi-space-18) var(--fi-space-4) var(--fi-space-10);
-}
-
-.group__head--toggle {
-  align-items: center;
-}
-
-.group__head--pressed {
-  opacity: var(--fi-primitive-opacity-pressed);
-}
-
-.group__title {
-  color: var(--fi-color-text-strong);
-  font-size: var(--fi-font-28);
-  font-weight: var(--fi-weight-extrabold);
-}
-
-.group__count {
-  flex: 1;
-  color: var(--fi-color-text-muted);
-  font-size: var(--fi-font-22);
-}
-
-.group__chevron {
-  width: var(--fi-space-32);
-  height: var(--fi-space-32);
-  transition: transform var(--fi-motion-duration-base) var(--fi-motion-ease-out);
-}
-
-.group__chevron--open {
-  transform: rotate(180deg);
+.tabs {
+  margin-bottom: var(--fi-space-12);
 }
 
 .row {
@@ -202,11 +156,5 @@ const formerOpen = ref(false)
   color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-20);
   font-weight: var(--fi-weight-bold);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .group__chevron {
-    transition: none;
-  }
 }
 </style>

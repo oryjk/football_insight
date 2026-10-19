@@ -107,3 +107,14 @@ export function positionIndex(squad: SquadResponse | null): (playerId: number) =
   for (const player of [...(squad?.former ?? []), ...(squad?.active ?? [])]) map.set(player.player_id, player.position)
   return (playerId) => map.get(playerId) ?? null
 }
+
+/** 选人弹层顶部的胶囊：每组一个，带人数；只有一组时不需要切换。 */
+export function buildSheetTabs(groups: SheetGroup[]): Array<{ key: string; label: string }> {
+  if (groups.length < 2) return []
+  return groups.map((group) => ({ key: group.key, label: `${group.title} ${group.players.length}` }))
+}
+
+/** 当前应显示的分组：选中的那组存在就用它，否则回到现役（没有前队员时不会停在不存在的那一页）。 */
+export function resolveSheetTab(groups: SheetGroup[], selected: string): SheetGroup | null {
+  return groups.find((group) => group.key === selected) ?? groups.find((group) => group.key === 'active') ?? groups[0] ?? null
+}

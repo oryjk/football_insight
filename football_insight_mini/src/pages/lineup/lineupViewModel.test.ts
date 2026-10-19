@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { SquadPlayer, SquadResponse } from '../../types/lineup'
 import { assignPlayer, emptyLineup } from './helpers'
-import { buildPitchPlayers, buildSheetGroups, positionIndex } from './lineupViewModel'
+import { buildPitchPlayers, buildSheetGroups, buildSheetTabs, positionIndex, resolveSheetTab } from './lineupViewModel'
 
 function player(id: number, position: SquadPlayer['position'], extra: Partial<SquadPlayer> = {}): SquadPlayer {
   return { player_id: id, name: `P${id}`, shirt_number: id, position, avatar_url: null, last_season: 2026, ...extra }
@@ -88,5 +88,32 @@ describe('positionIndex', () => {
     expect(of(21)).toBe('FW')
     expect(of(999)).toBeNull()
     expect(positionIndex(null)(1)).toBeNull()
+  })
+})
+
+describe('sheet tabs (现役 / 前队员)', () => {
+  const groups = buildSheetGroups(squad, emptyLineup('4-3-3'), 'DF')
+
+  test('builds one tab per group with its head count', () => {
+    expect(buildSheetTabs(groups)).toEqual([
+      { key: 'active', label: '现役 4' },
+      { key: 'former', label: '前队员 2' },
+    ])
+  })
+
+  test('has no tab switcher when there is only one group', () => {
+    const onlyActive = buildSheetGroups({ ...squad, former: [] }, emptyLineup('4-3-3'), 'DF')
+    expect(buildSheetTabs(onlyActive)).toEqual([])
+  })
+
+  test('resolves the visible group: the chosen tab when it exists, otherwise the active group', () => {
+    expect(resolveSheetTab(groups, 'former')?.key).toBe('former')
+    expect(resolveSheetTab(groups, 'active')?.key).toBe('active')
+    const onlyActive = buildSheetGroups({ ...squad, former: [] }, emptyLineup('4-3-3'), 'DF')
+    expect(resolveSheetTab(onlyActive, 'former')?.key).toBe('active') // 没有前队员时不会停在不存在的那一页
+  })
+
+  test('no groups at all resolves to nothing', () => {
+    expect(resolveSheetTab([], 'active')).toBeNull()
   })
 })
