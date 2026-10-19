@@ -2,9 +2,9 @@
   <FiPanel clip>
     <!-- 主队队徽斜放作背景水印：与「今日话题」的蓉城水印同一手法（右侧外溢、旋转 12°、低透明度）。 -->
     <image
-      v-if="favoriteTeam?.avatar_storage_url"
+      v-if="favoriteTeamCrest"
       class="support-home-panel__crest"
-      :src="favoriteTeam.avatar_storage_url"
+      :src="favoriteTeamCrest"
       mode="aspectFit"
       aria-hidden="true"
     />
@@ -64,7 +64,7 @@
     <template v-else-if="nextMatch">
       <view class="support-home-panel__favorite">
         <view class="support-home-panel__favorite-avatar-shell">
-          <image :src="favoriteTeam.avatar_storage_url || ''" mode="aspectFit" class="support-home-panel__favorite-avatar" />
+          <image :src="favoriteTeamCrest" mode="aspectFit" class="support-home-panel__favorite-avatar" />
         </view>
         <view class="support-home-panel__favorite-body">
           <text class="support-home-panel__favorite-name">{{ favoriteTeam.team_name }}</text>
@@ -134,6 +134,7 @@
 <script setup lang="ts">
 import FiPanel from '../../../components/FiPanel.vue'
 import { computed } from 'vue'
+import { CHENGDU_RONGCHENG_CREST_IMAGE_URL } from '../../../config/assets'
 import FiLoading from '../../../components/FiLoading.vue'
 import HomeSupportVoteButton from './HomeSupportVoteButton.vue'
 import type { SupportProfile, SupportTeam } from '../../../types/support'
@@ -165,6 +166,10 @@ const emit = defineEmits<{
 }>()
 
 const favoriteTeam = computed(() => props.profile?.favorite_team ?? null)
+// 列表头像仅 85px，放大水印使用同款高清队徽，避免拉伸后模糊。
+const favoriteTeamCrest = computed(() => favoriteTeam.value?.team_id === 77680
+  ? CHENGDU_RONGCHENG_CREST_IMAGE_URL
+  : favoriteTeam.value?.avatar_storage_url || '')
 const nextMatch = computed(() => props.profile?.next_match ?? null)
 const daysRemaining = computed(() => props.hasAuthToken && favoriteTeam.value && !props.errorMessage
   ? resolveHomeSupportMatchDaysRemaining(nextMatch.value, props.now) : null)
