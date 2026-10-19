@@ -23,4 +23,5 @@ pub mod system_config;
 pub mod team_board;
 pub mod ticket_watch;
 
+pub mod lineup;
 pub mod match_outlook;

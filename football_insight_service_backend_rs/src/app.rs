@@ -22,6 +22,7 @@ use crate::{
 pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
     let match_outlook_routes =
         crate::match_outlook::bootstrap::build_match_outlook_routes(pool.clone());
+    let lineup_routes = crate::lineup::bootstrap::build_lineup_routes(pool.clone());
     let insight = build_insight(pool.clone());
     let admin_routes = build_admin_routes(pool.clone(), config);
     let health_routes = build_health_routes(pool.clone());
@@ -107,6 +108,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         .route("/", get(|| async { "football insight service" }))
         .merge(health_routes)
         .merge(match_outlook_routes)
+        .merge(lineup_routes)
         .merge(daily_topics_routes)
         .merge(mini_review_routes)
         .merge(admin_routes)
