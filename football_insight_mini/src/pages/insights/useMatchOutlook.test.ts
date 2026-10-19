@@ -304,3 +304,63 @@ test('a team chosen before metadata arrives is honored, including clubs without 
   expect(loader.teams.value.length).toBe(2)
   loader.dispose()
 })
+
+// 回归证据：outlookLoading 只在 reset() 里被强制清零，而 reset() 由 underReview/authenticated/revision 的变化触发。
+// 页面每次 onShow 把 outlookReviewReady 打回 false 再置 true，正是让 underReview 抖动一次、从而 reset() 一次的原因；
+// 若把它改成"保持 true"，一次被打断的加载就没有任何路径把 forecastLoading 清掉。
+test('onShow 让 underReview 抖动一次：在途的预测加载被 reset 清掉，outlookLoading 不会一直为 true', async () => {
+  const authenticated = ref(true),
+    review = ref(false),
+    revision = ref(0),
+    selectedTeamId = ref<number | null>(null)
+  let release: () => void = () => {}
+  const loader = createOutlookLoader({
+    authenticated: () => authenticated.value,
+    underReview: () => review.value,
+    revision,
+    selectedTeamId,
+    metadata: async () => metadata as any,
+    outlook: () => new Promise((resolve) => { release = () => resolve({ status: 'unavailable', outlook: null } as any) }),
+  })
+  void loader.load()
+  await flush()
+  await flush()
+  expect(loader.loading.value).toBe(true) // 预测请求在途
+
+  // 页面 onShow：outlookReviewReady false → true，即 underReview 抖动一次
+  review.value = true
+  review.value = false
+  await flush()
+  await flush()
+  // reset() 已清掉旧的加载态；随后会重新加载，新的在途请求是新的一轮而不是被卡住的旧状态
+  release()
+  await flush()
+  await flush()
+  expect(loader.loading.value).toBe(false)
+  loader.dispose()
+})
+
+// 对照：underReview 全程不变（4131b32 的行为）时，没有任何 reset() 会清理"被打断的加载"。
+// 这里让预测请求永远不返回（网络在 1–3 秒的慢链路上被打断的极端情形），确认 outlookLoading 由此一直为 true。
+test('对照：underReview 不抖动且预测请求一直不返回时，outlookLoading 一直为 true（没有任何路径清掉它）', async () => {
+  const authenticated = ref(true),
+    review = ref(false),
+    revision = ref(0),
+    selectedTeamId = ref<number | null>(null)
+  const loader = createOutlookLoader({
+    authenticated: () => authenticated.value,
+    underReview: () => review.value,
+    revision,
+    selectedTeamId,
+    metadata: async () => metadata as any,
+    outlook: () => new Promise(() => {}), // 永不返回
+  })
+  void loader.load()
+  await flush()
+  await flush()
+  expect(loader.loading.value).toBe(true)
+  // 模拟回到页面却不重置 underReview：什么都不触发
+  await flush()
+  expect(loader.loading.value).toBe(true)
+  loader.dispose()
+})

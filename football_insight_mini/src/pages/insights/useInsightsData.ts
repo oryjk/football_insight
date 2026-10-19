@@ -84,10 +84,7 @@ export function useInsightsData(deps: InsightsDataDeps): InsightsData {
 
   async function loadUser(): Promise<boolean> {
     const requestRevision = session.revision.value
-    // 只有"还不知道是谁"（首次进入、没有当前用户）才显示加载态。已有用户时（如从战术板等子页返回）
-    // 静默确认会话：先置 true 再置回 false 会让整页骨架屏闪一下，把已经显示的洞察换掉。
-    const showLoading = session.currentUser.value === null
-    if (showLoading) userLoading.value = true
+    userLoading.value = true
 
     try {
       await session.ensureSessionReady()
@@ -96,7 +93,7 @@ export function useInsightsData(deps: InsightsDataDeps): InsightsData {
       // 退出/替代后迟到的 ensure 回调（superseded）也走这里，不再读/发布任何状态。
     } finally {
       // 旧 revision 的 finally 不清掉新会话的确认中状态。
-      if (showLoading && session.revision.value === requestRevision) {
+      if (session.revision.value === requestRevision) {
         userLoading.value = false
       }
     }

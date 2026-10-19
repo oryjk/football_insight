@@ -57,13 +57,3 @@ export async function runInsightsShow(deps: {
   }
   await deps.loadInsights()
 }
-
-/**
- * 页面每次 onShow 时赛前倾向区域（球队胶囊、倾向卡片）的就绪状态：
- * 首次进入还不知道审核状态，先隐藏；之后回到页面（如从战术板返回）审核状态已确认过且不在审核，
- * 保持显示、后台更新——无条件置 false 会让这些内容消失再出现，页面闪一下。
- * 审核优先：已知处于审核中时仍先隐藏，不为防闪烁冒险暴露审核期内容。
- */
-export function resolveOutlookReadyOnShow(input: { alreadyConfirmed: boolean; underReview: boolean }): boolean {
-  return input.alreadyConfirmed && !input.underReview
-}

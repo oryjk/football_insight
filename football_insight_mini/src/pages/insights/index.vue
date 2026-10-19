@@ -113,7 +113,7 @@ import {
   buildPlayerContributionRows,
 } from './helpers'
 import { buildLineupPageUrl } from '../../utils/lineupLinks'
-import { createInsightsSessionSync, resolveOutlookReadyOnShow, runInsightsShow } from './sessionEffects'
+import { createInsightsSessionSync, runInsightsShow } from './sessionEffects'
 import { useInsightsData } from './useInsightsData'
 
 const { navigationPageStyle } = useNavigationLayout()
@@ -305,11 +305,7 @@ function goToTeamBoard(): void {
 }
 
 onShow(async () => {
-  // 首次进入先隐藏，等审核状态确认；回到页面（如从战术板返回）保持显示，避免内容消失再出现。
-  outlookReviewReady.value = resolveOutlookReadyOnShow({
-    alreadyConfirmed: outlookReviewReady.value,
-    underReview: systemConfigUnderReview.value,
-  })
+  outlookReviewReady.value = false
   reportPageActivity('insights')
   beginPaywallVisit()
   reportTicketWatchEntryImpression()
