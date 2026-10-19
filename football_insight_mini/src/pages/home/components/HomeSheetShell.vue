@@ -2,7 +2,7 @@
   <view class="sheet-mask" :class="{ 'sheet-mask--animated': animated }" @tap="emit('close')">
     <view class="sheet-card" :class="{ 'sheet-card--animated': animated }" @tap.stop>
       <view class="section-heading">
-        <view>
+        <view class="section-heading__copy">
           <text v-if="kicker" class="section-kicker">{{ kicker }}</text>
           <slot name="title">
             <text v-if="title" class="section-title">{{ title }}</text>
@@ -78,7 +78,7 @@ const emit = defineEmits<{
   gap: 12rpx;
 }
 
-.section-heading > view {
+.section-heading__copy {
   display: grid;
   gap: 8rpx;
   min-width: 0;

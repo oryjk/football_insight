@@ -4,7 +4,7 @@
       <!-- mode=guest：未登录时的模糊预览 -->
       <view v-if="mode === 'guest'" class="insights-locked__preview">
         <view class="insights-locked__chips">
-          <text v-for="name in previewTeams" :key="name">{{ name }}</text>
+          <text v-for="name in previewTeams" :key="name" class="insights-locked__chip">{{ name }}</text>
         </view>
 
         <view class="insights-locked__summary">
@@ -24,8 +24,8 @@
           <view v-for="section in previewSections" :key="section.title" class="insights-locked__section">
             <text class="insights-locked__section-title">{{ section.title }}</text>
             <view v-for="row in section.rows" :key="row.name" class="insights-locked__row">
-              <text>{{ row.name }}</text>
-              <view><view :style="{ width: row.width }" /></view>
+              <text class="insights-locked__row-label">{{ row.name }}</text>
+              <view class="insights-locked__track"><view class="insights-locked__fill" :style="{ width: row.width }" /></view>
             </view>
           </view>
         </view>
@@ -108,7 +108,7 @@ const previewSections = computed(() => [
   gap: var(--fi-space-12);
 }
 
-.insights-locked__chips text {
+.insights-locked__chip {
   padding: var(--fi-space-14) var(--fi-space-22);
   border-radius: var(--fi-radius-round);
   background: var(--fi-color-page);
@@ -166,19 +166,19 @@ const previewSections = computed(() => [
   align-items: center;
 }
 
-.insights-locked__row text {
+.insights-locked__row-label {
   color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-22);
 }
 
-.insights-locked__row > view {
+.insights-locked__track {
   height: var(--fi-space-14);
   border-radius: var(--fi-radius-round);
   background: var(--fi-color-insights-track);
   overflow: hidden;
 }
 
-.insights-locked__row > view > view {
+.insights-locked__fill {
   height: 100%;
   border-radius: inherit;
   background: var(--fi-color-text-primary);

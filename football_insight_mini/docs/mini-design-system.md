@@ -54,6 +54,8 @@ component（--fi-component-*）   组件级复合契约（卡片、kicker/标题
 2. flex 行容器里子组件宿主节点收缩为内容宽，子组件内部 `width: 100%` 撑不满。由 flex 容器侧解决（`flex-direction: column` + `align-items: stretch`）。
 3. 通用原则：**H5 显示正常不代表小程序正常**，跨组件宽度/布局必须在 mp-weixin 端实际验证。
 
+组件样式中的选择器使用 class，避免标签、ID 和属性选择器触发微信 WXSS 警告。例如把 `.row > view` 改为子节点的专用 class，把 `[disabled]` 改为随状态更新的 class；原生 `disabled` 属性仍保留以约束交互。删除或更换图片后若开发工具仍请求旧资源，应重启小程序编译器并清除编译缓存，核对新生成的 `common/assets.js` 与打包文件一致。
+
 ## 组件契约
 
 - 跨页面通用组件命名带 `Fi` 前缀（`FiBottomSheet`、`FiBrandNav`、`FiLoading`、`FiLoginFloat`），放 `src/components/`；页面专属组件放 `src/pages/<domain>/components/`。

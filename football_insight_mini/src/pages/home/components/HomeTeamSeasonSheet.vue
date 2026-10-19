@@ -33,7 +33,7 @@
     />
 
     <view v-if="!loading && errorMessage" class="state-card state-card--error team-season-sheet__state">
-      <text>{{ errorMessage }}</text>
+      <text class="team-season-sheet__error">{{ errorMessage }}</text>
     </view>
 
     <view v-if="!loading && !errorMessage && finishedMatches.length" class="team-season-form">
@@ -130,9 +130,9 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
   line-height: var(--fi-leading-normal);
 }
 
-.state-card--error text {
-  font-size: 28rpx;
-  color: #c03a2b;
+.team-season-sheet__error {
+  font-size: var(--fi-font-28);
+  color: var(--fi-color-error);
 }
 
 .team-season-sheet__title {

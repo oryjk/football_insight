@@ -255,11 +255,6 @@ const awayRankLabel = computed(() => {
   z-index: 1;
 }
 
-.state-card--error text {
-  font-size: 28rpx;
-  color: #c03a2b;
-}
-
 .support-home-panel__summary {
   display: block;
   margin-top: 18rpx;

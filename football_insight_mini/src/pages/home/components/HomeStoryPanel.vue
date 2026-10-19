@@ -27,14 +27,14 @@
         @click="openTechStats(match)"
       >
         <image class="score-strip__corner" :src="pulseMatchCornerImage" mode="aspectFill" />
-        <view class="score-strip__meta">
-          <text>第 {{ match.round_number }} 轮</text>
+        <view class="score-strip__meta score-strip__foreground">
+          <text class="score-strip__meta-text">第 {{ match.round_number }} 轮</text>
           <view class="score-strip__meta-trailing">
-            <text>{{ match.match_date }} {{ match.match_time }}</text>
-            <text v-if="hasTechStats(match)" class="score-strip__meta-pill">技术统计</text>
+            <text class="score-strip__meta-text">{{ match.match_date }} {{ match.match_time }}</text>
+            <text v-if="hasTechStats(match)" class="score-strip__meta-text score-strip__meta-pill">技术统计</text>
           </view>
         </view>
-        <view class="score-strip__body">
+        <view class="score-strip__body score-strip__foreground">
           <view class="score-strip__team">
             <text class="score-strip__team-name inline-highlight">{{ match.home_team_name }}</text>
           </view>
@@ -43,7 +43,7 @@
             <text class="score-strip__team-name inline-highlight">{{ match.away_team_name }}</text>
           </view>
         </view>
-        <view v-if="hasTechStats(match)" class="score-strip__hint">
+        <view v-if="hasTechStats(match)" class="score-strip__hint score-strip__foreground">
           <text class="score-strip__hint-text">点击查看技术统计</text>
         </view>
       </view>
@@ -190,8 +190,7 @@ function openTechStats(match: HomePulseLeadMatch): void {
   transform: scaleX(-1);
 }
 
-.score-strip > view,
-.score-strip > text {
+.score-strip__foreground {
   position: relative;
   z-index: 1;
 }
@@ -215,9 +214,9 @@ function openTechStats(match: HomePulseLeadMatch): void {
   flex-wrap: wrap;
 }
 
-.score-strip__meta text {
+.score-strip__meta-text {
   color: var(--fi-color-text-muted);
-  font-size: 22rpx;
+  font-size: var(--fi-font-22);
 }
 
 .score-strip__meta-pill {
