@@ -51,10 +51,6 @@ page {
   --fi-primitive-topic-gallery-height: 440rpx;
   --fi-primitive-ink-rgb: 21, 22, 27;
   --fi-primitive-white-rgb: 255, 255, 255;
-  --fi-primitive-reaction-charcoal: #303030;
-  --fi-primitive-reaction-gloss: rgba(255, 255, 255, 0.06);
-  --fi-primitive-reaction-divider: rgba(255, 255, 255, 0.24);
-  --fi-primitive-reaction-selected: rgba(255, 255, 255, 0.14);
 
   /* ===== Primitive：间距（数字刻度，单位 rpx） ===== */
   --fi-primitive-space-4: 4rpx;
@@ -200,11 +196,14 @@ page {
   --fi-color-pitch: var(--fi-primitive-pitch);
   --fi-color-pitch-line: var(--fi-primitive-pitch-line);
   --fi-color-lineup-grass: var(--fi-primitive-pitch-grass);
-  --fi-color-reaction-bg: var(--fi-primitive-reaction-charcoal);
-  --fi-color-reaction-gloss: var(--fi-primitive-reaction-gloss);
-  --fi-color-reaction-divider: var(--fi-primitive-reaction-divider);
-  --fi-color-reaction-selected: var(--fi-primitive-reaction-selected);
-  --fi-color-reaction-text: var(--fi-primitive-white);
+  /* 战术赞踩胶囊：浅底描边，与卡片同一调色板；赞选中用品牌红，踩选中用墨色（图标 PNG 同色，见 scripts/generate-reaction-icons.mjs） */
+  --fi-color-reaction-bg: var(--fi-primitive-canvas-soft);
+  --fi-color-reaction-border: var(--fi-primitive-divider);
+  --fi-color-reaction-text: var(--fi-primitive-grey-text-deep);
+  --fi-color-reaction-like: var(--fi-primitive-red);
+  --fi-color-reaction-like-bg: var(--fi-primitive-red-soft);
+  --fi-color-reaction-dislike: var(--fi-primitive-ink-deep);
+  --fi-color-reaction-dislike-bg: var(--fi-primitive-divider);
   --fi-color-lineup-grass-alt: var(--fi-primitive-pitch-grass-alt);
   --fi-color-lineup-markings: var(--fi-primitive-pitch-markings);
   --fi-motion-duration-fast: var(--fi-primitive-motion-fast);
@@ -335,6 +334,9 @@ page {
   /* 战术板：球场宽高比 3:4（padding-top 百分比）与球员圆点直径 */
   --fi-component-lineup-pitch-ratio: 133.33%;
   --fi-component-lineup-dot-size: 84rpx;
+  /* 赞踩胶囊两档高度：sm 与列表行头像同高；md 与详情页 community-action 按钮同高（上下内边距 + 一行 26 号字 + 上下边框）。 */
+  --fi-component-reaction-height-sm: var(--fi-space-48);
+  --fi-component-reaction-height-md: calc(var(--fi-space-20) * 2 + var(--fi-font-26) * var(--fi-leading-normal) + var(--fi-border-width) * 2);
   --fi-component-loading-gap: var(--fi-space-12);
   --fi-component-loading-padding: var(--fi-space-40) var(--fi-space-32);
   --fi-component-loading-title-color: var(--fi-color-text-primary);

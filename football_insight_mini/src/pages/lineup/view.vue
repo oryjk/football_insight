@@ -20,7 +20,7 @@
       </view>
       <LineupPitch :players="pitchPlayers" readonly />
       <view class="community-row">
-        <view class="reaction-slot"><FiLineupReactionBar :count="detail.likes_count" :liked="detail.liked_by_me" :disliked="detail.disliked_by_me" :pending="pendingLikes.length > 0" @like="like(returnUrl)" @dislike="dislike(returnUrl)" /></view>
+        <view class="reaction-slot"><FiLineupReactionBar size="md" :count="detail.likes_count" :liked="detail.liked_by_me" :disliked="detail.disliked_by_me" :pending="pendingLikes.length > 0" @like="like(returnUrl)" @dislike="dislike(returnUrl)" /></view>
         <button class="community-action" @tap="openShare">分享阵容</button>
       </view>
       <view class="community-row">

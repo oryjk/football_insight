@@ -1,32 +1,52 @@
 <template>
-  <view class="reactions" :class="{ 'reactions--pending': pending }" @tap.stop>
-    <button class="reaction reaction--like" :class="{ 'reaction--selected': liked }" :disabled="pending"
-      :aria-label="liked ? '取消点赞' : '点赞'" :aria-pressed="liked" @tap.stop="emit('like')">
-      <!-- Lucide thumbs-up raster; ISC license in static/home/lucide-LICENSE.txt. -->
-      <image class="reaction__icon" src="/static/lineup/like.png" mode="aspectFit" />
+  <!-- 浅底描边胶囊：左赞（带赞数）右踩，互斥；sm 用于列表行，md 用于详情页按钮行。 -->
+  <view class="reactions" :class="[`reactions--${size}`, { 'reactions--pending': pending }]" :aria-busy="pending" @tap.stop>
+    <button class="reaction" :class="{ 'reaction--liked': liked }" hover-class="reaction--pressed"
+      :aria-label="liked ? '取消点赞' : '点赞'" :aria-pressed="liked" :aria-disabled="pending" @tap.stop="tap('like')">
+      <!-- Lucide thumbs-up/down raster（scripts/generate-reaction-icons.mjs）；ISC license in static/home/lucide-LICENSE.txt. -->
+      <image class="reaction__icon" :src="liked ? ICONS.likeActive : ICONS.likeIdle" mode="aspectFit" />
       <text class="reaction__count">{{ count }}</text>
     </button>
     <view class="reactions__divider" />
-    <button class="reaction reaction--dislike" :class="{ 'reaction--selected': disliked }" :disabled="pending"
-      :aria-label="disliked ? '取消点踩' : '点踩'" :aria-pressed="disliked" @tap.stop="emit('dislike')">
-      <image class="reaction__icon reaction__icon--down" src="/static/lineup/like.png" mode="aspectFit" />
+    <button class="reaction reaction--dislike" :class="{ 'reaction--disliked': disliked }" hover-class="reaction--pressed"
+      :aria-label="disliked ? '取消点踩' : '点踩'" :aria-pressed="disliked" :aria-disabled="pending" @tap.stop="tap('dislike')">
+      <image class="reaction__icon" :src="disliked ? ICONS.dislikeActive : ICONS.dislikeIdle" mode="aspectFit" />
     </button>
   </view>
 </template>
 <script setup lang="ts">
-withDefaults(defineProps<{ count: number; liked: boolean; disliked?: boolean; pending: boolean }>(), { disliked: false })
+const props = withDefaults(defineProps<{ count: number; liked: boolean; disliked?: boolean; pending: boolean; size?: 'sm' | 'md' }>(), {
+  disliked: false,
+  size: 'sm',
+})
 const emit = defineEmits<{ (e: 'like' | 'dislike'): void }>()
+const ICONS = {
+  likeIdle: '/static/lineup/reaction-like-idle.png',
+  likeActive: '/static/lineup/reaction-like-active.png',
+  dislikeIdle: '/static/lineup/reaction-dislike-idle.png',
+  dislikeActive: '/static/lineup/reaction-dislike-active.png',
+}
+// 不用原生 disabled：微信会给 button[disabled] 强制套灰底灰字，选中态会在请求中闪成灰色。
+function tap(kind: 'like' | 'dislike'): void {
+  if (!props.pending) emit(kind)
+}
 </script>
 <style scoped>
-.reactions { display:flex; flex-shrink:0; align-items:center; overflow:hidden; border-radius:var(--fi-radius-round); background:linear-gradient(var(--fi-color-reaction-gloss), transparent),var(--fi-color-reaction-bg); color:var(--fi-color-reaction-text); }
-.reaction { display:flex; align-items:center; justify-content:center; flex-shrink:0; gap:var(--fi-space-10); height:var(--fi-space-64); margin:0; padding:0 var(--fi-space-20); border:0; border-radius:0; background:transparent; color:var(--fi-color-reaction-text); line-height:var(--fi-leading-none); }
-.reaction::after { border:0; }
-.reaction--selected { background:var(--fi-color-reaction-selected); }
-.reaction--dislike { width:var(--fi-space-64); padding:0; }
-.reaction__icon { width:var(--fi-space-32); height:var(--fi-space-32); filter:brightness(0) invert(1); opacity:0.8; }
-.reaction--selected .reaction__icon { opacity:1; }
-.reaction__icon--down { transform:rotate(180deg); }
-.reaction__count { font-size:var(--fi-font-24); font-weight:var(--fi-weight-bold); }
-.reactions__divider { flex-shrink:0; width:var(--fi-border-width); height:var(--fi-space-32); background:var(--fi-color-reaction-divider); }
-.reactions--pending { opacity:0.55; }
+.reactions { display: flex; flex-shrink: 0; align-items: center; box-sizing: border-box; overflow: hidden; border: var(--fi-border-width) solid var(--fi-color-reaction-border); border-radius: var(--fi-radius-round); background: var(--fi-color-reaction-bg); transition: opacity var(--fi-motion-duration-fast) var(--fi-motion-ease-out); }
+.reactions--sm { height: var(--fi-component-reaction-height-sm); }
+.reactions--md { height: var(--fi-component-reaction-height-md); }
+.reactions--pending { opacity: var(--fi-opacity-pressed); }
+.reaction { display: flex; flex-shrink: 0; align-items: center; justify-content: center; gap: var(--fi-space-8); box-sizing: border-box; height: 100%; margin: 0; padding: 0 var(--fi-space-16); border: 0; border-radius: 0; background: transparent; color: var(--fi-color-reaction-text); line-height: var(--fi-leading-none); transition: background-color var(--fi-motion-duration-fast) var(--fi-motion-ease-out), color var(--fi-motion-duration-fast) var(--fi-motion-ease-out); }
+.reaction::after { border: 0; }
+.reactions--md .reaction { gap: var(--fi-space-10); padding: 0 var(--fi-space-24); }
+.reaction--dislike { padding: 0 var(--fi-space-14); }
+.reactions--md .reaction--dislike { padding: 0 var(--fi-space-22); }
+.reaction--liked { background: var(--fi-color-reaction-like-bg); color: var(--fi-color-reaction-like); }
+.reaction--disliked { background: var(--fi-color-reaction-dislike-bg); color: var(--fi-color-reaction-dislike); }
+.reaction--pressed { opacity: var(--fi-opacity-pressed); }
+.reaction__icon { width: var(--fi-space-28); height: var(--fi-space-28); }
+.reactions--md .reaction__icon { width: var(--fi-space-32); height: var(--fi-space-32); }
+.reaction__count { font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); font-variant-numeric: tabular-nums; }
+.reactions--md .reaction__count { font-size: var(--fi-font-26); }
+.reactions__divider { flex-shrink: 0; width: var(--fi-border-width); height: 50%; background: var(--fi-color-reaction-border); }
 </style>
