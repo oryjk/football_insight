@@ -1,8 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
-  buildSeatSwapMockCurrentResponse,
-  buildSeatSwapMockRegions,
   buildSeatSwapRegionAnchorId,
   canInteractSeatSwapMap,
   canConfirmCurrentSeatRegion,
@@ -10,24 +8,20 @@ import {
   canPublishSeatSwapRequest,
   filterOutMySeatSwapRequest,
   filterSeatSwapRequestsByDesiredRegion,
-  formatSeatLabel,
   groupSeatSwapRequestsByRegion,
   countSeatSwapDesiredRegions,
   previousSeatSwapStep,
   resolveSeatSwapBrowseFilterKey,
   resolveDefaultExpandedSeatSwapRegionKeys,
-  resolveSeatSwapStickyMapThreshold,
-  readSeatSwapViewportScrollTop,
   shouldDimSeatSwapRegion,
   resolveSeatSwapCandidateAction,
-  shouldShowSeatSwapStickyMap,
-  statusLabel,
   toggleDesiredSeatRegion,
   validateSeatSwapForm,
   type SeatSwapDesiredSeatFormState,
   type SeatSwapFormState,
 } from './helpers'
-import { resolveSeatSwapRegionLayout } from '../../utils/stadiumRegions'
+import { buildSeatSwapMockCurrentResponse, buildSeatSwapMockRegions } from './fixtures'
+import { formatSeatSwapSeatLabel, resolveSeatSwapRegionLayout, seatSwapStatusLabel } from '../../utils/stadiumRegions'
 
 function validForm(): SeatSwapFormState {
   return {
@@ -185,12 +179,12 @@ describe('seat swap request grouping', () => {
   })
 
   test('formats seat labels without requiring row and seat number', () => {
-    expect(formatSeatLabel({
+    expect(formatSeatSwapSeatLabel({
       current_region_name: '101',
       current_row: '',
       current_seat_no: '',
     })).toBe('101')
-    expect(formatSeatLabel({
+    expect(formatSeatSwapSeatLabel({
       current_region_name: '101',
       current_row: '8',
       current_seat_no: '',
@@ -198,7 +192,7 @@ describe('seat swap request grouping', () => {
   })
 
   test('does not show a display-only status label', () => {
-    expect(statusLabel('display_only')).toBe('')
+    expect(seatSwapStatusLabel('display_only')).toBe('')
   })
 })
 
@@ -227,34 +221,6 @@ describe('seat swap candidate actions', () => {
       myRequestId: 'my-request',
       isLoggedIn: true,
     })).toBe('matched_cancel')
-  })
-})
-
-describe('seat swap sticky map', () => {
-  test('shows the sticky mini map only after the page has scrolled past the threshold', () => {
-    expect(shouldShowSeatSwapStickyMap(0, 360)).toBe(false)
-    expect(shouldShowSeatSwapStickyMap(359, 360)).toBe(false)
-    expect(shouldShowSeatSwapStickyMap(360, 360)).toBe(true)
-    expect(shouldShowSeatSwapStickyMap(520, 360)).toBe(true)
-  })
-
-  test('does not show the sticky mini map before a measured threshold is ready', () => {
-    expect(shouldShowSeatSwapStickyMap(520, Number.POSITIVE_INFINITY)).toBe(false)
-  })
-
-  test('reads viewport scrollTop from selector query results', () => {
-    expect(readSeatSwapViewportScrollTop({ scrollTop: 520 })).toBe(520)
-    expect(readSeatSwapViewportScrollTop({ top: 520 })).toBeNull()
-    expect(readSeatSwapViewportScrollTop(null)).toBeNull()
-  })
-
-  test('falls back to a default threshold when sticky-map measurement is unavailable', () => {
-    expect(resolveSeatSwapStickyMapThreshold({
-      mapTop: null,
-      viewportScrollTop: null,
-      topOffsetPx: 32,
-      fallbackThreshold: 420,
-    })).toBe(420)
   })
 })
 
@@ -309,7 +275,7 @@ describe('seat swap map interaction', () => {
 })
 
 describe('seat swap mock data', () => {
-  test('builds a large candidate list for scroll and sticky-map testing', () => {
+  test('builds a large candidate list for scroll testing', () => {
     const mockView = buildSeatSwapMockCurrentResponse({
       candidateCount: 72,
       includeMyRequest: true,

@@ -124,18 +124,16 @@ import { extractApiErrorMessage } from '../../utils/apiError'
 import { formatDatetime } from '../../utils/format'
 import { useAppSession } from '../../stores/appSession'
 import {
-  buildSeatSwapMockCurrentResponse,
-  buildSeatSwapMockRegions,
   buildSeatSwapRegionAnchorId,
   countSeatSwapDesiredRegions,
   filterSeatSwapRequestsByDesiredRegion,
   filterOutMySeatSwapRequest,
-  formatSeatLabel,
   groupSeatSwapRequestsByRegion,
   resolveSeatSwapBrowseFilterKey,
   resolveDefaultExpandedSeatSwapRegionKeys,
-  statusLabel,
 } from './helpers'
+import { buildSeatSwapMockCurrentResponse, buildSeatSwapMockRegions } from './fixtures'
+import { formatSeatSwapSeatLabel, seatSwapStatusLabel } from '../../utils/stadiumRegions'
 
 const { navigationPageStyle } = useNavigationLayout()
 
@@ -220,10 +218,10 @@ const myDesiredSummary = computed(() => {
 })
 
 const myRequestSeatLabel = computed(() =>
-  currentView.value?.my_request ? formatSeatLabel(currentView.value.my_request) : '',
+  currentView.value?.my_request ? formatSeatSwapSeatLabel(currentView.value.my_request) : '',
 )
 
-const myRequestStatusLabel = computed(() => statusLabel(currentView.value?.my_request?.status || ''))
+const myRequestStatusLabel = computed(() => seatSwapStatusLabel(currentView.value?.my_request?.status || ''))
 
 const mainMapMode = computed<'browse' | 'filter' | 'published'>(() => {
   if (browsingFilterKey.value) return 'filter'
