@@ -90,7 +90,7 @@ export async function createSyncController({ projectRoot, git, stopDev, startDev
       const before = (await git(["rev-parse", "HEAD"])).trim();
       const target = (await git(["rev-parse", context.upstream])).trim();
       if (before === target) {
-        notice(`已与 ${context.upstream.replace("refs/remotes/", "")} 同步，等待新提交。`);
+        notice(`已与 ${context.upstream.replace("refs/remotes/", "")} 同步（${before.slice(0, 12)}），等待新提交。`);
         return;
       }
       const counts = (await git(["rev-list", "--left-right", "--count", `${before}...${target}`])).trim().split(/\s+/).map(Number);
@@ -206,7 +206,7 @@ export async function runMiniDevSync({ projectRoot = defaultProjectRoot, args = 
     await stopProcess(current);
   };
   const startDev = async () => {
-    log("启动 bun run dev:mp-weixin；微信开发者工具打开 dist/dev/mp-weixin。");
+    log(`启动 bun run dev:mp-weixin；微信开发者工具打开 ${path.join(projectRoot, "dist/dev/mp-weixin")}。`);
     const child = launch([process.execPath, "run", "dev:mp-weixin"], "inherit");
     watcher = child;
     const failed = (message) => {

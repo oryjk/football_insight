@@ -42,6 +42,7 @@ import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, rea
 import { boxCentreRpx, boxPositionPx, DOT_DIAMETER_RPX, useDragRebind, type Px } from '../dragGeometry'
 import { resolveDragRelease, type DragOutcome, type LineupSlots } from '../helpers'
 import type { PitchPlayer } from '../lineupViewModel'
+import { schedulePitchLayoutDiagnostic } from '../layoutDiagnostics'
 import LineupPlayerDot from './LineupPlayerDot.vue'
 
 interface MovableChangeEvent {
@@ -74,6 +75,7 @@ const MEASURE_RETRY_MS = 120
 let measureEpoch = 0
 let measureTimer: ReturnType<typeof setTimeout> | null = null
 let disposed = false
+let cancelDiagnostic = () => {}
 
 // 原生区域先以明确的 px 尺寸建立，量到真实布局后才放入球员。
 // 与 movable-view 同批创建时，微信可能先按尚未布局的区域把所有 x/y 钳制为 0。
@@ -92,6 +94,15 @@ const position = computed<Record<number, Px>>(() => {
 
 // 松手后先绑定到手指位置、下个 tick 再回到已提交位置，保证互换时被拖的点位真的回到自己的坐标。
 const { bound, release } = useDragRebind(() => position.value)
+
+watch([areaReady, position], () => {
+  cancelDiagnostic()
+  if (!instance || !areaReady.value) return
+  cancelDiagnostic = schedulePitchLayoutDiagnostic(instance, () => ({
+    expected: props.players.map(({ slot }) => ({ slot, ...bound.value[slot] })),
+    field: { ...fieldPx }, windowWidth: windowWidthPx.value,
+  }))
+})
 
 // 拖动中的实时位置：非响应式，避免把原生拖动的 change 回写成 x/y 而互相打架。
 const live: Record<number, Px> = {}
@@ -166,6 +177,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   disposed = true
+  cancelDiagnostic()
   measureEpoch += 1
   if (measureTimer) clearTimeout(measureTimer)
   uni.offWindowResize?.(onResize)
