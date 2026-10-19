@@ -15,6 +15,9 @@ import {
   resolveDefaultExpandedSeatSwapRegionKeys,
   shouldDimSeatSwapRegion,
   SEAT_SWAP_POOL_ANCHOR_ID,
+  SEAT_SWAP_STADIUM_REGION_NAMES,
+  buildSeatSwapThumbSvg,
+  resolveSeatSwapThumbHighlights,
   formatSeatSwapKickoffShort,
   isSeatSwapMapRectInViewport,
   resolveSeatSwapCandidateAction,
@@ -659,5 +662,48 @@ describe('seat swap compact kickoff label', () => {
   test('returns empty text for missing or invalid input', () => {
     expect(formatSeatSwapKickoffShort('')).toBe('')
     expect(formatSeatSwapKickoffShort('not-a-date')).toBe('')
+  })
+})
+
+describe('seat swap seat thumbnail', () => {
+  test('lists every stadium region once: 101-132, 501-536 and three VIP blocks', () => {
+    expect(SEAT_SWAP_STADIUM_REGION_NAMES.length).toBe(71)
+    expect(new Set(SEAT_SWAP_STADIUM_REGION_NAMES).size).toBe(71)
+    expect(SEAT_SWAP_STADIUM_REGION_NAMES.includes('132')).toBe(true)
+    expect(SEAT_SWAP_STADIUM_REGION_NAMES.includes('536')).toBe(true)
+    expect(SEAT_SWAP_STADIUM_REGION_NAMES.includes('VIP3')).toBe(true)
+  })
+
+  test('highlights the current region and each desired region with percentage boxes', () => {
+    const highlights = resolveSeatSwapThumbHighlights('108', ['112', 'VIP2'])
+    expect(highlights.map((h) => [h.key, h.kind])).toEqual([
+      ['112', 'desired'],
+      ['VIP2', 'desired'],
+      ['108', 'current'],
+    ])
+    const layout = resolveSeatSwapRegionLayout('108')
+    expect(highlights[2].style).toBe(
+      `left:${layout?.left}%;top:${layout?.top}%;width:${layout?.width}%;height:${layout?.height}%;`,
+    )
+  })
+
+  test('skips unknown regions and lets current win when a region is both', () => {
+    const highlights = resolveSeatSwapThumbHighlights('108', ['108', 'no-such', '112', '112'])
+    expect(highlights.map((h) => [h.key, h.kind])).toEqual([
+      ['112', 'desired'],
+      ['108', 'current'],
+    ])
+  })
+
+  test('returns nothing when there is no mappable region', () => {
+    expect(resolveSeatSwapThumbHighlights('', [])).toEqual([])
+    expect(resolveSeatSwapThumbHighlights('no-such', ['also-no'])).toEqual([])
+  })
+
+  test('builds a text-free base svg with one block per region', () => {
+    const svg = buildSeatSwapThumbSvg()
+    expect(svg.startsWith('<svg')).toBe(true)
+    expect((svg.match(/<rect /g) || []).length).toBe(71)
+    expect(svg.includes('<text')).toBe(false)
   })
 })

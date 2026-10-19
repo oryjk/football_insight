@@ -52,6 +52,7 @@
               @confirm="(id: string) => emit('confirm', id)"
               @cancel-confirmation="(id: string) => emit('cancel-confirmation', id)"
               @matched-cancel="(id: string) => emit('matched-cancel', id)"
+            @preview-seat="(id: string) => emit('preview-seat', id)"
             />
           </view>
         </view>
@@ -75,6 +76,7 @@
             @confirm="(id: string) => emit('confirm', id)"
             @cancel-confirmation="(id: string) => emit('cancel-confirmation', id)"
             @matched-cancel="(id: string) => emit('matched-cancel', id)"
+            @preview-seat="(id: string) => emit('preview-seat', id)"
           />
         </view>
       </view>
@@ -110,6 +112,7 @@ const emit = defineEmits<{
   (e: 'confirm', requestId: string): void
   (e: 'cancel-confirmation', requestId: string): void
   (e: 'matched-cancel', requestId: string): void
+  (e: 'preview-seat', requestId: string): void
 }>()
 
 function candidateAction(candidate: SeatSwapCandidate): ReturnType<typeof resolveSeatSwapCandidateAction> {

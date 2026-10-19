@@ -1,31 +1,26 @@
 <template>
   <view class="candidate" :class="cardClass">
     <view class="candidate__main">
+      <!-- 卡片内的球场缩略图：红=当前座位、绿=目标座位，点开看大图。 -->
+      <SeatSwapSeatThumb
+        :current-key="candidate.current_region_key"
+        :desired-keys="desiredKeys"
+        @open="emit('preview-seat', candidate.request_id)"
+      />
       <view class="candidate__content">
         <view class="candidate__user">
-          <image
-            v-if="candidate.avatar_url"
-            class="candidate__avatar"
-            :src="candidate.avatar_url"
-            mode="aspectFill"
-          />
-          <view v-else class="candidate__avatar candidate__avatar--fallback">
-            <text>{{ fallbackInitial }}</text>
-          </view>
-          <view class="candidate__id">
-            <text class="candidate__name">{{ candidate.display_name }}</text>
-            <view class="candidate__seat">
-              <text class="candidate__seat-label">当前座位</text>
-              <text class="candidate__seat-value">{{ formatSeatSwapSeatLabel(candidate) }}</text>
-            </view>
-          </view>
+          <text class="candidate__name">{{ candidate.display_name }}</text>
           <view v-if="statusText" class="candidate__status" :class="statusClass">
             <view class="candidate__status-dot" />
             <text>{{ statusText }}</text>
           </view>
         </view>
+        <view class="candidate__seat">
+          <text class="candidate__seat-label">当前</text>
+          <text class="candidate__seat-value">{{ formatSeatSwapSeatLabel(candidate) }}</text>
+        </view>
         <view class="candidate__wants">
-          <text class="candidate__wants-label">目标座位</text>
+          <text class="candidate__wants-label">目标</text>
           <text class="candidate__wants-value">{{ desiredSeatText }}</text>
         </view>
         <view v-if="candidate.contact" class="candidate__contact">
@@ -67,6 +62,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import SeatSwapSeatThumb from './SeatSwapSeatThumb.vue'
 import type { SeatSwapCandidate } from '../../../types/seatSwap'
 import {
   formatSeatSwapDesiredSeats,
@@ -83,9 +79,10 @@ const emit = defineEmits<{
   (e: 'confirm', requestId: string): void
   (e: 'cancel-confirmation', requestId: string): void
   (e: 'matched-cancel', requestId: string): void
+  (e: 'preview-seat', requestId: string): void
 }>()
 
-const fallbackInitial = computed(() => (props.candidate.display_name || '球').slice(0, 1))
+const desiredKeys = computed(() => props.candidate.desired_seats.map((seat) => seat.region_key))
 const statusText = computed(() => seatSwapStatusLabel(props.candidate.status))
 const isMatched = computed(() => props.candidate.status === 'matched')
 const cardClass = computed(() => ({
@@ -110,8 +107,8 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 
 .candidate__main {
   display: flex;
-  align-items: stretch;
-  gap: var(--fi-space-18);
+  align-items: flex-start;
+  gap: var(--fi-space-16);
 }
 
 .candidate__content {
@@ -121,34 +118,19 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 
 .candidate__user {
   display: flex;
-  align-items: flex-start;
-  gap: var(--fi-space-16);
-}
-
-.candidate__avatar {
-  flex-shrink: 0;
-  width: var(--fi-space-64);
-  height: var(--fi-space-64);
-  border-radius: var(--fi-radius-round);
-  background: var(--fi-color-page);
-}
-
-.candidate__avatar--fallback {
-  display: flex;
   align-items: center;
-  justify-content: center;
-  color: var(--fi-color-text-secondary);
-  font-size: var(--fi-font-28);
-  font-weight: var(--fi-weight-bold);
+  justify-content: space-between;
+  gap: var(--fi-space-12);
 }
 
-.candidate__id {
-  flex: 1;
-  min-width: 0;
-}
+
+
 
 .candidate__name {
-  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--fi-color-text-strong);
   font-size: var(--fi-font-28);
   font-weight: var(--fi-weight-bold);
@@ -164,15 +146,13 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 }
 
 .candidate__seat {
-  margin-top: var(--fi-space-8);
+  margin-top: var(--fi-space-10);
   background: var(--fi-color-seat-current-bg);
   color: var(--fi-color-seat-current);
 }
 
 .candidate__wants {
-  max-width: calc(100% - var(--fi-space-64) - var(--fi-space-16));
-  margin-top: var(--fi-space-12);
-  margin-left: calc(var(--fi-space-64) + var(--fi-space-16));
+  margin-top: var(--fi-space-8);
   background: var(--fi-color-seat-desired-bg);
   color: var(--fi-color-seat-desired);
 }
@@ -314,11 +294,6 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   box-shadow: var(--fi-shadow-card-strong);
 }
 
-.candidate--matched .candidate__avatar {
-  background: rgba(var(--fi-primitive-white-rgb), 0.18);
-}
-
-.candidate--matched .candidate__avatar--fallback,
 .candidate--matched .candidate__name,
 .candidate--matched .candidate__seat,
 .candidate--matched .candidate__wants,

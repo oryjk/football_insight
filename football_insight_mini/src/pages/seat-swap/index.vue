@@ -53,6 +53,7 @@
             @confirm="confirmCandidate"
             @cancel-confirmation="cancelCandidateConfirmation"
             @matched-cancel="openMatchedCancelForCandidate"
+            @preview-seat="openSeatPreview"
           />
         </view>
       </view>
@@ -87,6 +88,12 @@
       :desired-keys="myDesiredKeys"
       :has-my-request="!!currentView?.my_request"
       @region-tap="handleSheetMapTap"
+    />
+
+    <SeatSwapSeatSheet
+      v-model:visible="seatSheetVisible"
+      :regions="regions"
+      :candidate="seatPreviewCandidate"
     />
 
     <SeatSwapPublishSheet
@@ -125,6 +132,7 @@ import SeatSwapDock from './components/SeatSwapDock.vue'
 import SeatSwapPublishSheet from './components/SeatSwapPublishSheet.vue'
 import SeatSwapMapFab from './components/SeatSwapMapFab.vue'
 import SeatSwapMapSheet from './components/SeatSwapMapSheet.vue'
+import SeatSwapSeatSheet from './components/SeatSwapSeatSheet.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
@@ -156,8 +164,12 @@ const miniProgramNoticeEnabled = ref(false)
 const cancelReason = ref('')
 
 const mapSheetVisible = ref(false)
+const seatSheetVisible = ref(false)
+const seatPreviewId = ref('')
 // 任一弹层打开：锁页面滚动，并隐藏地图浮窗。
-const anySheetOpen = computed(() => publishSheetVisible.value || manageSheetVisible.value || mapSheetVisible.value)
+const anySheetOpen = computed(() =>
+  publishSheetVisible.value || manageSheetVisible.value || mapSheetVisible.value || seatSheetVisible.value,
+)
 const pageLockStyle = computed(() => anySheetOpen.value ? 'overflow: hidden;' : '')
 
 const { loading, errorMessage, currentView, regions, loadPage } = useSeatSwapPage({
@@ -211,6 +223,16 @@ const MAP_VISIBILITY_DEBOUNCE_MS = 150
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+// 换座卡缩略图点开：弹层里用完整球场图高亮该意向的当前与目标座位。
+const seatPreviewCandidate = computed(() =>
+  currentView.value?.candidates.find((candidate) => candidate.request_id === seatPreviewId.value) ?? null,
+)
+
+function openSeatPreview(requestId: string): void {
+  seatPreviewId.value = requestId
+  seatSheetVisible.value = true
 }
 
 function openMapSheet(): void {

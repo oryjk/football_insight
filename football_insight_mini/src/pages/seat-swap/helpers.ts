@@ -1,3 +1,5 @@
+import { resolveSeatSwapRegionLayout } from '../../utils/stadiumRegions'
+
 export interface SeatSwapDesiredSeatFormState {
   region_key: string
   region_name: string
@@ -318,4 +320,70 @@ export function filterSeatSwapRequestsByDesiredRegion<TRequest extends SeatSwapD
 
 export function hasSeatSwapFormErrors(errors: SeatSwapFormErrors): boolean {
   return Object.keys(errors).length > 0
+}
+
+/** 球场全部分区：100 层 101–132、500 层 501–536、VIP1–3（与 resolveSeatSwapRegionLayout 覆盖范围一致）。 */
+export const SEAT_SWAP_STADIUM_REGION_NAMES: string[] = [
+  ...Array.from({ length: 32 }, (_, i) => String(101 + i)),
+  ...Array.from({ length: 36 }, (_, i) => String(501 + i)),
+  'VIP1',
+  'VIP2',
+  'VIP3',
+]
+
+export interface SeatSwapThumbHighlight {
+  key: string
+  kind: 'current' | 'desired'
+  /** 相对球场区域的百分比定位，与 StadiumMap 同一套坐标。 */
+  style: string
+}
+
+/** 换座卡缩略图的高亮块：先目标后当前（当前叠在最上层）；未知分区跳过，当前与目标重合时只算当前。 */
+export function resolveSeatSwapThumbHighlights(currentKey: string, desiredKeys: string[]): SeatSwapThumbHighlight[] {
+  const toStyle = (key: string): string | null => {
+    const layout = resolveSeatSwapRegionLayout(key)
+    return layout
+      ? `left:${layout.left}%;top:${layout.top}%;width:${layout.width}%;height:${layout.height}%;`
+      : null
+  }
+  const highlights: SeatSwapThumbHighlight[] = []
+  const seen = new Set<string>([currentKey])
+  for (const key of desiredKeys) {
+    if (seen.has(key)) continue
+    seen.add(key)
+    const style = toStyle(key)
+    if (style) highlights.push({ key, kind: 'desired', style })
+  }
+  const currentStyle = currentKey ? toStyle(currentKey) : null
+  if (currentStyle) highlights.push({ key: currentKey, kind: 'current', style: currentStyle })
+  return highlights
+}
+
+/** 缩略图底图的画布比例与大图球场区域一致（750×560rpx）。 */
+export const SEAT_SWAP_THUMB_VIEWBOX = { width: 750, height: 560 }
+
+/**
+ * 生成缩略图底图 SVG：每个分区一块浅灰圆角矩形，不含编号、价格图例与票价配色。
+ * 由 scripts/generate-seat-swap-thumb.ts 写入 static/seat-swap/stadium-thumb.svg。
+ */
+export function buildSeatSwapThumbSvg(): string {
+  const { width, height } = SEAT_SWAP_THUMB_VIEWBOX
+  const round = (n: number) => Math.round(n * 100) / 100
+  const rects = SEAT_SWAP_STADIUM_REGION_NAMES.flatMap((name) => {
+    const layout = resolveSeatSwapRegionLayout(name)
+    if (!layout) return []
+    const x = round((layout.left / 100) * width)
+    const y = round((layout.top / 100) * height)
+    const w = round((layout.width / 100) * width)
+    const h = round((layout.height / 100) * height)
+    return [`  <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" />`]
+  })
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">`,
+    '  <g fill="#dde1e8">',
+    ...rects.map((r) => `  ${r}`),
+    '  </g>',
+    '</svg>',
+    '',
+  ].join('\n')
 }

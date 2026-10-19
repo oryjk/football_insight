@@ -369,7 +369,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
 
 .stadium-map--review .stadium-region--review-current {
   background: var(--fi-color-seat-current-bg);
-  outline: 6rpx solid rgba(var(--fi-primitive-red-rgb), 0.34);
+  outline: 6rpx solid var(--fi-color-seat-current);
 }
 
 .stadium-map--review .stadium-region--review-desired {

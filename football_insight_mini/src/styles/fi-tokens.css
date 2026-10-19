@@ -302,6 +302,9 @@ page {
   --fi-component-seat-swap-dock-height: 96rpx;
   --fi-component-seat-swap-action-width: 168rpx;
   --fi-component-seat-swap-action-min-height: 152rpx;
+  /* 换座卡球场缩略图：宽高比与大图球场区域一致（750×560） */
+  --fi-component-seat-swap-thumb-width: 176rpx;
+  --fi-component-seat-swap-thumb-height: 132rpx;
   --fi-component-loading-gap: var(--fi-space-12);
   --fi-component-loading-padding: var(--fi-space-40) var(--fi-space-32);
   --fi-component-loading-title-color: var(--fi-color-text-primary);
