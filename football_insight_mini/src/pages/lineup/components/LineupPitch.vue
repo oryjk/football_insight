@@ -1,5 +1,5 @@
 <template>
-  <view class="pitch">
+  <view class="pitch" :class="{ 'pitch--fit': fitContainer }">
     <view id="lineup-pitch-field" class="pitch__field">
       <view
         v-for="stripe in 8"
@@ -51,9 +51,11 @@ interface MovableChangeEvent {
 const props = withDefaults(defineProps<{
   players: PitchPlayer[]
   readonly?: boolean
+  fitContainer?: boolean
   selectedSlot?: number | null
 }>(), {
   readonly: false,
+  fitContainer: false,
   selectedSlot: null,
 })
 
@@ -197,6 +199,19 @@ function onTap(slot: number): void {
   overflow: hidden;
   border-radius: var(--fi-radius-md);
   background: var(--fi-color-lineup-grass);
+}
+
+/* The editor owns the available viewport slot; public details keep the normal ratio. */
+.pitch--fit {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+}
+
+.pitch--fit .pitch__field {
+  height: 100%;
+  padding-top: 0;
 }
 
 .pitch__stripe {

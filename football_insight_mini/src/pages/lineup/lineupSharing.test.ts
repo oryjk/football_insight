@@ -62,6 +62,22 @@ describe('poster content and geometry', () => {
     drawLineupPoster(context, withAvatar, new Map([['https://avatar', '/avatar.png'], ['https://crest', '/crest.png']]), '', true)
     expect(images).toEqual(['/crest.png', '/avatar.png']); expect(texts.includes('球员1')).toBe(true)
     expect(texts.includes('前')).toBe(true); expect(texts.includes('1')).toBe(true)
-    expect(texts.some(value => value.includes('…的战术板') && Array.from(value).length <= 21)).toBe(true)
+    expect(texts.some(value => value.includes('…分享的战术板') && Array.from(value).length <= 23)).toBe(true)
+  })
+  test('poster groups the actual sharer avatar and nickname without replacing the lineup author', () => {
+    const texts: string[] = [], images: string[] = []
+    const noop = () => {}
+    const context = { setFillStyle: noop, setFontSize: noop, fillText: (value: string) => texts.push(value), fillRect: noop, setStrokeStyle: noop, setLineWidth: noop, strokeRect: noop, beginPath: noop, moveTo: noop, lineTo: noop, stroke: noop, arc: noop, save: noop, clip: noop, restore: noop, setTextAlign: noop, drawImage: (path: string) => images.push(path) } as unknown as UniApp.CanvasContext
+    const sharer = { display_name: '转发球迷', avatar_url: 'https://sharer/avatar' }
+    drawLineupPoster(context, lineup, new Map([[sharer.avatar_url, '/sharer.png']]), '/code.png', false, sharer)
+    expect(images).toEqual(['/sharer.png', '/code.png'])
+    expect(texts.includes('分享人')).toBe(true)
+    expect(texts.includes('转发球迷')).toBe(true)
+    expect(texts.includes('球迷的战术板')).toBe(true)
+    texts.length = 0; images.length = 0
+    drawLineupPoster(context, lineup, new Map(), '/code.png', false, sharer)
+    expect(texts.includes('转')).toBe(true)
+    expect(texts.includes('转发球迷')).toBe(true)
+    expect(images).toEqual(['/code.png'])
   })
 })

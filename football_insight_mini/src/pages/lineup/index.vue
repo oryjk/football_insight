@@ -30,26 +30,31 @@
         <view v-if="notice" class="notice"><text>{{ notice }}</text></view>
 
         <view class="status-row">
-          <text class="status-row__title">我心中的最佳阵容</text>
-          <text class="status-row__state" :class="`status-row__state--${saveState}`">{{ saveStateText }}</text>
+          <view class="status-row__heading">
+            <text class="status-row__title">我的最佳阵容</text>
+            <text class="status-row__state" :class="`status-row__state--${saveState}`">{{ saveStateText }}</text>
+          </view>
+          <button class="community-link" @tap="openCommunity">看看大家怎么排 ›</button>
         </view>
 
         <LineupFormationBar :model-value="editor.formation.value" @update:model-value="changeFormation" />
 
-        <LineupPitch
-          :players="pitchPlayers"
-          :selected-slot="editor.selectedSlot.value"
-          @tap="openSheet"
-          @drag="editor.applyDrag"
-        />
+        <view class="pitch-slot">
+          <LineupPitch
+            :players="pitchPlayers"
+            :selected-slot="editor.selectedSlot.value"
+            fit-container
+            @tap="openSheet"
+            @drag="editor.applyDrag"
+          />
+        </view>
 
         <view class="hint-row">
-          <text class="hint">点位置选人，按住圆点可以拖动站位；前队员也能上场。已排 {{ editor.filled.value }}/11</text>
+          <text class="hint">点选球员 · 按住拖动 · 已排 {{ editor.filled.value }}/11</text>
           <text v-if="editor.filled.value < 11" class="hint-link" @tap="fillStartingEleven">一键填入首发</text>
         </view>
 
-        <text class="hint">保存满 11 人后，阵容会自动公开到球队战术板，其他球迷可查看和点赞。</text>
-        <button class="ghost-action" @tap="openCommunity">看看大家怎么排 ›</button>
+        <text class="hint">满 11 人保存后自动公开，球迷可查看和点赞</text>
 
         <view class="actions">
           <button
@@ -357,19 +362,35 @@ onBeforeUnmount(dispose)
 .page {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
-  padding: calc(var(--fi-brand-nav-height) + var(--fi-space-24)) var(--fi-space-24) var(--fi-space-64);
+  height: 100vh;
+  padding: calc(var(--fi-brand-nav-height) + var(--fi-space-12)) var(--fi-space-24) calc(env(safe-area-inset-bottom) + var(--fi-space-12));
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .page-content {
   display: flex;
   flex-direction: column;
-  gap: var(--fi-space-card-gap);
+  flex: 1;
+  min-height: 0;
+  gap: var(--fi-space-12);
+}
+
+.page-content > view:not(.pitch-slot),
+.page-content > text {
+  flex-shrink: 0;
+}
+
+.pitch-slot {
+  position: relative;
+  flex: 1;
+  min-height: calc(var(--fi-space-64) * 6);
 }
 
 .team-picker {
-  margin-bottom: var(--fi-space-card-gap);
+  flex-shrink: 0;
+  margin-bottom: var(--fi-space-12);
 }
 
 .state-card {
@@ -411,14 +432,35 @@ onBeforeUnmount(dispose)
 
 .status-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   padding: 0 var(--fi-space-4);
 }
 
+.status-row__heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--fi-space-12);
+  min-width: 0;
+}
+
+.community-link {
+  flex-shrink: 0;
+  margin: 0;
+  padding: var(--fi-space-8) 0 var(--fi-space-8) var(--fi-space-8);
+  background: transparent;
+  color: var(--fi-color-primary);
+  font-size: var(--fi-font-22);
+  line-height: var(--fi-leading-normal);
+}
+
+.community-link::after {
+  border: 0;
+}
+
 .status-row__title {
   color: var(--fi-color-text-strong);
-  font-size: var(--fi-font-30);
+  font-size: var(--fi-font-28);
   font-weight: var(--fi-weight-extrabold);
 }
 
@@ -449,11 +491,14 @@ onBeforeUnmount(dispose)
 }
 
 .hint {
-  flex: 1;
   min-width: 0;
   color: var(--fi-color-text-muted);
   font-size: var(--fi-font-22);
   line-height: var(--fi-leading-normal);
+}
+
+.hint-row .hint {
+  flex: 1;
 }
 
 .hint-link {
@@ -473,7 +518,7 @@ onBeforeUnmount(dispose)
 .actions__primary,
 .actions__reset {
   margin: 0;
-  padding: var(--fi-space-20) var(--fi-space-28);
+  padding: var(--fi-space-16) var(--fi-space-28);
   border-radius: var(--fi-radius-round);
   font-size: var(--fi-font-28);
   font-weight: var(--fi-weight-bold);

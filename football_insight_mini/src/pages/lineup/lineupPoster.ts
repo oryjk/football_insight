@@ -4,6 +4,7 @@ import { buildLineupViewUrl } from '../../utils/lineupLinks'
 
 export const LINEUP_POSTER = { canvasId: 'lineup-share-canvas', width: 750, height: 1200 }
 export const LINEUP_CARD = { canvasId: 'lineup-card-canvas', width: 750, height: 600 }
+export interface LineupSharer { display_name: string; avatar_url: string | null }
 export function canShareLineup(slots: Array<{ player_id: number | null }>): boolean {
   return slots.length === 11 && slots.every(slot => slot.player_id !== null) && new Set(slots.map(slot => slot.player_id)).size === 11
 }
@@ -26,7 +27,7 @@ function clippedLabel(value: string, limit: number): string {
   return chars.length > limit ? chars.slice(0, limit - 1).join('') + '…' : value
 }
 const palette = { paper: '#ffffff', ink: '#15161b', muted: '#6d7280', grass: '#28734f', alternate: '#2d7c56', line: '#a8c9b6', red: '#d92537' }
-export function drawLineupPoster(context: UniApp.CanvasContext, lineup: PublicLineup, images: Map<string, string>, codePath: string, card = false): void {
+export function drawLineupPoster(context: UniApp.CanvasContext, lineup: PublicLineup, images: Map<string, string>, codePath: string, card = false, sharer: LineupSharer = lineup.author): void {
   if (!card && !codePath) throw new Error('小程序码未就绪，请重试')
   const height = card ? 600 : 1200
   const text = (value: string, x: number, y: number, size: number, color = palette.ink) => {
@@ -73,12 +74,19 @@ export function drawLineupPoster(context: UniApp.CanvasContext, lineup: PublicLi
     context.setTextAlign('center'); text(clippedLabel(player.name, 8), point.x, point.y + radius + (card ? 18 : 25), card ? 16 : 21, palette.paper)
     context.setTextAlign('left')
   }
-  if (card) { text(`${clippedLabel(lineup.author.display_name, 16)}的战术板`, 32, 580, 23, palette.muted); return }
+  const avatarSize = card ? 38 : 64, avatarX = 40, avatarY = card ? 550 : 982
+  const sharerName = sharer.display_name.trim() || '球迷'
+  const sharerAvatar = sharer.avatar_url && images.get(sharer.avatar_url)
+  context.save(); context.beginPath(); context.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2); context.clip()
+  context.setFillStyle(palette.red); context.fillRect(avatarX, avatarY, avatarSize, avatarSize)
+  if (sharerAvatar) context.drawImage(sharerAvatar, avatarX, avatarY, avatarSize, avatarSize)
+  else { context.setTextAlign('center'); text(Array.from(sharerName)[0], avatarX + avatarSize / 2, avatarY + avatarSize * .7, card ? 23 : 34, palette.paper) }
+  context.restore(); context.setTextAlign('left')
+  if (card) { text(`${clippedLabel(sharerName, 16)}分享的战术板`, 92, 578, 23, palette.muted); return }
   text(`${clippedLabel(lineup.author.display_name, 16)}的战术板`, 32, 161, 24, palette.muted)
-  const authorAvatar = lineup.author.avatar_url && images.get(lineup.author.avatar_url)
-  if (authorAvatar) context.drawImage(authorAvatar, 40, 980, 62, 62)
-  text('我也排一套', authorAvatar ? 120 : 40, 1017, 32)
-  text('扫码查看阵容、为球迷点赞', 40, 1070, 23, palette.muted)
+  text('分享人', 122, 999, 21, palette.muted)
+  text(clippedLabel(sharerName, 13), 122, 1035, 28)
+  text('扫码看阵容 · 点赞 · 我也排一套', 40, 1091, 23, palette.muted)
   text('正式版扫码打开 · 足球洞察', 40, 1141, 21, palette.muted)
   context.drawImage(codePath, 528, 974, 174, 174)
 }
