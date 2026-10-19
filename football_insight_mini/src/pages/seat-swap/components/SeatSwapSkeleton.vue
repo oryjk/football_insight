@@ -26,6 +26,8 @@
 </template>
 
 <style scoped>
+@import '../../../styles/fi-skeleton.css';
+
 .seat-skeleton__headline {
   width: 56%;
   height: var(--fi-space-32);
