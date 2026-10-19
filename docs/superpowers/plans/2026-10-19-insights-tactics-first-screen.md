@@ -34,4 +34,4 @@
 - 1241 tests, type-check, import boundaries, H5/WeChat builds and component registration passed.
 - Browser 320/390/430: public guest, authenticated and benefits-paused views, sort/like, team/tab selection, child-editor return refresh, and visible-only paywall impressions passed.
 - Final independent review found no remaining blocking issues.
-- No backend deployment/restart or mini upload performed in this change.
+- Implementation did not require backend deployment/restart. The subsequent user upload request was completed from clean main `151db0a`: version 1.1.0, robot 2, upload succeeded; no review submission.
