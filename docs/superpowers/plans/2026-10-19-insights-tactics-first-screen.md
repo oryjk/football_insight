@@ -12,7 +12,7 @@
 
 ## Constraints and review focus
 
-- Tactics defaults first; tabs follow team selection; outlook/ticket entry move inside data.
+- Tactics defaults first; existing FiSegmented capsules follow team selection; outlook moves inside data; ticket entry stays fixed above team selection.
 - Guest public lists and authenticated private cards are independent of paid-stat/review restrictions.
 - No cross-page imports or new exceptions; old standalone editor/list/detail routes stay compatible.
 - Private/member/outlook results must not overwrite public team selection.
@@ -35,3 +35,7 @@
 - Browser 320/390/430: public guest, authenticated and benefits-paused views, sort/like, team/tab selection, child-editor return refresh, and visible-only paywall impressions passed.
 - Final independent review found no remaining blocking issues.
 - Implementation did not require backend deployment/restart. The subsequent user upload request was completed from clean main `151db0a`: version 1.1.0, robot 2, upload succeeded; no review submission.
+
+## User correction after first upload
+
+The ticket-watch card stays at the very top outside both content tabs. Reuse FiSegmented for the main content switch and remove InsightsMainTabs. This layout correction is verified separately and awaits upload.

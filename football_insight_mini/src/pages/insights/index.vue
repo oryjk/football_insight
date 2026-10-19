@@ -6,6 +6,11 @@
     <view class="page-bg-fade"></view>
     <view class="page-scroll">
       <view class="page">
+        <InsightsTicketWatchEntry
+          v-if="!systemConfigUnderReview"
+          :locked="shouldLockTicketWatchEntry"
+          @open="openTicketWatch"
+        />
         <InsightsTeamSelector
           v-if="selectableTeams.length"
           :teams="selectableTeams"
@@ -16,7 +21,9 @@
           <text>{{ teamError || '正在加载球队…' }}</text>
           <button v-if="teamError" @tap="teamBrowser.load()">重试</button>
         </view>
-        <InsightsMainTabs v-model="mainTab" />
+        <view>
+          <FiSegmented :items="mainTabs" :model-value="mainTab" aria-label="洞察内容" @update:model-value="changeMainTab" />
+        </view>
         <InsightsTacticsPanel
           v-if="mainTab === 'tactics'"
           :authenticated="tacticsAuthenticated"
@@ -27,11 +34,6 @@
           @sort="tactics.changeSort" @like="tactics.like" @open="openPublicTactics" @more="tactics.more()"
         />
         <template v-else>
-          <InsightsTicketWatchEntry
-            v-if="!systemConfigUnderReview"
-            :locked="shouldLockTicketWatchEntry"
-            @open="openTicketWatch"
-          />
           <InsightsMatchOutlook
             v-if="outlookReviewReady && !systemConfigUnderReview && currentUser"
             :matches="outlookMatches"
@@ -103,7 +105,7 @@ import { computed, ref, watch } from 'vue'
 import { onHide, onReachBottom, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
-import InsightsMainTabs from './components/InsightsMainTabs.vue'
+import FiSegmented from '../../components/FiSegmented.vue'
 import InsightsTacticsPanel from './components/InsightsTacticsPanel.vue'
 import { useInsightsTeams } from './useInsightsTeams'
 import { useInsightsTactics } from './useInsightsTactics'
@@ -139,6 +141,10 @@ const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
 const currentUser = session.currentUser
 const mainTab = ref<'data' | 'tactics'>('tactics')
+const mainTabs = [{ key: 'data', label: '数据洞察' }, { key: 'tactics', label: '战术' }]
+function changeMainTab(value: string): void {
+  if (value === 'data' || value === 'tactics') mainTab.value = value
+}
 const pageVisible = ref(false)
 const teamBrowser = useInsightsTeams(session)
 const { teams: selectableTeams, selectedTeamId, loading: teamLoading, error: teamError } = teamBrowser
@@ -262,7 +268,6 @@ watch([session.revision, currentUser], ([revision, user], [previousRevision, pre
 // 付费引导度量：只统计登录、权益未暂停且尚未达到 V6 的用户，这类用户才会在回流看板里遇到升级引导。
 function shouldMeasureTicketWatchEntry(): boolean {
   return pageVisible.value
-    && mainTab.value === 'data'
     && outlookReviewReady.value
     && Boolean(currentUser.value)
     && !userLoading.value
@@ -275,7 +280,7 @@ function reportTicketWatchEntryImpression(): void {
   if (shouldMeasureTicketWatchEntry()) reportPaywallImpression('insights_ticket_watch_entry')
 }
 
-watch([currentUser, userLoading, mainTab, pageVisible, outlookReviewReady], reportTicketWatchEntryImpression)
+watch([currentUser, userLoading, pageVisible, outlookReviewReady], reportTicketWatchEntryImpression)
 
 function openTicketWatch(): void {
   if (!currentUser.value) {
