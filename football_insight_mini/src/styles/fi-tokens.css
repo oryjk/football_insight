@@ -324,7 +324,7 @@ page {
   /* 换座页：Dock 与浮窗共用高度，确保浮窗定位在 Dock 之上 */
   --fi-component-seat-swap-dock-height: 96rpx;
   --fi-component-seat-swap-action-width: 168rpx;
-  --fi-component-seat-swap-action-min-height: 152rpx;
+  --fi-component-seat-swap-action-min-height: 64rpx;
   /* 换座卡球场缩略图：宽高比与大图球场区域一致（750×560） */
   --fi-component-seat-swap-thumb-width: 176rpx;
   --fi-component-seat-swap-thumb-height: 132rpx;

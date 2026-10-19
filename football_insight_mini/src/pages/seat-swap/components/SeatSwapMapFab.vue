@@ -7,7 +7,7 @@
     :aria-hidden="!visible"
   >
     <view class="map-fab__main" hover-class="map-fab__main--pressed" @tap="emit('open')">
-      <image class="map-fab__icon" src="/static/seat-swap/map.svg" mode="aspectFit" />
+      <image class="map-fab__icon" src="/static/seat-swap/map-ink.svg" mode="aspectFit" />
       <view class="map-fab__labels">
         <text :key="`in-${label}`" class="map-fab__label map-fab__label--in">{{ label }}</text>
         <text v-if="leavingLabel" :key="`out-${leavingLabel}`" class="map-fab__label map-fab__label--out">{{ leavingLabel }}</text>
@@ -58,7 +58,9 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   border-radius: var(--fi-radius-round);
-  background: var(--fi-primitive-ink);
+  /* 辅助工具：白底墨字，与红色发布按钮、卡片描边按钮区分开。 */
+  border: var(--fi-border-card);
+  background: var(--fi-color-surface);
   box-shadow: var(--fi-shadow-floating);
   opacity: 0;
   transform: translateY(var(--fi-space-16)) scale(0.95);
@@ -102,7 +104,7 @@ onBeforeUnmount(() => {
 
 .map-fab__label {
   display: block;
-  color: var(--fi-primitive-white);
+  color: var(--fi-color-text-strong);
   font-size: var(--fi-font-24);
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-snug);
@@ -128,7 +130,7 @@ onBeforeUnmount(() => {
   min-height: var(--fi-space-64);
   margin-right: var(--fi-space-6);
   border-radius: var(--fi-radius-round);
-  color: rgba(var(--fi-primitive-white-rgb), 0.84);
+  color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-24);
   transition: transform var(--fi-motion-duration-fast) var(--fi-motion-ease-out);
 }

@@ -49,7 +49,8 @@ const emit = defineEmits<{
   box-sizing: border-box;
   padding: var(--fi-space-24) var(--fi-space-28);
   border-radius: var(--fi-radius-md);
-  background: var(--fi-primitive-ink);
+  /* 整页唯一的主操作用品牌红；卡片内操作为描边胶囊、球场图浮窗为白底，层级逐级减弱。 */
+  background: var(--fi-color-primary);
   color: var(--fi-primitive-white);
   font-size: var(--fi-font-28);
   font-weight: var(--fi-weight-bold);
@@ -73,7 +74,7 @@ const emit = defineEmits<{
   width: var(--fi-space-36);
   height: var(--fi-space-36);
   border-radius: var(--fi-radius-round);
-  background: rgba(var(--fi-primitive-white-rgb), 0.18);
+  background: rgba(var(--fi-primitive-white-rgb), 0.22);
   font-size: var(--fi-font-26);
   line-height: var(--fi-leading-none);
 }

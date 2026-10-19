@@ -35,6 +35,7 @@
       <button
         v-if="action === 'confirm'"
         class="candidate__action candidate__action--primary"
+        :class="{ 'candidate__action--urgent': candidate.status !== 'display_only' }"
         hover-class="candidate__action--pressed"
         @tap.stop="emit('confirm', candidate.request_id)"
       >
@@ -244,22 +245,25 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   display: block;
 }
 
+/* 卡片内操作是次级按钮：单行胶囊、竖直居中，不再是撑满整卡高度的黑块。 */
 .candidate__action {
   flex-shrink: 0;
-  align-self: stretch;
+  align-self: center;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
   width: var(--fi-component-seat-swap-action-width);
   min-height: var(--fi-component-seat-swap-action-min-height);
   margin: 0;
-  padding: var(--fi-space-18) var(--fi-space-20);
-  border-radius: var(--fi-radius-md);
+  padding: 0 var(--fi-space-12);
+  border-radius: var(--fi-radius-round);
   color: var(--fi-primitive-white);
-  font-size: var(--fi-font-28);
+  font-size: var(--fi-font-24);
   font-weight: var(--fi-weight-bold);
-  line-height: var(--fi-leading-snug);
+  line-height: var(--fi-leading-none);
   text-align: center;
+  white-space: nowrap;
   transition: transform var(--fi-motion-duration-fast) var(--fi-motion-ease-out);
 }
 
@@ -272,13 +276,21 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 }
 
 .candidate__action--primary {
-  background: var(--fi-primitive-ink);
-  box-shadow: var(--fi-shadow-soft);
+  background: var(--fi-color-surface);
+  color: var(--fi-color-text-strong);
+  border: var(--fi-border-width) solid var(--fi-primitive-ink);
+}
+
+/* 对方已确认、等你确认换座：唯一需要立刻处理的卡片操作，用品牌红实心。 */
+.candidate__action--primary.candidate__action--urgent {
+  background: var(--fi-color-primary);
+  border-color: var(--fi-color-primary);
+  color: var(--fi-primitive-white);
 }
 
 .candidate__action--secondary {
   background: var(--fi-color-surface);
-  color: var(--fi-color-text-primary);
+  color: var(--fi-color-text-secondary);
   border: var(--fi-border-width) solid rgba(var(--fi-primitive-ink-rgb), 0.16);
 }
 
