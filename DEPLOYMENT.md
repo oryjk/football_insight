@@ -275,6 +275,16 @@ ssh peiqian 'curl -s http://127.0.0.1:8092/api/v1/ticket-watch/best-windows'
 - 面板消失：先看 `best-windows` 接口的 `status`（`ok` / `insufficient` / `unavailable`），再看 4001 读接口和 `data/restock-profiles` 是否有最新比赛的快照；最近 8 场里没就绪的比赛会被跳过，不影响其余样本。
 - 批处理失败：单场失败只记录并继续，整轮结束时才以非零退出；`journalctl -u ticket-restock-profiles.service` 看是哪场、什么原因。
 
+## 球队名单同步（战术板）
+
+战术板（最佳阵容）用的完整名单来自新浪 `/op/api/team/player`，由 local233 的抓取器写入生产 `f_i_squad_players`，后端 `GET /api/v1/lineups/squads/{team_id}` 只读。
+
+- 迁移：`20261019120000_add_squad_players.sql`（2026-10-19 已在 peiqian 用 `cargo run --release --bin run_migrations` 执行；peiqian 后端目录没有 `.env`，需先 `set -a; . ../football-insight-service-backend-rs.env; set +a` 加载 `DATABASE_URL`）。
+- 首次回填（往前 3 个赛季的前队员）：`cd sina_csl_scraper && FI_SQUAD_SYNC_BACKFILL=3 ./sync_squads_daily.sh`。头像逐张转存 MinIO，16 队首次超过半小时；同步是幂等的，被超时打断后重跑即可补齐（2026-10-19 首次因 25 分钟超时只跑完 14 队，重跑补齐 16 队）。
+- 每日调度：`sina_csl_scraper/deploy/squad-sync.cron.example`，每天 03:45 只同步当前赛季（`FI_SQUAD_SYNC_BACKFILL` 默认 0），日志 `sina_csl_scraper/squad_sync.log`。
+- 失败隔离：每队独立；某队请求失败、结构异常或返回空名单时跳过该队，不改它的任何数据，摘要 JSON 的 `teams_failed` 列出失败球队。只有当前赛季成功拿到非空名单，才把缺席者置为前队员（`active=false`，不删除）。
+- 只读核对：`curl -s http://127.0.0.1:18092/api/v1/lineups/squads/77680`，看 `active` / `former` 人数；接口返回 503 表示表不存在或库不可用。
+
 ## 日志查看
 
 应用代码会把 tracing 日志写入 `logs/` 目录，并按 10MB 滚动；这是排查业务日志时的优先入口（线上流量在 `peiqian`，排查线上问题优先看 peiqian；jd 备用容器同理把 `ssh peiqian` 换成 `ssh jd`）：
