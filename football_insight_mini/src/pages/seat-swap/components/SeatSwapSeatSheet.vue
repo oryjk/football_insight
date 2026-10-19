@@ -15,15 +15,11 @@
         :desired-keys="desiredKeys"
       />
       <view class="seat-sheet__rows">
-        <view class="seat-sheet__row">
-          <view class="seat-sheet__dot seat-sheet__dot--current" />
-          <text class="seat-sheet__label">当前</text>
-          <text class="seat-sheet__value">{{ formatSeatSwapSeatLabel(candidate) }}</text>
-        </view>
-        <view class="seat-sheet__row">
-          <view class="seat-sheet__dot seat-sheet__dot--desired" />
-          <text class="seat-sheet__label">目标</text>
-          <text class="seat-sheet__value">{{ formatSeatSwapDesiredSeats(candidate.desired_seats) }}</text>
+        <view v-for="(row, index) in priceRows" :key="`${row.kind}-${index}`" class="seat-sheet__row">
+          <view class="seat-sheet__dot" :class="`seat-sheet__dot--${row.kind}`" />
+          <text class="seat-sheet__label">{{ row.kind === 'current' ? '当前' : '目标' }}</text>
+          <text class="seat-sheet__value">{{ row.label }}</text>
+          <text v-if="row.price" class="seat-sheet__price">{{ row.price }}</text>
         </view>
       </view>
     </view>
@@ -36,7 +32,7 @@ import FiBottomSheet from '../../../components/FiBottomSheet.vue'
 import StadiumMap from './StadiumMap.vue'
 import type { SeatSwapCandidate } from '../../../types/seatSwap'
 import type { TicketWatchRegion } from '../../../types/ticketWatch'
-import { formatSeatSwapDesiredSeats, formatSeatSwapSeatLabel } from '../../../utils/stadiumRegions'
+import { buildSeatSwapSeatPriceRows } from '../helpers'
 
 const props = defineProps<{
   visible: boolean
@@ -47,6 +43,7 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'update:visible', value: boolean): void }>()
 
 const desiredKeys = computed(() => props.candidate?.desired_seats.map((seat) => seat.region_key) || [])
+const priceRows = computed(() => (props.candidate ? buildSeatSwapSeatPriceRows(props.candidate, props.regions) : []))
 </script>
 
 <style scoped>
@@ -94,8 +91,18 @@ const desiredKeys = computed(() => props.candidate?.desired_seats.map((seat) => 
 .seat-sheet__value {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
   color: var(--fi-color-text-strong);
   font-size: var(--fi-font-28);
+  font-weight: var(--fi-weight-bold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seat-sheet__price {
+  flex-shrink: 0;
+  color: var(--fi-color-text-secondary);
+  font-size: var(--fi-font-26);
   font-weight: var(--fi-weight-bold);
 }
 </style>

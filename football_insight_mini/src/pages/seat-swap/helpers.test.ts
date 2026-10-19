@@ -15,6 +15,8 @@ import {
   resolveDefaultExpandedSeatSwapRegionKeys,
   shouldDimSeatSwapRegion,
   SEAT_SWAP_POOL_ANCHOR_ID,
+  buildSeatSwapSeatPriceRows,
+  formatSeatSwapRegionPrice,
   SEAT_SWAP_STADIUM_REGION_NAMES,
   buildSeatSwapThumbSvg,
   resolveSeatSwapThumbHighlights,
@@ -705,5 +707,47 @@ describe('seat swap seat thumbnail', () => {
     expect(svg.startsWith('<svg')).toBe(true)
     expect((svg.match(/<rect /g) || []).length).toBe(71)
     expect(svg.includes('<text')).toBe(false)
+  })
+})
+
+describe('seat swap seat sheet price rows', () => {
+  const regions = [
+    { block_key: '101', block_name: '101', price: '180.00' },
+    { block_key: '109', block_name: '109', price: '220.00' },
+    { block_key: 'VIP2', block_name: 'VIP2', price: '1288.00' },
+    { block_key: '505', block_name: '505', price: '99.50' },
+  ]
+
+  test('formats a region price from the regions list', () => {
+    expect(formatSeatSwapRegionPrice(regions, '101')).toBe('180元')
+    expect(formatSeatSwapRegionPrice(regions, 'VIP2')).toBe('1288元')
+    expect(formatSeatSwapRegionPrice(regions, '505')).toBe('99.5元')
+  })
+
+  test('returns empty text when the region or price is unknown', () => {
+    expect(formatSeatSwapRegionPrice(regions, '999')).toBe('')
+    expect(formatSeatSwapRegionPrice([{ block_key: '101', block_name: '101', price: '' }], '101')).toBe('')
+    expect(formatSeatSwapRegionPrice([{ block_key: '101', block_name: '101', price: 'abc' }], '101')).toBe('')
+  })
+
+  test('lists the current seat then one row per desired region, each with its own price', () => {
+    const rows = buildSeatSwapSeatPriceRows(
+      {
+        current_region_key: '101',
+        current_region_name: '101',
+        current_row: '1',
+        current_seat_no: '1',
+        desired_seats: [
+          { region_key: '109', region_name: '109', desired_row: '1', desired_seat_no: '1' },
+          { region_key: '999', region_name: '999', desired_row: null, desired_seat_no: null },
+        ],
+      },
+      regions,
+    )
+    expect(rows).toEqual([
+      { kind: 'current', label: '101 1排 1号', price: '180元' },
+      { kind: 'desired', label: '109 1排 1号', price: '220元' },
+      { kind: 'desired', label: '999', price: '' },
+    ])
   })
 })

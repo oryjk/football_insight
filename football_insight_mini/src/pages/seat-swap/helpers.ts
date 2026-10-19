@@ -1,4 +1,8 @@
-import { resolveSeatSwapRegionLayout } from '../../utils/stadiumRegions'
+import {
+  formatSeatSwapDesiredSeats,
+  formatSeatSwapSeatLabel,
+  resolveSeatSwapRegionLayout,
+} from '../../utils/stadiumRegions'
 
 export interface SeatSwapDesiredSeatFormState {
   region_key: string
@@ -386,4 +390,54 @@ export function buildSeatSwapThumbSvg(): string {
     '</svg>',
     '',
   ].join('\n')
+}
+
+interface SeatSwapPricedRegion {
+  block_key?: string
+  block_name: string
+  price: string
+}
+
+/** 分区票价：取分区接口里的 price（如 "180.00" → "180元"）；找不到或无效时返回空串。 */
+export function formatSeatSwapRegionPrice(regions: SeatSwapPricedRegion[], key: string): string {
+  const region = regions.find((item) => (item.block_key || item.block_name) === key)
+  const value = Number.parseFloat(region?.price ?? '')
+  if (!Number.isFinite(value)) return ''
+  return `${Number(value.toFixed(2))}元`
+}
+
+export interface SeatSwapSeatPriceRow {
+  kind: 'current' | 'desired'
+  label: string
+  price: string
+}
+
+/** 座位大图下方的文字：当前座位一行，目标座位每个分区一行，各自带票价。 */
+export function buildSeatSwapSeatPriceRows(
+  request: {
+    current_region_key: string
+    current_region_name: string
+    current_row: string
+    current_seat_no: string
+    desired_seats: Array<{
+      region_key: string
+      region_name: string
+      desired_row?: string | null
+      desired_seat_no?: string | null
+    }>
+  },
+  regions: SeatSwapPricedRegion[],
+): SeatSwapSeatPriceRow[] {
+  return [
+    {
+      kind: 'current',
+      label: formatSeatSwapSeatLabel(request),
+      price: formatSeatSwapRegionPrice(regions, request.current_region_key),
+    },
+    ...request.desired_seats.map((seat) => ({
+      kind: 'desired' as const,
+      label: formatSeatSwapDesiredSeats([seat]),
+      price: formatSeatSwapRegionPrice(regions, seat.region_key),
+    })),
+  ]
 }

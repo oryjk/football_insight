@@ -2,7 +2,8 @@
   <view class="stadium-map" :class="{ 'stadium-map--review': mode === 'review' }">
     <view v-if="hint" class="stadium-map__hint">{{ hint }}</view>
     <view class="stadium-map__field">
-      <view class="stadium-price-legend" aria-hidden="true">
+      <!-- review 模式只突出当前/目标座位，彩色价格图例会喧宾夺主，不显示。 -->
+      <view v-if="mode !== 'review'" class="stadium-price-legend" aria-hidden="true">
         <view
           v-for="item in priceLegendItems"
           :key="item.grade"
