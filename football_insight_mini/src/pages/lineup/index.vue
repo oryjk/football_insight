@@ -61,13 +61,13 @@
             class="actions__reset"
             hover-class="actions__reset--pressed"
             :disabled="saving"
-            @tap="resetConfirmVisible = true"
+            @tap="requestConfirmation('reset')"
           >重置</button>
           <button
             class="actions__primary"
             hover-class="actions__primary--pressed"
             :disabled="saving"
-            @tap="handleSave"
+            @tap="requestConfirmation('save')"
           >{{ saving ? '保存中…' : '保存' }}</button>
           <button class="actions__ghost" :disabled="saving || sharePreparing" @tap="handleShare">{{ sharePreparing ? '准备中…' : '分享' }}</button>
         </view>
@@ -83,21 +83,13 @@
       @remove="handleRemove"
     />
 
-    <FiBottomSheet v-model:visible="resetConfirmVisible" title="确认重置？" height="45vh" :z-index="100" fit-content>
-      <text class="reset-confirm__copy">所有球员将恢复为当前阵型的默认站位，已选球员保持不变。</text>
-      <template #footer>
-        <button
-          class="reset-confirm__action reset-confirm__action--cancel"
-          hover-class="actions__ghost--pressed"
-          @tap="resetConfirmVisible = false"
-        >取消</button>
-        <button
-          class="reset-confirm__action reset-confirm__action--confirm"
-          hover-class="actions__reset--pressed"
-          @tap="confirmReset"
-        >确认重置</button>
-      </template>
-    </FiBottomSheet>
+    <LineupConfirmDialog
+      :visible="confirmAction !== null"
+      :title="confirmAction === 'reset' ? '确认重置？' : '确认保存？'"
+      :message="confirmationMessage"
+      @cancel="confirmAction = null"
+      @confirm="confirmPendingAction"
+    />
     <LineupShareSheet v-model:visible="shareVisible" :busy="shareBusy" :ready="Boolean(sharePayload)" :image-path="imagePath" :error="shareError" @generate="generate" @preview="preview" @save="saveImage" />
     <canvas canvas-id="lineup-share-canvas" class="share-canvas" :style="{ width: '750px', height: '1200px' }" />
     <canvas canvas-id="lineup-card-canvas" class="share-canvas" :style="{ width: '750px', height: '600px' }" />
@@ -110,7 +102,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { onLoad, onShow, onShareAppMessage } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
-import FiBottomSheet from '../../components/FiBottomSheet.vue'
+import LineupConfirmDialog from './components/LineupConfirmDialog.vue'
 import { getSharedLineup } from '../../api/lineup'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { prepareEditorShare } from './lineupEditorShare'
@@ -135,7 +127,7 @@ const { teamId, squad, loading, errorMessage, notice, saving, saveState, savedLi
 
 const teams = ref<Array<{ team_id: number; team_name: string; avatar_url: string | null }>>([])
 const sheetVisible = ref(false)
-const resetConfirmVisible = ref(false)
+const confirmAction = ref<'save' | 'reset' | null>(null)
 const sharePreparing = ref(false)
 const shareContext = () => JSON.stringify([teamId.value, editor.revision.value, session.revision.value, loading.value])
 const share = useLineupShare(shareContext, () => buildLineupPageUrl(teamId.value, { autosave: true }))
@@ -150,7 +142,14 @@ let requestedTeamId = 0
 let started = false
 
 // 弹层打开时锁页面滚动（沿用换座页的 page-meta 约定）。
-const pageLockStyle = computed(() => (sheetVisible.value || resetConfirmVisible.value || shareVisible.value ? 'overflow: hidden;' : ''))
+const pageLockStyle = computed(() => (sheetVisible.value || confirmAction.value !== null || shareVisible.value ? 'overflow: hidden;' : ''))
+const confirmationMessage = computed(() => {
+  if (confirmAction.value === 'reset') return '所有球员将恢复为当前阵型的默认站位，已选球员保持不变。'
+  return editor.filled.value === 11
+    ? '保存当前战术阵容？满 11 人的阵容保存后将公开展示，球迷可查看和点赞。'
+    : '保存当前战术阵容？未满 11 人的阵容仅自己可见。'
+})
+watch([teamId, loading, saving, session.revision], () => { confirmAction.value = null })
 
 const pitchPlayers = computed(() => buildPitchPlayers(editor.slots.value, editor.formation.value, squad.value))
 
@@ -220,10 +219,18 @@ function changeFormation(code: string): void {
   editor.setFormation(code, positionIndex(squad.value))
 }
 
-function confirmReset(): void {
-  resetConfirmVisible.value = false
-  if (loading.value || !squad.value || saving.value) return
-  editor.reset()
+function requestConfirmation(action: 'save' | 'reset'): void {
+  if (loading.value || !squad.value || saving.value || sharePreparing.value) return
+  uni.hideToast()
+  confirmAction.value = action
+}
+
+function confirmPendingAction(): void {
+  const action = confirmAction.value
+  confirmAction.value = null
+  if (!action || loading.value || !squad.value || saving.value || sharePreparing.value) return
+  if (action === 'reset') editor.reset()
+  else void handleSave()
 }
 
 async function switchTeam(nextTeamId: number): Promise<void> {
@@ -553,39 +560,6 @@ onBeforeUnmount(dispose)
 
 .actions__reset[disabled] {
   opacity: var(--fi-opacity-pressed);
-}
-
-.reset-confirm__copy {
-  display: block;
-  color: var(--fi-color-text-secondary);
-  font-size: var(--fi-font-28);
-  line-height: var(--fi-leading-relaxed);
-}
-
-.reset-confirm__action {
-  flex: 1;
-  margin: 0;
-  padding: var(--fi-space-20) var(--fi-space-24);
-  border-radius: var(--fi-radius-round);
-  font-size: var(--fi-font-28);
-  font-weight: var(--fi-weight-bold);
-  line-height: var(--fi-leading-snug);
-}
-
-.reset-confirm__action::after {
-  border: 0;
-}
-
-.reset-confirm__action--cancel {
-  border: var(--fi-border-width) solid var(--fi-color-border-chip);
-  background: var(--fi-color-page-soft);
-  color: var(--fi-color-text-primary);
-}
-
-.reset-confirm__action--confirm {
-  border: var(--fi-border-width) solid var(--fi-color-primary-deep);
-  background: var(--fi-color-primary);
-  color: var(--fi-color-surface);
 }
 
 .actions__primary {
