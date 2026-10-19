@@ -112,6 +112,7 @@ import {
   buildOpponentContributionRows,
   buildPlayerContributionRows,
 } from './helpers'
+import { buildLineupPageUrl } from '../../utils/lineupLinks'
 import { createInsightsSessionSync, runInsightsShow } from './sessionEffects'
 import { useInsightsData } from './useInsightsData'
 
@@ -297,8 +298,9 @@ function goToTeamBoard(): void {
     return
   }
 
+  // 「战术板」入口现在进入排阵页；旧的观点帖页面保留但不再提供入口。
   uni.navigateTo({
-    url: `/pages/team-board/index?teamId=${selectedInsight.value.team_id}`,
+    url: buildLineupPageUrl(selectedInsight.value.team_id),
   })
 }
 

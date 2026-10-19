@@ -120,3 +120,4 @@ defineProps<{
   color: rgba(var(--fi-primitive-white-rgb), 0.72);
   font-weight: var(--fi-weight-bold);
 }
+</style>

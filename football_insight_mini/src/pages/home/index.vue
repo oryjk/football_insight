@@ -59,6 +59,13 @@
           @tap="openMatchOutlook"
         >下一场的数据倾向 · 前往洞察查看</button>
 
+        <button
+          v-if="supportFavoriteTeam"
+          class="outlook-entry"
+          hover-class="outlook-entry--pressed"
+          @tap="openLineupBoard"
+        >排{{ supportFavoriteTeam.team_name }}的最佳阵容 · 前往战术板</button>
+
         <!-- 回到页面的后台刷新沿用已有内容，只有还没有总览数据时才显示骨架 -->
         <HomeSkeleton v-if="loading && !overview" />
 
@@ -161,6 +168,7 @@ import type {
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
+import { buildLineupPageUrl } from '../../utils/lineupLinks'
 import { useRuntimeConfig } from '../../stores/runtimeConfig'
 import { buildHeadlineTitleParts } from '../../utils/homeViewText'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
@@ -523,6 +531,10 @@ const outlookRestricted = outlookReview.shouldRestrictFeatures
 
 function openMatchOutlook() {
   uni.switchTab({ url: '/pages/insights/index' })
+}
+
+function openLineupBoard() {
+  uni.navigateTo({ url: buildLineupPageUrl(supportFavoriteTeam.value?.team_id) })
 }
 
 onShow(() => {

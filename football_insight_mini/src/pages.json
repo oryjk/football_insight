@@ -99,12 +99,28 @@
 					}
 				}
 			]
+		},
+		{
+			"root": "pages/lineup",
+			"pages": [
+				{
+					"path": "index",
+					"style": {
+						"navigationBarTitleText": "战术板",
+						"navigationStyle": "custom"
+					}
+				}
+			]
 		}
 	],
 	"preloadRule": {
 		"pages/insights/index": {
 			"network": "all",
-			"packages": ["pages/ticket-watch"]
+			"packages": ["pages/ticket-watch", "pages/lineup"]
+		},
+		"pages/home/index": {
+			"network": "all",
+			"packages": ["pages/lineup"]
 		}
 	},
 	"tabBar": {

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { getFormation } from './formations'
 import {
   COORD_MAX, COORD_MIN, SWAP_DISTANCE_RATIO, TAP_THRESHOLD_RPX,
-  applyDragOutcome, assignPlayer, buildLineupPageUrl, clampCoord, countFilled, emptyLineup,
+  applyDragOutcome, assignPlayer, clampCoord, countFilled, emptyLineup,
   reassignPlayersToFormation, resetPositions, resolveDragRelease,
   type LineupSlots,
 } from './helpers'
@@ -224,13 +224,5 @@ describe('applyDragOutcome', () => {
       const d = defaults.find((f) => f.slot === s.slot)!
       expect([s.x, s.y]).toEqual([d.x, d.y])
     }
-  })
-})
-
-describe('buildLineupPageUrl', () => {
-  test('adds teamId only when there is one', () => {
-    expect(buildLineupPageUrl(77680)).toBe('/pages/lineup/index?teamId=77680')
-    expect(buildLineupPageUrl()).toBe('/pages/lineup/index')
-    expect(buildLineupPageUrl(0)).toBe('/pages/lineup/index')
   })
 })

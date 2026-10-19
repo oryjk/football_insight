@@ -137,7 +137,3 @@ export function applyDragOutcome(slots: LineupSlots, slot: number, outcome: Drag
     return s
   })
 }
-
-export function buildLineupPageUrl(teamId?: number): string {
-  return teamId && teamId > 0 ? `/pages/lineup/index?teamId=${teamId}` : '/pages/lineup/index'
-}
