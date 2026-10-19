@@ -42,6 +42,8 @@ page {
   --fi-primitive-shadow-team-form-latest-loss: 0 0 0 4rpx rgba(38, 162, 105, 0.10), 0 0 8rpx 2rpx rgba(38, 162, 105, 0.55), 0 0 16rpx 4rpx rgba(38, 162, 105, 0.24);
   --fi-primitive-canvas: #f6f7fb;
   --fi-primitive-canvas-soft: #f7f8fa;
+  --fi-primitive-page-backdrop-mid: rgba(247, 248, 250, 0.55);
+  --fi-primitive-page-backdrop-fade: linear-gradient(180deg, transparent 45%, var(--fi-primitive-page-backdrop-mid) 78%, var(--fi-primitive-canvas-soft) 100%);
   --fi-primitive-surface-frosted: rgba(255, 255, 255, 0.92);
   --fi-primitive-surface-panel: rgba(255, 255, 255, 0.94);
   --fi-primitive-topic-audio-surface: #fef2f2;
@@ -179,6 +181,7 @@ page {
   --fi-color-primary-darker: var(--fi-primitive-red-darker);
   --fi-color-page: var(--fi-primitive-canvas);
   --fi-color-page-soft: var(--fi-primitive-canvas-soft);
+  --fi-color-page-backdrop-fade: var(--fi-primitive-page-backdrop-fade);
   --fi-color-surface-frosted: var(--fi-primitive-surface-frosted);
   --fi-color-surface-panel: var(--fi-primitive-surface-panel);
   --fi-color-topic-audio-surface: var(--fi-primitive-topic-audio-surface);

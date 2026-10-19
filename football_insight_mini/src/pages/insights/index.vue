@@ -11,86 +11,97 @@
           :locked="shouldLockTicketWatchEntry"
           @open="openTicketWatch"
         />
-        <InsightsTeamSelector
-          v-if="selectableTeams.length"
-          :teams="selectableTeams"
-          :selected-team-id="selectedTeamId"
-          @update:selected-team-id="teamBrowser.selectTeam"
-        />
-        <view v-else class="state-card team-loading">
-          <text>{{ teamError || '正在加载球队…' }}</text>
-          <button v-if="teamError" @tap="teamBrowser.load()">重试</button>
-        </view>
-        <view>
-          <FiSegmented :items="mainTabs" :model-value="mainTab" aria-label="洞察内容" @update:model-value="changeMainTab" />
-        </view>
-        <InsightsTacticsPanel
-          v-if="mainTab === 'tactics'"
-          :authenticated="tacticsAuthenticated"
-          :mine-loading="mineLoading" :mine-error="mineError" :draft="mineDraft" :published="minePublished"
-          :items="communityItems" :total="communityTotal" :sort="communitySort"
-          :loading="communityLoading || teamLoading" :error="teamError || communityError" :pending-likes="communityPendingLikes"
-          @edit="goToTeamBoard" @retry-mine="tactics.retryMine()" @retry-list="retryTacticsList"
-          @sort="tactics.changeSort" @like="tactics.like" @open="openPublicTactics" @more="tactics.more()"
-        />
-        <template v-else>
-          <InsightsMatchOutlook
-            v-if="outlookReviewReady && !systemConfigUnderReview && currentUser"
-            :matches="outlookMatches"
-            :selected-match-id="outlookSelectedMatchId"
-            :outlook="matchOutlook"
-            :loading="outlookLoading"
-            :error="outlookError"
-            @select-match="outlookLoader.selectMatch"
-          />
-
-          <InsightsSkeleton
-            v-if="userLoading"
-          />
-
-          <InsightsLockedPanel v-else-if="!currentUser" mode="guest" />
-
-          <InsightsLockedPanel v-else-if="membershipBenefitsLocked" mode="membership" @action="goToUserPage" />
-
-          <InsightsSkeleton
-            v-else-if="loading"
-          />
-
-          <view v-else-if="errorMessage" class="state-card state-card--error">
-            <text>{{ errorMessage }}</text>
-          </view>
-
-          <template v-else-if="selectedInsight">
-            <InsightsTeamPanel
-              :insight="selectedInsight"
+        <FiPanel>
+          <view class="insights-workspace">
+            <InsightsTeamSelector
+              v-if="selectableTeams.length"
+              :teams="selectableTeams"
+              :selected-team-id="selectedTeamId"
+              @update:selected-team-id="teamBrowser.selectTeam"
             />
+            <view v-else class="state-card team-loading">
+              <text>{{ teamError || '正在加载球队…' }}</text>
+              <button v-if="teamError" @tap="teamBrowser.load()">重试</button>
+            </view>
+            <view>
+              <FiSegmented :items="mainTabs" :model-value="mainTab" aria-label="洞察内容" @update:model-value="changeMainTab" />
+            </view>
+            <view class="insights-content">
+              <InsightsTacticsPanel
+                v-if="mainTab === 'tactics'"
+                :authenticated="tacticsAuthenticated"
+                :mine-loading="mineLoading" :mine-error="mineError" :draft="mineDraft" :published="minePublished"
+                :items="communityItems" :total="communityTotal" :sort="communitySort"
+                :loading="communityLoading || teamLoading" :error="teamError || communityError" :pending-likes="communityPendingLikes"
+                @edit="goToTeamBoard" @retry-mine="tactics.retryMine()" @retry-list="retryTacticsList"
+                @sort="tactics.changeSort" @like="tactics.like" @open="openPublicTactics" @more="tactics.more()"
+              />
+              <template v-else>
+                <view v-if="outlookReviewReady && !systemConfigUnderReview && currentUser" class="workspace-section">
+                  <InsightsMatchOutlook
+                    :matches="outlookMatches"
+                    :selected-match-id="outlookSelectedMatchId"
+                    :outlook="matchOutlook"
+                    :loading="outlookLoading"
+                    :error="outlookError"
+                    @select-match="outlookLoader.selectMatch"
+                  />
+                </view>
 
-            <InsightsContributionSurface
-              :rows="{
-                'goals-for-opponent': goalsForByOpponentRows,
-                'goals-for-player': goalsForByPlayerRows,
-                'assists-player': assistsByPlayerRows,
-                'goals-against-opponent': goalsAgainstByOpponentRows,
-              }"
-              :expanded="{
-                'goals-for-opponent': goalsForOpponentExpanded,
-                'goals-for-player': goalsForPlayerExpanded,
-                'assists-player': assistsForPlayerExpanded,
-                'goals-against-opponent': goalsAgainstOpponentExpanded,
-              }"
-              @toggle="key => {
-                if (key === 'goals-for-opponent') goalsForOpponentExpanded = !goalsForOpponentExpanded
-                else if (key === 'goals-for-player') goalsForPlayerExpanded = !goalsForPlayerExpanded
-                else if (key === 'assists-player') assistsForPlayerExpanded = !assistsForPlayerExpanded
-                else if (key === 'goals-against-opponent') goalsAgainstOpponentExpanded = !goalsAgainstOpponentExpanded
-              }"
-            />
-          </template>
+                <view class="workspace-section">
+                  <InsightsSkeleton
+                    v-if="userLoading"
+                  />
 
-          <view v-else class="state-card">
-            <text>当前还没有可展示的球队洞察数据。</text>
+                  <InsightsLockedPanel v-else-if="!currentUser" mode="guest" />
+
+                  <InsightsLockedPanel v-else-if="membershipBenefitsLocked" mode="membership" @action="goToUserPage" />
+
+                  <InsightsSkeleton
+                    v-else-if="loading"
+                  />
+
+                  <view v-else-if="errorMessage" class="state-card state-card--error">
+                    <text>{{ errorMessage }}</text>
+                  </view>
+
+                  <template v-else-if="selectedInsight">
+                    <InsightsTeamPanel
+                      :insight="selectedInsight"
+                    />
+
+                    <view class="contribution-section">
+                      <InsightsContributionSurface
+                        :rows="{
+                          'goals-for-opponent': goalsForByOpponentRows,
+                          'goals-for-player': goalsForByPlayerRows,
+                          'assists-player': assistsByPlayerRows,
+                          'goals-against-opponent': goalsAgainstByOpponentRows,
+                        }"
+                        :expanded="{
+                          'goals-for-opponent': goalsForOpponentExpanded,
+                          'goals-for-player': goalsForPlayerExpanded,
+                          'assists-player': assistsForPlayerExpanded,
+                          'goals-against-opponent': goalsAgainstOpponentExpanded,
+                        }"
+                        @toggle="key => {
+                          if (key === 'goals-for-opponent') goalsForOpponentExpanded = !goalsForOpponentExpanded
+                          else if (key === 'goals-for-player') goalsForPlayerExpanded = !goalsForPlayerExpanded
+                          else if (key === 'assists-player') assistsForPlayerExpanded = !assistsForPlayerExpanded
+                          else if (key === 'goals-against-opponent') goalsAgainstOpponentExpanded = !goalsAgainstOpponentExpanded
+                        }"
+                      />
+                    </view>
+                  </template>
+
+                  <view v-else class="state-card">
+                    <text>当前还没有可展示的球队洞察数据。</text>
+                  </view>
+                </view>
+              </template>
+            </view>
           </view>
-        </template>
+        </FiPanel>
       </view>
     </view>
 
@@ -106,6 +117,7 @@ import { onHide, onReachBottom, onShareAppMessage, onShow, onUnload } from '@dcl
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
 import FiSegmented from '../../components/FiSegmented.vue'
+import FiPanel from '../../components/FiPanel.vue'
 import InsightsTacticsPanel from './components/InsightsTacticsPanel.vue'
 import { useInsightsTeams } from './useInsightsTeams'
 import { useInsightsTactics } from './useInsightsTactics'
@@ -362,7 +374,22 @@ onShow(async () => {
 
 <style scoped lang="css">
 .team-loading { color:var(--fi-color-text-caption); font-size:var(--fi-font-24); }
-.page-root { position: relative; }
+.page-root { position: relative; min-height: 100vh; background: var(--fi-color-page-soft); }
+.insights-workspace { display: flex; flex-direction: column; gap: var(--fi-space-24); min-width: 0; }
+.insights-content {
+  /* FiPanel 的组件 token 可继承穿过小程序宿主节点，内层作为同一底板的内容区。 */
+  --fi-component-panel-bg: transparent;
+  --fi-component-panel-radius: 0;
+  --fi-component-panel-border: 0;
+  --fi-component-panel-shadow: none;
+  --fi-component-panel-padding: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fi-space-28);
+}
+.workspace-section { min-width: 0; padding-top: var(--fi-space-24); border-top: var(--fi-border-width) solid var(--fi-color-divider); }
+.contribution-section { margin-top: var(--fi-space-28); padding-top: var(--fi-space-24); border-top: var(--fi-border-width) solid var(--fi-color-divider); }
 .page-scroll {
   padding-top: var(--fi-brand-nav-height);
   position: relative;
@@ -390,17 +417,13 @@ onShow(async () => {
   left: 0;
   width: 100%;
   height: var(--fi-space-insights-backdrop-height);
-  background: var(--fi-color-insights-page-wash);
+  background: var(--fi-color-page-backdrop-fade);
   pointer-events: none;
   z-index: 0;
 }
 .state-card {
   position: relative;
-  background: var(--fi-color-surface-panel);
-  border-radius: var(--fi-radius-xl);
-  border: var(--fi-border-card);
-  box-shadow: var(--fi-shadow-card);
-  padding: var(--fi-space-20);
+  padding: var(--fi-space-16) 0;
 }
 .state-card--error text {
   font-size: var(--fi-font-28);

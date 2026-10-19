@@ -30,7 +30,7 @@ const summary = computed(() => myTacticsSummary(props.draft, props.published))
 </script>
 <style scoped>
 @import '../../../styles/fi-skeleton.css';
-.my-tactics { padding:var(--fi-space-24); border:var(--fi-border-card); border-radius:var(--fi-radius-lg); background:var(--fi-color-surface-panel); box-shadow:var(--fi-shadow-card); }
+.my-tactics { padding:var(--fi-space-20); border-radius:var(--fi-radius-md); background:var(--fi-color-page-soft); }
 .my-tactics__heading { display:flex; justify-content:space-between; align-items:center; gap:var(--fi-space-12); font-size:var(--fi-font-28); font-weight:var(--fi-weight-extrabold); color:var(--fi-color-text-primary); }
 .my-tactics__status { font-size:var(--fi-font-22); color:var(--fi-color-text-caption); font-weight:normal; }
 .my-tactics__body { margin-top:var(--fi-space-20); display:flex; align-items:center; gap:var(--fi-space-16); }

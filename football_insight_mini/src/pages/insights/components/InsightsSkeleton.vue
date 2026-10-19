@@ -38,7 +38,7 @@
 <style scoped lang="css">
 @import '../../../styles/fi-skeleton.css';
 
-.insights-skeleton { display: grid; gap: var(--fi-space-22); }
+.insights-skeleton { display: grid; gap: var(--fi-space-22); padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .insights-skeleton__chips { display: flex; gap: var(--fi-space-10); overflow: hidden; }
 .insights-skeleton__chip { flex: 0 0 38%; height: var(--fi-space-72); }
 .insights-skeleton__link { width: 22%; height: var(--fi-space-32); }

@@ -597,7 +597,7 @@ onShow(() => {
   top: 0;
   left: 0;
   width: 100%;
-  height: 600rpx;
+  height: var(--fi-space-600);
   pointer-events: none;
   z-index: 0;
 }
@@ -606,8 +606,8 @@ onShow(() => {
   top: 0;
   left: 0;
   width: 100%;
-  height: 600rpx;
-  background: linear-gradient(180deg, transparent 45%, rgba(247,248,250,0.55) 78%, var(--fi-color-page-soft) 100%);
+  height: var(--fi-space-600);
+  background: var(--fi-color-page-backdrop-fade);
   pointer-events: none;
   z-index: 0;
 }
