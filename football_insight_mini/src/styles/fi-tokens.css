@@ -1018,8 +1018,9 @@ page {
   --fi-component-topic-hero-radius: var(--fi-radius-topic-hero);
   --fi-component-topic-hero-title: var(--fi-color-topic-hero-text);
   --fi-component-topic-hero-copy: var(--fi-color-topic-hero-muted);
-  --fi-component-topic-hero-action-height: 52rpx;
-  --fi-component-topic-hero-action-width: var(--fi-space-72);
+  --fi-component-topic-hero-action-height: 60rpx;
+  /* 容纳「▶ 加载中」：图标 20 + 间距 10 + 三字 72 + 两侧留白。 */
+  --fi-component-topic-hero-action-width: 136rpx;
   --fi-component-topic-crest-size: var(--fi-space-topic-hero-crest);
   --fi-component-topic-crest-opacity: var(--fi-opacity-topic-hero-crest);
   --fi-component-topic-crest-history-opacity: var(--fi-opacity-topic-history-crest);
