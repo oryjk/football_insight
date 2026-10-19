@@ -4,7 +4,7 @@ import { useAppSession } from '../../stores/appSession'
 import type { SavedLineup, SquadResponse } from '../../types/lineup'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { DEFAULT_FORMATION } from './formations'
-import { emptyLineup, type LineupSlots } from './helpers'
+import { autoFillStartingEleven, emptyLineup, type LineupSlots } from './helpers'
 import { clearDraft, readDraft, sanitizeDraftSlots, writeDraft, type DraftStorage } from './lineupDraft'
 import { useLineupEditor } from './useLineupEditor'
 
@@ -118,7 +118,11 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
         if (removed) notice.value = '阵容里有球员已不在球队名单，已从阵容中移出，请重新选择后保存。'
         savedOnce.value = !removed
       } else {
-        editor.load(DEFAULT_FORMATION, emptyLineup(DEFAULT_FORMATION))
+        // 第一次进来（没有已保存阵容也没有草稿）：给一套按位置与号码推出的初始首发，不算"改动"，用户再自己换。
+        editor.load(
+          DEFAULT_FORMATION,
+          autoFillStartingEleven(emptyLineup(DEFAULT_FORMATION), DEFAULT_FORMATION, loadedSquad.active),
+        )
       }
     } catch (error) {
       if (!current()) return
@@ -159,6 +163,15 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
     }
   }
 
+  /** 一键填入首发：只填空位、不动已排的球员；球员名单还没加载时不做任何事。 */
+  function fillStartingEleven(): void {
+    if (!squad.value) return
+    const filled = autoFillStartingEleven(editor.slots.value, editor.formation.value, squad.value.active)
+    editor.slots.value.forEach((slot, index) => {
+      if (slot.player_id === null && filled[index].player_id !== null) editor.pick(slot.slot, filled[index].player_id)
+    })
+  }
+
   function dispose(): void {
     // 离开时若还有没来得及写草稿的改动（系统返回手势没有确认框），先写下来再停定时器。
     if (!disposed && editor.dirty.value) persistDraft()
@@ -166,5 +179,5 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
     cancelDraftTimer()
   }
 
-  return { teamId, squad, loading, errorMessage, notice, saving, saveState, editor, load, save, dispose }
+  return { teamId, squad, loading, errorMessage, notice, saving, saveState, editor, load, save, fillStartingEleven, dispose }
 }

@@ -60,3 +60,16 @@ describe('lineup style audit', () => {
     })
   }
 })
+
+// movable-area 必须显式设置 width 和 height（微信文档：不设置默认 10px）。
+// 只写 top/right/bottom/left 拉伸不会生效，可移动区域会缩成 10×10px，所有圆点被挤到左上角叠在一起。
+describe('lineup movable-area sizing', () => {
+  test('LineupPitch gives .pitch__area an explicit width and height', () => {
+    const source = readFileSync(join(ROOT, 'components/LineupPitch.vue'), 'utf8')
+    const block = source.match(/\.pitch__area\s*\{([^}]*)\}/)
+    expect(block === null).toBe(false)
+    const body = block ? block[1] : ''
+    expect(/width\s*:\s*100%/.test(body)).toBe(true)
+    expect(/height\s*:\s*100%/.test(body)).toBe(true)
+  })
+})

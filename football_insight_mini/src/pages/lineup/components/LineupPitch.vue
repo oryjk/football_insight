@@ -269,12 +269,14 @@ function onTap(slot: number): void {
   border-bottom: 0;
 }
 
+/* movable-area 必须显式写宽高：微信默认 10px，只靠 top/right/bottom/left 拉伸不会生效，
+   可移动区域缩成 10×10 时所有圆点都会被限制在左上角叠在一起。 */
 .pitch__area {
   position: absolute;
   top: 0;
-  right: 0;
-  bottom: 0;
   left: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .pitch__mover {

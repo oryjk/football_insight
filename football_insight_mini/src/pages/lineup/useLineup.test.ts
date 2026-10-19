@@ -90,14 +90,16 @@ describe('useLineupPage', () => {
     return { page, storage, calls }
   }
 
-  test('loads the saved lineup when there is one, otherwise an empty 4-3-3', async () => {
+  test('loads the saved lineup when there is one, otherwise a default 4-3-3 starting eleven', async () => {
     const { page } = build({ getMyLineup: async () => ({ lineup: saved }) })
     await page.load(1)
     expect(page.editor.formation.value).toBe('4-4-2')
-    const empty = build()
-    await empty.page.load(1)
-    expect(empty.page.editor.formation.value).toBe('4-3-3')
-    expect(empty.page.editor.filled.value).toBe(0)
+    const first = build()
+    await first.page.load(1)
+    expect(first.page.editor.formation.value).toBe('4-3-3')
+    // 测试名单只有 1 名门将和 1 名后卫，初始首发就只能填这两个
+    expect(first.page.editor.filled.value).toBe(2)
+    expect(first.page.editor.dirty.value).toBe(false)
   })
 
   test('anonymous visitors can still load and edit without calling my-lineup', async () => {
@@ -190,7 +192,8 @@ describe('useLineupPage', () => {
     page.editor.pick(0, 1)
     await page.load(2)
     expect(page.teamId.value).toBe(2)
-    expect(page.editor.filled.value).toBe(0)
+    // 新球队没有上一队的改动：回到该队自己的初始首发，且不算"未保存"
+    expect(page.editor.filled.value).toBe(2)
     expect(page.editor.dirty.value).toBe(false)
   })
 
@@ -267,6 +270,67 @@ describe('useLineupPage', () => {
     const { page } = build({ getMyLineup: async () => ({ lineup: saved }) })
     await page.load(1)
     expect(page.notice.value).toBe('')
+    expect(page.editor.dirty.value).toBe(false)
+  })
+
+  const fullSquad: SquadResponse = {
+    team: { team_id: 1, team_name: '成都蓉城', avatar_url: null },
+    active: [
+      ...[1, 15].map((n, i) => ({ player_id: 10 + i, name: `G${n}`, shirt_number: n, position: 'GK' as const, avatar_url: null, last_season: 2026 })),
+      ...[2, 3, 4, 5, 22].map((n, i) => ({ player_id: 20 + i, name: `D${n}`, shirt_number: n, position: 'DF' as const, avatar_url: null, last_season: 2026 })),
+      ...[6, 8, 10, 14].map((n, i) => ({ player_id: 30 + i, name: `M${n}`, shirt_number: n, position: 'MF' as const, avatar_url: null, last_season: 2026 })),
+      ...[9, 11, 19].map((n, i) => ({ player_id: 40 + i, name: `F${n}`, shirt_number: n, position: 'FW' as const, avatar_url: null, last_season: 2026 })),
+    ],
+    former: [{ player_id: 99, name: 'Old', shirt_number: 7, position: 'FW', avatar_url: null, last_season: 2024 }],
+  }
+
+  test('a first visit with no saved lineup and no draft starts from a filled starting eleven (not dirty, not saved)', async () => {
+    const { page } = build({ getSquad: async () => fullSquad })
+    await page.load(1)
+    expect(page.editor.filled.value).toBe(11)
+    expect(page.editor.slots.value.find((s) => s.slot === 0)!.player_id).toBe(10) // 1 号门将
+    expect(page.editor.slots.value.every((s) => s.player_id !== 99)).toBe(true) // 前队员不会自动入选
+    expect(page.editor.dirty.value).toBe(false)
+    expect(page.saveState.value).toBe('idle')
+  })
+
+  test('an automatically filled lineup is saved like any other when the user taps save', async () => {
+    const { page, calls } = build({ getSquad: async () => fullSquad })
+    await page.load(1)
+    expect(await page.save()).toBe('saved') // 没有改动，不重复请求
+    expect(calls).toEqual([])
+    page.editor.pick(0, 11)
+    expect(await page.save()).toBe('saved')
+    expect(calls).toEqual(['save'])
+  })
+
+  test('a saved lineup or a draft is never replaced by the automatic starting eleven', async () => {
+    const mine: SavedLineup = { ...saved, formation: '4-4-2', slots: assignPlayer(emptyLineup('4-4-2'), 0, 11) }
+    const { page } = build({ getSquad: async () => fullSquad, getMyLineup: async () => ({ lineup: mine }) })
+    await page.load(1)
+    expect(page.editor.filled.value).toBe(1)
+    const drafted = build({ getSquad: async () => fullSquad })
+    drafted.storage.setStorageSync('fi-lineup-draft-1', { teamId: 1, formation: '3-5-2', slots: assignPlayer(emptyLineup('3-5-2'), 0, 11), savedAt: 1 })
+    await drafted.page.load(1)
+    expect(drafted.page.editor.filled.value).toBe(1)
+  })
+
+  test('fillStartingEleven fills the empty slots and marks the lineup dirty; it never moves players already placed', async () => {
+    const { page } = build({ getSquad: async () => fullSquad })
+    await page.load(1)
+    page.editor.pick(0, null)
+    page.editor.pick(1, null)
+    page.editor.pick(2, 40)
+    page.fillStartingEleven()
+    expect(page.editor.slots.value.find((s) => s.slot === 2)!.player_id).toBe(40)
+    expect(page.editor.filled.value).toBe(11)
+    expect(page.editor.dirty.value).toBe(true)
+  })
+
+  test('fillStartingEleven before the squad is loaded does nothing', () => {
+    const { page } = build()
+    page.fillStartingEleven()
+    expect(page.editor.filled.value).toBe(0)
     expect(page.editor.dirty.value).toBe(false)
   })
 })

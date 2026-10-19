@@ -1,4 +1,4 @@
-import type { LineupPosition } from '../../types/lineup'
+import type { LineupPosition, SquadPlayer } from '../../types/lineup'
 import { getFormation } from './formations'
 
 /** 位移小于它视为点击（rpx）。 */
@@ -136,4 +136,42 @@ export function applyDragOutcome(slots: LineupSlots, slot: number, outcome: Drag
     if (s.slot === b.slot) return { ...s, player_id: a.player_id }
     return s
   })
+}
+
+/**
+ * 初始首发：把现役球员按位置分组，每组取号码最靠前的几人，依次填进阵型里同类别的空位。
+ * 我们没有真实首发数据，号码靠前通常是主力，只是个"像样的 11 人"，用户可以再自己换。
+ * 只填空位，不动已排好的球员；位置未知或没有号码的球员排在最后，仍会被用来补满空位。
+ */
+export function autoFillStartingEleven(slots: LineupSlots, formation: string, activeSquad: SquadPlayer[]): LineupSlots {
+  const placed = new Set(slots.map((s) => s.player_id).filter((id): id is number => id !== null))
+  const byNumber = (a: SquadPlayer, b: SquadPlayer) =>
+    (a.shirt_number ?? Number.MAX_SAFE_INTEGER) - (b.shirt_number ?? Number.MAX_SAFE_INTEGER) || a.player_id - b.player_id
+  const pool = activeSquad.filter((p) => !placed.has(p.player_id)).slice().sort(byNumber)
+  const result = slots.map((s) => ({ ...s }))
+  const emptySlots = (position: LineupPosition) =>
+    getFormation(formation).filter((f) => f.position === position).map((f) => f.slot)
+      .filter((slot) => result.find((s) => s.slot === slot)?.player_id === null)
+
+  const taken = new Set<number>()
+  for (const position of POSITION_ORDER) {
+    const candidates = pool.filter((p) => p.position === position && !taken.has(p.player_id))
+    emptySlots(position).forEach((slot, index) => {
+      const player = candidates[index]
+      if (!player) return
+      result.find((s) => s.slot === slot)!.player_id = player.player_id
+      taken.add(player.player_id)
+    })
+  }
+  // 同类别人不够的位置，用剩下的球员（位置不符、未知位置、没号码）按号码顺序补满，门将位最后才补
+  const leftover = pool.filter((p) => !taken.has(p.player_id))
+  const rest = [
+    ...POSITION_ORDER.filter((p) => p !== 'GK').flatMap((p) => emptySlots(p)),
+    ...emptySlots('GK'),
+  ]
+  rest.forEach((slot, index) => {
+    const player = leftover[index]
+    if (player) result.find((s) => s.slot === slot)!.player_id = player.player_id
+  })
+  return result
 }

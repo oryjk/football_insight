@@ -42,7 +42,10 @@
           @drag="editor.applyDrag"
         />
 
-        <text class="hint">点位置选人，按住圆点可以拖动站位；前队员也能上场。已排 {{ editor.filled.value }}/11</text>
+        <view class="hint-row">
+          <text class="hint">点位置选人，按住圆点可以拖动站位；前队员也能上场。已排 {{ editor.filled.value }}/11</text>
+          <text v-if="editor.filled.value < 11" class="hint-link" @tap="fillStartingEleven">一键填入首发</text>
+        </view>
 
         <view class="actions">
           <button class="actions__ghost" hover-class="actions__ghost--pressed" @tap="editor.reset()">重置站位</button>
@@ -89,7 +92,7 @@ import LineupTeamPicker from './components/LineupTeamPicker.vue'
 const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
 
-const { teamId, squad, loading, errorMessage, notice, saving, saveState, editor, load, save, dispose } = useLineupPage()
+const { teamId, squad, loading, errorMessage, notice, saving, saveState, editor, load, save, fillStartingEleven, dispose } = useLineupPage()
 
 const teams = ref<Array<{ team_id: number; team_name: string; avatar_url: string | null }>>([])
 const sheetVisible = ref(false)
@@ -365,11 +368,27 @@ onBeforeUnmount(dispose)
   color: var(--fi-color-primary-deep);
 }
 
-.hint {
+.hint-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--fi-space-16);
   padding: 0 var(--fi-space-4);
+}
+
+.hint {
+  flex: 1;
+  min-width: 0;
   color: var(--fi-color-text-muted);
   font-size: var(--fi-font-22);
   line-height: var(--fi-leading-normal);
+}
+
+.hint-link {
+  flex-shrink: 0;
+  color: var(--fi-color-primary);
+  font-size: var(--fi-font-24);
+  font-weight: var(--fi-weight-bold);
 }
 
 .actions {
