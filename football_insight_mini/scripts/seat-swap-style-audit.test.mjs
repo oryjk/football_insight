@@ -8,7 +8,12 @@ const ROOT = fileURLToPath(new URL('../src/pages/seat-swap', import.meta.url))
 
 // 逐任务纳入；全部组件迁移完成后改为 'ALL'。
 /** @type {string[] | 'ALL'} */
-const AUDITED_FILES = []
+const AUDITED_FILES = [
+  'index.vue',
+  'components/SeatSwapMatchCard.vue',
+  'components/SeatSwapNotice.vue',
+  'components/SeatSwapSkeleton.vue',
+]
 
 function listVueFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

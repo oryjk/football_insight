@@ -5,31 +5,29 @@
     <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
     <view class="page-bg-fade"></view>
     <view class="page">
-      <view v-if="loading" class="state-card">
-        <text>正在加载换座池...</text>
-      </view>
+      <SeatSwapSkeleton v-if="loading" />
 
       <view v-else-if="errorMessage" class="state-card state-card--error">
         <text>{{ errorMessage }}</text>
         <button class="ghost-action" @tap="loadPage">重试</button>
       </view>
 
-      <template v-else>
+      <view v-else class="page-content">
         <view>
-          <SeatSwapHero
+          <SeatSwapMatchCard
             :match-title="matchTitle"
             :match-summary="matchSummary"
             :candidates-count="candidatesCount"
           />
         </view>
 
-        <view v-if="!currentView?.available" class="info-row">
-          <text class="info-row__text">换座撮合只在成都蓉城当前比赛开放。</text>
-        </view>
-        <view v-else-if="!isLoggedIn" class="info-row info-row--login">
-          <text class="info-row__text">未登录可浏览脱敏意向;发布、确认和查看联系方式需要登录。</text>
-          <button class="info-row__action" @tap="goToUserPage">去登录</button>
-        </view>
+        <SeatSwapNotice v-if="!currentView?.available" text="换座撮合只在成都蓉城当前比赛开放。" />
+        <SeatSwapNotice
+          v-else-if="!isLoggedIn"
+          text="未登录可浏览脱敏意向;发布、确认和查看联系方式需要登录。"
+          action-label="去登录"
+          @action="goToUserPage"
+        />
 
         <view class="seat-map-section">
           <SeatSwapRegionPanel
@@ -60,7 +58,7 @@
           @cancel-confirmation="cancelCandidateConfirmation"
           @matched-cancel="openMatchedCancelForCandidate"
         />
-      </template>
+      </view>
     </view>
 
     <SeatSwapDock
@@ -101,7 +99,9 @@ import { computed, nextTick, ref } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import SeatSwapManageSheet from './components/SeatSwapManageSheet.vue'
-import SeatSwapHero from './components/SeatSwapHero.vue'
+import SeatSwapMatchCard from './components/SeatSwapMatchCard.vue'
+import SeatSwapNotice from './components/SeatSwapNotice.vue'
+import SeatSwapSkeleton from './components/SeatSwapSkeleton.vue'
 import SeatSwapRegionPanel from './components/SeatSwapRegionPanel.vue'
 import SeatSwapPoolList from './components/SeatSwapPoolList.vue'
 import SeatSwapDock from './components/SeatSwapDock.vue'
@@ -261,16 +261,35 @@ onShow(() => {
   z-index: 0;
 }
 
+/* 背景遮罩（spec 第 7 节）：照片区 32vh 为半透明白，以下为页面底色，纯色替代原渐变。 */
 .page-bg-fade {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100vh;
-  background:
-    linear-gradient(180deg, rgba(246, 247, 244, 0.24) 0%, rgba(247, 248, 250, 0.74) 32%, var(--fi-color-page-soft) 58%, var(--fi-color-page-soft) 100%);
   pointer-events: none;
   z-index: 0;
+}
+
+.page-bg-fade::before,
+.page-bg-fade::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+.page-bg-fade::before {
+  top: 0;
+  height: 32vh;
+  background: rgba(var(--fi-primitive-white-rgb), 0.5);
+}
+
+.page-bg-fade::after {
+  top: 32vh;
+  bottom: 0;
+  background: var(--fi-color-page-soft);
 }
 
 .page {
@@ -287,49 +306,29 @@ onShow(() => {
   box-sizing: border-box;
 }
 
+.page-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fi-space-card-gap);
+  animation: seat-swap-content-in 200ms var(--fi-motion-ease-out) both;
+}
+
+@keyframes seat-swap-content-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .state-card {
   padding: var(--fi-space-28);
-  border: 1rpx solid var(--fi-color-border-chip);
+  border: var(--fi-border-card);
   border-radius: var(--fi-radius-md);
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--fi-color-surface-frosted);
   box-shadow: var(--fi-shadow-soft);
   text-align: center;
 }
 
 .state-card--error {
-  color: #b42318;
-}
-
-.info-row {
-  display: flex;
-  align-items: center;
-  gap: var(--fi-space-12);
-  padding: var(--fi-space-18) var(--fi-space-22);
-
-  border-radius: var(--fi-radius-md);
-  background: var(--fi-color-page);
-  border: 1rpx dashed rgba(207, 211, 220, 0.95);
-}
-
-.info-row__text {
-  flex: 1;
-  color: var(--fi-color-text-secondary);
-  font-size: var(--fi-font-24);
-  line-height: var(--fi-leading-normal);
-}
-
-.info-row__action {
-  flex-shrink: 0;
-  padding: var(--fi-space-10) var(--fi-space-20);
-  border-radius: var(--fi-radius-round);
-  background: var(--fi-primitive-ink);
-  color: var(--fi-primitive-white);
-  font-size: var(--fi-font-22);
-  font-weight: 400;
-}
-
-.info-row__action::after {
-  border: 0;
+  color: var(--fi-color-primary-deep);
 }
 
 .ghost-action {
@@ -339,10 +338,11 @@ onShow(() => {
   margin-top: var(--fi-space-16);
   padding: var(--fi-space-12) var(--fi-space-22);
   border-radius: var(--fi-radius-round);
-  background: var(--fi-primitive-white);
-  border: 1rpx solid var(--fi-color-border-chip);
+  background: var(--fi-color-surface);
+  border: var(--fi-border-width) solid var(--fi-color-border-chip);
   color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-24);
+  font-weight: var(--fi-weight-bold);
 }
 
 .ghost-action::after {
