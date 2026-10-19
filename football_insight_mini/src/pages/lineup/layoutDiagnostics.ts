@@ -1,5 +1,6 @@
 import type { ComponentInternalInstance } from 'vue'
 import type { Px } from './dragGeometry'
+import { getDevBuildInfo } from '../../utils/devBuildInfo'
 
 type Rect = { left: number; top: number; width: number; height: number }
 type Expected = Array<Px & { slot: number }>
@@ -38,7 +39,7 @@ export function schedulePitchLayoutDiagnostic(
     query.exec((results) => {
       if (cancelled) return
       console.info('[lineup-layout]', JSON.stringify({
-        build: __FOOTBALL_BUILD_INFO__, field: snapshot.field, windowWidth: snapshot.windowWidth,
+        build: getDevBuildInfo(), field: snapshot.field, windowWidth: snapshot.windowWidth,
         ...describePitchLayout(snapshot.expected, results?.[0] ?? null, results?.[1] ?? []),
       }))
     })

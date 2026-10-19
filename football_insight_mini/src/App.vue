@@ -5,6 +5,7 @@ import { useAppSession } from "./stores/appSession";
 import { useRuntimeConfig } from "./stores/runtimeConfig";
 import { useMiniReviewStatus } from "./stores/miniReview";
 import { captureAcquisitionSource } from "./utils/acquisitionSource";
+import { getDevBuildInfo } from "./utils/devBuildInfo";
 // #ifdef MP-WEIXIN
 import { setupMiniProgramUpdatePrompt } from "./utils/miniProgramUpdate";
 // #endif
@@ -31,7 +32,7 @@ watch(
 
 onLaunch(() => {
   console.log("Football Insight mini launch");
-  if (import.meta.env.DEV) console.info("[mini-build]", JSON.stringify(__FOOTBALL_BUILD_INFO__));
+  if (import.meta.env.DEV) console.info("[mini-build]", JSON.stringify(getDevBuildInfo()));
   // Capture before silent login; malformed launch data/storage failures are best effort.
   captureAcquisitionSource();
   // #ifdef MP-WEIXIN
