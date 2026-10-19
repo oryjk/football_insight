@@ -13,7 +13,7 @@
         />
 
         <InsightsTeamSelector
-          v-if="outlookReviewReady && !systemConfigUnderReview && currentUser && selectableTeams.length"
+          v-if="outlookReviewReady && currentUser && selectableTeams.length"
           :teams="selectableTeams"
           :selected-team-id="selectedTeamId"
           @update:selected-team-id="outlookLoader.selectTeam"
@@ -30,12 +30,8 @@
         />
 
         <InsightsSkeleton
-          v-if="!systemConfigUnderReview && userLoading"
+          v-if="userLoading"
         />
-
-        <view v-else-if="systemConfigUnderReview" class="state-card">
-          <text>当前版本展示基础内容。</text>
-        </view>
 
         <InsightsLockedPanel v-else-if="!currentUser" mode="guest" />
 
@@ -116,7 +112,7 @@ import {
   buildOpponentContributionRows,
   buildPlayerContributionRows,
 } from './helpers'
-import { createInsightsSessionSync } from './sessionEffects'
+import { createInsightsSessionSync, runInsightsShow } from './sessionEffects'
 import { useInsightsData } from './useInsightsData'
 
 const { navigationPageStyle } = useNavigationLayout()
@@ -147,10 +143,8 @@ const {
   loadInsights,
   resetExpandedState,
   resetSessionScopedState: resetInsightsSessionState,
-  applyUnderReviewView,
 } = useInsightsData({
   session,
-  isUnderReview: () => systemConfigUnderReview.value,
   isMembershipLocked: () => membershipBenefitsLocked.value,
 })
 const outlookLoader = createOutlookLoader({
@@ -222,11 +216,10 @@ watch(selectedTeamId, () => {
   resetExpandedState()
 })
 
-// 后台静默恢复/登录发布已认证用户后，直接刷新会员洞察，无需再次切 Tab；审核中不拉取。
+// 后台静默恢复/登录发布已认证用户后，直接刷新会员洞察，无需再次切 Tab。
 // 会话身份变化（revision）先同步清掉旧账号私有缓存，跨账号不沿用。
 // 单一组合 watch 保证同一次发布里 reset 先于 load，且多次 revision 递增只触发一轮。
 const insightsSessionSync = createInsightsSessionSync({
-  isUnderReview: () => systemConfigUnderReview.value,
   loadInsights: () => loadInsights(),
   resetSessionScopedState: resetInsightsSessionState,
 })
@@ -315,29 +308,17 @@ onShow(async () => {
   beginPaywallVisit()
   reportTicketWatchEntryImpression()
   ticketWatchNavigating.value = false
-  // onShow 操作身份在第一个 await 之前建立。
-  const shownRevision = session.revision.value
-  const underReview = await loadSystemConfigUnderReview()
-  // 审核状态与账号无关：即使审核查询等待期间会话已切换，也必须发布最新审核结果——
-  // 审核中立即切审核视图（清会员数据、使在途 insights owner 失效），不能丢弃 true
-  // 让新账号的会员数据继续展示。
-  systemConfigUnderReview.value = underReview
-  outlookReviewReady.value = true
-  if (underReview) {
-    applyUnderReviewView()
-    return
-  }
-  // 私有数据链路仍保留旧 actor 身份：审核等待期间会话被替代（切账号/退出/失效）时，
-  // 旧 onShow 不再 loadUser/loadInsights，新会话的数据由它自己的 watcher/onShow 负责。
-  if (session.revision.value !== shownRevision) {
-    return
-  }
-  // loadUser 等待期间会话被替代时返回 false，同样停止后续 loadInsights。
-  const stillCurrent = await loadUser()
-  if (!stillCurrent) {
-    return
-  }
-  await loadInsights()
+  // 审核状态只决定是否隐藏回流看板入口与赛前倾向卡片，会员洞察照常加载。
+  await runInsightsShow({
+    revision: session.revision,
+    loadUnderReview: loadSystemConfigUnderReview,
+    publishUnderReview: (underReview) => {
+      systemConfigUnderReview.value = underReview
+      outlookReviewReady.value = true
+    },
+    loadUser,
+    loadInsights,
+  })
 })
 </script>
 

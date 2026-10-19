@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, test } from 'bun:test'
 import { effectScope, nextTick, ref, watch } from 'vue'
-import { createInsightsSessionSync } from './sessionEffects'
+import { createInsightsSessionSync, runInsightsShow } from './sessionEffects'
 import { useInsightsData, type InsightsData } from './useInsightsData'
 import { createAppSession, type AppSession } from '../../stores/appSession'
 import type * as authApi from '../../api/auth'
@@ -67,11 +67,10 @@ afterEach(() => {
 
 describe('insights session sync（恢复发布后刷新会员洞察）', () => {
   /** 与页面相同的接线，走真实 Vue watch。 */
-  function wireSync(options: { underReview: boolean }) {
+  function wireSync() {
     const currentUser = ref<CurrentUser | null>(null)
     let insightLoads = 0
     const sync = createInsightsSessionSync({
-      isUnderReview: () => options.underReview,
       loadInsights: async () => {
         insightLoads += 1
       },
@@ -93,7 +92,7 @@ describe('insights session sync（恢复发布后刷新会员洞察）', () => {
   }
 
   test('后台恢复发布已认证用户：自动加载洞察，无需切 Tab', async () => {
-    const fixture = wireSync({ underReview: false })
+    const fixture = wireSync()
 
     fixture.currentUser.value = userA
     await nextTick()
@@ -104,7 +103,7 @@ describe('insights session sync（恢复发布后刷新会员洞察）', () => {
   })
 
   test('退出清空用户：不加载洞察（模板已切游客视图）', async () => {
-    const fixture = wireSync({ underReview: false })
+    const fixture = wireSync()
     fixture.currentUser.value = userA
     await nextTick()
 
@@ -113,17 +112,6 @@ describe('insights session sync（恢复发布后刷新会员洞察）', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(fixture.insightLoads).toBe(1)
-    fixture.stop()
-  })
-
-  test('审核中即使发布用户也不拉取会员数据', async () => {
-    const fixture = wireSync({ underReview: true })
-
-    fixture.currentUser.value = userA
-    await nextTick()
-    await new Promise((resolve) => setTimeout(resolve, 0))
-
-    expect(fixture.insightLoads).toBe(0)
     fixture.stop()
   })
 })
@@ -156,7 +144,6 @@ function wireInsightsFixture(options: {
   const insightRequests: Array<Deferred<TeamInsightsResponse>> = []
   const data = useInsightsData({
     session,
-    isUnderReview: () => false,
     isMembershipLocked: () => false,
     getLiveTeamInsights: () => {
       const request = deferred<TeamInsightsResponse>()
@@ -165,7 +152,6 @@ function wireInsightsFixture(options: {
     },
   })
   const sync = createInsightsSessionSync({
-    isUnderReview: () => false,
     loadInsights: data.loadInsights,
     resetSessionScopedState: data.resetSessionScopedState,
   })
@@ -412,23 +398,13 @@ describe('insights 私有加载编排（真实 session + watch + 加载入口）
     // 审核结果与账号无关照常发布，私有链路在审核/loadUser 每个 await 之后核对身份。
     const reviewFlag = ref(false)
     const auditRequest = deferred<boolean>()
-    const shown = (async () => {
-      const shownRevision = session.revision.value
-      const underReview = await auditRequest.promise
-      reviewFlag.value = underReview
-      if (underReview) {
-        data.applyUnderReviewView()
-        return
-      }
-      if (session.revision.value !== shownRevision) {
-        return
-      }
-      const stillCurrent = await data.loadUser()
-      if (!stillCurrent) {
-        return
-      }
-      await data.loadInsights()
-    })()
+    const shown = runInsightsShow({
+      revision: session.revision,
+      loadUnderReview: () => auditRequest.promise,
+      publishUnderReview: (value) => { reviewFlag.value = value },
+      loadUser: data.loadUser,
+      loadInsights: data.loadInsights,
+    })
     await flushMicrotasks()
 
     // 审核查询在途期间用户登录 B：组合 watcher 发布 B 并成功加载 B 的洞察。
@@ -455,7 +431,7 @@ describe('insights 私有加载编排（真实 session + watch + 加载入口）
     fixture.stop()
   })
 
-  test('审核查询等待期间账号切换且审核中：仍发布审核 gate 并使新账号在途读取失效', async () => {
+  test('审核查询等待期间账号切换且审核中：只发布审核 gate，不清会员洞察、不打断新账号读取', async () => {
     const fixture = wireInsightsFixture({
       source: {
         login: (payload: { account_identifier: string }) =>
@@ -478,23 +454,13 @@ describe('insights 私有加载编排（真实 session + watch + 加载入口）
     // 与页面 onShow 相同的实际组合。
     const reviewFlag = ref(false)
     const auditRequest = deferred<boolean>()
-    const shown = (async () => {
-      const shownRevision = session.revision.value
-      const underReview = await auditRequest.promise
-      reviewFlag.value = underReview
-      if (underReview) {
-        data.applyUnderReviewView()
-        return
-      }
-      if (session.revision.value !== shownRevision) {
-        return
-      }
-      const stillCurrent = await data.loadUser()
-      if (!stillCurrent) {
-        return
-      }
-      await data.loadInsights()
-    })()
+    const shown = runInsightsShow({
+      revision: session.revision,
+      loadUnderReview: () => auditRequest.promise,
+      publishUnderReview: (value) => { reviewFlag.value = value },
+      loadUser: data.loadUser,
+      loadInsights: data.loadInsights,
+    })
     await flushMicrotasks()
 
     // 审核查询在途期间用户登录 B：watcher 发起 B 的读取（仍在途）。
@@ -504,23 +470,57 @@ describe('insights 私有加载编排（真实 session + watch + 加载入口）
     expect(insightRequests.length).toBe(2)
     expect(data.loading.value).toBe(true)
 
-    // 审核查询迟到返回 true：审核限制与账号无关，必须保留——发布审核 gate、
-    // 清掉会员数据并使 B 的在途读取 owner 失效；不再 loadUser/loadInsights。
+    // 审核查询迟到返回 true：审核只隐藏回流看板入口与赛前倾向卡片，
+    // 会员洞察照常展示——不清数据、不使 B 的在途读取失效；旧 onShow 已失效，不重读。
     auditRequest.resolve(true)
     await shown
     await flushMicrotasks()
-
     expect(reviewFlag.value).toBe(true)
     expect(insightRequests.length).toBe(2)
-    expect(data.teams.value).toEqual([])
-    expect(data.selectedTeamId.value).toBeNull()
-    expect(data.loading.value).toBe(false)
 
-    // B 的在途读取迟到成功：owner 已被审核视图失效，不再发布会员数据。
     insightRequests[1].resolve(buildTeamInsightsResponse(2))
     await flushMicrotasks()
-    expect(data.teams.value).toEqual([])
-    expect(data.selectedTeamId.value).toBeNull()
+    expect(data.selectedTeamId.value).toBe(2)
+    expect(data.errorMessage.value).toBe('')
+    expect(data.loading.value).toBe(false)
+    fixture.stop()
+  })
+
+  test('审核中进入洞察页：仍加载会员洞察', async () => {
+    const fixture = wireInsightsFixture({
+      source: {
+        login: (payload: { account_identifier: string }) =>
+          Promise.resolve({
+            access_token: `token-${payload.account_identifier}`,
+            expires_at: '2026-02-01T00:00:00Z',
+            user: { ...userA, id: payload.account_identifier },
+          } as AuthResponse),
+      },
+    })
+    const { session, data, insightRequests } = fixture
+    await session.loginWithPassword({ account_identifier: 'a', password: 'x' })
+    await nextTick()
+    await flushMicrotasks()
+    insightRequests[0].resolve(buildTeamInsightsResponse(1))
+    await flushMicrotasks()
+
+    const reviewFlag = ref(false)
+    const shown = runInsightsShow({
+      revision: session.revision,
+      loadUnderReview: async () => true,
+      publishUnderReview: (value) => { reviewFlag.value = value },
+      loadUser: data.loadUser,
+      loadInsights: data.loadInsights,
+    })
+    await flushMicrotasks()
+
+    // 审核中照常发起会员洞察读取（旧版本此处直接切审核视图、不发请求）。
+    expect(reviewFlag.value).toBe(true)
+    expect(insightRequests.length).toBe(2)
+    insightRequests[1].resolve(buildTeamInsightsResponse(1))
+    await shown
+    await flushMicrotasks()
+    expect(data.selectedTeamId.value).toBe(1)
     expect(data.errorMessage.value).toBe('')
     fixture.stop()
   })

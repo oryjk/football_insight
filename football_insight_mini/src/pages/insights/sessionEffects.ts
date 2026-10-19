@@ -1,10 +1,11 @@
+import type { Ref } from 'vue'
 import type { CurrentUser } from '../../types/auth'
 
 export interface InsightsSessionSync {
   /**
    * 页面 watch(session.currentUser) 的处理入口：后台静默恢复/登录发布已认证用户后，
-   * 直接加载会员洞察数据，无需再次切 Tab；退出清空用户时不加载（模板已切游客视图）；
-   * 审核中不拉取会员数据。
+   * 直接加载会员洞察数据，无需再次切 Tab；退出清空用户时不加载（模板已切游客视图）。
+   * 审核状态不影响会员洞察：审核中只隐藏回流看板入口与赛前倾向卡片（由页面模板处理）。
    */
   handleSessionUserPublished(user: CurrentUser | null): void
   /**
@@ -16,13 +17,12 @@ export interface InsightsSessionSync {
 }
 
 export function createInsightsSessionSync(deps: {
-  isUnderReview: () => boolean
   loadInsights: () => Promise<void>
   resetSessionScopedState: () => void
 }): InsightsSessionSync {
   return {
     handleSessionUserPublished(user) {
-      if (user && !deps.isUnderReview()) {
+      if (user) {
         void deps.loadInsights()
       }
     },
@@ -30,4 +30,30 @@ export function createInsightsSessionSync(deps: {
       deps.resetSessionScopedState()
     },
   }
+}
+
+/**
+ * 洞察页 onShow 编排：先查审核状态并发布（与账号无关，任何情况都发布），再在同一会话内
+ * loadUser → loadInsights。操作身份在第一个 await 之前建立；审核查询或 loadUser 等待期间
+ * 会话被替代（切账号/退出/失效）时，旧 onShow 不再续私有请求，新会话由它自己的 watcher 负责。
+ * 审核中不再中断加载：审核只隐藏回流看板入口与赛前倾向卡片。
+ */
+export async function runInsightsShow(deps: {
+  revision: Ref<number>
+  loadUnderReview: () => Promise<boolean>
+  publishUnderReview: (underReview: boolean) => void
+  loadUser: () => Promise<boolean>
+  loadInsights: () => Promise<void>
+}): Promise<void> {
+  const shownRevision = deps.revision.value
+  const underReview = await deps.loadUnderReview()
+  deps.publishUnderReview(underReview)
+  if (deps.revision.value !== shownRevision) {
+    return
+  }
+  const stillCurrent = await deps.loadUser()
+  if (!stillCurrent) {
+    return
+  }
+  await deps.loadInsights()
 }

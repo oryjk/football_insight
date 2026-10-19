@@ -6,8 +6,6 @@ import { extractApiErrorMessage } from '../../utils/apiError'
 
 export interface InsightsDataDeps {
   session: AppSession
-  /** 审核中不拉取会员洞察。 */
-  isUnderReview: () => boolean
   /** 会员权益锁定（取关公众号）时不加载。 */
   isMembershipLocked: () => boolean
   /** 测试注入可控的私有读取；默认走真实 api 层。 */
@@ -35,8 +33,6 @@ export interface InsightsData {
   resetExpandedState: () => void
   /** 会话身份变化（revision 递增）时同步丢弃旧账号私有缓存/选择/展开/错误/loading。 */
   resetSessionScopedState: () => void
-  /** 审核中视图：停止 loading、清空会员数据、使在途读取 owner 失效（旧响应不再发布），不发起任何请求。 */
-  applyUnderReviewView: () => void
 }
 
 /**
@@ -84,17 +80,6 @@ export function useInsightsData(deps: InsightsDataDeps): InsightsData {
     errorMessage.value = ''
     loading.value = false
     userLoading.value = false
-  }
-
-  function applyUnderReviewView(): void {
-    // 进入审核视图：在途读取的 owner 一并失效，迟到的成功/失败/finally 不再发布。
-    loadOwner = null
-    inFlightLoad = null
-    userLoading.value = false
-    loading.value = false
-    teams.value = []
-    insights.value = []
-    selectedTeamId.value = null
   }
 
   async function loadUser(): Promise<boolean> {
@@ -149,9 +134,6 @@ export function useInsightsData(deps: InsightsDataDeps): InsightsData {
   }
 
   function loadInsights(): Promise<void> {
-    if (deps.isUnderReview()) {
-      return Promise.resolve()
-    }
     if (!session.currentUser.value || deps.isMembershipLocked()) {
       return Promise.resolve()
     }
@@ -191,6 +173,5 @@ export function useInsightsData(deps: InsightsDataDeps): InsightsData {
     loadInsights,
     resetExpandedState,
     resetSessionScopedState,
-    applyUnderReviewView,
   }
 }
