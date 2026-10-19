@@ -127,6 +127,11 @@ page {
   --fi-primitive-ease-in: cubic-bezier(0.4, 0, 1, 1);
   --fi-primitive-ease-spring: cubic-bezier(0.3, 0.9, 0.3, 1);
 
+  /* ===== Primitive：战术板球场（草坪与线条） ===== */
+  --fi-primitive-pitch-grass: #2f7d4f;
+  --fi-primitive-pitch-grass-alt: #2a7448;
+  --fi-primitive-pitch-markings: rgba(255, 255, 255, 0.7);
+
   /* ===== Primitive：字重 ===== */
   --fi-primitive-weight-bold: 700;
   --fi-primitive-weight-extrabold: 800;
@@ -187,6 +192,9 @@ page {
   --fi-color-seat-desired-bg: var(--fi-primitive-green-soft);
   --fi-color-pitch: var(--fi-primitive-pitch);
   --fi-color-pitch-line: var(--fi-primitive-pitch-line);
+  --fi-color-lineup-grass: var(--fi-primitive-pitch-grass);
+  --fi-color-lineup-grass-alt: var(--fi-primitive-pitch-grass-alt);
+  --fi-color-lineup-markings: var(--fi-primitive-pitch-markings);
   --fi-motion-duration-fast: var(--fi-primitive-motion-fast);
   --fi-motion-duration-base: var(--fi-primitive-motion-base);
   --fi-motion-duration-slow: var(--fi-primitive-motion-slow);
@@ -312,6 +320,9 @@ page {
   /* 座位大图"想换到"列表：价格与差价两列固定宽度（容纳 1288元 / 省1108元） */
   --fi-component-seat-swap-price-width: 96rpx;
   --fi-component-seat-swap-delta-width: 112rpx;
+  /* 战术板：球场宽高比 3:4（padding-top 百分比）与球员圆点直径 */
+  --fi-component-lineup-pitch-ratio: 133.33%;
+  --fi-component-lineup-dot-size: 84rpx;
   --fi-component-loading-gap: var(--fi-space-12);
   --fi-component-loading-padding: var(--fi-space-40) var(--fi-space-32);
   --fi-component-loading-title-color: var(--fi-color-text-primary);
