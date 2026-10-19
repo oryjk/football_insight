@@ -11,23 +11,40 @@
     <view class="support-home-panel__header">
       <view class="support-home-panel__heading">
         <text class="support-home-panel__title">我的主队</text>
-        <view
-          v-if="daysRemaining !== null"
-          class="support-home-panel__countdown"
-          :class="{ 'support-home-panel__countdown--clock': countdownClock }"
-        >
-          <template v-if="daysRemaining === 0">
-            <template v-if="countdownClock">
-              <text>距比赛开始</text>
-              <template v-for="part in countdownParts" :key="part.unit">
+        <view v-if="daysRemaining !== null || saleDaysRemaining !== null" class="support-home-panel__countdowns">
+          <view
+            v-if="saleDaysRemaining !== null"
+            class="support-home-panel__countdown support-home-panel__countdown--sale"
+            :class="{ 'support-home-panel__countdown--clock': saleCountdownClock }"
+          >
+            <template v-if="saleCountdownClock">
+              <text>距抢票开始</text>
+              <template v-for="part in saleCountdownParts" :key="part.unit">
                 <text class="support-home-panel__countdown-clock">{{ part.value }}</text><text>{{ part.unit }}</text>
               </template>
             </template>
-            <text v-else>今天比赛</text>
-          </template>
-          <template v-else>
-            <text>距下场</text><text class="support-home-panel__countdown-days">{{ daysRemaining }}</text><text>天</text>
-          </template>
+            <template v-else>
+              <text>距抢票</text><text class="support-home-panel__countdown-days">{{ saleDaysRemaining }}</text><text>天</text>
+            </template>
+          </view>
+          <view
+            v-if="daysRemaining !== null"
+            class="support-home-panel__countdown"
+            :class="{ 'support-home-panel__countdown--clock': countdownClock }"
+          >
+            <template v-if="daysRemaining === 0">
+              <template v-if="countdownClock">
+                <text>距比赛开始</text>
+                <template v-for="part in countdownParts" :key="part.unit">
+                  <text class="support-home-panel__countdown-clock">{{ part.value }}</text><text>{{ part.unit }}</text>
+                </template>
+              </template>
+              <text v-else>今天比赛</text>
+            </template>
+            <template v-else>
+              <text>距下场</text><text class="support-home-panel__countdown-days">{{ daysRemaining }}</text><text>天</text>
+            </template>
+          </view>
         </view>
       </view>
 
@@ -63,52 +80,37 @@
 
     <template v-else-if="nextMatch">
       <view class="support-home-panel__favorite">
-        <view class="support-home-panel__favorite-avatar-shell">
-          <image :src="favoriteTeamCrest" mode="aspectFit" class="support-home-panel__favorite-avatar" />
-        </view>
-        <view class="support-home-panel__favorite-body">
-          <text class="support-home-panel__favorite-name">{{ favoriteTeam.team_name }}</text>
-          <text class="support-home-panel__favorite-note">{{ favoriteTeamLabel }}</text>
-        </view>
+        <text class="support-home-panel__favorite-name">{{ favoriteTeam.team_name }}</text>
         <button class="support-home-panel__switch" :disabled="voteSubmittingTeamId !== null || favoriteSubmitting" @click="emit('select-team')">切换主队</button>
       </view>
 
       <view class="support-home-match-card" @click="emit('open-match')">
-        <view class="support-home-match-card__meta">
-          <view class="support-home-match-card__meta-pill support-home-match-card__meta-pill--round">
-            <text>第 {{ nextMatch.round_number }} 轮</text>
-          </view>
-          <view class="support-home-match-card__meta-pill support-home-match-card__meta-pill--time">
-            <text v-if="weekdayLabel" class="support-home-match-card__weekday">{{ weekdayLabel }}</text>
-            <view class="support-home-match-card__datetime">
-              <text>{{ nextMatch.match_date }}</text>
-              <text>{{ nextMatch.match_time }}</text>
-            </view>
-          </view>
-        </view>
         <view class="support-home-match-card__teams">
           <view class="support-home-match-card__team-block">
+            <image v-if="homeCrest" :src="homeCrest" mode="aspectFit" class="support-home-match-card__crest" />
             <text class="support-home-match-card__team">{{ nextMatch.home_team.team_name }}</text>
             <text class="support-home-match-card__rank">{{ homeRankLabel }}</text>
-            <view class="support-home-match-card__vote">
-              <HomeSupportVoteButton
-                :team="nextMatch.home_team"
-                v-bind="homeVoteState"
-                @vote="emit('vote', $event)"
-              />
-            </view>
+            <HomeSupportVoteButton
+              :team="nextMatch.home_team"
+              v-bind="homeVoteState"
+              @vote="emit('vote', $event)"
+            />
           </view>
-          <text class="support-home-match-card__vs">{{ windowShortLabel }}</text>
-          <view class="support-home-match-card__team-block support-home-match-card__team-block--away">
-            <text class="support-home-match-card__team support-home-match-card__team--away">{{ nextMatch.away_team.team_name }}</text>
-            <text class="support-home-match-card__rank support-home-match-card__rank--away">{{ awayRankLabel }}</text>
-            <view class="support-home-match-card__vote support-home-match-card__vote--away">
-              <HomeSupportVoteButton
-                :team="nextMatch.away_team"
-                v-bind="awayVoteState"
-                @vote="emit('vote', $event)"
-              />
-            </view>
+          <view class="support-home-match-card__center">
+            <text class="support-home-match-card__round">第 {{ nextMatch.round_number }} 轮</text>
+            <text class="support-home-match-card__vs">{{ windowShortLabel }}</text>
+            <text class="support-home-match-card__time">{{ weekdayLabel }} {{ nextMatch.match_time }}</text>
+            <text class="support-home-match-card__date">{{ nextMatch.match_date }}</text>
+          </view>
+          <view class="support-home-match-card__team-block">
+            <image v-if="awayCrest" :src="awayCrest" mode="aspectFit" class="support-home-match-card__crest" />
+            <text class="support-home-match-card__team">{{ nextMatch.away_team.team_name }}</text>
+            <text class="support-home-match-card__rank">{{ awayRankLabel }}</text>
+            <HomeSupportVoteButton
+              :team="nextMatch.away_team"
+              v-bind="awayVoteState"
+              @vote="emit('vote', $event)"
+            />
           </view>
         </view>
         <view class="support-home-match-card__bar">
@@ -128,6 +130,17 @@
       </text>
       <button class="support-home-panel__action support-home-panel__action--ghost" @click="emit('select-team')">切换主队</button>
     </template>
+
+    <!-- 排阵容同样围绕主队，收进本面板底部；加载/出错时不显示。 -->
+    <view
+      v-if="!showLoading && !errorMessage"
+      class="support-home-panel__lineup"
+      hover-class="support-home-panel__lineup--pressed"
+      @click="emit('open-lineup')"
+    >
+      <text class="support-home-panel__lineup-title">排{{ favoriteTeam ? `${favoriteTeam.team_name}的` : '我的' }}最佳阵容</text>
+      <text class="support-home-panel__lineup-action">前往战术板</text>
+    </view>
   </FiPanel>
 </template>
 
@@ -145,6 +158,8 @@ import {
   resolveHomeSupportMatchDaysRemaining,
   resolveHomeSupportTeamRankLabel,
   resolveHomeSupportWindowShortLabel,
+  resolveHomeTicketSaleCountdownClock,
+  resolveHomeTicketSaleDaysRemaining,
   shouldShowHomeSupportLoading,
 } from '../helpers'
 
@@ -157,12 +172,15 @@ const props = defineProps<{
   teams: SupportTeam[]
   voteSubmittingTeamId: number | null
   favoriteSubmitting: boolean
+  /** 下一场的抢票开始时间（余票监控比赛才有）。 */
+  saleStartAt: string | null
 }>()
 
 const emit = defineEmits<{
   (e: 'select-team'): void
   (e: 'open-match'): void
   (e: 'vote', teamId: number): void
+  (e: 'open-lineup'): void
 }>()
 
 const favoriteTeam = computed(() => props.profile?.favorite_team ?? null)
@@ -171,19 +189,33 @@ const favoriteTeamCrest = computed(() => favoriteTeam.value?.team_id === 77680
   ? CHENGDU_RONGCHENG_CREST_IMAGE_URL
   : favoriteTeam.value?.avatar_storage_url || '')
 const nextMatch = computed(() => props.profile?.next_match ?? null)
+function resolveMatchTeamCrest(team: { team_id: number, avatar_storage_url: string | null } | undefined): string {
+  if (!team) return ''
+  return team.team_id === 77680 ? CHENGDU_RONGCHENG_CREST_IMAGE_URL : team.avatar_storage_url || ''
+}
+const homeCrest = computed(() => resolveMatchTeamCrest(nextMatch.value?.home_team))
+const awayCrest = computed(() => resolveMatchTeamCrest(nextMatch.value?.away_team))
 const daysRemaining = computed(() => props.hasAuthToken && favoriteTeam.value && !props.errorMessage
   ? resolveHomeSupportMatchDaysRemaining(nextMatch.value, props.now) : null)
 const countdownClock = computed(() => daysRemaining.value === 0
   ? resolveHomeSupportMatchCountdownClock(nextMatch.value, props.now) : null)
 // 同一天内的倒计时拆成「xx 小时 xx 分 xx 秒」；数字加粗，单位保持常规字重。
-const countdownParts = computed(() => {
-  const [hours, minutes, seconds] = (countdownClock.value ?? '').split(':')
+function splitCountdownClock(clock: string | null) {
+  const [hours, minutes, seconds] = (clock ?? '').split(':')
   return [
     { value: hours, unit: '小时' },
     { value: minutes, unit: '分' },
     { value: seconds, unit: '秒' },
   ]
-})
+}
+const countdownParts = computed(() => splitCountdownClock(countdownClock.value))
+// 抢票倒计时只在已展示下一场（登录、有主队、无错误）且该场有开票时间、尚未开票时出现。
+const saleDaysRemaining = computed(() => daysRemaining.value !== null
+  ? resolveHomeTicketSaleDaysRemaining(props.saleStartAt, props.now) : null)
+// 不足 24 小时切换为时分秒（可能跨自然日，所以不按 saleDaysRemaining === 0 判断）。
+const saleCountdownClock = computed(() => saleDaysRemaining.value !== null
+  ? resolveHomeTicketSaleCountdownClock(props.saleStartAt, props.now) : null)
+const saleCountdownParts = computed(() => splitCountdownClock(saleCountdownClock.value))
 const showLoading = computed(() =>
   shouldShowHomeSupportLoading({ loading: props.loading, hasCachedProfile: !!props.profile }),
 )
@@ -204,15 +236,6 @@ const contextNote = computed(() => {
   }
 
   return '当前关注球队'
-})
-const favoriteTeamLabel = computed(() => {
-  if (!favoriteTeam.value) {
-    return ''
-  }
-
-  return favoriteTeam.value.rank_no
-    ? `当前积分榜第 ${favoriteTeam.value.rank_no}`
-    : '已关注主队'
 })
 const windowShortLabel = computed(() => resolveHomeSupportWindowShortLabel(nextMatch.value))
 const homeVoteState = computed(() => resolveHomeSupportVoteState(
@@ -284,8 +307,15 @@ const awayRankLabel = computed(() => {
   font-size: var(--fi-component-title-size);
   line-height: var(--fi-component-title-leading);
 }
-.support-home-panel__countdown {
+/* 两个倒计时右对齐竖排：抢票在上（墨色，更紧迫），比赛在下。 */
+.support-home-panel__countdowns {
   margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--fi-space-8);
+}
+.support-home-panel__countdown {
   display: inline-flex;
   align-items: baseline;
   gap: var(--fi-space-6);
@@ -296,6 +326,10 @@ const awayRankLabel = computed(() => {
   font-size: var(--fi-font-22);
   line-height: var(--fi-leading-normal);
   white-space: nowrap;
+}
+.support-home-panel__countdown--sale {
+  color: var(--fi-primitive-white);
+  background: var(--fi-primitive-ink);
 }
 /* Match-day clock: the label and HH:MM:SS share one size, only the digits are heavier. */
 .support-home-panel__countdown--clock {
@@ -354,196 +388,107 @@ const awayRankLabel = computed(() => {
   background: #f5f6fa;
   color: #5f6673;
 }
+/* 主队信息：一行文字，不再用分割线和竖条圈起来；切换主队降级为文字链接。 */
 .support-home-panel__favorite {
-  position: relative;
-  margin-top: 22rpx;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--fi-space-18);
-  padding: var(--fi-space-22) 0 var(--fi-space-24);
-  border-top: 2rpx solid rgba(231, 232, 238, 0.92);
-  border-bottom: 2rpx solid rgba(231, 232, 238, 0.92);
-}
-.support-home-panel__favorite::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 22rpx;
-  bottom: 22rpx;
-  width: 4rpx;
-  border-radius: var(--fi-radius-round);
-  background: var(--fi-color-success-accent);
-}
-.support-home-panel__favorite-avatar-shell {
-  margin-left: 18rpx;
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: var(--fi-radius-md);
-  background: #f7f9f8;
-  border: 2rpx solid rgba(223, 229, 226, 0.96);
+  margin-top: 14rpx;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: baseline;
+  gap: var(--fi-space-14);
 }
-.support-home-panel__favorite-avatar {
-  width: 72rpx;
-  height: 72rpx;
-}
-.support-home-panel__favorite-body {
+/* 排名已在下方对阵里展示，这一行只放主队名和切换入口。 */
+.support-home-panel__favorite-name {
   flex: 1;
   min-width: 0;
-}
-.support-home-panel__favorite-name {
   color: var(--fi-color-text-strong);
-  display: block;
-  font-size: var(--fi-font-36);
+  font-size: var(--fi-font-30);
   line-height: 1;
   font-weight: 800;
 }
-.support-home-panel__favorite-note {
-  display: block;
-  margin-top: 6rpx;
-  color: var(--fi-color-text-muted);
-  font-size: var(--fi-font-22);
-}
 .support-home-panel__switch {
-  padding: var(--fi-space-14) var(--fi-space-22);
-  border-radius: var(--fi-radius-round);
-  background: #f5f6fa;
-  color: #5f6673;
-  font-size: var(--fi-font-23);
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--fi-color-text-secondary);
+  font-size: var(--fi-font-24);
   font-weight: 700;
   line-height: 1;
 }
+.support-home-panel__switch::after { border: 0; }
+/* 对阵：左右对称，中间放轮次/VS/时间；无底色、描边、药丸，与整块面板同一层背景。 */
 .support-home-match-card {
-  margin-top: 18rpx;
-  padding: var(--fi-space-22) var(--fi-space-20);
-  border-radius: var(--fi-radius-md);
-  border: 2rpx solid rgba(229, 231, 236, 0.98);
-  /* 半透明白底：让整张卡片的队徽水印能透出来。 */
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 10rpx 28rpx rgba(18, 20, 28, 0.04);
-}
-.support-home-match-card__meta,
-.support-home-match-card__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--fi-color-text-muted);
-  font-size: var(--fi-font-22);
-}
-.support-home-match-card__meta {
-  gap: var(--fi-space-12);
-}
-.support-home-match-card__meta-pill {
-  min-height: 44rpx;
-  border-radius: var(--fi-radius-round);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  font-size: var(--fi-font-22);
-  line-height: 1;
-  font-weight: 800;
-}
-.support-home-match-card__meta-pill--round {
-  padding: 0 var(--fi-space-18);
-  background: var(--fi-primitive-ink);
-  color: var(--fi-primitive-white);
-}
-.support-home-match-card__meta-pill--time {
-  margin-left: auto;
-  gap: var(--fi-space-10);
-  padding: var(--fi-space-6) var(--fi-space-14) var(--fi-space-6) var(--fi-space-8);
-  background: #f5f6fa;
-  color: #5d6673;
-}
-.support-home-match-card__weekday {
-  min-width: 58rpx;
-  padding: var(--fi-space-9) var(--fi-space-12);
-  border-radius: var(--fi-radius-round);
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--fi-primitive-ink);
-  color: var(--fi-primitive-white);
-  font-size: var(--fi-font-24);
-  font-weight: 950;
-  line-height: 1;
-}
-.support-home-match-card__datetime {
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fi-space-8);
-  white-space: nowrap;
+  margin-top: 26rpx;
 }
 .support-home-match-card__teams {
-  margin-top: 18rpx;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: var(--fi-space-16);
+  grid-template-columns: minmax(0, 1fr) 190rpx minmax(0, 1fr);
   align-items: center;
 }
 .support-home-match-card__team-block {
   min-width: 0;
-  display: grid;
-  gap: var(--fi-space-8);
-}
-.support-home-match-card__team-block--away {
-  justify-items: end;
-}
-.support-home-match-card__vote {
   display: flex;
-  width: 100%;
-  min-width: 0;
-  justify-content: flex-start;
+  flex-direction: column;
+  align-items: center;
 }
-.support-home-match-card__vote--away {
-  justify-content: flex-end;
+.support-home-match-card__crest {
+  width: 104rpx;
+  height: 104rpx;
 }
 .support-home-match-card__team {
+  max-width: 100%;
+  margin-top: var(--fi-space-12);
   color: var(--fi-color-text-strong);
-  font-size: var(--fi-font-32);
-  line-height: 1.12;
+  font-size: var(--fi-font-30);
+  line-height: 1.15;
   font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.support-home-match-card__team--away {
-  text-align: right;
-}
 .support-home-match-card__rank {
-  display: inline-flex;
+  margin-top: var(--fi-space-6);
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-22);
+  line-height: 1;
+}
+.support-home-match-card__center {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  justify-self: start;
-  min-height: 32rpx;
-  padding: 0 var(--fi-space-12);
+  text-align: center;
+}
+.support-home-match-card__round {
+  padding: var(--fi-space-8) var(--fi-space-16);
   border-radius: var(--fi-radius-round);
-  background: #f5f6fa;
-  color: var(--fi-color-text-secondary);
-  font-size: var(--fi-font-20);
+  background: var(--fi-primitive-ink);
+  color: var(--fi-primitive-white);
+  font-size: var(--fi-font-22);
   font-weight: 800;
   line-height: 1;
 }
-.support-home-match-card__rank--away {
-  justify-self: end;
-}
 .support-home-match-card__vs {
+  margin-top: var(--fi-space-14);
   color: var(--fi-color-primary);
-  font-size: var(--fi-font-24);
+  font-size: var(--fi-font-44);
   font-weight: 900;
+  font-style: italic;
+  letter-spacing: 2rpx;
   line-height: 1;
-  padding: var(--fi-space-8) var(--fi-space-14);
-  border-radius: var(--fi-radius-round);
-  background: rgba(var(--fi-primitive-red-rgb), 0.08);
+}
+.support-home-match-card__time {
+  margin-top: var(--fi-space-14);
+  color: var(--fi-color-text-strong);
+  font-size: var(--fi-font-26);
+  font-weight: 800;
+  line-height: 1;
+}
+.support-home-match-card__date {
+  margin-top: var(--fi-space-8);
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-22);
+  line-height: 1;
 }
 .support-home-match-card__bar {
-  margin-top: 18rpx;
+  margin-top: 22rpx;
   height: 12rpx;
   border-radius: var(--fi-radius-round);
   overflow: hidden;
@@ -557,6 +502,41 @@ const awayRankLabel = computed(() => {
 .support-home-match-card__bar-away {
   height: 100%;
   background: #a7adb8;
+}
+.support-home-match-card__footer {
+  margin-top: var(--fi-space-14);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-22);
+}
+.support-home-panel__lineup {
+  position: relative;
+  z-index: 1;
+  margin-top: var(--fi-space-22);
+  padding-top: var(--fi-space-20);
+  border-top: var(--fi-border-card);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fi-space-16);
+}
+.support-home-panel__lineup--pressed { opacity: var(--fi-opacity-pressed); }
+.support-home-panel__lineup-title {
+  min-width: 0;
+  color: var(--fi-color-text-strong);
+  font-size: var(--fi-font-26);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.support-home-panel__lineup-action {
+  flex-shrink: 0;
+  color: var(--fi-color-text-secondary);
+  font-size: var(--fi-font-24);
+  font-weight: 700;
 }
 .support-home-match-card__action {
   color: var(--fi-color-primary);

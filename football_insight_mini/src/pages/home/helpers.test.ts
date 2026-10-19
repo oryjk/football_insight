@@ -25,6 +25,8 @@ import {
   resolveHomeSupportNextMatchLabel,
   resolveHomeSupportMatchCountdownClock,
   resolveHomeSupportMatchDaysRemaining,
+  resolveHomeTicketSaleCountdownClock,
+  resolveHomeTicketSaleDaysRemaining,
   resolveHomeSupportTeamRankLabel,
   resolveHomeSupportMatchWeekdayLabel,
   resolveHomeSupportWindowShortLabel,
@@ -838,4 +840,27 @@ test('主队资料接口的新浪数字状态1也显示倒计时，其余非赛�
   for (const status of ['2', '3', '4', 'postponed', 'cancelled']) {
     expect(resolveHomeSupportMatchDaysRemaining({ ...match, status }, now)).toBeNull()
   }
+})
+
+describe('首页抢票开始倒计时', () => {
+  const saleStartAt = '2026-10-22T14:00:00+08:00'
+  test('超过 24 小时按北京自然日计天', () => {
+    expect(resolveHomeTicketSaleDaysRemaining(saleStartAt, Date.parse('2026-10-20T23:59:00+08:00'))).toBe(2)
+    expect(resolveHomeTicketSaleDaysRemaining(saleStartAt, Date.parse('2026-10-21T12:00:00+08:00'))).toBe(1)
+    expect(resolveHomeTicketSaleCountdownClock(saleStartAt, Date.parse('2026-10-21T12:00:00+08:00'))).toBeNull()
+    expect(resolveHomeTicketSaleCountdownClock(saleStartAt, Date.parse('2026-10-21T13:59:59+08:00'))).toBeNull()
+  })
+  test('不足 24 小时切换为时分秒，包括开票前一天晚上', () => {
+    expect(resolveHomeTicketSaleCountdownClock(saleStartAt, Date.parse('2026-10-21T14:00:01+08:00'))).toBe('23:59:59')
+    expect(resolveHomeTicketSaleCountdownClock(saleStartAt, Date.parse('2026-10-21T20:00:00+08:00'))).toBe('18:00:00')
+    expect(resolveHomeTicketSaleCountdownClock(saleStartAt, Date.parse('2026-10-22T09:30:15+08:00'))).toBe('04:29:45')
+    expect(resolveHomeTicketSaleCountdownClock(saleStartAt, Date.parse('2026-10-22T13:59:30+08:00'))).toBe('00:00:30')
+  })
+  test('无开票时间、时间异常或已开票均不显示', () => {
+    const now = Date.parse('2026-10-22T14:00:00+08:00')
+    for (const value of [null, undefined, '', 'bad-date', '2026-10-23T14:00:00', saleStartAt]) {
+      expect(resolveHomeTicketSaleDaysRemaining(value, now)).toBeNull()
+      expect(resolveHomeTicketSaleCountdownClock(value, now)).toBeNull()
+    }
+  })
 })

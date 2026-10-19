@@ -31,17 +31,35 @@ export function resolveHomeSupportNextMatchLabel(
 export { resolveSupportVoteState as resolveHomeSupportVoteState } from '../../utils/supportVoteState'
 
 /** Compare Beijing calendar dates, not rounded 24-hour durations or the phone timezone. */
+const DAY_MS = 24 * 60 * 60 * 1000
+const BEIJING_OFFSET_MS = 8 * 60 * 60 * 1000
+
+/** Beijing calendar days until an offset-qualified instant; null when the instant is missing, malformed or passed. */
+function resolveBeijingDaysUntil(instant: string | null | undefined, now: number): number | null {
+  if (!instant || !Number.isFinite(now) || !/(?:Z|[+-]\d{2}:\d{2})$/.test(instant)) return null
+  const target = Date.parse(instant)
+  if (!Number.isFinite(target) || target <= now) return null
+  return Math.floor((target + BEIJING_OFFSET_MS) / DAY_MS) - Math.floor((now + BEIJING_OFFSET_MS) / DAY_MS)
+}
+
+function formatCountdownClock(instant: string, now: number): string {
+  const totalSeconds = Math.max(0, Math.ceil((Date.parse(instant) - now) / 1000))
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${pad(Math.floor(totalSeconds / 3600))}:${pad(Math.floor((totalSeconds % 3600) / 60))}:${pad(totalSeconds % 60)}`
+}
+
+/** HH:MM:SS until the instant, only on its Beijing calendar day (so the hour part is below 24). */
+function resolveSameDayCountdownClock(instant: string | null | undefined, now: number): string | null {
+  if (resolveBeijingDaysUntil(instant, now) !== 0 || !instant) return null
+  return formatCountdownClock(instant, now)
+}
+
 export function resolveHomeSupportMatchDaysRemaining(
   match: Pick<SupportMatchDetail, 'kickoff_at' | 'status'> | null,
   now: number = Date.now(),
 ): number | null {
-  if (!match || !['scheduled', '1'].includes(match.status) || !Number.isFinite(now)
-    || !/(?:Z|[+-]\d{2}:\d{2})$/.test(match.kickoff_at)) return null
-  const kickoff = Date.parse(match.kickoff_at)
-  if (!Number.isFinite(kickoff) || kickoff <= now) return null
-  const day = 24 * 60 * 60 * 1000
-  const beijingOffset = 8 * 60 * 60 * 1000
-  return Math.floor((kickoff + beijingOffset) / day) - Math.floor((now + beijingOffset) / day)
+  if (!match || !['scheduled', '1'].includes(match.status)) return null
+  return resolveBeijingDaysUntil(match.kickoff_at, now)
 }
 
 /** HH:MM:SS until kickoff, only on the Beijing match day itself (so the hour part is below 24). */
@@ -50,9 +68,27 @@ export function resolveHomeSupportMatchCountdownClock(
   now: number = Date.now(),
 ): string | null {
   if (resolveHomeSupportMatchDaysRemaining(match, now) !== 0 || !match) return null
-  const totalSeconds = Math.max(0, Math.ceil((Date.parse(match.kickoff_at) - now) / 1000))
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${pad(Math.floor(totalSeconds / 3600))}:${pad(Math.floor((totalSeconds % 3600) / 60))}:${pad(totalSeconds % 60)}`
+  return resolveSameDayCountdownClock(match.kickoff_at, now)
+}
+
+/** 距抢票开始的北京自然日；无开票时间（如非监控比赛）或已开票时返回 null。 */
+export function resolveHomeTicketSaleDaysRemaining(
+  saleStartAt: string | null | undefined,
+  now: number = Date.now(),
+): number | null {
+  return resolveBeijingDaysUntil(saleStartAt, now)
+}
+
+/**
+ * 距开票不足 24 小时显示 HH:MM:SS，其余时间返回 null。
+ * 与比赛倒计时（按自然日）不同：开票多在下午，按自然日会让前一晚一直显示「1 天」。
+ */
+export function resolveHomeTicketSaleCountdownClock(
+  saleStartAt: string | null | undefined,
+  now: number = Date.now(),
+): string | null {
+  if (resolveBeijingDaysUntil(saleStartAt, now) === null || !saleStartAt) return null
+  return Date.parse(saleStartAt) - now < DAY_MS ? formatCountdownClock(saleStartAt, now) : null
 }
 
 export function resolveHomeSupportTeamRankLabel(rankNo: number | null | undefined): string {

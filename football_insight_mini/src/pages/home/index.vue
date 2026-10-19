@@ -47,23 +47,12 @@
           :teams="supportTeams"
           :vote-submitting-team-id="voteSubmittingTeamId"
           :favorite-submitting="favoriteSubmitting"
+          :sale-start-at="ticketSaleStartAt"
           @select-team="openFavoriteTeamSheet"
           @open-match="openSupportMatch"
           @vote="handleHomeSupportVote"
+          @open-lineup="openLineupBoard"
         />
-
-        <button
-          v-if="hasAuthToken && !outlookRestricted && supportProfile?.next_match"
-          class="outlook-entry"
-          hover-class="outlook-entry--pressed"
-          @tap="openMatchOutlook"
-        >下一场的数据倾向 · 前往洞察查看</button>
-
-        <button
-          class="outlook-entry"
-          hover-class="outlook-entry--pressed"
-          @tap="openLineupBoard"
-        >排{{ supportFavoriteTeam ? `${supportFavoriteTeam.team_name}的` : '我的' }}最佳阵容 · 前往战术板</button>
 
         <!-- 回到页面的后台刷新沿用已有内容，只有还没有总览数据时才显示骨架 -->
         <HomeSkeleton v-if="loading && !overview" />
@@ -137,7 +126,6 @@
 <script setup lang="ts">
 import { buildSharePath, buildShareQuery } from '../../utils/shareSource'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
-import { useMiniReviewStatus } from '../../stores/miniReview'
 import { computed, ref, watch } from 'vue'
 import { onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
@@ -180,6 +168,7 @@ import {
   resolveHomePulseMatches,
   resolveHomePulseTechStats,
   resolveHomeSupportMatchCountdownClock,
+  resolveHomeTicketSaleCountdownClock,
   resolveHomeTeamSeasonMatches,
   toHomeTeamSeasonPulseMatch,
   type HomePulseLeadMatch,
@@ -188,6 +177,7 @@ import {
 import { createHomeSessionSync } from './sessionEffects'
 import { useHomeMatchClock } from './useHomeMatchClock'
 import { useHomeSupportData } from './useHomeSupportData'
+import { useHomeTicketSale } from './useHomeTicketSale'
 import { useHomeDailyTopics } from './useHomeDailyTopics'
 import { useDailyTopicAudio } from '../../composables/useDailyTopicAudio'
 import { topicDetailUrl } from './dailyTopics'
@@ -238,9 +228,13 @@ const {
   loadSupportTeams,
   resetSessionScopedState: resetHomeSupportSessionState,
 } = useHomeSupportData({ session })
-// 比赛当天首页显示时分秒倒计时，此时按秒刷新时钟；其余时间每分钟刷新即可。
+const { saleStartAt: ticketSaleStartAt, loadTicketSaleMatches } = useHomeTicketSale(
+  computed(() => supportProfile.value?.next_match ?? null),
+)
+// 比赛当天或开票当天首页显示时分秒倒计时，此时按秒刷新时钟；其余时间每分钟刷新即可。
 const homeMatchNow = useHomeMatchClock(
-  (now) => resolveHomeSupportMatchCountdownClock(supportProfile.value?.next_match ?? null, now) !== null,
+  (now) => resolveHomeSupportMatchCountdownClock(supportProfile.value?.next_match ?? null, now) !== null
+    || resolveHomeTicketSaleCountdownClock(ticketSaleStartAt.value, now) !== null,
 )
 // 后台静默恢复/登录/退出发布 currentUser 后，助力面板（私有）随会话刷新，无需重新进入页面；
 // 会话身份变化（revision）先同步清掉旧账号私有缓存，跨账号不沿用。
@@ -525,21 +519,14 @@ async function handleHomeSupportVote(teamId: number) {
   }
 }
 
-const outlookReview = useMiniReviewStatus()
-const outlookRestricted = outlookReview.shouldRestrictFeatures
-
-function openMatchOutlook() {
-  uni.switchTab({ url: '/pages/insights/index' })
-}
-
 function openLineupBoard() {
   uni.navigateTo({ url: buildLineupPageUrl(supportFavoriteTeam.value?.team_id) })
 }
 
 onShow(() => {
-  void outlookReview.ensureMiniReviewReady()
   reportPageActivity('home')
   const pending = [loadPage(), loadDailyTopics(), loadSupportData()]
+  void loadTicketSaleMatches()
   if (!homeInitialSettled.value) {
     void Promise.allSettled(pending).then(() => { homeInitialSettled.value = true })
   }
@@ -547,19 +534,6 @@ onShow(() => {
 </script>
 
 <style scoped lang="css">
-.outlook-entry {
-  margin: 0;
-  padding: var(--fi-space-16) var(--fi-space-20);
-  background: var(--fi-color-surface-panel);
-  color: var(--fi-color-text-secondary);
-  font-size: var(--fi-font-24);
-  line-height: var(--fi-leading-normal);
-  border-radius: var(--fi-radius-round);
-  border: var(--fi-border-card);
-}
-.outlook-entry::after { border: 0; }
-.outlook-entry--pressed { opacity: var(--fi-opacity-pressed); }
-
 .home-page-shell {
   min-height: 100vh;
   position: relative;
