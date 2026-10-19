@@ -2,7 +2,7 @@ import { computed, ref, watch } from 'vue'
 import { getMyLineup, getSquad, saveMyLineup } from '../../api/lineup'
 import { useAppSession } from '../../stores/appSession'
 import type { SavedLineup, SquadResponse } from '../../types/lineup'
-import { extractApiErrorMessage } from '../../utils/apiError'
+import { extractApiErrorMessage, isUnauthorizedError } from '../../utils/apiError'
 import { DEFAULT_FORMATION } from './formations'
 import { autoFillStartingEleven, emptyLineup, type LineupSlots } from './helpers'
 import { clearDraft, readDraft, sanitizeDraftSlots, writeDraft, type DraftStorage } from './lineupDraft'
@@ -20,6 +20,8 @@ export interface LineupPageDeps {
   now: () => number
   /** 改动后多久写草稿（毫秒）。 */
   draftDelayMs: number
+  sessionRevision: () => number
+  invalidateSession: (revision: number) => void
 }
 
 export type SaveResult = 'saved' | 'need-login' | 'failed' | 'cancelled'
@@ -37,6 +39,8 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
     storage: overrides.storage ?? uni,
     now: Date.now,
     draftDelayMs: 300,
+    sessionRevision: () => session?.revision.value ?? 0,
+    invalidateSession: (revision) => session?.invalidateSession(revision),
     ...overrides,
   }
 
@@ -48,6 +52,7 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
   const saving = ref(false)
   const failed = ref(false)
   const savedOnce = ref(false)
+  const savedLineup = ref<SavedLineup | null>(null)
   /** 加载时发现的需要告诉用户的情况（如阵容里的球员已不在名单）。 */
   const notice = ref('')
   // 乱序响应保护：连续切换球队时只采用最后一次 load 的结果。
@@ -92,7 +97,8 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
     // 必须在换 teamId 前落盘；取消 debounce 本身不能保证最后一次改动已保存。
     if (editor.dirty.value) persistDraft()
     const seq = ++loadSeq
-    const current = () => !disposed && seq === loadSeq
+    let authRevision = deps.sessionRevision()
+    const current = () => !disposed && seq === loadSeq && authRevision === deps.sessionRevision()
     disposed = false
     cancelDraftTimer()
     teamId.value = nextTeamId
@@ -104,12 +110,19 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
     notice.value = ''
     failed.value = false
     savedOnce.value = false
+    savedLineup.value = null
     try {
       const [loadedSquad, mine] = await Promise.all([
         deps.getSquad(nextTeamId),
-        deps.isLoggedIn() ? deps.getMyLineup(nextTeamId) : Promise.resolve({ lineup: null }),
+        deps.isLoggedIn() ? deps.getMyLineup(nextTeamId).catch(error => {
+          if (!current() || !isUnauthorizedError(error)) throw error
+          deps.invalidateSession(authRevision)
+          authRevision = deps.sessionRevision()
+          return { lineup: null }
+        }) : Promise.resolve({ lineup: null }),
       ])
       if (!current()) return
+      savedLineup.value = mine.lineup
       squad.value = loadedSquad
       const known = new Set([...loadedSquad.active, ...loadedSquad.former].map((p) => p.player_id))
       const draft = readDraft(nextTeamId, deps.storage)
@@ -134,7 +147,7 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
       if (!current()) return
       errorMessage.value = extractApiErrorMessage(error, '战术板加载失败')
     } finally {
-      if (current()) loading.value = false
+      if (!disposed && seq === loadSeq) loading.value = false
     }
   }
 
@@ -151,13 +164,15 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
     const teamAtStart = teamId.value
     const contextAtStart = loadSeq
     const revisionAtStart = editor.revision.value
-    const current = () => !disposed && loadSeq === contextAtStart && teamId.value === teamAtStart
+    const authRevision = deps.sessionRevision()
+    const current = () => !disposed && loadSeq === contextAtStart && teamId.value === teamAtStart && deps.sessionRevision() === authRevision
     try {
-      await deps.saveMyLineup(teamAtStart, {
+      const response = await deps.saveMyLineup(teamAtStart, {
         formation: editor.formation.value,
         slots: editor.slots.value.map((slot) => ({ ...slot })),
       })
       if (!current()) return 'cancelled'
+      savedLineup.value = response.lineup
       failed.value = false
       savedOnce.value = true
       if (editor.revision.value === revisionAtStart) {
@@ -169,13 +184,19 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
         persistDraft()
       }
       return 'saved'
-    } catch {
+    } catch (error) {
       if (!current()) return 'cancelled'
+      if (isUnauthorizedError(error)) {
+        persistDraft()
+        saving.value = false
+        deps.invalidateSession(authRevision)
+        return 'need-login'
+      }
       persistDraft()
       failed.value = true
       return 'failed'
     } finally {
-      if (current()) saving.value = false
+      if (!disposed && loadSeq === contextAtStart && teamId.value === teamAtStart) saving.value = false
     }
   }
 
@@ -196,5 +217,5 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
     cancelDraftTimer()
   }
 
-  return { teamId, squad, loading, errorMessage, notice, saving, saveState, editor, load, save, fillStartingEleven, dispose }
+  return { teamId, squad, loading, errorMessage, notice, saving, saveState, savedLineup, editor, load, save, fillStartingEleven, dispose }
 }

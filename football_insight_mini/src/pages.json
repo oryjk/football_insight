@@ -109,6 +109,20 @@
 						"navigationBarTitleText": "战术板",
 						"navigationStyle": "custom"
 					}
+				},
+				{
+					"path": "view",
+					"style": {
+						"navigationBarTitleText": "球迷阵容",
+						"navigationStyle": "custom"
+					}
+				},
+				{
+					"path": "list",
+					"style": {
+						"navigationBarTitleText": "球队战术板",
+						"navigationStyle": "custom"
+					}
 				}
 			]
 		}
@@ -116,11 +130,16 @@
 	"preloadRule": {
 		"pages/insights/index": {
 			"network": "all",
-			"packages": ["pages/ticket-watch", "pages/lineup"]
+			"packages": [
+				"pages/ticket-watch",
+				"pages/lineup"
+			]
 		},
 		"pages/home/index": {
 			"network": "all",
-			"packages": ["pages/lineup"]
+			"packages": [
+				"pages/lineup"
+			]
 		}
 	},
 	"tabBar": {

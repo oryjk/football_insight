@@ -1,0 +1,13 @@
+.community-page { min-height: 100vh; box-sizing: border-box; padding: calc(var(--fi-brand-nav-height) + var(--fi-space-24)) var(--fi-space-24) var(--fi-space-64); background: var(--fi-color-page-soft); display: flex; flex-direction: column; gap: var(--fi-space-24); }
+.community-title { color: var(--fi-color-text-strong); font-size: var(--fi-font-32); font-weight: var(--fi-weight-bold); }
+.community-caption { color: var(--fi-color-text-muted); font-size: var(--fi-font-24); line-height: var(--fi-leading-normal); }
+.community-error { color: var(--fi-color-primary-deep); font-size: var(--fi-font-24); }
+.community-panel { padding: var(--fi-space-24); border-radius: var(--fi-radius-md); background: var(--fi-color-surface); display: flex; flex-direction: column; gap: var(--fi-space-16); }
+.community-row { display: flex; align-items: center; gap: var(--fi-space-16); }
+.community-action { margin: 0; padding: var(--fi-space-20); border-radius: var(--fi-radius-round); background: var(--fi-color-surface); color: var(--fi-color-text-primary); font-size: var(--fi-font-26); line-height: var(--fi-leading-normal); border: var(--fi-border-card); }
+.community-row > .community-action { flex: 1; }
+.community-action::after { border: 0; }
+.community-action--active { color: var(--fi-color-surface); background: var(--fi-color-primary); }
+.community-action[disabled] { opacity: var(--fi-opacity-pressed); }
+/* Canvas bitmap dimensions use logical pixels; off-screen placement does not affect layout. */
+.lineup-canvas { position: fixed; left: -3000rpx; top: 0; pointer-events: none; }

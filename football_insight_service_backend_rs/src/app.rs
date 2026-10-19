@@ -33,8 +33,11 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         system_config.system_config_port.clone(),
         Arc::new(PostgresOfficialAccountMatchIdAccess::new(pool.clone())),
     );
-    let lineup_routes =
-        crate::lineup::bootstrap::build_lineup_routes(pool.clone(), auth.token_port.clone());
+    let lineup_routes = crate::lineup::bootstrap::build_lineup_routes(
+        pool.clone(),
+        auth.token_port.clone(),
+        config,
+    );
     let daily_topics_routes = build_daily_topics_routes(pool.clone(), auth.token_port.clone());
     let activity_routes = build_activity_routes(pool.clone(), auth.token_port.clone());
     let ai_routes = build_ai_routes(

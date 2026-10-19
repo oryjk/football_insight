@@ -14,14 +14,14 @@ pub(super) struct SquadResponse {
 }
 
 #[derive(Serialize)]
-struct TeamDto {
+pub(super) struct TeamDto {
     team_id: i64,
     team_name: String,
     avatar_url: Option<String>,
 }
 
 #[derive(Serialize)]
-struct PlayerDto {
+pub(super) struct PlayerDto {
     player_id: i64,
     name: String,
     shirt_number: Option<i32>,

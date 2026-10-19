@@ -207,3 +207,128 @@ mod lineup_validation_tests {
         );
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum LineupPublicError {
+    #[error("参数无效")]
+    Invalid,
+    #[error("账号不可用，请重新登录")]
+    Unauthorized,
+    #[error("阵容或球队不存在")]
+    NotFound,
+    #[error("阵容暂不可用")]
+    Unavailable,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LineupCodeImage {
+    pub image_base64: String,
+    pub mime_type: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LineupSort {
+    Latest,
+    Likes,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PublicLineupQuery {
+    pub sort: LineupSort,
+    pub page: u32,
+    pub page_size: u32,
+}
+
+impl PublicLineupQuery {
+    pub fn parse(sort: &str, page: u32, page_size: u32) -> Result<Self, LineupPublicError> {
+        let sort = match sort {
+            "latest" => LineupSort::Latest,
+            "likes" => LineupSort::Likes,
+            _ => return Err(LineupPublicError::Invalid),
+        };
+        if page == 0 || !(1..=50).contains(&page_size) {
+            return Err(LineupPublicError::Invalid);
+        }
+        Ok(Self {
+            sort,
+            page,
+            page_size,
+        })
+    }
+
+    pub fn offset(self) -> i64 {
+        i64::from(self.page - 1) * i64::from(self.page_size)
+    }
+}
+
+pub fn valid_share_code(code: &str) -> bool {
+    code.len() == 8 && code.bytes().all(|b| b.is_ascii_alphanumeric())
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LineupAuthor {
+    pub display_name: String,
+    pub avatar_url: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LineupLikeState {
+    pub likes_count: i64,
+    pub liked_by_me: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PublicLineupItem {
+    pub share_code: String,
+    pub formation: String,
+    pub author: LineupAuthor,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+    pub likes: LineupLikeState,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PublicLineupPage {
+    pub team: SquadTeam,
+    pub items: Vec<PublicLineupItem>,
+    pub total: i64,
+    pub query: PublicLineupQuery,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SharedLineup {
+    pub item: PublicLineupItem,
+    pub team: SquadTeam,
+    pub slots: Vec<LineupSlot>,
+    pub players: Vec<SquadPlayer>,
+}
+
+#[cfg(test)]
+mod public_validation_tests {
+    use super::*;
+    #[test]
+    fn public_query_rejects_unknown_sort_and_invalid_paging() {
+        for (sort, page, size) in [
+            ("bad", 1, 20),
+            ("latest", 0, 20),
+            ("likes", 1, 0),
+            ("likes", 1, 51),
+        ] {
+            assert_eq!(
+                PublicLineupQuery::parse(sort, page, size),
+                Err(LineupPublicError::Invalid)
+            );
+        }
+        assert_eq!(
+            PublicLineupQuery::parse("likes", 2, 50).unwrap().offset(),
+            50
+        );
+    }
+    #[test]
+    fn shared_codes_are_exactly_eight_ascii_base62_characters() {
+        assert!(valid_share_code("aAzZ0199"));
+        for code in ["", "short", "123456789", "1234/678", "1234é78"] {
+            assert!(!valid_share_code(code));
+        }
+    }
+}

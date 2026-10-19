@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { buildLineupPageUrl, parseLineupPageQuery } from './lineupLinks'
+import { buildLineupPageUrl, parseLineupPageQuery, buildLineupViewUrl, parseLineupShareCode, buildLineupListUrl, parseLineupListQuery } from './lineupLinks'
 
 describe('buildLineupPageUrl', () => {
   test('adds teamId only when there is one', () => {
@@ -25,5 +25,23 @@ describe('parseLineupPageQuery', () => {
     expect(parseLineupPageQuery(undefined)).toEqual({ teamId: 0, autosave: false })
     expect(parseLineupPageQuery({ teamId: 'abc', autosave: 'yes' })).toEqual({ teamId: 0, autosave: false })
     expect(parseLineupPageQuery({ teamId: '-3' })).toEqual({ teamId: 0, autosave: false })
+  })
+})
+
+
+describe('public lineup navigation', () => {
+  test('shares only a validated readonly target, with attribution', () => {
+    expect(buildLineupViewUrl('Ab12Cd34', true)).toBe('/pages/lineup/view?code=Ab12Cd34&src=share&cid=lineup')
+    expect(buildLineupViewUrl('Ab12Cd34')).toBe('/pages/lineup/view?code=Ab12Cd34')
+    expect(buildLineupViewUrl('../mine')).toBe('')
+    expect(buildLineupListUrl(21)).toBe('/pages/lineup/list?teamId=21')
+    expect(buildLineupListUrl(21, 'likes')).toBe('/pages/lineup/list?teamId=21&sort=likes')
+    expect(parseLineupListQuery({ teamId: '21', sort: 'likes' })).toEqual({ teamId: 21, sort: 'likes' })
+    expect(parseLineupListQuery({ teamId: '21', sort: 'bad' })).toEqual({ teamId: 21, sort: 'latest' })
+  })
+  test('reads encoded wxacode l parameter, never accepts another campaign or bad code', () => {
+    expect(parseLineupShareCode({ scene: encodeURIComponent('s=share&c=lineup&l=Ab12Cd34') })).toBe('Ab12Cd34')
+    expect(parseLineupShareCode({ code: 'Ab12Cd34' })).toBe('Ab12Cd34')
+    for (const scene of ['%', 's=share&c=ticket&l=Ab12Cd34', 's=share&c=lineup&l=bad', 'l=Ab12Cd34']) expect(parseLineupShareCode({ scene })).toBe('')
   })
 })

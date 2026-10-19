@@ -3,6 +3,7 @@ use super::{
     ports::SquadRepository,
 };
 pub mod my_lineup;
+pub mod public_lineup;
 
 use std::sync::Arc;
 

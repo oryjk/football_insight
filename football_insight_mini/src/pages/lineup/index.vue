@@ -48,6 +48,9 @@
           <text v-if="editor.filled.value < 11" class="hint-link" @tap="fillStartingEleven">一键填入首发</text>
         </view>
 
+        <text class="hint">保存满 11 人后，阵容会自动公开到球队战术板，其他球迷可查看和点赞。</text>
+        <button class="ghost-action" @tap="openCommunity">看看大家怎么排 ›</button>
+
         <view class="actions">
           <button
             class="actions__reset"
@@ -61,7 +64,7 @@
             :disabled="saving"
             @tap="handleSave"
           >{{ saving ? '保存中…' : '保存' }}</button>
-          <button class="actions__ghost actions__ghost--disabled" @tap="handleShareSoon">分享</button>
+          <button class="actions__ghost" :disabled="saving || sharePreparing" @tap="handleShare">{{ sharePreparing ? '准备中…' : '分享' }}</button>
         </view>
       </view>
     </view>
@@ -90,20 +93,28 @@
         >确认重置</button>
       </template>
     </FiBottomSheet>
+    <LineupShareSheet v-model:visible="shareVisible" :busy="shareBusy" :ready="Boolean(sharePayload)" :image-path="imagePath" :error="shareError" @generate="generate" @preview="preview" @save="saveImage" />
+    <canvas canvas-id="lineup-share-canvas" class="share-canvas" :style="{ width: '750px', height: '1200px' }" />
+    <canvas canvas-id="lineup-card-canvas" class="share-canvas" :style="{ width: '750px', height: '600px' }" />
     <!-- #endif -->
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
-import { onLoad, onShow } from '@dcloudio/uni-app'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { onLoad, onShow, onShareAppMessage } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import FiBottomSheet from '../../components/FiBottomSheet.vue'
+import { getSharedLineup } from '../../api/lineup'
+import { extractApiErrorMessage } from '../../utils/apiError'
+import { prepareEditorShare } from './lineupEditorShare'
+import { useLineupShare } from './useLineupShare'
+import LineupShareSheet from './components/LineupShareSheet.vue'
 import { getSupportProfile, listSupportTeams } from '../../api/support'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { useAppSession } from '../../stores/appSession'
-import { buildLineupPageUrl, parseLineupPageQuery } from '../../utils/lineupLinks'
+import { buildLineupListUrl, buildLineupPageUrl, parseLineupPageQuery } from '../../utils/lineupLinks'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
 import { buildPitchPlayers, buildSheetGroups, positionIndex } from './lineupViewModel'
 import { useLineupPage } from './useLineupPage'
@@ -115,16 +126,26 @@ import LineupTeamPicker from './components/LineupTeamPicker.vue'
 const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
 
-const { teamId, squad, loading, errorMessage, notice, saving, saveState, editor, load, save, fillStartingEleven, dispose } = useLineupPage()
+const { teamId, squad, loading, errorMessage, notice, saving, saveState, savedLineup, editor, load, save, fillStartingEleven, dispose } = useLineupPage()
 
 const teams = ref<Array<{ team_id: number; team_name: string; avatar_url: string | null }>>([])
 const sheetVisible = ref(false)
 const resetConfirmVisible = ref(false)
+const sharePreparing = ref(false)
+const shareContext = () => JSON.stringify([teamId.value, editor.revision.value, session.revision.value, loading.value])
+const share = useLineupShare(shareContext, () => buildLineupPageUrl(teamId.value, { autosave: true }))
+const { visible: shareVisible, busy: shareBusy, error: shareError, imagePath, payload: sharePayload, generate, preview, save: saveImage } = share
+watch(sharePayload, payload => {
+  // #ifdef MP-WEIXIN
+  if (payload) uni.showShareMenu({ menus: ['shareAppMessage'] }); else uni.hideShareMenu({ hideShareItems: ['shareAppMessage', 'shareTimeline'] })
+  // #endif
+}, { immediate: true })
+onShareAppMessage(() => sharePayload.value ?? {})
 let requestedTeamId = 0
 let started = false
 
 // 弹层打开时锁页面滚动（沿用换座页的 page-meta 约定）。
-const pageLockStyle = computed(() => (sheetVisible.value || resetConfirmVisible.value ? 'overflow: hidden;' : ''))
+const pageLockStyle = computed(() => (sheetVisible.value || resetConfirmVisible.value || shareVisible.value ? 'overflow: hidden;' : ''))
 
 const pitchPlayers = computed(() => buildPitchPlayers(editor.slots.value, editor.formation.value, squad.value))
 
@@ -233,8 +254,24 @@ async function handleSave(): Promise<void> {
   uni.showToast({ title: '保存失败，已存为草稿，稍后重试', icon: 'none' })
 }
 
-function handleShareSoon(): void {
-  uni.showToast({ title: '分享功能即将上线', icon: 'none' })
+function openCommunity(): void { uni.navigateTo({ url: buildLineupListUrl(teamId.value) }) }
+async function handleShare(): Promise<void> {
+  if (sharePreparing.value || loading.value || saving.value) return
+  sharePreparing.value = true
+  try {
+    const prepared = await prepareEditorShare({
+      context: shareContext, slots: () => editor.slots.value, save, saved: () => savedLineup.value,
+      dirty: () => editor.dirty.value, detail: getSharedLineup,
+    })
+    if (prepared.lineup) { await share.open(prepared.lineup); return }
+    if (prepared.result === 'incomplete') uni.showToast({ title: '排满 11 人后再分享', icon: 'none' })
+    else if (prepared.result === 'need-login') {
+      rememberPostLoginRedirect({ type: 'navigateTo', url: buildLineupPageUrl(teamId.value, { autosave: true }) })
+      uni.showToast({ title: '登录并保存后即可分享', icon: 'none' })
+      uni.switchTab({ url: '/pages/user/index' })
+    } else if (prepared.result === 'failed') uni.showToast({ title: '保存失败，稍后重试分享', icon: 'none' })
+  } catch (error) { uni.showToast({ title: extractApiErrorMessage(error, '分享准备失败，请重试'), icon: 'none' }) }
+  finally { sharePreparing.value = false }
 }
 
 async function resolveDefaultTeamId(list: Array<{ team_id: number }>): Promise<number> {
@@ -508,8 +545,8 @@ onBeforeUnmount(dispose)
 
 .actions__primary {
   flex: 1;
-  background: var(--fi-primitive-ink);
-  color: var(--fi-primitive-white);
+  background: var(--fi-color-text-strong);
+  color: var(--fi-color-surface);
   box-shadow: var(--fi-shadow-soft);
 }
 
@@ -531,4 +568,8 @@ onBeforeUnmount(dispose)
     transition: none;
   }
 }
+</style>
+
+<style scoped>
+.share-canvas { position: fixed; left: -3000rpx; top: 0; pointer-events: none; }
 </style>

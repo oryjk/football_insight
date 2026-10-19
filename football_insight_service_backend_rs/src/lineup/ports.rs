@@ -36,3 +36,35 @@ pub trait LineupRepository: Send + Sync {
         share_code: &str,
     ) -> Result<Lineup, StoreError>;
 }
+
+use super::domain::{
+    LineupCodeImage, LineupLikeState, LineupPublicError, PublicLineupItem, PublicLineupQuery,
+    SharedLineup,
+};
+
+#[async_trait]
+pub trait LineupCodePort: Send + Sync {
+    async fn image(&self, code: &str) -> Result<LineupCodeImage, LineupPublicError>;
+}
+
+#[async_trait]
+pub trait PublicLineupRepository: Send + Sync {
+    async fn list(
+        &self,
+        team_id: i64,
+        query: PublicLineupQuery,
+        viewer: Option<Uuid>,
+    ) -> Result<(Vec<PublicLineupItem>, i64), LineupPublicError>;
+    async fn shared(
+        &self,
+        code: &str,
+        viewer: Option<Uuid>,
+    ) -> Result<Option<SharedLineup>, LineupPublicError>;
+    /// Atomically check public visibility and active actor, set or remove the unique like, and read counts.
+    async fn set_like(
+        &self,
+        code: &str,
+        user_id: Uuid,
+        liked: bool,
+    ) -> Result<LineupLikeState, LineupPublicError>;
+}

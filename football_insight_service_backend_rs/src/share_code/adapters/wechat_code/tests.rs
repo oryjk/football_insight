@@ -22,6 +22,8 @@ struct Calls {
     codes: AtomicUsize,
     fail_token: bool,
     fail_code: bool,
+    lineup: bool,
+    payloads: std::sync::Mutex<Vec<Value>>,
 }
 
 async fn token(State(calls): State<Arc<Calls>>, Json(body): Json<Value>) -> Json<Value> {
@@ -43,10 +45,13 @@ async fn code(
     Json(body): Json<Value>,
 ) -> Vec<u8> {
     assert_eq!(query["access_token"], "test-token");
-    assert_eq!(
-        body,
-        json!({"scene":"s=share&c=ticket_poster","page":"pages/ticket-watch/index","check_path":false,"env_version":"release","width":280})
-    );
+    if !calls.lineup {
+        assert_eq!(
+            body,
+            json!({"scene":"s=share&c=ticket_poster","page":"pages/ticket-watch/index","check_path":false,"env_version":"release","width":280})
+        );
+    }
+    calls.payloads.lock().unwrap().push(body);
     calls.codes.fetch_add(1, Ordering::SeqCst);
     if calls.fail_code {
         br#"{"errcode":45009,"errmsg":"quota exceeded"}"#.to_vec()
@@ -210,4 +215,80 @@ fn only_bounded_png_and_jpeg_images_are_returned() {
     let mut oversized = PNG.to_vec();
     oversized.resize(1024 * 1024 + 1, 0);
     assert_eq!(decode_image(&oversized), Err(ShareCodeError::Unavailable));
+}
+
+#[tokio::test]
+async fn lineup_codes_use_their_own_scene_and_coalesce_per_lineup() {
+    use crate::lineup::ports::LineupCodePort;
+    let calls = Arc::new(Calls {
+        lineup: true,
+        ..Calls::default()
+    });
+    let (template, server) = fixture(calls.clone()).await;
+    let mut adapter = WechatLineupCode::new("test-app".into(), "test-secret".into());
+    adapter.api_base = template.api_base;
+    adapter.client = template.client;
+    let (a, a_again) = tokio::join!(adapter.image("ABCD1234"), adapter.image("ABCD1234"));
+    assert_eq!(a.unwrap(), a_again.unwrap());
+    adapter.image("EFGH5678").await.unwrap();
+    adapter.image("ABCD1234").await.unwrap();
+    assert_eq!(calls.codes.load(Ordering::SeqCst), 2);
+    let payloads = calls.payloads.lock().unwrap();
+    assert_eq!(
+        payloads[0],
+        json!({"scene":"s=share&c=lineup&l=ABCD1234","page":"pages/lineup/view","check_path":false,"env_version":"release","width":280})
+    );
+    assert_eq!(
+        payloads[1],
+        json!({"scene":"s=share&c=lineup&l=EFGH5678","page":"pages/lineup/view","check_path":false,"env_version":"release","width":280})
+    );
+    server.abort();
+}
+
+#[tokio::test]
+async fn lineup_code_errors_are_cached_and_invalid_codes_never_call_wechat() {
+    use crate::lineup::ports::LineupCodePort;
+    let calls = Arc::new(Calls {
+        lineup: true,
+        fail_code: true,
+        ..Calls::default()
+    });
+    let (template, server) = fixture(calls.clone()).await;
+    let mut adapter = WechatLineupCode::new("test-app".into(), "test-secret".into());
+    adapter.api_base = template.api_base;
+    adapter.client = template.client;
+    for invalid in ["", "too-long-code", "../../ab", "ABCD_123"] {
+        assert!(adapter.image(invalid).await.is_err());
+    }
+    assert_eq!(calls.tokens.load(Ordering::SeqCst), 0);
+    for _ in 0..2 {
+        assert!(adapter.image("ABCD1234").await.is_err());
+    }
+    assert_eq!(calls.tokens.load(Ordering::SeqCst), 1);
+    assert_eq!(calls.codes.load(Ordering::SeqCst), 1);
+    let cached = adapter.codes.lock().await.get("ABCD1234").unwrap().clone();
+    let until = cached.cache.lock().await.as_ref().unwrap().0;
+    assert!(until <= Instant::now() + Duration::from_secs(30));
+    cached.cache.lock().await.as_mut().unwrap().0 = Instant::now() - Duration::from_secs(1);
+    assert!(adapter.image("ABCD1234").await.is_err());
+    assert_eq!(calls.codes.load(Ordering::SeqCst), 2);
+    server.abort();
+}
+
+#[tokio::test]
+async fn many_lineup_targets_cannot_grow_the_image_cache_without_bound() {
+    use crate::lineup::ports::LineupCodePort;
+    let calls = Arc::new(Calls {
+        lineup: true,
+        ..Calls::default()
+    });
+    let (template, server) = fixture(calls.clone()).await;
+    let mut adapter = WechatLineupCode::new("test-app".into(), "test-secret".into());
+    adapter.api_base = template.api_base;
+    adapter.client = template.client;
+    for index in 0..130 {
+        adapter.image(&format!("{index:08}")).await.unwrap();
+    }
+    assert!(adapter.codes.lock().await.len() <= 128);
+    server.abort();
 }

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { nextTick } from 'vue'
 import type { SavedLineup, SquadResponse } from '../../types/lineup'
 import { assignPlayer, emptyLineup } from './helpers'
+import { ApiRequestError } from '../../utils/apiError'
 import { readDraft } from './lineupDraft'
 import { useLineupEditor } from './useLineupEditor'
 import { useLineupPage } from './useLineupPage'
@@ -440,5 +441,47 @@ describe('useLineupPage', () => {
     expect(page.editor.filled.value).toBe(0)
     expect(page.editor.dirty.value).toBe(false)
   })
+  test('saved metadata comes from the last successful save and is cleared for the next team', async () => {
+    const { page } = build()
+    await page.load(1)
+    expect(page.savedLineup.value).toBeNull()
+    await page.save()
+    expect(page.savedLineup.value?.share_code).toBe('ABCDEFGH')
+    await page.load(2)
+    expect(page.savedLineup.value).toBeNull()
+  })
+
+  test('an expired active session during save keeps a draft and returns a login intent', async () => {
+    let revision = 1, loggedIn = true
+    const { page, storage } = build({
+      sessionRevision: () => revision, isLoggedIn: () => loggedIn,
+      invalidateSession: expected => { if (expected === revision) { revision++; loggedIn = false } },
+      saveMyLineup: async () => { throw new ApiRequestError('disabled', 401) },
+    })
+    await page.load(1); page.editor.pick(0, null)
+    expect(await page.save()).toBe('need-login')
+    expect(loggedIn).toBe(false); expect(page.saving.value).toBe(false)
+    expect(readDraft(1, storage) === null).toBe(false)
+  })
+
+  test('an expired optional editor session still loads the squad anonymously', async () => {
+    let revision = 1
+    const { page } = build({
+      sessionRevision: () => revision,
+      invalidateSession: expected => { if (expected === revision) revision++ },
+      getMyLineup: async () => { throw new ApiRequestError('expired', 401) },
+    })
+    await page.load(1)
+    expect(page.squad.value?.team.team_id).toBe(1); expect(page.loading.value).toBe(false)
+    expect(page.errorMessage.value).toBe(''); expect(revision).toBe(2)
+  })
+
+  test('a response from the prior account cannot publish saved metadata or strand its save lock', async () => {
+    let revision = 1, finish: () => void = () => {}
+    const { page } = build({ sessionRevision: () => revision, saveMyLineup: (_id, payload) => new Promise(resolve => { finish = () => resolve({ lineup: { ...saved, ...payload } }) }) })
+    await page.load(1); const saving = page.save(); revision++
+    finish(); expect(await saving).toBe('cancelled'); expect(page.savedLineup.value).toBeNull(); expect(page.saving.value).toBe(false)
+  })
+
 })
 

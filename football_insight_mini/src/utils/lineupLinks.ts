@@ -14,3 +14,28 @@ export function parseLineupPageQuery(query: Record<string, unknown> | undefined)
     autosave: query?.autosave === '1',
   }
 }
+
+
+export function validLineupCode(code: unknown): code is string {
+  return typeof code === 'string' && /^[a-zA-Z0-9]{8}$/.test(code)
+}
+export function buildLineupViewUrl(code: string, shared = false): string {
+  if (!validLineupCode(code)) return ''
+  return `/pages/lineup/view?code=${code}${shared ? '&src=share&cid=lineup' : ''}`
+}
+export function buildLineupListUrl(teamId: number, sort: 'latest' | 'likes' = 'latest'): string {
+  return `/pages/lineup/list?teamId=${teamId}${sort === 'likes' ? '&sort=likes' : ''}`
+}
+export function parseLineupShareCode(query: Record<string, unknown> | undefined): string {
+  if (validLineupCode(query?.code)) return query!.code as string
+  if (typeof query?.scene !== 'string') return ''
+  try {
+    const scene = decodeURIComponent(query.scene)
+    const values = Object.fromEntries(scene.split('&').map(pair => pair.split('=')))
+    return values.s === 'share' && values.c === 'lineup' && validLineupCode(values.l) ? values.l : ''
+  } catch { return '' }
+}
+
+export function parseLineupListQuery(query: Record<string, unknown> | undefined): { teamId: number; sort: 'latest' | 'likes' } {
+  return { teamId: parseLineupPageQuery(query).teamId, sort: query?.sort === 'likes' ? 'likes' : 'latest' }
+}
