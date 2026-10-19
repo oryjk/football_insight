@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import pytest
+
 from sina_csl_scraper.assets import (
     AssetUploader,
     MinioAssetTarget,
     default_public_base_url,
 )
 from sina_csl_scraper.models import PlayerProfile, TeamProfile
+from sina_csl_scraper.models import SquadPlayer
+from sina_csl_scraper.squad_sync import make_avatar_uploader
 
 
 class FakeFetcher:
@@ -86,3 +90,32 @@ def test_default_public_base_url_supports_root_endpoint() -> None:
     )
 
     assert url == "http://127.0.0.1:9000/football-insight"
+
+
+@pytest.mark.parametrize("player_id,image_id", [
+    (184911, "800b9c6aa26f4ca2a293ecacff9c81f5"),
+    (520149, "c6180d34d2be4c95b331b191df8f6df3"),
+])
+def test_verified_chengdu_portraits_replace_old_provider_images_in_both_sync_paths(player_id, image_id):
+    old = f"http://n.sinaimg.cn/ty/opta/player150/{player_id}.png"
+    fetcher, target = FakeFetcher(), FakeTarget()
+    profile = PlayerProfile(player_id, "球员", 77680, "成都蓉城", old)
+    updated = AssetUploader(fetcher, target).upload_player_avatars([profile], "summary")[0]
+    expected_object = f"summary/players/{player_id}-chengdu-20260228.jpg"
+    assert image_id in fetcher.calls[0]
+    assert updated.avatar_source_url == fetcher.calls[0]
+    assert updated.avatar_object_name == expected_object
+    squad_upload = make_avatar_uploader(fetcher, target, "summary")
+    squad = SquadPlayer(77680, player_id, "球员", 7, "FW", "中国", old)
+    assert squad_upload(squad) == updated.avatar_storage_url
+    assert fetcher.calls[1] == fetcher.calls[0]
+    assert [call[0] for call in target.calls] == [expected_object, expected_object]
+
+
+def test_chengdu_portrait_override_does_not_apply_to_another_team():
+    fetcher, target = FakeFetcher(), FakeTarget()
+    source = "https://provider/another-team.png"
+    profile = PlayerProfile(184911, "韦世豪", 999, "其他球队", source)
+    updated = AssetUploader(fetcher, target).upload_player_avatars([profile], "summary")[0]
+    assert fetcher.calls == [source]
+    assert updated.avatar_object_name == "summary/players/184911.png"

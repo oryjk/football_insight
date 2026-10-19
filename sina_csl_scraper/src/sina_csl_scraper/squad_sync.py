@@ -9,7 +9,7 @@ import sys
 from collections.abc import Callable
 from typing import Any, Protocol
 
-from .assets import AssetFetcher, AssetTarget, _extension_for
+from .assets import AssetFetcher, AssetTarget, upload_player_avatar
 from .models import SquadPlayer
 
 UPSERT_CURRENT_SQL = """
@@ -112,11 +112,10 @@ def build_squad_rows(players: list[SquadPlayer], season: int, storage_urls: dict
 
 def make_avatar_uploader(fetcher: AssetFetcher, target: AssetTarget, prefix: str) -> Callable[[SquadPlayer], str | None]:
     def upload(player: SquadPlayer) -> str | None:
-        if not player.avatar_source_url:
-            return None
-        content, content_type = fetcher.fetch(player.avatar_source_url)
-        object_name = f"{prefix.strip('/')}/players/{player.player_id}{_extension_for(player.avatar_source_url, content_type)}"
-        return target.upload_bytes(object_name, content, content_type)
+        uploaded = upload_player_avatar(
+            fetcher, target, prefix, player.player_id, player.team_id, player.avatar_source_url,
+        )
+        return uploaded[2] if uploaded else None
 
     return upload
 

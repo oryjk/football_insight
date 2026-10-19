@@ -10,6 +10,20 @@ import requests
 
 from .models import PlayerProfile, TeamProfile
 
+# Manually verified 2026 Chengdu headshots; Sina still serves the previous clubs' photos.
+# Name captions and date: https://www.sohu.com/picture/991014558 (2026-02-28).
+# Team-scoped, versioned keys preserve the old objects and invalidate client image caches.
+PLAYER_AVATAR_OVERRIDES: dict[tuple[int, int], tuple[str, str]] = {
+    (77680, 184911): (
+        "https://q3.itc.cn/q_85,c_zoom,w_600/images03/20260228/800b9c6aa26f4ca2a293ecacff9c81f5.jpeg",
+        "184911-chengdu-20260228.jpg",
+    ),
+    (77680, 520149): (
+        "https://q2.itc.cn/q_85,c_zoom,w_600/images03/20260228/c6180d34d2be4c95b331b191df8f6df3.jpeg",
+        "520149-chengdu-20260228.jpg",
+    ),
+}
+
 
 class AssetFetchError(RuntimeError):
     """Raised when a remote asset cannot be downloaded."""
@@ -23,9 +37,27 @@ class AssetTarget(Protocol):
     def upload_bytes(self, object_name: str, content: bytes, content_type: str) -> str: ...
 
 
+def upload_player_avatar(
+    fetcher: AssetFetcher, target: AssetTarget, prefix: str,
+    player_id: int, team_id: int, source_url: str | None,
+) -> tuple[str, str, str] | None:
+    override = PLAYER_AVATAR_OVERRIDES.get((team_id, player_id))
+    if override:
+        source_url = override[0]
+    if not source_url:
+        return None
+    content, content_type = fetcher.fetch(source_url)
+    filename = override[1] if override else f"{player_id}{_extension_for(source_url, content_type)}"
+    object_name = f"{prefix.strip('/')}/players/{filename}"
+    return source_url, object_name, target.upload_bytes(object_name, content, content_type)
+
+
 class HttpAssetFetcher:
     def __init__(self, session: requests.Session | None = None, timeout: int = 20) -> None:
         self.session = session or requests.Session()
+        if session is None:
+            # Image CDNs may reject the default python-requests user agent.
+            self.session.headers["User-Agent"] = "Mozilla/5.0 (compatible; FootballInsight/1.0)"
         self.timeout = timeout
 
     def fetch(self, url: str) -> tuple[bytes, str]:
@@ -144,16 +176,18 @@ class AssetUploader:
     def upload_player_avatars(self, players: list[PlayerProfile], prefix: str) -> list[PlayerProfile]:
         updated: list[PlayerProfile] = []
         for player in players:
-            if not player.avatar_source_url:
+            uploaded = upload_player_avatar(
+                self.fetcher, self.target, prefix, player.player_id, player.team_id, player.avatar_source_url,
+            )
+            if uploaded is None:
                 updated.append(player)
                 continue
 
-            content, content_type = self.fetcher.fetch(player.avatar_source_url)
-            object_name = f"{prefix.strip('/')}/players/{player.player_id}{_extension_for(player.avatar_source_url, content_type)}"
-            storage_url = self.target.upload_bytes(object_name, content, content_type)
+            source_url, object_name, storage_url = uploaded
             updated.append(
                 replace(
                     player,
+                    avatar_source_url=source_url,
                     avatar_object_name=object_name,
                     avatar_storage_url=storage_url,
                 )
