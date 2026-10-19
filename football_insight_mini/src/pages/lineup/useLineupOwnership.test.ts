@@ -98,3 +98,17 @@ test('unmount cancels late ownership publication', async () => {
   state.dispose(); pending.resolve({ lineup: published() }); await flush()
   expect(state.isOwner.value).toBe(false); expect(state.loading.value).toBe(false)
 })
+
+test('a refreshed user object for the same account keeps the owner state without re-requesting', async () => {
+  // ensureSessionReady 缓存过期后会把同一个人换成新对象（appSession: currentUser.value = user）。
+  const auth = session(); let calls = 0
+  const state = useLineupOwnership(ref(lineup()), auth, async () => { calls++; return { lineup: published() } })
+  cleanups.push(state.dispose)
+  await flush()
+  expect(calls).toBe(1); expect(state.isOwner.value).toBe(true)
+  auth.currentUser.value = user()
+  await nextTick()
+  expect(state.loading.value).toBe(false); expect(state.isOwner.value).toBe(true)
+  await flush()
+  expect(calls).toBe(1)
+})

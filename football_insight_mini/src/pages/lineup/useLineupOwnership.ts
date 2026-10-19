@@ -14,7 +14,8 @@ export function useLineupOwnership(
   const userId = () => session.hasAccessToken.value
     && (session.status.value === 'authenticated' || session.status.value === 'error')
     ? session.currentUser.value?.id ?? '' : ''
-  const stop = watch(() => [session.revision.value, userId(), detail.value?.share_code, detail.value?.team.team_id] as const,
+  // 多数据源逐项比较：同一账号的 currentUser 被换成新对象时 userId 不变，不重新查归属。
+  const stop = watch([() => session.revision.value, userId, () => detail.value?.share_code, () => detail.value?.team.team_id],
     ([revision, user, code, teamId]) => {
       const owner = ++generation
       isOwner.value = false
