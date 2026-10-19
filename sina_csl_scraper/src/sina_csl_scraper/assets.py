@@ -10,19 +10,7 @@ import requests
 
 from .models import PlayerProfile, TeamProfile
 
-# Manually verified 2026 Chengdu headshots; Sina still serves the previous clubs' photos.
-# Name captions and date: https://www.sohu.com/picture/991014558 (2026-02-28).
-# Team-scoped, versioned keys preserve the old objects and invalidate client image caches.
-PLAYER_AVATAR_OVERRIDES: dict[tuple[int, int], tuple[str, str]] = {
-    (77680, 184911): (
-        "https://q3.itc.cn/q_85,c_zoom,w_600/images03/20260228/800b9c6aa26f4ca2a293ecacff9c81f5.jpeg",
-        "184911-chengdu-20260228.jpg",
-    ),
-    (77680, 520149): (
-        "https://q2.itc.cn/q_85,c_zoom,w_600/images03/20260228/c6180d34d2be4c95b331b191df8f6df3.jpeg",
-        "520149-chengdu-20260228.jpg",
-    ),
-}
+from .player_portraits import PLAYER_AVATAR_OVERRIDES
 
 
 class AssetFetchError(RuntimeError):
