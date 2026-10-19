@@ -97,14 +97,6 @@
 </template>
 
 <script setup lang="ts">
-import { buildSharePath } from '../../utils/shareSource'
-
-onShareAppMessage(() => ({
-  title: '球迷换座位，看看有没有合适的位置',
-  path: buildSharePath('/pages/seat-swap/index', 'swap'),
-}))
-
-import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, nextTick, ref } from 'vue'
 import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
@@ -114,53 +106,62 @@ import SeatSwapRegionPanel from './components/SeatSwapRegionPanel.vue'
 import SeatSwapPoolList from './components/SeatSwapPoolList.vue'
 import SeatSwapDock from './components/SeatSwapDock.vue'
 import SeatSwapPublishSheet from './components/SeatSwapPublishSheet.vue'
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
-import { getCurrentSeatSwap } from '../../api/seatSwap'
-import { useSeatSwapActions } from './useSeatSwapActions'
-import { getTicketWatchRegions } from '../../api/ticketWatch'
-import type { SeatSwapCandidate, SeatSwapCurrentResponse } from '../../types/seatSwap'
-import type { TicketWatchRegion } from '../../types/ticketWatch'
-import { extractApiErrorMessage } from '../../utils/apiError'
-import { formatDatetime } from '../../utils/format'
 import { useAppSession } from '../../stores/appSession'
-import {
-  buildSeatSwapRegionAnchorId,
-  countSeatSwapDesiredRegions,
-  filterSeatSwapRequestsByDesiredRegion,
-  filterOutMySeatSwapRequest,
-  groupSeatSwapRequestsByRegion,
-  resolveSeatSwapBrowseFilterKey,
-  resolveDefaultExpandedSeatSwapRegionKeys,
-} from './helpers'
-import { buildSeatSwapMockCurrentResponse, buildSeatSwapMockRegions } from './fixtures'
-import { formatSeatSwapSeatLabel, seatSwapStatusLabel } from '../../utils/stadiumRegions'
+import type { SeatSwapCandidate } from '../../types/seatSwap'
+import { buildSharePath } from '../../utils/shareSource'
+import { buildSeatSwapRegionAnchorId } from './helpers'
+import { useSeatSwapActions } from './useSeatSwapActions'
+import { useSeatSwapBrowse } from './useSeatSwapBrowse'
+import { useSeatSwapPage } from './useSeatSwapPage'
+
+onShareAppMessage(() => ({
+  title: '球迷换座位，看看有没有合适的位置',
+  path: buildSharePath('/pages/seat-swap/index', 'swap'),
+}))
 
 const { navigationPageStyle } = useNavigationLayout()
 
 const USE_SEAT_SWAP_MOCK_LARGE_DATA =
   import.meta.env.DEV && String(import.meta.env.VITE_SEAT_SWAP_MOCK_LARGE_DATA || '').trim() === '1'
 
-const loading = ref(true)
-const submitting = ref(false)
-const errorMessage = ref('')
-const currentView = ref<SeatSwapCurrentResponse | null>(null)
-const regions = ref<TicketWatchRegion[]>([])
 // 登录标记共享自 appSession，退出/换号后自动更新，不再读本地存储。
 const isLoggedIn = useAppSession().hasAccessToken
-
+const submitting = ref(false)
 const publishSheetVisible = ref(false)
 const manageSheetVisible = ref(false)
-const browsingFilterKey = ref('')
-
-const pageScrollLocked = computed(() => publishSheetVisible.value || manageSheetVisible.value)
-const pageLockStyle = computed(() => pageScrollLocked.value ? 'overflow: hidden;' : '')
-
-const expandedRegionKeys = ref<string[]>([])
 const pendingConfirmTarget = ref<SeatSwapCandidate | null>(null)
 const pendingMatchedCancelTargetId = ref('')
 const miniProgramNoticeEnabled = ref(false)
-
 const cancelReason = ref('')
+
+const anySheetOpen = computed(() => publishSheetVisible.value || manageSheetVisible.value)
+const pageLockStyle = computed(() => anySheetOpen.value ? 'overflow: hidden;' : '')
+
+const { loading, errorMessage, currentView, regions, loadPage } = useSeatSwapPage({
+  useMock: USE_SEAT_SWAP_MOCK_LARGE_DATA,
+  onLoaded: () => browse.syncExpandedRegionKeys(),
+})
+const browse = useSeatSwapBrowse({ currentView, regions, sheetOpen: anySheetOpen })
+const {
+  browsingFilterKey,
+  expandedRegionKeys,
+  matchTitle,
+  matchSummary,
+  candidatesCount,
+  seatSwapRegionGroups,
+  filteredCandidates,
+  browsingFilterName,
+  regionBadgeCounts,
+  myDesiredKeys,
+  myDesiredSummary,
+  myRequestSeatLabel,
+  myRequestStatusLabel,
+  mainMapMode,
+  toggleRegionGroup,
+  clearFilter,
+} = browse
 
 const { submitForm, deleteRequest, confirmCandidate, cancelCandidateConfirmation, submitMatchedCancel } = useSeatSwapActions({
   submitting,
@@ -175,130 +176,9 @@ const { submitForm, deleteRequest, confirmCandidate, cancelCandidateConfirmation
   openPublishSheetForCandidate,
 })
 
-const matchTitle = computed(() => {
-  const m = currentView.value?.current_match
-  return m ? `${m.home_team_name} VS ${m.away_team_name}` : '暂无当前比赛'
-})
-
-const matchSummary = computed(() => {
-  const raw = currentView.value?.current_match?.kickoff_at
-  if (!raw) return ''
-  return `${formatDatetime(raw)} · 凤凰山专业足球场`
-})
-
-const candidatesCount = computed(() => currentView.value?.candidates.length || 0)
-
-const displayCandidates = computed<SeatSwapCandidate[]>(() => {
-  return filterOutMySeatSwapRequest(
-    currentView.value?.candidates || [],
-    currentView.value?.my_request?.request_id,
-  )
-})
-
-const seatSwapRegionGroups = computed(() => groupSeatSwapRequestsByRegion(displayCandidates.value))
-
-const filteredCandidates = computed<SeatSwapCandidate[]>(() => {
-  if (!browsingFilterKey.value) return []
-  return filterSeatSwapRequestsByDesiredRegion(displayCandidates.value, browsingFilterKey.value)
-})
-
-const browsingFilterName = computed(() => findRegion(browsingFilterKey.value)?.block_name || '')
-
-const regionBadgeCounts = computed<Record<string, number>>(() => {
-  return countSeatSwapDesiredRegions(displayCandidates.value)
-})
-
-const myDesiredKeys = computed<string[]>(() =>
-  currentView.value?.my_request?.desired_seats.map((s) => s.region_key) || [],
-)
-
-const myDesiredSummary = computed(() => {
-  const names = currentView.value?.my_request?.desired_seats.map((s) => s.region_name) || []
-  return names.length ? names.join(' / ') : '未选择'
-})
-
-const myRequestSeatLabel = computed(() =>
-  currentView.value?.my_request ? formatSeatSwapSeatLabel(currentView.value.my_request) : '',
-)
-
-const myRequestStatusLabel = computed(() => seatSwapStatusLabel(currentView.value?.my_request?.status || ''))
-
-const mainMapMode = computed<'browse' | 'filter' | 'published'>(() => {
-  if (browsingFilterKey.value) return 'filter'
-  if (currentView.value?.my_request) return 'published'
-  return 'browse'
-})
-
-function regionKey(region: TicketWatchRegion): string {
-  return region.block_key || region.block_name
-}
-
-function findRegion(key: string): TicketWatchRegion | undefined {
-  if (!key) return undefined
-  return regions.value.find((r) => regionKey(r) === key)
-}
-
-function syncExpandedRegionKeys(): void {
-  const available = seatSwapRegionGroups.value.map((g) => g.region_key)
-  expandedRegionKeys.value = expandedRegionKeys.value.filter((k) => available.includes(k))
-  if (!expandedRegionKeys.value.length && available.length) {
-    expandedRegionKeys.value = resolveDefaultExpandedSeatSwapRegionKeys(available)
-  }
-}
-
-function toggleRegionGroup(key: string): void {
-  if (expandedRegionKeys.value.includes(key)) {
-    expandedRegionKeys.value = expandedRegionKeys.value.filter((k) => k !== key)
-  } else {
-    expandedRegionKeys.value = [...expandedRegionKeys.value, key]
-  }
-}
-
-async function loadPage(): Promise<void> {
-  loading.value = true
-  errorMessage.value = ''
-  try {
-    if (USE_SEAT_SWAP_MOCK_LARGE_DATA) {
-      currentView.value = buildSeatSwapMockCurrentResponse({
-        candidateCount: 96,
-        includeMyRequest: true,
-      })
-      regions.value = buildSeatSwapMockRegions()
-      syncExpandedRegionKeys()
-      return
-    }
-
-    const [view, regionList] = await Promise.all([
-      getCurrentSeatSwap(),
-      getTicketWatchRegions(),
-    ])
-    currentView.value = view
-    regions.value = regionList
-    syncExpandedRegionKeys()
-  } catch (err) {
-    errorMessage.value = extractApiErrorMessage(err, '换座池加载失败')
-  } finally {
-    loading.value = false
-  }
-}
-
 function handleMainMapTap(key: string): void {
-  const hasBadge = Boolean(regionBadgeCounts.value[key])
-  const nextFilterKey = resolveSeatSwapBrowseFilterKey(browsingFilterKey.value, key)
-
-  if (hasBadge) {
-    browsingFilterKey.value = nextFilterKey
-    if (nextFilterKey) {
-      void scrollToSeatSwapRegion(key)
-    }
-    return
-  }
-
-  browsingFilterKey.value = nextFilterKey
-}
-
-function clearFilter(): void {
-  browsingFilterKey.value = ''
+  const outcome = browse.applyMapTap(key, false)
+  if (outcome.scrollTo) void scrollToSeatSwapRegion(outcome.scrollTo)
 }
 
 async function scrollToSeatSwapRegion(regionKey: string): Promise<void> {
