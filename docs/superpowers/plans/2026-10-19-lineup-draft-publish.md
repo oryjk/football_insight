@@ -57,6 +57,8 @@ Files: `pages/lineup/index.vue`, local `LineupActionBar.vue`, `src/static/lineup
 
 ### Authorized release
 
-- [ ] Verify sole pending migration and preserve current published records/likes.
-- [ ] Build image on local233, transfer with docker save/load, apply production migration with run_migrations, retain old container and restart new backend.
-- [ ] Verify production health, private endpoint authorization and public compatibility; upload robot 2 from clean synced main and record release evidence.
+- [x] Verify sole pending migration and preserve current published records/likes.
+- [x] Build image on local233, transfer with docker save/load, apply production migration with run_migrations, retain old container and restart new backend.
+- [x] Verify production health, private endpoint authorization and public compatibility; upload robot 2 from clean synced main and record release evidence.
+
+Release completed: backend `9178901` healthy, migration `20261019150000` registered; mini `1.1.0 robot 2` uploaded. Evidence and rollback: `docs/lineup-draft-publish-validation.md`.
