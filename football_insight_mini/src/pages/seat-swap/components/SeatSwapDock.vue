@@ -116,7 +116,7 @@ const emit = defineEmits<{
 .dock-status__seat {
   min-width: 0;
   padding: var(--fi-space-8) var(--fi-space-14);
-  border-radius: var(--fi-radius-sm);
+  border-radius: var(--fi-radius-xs);
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-none);
   overflow: hidden;

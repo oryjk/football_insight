@@ -42,22 +42,24 @@
           />
         </view>
 
-        <SeatSwapPoolList
-          :groups="seatSwapRegionGroups"
-          :expanded-keys="expandedRegionKeys"
-          :filter-key="browsingFilterKey"
-          :filter-name="browsingFilterName"
-          :filtered-candidates="filteredCandidates"
-          :total-count="candidatesCount"
-          :my-desired-keys="myDesiredKeys"
-          :is-logged-in="isLoggedIn"
-          :my-request-id="currentView?.my_request?.request_id ?? null"
-          @toggle-group="toggleRegionGroup"
-          @clear-filter="clearFilter"
-          @confirm="confirmCandidate"
-          @cancel-confirmation="cancelCandidateConfirmation"
-          @matched-cancel="openMatchedCancelForCandidate"
-        />
+        <view :id="SEAT_SWAP_POOL_ANCHOR_ID">
+          <SeatSwapPoolList
+            :groups="seatSwapRegionGroups"
+            :expanded-keys="expandedRegionKeys"
+            :filter-key="browsingFilterKey"
+            :filter-name="browsingFilterName"
+            :filtered-candidates="filteredCandidates"
+            :total-count="candidatesCount"
+            :my-desired-keys="myDesiredKeys"
+            :is-logged-in="isLoggedIn"
+            :my-request-id="currentView?.my_request?.request_id ?? null"
+            @toggle-group="toggleRegionGroup"
+            @clear-filter="clearFilter"
+            @confirm="confirmCandidate"
+            @cancel-confirmation="cancelCandidateConfirmation"
+            @matched-cancel="openMatchedCancelForCandidate"
+          />
+        </view>
       </view>
     </view>
 
@@ -134,7 +136,7 @@ import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../con
 import { useAppSession } from '../../stores/appSession'
 import type { SeatSwapCandidate } from '../../types/seatSwap'
 import { buildSharePath } from '../../utils/shareSource'
-import { buildSeatSwapRegionAnchorId } from './helpers'
+import { SEAT_SWAP_POOL_ANCHOR_ID, isSeatSwapMapRectInViewport } from './helpers'
 import { useSeatSwapActions } from './useSeatSwapActions'
 import { useSeatSwapBrowse } from './useSeatSwapBrowse'
 import { useSeatSwapPage } from './useSeatSwapPage'
@@ -205,7 +207,7 @@ const { submitForm, deleteRequest, confirmCandidate, cancelCandidateConfirmation
 
 function handleMainMapTap(key: string): void {
   const outcome = browse.applyMapTap(key, false)
-  if (outcome.scrollTo) void scrollToSeatSwapRegion(outcome.scrollTo)
+  if (outcome.scrollTo) void scrollToAnchor(outcome.scrollTo)
 }
 
 const SHEET_CLOSE_MS = 220 // 与 FiBottomSheet 关闭动画一致
@@ -232,7 +234,7 @@ async function handleSheetMapTap(key: string): Promise<void> {
     await wait(REGION_HIGHLIGHT_MS)
     mapSheetVisible.value = false
     await wait(SHEET_CLOSE_MS)
-    if (outcome.scrollTo) await scrollToSeatSwapRegion(outcome.scrollTo)
+    if (outcome.scrollTo) await scrollToAnchor(outcome.scrollTo)
   } finally {
     mapTapBusy = false
   }
@@ -254,7 +256,8 @@ function attachMapObserver(): void {
   detachMapObserver()
   browse.mapInViewport.value = true
   if (!pageInstance || !currentView.value?.available) return
-  const observer = uni.createIntersectionObserver(pageInstance.proxy)
+  const observer = createPageIntersectionObserver()
+  if (!observer) return
   mapObserver = observer
   // 扣除被品牌导航遮挡的顶部区域
   observer.relativeToViewport({ top: -navigationHeightPx.value })
@@ -265,6 +268,42 @@ function attachMapObserver(): void {
       browse.mapInViewport.value = visible
     }, MAP_VISIBILITY_DEBOUNCE_MS)
   })
+  // IntersectionObserver 只在比例变化时回调：挂载时地图若已在屏幕外不会触发，主动量一次作为初值。
+  seedMapVisibility()
+}
+
+function createPageIntersectionObserver(): UniNamespace.IntersectionObserver | null {
+  const proxy = pageInstance?.proxy as unknown as {
+    createIntersectionObserver?: () => UniNamespace.IntersectionObserver
+  } | null | undefined
+  if (!proxy) return null
+  // #ifdef MP-WEIXIN
+  // 小程序：uni.createIntersectionObserver 直接透传给 wx，不识别 Vue proxy；用 proxy 上转发到页面实例的方法。
+  return proxy.createIntersectionObserver?.() ?? null
+  // #endif
+  // #ifndef MP-WEIXIN
+  return uni.createIntersectionObserver(proxy)
+  // #endif
+}
+
+function seedMapVisibility(): void {
+  if (!pageInstance) return
+  let windowHeight = 0
+  try {
+    windowHeight = uni.getWindowInfo ? uni.getWindowInfo().windowHeight : uni.getSystemInfoSync().windowHeight
+  } catch {
+    return
+  }
+  uni.createSelectorQuery()
+    .in(pageInstance)
+    .select('#seat-swap-map-anchor')
+    .boundingClientRect((rect) => {
+      const box = rect && !Array.isArray(rect) && typeof rect.top === 'number' && typeof rect.bottom === 'number'
+        ? { top: rect.top, bottom: rect.bottom }
+        : null
+      browse.mapInViewport.value = isSeatSwapMapRectInViewport(box, navigationHeightPx.value, windowHeight)
+    })
+    .exec()
 }
 
 watch(loading, (isLoading) => {
@@ -279,11 +318,15 @@ onHide(detachMapObserver)
 onUnload(detachMapObserver)
 onBeforeUnmount(detachMapObserver)
 
-async function scrollToSeatSwapRegion(regionKey: string): Promise<void> {
+const SCROLL_GAP_PX = 12
+
+// 滚到换座池顶部，扣除固定品牌导航，避免标题被遮住。
+async function scrollToAnchor(anchorId: string): Promise<void> {
   await new Promise<void>((resolve) => {
     nextTick(() => {
       uni.pageScrollTo({
-        selector: `#${buildSeatSwapRegionAnchorId(regionKey)}`,
+        selector: `#${anchorId}`,
+        offsetTop: -(navigationHeightPx.value + SCROLL_GAP_PX),
         duration: SCROLL_MS,
         success: () => resolve(),
         fail: () => resolve(),

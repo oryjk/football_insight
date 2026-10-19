@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { buildSeatSwapMockCurrentResponse, buildSeatSwapMockRegions } from './fixtures'
 import { useSeatSwapBrowse } from './useSeatSwapBrowse'
 import { useSeatSwapPage } from './useSeatSwapPage'
+import { SEAT_SWAP_POOL_ANCHOR_ID } from './helpers'
 import type { SeatSwapCurrentResponse } from '../../types/seatSwap'
 
 function setupBrowse(
@@ -87,7 +88,7 @@ describe('useSeatSwapBrowse', () => {
     const { browse } = setupBrowse()
     const key = Object.keys(browse.regionBadgeCounts.value)[0]
     const outcome = browse.applyMapTap(key, false)
-    expect(outcome).toEqual({ filterKey: key, closeSheet: false, scrollTo: key })
+    expect(outcome).toEqual({ filterKey: key, closeSheet: false, scrollTo: SEAT_SWAP_POOL_ANCHOR_ID })
     expect(browse.browsingFilterKey.value).toBe(key)
     expect(browse.mainMapMode.value).toBe('filter')
     expect(browse.mapFabLabel.value.clearable).toBe(true)

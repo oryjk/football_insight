@@ -197,7 +197,7 @@ function handleTap(key: string, disabled: boolean, unmapped: boolean) {
   justify-content: center;
   /* 百分比布局已定义区域高度，避免最小高度撑大色块而重叠。 */
   min-height: 0;
-  border-radius: var(--fi-radius-sm);
+  border-radius: var(--fi-radius-xs);
   box-sizing: border-box;
   margin: 0;
   padding: 2rpx 3rpx;

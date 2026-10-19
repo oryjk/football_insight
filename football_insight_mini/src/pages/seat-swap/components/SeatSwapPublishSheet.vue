@@ -266,7 +266,7 @@ function handleVisibleChange(value: boolean): void {
 
 /* 区域色是 StadiumMap 业务色系，不属于视觉 token，保留字面量（见下方 decorative 块）。 */
 .tag--region {
-  border-radius: var(--fi-radius-sm);
+  border-radius: var(--fi-radius-xs);
   border-color: transparent;
   color: var(--fi-primitive-white);
   font-weight: var(--fi-weight-black);
@@ -314,7 +314,7 @@ function handleVisibleChange(value: boolean): void {
   gap: var(--fi-space-10);
   min-height: 54rpx;
   padding: 0 var(--fi-space-16);
-  border-radius: var(--fi-radius-sm);
+  border-radius: var(--fi-radius-xs);
   box-sizing: border-box;
 }
 
@@ -355,7 +355,7 @@ function handleVisibleChange(value: boolean): void {
   padding: 0 var(--fi-space-18);
   background: var(--fi-color-surface);
   border: var(--fi-border-width) solid var(--fi-color-border-chip);
-  border-radius: var(--fi-radius-sm);
+  border-radius: var(--fi-radius-xs);
   font-size: var(--fi-font-26);
   color: var(--fi-color-text-strong);
   box-sizing: border-box;
@@ -377,7 +377,7 @@ function handleVisibleChange(value: boolean): void {
   align-items: center;
   min-height: 54rpx;
   padding: 0 var(--fi-space-16);
-  border-radius: var(--fi-radius-sm);
+  border-radius: var(--fi-radius-xs);
   box-sizing: border-box;
   box-shadow: 0 8rpx 18rpx rgba(18, 25, 20, 0.14);
 }

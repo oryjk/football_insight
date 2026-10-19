@@ -88,7 +88,7 @@ function normalizeInputValue(event: Event): string {
 .seat-swap-manage__summary {
   padding: var(--fi-space-18) var(--fi-space-22);
   margin: var(--fi-space-18) 0 0;
-  border-radius: var(--fi-radius-sm);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-surface);
   border: var(--fi-border-width) solid var(--fi-color-border-chip);
 }
@@ -145,7 +145,7 @@ function normalizeInputValue(event: Event): string {
   padding: var(--fi-space-14) var(--fi-space-18);
   background: var(--fi-color-surface);
   border: var(--fi-border-width) solid var(--fi-color-border-chip);
-  border-radius: var(--fi-radius-sm);
+  border-radius: var(--fi-radius-xs);
   font-size: var(--fi-font-26);
   color: var(--fi-color-text-strong);
   box-sizing: border-box;

@@ -92,6 +92,7 @@ page {
   --fi-primitive-leading-relaxed: 1.7;
 
   /* ===== Primitive：圆角 ===== */
+  --fi-primitive-radius-xs: 12rpx;
   --fi-primitive-radius-sm: 18rpx;
   --fi-primitive-radius-md: 24rpx;
   --fi-primitive-radius-lg: 28rpx;
@@ -242,6 +243,7 @@ page {
   --fi-leading-loose: var(--fi-primitive-leading-loose);
   --fi-leading-relaxed: var(--fi-primitive-leading-relaxed);
 
+  --fi-radius-xs: var(--fi-primitive-radius-xs);
   --fi-radius-sm: var(--fi-primitive-radius-sm);
   --fi-radius-md: var(--fi-primitive-radius-md);
   --fi-radius-lg: var(--fi-primitive-radius-lg);

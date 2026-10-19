@@ -140,6 +140,22 @@ export function shouldShowSeatSwapMapFab(input: {
   return input.available && !input.mapInViewport && !input.sheetOpen
 }
 
+/** 换座池外层锚点：筛选态与分组态都存在，用作地图点击后的滚动目标。 */
+export const SEAT_SWAP_POOL_ANCHOR_ID = 'seat-swap-pool-anchor'
+
+/**
+ * 根据地图包裹节点的位置判断是否仍有部分露在导航下方的视口内。
+ * rect 未知时按可见处理（不显示浮窗），避免误弹。
+ */
+export function isSeatSwapMapRectInViewport(
+  rect: { top: number; bottom: number } | null,
+  navigationHeight: number,
+  windowHeight: number,
+): boolean {
+  if (!rect) return true
+  return rect.bottom > navigationHeight && rect.top < windowHeight
+}
+
 export interface SeatSwapMapTapOutcome {
   filterKey: string
   closeSheet: boolean
@@ -148,7 +164,7 @@ export interface SeatSwapMapTapOutcome {
 
 /**
  * 首屏地图与地图弹层共用的点击规则：
- * 有意向的分区被选中 → 滚动到该分组（来自弹层时先关闭弹层）；其余情况只切换筛选。
+ * 有意向的分区被选中 → 滚动到换座池（来自弹层时先关闭弹层）；其余情况只切换筛选。
  */
 export function resolveSeatSwapMapTap(input: {
   currentFilterKey: string
@@ -161,7 +177,7 @@ export function resolveSeatSwapMapTap(input: {
   return {
     filterKey,
     closeSheet: jump && input.fromSheet,
-    scrollTo: jump ? input.tappedKey : null,
+    scrollTo: jump ? SEAT_SWAP_POOL_ANCHOR_ID : null,
   }
 }
 

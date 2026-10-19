@@ -14,6 +14,8 @@ import {
   resolveSeatSwapBrowseFilterKey,
   resolveDefaultExpandedSeatSwapRegionKeys,
   shouldDimSeatSwapRegion,
+  SEAT_SWAP_POOL_ANCHOR_ID,
+  isSeatSwapMapRectInViewport,
   resolveSeatSwapCandidateAction,
   resolveSeatSwapMapFabLabel,
   resolveSeatSwapMapTap,
@@ -601,12 +603,12 @@ describe('seat swap list stagger', () => {
 describe('seat swap map tap outcome', () => {
   test('main map: tapping a region with candidates filters and scrolls without a sheet', () => {
     expect(resolveSeatSwapMapTap({ currentFilterKey: '', tappedKey: '112', hasBadge: true, fromSheet: false }))
-      .toEqual({ filterKey: '112', closeSheet: false, scrollTo: '112' })
+      .toEqual({ filterKey: '112', closeSheet: false, scrollTo: SEAT_SWAP_POOL_ANCHOR_ID })
   })
 
   test('sheet: tapping a region with candidates filters, closes the sheet and scrolls', () => {
     expect(resolveSeatSwapMapTap({ currentFilterKey: '', tappedKey: '112', hasBadge: true, fromSheet: true }))
-      .toEqual({ filterKey: '112', closeSheet: true, scrollTo: '112' })
+      .toEqual({ filterKey: '112', closeSheet: true, scrollTo: SEAT_SWAP_POOL_ANCHOR_ID })
   })
 
   test('tapping the active region again clears the filter and stays put', () => {
@@ -620,4 +622,29 @@ describe('seat swap map tap outcome', () => {
     expect(resolveSeatSwapMapTap({ currentFilterKey: '', tappedKey: '113', hasBadge: false, fromSheet: false }))
       .toEqual({ filterKey: '113', closeSheet: false, scrollTo: null })
   })
+})
+
+describe('seat swap map scroll target', () => {
+  // 筛选态下列表只渲染筛选结果，分组锚点不存在；滚动目标必须是始终存在的换座池锚点。
+  test('scrolls to the always-rendered pool anchor, not a region group anchor', () => {
+    expect(SEAT_SWAP_POOL_ANCHOR_ID).toBe('seat-swap-pool-anchor')
+    const outcome = resolveSeatSwapMapTap({ currentFilterKey: '', tappedKey: '112', hasBadge: true, fromSheet: true })
+    expect(outcome.scrollTo).toBe(SEAT_SWAP_POOL_ANCHOR_ID)
+  })
+})
+
+describe('seat swap map initial visibility', () => {
+  const cases: Array<[string, { top: number; bottom: number } | null, boolean]> = [
+    ['unknown rect keeps the map treated as visible', null, true],
+    ['map fully inside the viewport', { top: 120, bottom: 400 }, true],
+    ['map partly under the nav but still showing', { top: 20, bottom: 100 }, true],
+    ['map scrolled entirely under the nav', { top: -300, bottom: 60 }, false],
+    ['map scrolled above the screen', { top: -500, bottom: -100 }, false],
+    ['map below the screen', { top: 900, bottom: 1200 }, false],
+  ]
+  for (const [label, rect, expected] of cases) {
+    test(label, () => {
+      expect(isSeatSwapMapRectInViewport(rect, 64, 800)).toBe(expected)
+    })
+  }
 })
