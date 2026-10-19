@@ -24,7 +24,7 @@
         <button class="community-action" @tap="openShare">分享阵容</button>
       </view>
       <view class="community-row">
-        <button class="community-action community-action--active" @tap="edit">我也排一套</button>
+        <button class="community-action community-action--active" :disabled="ownershipLoading" @tap="edit">{{ ownershipLoading ? '加载中…' : isOwner ? '编辑' : '我也排一套' }}</button>
         <button class="community-action" @tap="list">球队战术板</button>
       </view>
     </template>
@@ -49,10 +49,13 @@ import { createLineupDetail } from '../../composables/useLineupCommunity'
 import { publicPitch, lineupSharePayload } from './lineupPoster'
 import { lineupDateLabel } from '../../utils/lineupPresentation'
 import { useLineupShare } from './useLineupShare'
+import { useLineupOwnership } from './useLineupOwnership'
 const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
 const state = createLineupDetail()
 const { detail, loading, error, pendingLikes, like, dislike } = state
+const ownership = useLineupOwnership(detail, session)
+const { isOwner, loading: ownershipLoading } = ownership
 const code = ref('')
 const returnUrl = computed(() => buildLineupViewUrl(code.value))
 const share = useLineupShare(() => JSON.stringify([code.value, detail.value?.updated_at, session.revision.value]), () => returnUrl.value)
@@ -78,6 +81,7 @@ watch(detail, value => {
 })
 onShareAppMessage(() => sharePayload.value ?? (detail.value ? lineupSharePayload(detail.value) : {}))
 onBeforeUnmount(state.dispose)
+onBeforeUnmount(ownership.dispose)
 </script>
 <style scoped src="./community.css"></style>
 
