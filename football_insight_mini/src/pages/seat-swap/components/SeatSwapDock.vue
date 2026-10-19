@@ -1,6 +1,6 @@
 <template>
   <view class="dock">
-    <button v-if="!hasMyRequest" class="dock-cta" @tap="emit('cta')">
+    <button v-if="!hasMyRequest" class="dock-cta" hover-class="dock-cta--pressed" @tap="emit('cta')">
       <text class="dock-cta__icon">+</text>
       <text class="dock-cta__label">{{ isLoggedIn ? '发布我的换座' : '登录后发布' }}</text>
     </button>
@@ -40,34 +40,40 @@ const emit = defineEmits<{
 }
 
 .dock-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fi-space-14);
   width: 100%;
+  min-height: var(--fi-component-seat-swap-dock-height);
+  box-sizing: border-box;
   padding: var(--fi-space-24) var(--fi-space-28);
   border-radius: var(--fi-radius-md);
   background: var(--fi-primitive-ink);
   color: var(--fi-primitive-white);
   font-size: var(--fi-font-28);
-  font-weight: 400;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fi-space-14);
-  box-shadow: 0 16rpx 36rpx rgba(21, 22, 27, 0.2);
-  letter-spacing: 1rpx;
+  font-weight: var(--fi-weight-bold);
+  box-shadow: var(--fi-shadow-floating);
+  transition: transform var(--fi-motion-duration-fast) var(--fi-motion-ease-out);
 }
 
 .dock-cta::after {
   border: 0;
 }
 
+.dock-cta--pressed {
+  transform: scale(0.98);
+}
+
 .dock-cta__icon {
   flex-shrink: 0;
   display: inline-flex;
-  width: 36rpx;
-  height: 36rpx;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
   align-items: center;
   justify-content: center;
+  width: var(--fi-space-36);
+  height: var(--fi-space-36);
+  border-radius: var(--fi-radius-round);
+  background: rgba(var(--fi-primitive-white-rgb), 0.18);
   font-size: var(--fi-font-26);
   line-height: var(--fi-leading-none);
 }
@@ -77,47 +83,41 @@ const emit = defineEmits<{
 }
 
 .dock-status {
+  display: flex;
+  align-items: center;
+  min-height: var(--fi-component-seat-swap-dock-height);
+  box-sizing: border-box;
   padding: var(--fi-space-20) var(--fi-space-22);
-  border-radius: 20rpx;
+  border-radius: var(--fi-radius-md);
   background: var(--fi-primitive-ink);
   color: var(--fi-primitive-white);
-  box-shadow: 0 16rpx 36rpx rgba(21, 22, 27, 0.32);
-}
-
-.dock-status__dot {
-  flex: 0 0 auto;
-  width: 14rpx;
-  height: 14rpx;
-  border-radius: 50%;
-  background: #9aa0aa;
-  box-shadow: 0 0 0 6rpx rgba(154, 160, 170, 0.18);
-}
-
-.dock-status__manage {
-  flex: 0 0 auto;
-  margin-left: auto;
-  font-size: var(--fi-font-22);
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.84);
-  padding: var(--fi-space-12) var(--fi-space-18);
-  border-radius: var(--fi-radius-round);
-  background: rgba(255, 255, 255, 0.12);
+  box-shadow: var(--fi-shadow-floating);
 }
 
 .dock-status__body {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: var(--fi-space-12);
   flex-wrap: nowrap;
-  font-size: var(--fi-font-22);
   min-width: 0;
+  font-size: var(--fi-font-22);
+}
+
+.dock-status__dot {
+  flex: 0 0 auto;
+  width: var(--fi-space-14);
+  height: var(--fi-space-14);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-text-caption);
+  box-shadow: 0 0 0 var(--fi-space-6) rgba(var(--fi-primitive-white-rgb), 0.12);
 }
 
 .dock-status__seat {
   min-width: 0;
   padding: var(--fi-space-8) var(--fi-space-14);
-  border-radius: 12rpx;
-  font-weight: 400;
+  border-radius: var(--fi-radius-sm);
+  font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-none);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -125,18 +125,29 @@ const emit = defineEmits<{
 }
 
 .dock-status__seat--current {
-  background: #fff1f0;
-  color: #b42318;
+  background: var(--fi-color-seat-current-bg);
+  color: var(--fi-color-seat-current);
 }
 
 .dock-status__seat--desired {
   flex: 1 1 auto;
-  background: #eef8f2;
-  color: #167348;
+  background: var(--fi-color-seat-desired-bg);
+  color: var(--fi-color-seat-desired);
 }
 
 .dock-status__arrow {
   flex: 0 0 auto;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(var(--fi-primitive-white-rgb), 0.4);
+}
+
+.dock-status__manage {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: var(--fi-space-12) var(--fi-space-18);
+  border-radius: var(--fi-radius-round);
+  background: rgba(var(--fi-primitive-white-rgb), 0.12);
+  color: rgba(var(--fi-primitive-white-rgb), 0.84);
+  font-size: var(--fi-font-22);
+  font-weight: var(--fi-weight-bold);
 }
 </style>

@@ -1,58 +1,62 @@
 <template>
-  <view class="seat-swap-candidate" :class="cardClass">
-    <view class="seat-swap-candidate__main">
-      <view class="seat-swap-candidate__content">
-        <view class="seat-swap-candidate__user">
+  <view class="candidate" :class="cardClass">
+    <view class="candidate__main">
+      <view class="candidate__content">
+        <view class="candidate__user">
           <image
             v-if="candidate.avatar_url"
-            class="seat-swap-candidate__avatar"
+            class="candidate__avatar"
             :src="candidate.avatar_url"
             mode="aspectFill"
           />
-          <view v-else class="seat-swap-candidate__avatar seat-swap-candidate__avatar--fallback">
+          <view v-else class="candidate__avatar candidate__avatar--fallback">
             <text>{{ fallbackInitial }}</text>
           </view>
-          <view class="seat-swap-candidate__id">
-            <text class="seat-swap-candidate__name">{{ candidate.display_name }}</text>
-            <view class="seat-swap-candidate__seat">
-              <text class="seat-swap-candidate__seat-label">当前座位</text>
-              <text class="seat-swap-candidate__seat-value">{{ formatSeatSwapSeatLabel(candidate) }}</text>
+          <view class="candidate__id">
+            <text class="candidate__name">{{ candidate.display_name }}</text>
+            <view class="candidate__seat">
+              <text class="candidate__seat-label">当前座位</text>
+              <text class="candidate__seat-value">{{ formatSeatSwapSeatLabel(candidate) }}</text>
             </view>
           </view>
-          <text v-if="statusText" class="seat-swap-candidate__status" :class="statusClass">
-            {{ statusText }}
-          </text>
+          <view v-if="statusText" class="candidate__status" :class="statusClass">
+            <view class="candidate__status-dot" />
+            <text>{{ statusText }}</text>
+          </view>
         </view>
-        <view class="seat-swap-candidate__wants">
-          <text class="seat-swap-candidate__wants-label">目标座位</text>
-          <text class="seat-swap-candidate__wants-value">{{ desiredSeatText }}</text>
+        <view class="candidate__wants">
+          <text class="candidate__wants-label">目标座位</text>
+          <text class="candidate__wants-value">{{ desiredSeatText }}</text>
         </view>
-        <view v-if="candidate.contact" class="seat-swap-candidate__contact">
-          <text v-if="candidate.contact.wechat_id" class="seat-swap-candidate__contact-line">
+        <view v-if="candidate.contact" class="candidate__contact">
+          <text v-if="candidate.contact.wechat_id" class="candidate__contact-line">
             微信:{{ candidate.contact.wechat_id }}
           </text>
-          <text v-if="candidate.contact.phone_number" class="seat-swap-candidate__contact-line">
+          <text v-if="candidate.contact.phone_number" class="candidate__contact-line">
             手机:{{ candidate.contact.phone_number }}
           </text>
         </view>
       </view>
       <button
         v-if="action === 'confirm'"
-        class="seat-swap-candidate__action seat-swap-candidate__action--primary"
+        class="candidate__action candidate__action--primary"
+        hover-class="candidate__action--pressed"
         @tap.stop="emit('confirm', candidate.request_id)"
       >
         {{ candidate.status === 'display_only' ? '我要换到这' : '确认换座' }}
       </button>
       <button
         v-else-if="action === 'cancel_confirmation'"
-        class="seat-swap-candidate__action seat-swap-candidate__action--secondary"
+        class="candidate__action candidate__action--secondary"
+        hover-class="candidate__action--pressed"
         @tap.stop="emit('cancel-confirmation', candidate.request_id)"
       >
         取消匹配
       </button>
       <button
         v-else-if="action === 'matched_cancel'"
-        class="seat-swap-candidate__action seat-swap-candidate__action--matched-cancel"
+        class="candidate__action candidate__action--matched-cancel"
+        hover-class="candidate__action--pressed"
         @tap.stop="emit('matched-cancel', candidate.request_id)"
       >
         取消匹配
@@ -85,286 +89,265 @@ const fallbackInitial = computed(() => (props.candidate.display_name || '球').s
 const statusText = computed(() => seatSwapStatusLabel(props.candidate.status))
 const isMatched = computed(() => props.candidate.status === 'matched')
 const cardClass = computed(() => ({
-  'seat-swap-candidate--matched': isMatched.value,
+  'candidate--matched': isMatched.value,
 }))
+// 状态色只保留中性、可沟通（绿点）与"对方已确认你"（主色强调，需要你去操作）。
 const statusClass = computed(() => ({
-  'seat-swap-candidate__status--communicable': props.candidate.status === 'communicable',
-  'seat-swap-candidate__status--waiting': props.candidate.status === 'waiting_peer_confirmation',
-  'seat-swap-candidate__status--peer-confirmed': props.candidate.status === 'peer_confirmed_me',
-  'seat-swap-candidate__status--matched': props.candidate.status === 'matched',
+  'candidate__status--ready': props.candidate.status === 'communicable',
+  'candidate__status--attention': props.candidate.status === 'peer_confirmed_me',
 }))
 const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidate.desired_seats))
 </script>
 
 <style scoped>
-.seat-swap-candidate {
+.candidate {
   padding: var(--fi-space-22);
-  border-radius: 16rpx;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1rpx solid rgba(232, 233, 238, 0.95);
-  box-shadow: 0 8rpx 18rpx rgba(26, 28, 36, 0.04);
+  border-radius: var(--fi-radius-md);
+  border: var(--fi-border-card);
+  background: var(--fi-color-surface);
+  box-shadow: var(--fi-shadow-card);
 }
 
-.seat-swap-candidate__main {
+.candidate__main {
   display: flex;
   align-items: stretch;
   gap: var(--fi-space-18);
 }
 
-.seat-swap-candidate__content {
-  min-width: 0;
+.candidate__content {
   flex: 1;
+  min-width: 0;
 }
 
-.seat-swap-candidate__user {
+.candidate__user {
   display: flex;
   align-items: flex-start;
   gap: var(--fi-space-16);
 }
 
-.seat-swap-candidate__avatar {
+.candidate__avatar {
   flex-shrink: 0;
-  width: 64rpx;
-  height: 64rpx;
-  border-radius: 50%;
-  background: #dde5ee;
+  width: var(--fi-space-64);
+  height: var(--fi-space-64);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-page);
 }
 
-.seat-swap-candidate__avatar--fallback {
+.candidate__avatar--fallback {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #4b5563;
-  font-size: 28rpx;
-  font-weight: 400;
+  color: var(--fi-color-text-secondary);
+  font-size: var(--fi-font-28);
+  font-weight: var(--fi-weight-bold);
 }
 
-.seat-swap-candidate__id {
+.candidate__id {
   flex: 1;
   min-width: 0;
 }
 
-.seat-swap-candidate__name {
+.candidate__name {
   display: block;
-  color: #121212;
-  font-size: 28rpx;
-  font-weight: 400;
+  color: var(--fi-color-text-strong);
+  font-size: var(--fi-font-28);
+  font-weight: var(--fi-weight-bold);
 }
 
-.seat-swap-candidate__seat {
+.candidate__seat,
+.candidate__wants {
   display: inline-flex;
   align-items: center;
   max-width: 100%;
+  overflow: hidden;
+  border-radius: var(--fi-radius-sm);
+}
+
+.candidate__seat {
   margin-top: var(--fi-space-8);
-  overflow: hidden;
-  border-radius: 16rpx;
-  background: #fff1f0;
-  color: #b42318;
+  background: var(--fi-color-seat-current-bg);
+  color: var(--fi-color-seat-current);
 }
 
-.seat-swap-candidate__seat-label {
+.candidate__wants {
+  max-width: calc(100% - var(--fi-space-64) - var(--fi-space-16));
+  margin-top: var(--fi-space-12);
+  margin-left: calc(var(--fi-space-64) + var(--fi-space-16));
+  background: var(--fi-color-seat-desired-bg);
+  color: var(--fi-color-seat-desired);
+}
+
+.candidate__seat-label,
+.candidate__wants-label {
   flex-shrink: 0;
-  padding: 7rpx var(--fi-space-10) 7rpx var(--fi-space-12);
-  background: rgba(226, 59, 46, 0.12);
-  color: #b42318;
-  font-size: 20rpx;
-  font-weight: 600;
-  line-height: 1;
+  padding: var(--fi-space-6) var(--fi-space-10) var(--fi-space-6) var(--fi-space-12);
+  font-size: var(--fi-font-20);
+  font-weight: var(--fi-weight-bold);
+  line-height: var(--fi-leading-none);
 }
 
-.seat-swap-candidate__seat-value {
+.candidate__seat-label {
+  background: rgba(var(--fi-primitive-red-rgb), 0.12);
+}
+
+.candidate__wants-label {
+  background: rgba(var(--fi-primitive-ink-rgb), 0.04);
+}
+
+.candidate__seat-value,
+.candidate__wants-value {
   min-width: 0;
-  padding: 7rpx var(--fi-space-14) 7rpx var(--fi-space-10);
+  padding: var(--fi-space-6) var(--fi-space-14) var(--fi-space-6) var(--fi-space-10);
   overflow: hidden;
-  font-size: 26rpx;
-  font-weight: 800;
-  line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: var(--fi-leading-none);
 }
 
-.seat-swap-candidate__status {
+.candidate__seat-value {
+  font-size: var(--fi-font-26);
+  font-weight: var(--fi-weight-extrabold);
+}
+
+.candidate__wants-value {
+  font-size: var(--fi-font-24);
+  font-weight: var(--fi-weight-bold);
+}
+
+.candidate__status {
   flex-shrink: 0;
-  padding: var(--fi-space-6) var(--fi-space-14);
-  border-radius: 999rpx;
-  background: #f6f7fb;
-  border: 1rpx solid rgba(232, 233, 238, 0.95);
-  color: #6d7280;
-  font-size: 20rpx;
-  font-weight: 400;
-  line-height: 1;
-}
-
-.seat-swap-candidate__status--communicable {
-  background: #eef8f2;
-  border-color: rgba(29, 138, 85, 0.35);
-  color: #167348;
-}
-
-.seat-swap-candidate__status--waiting {
-  background: #fff6e8;
-  border-color: rgba(217, 119, 6, 0.34);
-  color: #b45309;
-}
-
-.seat-swap-candidate__status--peer-confirmed {
-  background: #edf4ff;
-  border-color: rgba(37, 99, 235, 0.28);
-  color: #1d4ed8;
-}
-
-.seat-swap-candidate__status--matched {
-  background: #f2ecff;
-  border-color: rgba(109, 40, 217, 0.22);
-  color: #6d28d9;
-}
-
-.seat-swap-candidate__wants {
   display: inline-flex;
   align-items: center;
-  max-width: calc(100% - 80rpx);
-  margin-top: var(--fi-space-12);
-  margin-left: 80rpx;
-  overflow: hidden;
-  border-radius: 16rpx;
-  background: #eef8f2;
-  color: #175c31;
-  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.5);
+  gap: var(--fi-space-8);
+  padding: var(--fi-space-6) var(--fi-space-14);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-page);
+  color: var(--fi-color-text-secondary);
+  font-size: var(--fi-font-20);
+  font-weight: var(--fi-weight-bold);
+  line-height: var(--fi-leading-none);
 }
 
-.seat-swap-candidate__wants-label {
-  flex-shrink: 0;
-  padding: 7rpx var(--fi-space-10) 7rpx var(--fi-space-12);
-  background: rgba(70, 171, 89, 0.12);
-  color: rgba(24, 103, 67, 0.88);
-  font-size: 20rpx;
-  font-weight: 600;
-  line-height: 1;
+.candidate__status-dot {
+  width: var(--fi-space-12);
+  height: var(--fi-space-12);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-text-muted);
 }
 
-.seat-swap-candidate__wants-value {
-  min-width: 0;
-  padding: 7rpx var(--fi-space-14) 7rpx var(--fi-space-10);
-  overflow: hidden;
-  font-size: 24rpx;
-  font-weight: 700;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.candidate__status--ready .candidate__status-dot {
+  background: var(--fi-color-seat-desired);
 }
 
-.seat-swap-candidate__contact {
-  margin-top: var(--fi-space-12);
-  padding: var(--fi-space-16) var(--fi-space-18);
-  border-radius: 16rpx;
-  background: #f6f7fb;
-  font-size: 22rpx;
-  color: #6f6a5f;
+.candidate__status--attention {
+  background: rgba(var(--fi-primitive-red-rgb), 0.1);
+  color: var(--fi-color-primary);
+}
+
+.candidate__status--attention .candidate__status-dot {
+  background: var(--fi-color-primary);
+}
+
+.candidate__contact {
   display: flex;
   flex-direction: column;
   gap: var(--fi-space-4);
+  margin-top: var(--fi-space-12);
+  padding: var(--fi-space-16) var(--fi-space-18);
+  border-radius: var(--fi-radius-sm);
+  background: var(--fi-color-page);
+  color: var(--fi-color-text-secondary);
+  font-size: var(--fi-font-22);
 }
 
-.seat-swap-candidate__contact-line {
+.candidate__contact-line {
   display: block;
 }
 
-.seat-swap-candidate__action {
+.candidate__action {
   flex-shrink: 0;
   align-self: stretch;
-  width: 168rpx;
-  min-height: 152rpx;
-  padding: var(--fi-space-18) var(--fi-space-20);
-  border-radius: 26rpx;
-  color: #fff;
-  font-size: 30rpx;
-  font-weight: 700;
-  line-height: 1.25;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: var(--fi-component-seat-swap-action-width);
+  min-height: var(--fi-component-seat-swap-action-min-height);
+  margin: 0;
+  padding: var(--fi-space-18) var(--fi-space-20);
+  border-radius: var(--fi-radius-md);
+  color: var(--fi-primitive-white);
+  font-size: var(--fi-font-28);
+  font-weight: var(--fi-weight-bold);
+  line-height: var(--fi-leading-snug);
   text-align: center;
+  transition: transform var(--fi-motion-duration-fast) var(--fi-motion-ease-out);
 }
 
-.seat-swap-candidate__action::after {
+.candidate__action::after {
   border: 0;
 }
 
-.seat-swap-candidate__action--primary {
-  background: #15161b;
-  box-shadow: 0 10rpx 22rpx rgba(21, 22, 27, 0.12);
+.candidate__action--pressed {
+  transform: scale(0.96);
 }
 
-.seat-swap-candidate__action--secondary {
-  background: #ffffff;
-  color: #20242c;
-  border: 2rpx solid rgba(32, 36, 44, 0.16);
-  box-shadow: none;
+.candidate__action--primary {
+  background: var(--fi-primitive-ink);
+  box-shadow: var(--fi-shadow-soft);
 }
 
-.seat-swap-candidate__action--matched-cancel {
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  border: 2rpx solid rgba(255, 255, 255, 0.28);
-  box-shadow: none;
+.candidate__action--secondary {
+  background: var(--fi-color-surface);
+  color: var(--fi-color-text-primary);
+  border: var(--fi-border-width) solid rgba(var(--fi-primitive-ink-rgb), 0.16);
 }
 
-.seat-swap-candidate--matched {
-  background: linear-gradient(180deg, #c61f26 0%, #b3131f 100%);
-  border-color: rgba(152, 12, 24, 0.92);
-  box-shadow: 0 12rpx 28rpx rgba(138, 12, 22, 0.22);
+.candidate__action--matched-cancel {
+  background: rgba(var(--fi-primitive-white-rgb), 0.18);
+  border: var(--fi-border-width) solid rgba(var(--fi-primitive-white-rgb), 0.28);
 }
 
-.seat-swap-candidate--matched .seat-swap-candidate__avatar {
-  background: rgba(255, 255, 255, 0.18);
+/* 已匹配：纯色主色卡（原红色渐变） */
+.candidate--matched {
+  background: var(--fi-color-primary);
+  border-color: var(--fi-color-primary-deep);
+  box-shadow: var(--fi-shadow-card-strong);
 }
 
-.seat-swap-candidate--matched .seat-swap-candidate__avatar--fallback,
-.seat-swap-candidate--matched .seat-swap-candidate__name,
-.seat-swap-candidate--matched .seat-swap-candidate__seat-label,
-.seat-swap-candidate--matched .seat-swap-candidate__seat-value,
-.seat-swap-candidate--matched .seat-swap-candidate__wants-label,
-.seat-swap-candidate--matched .seat-swap-candidate__wants-value,
-.seat-swap-candidate--matched .seat-swap-candidate__contact,
-.seat-swap-candidate--matched .seat-swap-candidate__contact-line {
-  color: #ffffff;
+.candidate--matched .candidate__avatar {
+  background: rgba(var(--fi-primitive-white-rgb), 0.18);
 }
 
-.seat-swap-candidate--matched .seat-swap-candidate__seat {
-  background: rgba(255, 255, 255, 0.14);
+.candidate--matched .candidate__avatar--fallback,
+.candidate--matched .candidate__name,
+.candidate--matched .candidate__seat,
+.candidate--matched .candidate__wants,
+.candidate--matched .candidate__contact,
+.candidate--matched .candidate__status {
+  color: var(--fi-primitive-white);
 }
 
-.seat-swap-candidate--matched .seat-swap-candidate__seat-label {
-  background: rgba(255, 255, 255, 0.14);
+.candidate--matched .candidate__seat,
+.candidate--matched .candidate__wants,
+.candidate--matched .candidate__status,
+.candidate--matched .candidate__contact {
+  background: rgba(var(--fi-primitive-white-rgb), 0.14);
 }
 
-.seat-swap-candidate--matched .seat-swap-candidate__wants {
-  background: rgba(255, 255, 255, 0.14);
-  box-shadow: none;
+.candidate--matched .candidate__seat-label,
+.candidate--matched .candidate__wants-label {
+  background: rgba(var(--fi-primitive-white-rgb), 0.12);
 }
 
-.seat-swap-candidate--matched .seat-swap-candidate__wants-label {
-  background: rgba(255, 255, 255, 0.12);
+.candidate--matched .candidate__status-dot {
+  background: var(--fi-primitive-white);
 }
 
-.seat-swap-candidate--matched .seat-swap-candidate__status {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-}
-
-.seat-swap-candidate--matched .seat-swap-candidate__status--matched {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-}
-
-.seat-swap-candidate--matched .seat-swap-candidate__contact {
+.candidate--matched .candidate__contact {
   margin-top: var(--fi-space-16);
   padding: var(--fi-space-20) var(--fi-space-22);
-  background: rgba(255, 255, 255, 0.16);
-  border: 2rpx solid rgba(255, 255, 255, 0.16);
-  font-size: 25rpx;
+  border: var(--fi-border-width) solid rgba(var(--fi-primitive-white-rgb), 0.16);
+  font-size: var(--fi-font-26);
   gap: var(--fi-space-8);
 }
 </style>
