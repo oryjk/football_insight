@@ -31,5 +31,9 @@ export function useNavigationLayout() {
   onShow(syncLayout)
   onReady(syncLayout)
   onResize(syncLayout)
-  return { navigationPageStyle: computed(() => layout.value ? formatPageStyle(layout.value) : '') }
+  return {
+    navigationPageStyle: computed(() => layout.value ? formatPageStyle(layout.value) : ''),
+    /** 品牌导航总高度（CSS px，H5 为 0），供 IntersectionObserver 扣除被导航遮挡的区域。 */
+    navigationHeightPx: computed(() => layout.value?.totalHeight ?? 0),
+  }
 }

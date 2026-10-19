@@ -111,6 +111,19 @@ page {
   --fi-primitive-shadow-soft: 0 8rpx 18rpx rgba(18, 20, 28, 0.06);
   --fi-primitive-shadow-floating: 0 24rpx 60rpx rgba(26, 28, 36, 0.08);
 
+  /* ===== Primitive：换座座位语义色（取自换座页原有值） ===== */
+  --fi-primitive-green-deep: #167348;
+  --fi-primitive-green-soft: #eef8f2;
+  --fi-primitive-red-soft: #fff1f0;
+
+  /* ===== Primitive：动效（取自 FiBottomSheet / FiSegmented 现值） ===== */
+  --fi-primitive-motion-fast: 120ms;
+  --fi-primitive-motion-base: 220ms;
+  --fi-primitive-motion-slow: 280ms;
+  --fi-primitive-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --fi-primitive-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --fi-primitive-ease-spring: cubic-bezier(0.3, 0.9, 0.3, 1);
+
   /* ===== Primitive：字重 ===== */
   --fi-primitive-weight-bold: 700;
   --fi-primitive-weight-extrabold: 800;
@@ -165,6 +178,16 @@ page {
   --fi-space-topic-gallery-height: var(--fi-primitive-topic-gallery-height);
   --fi-color-overlay: rgba(var(--fi-primitive-ink-rgb), 0.46);
   --fi-color-success-accent: var(--fi-primitive-green);
+  --fi-color-seat-current: var(--fi-color-primary);
+  --fi-color-seat-current-bg: var(--fi-primitive-red-soft);
+  --fi-color-seat-desired: var(--fi-primitive-green-deep);
+  --fi-color-seat-desired-bg: var(--fi-primitive-green-soft);
+  --fi-motion-duration-fast: var(--fi-primitive-motion-fast);
+  --fi-motion-duration-base: var(--fi-primitive-motion-base);
+  --fi-motion-duration-slow: var(--fi-primitive-motion-slow);
+  --fi-motion-ease-out: var(--fi-primitive-ease-out);
+  --fi-motion-ease-in: var(--fi-primitive-ease-in);
+  --fi-motion-ease-spring: var(--fi-primitive-ease-spring);
   --fi-color-divider: var(--fi-primitive-divider);
   --fi-color-divider-soft: var(--fi-primitive-divider-soft);
   --fi-color-border-card: var(--fi-primitive-border-card);
@@ -273,6 +296,10 @@ page {
   --fi-component-loading-bg: var(--fi-color-surface-frosted);
   --fi-component-loading-radius: var(--fi-radius-lg);
   --fi-component-loading-shadow: var(--fi-shadow-floating);
+  /* 换座页：Dock 与浮窗共用高度，确保浮窗定位在 Dock 之上 */
+  --fi-component-seat-swap-dock-height: 96rpx;
+  --fi-component-seat-swap-action-width: 168rpx;
+  --fi-component-seat-swap-action-min-height: 152rpx;
   --fi-component-loading-gap: var(--fi-space-12);
   --fi-component-loading-padding: var(--fi-space-40) var(--fi-space-32);
   --fi-component-loading-title-color: var(--fi-color-text-primary);
