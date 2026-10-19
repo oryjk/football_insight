@@ -82,50 +82,50 @@ function normalizeInputValue(event: Event): string {
 
 <style scoped>
 .seat-swap-manage {
-  padding-bottom: 14rpx;
+  padding-bottom: var(--fi-space-14);
 }
 
 .seat-swap-manage__summary {
-  padding: 18rpx 22rpx;
-  margin: 18rpx 0 0;
-  border-radius: 12rpx;
-  background: #ffffff;
-  border: 1rpx solid rgba(232, 233, 238, 0.95);
+  padding: var(--fi-space-18) var(--fi-space-22);
+  margin: var(--fi-space-18) 0 0;
+  border-radius: var(--fi-radius-sm);
+  background: var(--fi-color-surface);
+  border: var(--fi-border-width) solid var(--fi-color-border-chip);
 }
 
 .seat-swap-manage__summary-row {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 16rpx;
-  padding: 6rpx 0;
+  gap: var(--fi-space-16);
+  padding: var(--fi-space-6) 0;
 }
 
 .seat-swap-manage__summary-label {
-  color: #8f9198;
-  font-size: 22rpx;
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-22);
 }
 
 .seat-swap-manage__summary-value {
-  color: #121212;
-  font-size: 24rpx;
-  font-weight: 400;
-  text-align: right;
   flex: 1;
+  color: var(--fi-color-text-strong);
+  font-size: var(--fi-font-24);
+  font-weight: var(--fi-weight-bold);
+  text-align: right;
 }
 
 .seat-swap-manage__note {
   display: block;
-  margin: 12rpx 4rpx;
-  color: #988f84;
-  font-size: 22rpx;
-  line-height: 1.5;
+  margin: var(--fi-space-12) var(--fi-space-4);
+  color: var(--fi-color-text-caption);
+  font-size: var(--fi-font-22);
+  line-height: var(--fi-leading-normal);
 }
 
 .seat-swap-manage__field {
   display: flex;
-  gap: 16rpx;
-  margin-top: 12rpx;
+  gap: var(--fi-space-16);
+  margin-top: var(--fi-space-12);
 }
 
 .seat-swap-manage__field--full {
@@ -134,21 +134,20 @@ function normalizeInputValue(event: Event): string {
 
 .seat-swap-manage__field-label {
   display: block;
-  color: #8f9198;
-  font-size: 22rpx;
-  font-weight: 400;
-  margin-bottom: 6rpx;
+  margin-bottom: var(--fi-space-6);
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-22);
 }
 
 .seat-swap-manage__textarea {
   width: 100%;
   min-height: 140rpx;
-  padding: 14rpx 18rpx;
-  background: #ffffff;
-  border: 1rpx solid rgba(232, 233, 238, 0.95);
-  border-radius: 12rpx;
-  font-size: 26rpx;
-  color: #121212;
+  padding: var(--fi-space-14) var(--fi-space-18);
+  background: var(--fi-color-surface);
+  border: var(--fi-border-width) solid var(--fi-color-border-chip);
+  border-radius: var(--fi-radius-sm);
+  font-size: var(--fi-font-26);
+  color: var(--fi-color-text-strong);
   box-sizing: border-box;
 }
 
@@ -156,22 +155,22 @@ function normalizeInputValue(event: Event): string {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  gap: var(--fi-space-16);
 }
 
 .seat-swap-manage__primary {
   flex: 1;
-  padding: 20rpx;
-  border-radius: 999rpx;
-  background: #15161b;
-  color: #fff;
-  font-size: 28rpx;
-  font-weight: 400;
-  box-shadow: 0 8rpx 18rpx rgba(21, 22, 27, 0.12);
+  padding: var(--fi-space-20);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-primitive-ink);
+  color: var(--fi-primitive-white);
+  font-size: var(--fi-font-28);
+  font-weight: var(--fi-weight-bold);
+  box-shadow: var(--fi-shadow-soft);
 }
 
 .seat-swap-manage__primary--danger {
-  background: #b42318;
+  background: var(--fi-color-primary-deep);
 }
 
 .seat-swap-manage__primary::after {
@@ -180,19 +179,19 @@ function normalizeInputValue(event: Event): string {
 
 .seat-swap-manage__ghost {
   flex-shrink: 0;
-  padding: 20rpx 28rpx;
-  border-radius: 999rpx;
-  background: #ffffff;
-  border: 1rpx solid rgba(232, 233, 238, 0.95);
-  color: #6d7280;
-  font-size: 26rpx;
-  font-weight: 400;
+  padding: var(--fi-space-20) var(--fi-space-28);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-surface);
+  border: var(--fi-border-width) solid var(--fi-color-border-chip);
+  color: var(--fi-color-text-secondary);
+  font-size: var(--fi-font-26);
+  font-weight: var(--fi-weight-bold);
 }
 
 .seat-swap-manage__ghost--danger {
-  border-color: rgba(180, 35, 24, 0.3);
-  color: #b42318;
-  background: #fff7f6;
+  border-color: rgba(var(--fi-primitive-red-rgb), 0.3);
+  color: var(--fi-color-primary-deep);
+  background: rgba(var(--fi-primitive-red-rgb), 0.06);
 }
 
 .seat-swap-manage__ghost::after {

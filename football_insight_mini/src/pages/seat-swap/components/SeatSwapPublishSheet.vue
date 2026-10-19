@@ -194,7 +194,7 @@ function handleVisibleChange(value: boolean): void {
   gap: var(--fi-space-8);
   margin-bottom: var(--fi-space-18);
   padding: var(--fi-space-18);
-  border: 1rpx solid var(--fi-color-border-chip);
+  border: var(--fi-border-width) solid var(--fi-color-border-chip);
   border-radius: var(--fi-radius-sm);
   background: var(--fi-color-page);
 }
@@ -228,18 +228,17 @@ function handleVisibleChange(value: boolean): void {
   padding: var(--fi-space-12) var(--fi-space-10);
   border-radius: var(--fi-radius-round);
   background: var(--fi-color-page);
-  border: 1rpx solid var(--fi-color-border-chip);
+  border: var(--fi-border-width) solid var(--fi-color-border-chip);
   color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-20);
-  font-weight: 400;
   line-height: var(--fi-leading-snug);
   box-sizing: border-box;
 }
 
 .steps__item--done {
-  background: #eef8f2;
-  border-color: rgba(29, 138, 85, 0.3);
-  color: #167348;
+  background: var(--fi-color-seat-desired-bg);
+  border-color: transparent;
+  color: var(--fi-color-seat-desired);
 }
 
 .steps__item--active {
@@ -261,20 +260,20 @@ function handleVisibleChange(value: boolean): void {
   padding: var(--fi-space-8) var(--fi-space-16);
   border-radius: var(--fi-radius-round);
   font-size: var(--fi-font-22);
-  font-weight: 400;
-  border: 1rpx solid transparent;
+  border: var(--fi-border-width) solid transparent;
   line-height: var(--fi-leading-none);
 }
 
-/* 区域色是 StadiumMap 业务色系，不属于视觉 token，保留字面量。 */
+/* 区域色是 StadiumMap 业务色系，不属于视觉 token，保留字面量（见下方 decorative 块）。 */
 .tag--region {
-  border-radius: 12rpx;
+  border-radius: var(--fi-radius-sm);
   border-color: transparent;
   color: var(--fi-primitive-white);
   font-weight: var(--fi-weight-black);
   box-shadow: 0 8rpx 18rpx rgba(18, 25, 20, 0.18);
 }
 
+/* decorative:start 票价分区配色，与 StadiumMap 一致 */
 .tag--region-blue { background: #336fbd; }
 .tag--region-green { background: #46ab59; }
 .tag--region-purple { background: #6c369b; }
@@ -283,11 +282,12 @@ function handleVisibleChange(value: boolean): void {
 .tag--region-red { background: #ec3b20; }
 .tag--region-vip { background: #b90000; }
 .tag--region-muted { background: #d9dee7; color: #17191f; }
+/* decorative:end */
 
 .tag--empty {
-  background: #fff1f0;
-  color: #c52018;
-  border-color: rgba(226, 59, 46, 0.42);
+  background: var(--fi-color-seat-current-bg);
+  color: var(--fi-color-seat-current);
+  border-color: rgba(var(--fi-primitive-red-rgb), 0.42);
   border-style: dashed;
 }
 
@@ -301,7 +301,6 @@ function handleVisibleChange(value: boolean): void {
 .seat-selection-group__title {
   color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-22);
-  font-weight: 400;
   line-height: var(--fi-leading-none);
 }
 
@@ -315,7 +314,7 @@ function handleVisibleChange(value: boolean): void {
   gap: var(--fi-space-10);
   min-height: 54rpx;
   padding: 0 var(--fi-space-16);
-  border-radius: 14rpx;
+  border-radius: var(--fi-radius-sm);
   box-sizing: border-box;
 }
 
@@ -347,7 +346,6 @@ function handleVisibleChange(value: boolean): void {
   display: block;
   color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-22);
-  font-weight: 400;
   margin-bottom: var(--fi-space-6);
 }
 
@@ -355,11 +353,10 @@ function handleVisibleChange(value: boolean): void {
   width: 100%;
   height: 72rpx;
   padding: 0 var(--fi-space-18);
-  background: var(--fi-primitive-white);
-  border: 1rpx solid var(--fi-color-border-chip);
-  border-radius: 12rpx;
+  background: var(--fi-color-surface);
+  border: var(--fi-border-width) solid var(--fi-color-border-chip);
+  border-radius: var(--fi-radius-sm);
   font-size: var(--fi-font-26);
-  font-weight: 400;
   color: var(--fi-color-text-strong);
   box-sizing: border-box;
 }
@@ -380,7 +377,7 @@ function handleVisibleChange(value: boolean): void {
   align-items: center;
   min-height: 54rpx;
   padding: 0 var(--fi-space-16);
-  border-radius: 14rpx;
+  border-radius: var(--fi-radius-sm);
   box-sizing: border-box;
   box-shadow: 0 8rpx 18rpx rgba(18, 25, 20, 0.14);
 }
@@ -393,7 +390,7 @@ function handleVisibleChange(value: boolean): void {
 .field-error {
   display: block;
   margin-top: var(--fi-space-12);
-  color: #b42318;
+  color: var(--fi-color-primary-deep);
   font-size: var(--fi-font-22);
 }
 
@@ -404,12 +401,12 @@ function handleVisibleChange(value: boolean): void {
   background: var(--fi-primitive-ink);
   color: var(--fi-primitive-white);
   font-size: var(--fi-font-28);
-  font-weight: 400;
-  box-shadow: 0 8rpx 18rpx rgba(21, 22, 27, 0.12);
+  font-weight: var(--fi-weight-bold);
+  box-shadow: var(--fi-shadow-soft);
 }
 
 .btn-primary[disabled] {
-  background: #c5c9d2;
+  background: var(--fi-color-text-caption);
   box-shadow: none;
 }
 
@@ -422,10 +419,10 @@ function handleVisibleChange(value: boolean): void {
   padding: var(--fi-space-20) var(--fi-space-28);
   border-radius: var(--fi-radius-round);
   background: var(--fi-primitive-white);
-  border: 1rpx solid var(--fi-color-border-chip);
+  border: var(--fi-border-width) solid var(--fi-color-border-chip);
   color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-26);
-  font-weight: 400;
+  font-weight: var(--fi-weight-bold);
 }
 
 .btn-ghost::after {
