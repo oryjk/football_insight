@@ -305,6 +305,7 @@ VALUES ('2027-summer', '2027 夏窗', '2027-06-01T00:00:00+08:00', '2027-08-01T0
 ```
 
 - 核对：迁移并部署后 `curl https://match.oryjk.cn/api/v1/transfers/windows/current` 应返回当期窗口 JSON；榜单接口 `GET /api/v1/transfers/teams/{team_id}/board` 公开，提名与投票接口需要登录。
+- 第二期（拉票海报与小程序码）：**无数据库迁移**，上线只需 ① 部署并重启生产后端（小程序码用已有的小程序 appid/secret 环境变量，与战术板小程序码共用同一对凭据）→ ② 上传小程序体验版。部署后核对 `curl -i https://match.oryjk.cn/api/v1/transfers/nominations/XXXXXXXX/wxacode` 未登录应为 401。
 
 ## 日志查看
 
