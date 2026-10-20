@@ -29,6 +29,7 @@
             <view class="insights-content">
               <InsightsTacticsPanel
                 v-if="mainTab === 'tactics'"
+                :team-name="selectedTeamName"
                 :authenticated="tacticsAuthenticated"
                 :mine-loading="mineLoading" :mine-error="mineError" :draft="mineDraft" :published="minePublished"
                 :items="communityItems" :total="communityTotal" :sort="communitySort"
@@ -163,7 +164,8 @@ const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
 const currentUser = session.currentUser
 const mainTab = ref<'data' | 'tactics' | 'transfer'>('data')
-const mainTabs = [{ key: 'data', label: '数据洞察' }, { key: 'tactics', label: '战术' }, { key: 'transfer', label: '转会' }]
+// 胶囊用动作命名，告诉用户进来做什么：排阵容、对转会表态。
+const mainTabs = [{ key: 'data', label: '数据洞察' }, { key: 'tactics', label: '排阵容' }, { key: 'transfer', label: '转会表态' }]
 function changeMainTab(value: string): void {
   if (value === 'data' || value === 'tactics' || value === 'transfer') mainTab.value = value
 }
@@ -173,6 +175,7 @@ const { teams: selectableTeams, selectedTeamId, loading: teamLoading, error: tea
 const tactics = useInsightsTactics({ session, selectedTeamId, active: computed(() => pageVisible.value && mainTab.value === 'tactics') })
 const { mineLoading, mineError, mineDraft, minePublished, authenticated: tacticsAuthenticated } = tactics
 const { items: communityItems, total: communityTotal, sort: communitySort, loading: communityLoading, error: communityError, pendingLikes: communityPendingLikes } = tactics.community
+const selectedTeamName = computed(() => selectableTeams.value.find(team => team.team_id === selectedTeamId.value)?.team_name ?? '')
 const transfer = useInsightsTransfer({ session, selectedTeamId, active: computed(() => pageVisible.value && mainTab.value === 'transfer') })
 const { summary: transferSummary, loading: transferLoading, error: transferError, hint: transferHint, pending: transferPending } = transfer
 function retryTransfer(): void {

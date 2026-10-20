@@ -2,10 +2,10 @@
   <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav @back="goBack" />
   <view class="transfer-page">
-    <text class="transfer-title">{{ board?.team.team_name ?? '' }}转会榜</text>
+    <text class="transfer-title">{{ board?.team.team_name ?? '' }}球迷的转会表态</text>
     <text v-if="!teamId" class="transfer-caption">先在首页选择你的主队，再来给转会表态。</text>
     <template v-else>
-      <text v-if="board?.window" class="transfer-caption">{{ board.window.name }} · {{ board.window.open ? '投票中' : '本期投票已结束' }} · {{ board.total }} 张提名</text>
+      <text v-if="board?.window" class="transfer-caption">{{ board.window.name }} · {{ board.window.open ? '表态中，提名一位球员或给大家的提名点赞成 / 反对' : '本期已结束' }}</text>
       <FiSegmented :items="intentItems" :model-value="intent" aria-label="转会榜" @update:model-value="changeIntent($event as TransferIntent)" />
       <text v-if="error" class="transfer-error">{{ error }}</text>
       <FiLoading v-if="loading && !items.length" title="转会榜加载中" caption="正在读取球迷的提名。" />
@@ -14,10 +14,10 @@
           <FiTransferCard :card="card" :pending="pending.includes(card.share_code)" @open="openCard(card.share_code)" @vote="vote(card, $event)" />
         </view>
       </view>
-      <text v-if="!loading && !error && !items.length" class="transfer-caption">还没有人提名，来做第一个。</text>
+      <text v-if="!loading && !error && !items.length" class="transfer-caption">还没人提名，你来说第一句。</text>
       <button v-if="error || hasMore" class="transfer-action" :disabled="loading" @tap="retry">{{ loading ? '加载中…' : error ? '重试加载' : '加载更多' }}</button>
       <view v-if="board?.window?.open" class="transfer-dock">
-        <button class="transfer-action transfer-action--active" @tap="openNominate">提名球员</button>
+        <button class="transfer-action transfer-action--active" @tap="openNominate">我要提名</button>
       </view>
     </template>
     <TransferNominateSheet v-model:visible="nominate.visible.value" :intent="nominate.intent.value" :groups="nominate.groups.value"

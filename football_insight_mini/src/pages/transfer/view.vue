@@ -6,16 +6,16 @@
     <text v-else-if="error && !view" class="transfer-error">{{ error }}</text>
     <template v-else-if="view">
       <text class="transfer-title">{{ view.team.team_name }}球迷希望 {{ view.card.player.name }} {{ transferStance(view.card) }}</text>
-      <text class="transfer-caption">{{ view.window.name }} · {{ TRANSFER_BOARD_LABELS[view.card.intent] }}{{ view.card.rank ? ` 第 ${view.card.rank}` : '' }}{{ view.window.open ? '' : ' · 本期投票已结束' }}</text>
+      <text class="transfer-caption">{{ view.window.name }} · {{ TRANSFER_BOARD_LABELS[view.card.intent] }}{{ view.card.rank ? `第 ${view.card.rank} 名` : '' }}{{ view.window.open ? ' · 你同意吗？' : ' · 本期已结束' }}</text>
       <view class="transfer-panel">
         <FiTransferCard size="md" :card="view.card" :show-rank="false" :pending="pending.includes(view.card.share_code)" @vote="vote" />
       </view>
       <text v-if="hint" class="transfer-caption">{{ hint }}</text>
       <view class="transfer-row">
         <button class="transfer-action transfer-action--active" open-type="share">分享拉票</button>
-        <button class="transfer-action" @tap="openBoard">看完整榜单</button>
+        <button class="transfer-action" @tap="openBoard">看大家怎么投</button>
       </view>
-      <button v-if="view.window.open" class="transfer-action" @tap="openNominate">我也提名</button>
+      <button v-if="view.window.open" class="transfer-action" @tap="openNominate">我也来提名</button>
     </template>
   </view>
 </template>

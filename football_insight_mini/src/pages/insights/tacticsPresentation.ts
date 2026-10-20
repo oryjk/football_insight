@@ -9,7 +9,8 @@ export function myTacticsSummary(draft: SavedLineupDraft | null, published: Save
     snapshot,
     filled: snapshot?.slots.filter(slot => slot.player_id !== null).length ?? 0,
     status: unpublished ? (published ? '有未发布的修改' : '草稿已保存') : published ? '已发布' : '还没有战术',
-    action: snapshot ? '继续排阵' : '开始排阵',
+    // 按用户所处阶段邀请：还没排 → 排我的阵容；有没发布的草稿 → 继续排阵；已发布且无改动 → 改我的阵容。
+    action: !snapshot ? '排我的阵容' : unpublished ? '继续排阵' : '改我的阵容',
   }
 }
 

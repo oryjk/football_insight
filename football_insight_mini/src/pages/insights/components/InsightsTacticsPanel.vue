@@ -1,17 +1,17 @@
 <template>
   <view class="tactics-panel">
-    <InsightsMyTacticsCard :authenticated="authenticated" :loading="mineLoading" :error="mineError" :draft="draft" :published="published" @edit="emit('edit')" @retry="emit('retry-mine')" />
+    <InsightsMyTacticsCard :team-name="teamName" :authenticated="authenticated" :loading="mineLoading" :error="mineError" :draft="draft" :published="published" @edit="emit('edit')" @retry="emit('retry-mine')" />
     <view class="community">
-      <view class="community__header"><text class="community__title">球队战术<text v-if="total" class="community__count">{{ total }}</text></text>
+      <view class="community__header"><text class="community__title">大家排的阵容<text v-if="total" class="community__count">{{ total }}</text></text>
         <view class="community__sort"><FiSegmented :items="sortItems" :model-value="sort" compact aria-label="战术排序" @update:model-value="changeSort" /></view>
       </view>
       <view v-if="loading && !items.length" class="community__skeletons"><view v-for="n in 3" :key="n" class="community__skeleton fi-skeleton-block" /></view>
       <view v-if="error" class="community__state"><text>{{ error }}</text><button class="community__retry" @tap="emit('retry-list')">重试</button></view>
-      <view v-else-if="!loading && !items.length" class="community__state"><text>还没有人发布战术，来做第一个排阵的人。</text></view>
+      <view v-else-if="!loading && !items.length" class="community__state"><text>还没人发布阵容，你来排第一套。</text></view>
       <view v-for="(item, index) in items" :key="item.share_code" class="community__item">
         <FiLineupCommunityCard :item="item" :rank="sort === 'likes' ? index + 1 : undefined" :pending="pendingLikes.includes(item.share_code)" compact @open="emit('open', item.share_code)" @like="emit('like', item)" @dislike="emit('dislike', item)" />
       </view>
-      <button v-if="items.length && items.length < total" class="community__more" :disabled="loading" @tap="emit('more')">{{ loading ? '加载中…' : '查看更多战术' }}</button>
+      <button v-if="items.length && items.length < total" class="community__more" :disabled="loading" @tap="emit('more')">{{ loading ? '加载中…' : '查看更多阵容' }}</button>
     </view>
   </view>
 </template>
@@ -20,7 +20,7 @@ import FiSegmented from '../../../components/FiSegmented.vue'
 import FiLineupCommunityCard from '../../../components/FiLineupCommunityCard.vue'
 import InsightsMyTacticsCard from './InsightsMyTacticsCard.vue'
 import type { LineupSort, PublicLineupSummary, SavedLineup, SavedLineupDraft } from '../../../types/lineup'
-defineProps<{ authenticated: boolean; mineLoading: boolean; mineError: string; draft: SavedLineupDraft | null; published: SavedLineup | null; items: PublicLineupSummary[]; total: number; sort: LineupSort; loading: boolean; error: string; pendingLikes: string[] }>()
+defineProps<{ teamName: string; authenticated: boolean; mineLoading: boolean; mineError: string; draft: SavedLineupDraft | null; published: SavedLineup | null; items: PublicLineupSummary[]; total: number; sort: LineupSort; loading: boolean; error: string; pendingLikes: string[] }>()
 const emit = defineEmits<{ (e: 'edit' | 'retry-mine' | 'retry-list' | 'more'): void; (e: 'open', code: string): void; (e: 'like' | 'dislike', item: PublicLineupSummary): void; (e: 'sort', order: LineupSort): void }>()
 const sortItems = [{ key: 'latest', label: '最新' }, { key: 'likes', label: '点赞榜' }]
 function changeSort(value: string) { if (value === 'latest' || value === 'likes') emit('sort', value) }

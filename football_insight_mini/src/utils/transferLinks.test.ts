@@ -69,3 +69,8 @@ describe('transfer eligibility messages', () => {
     expect(transferHint({ loggedIn: true, canVote: true, open: true })).toBe('')
   })
 })
+
+test('board labels read as what fans want, not as feature names', async () => {
+  const { TRANSFER_BOARD_LABELS } = await import('./transferLinks')
+  expect(TRANSFER_BOARD_LABELS).toEqual({ out: '最想送走', stay: '最想留下', in: '最想买入' })
+})

@@ -2,7 +2,7 @@
   <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav :shareable="false" @back="goBack" />
   <view class="community-page">
-    <text class="community-title">球队战术板</text>
+    <text class="community-title">大家排的阵容</text>
     <!-- #ifdef H5 -->
     <text class="community-caption">请在微信小程序中查看球队战术板。</text>
     <!-- #endif -->

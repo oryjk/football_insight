@@ -2,7 +2,8 @@ import type { TransferCard, TransferIntent, TransferPlayer, TransferTally } from
 
 /** 转会投票页面路径与文案：洞察页、首页、分包页面共用，页面之间不互相引用。 */
 export const TRANSFER_INTENTS: TransferIntent[] = ['out', 'stay', 'in']
-export const TRANSFER_BOARD_LABELS: Record<TransferIntent, string> = { out: '离队榜', stay: '留队榜', in: '引援榜' }
+// 榜单名用球迷的口吻（最想送走谁），不用功能名（离队榜）。
+export const TRANSFER_BOARD_LABELS: Record<TransferIntent, string> = { out: '最想送走', stay: '最想留下', in: '最想买入' }
 const SHARE_VERBS: Record<TransferIntent, string> = { out: '送走', stay: '留下', in: '买入' }
 const POSITION_LABELS: Record<NonNullable<TransferPlayer['position']>, string> = { GK: '门将', DF: '后卫', MF: '中场', FW: '前锋' }
 

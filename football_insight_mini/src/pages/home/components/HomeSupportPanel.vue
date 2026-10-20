@@ -151,8 +151,8 @@
       hover-class="support-home-panel__lineup--pressed"
       @click="emit('open-lineup')"
     >
-      <text class="support-home-panel__lineup-title">排{{ favoriteTeam ? `${favoriteTeam.team_name}的` : '我的' }}最佳阵容</text>
-      <text class="support-home-panel__lineup-action">前往战术板</text>
+      <text class="support-home-panel__lineup-title">你心中的最佳 11 人</text>
+      <text class="support-home-panel__lineup-action">去排阵 ›</text>
     </view>
 
     <!-- 转会投票同样围绕主队，第二行入口；加载/出错时不显示。 -->
@@ -162,8 +162,8 @@
       hover-class="support-home-panel__lineup--pressed"
       @click="emit('open-transfer')"
     >
-      <text class="support-home-panel__lineup-title">{{ favoriteTeam ? `${favoriteTeam.team_name}` : '' }}转会投票</text>
-      <text class="support-home-panel__lineup-action">去表态</text>
+      <text class="support-home-panel__lineup-title">这个冬窗，送走谁？</text>
+      <text class="support-home-panel__lineup-action">去表态 ›</text>
     </view>
   </FiPanel>
 </template>
