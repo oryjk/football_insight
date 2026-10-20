@@ -158,22 +158,21 @@ ssh peiqian "docker rm -f football-insight-service-backend-rs; docker run -d --n
 
 ### 3. 数据库迁移
 
-生产数据库 `football-data-postgres` 运行在 `peiqian`，不对外开放公网端口。如果这次改动包含 migration，在 `peiqian` 的生产目录执行仓库内置迁移入口（`_sqlx_migrations` 表记账，部署脚本不会自动跑迁移）：
+生产数据库 `football-data-postgres` 运行在 `peiqian`，不对外开放公网端口。如果这次改动包含 migration，用**本次要发布的新镜像**里的 `/usr/local/bin/run_migrations` 在 peiqian 上执行（`_sqlx_migrations` 表记账，部署脚本不会自动跑迁移）。`sqlx::migrate!` 在编译时把 `migrations/` 嵌进二进制，所以 peiqian 不需要源码、不需要 `git pull`、不需要 cargo：
 
 ```bash
-ssh peiqian
-cd /root/projects/football_insight/football_insight_service_backend_rs
-cargo run --release --bin run_migrations
+# 镜像 docker load 到 peiqian 之后、切换容器之前执行（迁移先于新后端发布）
+ssh peiqian "docker run --rm --network host \
+  --env-file /root/projects/football_insight/football-insight-service-backend-rs.env \
+  --entrypoint /usr/local/bin/run_migrations \
+  football-insight-service-backend-rs:$TAG"
 ```
 
-如果需要临时执行某一条单独的 SQL 文件，也可以直接走项目内置入口：
+- 必须用包含新迁移文件的镜像 tag；旧镜像里没有新迁移，会直接输出成功但什么也不做
+- 执行前后核对 `_sqlx_migrations`，确认只应用了本次新增的版本
+- 临时执行单个 SQL 文件：镜像内 `/app/migrations/` 也带有迁移文件，在上面命令末尾追加 `/app/migrations/<your_migration>.sql`；镜像外的文件用 `-v` 挂载进去再传路径
 
-```bash
-cd /root/projects/football_insight/football_insight_service_backend_rs
-cargo run --release --bin run_migrations -- migrations/<your_migration>.sql
-```
-
-当前不再把“服务器全局安装 `sqlx`”作为默认前提，优先使用仓库内的 `run_migrations`。
+不再在 peiqian 源码目录用 `cargo run --bin run_migrations`，也不再把“服务器全局安装 `sqlx`”作为前提。
 
 ### 4. systemd 备用发布
 
@@ -360,7 +359,7 @@ ssh peiqian 'journalctl -u football-insight.service -n 100 --no-pager'
 2. 发 `peiqian` 即对线上生效（线上流量由 peiqian 后端容器承接）：
    - `football_insight_service_backend_rs/deploy_peiqian_docker.sh`
    - `jd` 上的容器是备用、不在流量路径上，无需每次同步发版；确需同步时再跑 `football_insight_service_backend_rs/deploy_jd_docker.sh`
-3. 如有 migration，在 `peiqian` 上执行 `cargo run --release --bin run_migrations`
+3. 如有 migration，在切换容器前用新镜像里的 `run_migrations` 执行（见上文「3. 数据库迁移」）
 4. 用 `https://match.oryjk.cn` 域名验证接口（目标机本机 8092 正常不代表线上生效）
 5. 优先看 `logs/app.log`，必要时再看 `docker logs`
 

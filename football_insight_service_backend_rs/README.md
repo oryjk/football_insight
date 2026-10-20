@@ -77,18 +77,19 @@ local233 统一使用 `18092`。配置由项目目录下被 Git 忽略、权限�
 - 管理端：admin 身份与审计日志
 - 小程序审核：审核配置表、`f_i_mini_review_statuses` 登记库、`match_id_unlocks`
 
-执行迁移：生产库 `football-data-postgres` 运行在 `peiqian` 的 Docker 容器内，不开放公网端口，迁移需在 `peiqian` 上执行（`_sqlx_migrations` 表记账，部署脚本不会自动跑迁移）：
+执行迁移：生产库 `football-data-postgres` 运行在 `peiqian` 的 Docker 容器内，不开放公网端口，迁移需在 `peiqian` 上执行（`_sqlx_migrations` 表记账，部署脚本不会自动跑迁移）。生产用本次新镜像里的 `run_migrations`（迁移在编译时嵌入，peiqian 不需要源码）：
 
 ```bash
-ssh peiqian
-cd /root/projects/football_insight/football_insight_service_backend_rs
-DATABASE_URL='postgresql://football_app:***@127.0.0.1:5432/football_data?sslmode=disable' \
-cargo run --bin run_migrations
+ssh peiqian "docker run --rm --network host \
+  --env-file /root/projects/football_insight/football-insight-service-backend-rs.env \
+  --entrypoint /usr/local/bin/run_migrations \
+  football-insight-service-backend-rs:<新镜像 tag>"
 
-# 只应用单个迁移文件时：
-DATABASE_URL='postgresql://football_app:***@127.0.0.1:5432/football_data?sslmode=disable' \
-cargo run --bin run_migrations -- migrations/20260409001000_add_membership_tier_to_users.sql
+# 只应用单个迁移文件时，在命令末尾追加镜像内路径：
+#   /app/migrations/20260409001000_add_membership_tier_to_users.sql
 ```
+
+本地开发库仍可直接 `cargo run --bin run_migrations`。
 
 ## Docker 运行
 
