@@ -285,6 +285,15 @@ ssh peiqian 'curl -s http://127.0.0.1:8092/api/v1/ticket-watch/best-windows'
 - 失败隔离：每队独立；某队请求失败、结构异常或返回空名单时跳过该队，不改它的任何数据，摘要 JSON 的 `teams_failed` 列出失败球队。只有当前赛季成功拿到非空名单，才把缺席者置为前队员（`active=false`，不删除）。
 - 只读核对：`curl -s http://127.0.0.1:18092/api/v1/lineups/squads/77680`，看 `active` / `former` 人数；接口返回 503 表示表不存在或库不可用。
 
+### 球员头像小图补生成（一次性 + 幂等）
+
+球员头像的 96/240px 小图（`summary/players/thumbs/<尺寸>/<文件名>.jpg`）由抓取器在上传新头像时顺带生成；存量头像用补生成命令（会写生产 MinIO，在 local233 的 `sina_csl_scraper` 目录执行）：
+
+1. 先演练：`uv run sina-csl-scraper sync-avatar-thumbs --dry-run`（只读库统计候选数，不下载、不上传；需要 `FI_DATABASE_URL` 或 `DATABASE_URL`）。
+2. 确认统计合理后正式执行：`uv run sina-csl-scraper sync-avatar-thumbs`（需要 MinIO 凭据环境变量，与 `sync-squads` 相同）。
+
+命令幂等（已存在的小图用 `head_object` 跳过），可重复执行；`--limit N` 限制处理张数；单张失败继续其余，最后输出 JSON 统计（`candidates`/`skipped`/`generated`/`failed`/`ignored`），有失败时退出码非 0。补生成前小程序会自动回退原图。
+
 ## 战术板阵容（`f_i_lineups`）
 
 - 迁移：`20261019130000_add_lineups.sql`（2026-10-19 已在 peiqian 执行；加载 env 文件后 `cargo run --release --bin run_migrations`，注意 peiqian 后端目录没有 `.env`）。迁移必须先于新后端发布。

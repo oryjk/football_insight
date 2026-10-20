@@ -2,6 +2,14 @@
 
 > 按时间倒序记录用户可见变更。每条记录必须说明“原因”。
 
+## 2026-10-20 · 球员头像小尺寸版本（代码完成，待补生成与上传）
+
+- 问题：提名弹层等处头像渲染很慢。排查（2026-10-20，生产只读）：`f_i_squad_players` 736 条带头像记录、619 个不重复地址；其中 356 条是 600×900 的 JPEG 标准照（每张 80–120KB），其余是 85×85 到 200×200 的 PNG（12–46KB），界面上只显示成约 32px 圆形头像；头像直接从 MinIO 读取，单张首字节约 1–2 秒且无 `Cache-Control`。
+- 方案（`docs/superpowers/specs/2026-10-20-avatar-thumbnails-design.md`）：抓取器为每张球员头像生成 96px 与 240px 正方形 JPEG 小图，与原图同目录固定命名（`summary/players/<文件>` → `summary/players/thumbs/<96|240>/<文件>.jpg`），竖图取上方正方形、其余居中、不放大、透明铺白、JPEG 82、长缓存一年；`upload_player_avatar` 上传原图后顺带生成小图，小图失败只记警告不阻断原图与名单同步；新增幂等补生成命令 `sync-avatar-thumbs`（跳过已存在、`--dry-run`、`--limit`、单张失败继续、有失败非 0 退出）。不改数据库、不改后端。
+- 小程序：新增 `utils/avatarThumb.ts` 与共享组件 `FiAvatar`（先小图、失败回退原图、再失败显示首字；只对 MinIO 球员目录地址换算，用户头像/队徽/外部地址原样使用），替换提名弹层、转会卡、选人弹层、球场圆点、共识卡片 5 处头像；转会与战术板海报绘制前优先取 240 小图、回退原图；长列表 lazy 守护改为检查 `FiAvatar` 带 `lazy`（作者微信头像 `FiLineupCommunityCard` 不在球员目录，仍用 `<image lazy-load>`）。
+- 验证：抓取器先写失败测试再实现，`uv run pytest` 全量 253 passed、22 skipped（基线 245 passed、22 skipped，跳过数不变）；`sync-avatar-thumbs --help` 正常。小程序 `bun test` 1347 pass 0 fail，`type-check`、`check:boundaries`、`MINI_REVIEW_SKIP=1 bun run build:mp-weixin`、`verify:mp-components` 均通过。测试全部使用假下载器与存储，未连接生产 MinIO 或生产数据库。
+- 发布状态：**小图尚未补生成**——负责人确认后先 `uv run sina-csl-scraper sync-avatar-thumbs --dry-run` 看统计，再正式执行（写生产 MinIO）；补生成前小程序会自动回退原图，不会显示坏图。小程序未上传。
+
 ## 2026-10-20 · 长列表头像延迟加载（提名弹层等）
 
 - 修复：提名弹层（"希望买入"约 500 名候选）、战术板选人弹层、转会提名卡、阵容列表卡片的头像加 `lazy-load`，滚动到附近才下载，不再打开弹层就同时请求几百张头像。
