@@ -8,6 +8,7 @@
           {{ player.player.shirt_number }}
         </text>
         <text v-if="player.player.former" class="dot__former">前</text>
+        <text v-if="exclusive" class="dot__exclusive">独家</text>
       </template>
       <text v-else class="dot__plus">+</text>
     </view>
@@ -23,6 +24,8 @@ defineProps<{
   selected?: boolean
   /** 缩小版，供分享预览复用。 */
   compact?: boolean
+  /** 不在共识阵容里的"独家"球员标记。 */
+  exclusive?: boolean
 }>()
 </script>
 
@@ -101,6 +104,19 @@ defineProps<{
   background: var(--fi-color-primary);
   color: var(--fi-primitive-white);
   font-size: var(--fi-font-20);
+  font-weight: var(--fi-weight-bold);
+  line-height: var(--fi-leading-snug);
+}
+
+.dot__exclusive {
+  position: absolute;
+  top: calc(-1 * var(--fi-space-6));
+  right: calc(-1 * var(--fi-space-14));
+  padding: var(--fi-space-2) var(--fi-space-8);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-text-strong);
+  color: var(--fi-primitive-white);
+  font-size: var(--fi-font-18);
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-snug);
 }

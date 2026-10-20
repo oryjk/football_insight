@@ -11,3 +11,4 @@
 .community-action[disabled] { opacity: var(--fi-opacity-pressed); }
 /* Canvas bitmap dimensions use logical pixels; off-screen placement does not affect layout. */
 .lineup-canvas { position: fixed; left: -3000rpx; top: 0; pointer-events: none; }
+.community-caption--overlap { color: var(--fi-color-primary); font-weight: var(--fi-weight-bold); }

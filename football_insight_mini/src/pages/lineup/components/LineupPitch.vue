@@ -30,7 +30,7 @@
           @touchend="() => onEnd(entry.slot)"
           @tap="() => onTap(entry.slot)"
         >
-          <LineupPlayerDot :player="entry" :selected="selectedSlot === entry.slot" />
+          <LineupPlayerDot :player="entry" :selected="selectedSlot === entry.slot" :exclusive="Boolean(entry.player && exclusiveIds.includes(entry.player.player_id))" />
         </movable-view>
       </movable-area>
     </view>
@@ -54,10 +54,13 @@ const props = withDefaults(defineProps<{
   readonly?: boolean
   fitContainer?: boolean
   selectedSlot?: number | null
+  /** 共识之外的"独家"球员 id（只读展示用；编辑页不传，外观不变）。 */
+  exclusiveIds?: number[]
 }>(), {
   readonly: false,
   fitContainer: false,
   selectedSlot: null,
+  exclusiveIds: () => [],
 })
 
 const emit = defineEmits<{
