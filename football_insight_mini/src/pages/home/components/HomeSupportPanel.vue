@@ -10,7 +10,22 @@
     />
     <view class="support-home-panel__header">
       <view class="support-home-panel__heading">
-        <text class="support-home-panel__title">我的主队</text>
+        <!-- 切换主队紧跟标题：主队行与对阵卡里不再放按钮，避免拥挤。 -->
+        <view class="support-home-panel__title-row">
+          <text class="support-home-panel__title">我的主队</text>
+          <button
+            v-if="favoriteTeam"
+            class="support-home-panel__switch"
+            hover-class="support-home-panel__switch--pressed"
+            aria-label="切换主队"
+            :class="{ 'support-home-panel__switch--disabled': switchDisabled }"
+            :disabled="switchDisabled"
+            @click="emit('select-team')"
+          >
+            <image class="support-home-panel__switch-icon" :src="switchIcon" mode="aspectFit" aria-hidden="true" />
+            <text>切换</text>
+          </button>
+        </view>
         <view v-if="daysRemaining !== null || saleDaysRemaining !== null" class="support-home-panel__countdowns">
           <view
             v-if="saleDaysRemaining !== null"
@@ -81,7 +96,6 @@
     <template v-else-if="nextMatch">
       <view class="support-home-panel__favorite">
         <text class="support-home-panel__favorite-name">{{ favoriteTeam.team_name }}</text>
-        <button class="support-home-panel__switch" :disabled="voteSubmittingTeamId !== null || favoriteSubmitting" @click="emit('select-team')">切换主队</button>
       </view>
 
       <view class="support-home-match-card" @click="emit('open-match')">
@@ -128,7 +142,6 @@
       <text class="support-home-panel__summary">
         {{ favoriteTeam.team_name }} 当前还没有可展示的下一场助力比赛，等赛程刷新后这里会自动出现。
       </text>
-      <button class="support-home-panel__action support-home-panel__action--ghost" @click="emit('select-team')">切换主队</button>
     </template>
 
     <!-- 排阵容同样围绕主队，收进本面板底部；加载/出错时不显示。 -->
@@ -159,6 +172,7 @@
 import FiPanel from '../../../components/FiPanel.vue'
 import { computed } from 'vue'
 import { CHENGDU_RONGCHENG_CREST_IMAGE_URL } from '../../../config/assets'
+import switchIcon from '../../../static/home/switch-team.svg'
 import FiLoading from '../../../components/FiLoading.vue'
 import HomeSupportVoteButton from './HomeSupportVoteButton.vue'
 import type { SupportProfile, SupportTeam } from '../../../types/support'
@@ -196,6 +210,8 @@ const emit = defineEmits<{
 }>()
 
 const favoriteTeam = computed(() => props.profile?.favorite_team ?? null)
+// 助力提交中或正在切换主队时不允许再次切换（与原来主队行里的按钮同一条件）。
+const switchDisabled = computed(() => props.voteSubmittingTeamId !== null || props.favoriteSubmitting)
 // 列表头像仅 85px，放大水印使用同款高清队徽，避免拉伸后模糊。
 const favoriteTeamCrest = computed(() => favoriteTeam.value?.team_id === 77680
   ? CHENGDU_RONGCHENG_CREST_IMAGE_URL
@@ -396,10 +412,6 @@ const awayRankLabel = computed(() => {
   font-size: var(--fi-font-26);
   line-height: 1;
 }
-.support-home-panel__action--ghost {
-  background: #f5f6fa;
-  color: #5f6673;
-}
 /* 主队信息：一行文字，不再用分割线和竖条圈起来；切换主队降级为文字链接。 */
 .support-home-panel__favorite {
   margin-top: 14rpx;
@@ -416,14 +428,34 @@ const awayRankLabel = computed(() => {
   line-height: 1;
   font-weight: 800;
 }
+.support-home-panel__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fi-space-12);
+  min-width: 0;
+}
+/* 切换主队：标题旁的小描边胶囊（图标 + "切换"），字号与倒计时一致，层级低于标题。 */
 .support-home-panel__switch {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--fi-space-6);
   margin: 0;
-  padding: 0;
-  background: transparent;
+  padding: var(--fi-space-6) var(--fi-space-14);
+  border: var(--fi-border-card);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-surface);
   color: var(--fi-color-text-secondary);
-  font-size: var(--fi-font-24);
-  font-weight: 700;
-  line-height: 1;
+  font-size: var(--fi-font-22);
+  font-weight: var(--fi-weight-bold);
+  line-height: var(--fi-leading-normal);
+}
+.support-home-panel__switch--pressed { opacity: var(--fi-opacity-pressed); }
+.support-home-panel__switch--disabled { opacity: var(--fi-opacity-pressed); }
+.support-home-panel__switch-icon {
+  flex-shrink: 0;
+  width: var(--fi-space-22);
+  height: var(--fi-space-22);
 }
 .support-home-panel__switch::after { border: 0; }
 /* 对阵：左右对称，中间放轮次/VS/时间；无底色、描边、药丸，与整块面板同一层背景。 */
