@@ -585,6 +585,39 @@ async fn missing_team_blocks_shared_reads_and_like_writes_consistently() {
 
 #[tokio::test]
 #[ignore = "requires explicit disposable local LINEUP_TEST_DATABASE_URL"]
+async fn consensus_counts_only_public_full_lineups() {
+    let db = setup().await;
+    let (a, b, c, d) = (
+        user(&db.pool).await,
+        user(&db.pool).await,
+        user(&db.pool).await,
+        user(&db.pool).await,
+    );
+    save(&db.pool, a, 1, "CONS0001", true).await;
+    save(&db.pool, b, 1, "CONS0002", true).await;
+    save(&db.pool, c, 1, "CONS0003", false).await;
+    save(&db.pool, d, 1, "CONS0004", true).await;
+    sqlx::query("UPDATE f_i_users SET status = 'disabled' WHERE id = $1")
+        .bind(d)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    let rows = PostgresPublicLineupRepository::new(db.pool.clone())
+        .team_lineup_players(1)
+        .await
+        .unwrap();
+    assert_eq!(rows.len(), 2);
+    for (formation, players) in rows {
+        assert_eq!(formation, "4-3-3");
+        let mut sorted = players.clone();
+        sorted.sort();
+        assert_eq!(sorted, (1..=11).collect::<Vec<i64>>());
+    }
+    teardown(db).await;
+}
+
+#[tokio::test]
+#[ignore = "requires explicit disposable local LINEUP_TEST_DATABASE_URL"]
 async fn private_drafts_do_not_change_public_snapshots_likes_identity_or_other_users() {
     let db = setup().await;
     let repo = PostgresLineupRepository::new(db.pool.clone());

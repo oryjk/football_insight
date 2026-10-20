@@ -85,6 +85,11 @@ pub trait PublicLineupRepository: Send + Sync {
         code: &str,
         viewer: Option<Uuid>,
     ) -> Result<Option<SharedLineup>, LineupPublicError>;
+    /// 球队全部公开阵容（与公开列表同一可见条件）的阵型与 11 个球员 ID。
+    async fn team_lineup_players(
+        &self,
+        team_id: i64,
+    ) -> Result<Vec<(String, Vec<i64>)>, LineupPublicError>;
     /// Atomically check visibility/actor, replace the mutually exclusive reaction and read its state.
     async fn set_reaction(
         &self,

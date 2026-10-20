@@ -1,7 +1,7 @@
 use super::dto::{PlayerDto, SlotDto, TeamDto};
 use crate::lineup::domain::{
-    LineupAuthor, LineupCodeImage, LineupLikeState, PublicLineupItem, PublicLineupPage,
-    SharedLineup,
+    LineupAuthor, LineupCodeImage, LineupConsensus, LineupLikeState, Position, PublicLineupItem,
+    PublicLineupPage, SharedLineup,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -141,6 +141,71 @@ impl From<LineupCodeImage> for CodeDto {
         Self {
             image_base64: image.image_base64,
             mime_type: image.mime_type,
+        }
+    }
+}
+
+fn position_code(position: Position) -> &'static str {
+    match position {
+        Position::GK => "GK",
+        Position::DF => "DF",
+        Position::MF => "MF",
+        Position::FW => "FW",
+    }
+}
+
+#[derive(Serialize)]
+pub(super) struct ConsensusTeamDto {
+    team_id: i64,
+    team_name: String,
+    avatar_url: Option<String>,
+}
+#[derive(Serialize)]
+pub(super) struct ConsensusPlayerDto {
+    player_id: i64,
+    name: String,
+    avatar_url: Option<String>,
+    shirt_number: Option<i32>,
+    position: Option<&'static str>,
+    group: &'static str,
+    pick_rate: u8,
+}
+#[derive(Serialize)]
+pub(super) struct ConsensusDto {
+    team: ConsensusTeamDto,
+    total: usize,
+    threshold: usize,
+    unlocked: bool,
+    formation: Option<String>,
+    formation_share: u8,
+    players: Vec<ConsensusPlayerDto>,
+}
+impl From<LineupConsensus> for ConsensusDto {
+    fn from(c: LineupConsensus) -> Self {
+        Self {
+            team: ConsensusTeamDto {
+                team_id: c.team.team_id,
+                team_name: c.team.team_name,
+                avatar_url: c.team.avatar_url,
+            },
+            total: c.total,
+            threshold: c.threshold,
+            unlocked: c.formation.is_some(),
+            formation: c.formation,
+            formation_share: c.formation_share,
+            players: c
+                .players
+                .into_iter()
+                .map(|p| ConsensusPlayerDto {
+                    player_id: p.player.player_id,
+                    name: p.player.name,
+                    avatar_url: p.player.avatar_url,
+                    shirt_number: p.player.shirt_number,
+                    position: p.player.position.map(position_code),
+                    group: position_code(p.group),
+                    pick_rate: p.pick_rate,
+                })
+                .collect(),
         }
     }
 }

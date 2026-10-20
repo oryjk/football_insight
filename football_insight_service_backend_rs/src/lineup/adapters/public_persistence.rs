@@ -156,6 +156,22 @@ impl PublicLineupRepository for PostgresPublicLineupRepository {
         }))
     }
 
+    async fn team_lineup_players(
+        &self,
+        team_id: i64,
+    ) -> Result<Vec<(String, Vec<i64>)>, LineupPublicError> {
+        sqlx::query_as::<_, (String, Vec<i64>)>(&format!(
+            "SELECT l.formation,
+                ARRAY(SELECT (s->>'player_id')::BIGINT FROM jsonb_array_elements(l.slots) s) AS players
+             FROM f_i_lineups l JOIN f_i_users u ON u.id = l.user_id
+             WHERE l.team_id = $1 AND {VISIBLE}"
+        ))
+        .bind(team_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(unavailable)
+    }
+
     async fn set_reaction(
         &self,
         code: &str,

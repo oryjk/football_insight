@@ -427,6 +427,23 @@ pub struct PublicLineupItem {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct ConsensusPlayer {
+    pub player: SquadPlayer,
+    pub group: Position,
+    pub pick_rate: u8,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LineupConsensus {
+    pub team: SquadTeam,
+    pub total: usize,
+    pub threshold: usize,
+    pub formation: Option<String>,
+    pub formation_share: u8,
+    pub players: Vec<ConsensusPlayer>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct PublicLineupPage {
     pub team: SquadTeam,
     pub items: Vec<PublicLineupItem>,

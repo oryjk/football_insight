@@ -1,4 +1,4 @@
-use super::public_dto::{CodeDto, LikeDto, ListDto, ListQuery, SharedDto};
+use super::public_dto::{CodeDto, ConsensusDto, LikeDto, ListDto, ListQuery, SharedDto};
 use crate::{
     auth::ports::token_port::TokenPort,
     lineup::{
@@ -30,6 +30,7 @@ type WebError = (StatusCode, String);
 pub fn public_routes(state: Arc<PublicLineupWebState>) -> Router {
     Router::new()
         .route("/api/v1/lineups/teams/{team_id}", get(list))
+        .route("/api/v1/lineups/teams/{team_id}/consensus", get(consensus))
         .route("/api/v1/lineups/shared/{share_code}", get(shared))
         .route(
             "/api/v1/lineups/shared/{share_code}/like",
@@ -106,6 +107,17 @@ async fn shared(
         .shared(&code, viewer)
         .await
         .map(|lineup| Json(lineup.into()))
+        .map_err(map_error)
+}
+async fn consensus(
+    State(state): State<Arc<PublicLineupWebState>>,
+    Path(team_id): Path<i64>,
+) -> Result<Json<ConsensusDto>, WebError> {
+    state
+        .service
+        .consensus(team_id)
+        .await
+        .map(|c| Json(c.into()))
         .map_err(map_error)
 }
 async fn like(
@@ -331,5 +343,28 @@ mod tests {
         ] {
             assert_eq!(map_error(error).0.as_u16(), status);
         }
+    }
+
+    #[tokio::test]
+    async fn consensus_is_anonymous_and_validates_the_team() {
+        let (status, body) = call(true, "GET", "/api/v1/lineups/teams/77680/consensus", None).await;
+        assert_eq!(status, StatusCode::OK);
+        let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(json["team"]["team_id"], 77680);
+        assert_eq!(json["unlocked"], false);
+        assert_eq!(json["threshold"], 10);
+        assert_eq!(json["players"], serde_json::json!([]));
+        assert_eq!(
+            call(true, "GET", "/api/v1/lineups/teams/1/consensus", None)
+                .await
+                .0,
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            call(true, "GET", "/api/v1/lineups/teams/0/consensus", None)
+                .await
+                .0,
+            StatusCode::BAD_REQUEST
+        );
     }
 }
