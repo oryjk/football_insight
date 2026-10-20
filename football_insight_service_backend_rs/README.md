@@ -562,7 +562,7 @@ cargo test --test admin_products_postgres -- --ignored
   - 处理安全模式加密 XML
   - `subscribe` 事件会自动生成或复用一条邀请码
   - 文本指令 `邀请码` 会返回当前可用邀请码
-  - 文本指令 `下一场id` 会调用同机 `127.0.0.1:4000` 的 `ticket-monitor-axum` `/api/matches/current-standard`，并返回 `match_id`
+  - 文本指令 `下一场` / `下一场id` / `2` / `3` 会调用 `ticket-monitor-axum` 的 `/api/matches/current-standard`：V6+ 或本场已购买解锁可查询；从未获取过的公众号身份及账号可免费获取一次，之后恢复原权益校验。存量用户通过迁移统一补记为已获取，会员及付费查询也写入获取记录
   - 通过被动回复把邀请码发回给用户
 
 ## 生产部署

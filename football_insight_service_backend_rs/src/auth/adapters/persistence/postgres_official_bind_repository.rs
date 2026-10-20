@@ -18,8 +18,15 @@ const FIND_CODE_USER_SQL: &str =
 const LOCK_BIND_USER_SQL: &str =
     r#"SELECT official_wechat_open_id FROM f_i_users WHERE id=$1 AND status='active' FOR UPDATE"#;
 const CONSUME_CODE_SQL: &str = r#"UPDATE f_i_wechat_official_bind_codes SET used_at=NOW() WHERE code_hash=$1 AND used_at IS NULL AND expires_at>statement_timestamp() RETURNING user_id"#;
-const UPDATE_OFFICIAL_SQL: &str =
-    r#"UPDATE f_i_users SET official_wechat_open_id=$2 WHERE id=$1 AND status='active'"#;
+const UPDATE_OFFICIAL_SQL: &str = r#"
+UPDATE f_i_users
+SET official_wechat_open_id=$2,
+    official_match_id_received = official_match_id_received OR EXISTS (
+        SELECT 1 FROM f_i_official_match_id_acquisitions
+        WHERE official_open_id=$2 OR official_open_id=f_i_users.official_wechat_open_id
+    )
+WHERE id=$1 AND status='active'
+"#;
 
 pub struct PostgresOfficialBindRepository {
     pool: PgPool,
@@ -98,6 +105,11 @@ impl OfficialBindRepository for PostgresOfficialBindRepository {
             return Ok(ConsumeBindCodeOutcome::Invalid);
         }
         let mut tx = self.pool.begin().await?;
+        // Acquire the shared history lock before user/code row locks, as acquisition and
+        // invited registration do, so a concurrent acquisition cannot lose its account binding.
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('football_insight:official-match-id-history', 0))")
+            .execute(&mut *tx)
+            .await?;
         let Some(user_id) = sqlx::query_scalar::<_, Uuid>(FIND_CODE_USER_SQL)
             .bind(code_hash)
             .fetch_optional(&mut *tx)

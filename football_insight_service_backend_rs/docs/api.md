@@ -157,9 +157,11 @@ The migration only adds catalog/snapshot fields, backfills new catalog metadata 
 
 `/football/wechat/webhook` 的路径、签名及明文/加密封装不变。文字命令去掉全部空白并转小写后，`下一场`、`下一场id`、数字 `2`/`3` 共用门控；`1` 仍为邀请码。
 
-顺序为现有开关 → current-standard 比赛 ID → 公众号身份判定。关闭、无比赛或获取失败继续原缺省回复且不查身份；身份出错 fail closed。有效等级达到 `MATCH_ID_UNLOCK_MINIMUM_TIER` 或已解锁本场才返回 ID，过期等级沿用现有回落规则。ID 解析失败仍可按等级授权，不能按解锁授权。
+顺序为现有开关 → current-standard 比赛 ID → 公众号身份判定。关闭、无比赛或获取失败继续原缺省回复且不查身份；身份或获取记录写入出错 fail closed。有效等级达到 `MATCH_ID_UNLOCK_MINIMUM_TIER` 或已解锁本场可继续查询，过期等级沿用现有回落规则。没有这些权益、且公众号身份及关联账号都从未成功获取过 ID 的用户，可免费获取一次，无需先绑定小程序；用过后同一场或换场都不再免费。ID 解析失败仍可按等级授权，不能按解锁或首次获取授权。
 
-身份端口仅执行一条按 active 账号公众号 openid 读取等级、到期时间及本场解锁的 SELECT；None 比赛 ID 使用 CASE 跳过解锁子查询。无迁移、配置键或系统配置值修改。每次命令记录 `next_match_id_reply decision=...`，不记录 ID/openid 或原始上游错误。
+身份端口按 active 账号公众号 openid 读取等级、到期时间及本场解锁；None 比赛 ID 使用 CASE 跳过解锁子查询。所有成功获取（包含会员和单场解锁）都通过事务写入终身获取记录，并标记该公众号身份关联的全部账号。唯一公众号键和账号行锁确保并发最多一次首次获取，取关重关或自助换绑不重置记录；无比赛、获取失败、身份失败或写入失败不发放免费 ID。每次命令记录 `next_match_id_reply decision=...`，新增 `first_acquisition` 判定，不记录 ID/openid 或原始上游错误。
+
+迁移 `20261020160000_add_official_match_id_acquisitions.sql` 将全部存量账号补记为已获取，并将已有关注者（含取关）、已绑定公众号身份及历史邀请码身份写入 `f_i_official_match_id_acquisitions` 的 historical 记录。新账号默认未获取；这不是按比赛发放的单场解锁，也不授予小程序权益。生产应先应用迁移再部署后端；迁移含存量回填，不应作为日常启动 SQL 重复执行。
 
 ## C 端公众号自助绑定
 

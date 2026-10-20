@@ -17,6 +17,9 @@ use crate::auth::{
 };
 use crate::system_config::domain::public_system_config::parse_membership_tier_rules;
 
+// Shared with official-account acquisition and binding; take before account/invite row locks.
+const OFFICIAL_HISTORY_LOCK_SQL: &str = "SELECT pg_advisory_xact_lock(hashtextextended('football_insight:official-match-id-history', 0))";
+
 const OFFICIAL_BOUND_SQL: &str = r#"SELECT (official_wechat_open_id IS NOT NULL) FROM f_i_users WHERE id=$1 AND status='active'"#;
 
 #[derive(Clone)]
@@ -278,6 +281,9 @@ impl PostgresAuthRepository {
         password_hash: &str,
     ) -> anyhow::Result<RegisteredUser> {
         let mut tx = self.pool.begin().await?;
+        sqlx::query(OFFICIAL_HISTORY_LOCK_SQL)
+            .execute(&mut *tx)
+            .await?;
         Self::validate_unused_invite_code(&mut tx, invite_code).await?;
         let referrer_user_id = Self::resolve_referrer_user_id(&mut tx, referral_code).await?;
         let official_wechat_open_id =
@@ -298,6 +304,11 @@ impl PostgresAuthRepository {
                        password_hash = $3,
                        membership_tier = 'V3',
                        official_wechat_open_id = $4,
+                       official_match_id_received = official_match_id_received OR EXISTS (
+                           SELECT 1 FROM f_i_official_match_id_acquisitions
+                           WHERE official_open_id = $4
+                              OR official_open_id = f_i_users.official_wechat_open_id
+                       ),
                        status = 'active',
                        updated_at = NOW()
                  WHERE id = $1
@@ -373,8 +384,11 @@ impl PostgresAuthRepository {
                 display_name,
                 password_hash,
                 membership_tier,
-                official_wechat_open_id
-            ) VALUES ($1, $2, $3, $4, $5, $6)
+                official_wechat_open_id,
+                official_match_id_received
+            ) VALUES ($1, $2, $3, $4, $5, $6, EXISTS (
+                SELECT 1 FROM f_i_official_match_id_acquisitions WHERE official_open_id = $6
+            ))
             RETURNING id,
                       account_identifier,
                       display_name,
@@ -580,6 +594,9 @@ impl PostgresAuthRepository {
         profile: &WechatOauthProfile,
     ) -> anyhow::Result<RegisteredUser> {
         let mut tx = self.pool.begin().await?;
+        sqlx::query(OFFICIAL_HISTORY_LOCK_SQL)
+            .execute(&mut *tx)
+            .await?;
         Self::validate_unused_invite_code(&mut tx, invite_code).await?;
         let referrer_user_id = Self::resolve_referrer_user_id(&mut tx, referral_code).await?;
         let official_wechat_open_id =
@@ -603,6 +620,11 @@ impl PostgresAuthRepository {
                        password_hash = $6,
                        membership_tier = 'V3',
                        official_wechat_open_id = $7,
+                       official_match_id_received = official_match_id_received OR EXISTS (
+                           SELECT 1 FROM f_i_official_match_id_acquisitions
+                           WHERE official_open_id = $7
+                              OR official_open_id = f_i_users.official_wechat_open_id
+                       ),
                        status = 'active',
                        updated_at = NOW()
                  WHERE id = $1
@@ -689,8 +711,11 @@ impl PostgresAuthRepository {
                 avatar_url,
                 password_hash,
                 membership_tier,
-                official_wechat_open_id
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                official_wechat_open_id,
+                official_match_id_received
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, EXISTS (
+                SELECT 1 FROM f_i_official_match_id_acquisitions WHERE official_open_id = $9
+            ))
             RETURNING id,
                       account_identifier,
                       display_name,
@@ -925,6 +950,9 @@ impl PostgresAuthRepository {
         profile: &WechatOauthProfile,
     ) -> anyhow::Result<RegisteredUser> {
         let mut tx = self.pool.begin().await?;
+        sqlx::query(OFFICIAL_HISTORY_LOCK_SQL)
+            .execute(&mut *tx)
+            .await?;
         Self::validate_unused_invite_code(&mut tx, invite_code).await?;
         let referrer_user_id = Self::resolve_referrer_user_id(&mut tx, referral_code).await?;
         let official_wechat_open_id =
@@ -949,6 +977,11 @@ impl PostgresAuthRepository {
                        avatar_url = $5,
                        membership_tier = 'V3',
                        official_wechat_open_id = $6,
+                       official_match_id_received = official_match_id_received OR EXISTS (
+                           SELECT 1 FROM f_i_official_match_id_acquisitions
+                           WHERE official_open_id = $6
+                              OR official_open_id = f_i_users.official_wechat_open_id
+                       ),
                        status = 'active',
                        updated_at = NOW()
                  WHERE id = $1
@@ -1033,8 +1066,11 @@ impl PostgresAuthRepository {
                 display_name,
                 avatar_url,
                 membership_tier,
-                official_wechat_open_id
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                official_wechat_open_id,
+                official_match_id_received
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, EXISTS (
+                SELECT 1 FROM f_i_official_match_id_acquisitions WHERE official_open_id = $8
+            ))
             RETURNING id,
                       account_identifier,
                       display_name,

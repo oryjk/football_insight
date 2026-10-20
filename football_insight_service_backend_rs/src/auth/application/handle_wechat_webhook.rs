@@ -300,8 +300,6 @@ impl HandleWechatWebhookUseCase {
     }
 
     async fn next_match_reply(&self, official_open_id: &str) -> String {
-        use crate::auth::domain::official_account_match_id_access::OfficialAccountMatchIdAccess;
-
         let (decision, content) = if !self.next_match_reply_enabled().await {
             ("disabled", next_match_missing_message())
         } else {
@@ -311,25 +309,16 @@ impl HandleWechatWebhookUseCase {
                 .await
             {
                 Ok(Some(match_id)) => {
-                    match self
+                    let access = self
                         .official_account_access_port
                         .check(official_open_id, match_id.parse::<i64>().ok())
-                        .await
-                    {
-                        Ok(OfficialAccountMatchIdAccess::Granted) => {
-                            ("granted", next_match_id_message(&match_id))
+                        .await;
+                    match access {
+                        Ok(access) => {
+                            self.match_id_access_reply(official_open_id, &match_id, access)
+                                .await
                         }
-                        Ok(OfficialAccountMatchIdAccess::NotMember) => {
-                            ("not_member", next_match_not_member_message())
-                        }
-                        Ok(OfficialAccountMatchIdAccess::Unrecognized) => {
-                            ("unrecognized", next_match_unrecognized_message())
-                        }
-                        Err(_) => {
-                            // Provider errors may contain identifiers; never log their raw text.
-                            tracing::warn!("failed to confirm official-account membership");
-                            ("error", next_match_identity_error_message())
-                        }
+                        Err(_) => next_match_access_error(),
                     }
                 }
                 Ok(None) => ("no_match", next_match_missing_message()),
@@ -341,6 +330,37 @@ impl HandleWechatWebhookUseCase {
         };
         tracing::info!(decision = %decision, "next_match_id_reply");
         content
+    }
+
+    async fn match_id_access_reply(
+        &self,
+        official_open_id: &str,
+        match_id: &str,
+        access: crate::auth::domain::official_account_match_id_access::OfficialAccountMatchIdAccess,
+    ) -> (&'static str, String) {
+        use crate::auth::domain::official_account_match_id_access::OfficialAccountMatchIdAccess;
+        let entitled = access == OfficialAccountMatchIdAccess::Granted;
+        // Invalid source IDs cannot consume a first acquisition. Preserve existing member replies.
+        let can_record = entitled || match_id.parse::<i64>().is_ok_and(|id| id > 0);
+        if can_record {
+            match self
+                .official_account_access_port
+                .record_acquisition(official_open_id, !entitled)
+                .await
+            {
+                Ok(true) if entitled => return ("granted", next_match_id_message(match_id)),
+                Ok(true) => return ("first_acquisition", next_match_first_id_message(match_id)),
+                Ok(false) if !entitled => {}
+                // Any storage failure must withhold the ID, including a refused entitled write.
+                _ => return next_match_access_error(),
+            }
+        }
+        match access {
+            OfficialAccountMatchIdAccess::Unrecognized => {
+                ("unrecognized", next_match_unrecognized_message())
+            }
+            _ => ("not_member", next_match_not_member_message()),
+        }
     }
 
     async fn invite_code_message(&self, invite_code: &str) -> String {
@@ -449,6 +469,18 @@ fn next_match_id_message(match_id: &str) -> String {
     with_product_intro(format!(
         "【足球洞察】当前比赛信息\n\n当前下一场比赛 match_id：{match_id}\n\n常用指令：\n- 回复“邀请码”或“1”获取注册邀请码\n- 回复“下一场”或“2”再次查询\n- 回复“下一场id”或“3”再次查询"
     ))
+}
+
+fn next_match_first_id_message(match_id: &str) -> String {
+    with_product_intro(format!(
+        "【足球洞察】当前比赛信息\n\n当前下一场比赛 match_id：{match_id}\n\n这是你首次获取比赛 ID，本次免费。每位用户仅有一次免费机会，后续查询需开通 V6 及以上会员。\n\n开通方式：打开小程序「足球洞察」，在「我的」页点会员卡上的「升级」。\n\n常用指令：\n- 回复“邀请码”或“1”获取注册邀请码"
+    ))
+}
+
+fn next_match_access_error() -> (&'static str, String) {
+    // Provider errors may contain identifiers; never log their raw text.
+    tracing::warn!("failed to confirm or record official-account match id access");
+    ("error", next_match_identity_error_message())
 }
 
 fn next_match_not_member_message() -> String {
@@ -1384,6 +1416,8 @@ mod tests {
         requires_match: bool,
         fail: bool,
         calls: Mutex<Vec<Option<i64>>>,
+        first_acquisition: Mutex<bool>,
+        record_fail: bool,
     }
 
     impl GateAccessFake {
@@ -1396,6 +1430,8 @@ mod tests {
                 requires_match,
                 fail: false,
                 calls: Mutex::new(Vec::new()),
+                first_acquisition: Mutex::new(false),
+                record_fail: false,
             }
         }
     }
@@ -1417,6 +1453,23 @@ mod tests {
             } else {
                 self.decision
             })
+        }
+
+        async fn record_acquisition(
+            &self,
+            official_open_id: &str,
+            require_first: bool,
+        ) -> anyhow::Result<bool> {
+            assert_eq!(official_open_id, "openid_123");
+            if self.record_fail {
+                anyhow::bail!("storage failure: 987654321 openid_123");
+            }
+            let mut first = self.first_acquisition.lock().unwrap();
+            let granted = !require_first || *first;
+            if granted {
+                *first = false;
+            }
+            Ok(granted)
         }
     }
 
@@ -1552,6 +1605,161 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn first_time_follower_can_receive_one_match_id_without_membership() {
+        let access = Arc::new(GateAccessFake::result(
+            OfficialAccountMatchIdAccess::Unrecognized,
+            false,
+        ));
+        *access.first_acquisition.lock().unwrap() = true;
+        let use_case = HandleWechatWebhookUseCase::new(
+            Arc::new(FakeRepository::default()),
+            Arc::new(FakeCryptoPort),
+            Arc::new(GateMatchFake {
+                id: Some("987654321"),
+                fail: false,
+            }),
+            Arc::new(next_match_enabled_config()),
+            access.clone(),
+        );
+        let reply = use_case.next_match_reply("openid_123").await;
+        assert!(
+            reply.contains("987654321"),
+            "a first-time follower should receive the ID"
+        );
+        assert!(reply.contains("免费"));
+        assert!(reply.contains("V6"));
+        for command in ["下一场", "下一场id", "2", "3"] {
+            let reply = use_case
+                .handle_message(WechatMessageInput {
+                    signature: "sig".into(),
+                    timestamp: "1".into(),
+                    nonce: "2".into(),
+                    body: command.into(),
+                })
+                .await
+                .unwrap()
+                .unwrap();
+            assert!(
+                !reply.contains("987654321"),
+                "a second query cannot receive the ID: {command}"
+            );
+        }
+        let next_match = HandleWechatWebhookUseCase::new(
+            Arc::new(FakeRepository::default()),
+            Arc::new(FakeCryptoPort),
+            Arc::new(GateMatchFake {
+                id: Some("987654322"),
+                fail: false,
+            }),
+            Arc::new(next_match_enabled_config()),
+            access,
+        );
+        assert!(
+            !next_match
+                .next_match_reply("openid_123")
+                .await
+                .contains("987654322")
+        );
+    }
+
+    #[tokio::test]
+    async fn first_id_is_available_for_bound_nonmembers_and_both_message_modes() {
+        for outcome in [
+            OfficialAccountMatchIdAccess::Unrecognized,
+            OfficialAccountMatchIdAccess::NotMember,
+        ] {
+            for command in ["下一场", "下一场id", "2", "3", " 下 一 场 ID "] {
+                for plain in [true, false] {
+                    let access = Arc::new(GateAccessFake::result(outcome, false));
+                    *access.first_acquisition.lock().unwrap() = true;
+                    let use_case = HandleWechatWebhookUseCase::new(
+                        Arc::new(FakeRepository::default()),
+                        Arc::new(FakeCryptoPort),
+                        Arc::new(GateMatchFake {
+                            id: Some("987654321"),
+                            fail: false,
+                        }),
+                        Arc::new(next_match_enabled_config()),
+                        access,
+                    );
+                    let body = if plain {
+                        format!("<xml><Content><![CDATA[{command}]]></Content></xml>")
+                    } else {
+                        command.into()
+                    };
+                    let reply = use_case
+                        .handle_message(WechatMessageInput {
+                            signature: "sig".into(),
+                            timestamp: "1".into(),
+                            nonce: "2".into(),
+                            body,
+                        })
+                        .await
+                        .unwrap()
+                        .unwrap();
+                    assert!(
+                        reply.contains("987654321")
+                            && reply.contains("首次")
+                            && reply.contains("免费")
+                    );
+                    assert!(reply.starts_with(if plain { "plain::" } else { "encrypted::" }));
+                    assert!(reply.contains("产品介绍"));
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn acquisition_errors_withhold_id_and_invalid_source_does_not_consume_first_id() {
+        for outcome in [
+            OfficialAccountMatchIdAccess::Granted,
+            OfficialAccountMatchIdAccess::NotMember,
+            OfficialAccountMatchIdAccess::Unrecognized,
+        ] {
+            let mut access = GateAccessFake::result(outcome, false);
+            access.record_fail = true;
+            *access.first_acquisition.lock().unwrap() = true;
+            let use_case = HandleWechatWebhookUseCase::new(
+                Arc::new(FakeRepository::default()),
+                Arc::new(FakeCryptoPort),
+                Arc::new(GateMatchFake {
+                    id: Some("987654321"),
+                    fail: false,
+                }),
+                Arc::new(next_match_enabled_config()),
+                Arc::new(access),
+            );
+            let reply = use_case.next_match_reply("openid_123").await;
+            assert!(!reply.contains("987654321") && !reply.contains("openid_123"));
+            assert!(reply.contains("稍后"));
+        }
+        let access = Arc::new(GateAccessFake::result(
+            OfficialAccountMatchIdAccess::NotMember,
+            false,
+        ));
+        *access.first_acquisition.lock().unwrap() = true;
+        for id in ["not-numeric-match", "", "0", "-1"] {
+            let use_case = HandleWechatWebhookUseCase::new(
+                Arc::new(FakeRepository::default()),
+                Arc::new(FakeCryptoPort),
+                Arc::new(GateMatchFake {
+                    id: Some(id),
+                    fail: false,
+                }),
+                Arc::new(next_match_enabled_config()),
+                access.clone(),
+            );
+            assert!(
+                !use_case
+                    .next_match_reply("openid_123")
+                    .await
+                    .contains("本次免费")
+            );
+            assert!(*access.first_acquisition.lock().unwrap());
+        }
+    }
+
+    #[tokio::test]
     async fn next_match_gate_skips_identity_for_disabled_missing_and_fetch_failure() {
         for scenario in ["disabled", "config_error", "missing", "fetch_error"] {
             let access = Arc::new(GateAccessFake::granted());
@@ -1598,6 +1806,38 @@ mod tests {
             assert!(access.calls.lock().unwrap().is_empty(), "{scenario}");
             assert_eq!(match_port.calls(), 0, "{scenario}");
         }
+    }
+
+    #[tokio::test]
+    async fn missing_match_and_failed_lookup_leave_the_first_acquisition_available() {
+        let access = Arc::new(GateAccessFake::result(
+            OfficialAccountMatchIdAccess::Unrecognized,
+            false,
+        ));
+        *access.first_acquisition.lock().unwrap() = true;
+        for (id, fail) in [(None, false), (None, true)] {
+            let use_case = HandleWechatWebhookUseCase::new(
+                Arc::new(FakeRepository::default()),
+                Arc::new(FakeCryptoPort),
+                Arc::new(GateMatchFake { id, fail }),
+                Arc::new(next_match_enabled_config()),
+                access.clone(),
+            );
+            let reply = use_case.next_match_reply("openid_123").await;
+            assert!(reply.contains("暂未获取到"));
+        }
+        let use_case = HandleWechatWebhookUseCase::new(
+            Arc::new(FakeRepository::default()),
+            Arc::new(FakeCryptoPort),
+            Arc::new(GateMatchFake {
+                id: Some("987654321"),
+                fail: false,
+            }),
+            Arc::new(next_match_enabled_config()),
+            access,
+        );
+        let reply = use_case.next_match_reply("openid_123").await;
+        assert!(reply.contains("987654321") && reply.contains("本次免费"));
     }
 
     #[tokio::test]
@@ -1648,9 +1888,11 @@ mod tests {
         );
         for scenario in [
             "granted",
+            "first_acquisition",
             "not_member",
             "unrecognized",
             "error",
+            "record_error",
             "disabled",
             "no_match",
             "fetch_error",
@@ -1659,11 +1901,13 @@ mod tests {
             bytes.lock().unwrap().clear();
             let outcome = match scenario {
                 "not_member" => OfficialAccountMatchIdAccess::NotMember,
-                "unrecognized" => OfficialAccountMatchIdAccess::Unrecognized,
+                "unrecognized" | "first_acquisition" => OfficialAccountMatchIdAccess::Unrecognized,
                 _ => OfficialAccountMatchIdAccess::Granted,
             };
             let mut access = GateAccessFake::result(outcome, false);
             access.fail = scenario == "error";
+            access.record_fail = scenario == "record_error";
+            *access.first_acquisition.lock().unwrap() = scenario == "first_acquisition";
             let current = Arc::new(GateMatchFake {
                 id: if scenario == "no_match" {
                     None
@@ -1687,7 +1931,7 @@ mod tests {
             let reply = use_case.next_match_reply("openid_123").await;
             assert_eq!(
                 reply.contains("987654321"),
-                scenario == "granted",
+                matches!(scenario, "granted" | "first_acquisition"),
                 "{scenario}"
             );
             let logs = String::from_utf8(bytes.lock().unwrap().clone()).unwrap();
@@ -1699,6 +1943,7 @@ mod tests {
             let expected = match scenario {
                 "fetch_error" => "no_match",
                 "config_error" => "disabled",
+                "record_error" => "error",
                 _ => scenario,
             };
             assert!(
