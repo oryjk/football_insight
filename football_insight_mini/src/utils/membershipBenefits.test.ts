@@ -13,6 +13,11 @@ describe('resolveMembershipBenefitsLocked', () => {
     expect(resolveMembershipBenefitsLocked({ membership_benefits_enabled: true })).toBe(false)
     expect(resolveMembershipBenefitsLocked({ membership_benefits_enabled: false })).toBe(true)
   })
+
+  test('requires binding for a non-paying unbound account even when the old benefits flag allows access', () => {
+    expect(resolveMembershipBenefitsLocked({ membership_benefits_enabled: true, official_wechat_binding_required: true })).toBe(true)
+    expect(resolveMembershipBenefitsLocked({ membership_benefits_enabled: true, official_wechat_binding_required: false })).toBe(false)
+  })
 })
 
 describe('buildMembershipBenefitItems', () => {

@@ -1,5 +1,5 @@
 <template>
-  <page-meta :page-style="navigationPageStyle" />
+  <page-meta :page-style="pageStyle" />
   <view class="page-root">
     <FiBrandNav />
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
@@ -63,7 +63,7 @@
 
                   <InsightsLockedPanel v-else-if="!currentUser" mode="guest" />
 
-                  <InsightsLockedPanel v-else-if="membershipBenefitsLocked" mode="membership" @action="goToUserPage" />
+                  <InsightsLockedPanel v-else-if="membershipBenefitsLocked" :mode="officialBindingRequired ? 'binding' : 'membership'" @action="officialBindingRequired ? officialBind.open() : goToUserPage()" />
 
                   <InsightsSkeleton
                     v-else-if="loading"
@@ -113,11 +113,26 @@
       </view>
     </view>
 
+    <FiOfficialBindSheet
+      :visible="officialBind.visible.value"
+      :code="officialBind.code.value"
+      :remaining-seconds="officialBind.remainingSeconds.value"
+      :loading="officialBind.loading.value"
+      :error="officialBind.error.value"
+      @close="officialBind.close"
+      @get-code="officialBind.getCode"
+      @copy="officialBind.copyCode"
+      @open-official="openUserOfficialAccount"
+    />
     <FiLoginFloat v-if="showLoginFloat" :desc="systemConfigUnderReview ? '登录后，可以关注主队并参与赛前助力。' : undefined" @action="goToLogin" />
   </view>
 </template>
 
 <script setup lang="ts">
+import FiOfficialBindSheet from '../../components/FiOfficialBindSheet.vue'
+import { createOfficialBindingGate } from '../../composables/officialBindingGate'
+import { openUserOfficialAccount } from '../../utils/officialAccountNavigation'
+
 import { buildSharePath } from '../../utils/shareSource'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { anchorTabsToTop } from '../../composables/useTabAnchor'
@@ -240,6 +255,9 @@ const {
   isMembershipLocked: () => membershipBenefitsLocked.value,
   selectedTeamId,
 })
+const officialBind = createOfficialBindingGate(session, systemConfigUnderReview, computed(() => !userLoading.value && outlookReviewReady.value))
+const officialBindingRequired = computed(() => currentUser.value?.official_wechat_binding_required === true)
+const pageStyle = computed(() => `${navigationPageStyle.value};${officialBind.visible.value ? 'overflow: hidden;' : ''}`)
 const outlookLoader = createOutlookLoader({
   authenticated: () => Boolean(currentUser.value),
   identity: () => currentUser.value,
@@ -255,8 +273,8 @@ const {
   loading: outlookLoading,
   error: outlookError,
 } = outlookLoader
-onUnload(() => { outlookLoader.dispose(); tactics.dispose(); transfer.dispose(); teamBrowser.dispose() })
-onHide(() => { pageVisible.value = false })
+onUnload(() => { outlookLoader.dispose(); tactics.dispose(); transfer.dispose(); teamBrowser.dispose(); officialBind.dispose() })
+onHide(() => { pageVisible.value = false; officialBind.handlePageHide() })
 onReachBottom(() => { if (mainTab.value === 'tactics') void tactics.more() })
 
 const showLoginFloat = computed(() => mainTab.value === 'data' && !userLoading.value && !currentUser.value)
@@ -357,6 +375,8 @@ function openTicketWatch(): void {
     return
   }
 
+  if (officialBindingRequired.value) { officialBind.open(); return }
+
   if (membershipBenefitsLocked.value) {
     uni.showToast({
       title: '当前账号已取关公众号，会员权益已暂停',
@@ -408,6 +428,7 @@ function retryTacticsList(): void {
 }
 
 onShow(async () => {
+  void officialBind.handlePageShow()
   pageVisible.value = true
   void teamBrowser.load()
   void tactics.refresh()

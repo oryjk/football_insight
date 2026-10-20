@@ -18,8 +18,9 @@
         ><text>当前版本展示基础内容。</text></view
       >
       <TicketMembershipLock
+        :binding-required="officialBindingRequired"
         v-else-if="membershipBenefitsLocked"
-        @login="goToUserPage"
+        @login="officialBindingRequired ? officialBind.open() : goToUserPage()"
       />
       <view v-else-if="activeTab === 'current'" class="board-content">
         <TicketBoardSkeleton v-if="currentLoading" mode="current" :show-tabs="false" />
@@ -239,14 +240,29 @@
       @pay="payForMatchId"
       @upgrade="handleMatchIdSheetUpgrade"
     />
+    <FiOfficialBindSheet
+      :visible="officialBind.visible.value"
+      :code="officialBind.code.value"
+      :remaining-seconds="officialBind.remainingSeconds.value"
+      :loading="officialBind.loading.value"
+      :error="officialBind.error.value"
+      @close="officialBind.close"
+      @get-code="officialBind.getCode"
+      @copy="officialBind.copyCode"
+      @open-official="openUserOfficialAccount"
+    />
   </view>
   <view v-else class="page page--entry-mask" />
 </template>
 
 <script setup lang="ts">
+import FiOfficialBindSheet from '../../components/FiOfficialBindSheet.vue'
+import { createOfficialBindingGate } from '../../composables/officialBindingGate'
+import { openUserOfficialAccount } from '../../utils/officialAccountNavigation'
+
 import { buildSharePath, buildShareQuery } from '../../utils/shareSource'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
-import { computed, nextTick, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import {
@@ -369,8 +385,11 @@ const {
   toggleCurrentSectionCollapsed,
   toggleHistorySectionCollapsed,
 } = state
-const pageStyle = computed(() => `${navigationPageStyle.value};${matchIdSheetVisible.value ? 'overflow: hidden;' : ''}`)
+const pageStyle = computed(() => `${navigationPageStyle.value};${matchIdSheetVisible.value || officialBind.visible.value ? 'overflow: hidden;' : ''}`)
 const session = useAppSession()
+const bindingStateReady = ref(false)
+const officialBind = createOfficialBindingGate(session, systemConfigUnderReview, bindingStateReady)
+const officialBindingRequired = computed(() => currentUser.value?.official_wechat_binding_required === true)
 const bestWindows = useTicketWatchBestWindows({
   revision: session.revision,
   underReview: systemConfigUnderReview,
@@ -458,7 +477,7 @@ const sessionSync = createTicketWatchSessionSync(state, session, {
   isPageVisible: isTicketWatchPageVisible,
 })
 
-watch(session.revision, () => {
+watch([session.revision, session.currentUser], () => {
   sessionSync.handleSessionRevisionChange()
 })
 
@@ -552,6 +571,8 @@ onShareTimeline(() => ({
     ? 'ticket_history' : 'ticket_current'),
 }))
 onShow(() => {
+  bindingStateReady.value = false
+  void officialBind.handlePageShow()
   reportPageActivity('ticket_watch')
   beginPaywallVisit()
   reportRecentRefluxLockImpression()
@@ -581,6 +602,7 @@ onShow(() => {
     if (!isCurrentShow()) {
       return
     }
+    bindingStateReady.value = true
     void bestWindows.show()
     if (membershipBenefitsLocked.value) {
       stopPolling()
@@ -603,6 +625,7 @@ onReady(() => {
 })
 
 onHide(() => {
+  officialBind.handlePageHide()
   bestWindows.hide()
   pageVisible = false
   isPageVisible.value = false
@@ -611,6 +634,7 @@ onHide(() => {
 })
 
 onUnload(() => {
+  officialBind.dispose()
   bestWindows.hide()
   pageVisible = false
   isPageVisible.value = false

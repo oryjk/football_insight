@@ -1543,6 +1543,26 @@ impl StoredAuthUserRow {
 
 #[async_trait]
 impl AuthRepository for PostgresAuthRepository {
+    async fn official_wechat_binding_required(
+        &self,
+        user_id: Uuid,
+    ) -> anyhow::Result<Option<bool>> {
+        let row = sqlx::query_as::<_, (bool, String, Option<DateTime<Utc>>)>(
+            "SELECT official_wechat_open_id IS NOT NULL, membership_origin, membership_expires_at
+             FROM f_i_users WHERE id=$1 AND status='active'",
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|(bound, origin, expiry)| {
+            crate::auth::domain::user::requires_official_wechat_binding(
+                bound,
+                &origin,
+                expiry,
+                Utc::now(),
+            )
+        }))
+    }
     async fn register_user(&self, request: UserRegistration<'_>) -> anyhow::Result<RegisteredUser> {
         match (request.identity, request.invite_code) {
             (

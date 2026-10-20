@@ -86,7 +86,9 @@ export function useTicketWatchPolling(
 
     if (membershipBenefitsLocked.value) {
       uni.showToast({
-        title: '当前账号已取关公众号，会员权益已暂停',
+        title: state.currentUser.value?.official_wechat_binding_required === true
+          ? '请先绑定公众号后使用会员功能'
+          : '当前账号已取关公众号，会员权益已暂停',
         icon: 'none',
         duration: 2200,
       })

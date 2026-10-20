@@ -82,6 +82,17 @@ pub fn resolve_membership_benefits_enabled(
     has_active_follow.unwrap_or(false)
 }
 
+pub fn requires_official_wechat_binding(
+    bound: bool,
+    membership_origin: &str,
+    expires_at: Option<DateTime<Utc>>,
+    now: DateTime<Utc>,
+) -> bool {
+    let active_purchase =
+        membership_origin == "purchase" && expires_at.is_none_or(|expiry| expiry > now);
+    !bound && !active_purchase
+}
+
 pub fn resolve_effective_membership_tier(
     membership_tier: &str,
     membership_expires_at: Option<DateTime<Utc>>,
@@ -99,6 +110,40 @@ mod tests {
     use chrono::{TimeZone, Utc};
 
     use super::{resolve_effective_membership_tier, resolve_membership_benefits_enabled};
+
+    #[test]
+    fn only_active_purchase_memberships_are_exempt_from_official_binding() {
+        let now = Utc.with_ymd_and_hms(2026, 10, 20, 12, 0, 0).unwrap();
+        for (bound, origin, expiry, required) in [
+            (
+                false,
+                "referral",
+                Some(now + chrono::Duration::days(1)),
+                true,
+            ),
+            (false, "unknown", None, true),
+            (
+                false,
+                "purchase",
+                Some(now + chrono::Duration::seconds(1)),
+                false,
+            ),
+            (false, "purchase", None, false),
+            (false, "purchase", Some(now), true),
+            (
+                false,
+                "purchase",
+                Some(now - chrono::Duration::seconds(1)),
+                true,
+            ),
+            (true, "unknown", None, false),
+        ] {
+            assert_eq!(
+                super::requires_official_wechat_binding(bound, origin, expiry, now),
+                required
+            );
+        }
+    }
 
     #[test]
     fn membership_benefits_stay_enabled_without_official_binding() {

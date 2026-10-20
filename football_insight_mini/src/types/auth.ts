@@ -12,6 +12,7 @@ export interface CurrentUser {
   avatar_url: string | null
   has_wechat_binding: boolean
   official_wechat_bound?: boolean
+  official_wechat_binding_required?: boolean
   membership_tier: string
   membership_expires_at?: string | null
   membership_benefits_enabled?: boolean

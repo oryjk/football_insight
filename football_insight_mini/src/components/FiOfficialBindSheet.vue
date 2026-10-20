@@ -9,7 +9,7 @@
     @update:visible="emit('close')"
   >
     <view class="official-bind">
-      <text class="official-bind__summary">绑定一次，之后可在公众号里查询下一场比赛 ID。</text>
+      <text class="official-bind__summary">绑定后可使用对应等级的会员功能，并在公众号查询下一场比赛 ID。</text>
       <view v-if="code" class="official-bind__code-card">
         <text class="official-bind__code">{{ code }}</text>
         <text class="official-bind__caption">{{ remainingSeconds > 0 ? `剩余 ${countdown}` : '绑定码已过期，请重新获取' }}</text>
@@ -34,8 +34,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import FiBottomSheet from '../../../components/FiBottomSheet.vue'
-import { formatOfficialWechatBindCountdown } from '../helpers'
+import FiBottomSheet from './FiBottomSheet.vue'
+import { formatOfficialWechatBindCountdown } from '../utils/officialAccountBinding'
 
 const props = defineProps<{
   visible: boolean

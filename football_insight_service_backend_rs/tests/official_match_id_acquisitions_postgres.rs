@@ -48,6 +48,7 @@ impl Database {
             "CREATE TABLE f_i_users (
                 id UUID PRIMARY KEY, official_wechat_open_id VARCHAR(128),
                 membership_tier TEXT NOT NULL DEFAULT 'V1', membership_expires_at TIMESTAMPTZ,
+                membership_origin TEXT NOT NULL DEFAULT 'unknown',
                 status TEXT NOT NULL DEFAULT 'active'
              );
              CREATE TABLE f_i_wechat_followers (
@@ -94,6 +95,47 @@ impl Database {
             .unwrap();
         self.admin.close().await;
     }
+}
+
+#[tokio::test]
+#[ignore = "requires explicit disposable localhost PostgreSQL database"]
+async fn unbound_accounts_require_official_binding_except_active_purchase_memberships() {
+    use football_insight_service_backend_rs::auth::{
+        adapters::persistence::postgres_auth_repository::PostgresAuthRepository,
+        ports::auth_repository::AuthRepository,
+    };
+    let db = Database::new().await;
+    let repository = PostgresAuthRepository::new(db.pool.clone());
+    for tier in ["V1", "V3", "V6", "V9"] {
+        for (origin, expiry, bound, required) in [
+            ("unknown", None, false, true),
+            ("referral", Some(1), false, true),
+            ("purchase", Some(1), false, false),
+            ("purchase", None, false, false),
+            ("purchase", Some(-1), false, true),
+            ("referral", None, true, false),
+        ] {
+            let user = db.user(bound.then_some("bound-account"), tier).await;
+            sqlx::query("UPDATE f_i_users SET membership_origin=$2,membership_expires_at=CASE WHEN $3::int IS NULL THEN NULL ELSE NOW()+$3*INTERVAL '1 day' END WHERE id=$1")
+                .bind(user).bind(origin).bind(expiry).execute(&db.pool).await.unwrap();
+            assert_eq!(
+                repository
+                    .official_wechat_binding_required(user)
+                    .await
+                    .unwrap(),
+                Some(required),
+                "tier={tier},origin={origin},expiry={expiry:?},bound={bound}"
+            );
+        }
+    }
+    assert_eq!(
+        repository
+            .official_wechat_binding_required(Uuid::new_v4())
+            .await
+            .unwrap(),
+        None
+    );
+    db.close().await;
 }
 
 #[tokio::test]

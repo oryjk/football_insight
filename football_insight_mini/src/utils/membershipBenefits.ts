@@ -3,12 +3,13 @@ import { resolveMembershipTierGuide } from './membershipRules'
 
 export interface MembershipBenefitsViewer {
   membership_benefits_enabled?: boolean
+  official_wechat_binding_required?: boolean
 }
 
 export function resolveMembershipBenefitsLocked(
   viewer: MembershipBenefitsViewer | null | undefined,
 ): boolean {
-  return viewer?.membership_benefits_enabled === false
+  return viewer?.official_wechat_binding_required === true || viewer?.membership_benefits_enabled === false
 }
 
 export interface MembershipBenefitItem {

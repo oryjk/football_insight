@@ -223,6 +223,12 @@ pub trait AuthRepository: Send + Sync {
     async fn official_wechat_bound(&self, _user_id: Uuid) -> anyhow::Result<Option<bool>> {
         Ok(None)
     }
+    async fn official_wechat_binding_required(
+        &self,
+        _user_id: Uuid,
+    ) -> anyhow::Result<Option<bool>> {
+        Ok(None)
+    }
     async fn record_user_login(&self, user_id: Uuid) -> anyhow::Result<()> {
         let _ = user_id;
         Ok(())

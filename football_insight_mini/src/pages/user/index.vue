@@ -132,7 +132,7 @@ import UserAccountInfoPanel from './components/UserAccountInfoPanel.vue'
 import UserPasswordLoginSheet from './components/UserPasswordLoginSheet.vue'
 import UserWechatBindSheet from './components/UserWechatBindSheet.vue'
 import UserNotificationEmailSheet from './components/UserNotificationEmailSheet.vue'
-import UserOfficialBindSheet from './components/UserOfficialBindSheet.vue'
+import UserOfficialBindSheet from '../../components/FiOfficialBindSheet.vue'
 import UserH5TestLoginPanel from './components/UserH5TestLoginPanel.vue'
 import badgeCheckIcon from '../../static/user/badge-check.svg'
 import calendarDaysIcon from '../../static/user/calendar-days.svg'
@@ -146,8 +146,8 @@ import { useRuntimeConfig } from '../../stores/runtimeConfig'
 import { reportPageActivity } from '../../utils/userActivity'
 import { beginPaywallVisit, reportPaywallImpression, reportPaywallTap } from '../../composables/usePaywallTelemetry'
 import { createUserAccountEffects } from './accountEffects'
-import { createUserOfficialBindFlow } from './officialBindFlow'
-import { openUserOfficialAccount } from './officialAccountNavigation'
+import { createOfficialBindingGate } from '../../composables/officialBindingGate'
+import { openUserOfficialAccount } from '../../utils/officialAccountNavigation'
 import { createUserLoginFlow, type MiniWechatBindForm } from './loginFlow'
 import {
   buildUserAccountInfoItems,
@@ -180,7 +180,7 @@ const publicConfig = runtimeConfig.config
 const miniReview = useMiniReviewStatus()
 // 生产构建查询期间保留会员展示限制；开发构建放开，登录和认证始终独立。
 const systemConfigUnderReview = miniReview.shouldRestrictFeatures
-const officialBind = createUserOfficialBindFlow(session, systemConfigUnderReview)
+const officialBind = createOfficialBindingGate(session, systemConfigUnderReview, computed(() => !loading.value))
 const {
   visible: officialBindVisible,
   code: officialBindCode,
@@ -190,27 +190,8 @@ const {
   canOpen: canOpenOfficialBind,
 } = officialBind
 const pageStyle = computed(() => `${navigationPageStyle.value};${officialBindVisible.value ? 'overflow: hidden;' : ''}`)
-let officialBindTimer: ReturnType<typeof setInterval> | null = null
-function stopOfficialBindTimer(): void {
-  if (officialBindTimer !== null) clearInterval(officialBindTimer)
-  officialBindTimer = null
-}
-function syncOfficialBindTimer(): void {
-  stopOfficialBindTimer()
-  officialBind.refreshCountdown()
-  if (officialBindVisible.value) {
-    officialBindTimer = setInterval(officialBind.refreshCountdown, 1000)
-  }
-}
-watch(officialBindVisible, syncOfficialBindTimer)
-onHide(() => {
-  stopOfficialBindTimer()
-  officialBind.handlePageHide()
-})
-onUnmounted(() => {
-  stopOfficialBindTimer()
-  officialBind.dispose()
-})
+onHide(officialBind.handlePageHide)
+onUnmounted(officialBind.dispose)
 const notificationEmail = ref('')
 const notificationEmailSheetVisible = ref(false)
 const notificationEmailSaving = ref(false)
@@ -429,7 +410,6 @@ async function handleH5TestLoginSelect(user: H5TestLoginUser): Promise<void> {
 }
 
 onShow(() => {
-  syncOfficialBindTimer()
   void officialBind.handlePageShow()
   reportPageActivity('user')
   beginPaywallVisit()

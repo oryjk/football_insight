@@ -21,8 +21,8 @@ use crate::auth::{
             BindWechatMiniProgramAccountInput, BindWechatMiniProgramAccountUseCase,
         },
         get_current_user::GetCurrentUserUseCase,
-        login_with_mini_wechat::{CompleteMiniWechatLoginInput, CompleteMiniWechatLoginUseCase},
         login_as_h5_test_user::LoginAsH5TestUserUseCase,
+        login_with_mini_wechat::{CompleteMiniWechatLoginInput, CompleteMiniWechatLoginUseCase},
         login_with_password::{LoginInput, LoginWithPasswordUseCase},
         login_with_wechat::{
             CompleteWechatLoginInput, CompleteWechatLoginUseCase, WechatLoginResult,
@@ -182,8 +182,16 @@ pub async fn get_current_user_handler(
             tracing::warn!("failed to read official-account binding status");
             None
         });
+    let binding_required = use_case
+        .official_wechat_binding_required(user.id)
+        .await
+        .unwrap_or_else(|_| {
+            tracing::warn!("failed to read official-account binding requirement");
+            None
+        });
     let mut dto = CurrentUserDto::from(user);
     dto.official_wechat_bound = official_wechat_bound;
+    dto.official_wechat_binding_required = binding_required;
     Ok(Json(dto))
 }
 
@@ -326,10 +334,7 @@ pub async fn h5_test_login_users_handler(
         return Err((StatusCode::FORBIDDEN, "H5 测试登录未开放".to_string()));
     }
 
-    let users = use_case
-        .list_users()
-        .await
-        .map_err(map_auth_error)?;
+    let users = use_case.list_users().await.map_err(map_auth_error)?;
 
     Ok(Json(H5TestLoginUsersResponseDto {
         items: users
@@ -353,19 +358,19 @@ pub async fn h5_test_login_handler(
 
     let user_id = uuid::Uuid::parse_str(&request.user_id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "用户 ID 无效".to_string()))?;
-    let result = use_case
-        .execute(user_id)
-        .await
-        .map_err(|error| {
-            let message = error.to_string();
-            if message.contains("not available") {
-                (StatusCode::FORBIDDEN, "该用户不在 H5 测试登录白名单内".to_string())
-            } else if message.contains("not found") {
-                (StatusCode::NOT_FOUND, "用户不存在或已停用".to_string())
-            } else {
-                (StatusCode::INTERNAL_SERVER_ERROR, message)
-            }
-        })?;
+    let result = use_case.execute(user_id).await.map_err(|error| {
+        let message = error.to_string();
+        if message.contains("not available") {
+            (
+                StatusCode::FORBIDDEN,
+                "该用户不在 H5 测试登录白名单内".to_string(),
+            )
+        } else if message.contains("not found") {
+            (StatusCode::NOT_FOUND, "用户不存在或已停用".to_string())
+        } else {
+            (StatusCode::INTERNAL_SERVER_ERROR, message)
+        }
+    })?;
 
     Ok(Json(result.into()))
 }

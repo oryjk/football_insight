@@ -36,25 +36,25 @@
         <view class="insights-locked__summary">
           <view class="insights-locked__metric">
             <text>洞察权限</text>
-            <text class="insights-locked__metric-value">暂停</text>
-            <text>取关后自动冻结</text>
+            <text class="insights-locked__metric-value">{{ mode === 'binding' ? '待绑定' : '暂停' }}</text>
+            <text>{{ mode === 'binding' ? '绑定公众号后使用' : '取关后自动冻结' }}</text>
           </view>
           <view class="insights-locked__metric">
             <text>恢复方式</text>
-            <text class="insights-locked__metric-value">重新关注</text>
+            <text class="insights-locked__metric-value">{{ mode === 'binding' ? '绑定公众号' : '重新关注' }}</text>
             <text>返回这里刷新即可</text>
           </view>
         </view>
       </view>
 
       <view class="insights-lock-overlay">
-        <view v-if="mode === 'membership'" class="insights-lock-overlay__card">
-          <text class="section-kicker">会员权益已暂停</text>
-          <text class="insights-lock-overlay__title">当前账号已取关公众号</text>
+        <view v-if="mode !== 'guest'" class="insights-lock-overlay__card">
+          <text class="section-kicker">{{ mode === 'binding' ? '公众号绑定' : '会员权益已暂停' }}</text>
+          <text class="insights-lock-overlay__title">{{ mode === 'binding' ? '请先绑定公众号' : '当前账号已取关公众号' }}</text>
           <text class="insights-lock-overlay__copy">
-            洞察页和回流看板属于会员权益。重新关注公众号后，回到小程序刷新即可恢复；会员等级和你已推荐的人不会受影响。
+            {{ mode === 'binding' ? '绑定「何止编程」公众号后，即可使用对应等级的会员功能。有效付费会员无需绑定。' : '洞察页和回流看板属于会员权益。重新关注公众号后，回到小程序刷新即可恢复；会员等级和你已推荐的人不会受影响。' }}
           </text>
-          <button class="insights-lock-overlay__action" @click="emit('action')">去我的页查看</button>
+          <button class="insights-lock-overlay__action" @click="emit('action')">{{ mode === 'binding' ? '绑定公众号' : '去我的页查看' }}</button>
         </view>
       </view>
     </view>
@@ -73,7 +73,7 @@ import {
 
 withDefaults(
   defineProps<{
-    mode: 'guest' | 'membership'
+    mode: 'guest' | 'membership' | 'binding'
   }>(),
   { mode: 'guest' },
 )
