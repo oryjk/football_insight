@@ -38,6 +38,8 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         auth.token_port.clone(),
         config,
     );
+    let transfer_routes =
+        crate::transfer::bootstrap::build_transfer_routes(pool.clone(), auth.token_port.clone());
     let daily_topics_routes = build_daily_topics_routes(pool.clone(), auth.token_port.clone());
     let activity_routes = build_activity_routes(pool.clone(), auth.token_port.clone());
     let ai_routes = build_ai_routes(
@@ -113,6 +115,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         .merge(health_routes)
         .merge(match_outlook_routes)
         .merge(lineup_routes)
+        .merge(transfer_routes)
         .merge(daily_topics_routes)
         .merge(mini_review_routes)
         .merge(admin_routes)
