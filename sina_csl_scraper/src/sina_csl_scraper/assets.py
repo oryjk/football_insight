@@ -86,6 +86,29 @@ def _normalize_endpoint_url(endpoint: str, secure: bool = True) -> str:
     return f"{scheme}://{endpoint.rstrip('/')}"
 
 
+def _sign_without_proxy_prefix(client, prefix: str) -> None:
+    """反向代理（如 oryjk.cn:82/minio）转发前会去掉路径前缀，MinIO 按去掉前缀的路径验签。
+    签名时临时去掉前缀，发送前恢复原地址，请求仍经代理转发。"""
+    if not prefix:
+        return
+    original: dict[int, str] = {}
+
+    def strip_prefix(request, **_kwargs) -> None:
+        parsed = urlparse(request.url)
+        if parsed.path.startswith(prefix + "/"):
+            original[id(request)] = request.url
+            request.url = urlunparse(parsed._replace(path=parsed.path[len(prefix):]))
+
+    def restore_prefix(request, **_kwargs) -> None:
+        url = original.pop(id(request), None)
+        if url is not None:
+            request.url = url
+
+    client.meta.events.register_first("before-sign.s3", strip_prefix)
+    # 签名器挂在 request-created 上；排在它之后恢复，后续准备与发送都用带前缀的地址。
+    client.meta.events.register_last("request-created.s3", restore_prefix)
+
+
 def default_public_base_url(endpoint: str, bucket: str, secure: bool = True) -> str:
     endpoint_url = _normalize_endpoint_url(endpoint, secure=secure)
     parsed = urlparse(endpoint_url)
@@ -126,6 +149,7 @@ class MinioAssetTarget:
                 s3={"addressing_style": "path"},
             ),
         )
+        _sign_without_proxy_prefix(client, urlparse(endpoint_url).path.rstrip("/"))
         return cls(
             client=client,
             bucket=bucket,

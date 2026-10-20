@@ -150,3 +150,43 @@ def test_unconfirmed_standard_portrait_keeps_existing_source():
     updated = AssetUploader(fetcher, target).upload_player_avatars([profile], "summary")[0]
     assert fetcher.calls == [source]
     assert updated.avatar_object_name == "summary/players/86364.png"
+
+
+def test_minio_target_signs_path_prefixed_endpoint_without_the_proxy_prefix() -> None:
+    # 反向代理（oryjk.cn:82/minio）转发前会去掉 /minio，MinIO 按去掉前缀的路径验签；请求本身仍要发到带前缀的地址。
+    target = MinioAssetTarget.from_credentials(
+        endpoint="https://example.com:82/minio", access_key="ak", secret_key="sk", bucket="football-insight",
+    )
+    seen: dict[str, str] = {}
+
+    def at_signing(request, **_kwargs):
+        seen["signed_url"] = request.url
+
+    def at_sending(request, **_kwargs):
+        seen["sent_url"] = request.url
+        raise RuntimeError("stop before network")
+
+    target.client.meta.events.register_last("before-sign.s3", at_signing)
+    target.client.meta.events.register("before-send.s3", at_sending)
+    with pytest.raises(RuntimeError, match="stop before network"):
+        target.client.head_object(Bucket="football-insight", Key="summary/players/a.png")
+
+    assert seen["signed_url"] == "https://example.com:82/football-insight/summary/players/a.png"
+    assert seen["sent_url"] == "https://example.com:82/minio/football-insight/summary/players/a.png"
+
+
+def test_minio_target_root_endpoint_signs_the_request_url_unchanged() -> None:
+    target = MinioAssetTarget.from_credentials(
+        endpoint="https://example.com:9000", access_key="ak", secret_key="sk", bucket="football-insight",
+    )
+    seen: dict[str, str] = {}
+
+    def at_signing(request, **_kwargs):
+        seen["signed_url"] = request.url
+        raise RuntimeError("stop before network")
+
+    target.client.meta.events.register_last("before-sign.s3", at_signing)
+    with pytest.raises(RuntimeError, match="stop before network"):
+        target.client.head_object(Bucket="football-insight", Key="summary/players/a.png")
+
+    assert seen["signed_url"] == "https://example.com:9000/football-insight/summary/players/a.png"
