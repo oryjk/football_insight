@@ -1,4 +1,4 @@
-import type { TransferBoard, TransferCandidates, TransferCardView, TransferIntent, TransferNominateResult, TransferSummary, TransferTally } from '../types/transfer'
+import type { TransferBoard, TransferCandidates, TransferCardView, TransferCodeImage, TransferIntent, TransferNominateResult, TransferSummary, TransferTally } from '../types/transfer'
 import { request } from '../utils/request'
 
 // auth: true 表示"有 token 就带上"：游客也能读，登录后多返回 my_vote / can_vote。
@@ -23,4 +23,7 @@ export function setTransferVote(code: string, value: 1 | -1 | 0): Promise<Transf
   return value === 0
     ? request({ url, method: 'DELETE', auth: true })
     : request({ url, method: 'PUT', auth: true, data: { value } })
+}
+export function getTransferCode(code: string): Promise<TransferCodeImage> {
+  return request({ url: `/transfers/nominations/${encodeURIComponent(code)}/wxacode`, auth: true })
 }

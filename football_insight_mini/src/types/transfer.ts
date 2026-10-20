@@ -47,3 +47,4 @@ export interface TransferCandidate {
 export interface TransferCandidateGroup { key: string; title: string; players: TransferCandidate[] }
 export interface TransferCandidates { intent: TransferIntent; groups: TransferCandidateGroup[] }
 export interface TransferNominateResult { created: boolean; view: TransferCardView }
+export interface TransferCodeImage { image_base64: string; mime_type: 'image/png' | 'image/jpeg' }

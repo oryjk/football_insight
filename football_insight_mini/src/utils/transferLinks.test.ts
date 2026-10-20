@@ -74,3 +74,13 @@ test('board labels read as what fans want, not as feature names', async () => {
   const { TRANSFER_BOARD_LABELS } = await import('./transferLinks')
   expect(TRANSFER_BOARD_LABELS).toEqual({ out: '最想送走', stay: '最想留下', in: '最想买入' })
 })
+
+test('scene_parsing_accepts_only_transfer_cards', async () => {
+  const { parseTransferCode } = await import('./transferLinks')
+  expect(parseTransferCode({ scene: encodeURIComponent('s=share&c=transfer&t=ABCD1234') })).toBe('ABCD1234')
+  expect(parseTransferCode({ scene: 's=share&c=transfer&t=ABCD1234' })).toBe('ABCD1234')
+  expect(parseTransferCode({ scene: encodeURIComponent('s=share&c=lineup&l=ABCD1234') })).toBe('')
+  expect(parseTransferCode({ scene: encodeURIComponent('s=share&c=transfer&t=bad') })).toBe('')
+  expect(parseTransferCode({ scene: '%E0%A4%A' })).toBe('')
+  expect(parseTransferCode({ code: 'ABCD1234', scene: 'whatever' })).toBe('ABCD1234')
+})

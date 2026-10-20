@@ -25,8 +25,15 @@ export function parseTransferBoardQuery(query: Record<string, unknown> | undefin
 export function buildTransferViewUrl(code: string): string {
   return validTransferCode(code) ? `/pages/transfer/view?code=${code}` : ''
 }
+/** 链接参数 code=，或扫小程序码进入时的 scene（s=share&c=transfer&t=<码>，可能经过 URL 编码）。 */
 export function parseTransferCode(query: Record<string, unknown> | undefined): string {
-  return validTransferCode(query?.code) ? (query!.code as string) : ''
+  if (validTransferCode(query?.code)) return query!.code as string
+  if (typeof query?.scene !== 'string') return ''
+  try {
+    const scene = decodeURIComponent(query.scene)
+    const values = Object.fromEntries(scene.split('&').map(pair => pair.split('=')))
+    return values.s === 'share' && values.c === 'transfer' && validTransferCode(values.t) ? values.t : ''
+  } catch { return '' }
 }
 
 /** "我希望 X ___"里的动词。 */
