@@ -183,6 +183,12 @@ pub struct VoteTally {
     pub my_vote: i16,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransferCodeImage {
+    pub image_base64: String,
+    pub mime_type: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum TransferError {
     #[error("参数无效")]

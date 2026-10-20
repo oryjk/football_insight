@@ -125,7 +125,54 @@ impl TicketWatchCodePort for WechatMiniCode {
     }
 }
 
-const MAX_LINEUP_CODES: usize = 128;
+pub(crate) const MAX_PER_CODE_TARGETS: usize = 128;
+
+#[derive(Debug, PartialEq, Eq)]
+enum PerCodeError {
+    Invalid,
+    Unavailable,
+}
+
+/// 按分享码缓存小程序码：每个码一个缓存槽与在途锁，最多 MAX_PER_CODE_TARGETS 个；
+/// 满了淘汰一个没有在途请求的槽。战术板与转会提名共用。
+async fn per_code_image(
+    codes: &Mutex<HashMap<String, Arc<WechatMiniCode>>>,
+    template: (&str, &str, &reqwest::Client, &str),
+    code: &str,
+    scene: String,
+    page: &str,
+) -> Result<CodeImage, PerCodeError> {
+    if code.len() != 8 || !code.bytes().all(|b| b.is_ascii_alphanumeric()) {
+        return Err(PerCodeError::Invalid);
+    }
+    let (app_id, secret, client, api_base) = template;
+    let adapter = {
+        let mut codes = codes.lock().await;
+        if let Some(adapter) = codes.get(code) {
+            adapter.clone()
+        } else {
+            if codes.len() >= MAX_PER_CODE_TARGETS {
+                // An in-flight entry has an extra Arc owner; keep its coalescing lock.
+                let key = codes
+                    .iter()
+                    .find_map(|(key, entry)| (Arc::strong_count(entry) == 1).then(|| key.clone()))
+                    .ok_or(PerCodeError::Unavailable)?;
+                codes.remove(&key);
+            }
+            let mut adapter =
+                WechatMiniCode::for_target(app_id.into(), secret.into(), scene, page.into());
+            adapter.client = client.clone();
+            adapter.api_base = api_base.into();
+            let adapter = Arc::new(adapter);
+            codes.insert(code.into(), adapter.clone());
+            adapter
+        }
+    };
+    adapter
+        .cached_image()
+        .await
+        .map_err(|_| PerCodeError::Unavailable)
+}
 
 /// Each target owns its cached result and in-flight lock; unrelated lineups can fetch concurrently.
 pub struct WechatLineupCode {
@@ -157,42 +204,68 @@ impl crate::lineup::ports::LineupCodePort for WechatLineupCode {
     ) -> Result<crate::lineup::domain::LineupCodeImage, crate::lineup::domain::LineupPublicError>
     {
         use crate::lineup::domain::{LineupCodeImage, LineupPublicError};
-        if code.len() != 8 || !code.bytes().all(|b| b.is_ascii_alphanumeric()) {
-            return Err(LineupPublicError::Invalid);
-        }
-        let adapter = {
-            let mut codes = self.codes.lock().await;
-            if let Some(adapter) = codes.get(code) {
-                adapter.clone()
-            } else {
-                if codes.len() >= MAX_LINEUP_CODES {
-                    // An in-flight entry has an extra Arc owner; keep its coalescing lock.
-                    let key = codes
-                        .iter()
-                        .find_map(|(key, entry)| {
-                            (Arc::strong_count(entry) == 1).then(|| key.clone())
-                        })
-                        .ok_or(LineupPublicError::Unavailable)?;
-                    codes.remove(&key);
-                }
-                let mut adapter = WechatMiniCode::for_target(
-                    self.app_id.clone(),
-                    self.secret.clone(),
-                    format!("s=share&c=lineup&l={code}"),
-                    "pages/lineup/view".into(),
-                );
-                adapter.client = self.client.clone();
-                adapter.api_base = self.api_base.clone();
-                let adapter = Arc::new(adapter);
-                codes.insert(code.into(), adapter.clone());
-                adapter
-            }
-        };
-        let image = adapter
-            .cached_image()
-            .await
-            .map_err(|_| LineupPublicError::Unavailable)?;
+        let image = per_code_image(
+            &self.codes,
+            (&self.app_id, &self.secret, &self.client, &self.api_base),
+            code,
+            format!("s=share&c=lineup&l={code}"),
+            "pages/lineup/view",
+        )
+        .await
+        .map_err(|error| match error {
+            PerCodeError::Invalid => LineupPublicError::Invalid,
+            PerCodeError::Unavailable => LineupPublicError::Unavailable,
+        })?;
         Ok(LineupCodeImage {
+            image_base64: image.image_base64,
+            mime_type: image.mime_type,
+        })
+    }
+}
+
+/// 转会提名卡的小程序码：扫码直达 pages/transfer/view，场景值携带提名分享码。
+pub struct WechatTransferCode {
+    app_id: String,
+    secret: String,
+    client: reqwest::Client,
+    api_base: String,
+    codes: Mutex<HashMap<String, Arc<WechatMiniCode>>>,
+}
+
+impl WechatTransferCode {
+    pub fn new(app_id: String, secret: String) -> Self {
+        let template = WechatMiniCode::new(app_id, secret);
+        Self {
+            app_id: template.app_id,
+            secret: template.secret,
+            client: template.client,
+            api_base: template.api_base,
+            codes: Mutex::new(HashMap::new()),
+        }
+    }
+}
+
+#[async_trait]
+impl crate::transfer::ports::TransferCodePort for WechatTransferCode {
+    async fn image(
+        &self,
+        code: &str,
+    ) -> Result<crate::transfer::domain::TransferCodeImage, crate::transfer::domain::TransferError>
+    {
+        use crate::transfer::domain::{TransferCodeImage, TransferError};
+        let image = per_code_image(
+            &self.codes,
+            (&self.app_id, &self.secret, &self.client, &self.api_base),
+            code,
+            format!("s=share&c=transfer&t={code}"),
+            "pages/transfer/view",
+        )
+        .await
+        .map_err(|error| match error {
+            PerCodeError::Invalid => TransferError::Invalid,
+            PerCodeError::Unavailable => TransferError::Unavailable,
+        })?;
+        Ok(TransferCodeImage {
             image_base64: image.image_base64,
             mime_type: image.mime_type,
         })

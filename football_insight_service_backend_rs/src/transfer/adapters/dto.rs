@@ -274,3 +274,17 @@ impl From<VoteTally> for TallyDto {
         }
     }
 }
+
+#[derive(Serialize, Debug, PartialEq)]
+pub struct CodeDto {
+    pub image_base64: String,
+    pub mime_type: String,
+}
+impl From<crate::transfer::domain::TransferCodeImage> for CodeDto {
+    fn from(i: crate::transfer::domain::TransferCodeImage) -> Self {
+        Self {
+            image_base64: i.image_base64,
+            mime_type: i.mime_type,
+        }
+    }
+}

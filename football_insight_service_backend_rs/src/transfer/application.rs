@@ -1,12 +1,12 @@
 use super::{
     domain::{
-        CandidatePlayer, NOMINATION_LIMIT, NominationCard, TransferError, TransferIntent,
-        TransferTeam, TransferWindow, VoteTally, VoteValue, candidate_allowed, generate_share_code,
-        membership_from, valid_share_code,
+        CandidatePlayer, NOMINATION_LIMIT, NominationCard, TransferCodeImage, TransferError,
+        TransferIntent, TransferTeam, TransferWindow, VoteTally, VoteValue, candidate_allowed,
+        generate_share_code, membership_from, valid_share_code,
     },
     ports::{
-        NominateCommand, TransferCandidateDirectory, TransferRepository, TransferUserAccess,
-        UserProfile,
+        NominateCommand, TransferCandidateDirectory, TransferCodePort, TransferRepository,
+        TransferUserAccess, UserProfile,
     },
 };
 use chrono::{DateTime, Utc};
@@ -75,6 +75,7 @@ pub struct TransferService {
     repo: Arc<dyn TransferRepository>,
     directory: Arc<dyn TransferCandidateDirectory>,
     users: Arc<dyn TransferUserAccess>,
+    codes: Arc<dyn TransferCodePort>,
     clock: Clock,
 }
 
@@ -83,12 +84,14 @@ impl TransferService {
         repo: Arc<dyn TransferRepository>,
         directory: Arc<dyn TransferCandidateDirectory>,
         users: Arc<dyn TransferUserAccess>,
+        codes: Arc<dyn TransferCodePort>,
         clock: Clock,
     ) -> Self {
         Self {
             repo,
             directory,
             users,
+            codes,
             clock,
         }
     }
@@ -371,14 +374,34 @@ impl TransferService {
             .await?;
         self.repo.set_vote(share_code, user_id, value).await
     }
+
+    /// 拉票海报的小程序码：只要求登录的正常账号和存在的提名卡；
+    /// 不要求是主队、也不要求本期开放——海报只是分享，不是投票。
+    pub async fn code_image(
+        &self,
+        user_id: Uuid,
+        share_code: &str,
+    ) -> Result<TransferCodeImage, TransferError> {
+        if !valid_share_code(share_code) {
+            return Err(TransferError::Invalid);
+        }
+        self.viewer_profile(Some(user_id))
+            .await?
+            .ok_or(TransferError::Unauthorized)?;
+        self.repo
+            .card(share_code, Some(user_id))
+            .await?
+            .ok_or(TransferError::NotFound)?;
+        self.codes.image(share_code).await
+    }
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
     use crate::transfer::{
-        domain::{CardPlayer, NominationCard},
-        ports::{CardContext, NominateOutcome},
+        domain::{CardPlayer, NominationCard, TransferCodeImage},
+        ports::{CardContext, NominateOutcome, TransferCodePort},
     };
     use chrono::TimeZone;
     use std::sync::Mutex;
@@ -584,6 +607,17 @@ pub(crate) mod tests {
         }
     }
 
+    pub(crate) struct FakeCodes;
+    #[async_trait::async_trait]
+    impl TransferCodePort for FakeCodes {
+        async fn image(&self, code: &str) -> Result<TransferCodeImage, TransferError> {
+            Ok(TransferCodeImage {
+                image_base64: format!("img-{code}"),
+                mime_type: "image/png".into(),
+            })
+        }
+    }
+
     pub(crate) fn service_at(
         now: DateTime<Utc>,
         active: bool,
@@ -597,9 +631,41 @@ pub(crate) mod tests {
             repo.clone(),
             Arc::new(FakeDirectory),
             users.clone(),
+            Arc::new(FakeCodes),
             Arc::new(move || now),
         );
         (service, repo, users)
+    }
+
+    #[tokio::test]
+    async fn code_images_require_an_active_viewer_and_an_existing_card() {
+        let (service, _, _) = service_at(at(5), true);
+        let image = service.code_image(FAN, "CODE0001").await.unwrap();
+        assert_eq!(image.image_base64, "img-CODE0001");
+        // 非主队、本期结束也可以生成海报：拉票海报只是分享，不是投票
+        assert!(service.code_image(RIVAL, "CODE0001").await.is_ok());
+        assert_eq!(
+            service.code_image(FAN, "bad").await.unwrap_err(),
+            TransferError::Invalid
+        );
+        assert_eq!(
+            service.code_image(FAN, "MISSING0").await.unwrap_err(),
+            TransferError::NotFound
+        );
+        assert_eq!(
+            service
+                .code_image(Uuid::from_u128(9), "CODE0001")
+                .await
+                .unwrap_err(),
+            TransferError::Unauthorized
+        );
+        let (disabled, _, _) = service_at(at(5), false);
+        assert_eq!(
+            disabled.code_image(FAN, "CODE0001").await.unwrap_err(),
+            TransferError::Unauthorized
+        );
+        let (closed, _, _) = service_at(at(25), true);
+        assert!(closed.code_image(FAN, "CODE0001").await.is_ok());
     }
 
     #[tokio::test]

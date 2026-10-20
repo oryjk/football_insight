@@ -1,6 +1,6 @@
 use super::dto::{
-    BoardDto, BoardQuery, CandidatesDto, CardViewDto, CurrentWindowDto, IntentQuery, NominateBody,
-    NominateDto, SummaryDto, TallyDto, VoteBody, WindowQuery,
+    BoardDto, BoardQuery, CandidatesDto, CardViewDto, CodeDto, CurrentWindowDto, IntentQuery,
+    NominateBody, NominateDto, SummaryDto, TallyDto, VoteBody, WindowQuery,
 };
 use crate::{
     auth::ports::token_port::TokenPort,
@@ -48,6 +48,10 @@ pub fn transfer_routes(state: Arc<TransferWebState>) -> Router {
         .route(
             "/api/v1/transfers/nominations/{share_code}/vote",
             put(vote).delete(unvote),
+        )
+        .route(
+            "/api/v1/transfers/nominations/{share_code}/wxacode",
+            get(code_image),
         )
         .layer(middleware::from_fn(no_store))
         .with_state(state)
@@ -218,6 +222,20 @@ async fn unvote(
         .vote(user, &code, None)
         .await
         .map(|t| Json(t.into()))
+        .map_err(map_error)
+}
+
+async fn code_image(
+    State(state): Shared,
+    headers: HeaderMap,
+    Path(code): Path<String>,
+) -> Result<Json<CodeDto>, WebError> {
+    let user = required_viewer(&headers, state.token_port.as_ref())?;
+    state
+        .service
+        .code_image(user, &code)
+        .await
+        .map(|i| Json(i.into()))
         .map_err(map_error)
 }
 
@@ -440,6 +458,34 @@ mod tests {
             .await
             .0,
             StatusCode::UNPROCESSABLE_ENTITY
+        );
+    }
+
+    #[tokio::test]
+    async fn code_image_requires_login_and_returns_the_image_contract() {
+        let path = "/api/v1/transfers/nominations/CODE0001/wxacode";
+        assert_eq!(
+            call(5, "GET", path, None, None).await.0,
+            StatusCode::UNAUTHORIZED
+        );
+        let (status, body) = call(5, "GET", path, Some("Bearer good"), None).await;
+        assert_eq!(status, StatusCode::OK);
+        let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({"image_base64": "img-CODE0001", "mime_type": "image/png"})
+        );
+        assert_eq!(
+            call(
+                5,
+                "GET",
+                "/api/v1/transfers/nominations/MISSING0/wxacode",
+                Some("Bearer good"),
+                None
+            )
+            .await
+            .0,
+            StatusCode::NOT_FOUND
         );
     }
 

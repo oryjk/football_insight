@@ -38,8 +38,11 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         auth.token_port.clone(),
         config,
     );
-    let transfer_routes =
-        crate::transfer::bootstrap::build_transfer_routes(pool.clone(), auth.token_port.clone());
+    let transfer_routes = crate::transfer::bootstrap::build_transfer_routes(
+        pool.clone(),
+        auth.token_port.clone(),
+        config,
+    );
     let daily_topics_routes = build_daily_topics_routes(pool.clone(), auth.token_port.clone());
     let activity_routes = build_activity_routes(pool.clone(), auth.token_port.clone());
     let ai_routes = build_ai_routes(

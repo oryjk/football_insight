@@ -1,6 +1,6 @@
 use super::domain::{
-    CandidatePlayer, NominationCard, TransferError, TransferIntent, TransferTeam, TransferWindow,
-    VoteTally, VoteValue,
+    CandidatePlayer, NominationCard, TransferCodeImage, TransferError, TransferIntent,
+    TransferTeam, TransferWindow, VoteTally, VoteValue,
 };
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -91,4 +91,10 @@ pub trait TransferCandidateDirectory: Send + Sync {
 #[async_trait]
 pub trait TransferUserAccess: Send + Sync {
     async fn profile(&self, user_id: Uuid) -> Result<Option<UserProfile>, TransferError>;
+}
+
+#[async_trait]
+pub trait TransferCodePort: Send + Sync {
+    /// 提名卡分享码对应的小程序码；码格式错为 Invalid，微信失败为 Unavailable。
+    async fn image(&self, share_code: &str) -> Result<TransferCodeImage, TransferError>;
 }

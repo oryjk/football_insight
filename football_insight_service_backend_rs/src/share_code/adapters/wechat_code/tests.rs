@@ -292,3 +292,32 @@ async fn many_lineup_targets_cannot_grow_the_image_cache_without_bound() {
     assert!(adapter.codes.lock().await.len() <= 128);
     server.abort();
 }
+
+#[tokio::test]
+async fn transfer_codes_use_their_own_scene_and_cap_the_cache() {
+    use crate::transfer::ports::TransferCodePort;
+    let calls = Arc::new(Calls {
+        lineup: true,
+        ..Calls::default()
+    });
+    let (template, server) = fixture(calls.clone()).await;
+    let mut adapter = WechatTransferCode::new("test-app".into(), "test-secret".into());
+    adapter.api_base = template.api_base;
+    adapter.client = template.client;
+    let (a, a_again) = tokio::join!(adapter.image("ABCD1234"), adapter.image("ABCD1234"));
+    assert_eq!(a.unwrap(), a_again.unwrap());
+    assert_eq!(calls.codes.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        calls.payloads.lock().unwrap()[0],
+        json!({"scene":"s=share&c=transfer&t=ABCD1234","page":"pages/transfer/view","check_path":false,"env_version":"release","width":280})
+    );
+    for index in 0..(MAX_PER_CODE_TARGETS + 5) {
+        adapter.image(&format!("T{index:07}")).await.unwrap();
+    }
+    assert!(adapter.codes.lock().await.len() <= MAX_PER_CODE_TARGETS);
+    assert_eq!(
+        adapter.image("bad").await.unwrap_err(),
+        crate::transfer::domain::TransferError::Invalid
+    );
+    server.abort();
+}
