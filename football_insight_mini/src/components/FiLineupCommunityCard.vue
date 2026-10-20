@@ -2,7 +2,7 @@
   <view class="lineup-card" :class="{ 'lineup-card--compact': compact }" @tap="emit('open')">
     <view class="card-row">
       <text v-if="rank && !compact" class="rank">#{{ rank }}</text>
-      <image v-if="item.author.avatar_url" :src="item.author.avatar_url" class="avatar" mode="aspectFill" />
+      <image v-if="item.author.avatar_url" :src="item.author.avatar_url" class="avatar" mode="aspectFill" lazy-load />
       <view v-else class="avatar avatar--fallback">{{ item.author.display_name.charAt(0) }}</view>
       <view class="identity"><text class="name">{{ item.author.display_name }}</text><text class="date">{{ createdLabel }}</text></view>
       <text class="formation">{{ item.formation }}</text>

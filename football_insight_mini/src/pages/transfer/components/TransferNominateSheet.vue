@@ -14,7 +14,7 @@
     <view v-for="group in visibleGroups" :key="group.key" class="nominate__group">
       <text class="nominate__group-title">{{ group.title }}</text>
       <view v-for="player in group.players" :key="player.player_id" class="nominate__row" hover-class="nominate__row--pressed" @tap="!submitting && emit('pick', player.player_id)">
-        <image v-if="player.avatar_url" class="nominate__avatar" :src="player.avatar_url" mode="aspectFill" />
+        <image v-if="player.avatar_url" class="nominate__avatar" :src="player.avatar_url" mode="aspectFill" lazy-load />
         <view v-else class="nominate__avatar nominate__avatar--fallback"><text>{{ player.name.slice(0, 1) }}</text></view>
         <view class="nominate__body">
           <text class="nominate__name">{{ player.name }}</text>

@@ -23,7 +23,7 @@
       hover-class="row--pressed"
       @tap="emit('pick', item.player_id)"
     >
-      <image v-if="item.avatar_url" class="row__avatar" :src="item.avatar_url" mode="aspectFill" />
+      <image v-if="item.avatar_url" class="row__avatar" :src="item.avatar_url" mode="aspectFill" lazy-load />
       <view v-else class="row__avatar row__avatar--fallback">
         <text>{{ item.shirt_number ?? item.name.slice(0, 1) }}</text>
       </view>

@@ -2,7 +2,7 @@
   <!-- 一行转会提名：名次、头像、名字与位置/现属球队、标签、赞踩（显示赞数与踩数）。洞察页与转会分包共用。 -->
   <view class="transfer-card" :class="`transfer-card--${size}`" hover-class="transfer-card--pressed" @tap="emit('open')">
     <text v-if="showRank && card.rank !== null" class="transfer-card__rank">{{ card.rank }}</text>
-    <image v-if="card.player.avatar_url" class="transfer-card__avatar" :src="card.player.avatar_url" mode="aspectFill" />
+    <image v-if="card.player.avatar_url" class="transfer-card__avatar" :src="card.player.avatar_url" mode="aspectFill" lazy-load />
     <view v-else class="transfer-card__avatar transfer-card__avatar--fallback"><text>{{ card.player.name.slice(0, 1) }}</text></view>
     <view class="transfer-card__body">
       <view class="transfer-card__title">
