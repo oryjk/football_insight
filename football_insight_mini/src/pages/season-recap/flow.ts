@@ -1,4 +1,4 @@
-import { ref, watch, type Ref } from 'vue'
+import { ref, watch, computed, type Ref } from 'vue'
 import type { SeasonRecap, SaveSeasonRecap, RecapCodeImage } from '../../types/seasonRecap'
 import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
 import { parseHomeDistance } from './helpers'
@@ -39,6 +39,20 @@ export function createRecapFlow(session: { revision: Ref<number>; hasAccessToken
   if (generating.value || !view.value?.matches.some(m=>m.match_id===id)) return
   selected.value=selected.value.includes(id)?selected.value.filter(item=>item!==id):[...selected.value,id];invalidatePoster()
  }
+ function setSelected(ids: number[]) {
+  if (generating.value || !view.value) return
+  const known = new Set(view.value.matches.map(m=>m.match_id))
+  selected.value=[...new Set(ids.filter(id=>known.has(id)))];invalidatePoster()
+ }
+ const dirty = computed(() => {
+  const current = view.value
+  if (!current) return false
+  const sort = (ids: number[]) => [...new Set(ids)].sort((a,b)=>a-b)
+  const picked = sort(selected.value), saved = sort(current.selected_match_ids)
+  if (picked.length !== saved.length || picked.some((id,index)=>id!==saved[index])) return true
+  const km = distance.value.trim() === '' ? null : Number(distance.value)
+  return km !== current.home_one_way_km
+ })
  function editDistance(value: string) { if(generating.value)return;distance.value=value;invalidatePoster() }
  async function generate() {
   if(generating.value||loading.value||!view.value||!session.hasAccessToken.value)return
@@ -59,5 +73,5 @@ export function createRecapFlow(session: { revision: Ref<number>; hasAccessToken
  function posterReady(generation: number, path: string) {if(generation!==key.value||!generated.value)return;posterPath.value=path;generating.value=false}
  function posterFailed(generation: number) {if(generation!==key.value)return;error.value='海报生成失败，请重试';generated.value=null;generating.value=false}
  function dispose() {stop();invalidate()}
- return {season,view,selected,distance,loading,generating,error,posterPath,generated,key,client,load,toggle,editDistance,generate,posterReady,posterFailed,dispose}
+ return {season,view,selected,distance,loading,generating,error,posterPath,generated,key,client,dirty,load,toggle,setSelected,editDistance,generate,posterReady,posterFailed,dispose}
 }

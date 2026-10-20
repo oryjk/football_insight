@@ -50,3 +50,41 @@ test('expired token clears only the requesting session and exposes login recover
  const flow=createRecapFlow({revision,hasAccessToken,invalidateSession:(expected:number)=>{if(expected===revision.value){invalidated++;revision.value++;hasAccessToken.value=false}}}, {load:async()=>{throw new ApiRequestError('anything',401)},save:async()=>data,code:async()=>({image_base64:'',mime_type:'image/png'})})
  await flow.load();expect(invalidated).toBe(1);expect(hasAccessToken.value).toBe(false);expect(flow.view.value).toBe(null);flow.dispose()
 })
+
+test('setSelected replaces selection wholesale, drops unknown ids, dedupes and invalidates the poster',async()=>{
+ const {flow}=setup();await flow.load()
+ const key=flow.key.value
+ flow.setSelected([1,1,999]);expect(flow.selected.value).toEqual([1])
+ expect(flow.key.value).toBe(key+1)
+ flow.setSelected([]);expect(flow.selected.value).toEqual([]);flow.dispose()
+})
+
+test('setSelected is ignored while generating',async()=>{
+ const pending=deferred<SeasonRecap>();const {flow}=setup();await flow.load()
+ flow.client.save=()=>pending.promise
+ flow.toggle(1);flow.distance.value='10'
+ const generating=flow.generate()
+ flow.setSelected([])
+ expect(flow.selected.value).toEqual([1])
+ pending.resolve(data);await generating;flow.dispose()
+})
+
+test('dirty tracks edits against the last loaded or saved record',async()=>{
+ const twoMatches: SeasonRecap = {...data,matches:[...data.matches,{match_id:2,match_date:'2026-01-08',opponent:'上海申花',is_home:false}],selected_match_ids:[2,1],home_one_way_km:12.25}
+ const revision=ref(1),hasAccessToken=ref(true)
+ const flow=createRecapFlow({revision,hasAccessToken},{
+  load:async()=>twoMatches,
+  save:async(_year,payload)=>({...twoMatches,selected_match_ids:payload.selected_match_ids,home_one_way_km:payload.home_one_way_km}),
+  code:async()=>({image_base64:'png',mime_type:'image/png'}),
+ })
+ await flow.load()
+ // loaded selection order does not matter; identical sets are clean
+ expect(flow.dirty.value).toBe(false)
+ flow.toggle(1);expect(flow.dirty.value).toBe(true)
+ flow.toggle(1);expect(flow.dirty.value).toBe(false)
+ flow.editDistance('30');expect(flow.dirty.value).toBe(true)
+ await flow.generate();expect(flow.dirty.value).toBe(false)
+ flow.posterReady(flow.key.value,'poster-path') // 画板完成后 generating 才会解除
+ flow.editDistance('12.25');expect(flow.dirty.value).toBe(true)
+ flow.dispose()
+})

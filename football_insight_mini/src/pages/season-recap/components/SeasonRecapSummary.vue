@@ -1,0 +1,44 @@
+<template>
+ <view class="summary">
+  <view class="summary__head">
+   <text class="summary__title">{{season}} 赛季里程</text>
+   <text v-if="dirty" class="summary__dirty">未保存</text>
+  </view>
+  <view class="summary__total">
+   <text class="summary__number">{{summary.matches?summary.total_km:0}}</text>
+   <text class="summary__unit">公里</text>
+  </view>
+  <text v-if="!summary.matches" class="summary__empty">还没有记录，勾选比赛后生成海报</text>
+  <view v-else class="summary__stats">
+   <view class="summary__stat">
+    <text class="summary__stat-value">{{summary.away_km}} 公里</text>
+    <text class="summary__stat-label">客场</text>
+   </view>
+   <view class="summary__stat">
+    <text class="summary__stat-value">{{summary.home_km===null?'—':`${summary.home_km} 公里`}}</text>
+    <text class="summary__stat-label">主场</text>
+   </view>
+   <view class="summary__stat">
+    <text class="summary__stat-value">{{summary.matches}} 场 · {{summary.cities}} 城</text>
+    <text class="summary__stat-label">足迹</text>
+   </view>
+  </view>
+ </view>
+</template>
+<script setup lang="ts">
+import type { RecapSummary } from '../../../types/seasonRecap'
+defineProps<{summary:RecapSummary;season:number;dirty:boolean}>()
+</script>
+<style scoped>
+.summary__head {display:flex;align-items:center;justify-content:space-between;gap:var(--fi-space-12);}
+.summary__title {font-size:var(--fi-font-24);font-weight:var(--fi-weight-bold);color:var(--fi-color-text-muted);letter-spacing:var(--fi-component-kicker-tracking);}
+.summary__dirty {flex-shrink:0;padding:var(--fi-space-4) var(--fi-space-12);border-radius:var(--fi-radius-round);background:var(--fi-color-primary-soft);color:var(--fi-color-primary);font-size:var(--fi-font-20);font-weight:var(--fi-weight-bold);line-height:var(--fi-leading-normal);}
+.summary__total {display:flex;align-items:baseline;gap:var(--fi-space-8);margin-top:var(--fi-space-12);}
+.summary__number {font-size:var(--fi-font-56);font-weight:var(--fi-weight-black);line-height:var(--fi-leading-heading);color:var(--fi-color-primary);}
+.summary__unit {font-size:var(--fi-font-24);color:var(--fi-color-text-secondary);}
+.summary__empty {display:block;margin-top:var(--fi-space-12);font-size:var(--fi-font-24);line-height:var(--fi-leading-normal);color:var(--fi-color-text-secondary);}
+.summary__stats {display:flex;gap:var(--fi-space-12);margin-top:var(--fi-space-16);}
+.summary__stat {flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--fi-space-4);padding:var(--fi-space-12);border-radius:var(--fi-radius-sm);background:var(--fi-color-page);}
+.summary__stat-value {font-size:var(--fi-font-26);font-weight:var(--fi-weight-bold);color:var(--fi-color-text-primary);line-height:var(--fi-leading-snug);}
+.summary__stat-label {font-size:var(--fi-font-20);color:var(--fi-color-text-muted);line-height:var(--fi-leading-normal);}
+</style>

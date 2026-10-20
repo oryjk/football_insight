@@ -179,6 +179,8 @@ page {
   --fi-shadow-team-form-latest-loss: var(--fi-primitive-shadow-team-form-latest-loss);
   --fi-color-primary-deep: var(--fi-primitive-red-deep);
   --fi-color-primary-darker: var(--fi-primitive-red-darker);
+  /* 主色浅底：选中态、小标签底色 */
+  --fi-color-primary-soft: var(--fi-primitive-red-soft);
   --fi-color-page: var(--fi-primitive-canvas);
   --fi-color-page-soft: var(--fi-primitive-canvas-soft);
   --fi-color-page-backdrop-fade: var(--fi-primitive-page-backdrop-fade);
