@@ -36,6 +36,12 @@
                 @edit="goToTeamBoard" @retry-mine="tactics.retryMine()" @retry-list="retryTacticsList"
                 @sort="tactics.changeSort" @like="tactics.like" @dislike="tactics.dislike" @open="openPublicTactics" @more="tactics.more()"
               />
+              <InsightsTransferPanel
+                v-else-if="mainTab === 'transfer'"
+                :summary="transferSummary" :loading="transferLoading || teamLoading" :error="teamError || transferError"
+                :hint="transferHint" :pending="transferPending"
+                @retry="retryTransfer" @vote="transfer.vote" @open="openTransferCard" @more="openTransferBoard" @nominate="openTransferNominate"
+              />
               <template v-else>
                 <view v-if="outlookReviewReady && !systemConfigUnderReview && currentUser" class="workspace-section">
                   <InsightsMatchOutlook
@@ -119,8 +125,10 @@ import FiLoginFloat from '../../components/FiLoginFloat.vue'
 import FiSegmented from '../../components/FiSegmented.vue'
 import FiPanel from '../../components/FiPanel.vue'
 import InsightsTacticsPanel from './components/InsightsTacticsPanel.vue'
+import InsightsTransferPanel from './components/InsightsTransferPanel.vue'
 import { useInsightsTeams } from './useInsightsTeams'
 import { useInsightsTactics } from './useInsightsTactics'
+import { useInsightsTransfer } from './useInsightsTransfer'
 import InsightsSkeleton from './components/InsightsSkeleton.vue'
 import InsightsTicketWatchEntry from './components/InsightsTicketWatchEntry.vue'
 import InsightsLockedPanel from './components/InsightsLockedPanel.vue'
@@ -144,6 +152,8 @@ import {
   buildPlayerContributionRows,
 } from './helpers'
 import { buildLineupPageUrl, buildLineupViewUrl } from '../../utils/lineupLinks'
+import { buildTransferBoardUrl, buildTransferViewUrl, transferBoardShareTitle } from '../../utils/transferLinks'
+import type { TransferIntent } from '../../types/transfer'
 import { createInsightsSessionSync, runInsightsShow } from './sessionEffects'
 import { useInsightsData } from './useInsightsData'
 
@@ -152,10 +162,10 @@ const { navigationPageStyle } = useNavigationLayout()
 // 登录用户共享自 appSession：读取走会话缓存，401 清理由 session 统一处理。
 const session = useAppSession()
 const currentUser = session.currentUser
-const mainTab = ref<'data' | 'tactics'>('data')
-const mainTabs = [{ key: 'data', label: '数据洞察' }, { key: 'tactics', label: '战术' }]
+const mainTab = ref<'data' | 'tactics' | 'transfer'>('data')
+const mainTabs = [{ key: 'data', label: '数据洞察' }, { key: 'tactics', label: '战术' }, { key: 'transfer', label: '转会' }]
 function changeMainTab(value: string): void {
-  if (value === 'data' || value === 'tactics') mainTab.value = value
+  if (value === 'data' || value === 'tactics' || value === 'transfer') mainTab.value = value
 }
 const pageVisible = ref(false)
 const teamBrowser = useInsightsTeams(session)
@@ -163,6 +173,22 @@ const { teams: selectableTeams, selectedTeamId, loading: teamLoading, error: tea
 const tactics = useInsightsTactics({ session, selectedTeamId, active: computed(() => pageVisible.value && mainTab.value === 'tactics') })
 const { mineLoading, mineError, mineDraft, minePublished, authenticated: tacticsAuthenticated } = tactics
 const { items: communityItems, total: communityTotal, sort: communitySort, loading: communityLoading, error: communityError, pendingLikes: communityPendingLikes } = tactics.community
+const transfer = useInsightsTransfer({ session, selectedTeamId, active: computed(() => pageVisible.value && mainTab.value === 'transfer') })
+const { summary: transferSummary, loading: transferLoading, error: transferError, hint: transferHint, pending: transferPending } = transfer
+function retryTransfer(): void {
+  if (teamError.value) void teamBrowser.load()
+  else void transfer.refresh()
+}
+function openTransferCard(code: string): void {
+  const url = buildTransferViewUrl(code)
+  if (url) uni.navigateTo({ url })
+}
+function openTransferBoard(intent: TransferIntent): void {
+  if (selectedTeamId.value !== null) uni.navigateTo({ url: buildTransferBoardUrl(selectedTeamId.value, intent) })
+}
+function openTransferNominate(): void {
+  if (selectedTeamId.value !== null) uni.navigateTo({ url: buildTransferBoardUrl(selectedTeamId.value, 'out', { nominate: true }) })
+}
 const ticketWatchNavigating = ref(false)
 const systemConfigUnderReview = ref(false)
 const outlookReviewReady = ref(false)
@@ -204,7 +230,7 @@ const {
   loading: outlookLoading,
   error: outlookError,
 } = outlookLoader
-onUnload(() => { outlookLoader.dispose(); tactics.dispose(); teamBrowser.dispose() })
+onUnload(() => { outlookLoader.dispose(); tactics.dispose(); transfer.dispose(); teamBrowser.dispose() })
 onHide(() => { pageVisible.value = false })
 onReachBottom(() => { if (mainTab.value === 'tactics') void tactics.more() })
 
@@ -248,12 +274,19 @@ const goalsAgainstByOpponentRows = computed(() =>
   ),
 )
 
-onShareAppMessage(() => ({
-  title: mainTab.value === 'tactics' ? `${selectableTeams.value.find(team => team.team_id === selectedTeamId.value)?.team_name ?? '球队'}战术，看看大家怎么排` : selectedInsight.value
-    ? `${selectedInsight.value.team_name} 的贡献结构，看看这队靠谁赢球`
-    : '球队洞察：不是榜单，而是贡献结构',
-  path: buildSharePath('/pages/insights/index', 'insights'),
-}))
+onShareAppMessage(() => {
+  const teamName = selectableTeams.value.find(team => team.team_id === selectedTeamId.value)?.team_name ?? '球队'
+  const windowName = transferSummary.value?.window?.name
+  if (mainTab.value === 'transfer' && windowName && selectedTeamId.value !== null) {
+    return { title: transferBoardShareTitle(teamName, windowName, 'out'), path: buildSharePath(buildTransferBoardUrl(selectedTeamId.value, 'out'), 'transfer_board') }
+  }
+  return {
+    title: mainTab.value === 'tactics' ? `${teamName}战术，看看大家怎么排` : selectedInsight.value
+      ? `${selectedInsight.value.team_name} 的贡献结构，看看这队靠谁赢球`
+      : '球队洞察：不是榜单，而是贡献结构',
+    path: buildSharePath('/pages/insights/index', 'insights'),
+  }
+})
 
 watch(selectedTeamId, () => {
   resetExpandedState()
@@ -353,6 +386,7 @@ onShow(async () => {
   pageVisible.value = true
   void teamBrowser.load()
   void tactics.refresh()
+  void transfer.refresh()
   outlookReviewReady.value = false
   reportPageActivity('insights')
   beginPaywallVisit()
