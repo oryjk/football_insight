@@ -1,5 +1,5 @@
 import { parseAcquisitionLaunch } from '../../utils/acquisitionSource'
-import type { RecapMatch } from '../../types/seasonRecap'
+import type { RecapMatch, RecapSummary } from '../../types/seasonRecap'
 export function parseHomeDistance(value: string, required: boolean): number | null {
  const input = value.trim()
  if (!input && !required) return null
@@ -49,4 +49,40 @@ export function toggleFilterSelection(matches: RecapMatch[], selected: number[],
 export function formatRecapDate(date: string): string {
  const matched = /^\d{4}-(\d{2})-(\d{2})$/.exec(date)
  return matched ? `${matched[1]}-${matched[2]}` : date
+}
+// 实时预览口径与后端 calculate 一致：逐场取整后的 round_trip_km 相加，不做球面计算。
+// 任一场已选比赛缺 city、或已选客场缺 round_trip_km（旧后端）时返回 null，由页面回退到已保存 summary。
+export function previewRecapSummary(matches: RecapMatch[], selected: number[], distance: string): RecapSummary | null {
+ const byId = new Map(matches.map(match => [match.match_id, match]))
+ const ids = [...new Set(selected)].filter(id => byId.has(id))
+ const cities = new Set<string>()
+ let awayKm = 0, homeMatches = 0, awayMatches = 0
+ for (const id of ids) {
+  const match = byId.get(id)!
+  if (!match.city) return null
+  cities.add(match.city)
+  if (match.is_home) {
+   homeMatches++
+  } else {
+   if (typeof match.round_trip_km !== 'number') return null
+   awayMatches++
+   awayKm += match.round_trip_km
+  }
+ }
+ let homeKm: number | null = null
+ if (homeMatches > 0) {
+  try {
+   const km = parseHomeDistance(distance, true)
+   if (km !== null) homeKm = Math.round(km * 2 * homeMatches)
+  } catch { homeKm = null }
+ }
+ return {
+  away_km: awayKm,
+  home_km: homeKm,
+  total_km: awayKm + (homeKm ?? 0),
+  matches: ids.length,
+  home_matches: homeMatches,
+  away_matches: awayMatches,
+  cities: cities.size,
+ }
 }

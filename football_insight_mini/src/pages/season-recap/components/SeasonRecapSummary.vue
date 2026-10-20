@@ -15,7 +15,7 @@
     <text class="summary__stat-label">客场</text>
    </view>
    <view class="summary__stat">
-    <text class="summary__stat-value">{{summary.home_km===null?'—':`${summary.home_km} 公里`}}</text>
+    <text class="summary__stat-value">{{homeValue}}</text>
     <text class="summary__stat-label">主场</text>
    </view>
    <view class="summary__stat">
@@ -26,8 +26,11 @@
  </view>
 </template>
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { RecapSummary } from '../../../types/seasonRecap'
-defineProps<{summary:RecapSummary;season:number;dirty:boolean}>()
+const props = defineProps<{summary:RecapSummary;season:number;dirty:boolean}>()
+// 有已选主场但距离未填/非法时提示「待填写」；没有主场时主场格不适用。
+const homeValue = computed(() => props.summary.home_km !== null ? `${props.summary.home_km} 公里` : props.summary.home_matches > 0 ? '待填写' : '—')
 </script>
 <style scoped>
 .summary__head {display:flex;align-items:center;justify-content:space-between;gap:var(--fi-space-12);}

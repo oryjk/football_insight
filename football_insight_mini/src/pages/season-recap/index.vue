@@ -17,7 +17,7 @@
   <FiLoading v-else-if="loading" title="正在整理赛季比赛" caption="只展示成都蓉城一线队已结束的比赛" />
   <template v-if="view">
    <FiPanel>
-    <SeasonRecapSummary :summary="view.summary" :season="season" :dirty="dirty" />
+    <SeasonRecapSummary :summary="summaryPreview" :season="season" :dirty="dirty" />
    </FiPanel>
    <FiPanel>
     <SeasonRecapMatches :matches="view.matches" :selected="selected" :disabled="generating" @toggle="toggle" @select="setSelected" />
@@ -62,7 +62,8 @@ import { useAppSession } from '../../stores/appSession'
 import { getSeasonRecap,saveSeasonRecap,getSeasonRecapCode } from '../../api/seasonRecap'
 import { setPostLoginRedirectTarget } from '../../utils/authStorage'
 import { copyPageShareLink,goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
-import { recapSharePath,recapSelectionStats,resolveRecapSeason } from './helpers'
+import type { RecapSummary } from '../../types/seasonRecap'
+import { recapSharePath,recapSelectionStats,previewRecapSummary,resolveRecapSeason } from './helpers'
 import { createRecapFlow } from './flow'
 import { saveRecapPoster } from './poster'
 const session=useAppSession()
@@ -76,6 +77,13 @@ const pageLockStyle=computed(()=>posterSheetVisible.value?'overflow: hidden;':''
 const showDock=computed(()=>session.hasAccessToken.value&&!loading.value&&!!view.value)
 const hasHomeSelected=computed(()=>!!view.value&&view.value.matches.some(m=>m.is_home&&selected.value.includes(m.match_id)))
 const selectionStats=computed(()=>recapSelectionStats(view.value?.matches??[],selected.value))
+// 勾选/距离修改实时联动总览卡；旧后端缺 city/round_trip_km 时回退到已保存结果。
+const EMPTY_SUMMARY:RecapSummary={away_km:0,home_km:null,total_km:0,matches:0,home_matches:0,away_matches:0,cities:0}
+const summaryPreview=computed<RecapSummary>(()=>{
+ const current=view.value
+ if(!current)return EMPTY_SUMMARY
+ return previewRecapSummary(current.matches,selected.value,distance.value)??current.summary
+})
 onLoad(query=>{season.value=resolveRecapSeason(query??{})})
 onShow(()=>{if(!view.value)void load()})
 onUnload(flow.dispose)

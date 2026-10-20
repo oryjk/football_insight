@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { filterRecapMatches, formatRecapDate, isFilterFullySelected, parseHomeDistance, recapFilterCounts, recapSelectionStats, recapSharePath, resolveRecapSeason, toggleFilterSelection } from './helpers'
+import { filterRecapMatches, formatRecapDate, isFilterFullySelected, parseHomeDistance, previewRecapSummary, recapFilterCounts, recapSelectionStats, recapSharePath, resolveRecapSeason, toggleFilterSelection } from './helpers'
 import { parseAcquisitionLaunch } from '../../utils/acquisitionSource'
 import type { RecapMatch } from '../../types/seasonRecap'
 describe('season recap inputs and attribution', () => {
@@ -63,5 +63,45 @@ describe('recap filter and selection helpers', () => {
   expect(formatRecapDate('2026-03-01')).toBe('03-01')
   expect(formatRecapDate('2026-12-31')).toBe('12-31')
   for (const input of ['2026/03/01', '03-01', '2026-3-1', '']) expect(formatRecapDate(input)).toBe(input)
+ })
+})
+
+describe('previewRecapSummary live preview', () => {
+ const matches: RecapMatch[] = [
+  { match_id: 1, match_date: '2026-03-01', opponent: '北京国安', is_home: true, city: '成都', round_trip_km: null },
+  { match_id: 2, match_date: '2026-03-08', opponent: '上海申花', is_home: false, city: '上海', round_trip_km: 3340 },
+  { match_id: 3, match_date: '2026-03-15', opponent: '上海海港', is_home: false, city: '上海', round_trip_km: 3340 },
+  { match_id: 4, match_date: '2026-03-22', opponent: '山东泰山', is_home: true, city: '成都', round_trip_km: null },
+ ]
+ test('sums per-match round trips, dedupes selection and unknown ids', () => {
+  const summary = previewRecapSummary(matches, [1, 2, 2, 3, 99], '')
+  expect(summary).toEqual({ away_km: 6680, home_km: null, total_km: 6680, matches: 3, home_matches: 1, away_matches: 2, cities: 2 })
+ })
+ test('home distance multiplies per home match and rounds the total', () => {
+  const summary = previewRecapSummary(matches, [1, 4], '12.25')
+  expect(summary).toEqual({ away_km: 0, home_km: 49, total_km: 49, matches: 2, home_matches: 2, away_matches: 0, cities: 1 })
+ })
+ test('empty or invalid distance leaves home_km null but keeps away mileage', () => {
+  for (const distance of ['', ' ', '-1', '500.01', 'abc', '12.345']) {
+   const summary = previewRecapSummary(matches, [1, 2], distance)
+   expect(summary?.home_km).toBe(null)
+   expect(summary?.away_km).toBe(3340)
+   expect(summary?.total_km).toBe(3340)
+  }
+  expect(previewRecapSummary(matches, [2], '')?.home_km).toBe(null)
+ })
+ test('legacy backend without city or round_trip_km falls back to null', () => {
+  const legacy: RecapMatch[] = [
+   { match_id: 1, match_date: '2026-03-01', opponent: '北京国安', is_home: true },
+   { match_id: 2, match_date: '2026-03-08', opponent: '上海申花', is_home: false },
+  ]
+  expect(previewRecapSummary(legacy, [1], '10')).toBe(null)
+  expect(previewRecapSummary(legacy, [2], '')).toBe(null)
+  expect(previewRecapSummary(legacy, [], '')?.matches).toBe(0)
+  const partial: RecapMatch[] = [{ ...matches[1]!, round_trip_km: null }]
+  expect(previewRecapSummary(partial, [2], '')).toBe(null)
+ })
+ test('no selection previews an empty summary', () => {
+  expect(previewRecapSummary(matches, [], '')).toEqual({ away_km: 0, home_km: null, total_km: 0, matches: 0, home_matches: 0, away_matches: 0, cities: 0 })
  })
 })

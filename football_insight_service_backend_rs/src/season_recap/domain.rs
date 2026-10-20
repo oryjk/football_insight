@@ -5,6 +5,10 @@ pub struct RecapMatch {
     pub match_date: String,
     pub opponent: String,
     pub is_home: bool,
+    /// 主场为成都，客场为对手城市；由 application 填充，persistence 给默认值。
+    pub city: String,
+    /// 客场：成都往返大圆距离取整；主场无往返里程。
+    pub round_trip_km: Option<u32>,
 }
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum RecapError {
@@ -76,6 +80,19 @@ pub fn great_circle_km(from: City, to: City) -> f64 {
             * to.latitude.to_radians().cos()
             * (lon / 2.0).sin().powi(2);
     6371.0 * 2.0 * a.clamp(0.0, 1.0).sqrt().asin()
+}
+/// 每场里程口径：calculate 的汇总与返回给前端的 round_trip_km 共用，
+/// 保证「每场取整后相加」一致；城市查不到时返回 UnknownCity。
+pub fn match_trip(m: &RecapMatch) -> Result<(&'static str, Option<u32>), RecapError> {
+    if m.is_home {
+        Ok((CHENGDU.name, None))
+    } else {
+        let city = city_for_team(&m.opponent).ok_or(RecapError::UnknownCity)?;
+        Ok((
+            city.name,
+            Some((great_circle_km(CHENGDU, city) * 2.0).round() as u32),
+        ))
+    }
 }
 
 #[derive(Clone, Debug, Serialize)]

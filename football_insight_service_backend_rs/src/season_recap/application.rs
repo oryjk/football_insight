@@ -15,13 +15,12 @@ pub fn calculate(
     let mut away_km = 0;
     for id in &selected {
         let m = by_id.get(id).ok_or(RecapError::InvalidMatch)?;
+        let (city, round_trip_km) = match_trip(m)?;
+        cities.insert(city);
         if m.is_home {
             home_matches += 1;
-            cities.insert(CHENGDU.name);
         } else {
-            let city = city_for_team(&m.opponent).ok_or(RecapError::UnknownCity)?;
-            cities.insert(city.name);
-            away_km += (great_circle_km(CHENGDU, city) * 2.0).round() as u32;
+            away_km += round_trip_km.unwrap_or(0);
         }
     }
     if home_matches > 0 && home_km.is_none() {
@@ -47,6 +46,8 @@ mod tests {
             match_date: "2026-10-01".into(),
             opponent: opponent.into(),
             is_home: home,
+            city: String::new(),
+            round_trip_km: None,
         }
     }
     #[test]
@@ -140,15 +141,23 @@ impl RecapService {
     }
     fn view(season: i32, snapshot: Snapshot) -> Result<RecapView, RecapError> {
         // Schedule reconciliation may retire earlier selections. They stay stored but never contribute.
+        let mut matches = snapshot.matches;
+        // 逐场城市/往返里程仅供前端预览：个别球队城市缺失不应拖垮整个视图，留空由前端回退。
+        for m in &mut matches {
+            if let Ok((city, round_trip_km)) = match_trip(m) {
+                m.city = city.to_string();
+                m.round_trip_km = round_trip_km;
+            }
+        }
         let selected: Vec<_> = snapshot
             .selected
             .into_iter()
-            .filter(|id| snapshot.matches.iter().any(|m| m.match_id == *id))
+            .filter(|id| matches.iter().any(|m| m.match_id == *id))
             .collect();
-        let summary = calculate(&snapshot.matches, &selected, snapshot.home_one_way_km)?;
+        let summary = calculate(&matches, &selected, snapshot.home_one_way_km)?;
         Ok(RecapView {
             season,
-            matches: snapshot.matches,
+            matches,
             selected_match_ids: selected,
             home_one_way_km: snapshot.home_one_way_km,
             summary,
@@ -207,6 +216,43 @@ mod service_tests {
         .unwrap();
         assert!(result.selected_match_ids.is_empty());
         assert_eq!(result.summary.total_km, 0);
+    }
+    #[test]
+    fn view_enriches_per_match_trip_and_round_trips_sum_to_away_km() {
+        let fixture = |id: i64, home: bool, opponent: &str| RecapMatch {
+            match_id: id,
+            match_date: "2026-10-01".into(),
+            opponent: opponent.into(),
+            is_home: home,
+            city: String::new(),
+            round_trip_km: None,
+        };
+        let view = RecapService::view(
+            2026,
+            Snapshot {
+                matches: vec![
+                    fixture(1, true, "上海申花"),
+                    fixture(2, false, "北京国安"),
+                    fixture(3, false, "云南玉昆"),
+                ],
+                selected: vec![1, 2, 3],
+                home_one_way_km: Some(10.0),
+            },
+        )
+        .unwrap();
+        let home = view.matches.iter().find(|m| m.match_id == 1).unwrap();
+        assert_eq!(home.city, "成都");
+        assert_eq!(home.round_trip_km, None);
+        let beijing = view.matches.iter().find(|m| m.match_id == 2).unwrap();
+        assert_eq!(beijing.city, "北京");
+        assert!((2900..3100).contains(&beijing.round_trip_km.unwrap()));
+        let round_trips: u32 = view
+            .matches
+            .iter()
+            .filter(|m| view.selected_match_ids.contains(&m.match_id))
+            .filter_map(|m| m.round_trip_km)
+            .sum();
+        assert_eq!(round_trips, view.summary.away_km);
     }
     #[test]
     fn spherical_formula_has_known_one_degree_baseline_and_symmetry() {
@@ -268,6 +314,8 @@ mod transactional_tests {
                     match_date: "2026-01-01".into(),
                     opponent: "北京国安".into(),
                     is_home: false,
+                    city: String::new(),
+                    round_trip_km: None,
                 }],
                 selected: vec![],
                 home_one_way_km: None,
@@ -287,6 +335,8 @@ mod transactional_tests {
                     match_date: "2026-01-01".into(),
                     opponent: "北京国安".into(),
                     is_home: true,
+                    city: String::new(),
+                    round_trip_km: None,
                 }],
                 selected: selected.to_vec(),
                 home_one_way_km: None,

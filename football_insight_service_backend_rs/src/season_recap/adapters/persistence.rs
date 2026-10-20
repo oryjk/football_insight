@@ -61,6 +61,9 @@ async fn snapshot_with_lock(
             match_date: m.match_date,
             opponent: m.opponent,
             is_home: m.is_home,
+            // 城市与往返里程由 application 层填充（match_trip），SQL 只取赛程字段。
+            city: String::new(),
+            round_trip_km: None,
         })
         .collect();
     let home_one_way_km = sqlx::query_scalar::<_, Option<f64>>(PREF_SQL)
