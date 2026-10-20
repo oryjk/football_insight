@@ -53,12 +53,17 @@ export function buildUserAccountInfoItems(
       value: options.joinedAtLabel,
     },
     {
+      key: 'official-follow',
+      iconName: 'badge-check',
+      label: '公众号关注状态',
+      value: options.officialWechatSubscribed === true ? '已关注'
+        : options.officialWechatSubscribed === false ? '已取关' : '关注状态待确认',
+    },
+    {
       key: 'official-bind',
       iconName: 'log-in',
-      label: '公众号状态',
-      value: options.officialWechatBound !== true ? '未绑定公众号'
-        : options.officialWechatSubscribed === true ? '已关注'
-        : options.officialWechatSubscribed === false ? '已取关' : '关注状态待确认',
+      label: '公众号绑定状态',
+      value: options.officialWechatBound === true ? '已绑定公众号' : '未绑定公众号',
     },
   ]
 }

@@ -75,7 +75,8 @@ describe('buildUserAccountInfoItems', () => {
     })).toEqual([
       { key: 'identity', iconName: 'badge-check', label: '身份状态', value: '微信会员' },
       { key: 'joined-at', iconName: 'calendar-days', label: '加入时间', value: '2026-4-8' },
-      { key: 'official-bind', iconName: 'log-in', label: '公众号状态', value: '已关注' },
+      { key: 'official-follow', iconName: 'badge-check', label: '公众号关注状态', value: '已关注' },
+      { key: 'official-bind', iconName: 'log-in', label: '公众号绑定状态', value: '已绑定公众号' },
     ])
   })
 
@@ -83,21 +84,25 @@ describe('buildUserAccountInfoItems', () => {
     for (const [hasWechatBinding, officialWechatBound, value] of [
       [true, false, '未绑定公众号'],
       [true, undefined, '未绑定公众号'],
-      [false, true, '关注状态待确认'],
+      [false, true, '已绑定公众号'],
     ] as const) {
       const items = buildUserAccountInfoItems({ hasWechatBinding, officialWechatBound, joinedAtLabel: '' })
       expect(items.find(item => item.key === 'official-bind')?.value).toBe(value)
     }
   })
 
-  test('distinguishes a bound follower, a bound unfollower and an unbound account', () => {
-    for (const [officialWechatBound, officialWechatSubscribed, expected] of [
-      [true, true, '已关注'],
-      [true, false, '已取关'],
-      [false, true, '未绑定公众号'],
+  test('shows follow and binding states independently, including unknown follow status', () => {
+    for (const [officialWechatBound, officialWechatSubscribed, expectedFollow, expectedBinding] of [
+      [true, true, '已关注', '已绑定公众号'],
+      [true, false, '已取关', '已绑定公众号'],
+      [false, true, '已关注', '未绑定公众号'],
+      [false, false, '已取关', '未绑定公众号'],
+      [true, undefined, '关注状态待确认', '已绑定公众号'],
+      [false, undefined, '关注状态待确认', '未绑定公众号'],
     ] as const) {
       const items = buildUserAccountInfoItems({ hasWechatBinding: true, officialWechatBound, officialWechatSubscribed, joinedAtLabel: '' })
-      expect(items.find(item => item.key === 'official-bind')?.value).toBe(expected)
+      expect(items.find(item => item.key === 'official-follow')?.value).toBe(expectedFollow)
+      expect(items.find(item => item.key === 'official-bind')?.value).toBe(expectedBinding)
     }
   })
 
