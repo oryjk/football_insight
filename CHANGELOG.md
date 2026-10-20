@@ -8,7 +8,7 @@
 - 变更：GET/PUT 赛季总结逐场返回可空 `opponent_avatar_url`，读取 `f_i_teams.avatar_storage_url`，缺失或空串回退 `avatar_source_url`；前端字段可选以兼容旧接口，无新增迁移或里程口径变动。
 - 原因：用户希望分享海报具有蓉城队徽与夜场氛围，强化赛季成就感和球队归属。
 - 验证：Rust 全量 644 项通过、122 项按既有标记忽略；独立一次性 PostgreSQL 队徽回退/保存锁查询测试另行通过。小程序 1405 项、类型/依赖边界、离线微信构建与组件注册通过；浏览器 canvas 查看完整背景、渐变降级与全缺图成图。Cargo check 与变更文件 rustfmt 检查通过，全库严格 Clippy 的 17 项及架构扫描的两类既有问题均在其他模块，未改动。
-- 发布状态：背景 JPEG 750×1334、105,548 字节与原始生成 PNG 仅保存于会话 scratchpad，待用户上传；代码未提交或推送，小程序未上传，本地后端未重启，生产后端未部署/未重启，微信真机验收待用户执行。
+- 发布状态：背景 JPEG（750×1334、105,548 字节）已上传 MinIO `football-insight/static/season-recap/poster-bg-v1.jpg`，公网 200。代码已推送 main（`694f262`）；local233 本地后端已重启。local233 构建镜像传至 peiqian，两个可执行文件 SHA-256 与本地一致；北京时间 10-21 生产后端已部署并重启为 `football-insight-service-backend-rs:694f262`，healthy、重启次数 0、启动错误数 0；旧容器改名 `football-insight-service-backend-rs-a835092` 停用保留，回滚即启动该容器。无新增迁移，未改 Nginx 或 jd 备用容器。小程序体验版随后上传（robot 2），微信真机验收待执行。
 
 ## 2026-10-20 · 学员功能合并与生产发布
 
