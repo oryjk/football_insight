@@ -57,3 +57,37 @@ def upload_thumbnails(target, object_name: str, content: bytes) -> list[str]:
         )
         for size in THUMB_SIZES
     ]
+
+
+def sync_avatar_thumbs(
+    urls, public_base_url: str, prefix: str, fetcher, target, dry_run: bool = False, limit: int | None = None
+) -> dict[str, int]:
+    """Generate missing thumbnails for existing player avatars (idempotent)."""
+    base = f"{public_base_url.rstrip('/')}/"
+    player_prefix = f"{prefix.strip('/')}/players/"
+    summary = {"candidates": 0, "skipped": 0, "generated": 0, "failed": 0, "ignored": 0}
+    seen: set[str] = set()
+    for url in urls:
+        if url in seen:
+            continue
+        seen.add(url)
+        object_name = url[len(base):] if url.startswith(base) else ""
+        if not object_name.startswith(player_prefix) or "/" in object_name[len(player_prefix):]:
+            summary["ignored"] += 1
+            continue
+        if limit is not None and summary["candidates"] >= limit:
+            break
+        summary["candidates"] += 1
+        if dry_run:
+            continue
+        try:
+            if all(target.exists(thumb_object_name(object_name, size)) for size in THUMB_SIZES):
+                summary["skipped"] += 1
+                continue
+            content, _ = fetcher.fetch(url)
+            upload_thumbnails(target, object_name, content)
+            summary["generated"] += 1
+        except Exception:  # noqa: BLE001 - 单张失败继续，最后汇总
+            logger.warning("thumbnail backfill failed for %s", url, exc_info=True)
+            summary["failed"] += 1
+    return summary

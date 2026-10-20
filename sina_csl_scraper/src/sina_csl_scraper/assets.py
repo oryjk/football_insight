@@ -152,6 +152,18 @@ class MinioAssetTarget:
         self.client.put_object(**kwargs)
         return self.build_public_url(object_name)
 
+    def exists(self, object_name: str) -> bool:
+        if self.client is None:
+            return False
+        try:
+            self.client.head_object(Bucket=self.bucket, Key=object_name)
+            return True
+        except Exception as error:  # botocore ClientError
+            code = getattr(error, "response", {}).get("Error", {}).get("Code")
+            if code in ("404", "NoSuchKey", "NotFound"):
+                return False
+            raise
+
 
 class AssetUploader:
     def __init__(self, fetcher: AssetFetcher, target: AssetTarget) -> None:

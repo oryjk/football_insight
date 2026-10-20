@@ -138,3 +138,64 @@ def test_minio_target_sends_cache_control_only_when_given() -> None:
     target.upload_bytes("b.jpg", b"y", "image/jpeg", cache_control=THUMB_CACHE_CONTROL)
     assert "CacheControl" not in client.kwargs[0]
     assert client.kwargs[1]["CacheControl"] == THUMB_CACHE_CONTROL
+
+
+from sina_csl_scraper.avatar_thumbs import sync_avatar_thumbs
+
+
+class ExistingTarget(RecordingTarget):
+    def __init__(self, existing: set[str]) -> None:
+        super().__init__()
+        self.existing = existing
+
+    def exists(self, object_name: str) -> bool:
+        return object_name in self.existing
+
+
+class MapFetcher:
+    def __init__(self, contents: dict[str, bytes]) -> None:
+        self.contents = contents
+        self.calls: list[str] = []
+
+    def fetch(self, url: str) -> tuple[bytes, str]:
+        self.calls.append(url)
+        if url not in self.contents:
+            raise RuntimeError("download failed")
+        return self.contents[url], "image/png"
+
+
+BASE = "https://oryjk.cn:82/minio/football-insight"
+
+
+def test_backfill_skips_existing_and_ignores_foreign_urls() -> None:
+    png = image_bytes((150, 150), (1, 2, 3))
+    urls = [f"{BASE}/summary/players/1.png", f"{BASE}/summary/players/2.png", f"{BASE}/summary/teams/1.png", "https://other.example/p.png"]
+    target = ExistingTarget({"summary/players/thumbs/96/1.png.jpg", "summary/players/thumbs/240/1.png.jpg"})
+    fetcher = MapFetcher({urls[1]: png})
+    summary = sync_avatar_thumbs(urls, BASE, "summary", fetcher, target)
+    assert summary == {"candidates": 2, "skipped": 1, "generated": 1, "failed": 0, "ignored": 2}
+    assert fetcher.calls == [urls[1]]
+    assert [call[0] for call in target.calls] == ["summary/players/thumbs/96/2.png.jpg", "summary/players/thumbs/240/2.png.jpg"]
+
+
+def test_backfill_dry_run_never_downloads_or_writes() -> None:
+    urls = [f"{BASE}/summary/players/1.png"]
+    target, fetcher = ExistingTarget(set()), MapFetcher({})
+    summary = sync_avatar_thumbs(urls, BASE, "summary", fetcher, target, dry_run=True)
+    assert summary["candidates"] == 1 and summary["generated"] == 0
+    assert fetcher.calls == [] and target.calls == []
+
+
+def test_backfill_continues_after_failures_and_reports_them() -> None:
+    png = image_bytes((150, 150), (1, 2, 3))
+    urls = [f"{BASE}/summary/players/{i}.png" for i in (1, 2, 3)]
+    summary = sync_avatar_thumbs(urls, BASE, "summary", MapFetcher({urls[0]: png, urls[2]: png}), ExistingTarget(set()))
+    assert (summary["generated"], summary["failed"]) == (2, 1)
+
+
+def test_backfill_limit_and_duplicate_urls() -> None:
+    png = image_bytes((150, 150), (1, 2, 3))
+    urls = [f"{BASE}/summary/players/{i}.png" for i in (1, 1, 2, 3)]
+    fetcher = MapFetcher({u: png for u in urls})
+    summary = sync_avatar_thumbs(urls, BASE, "summary", fetcher, ExistingTarget(set()), limit=2)
+    assert summary["candidates"] == 2 and summary["generated"] == 2

@@ -15,7 +15,8 @@ from .auto_sync import (
     load_auto_sync_state,
     save_auto_sync_state,
 )
-from .assets import AssetUploader, HttpAssetFetcher, MinioAssetTarget
+from .assets import AssetUploader, HttpAssetFetcher, MinioAssetTarget, default_public_base_url
+from .avatar_thumbs import sync_avatar_thumbs
 from .catalog import build_player_profiles, build_team_profiles
 from .cfl_client import CflCslClient
 from .client import SinaCslClient, serialize_datasets
@@ -297,6 +298,45 @@ def sync_squads_command(
             avatars=avatars,
         )
     typer.echo(json.dumps({"season": target_season, **summary}, ensure_ascii=False))
+
+
+@app.command("sync-avatar-thumbs")
+def sync_avatar_thumbs_command(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Only count candidates; no download, no upload."),
+    limit: int | None = typer.Option(None, help="Process at most N avatars."),
+    database_url: str | None = typer.Option(None, envvar=["FI_DATABASE_URL", "DATABASE_URL"]),
+    minio_endpoint: str = typer.Option(_env_default("FI_MINIO_ENDPOINT", "https://oryjk.cn:82/minio")),
+    minio_access_key: str = typer.Option(_env_default("FI_MINIO_ACCESS_KEY", "") or ""),
+    minio_secret_key: str = typer.Option(_env_default("FI_MINIO_SECRET_KEY", "") or ""),
+    minio_bucket: str = typer.Option(_env_default("FI_MINIO_BUCKET", "football-insight") or "football-insight"),
+    minio_region: str = typer.Option(_env_default("FI_MINIO_REGION", "us-east-1") or "us-east-1"),
+    minio_prefix: str = typer.Option(_env_default("FI_MINIO_PREFIX", "summary") or "summary"),
+    minio_public_base_url: str | None = typer.Option(_env_default("FI_MINIO_PUBLIC_BASE_URL")),
+) -> None:
+    """Backfill 96/240px thumbnails for existing player avatars (idempotent)."""
+    if not database_url:
+        raise typer.BadParameter("PostgreSQL database_url is required")
+    if not dry_run and (not minio_access_key or not minio_secret_key):
+        raise typer.BadParameter("MinIO credentials are required unless --dry-run")
+    target = MinioAssetTarget.from_credentials(
+        endpoint=minio_endpoint,
+        access_key=minio_access_key,
+        secret_key=minio_secret_key,
+        bucket=minio_bucket,
+        region=minio_region,
+        public_base_url=minio_public_base_url,
+    )
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        urls = [row[0] for row in connection.execute(
+            "SELECT DISTINCT avatar_storage_url FROM f_i_squad_players WHERE avatar_storage_url IS NOT NULL ORDER BY 1"
+        ).fetchall()]
+    public_base = minio_public_base_url or default_public_base_url(minio_endpoint, minio_bucket)
+    summary = sync_avatar_thumbs(
+        urls, public_base, minio_prefix, HttpAssetFetcher(), target, dry_run=dry_run, limit=limit,
+    )
+    typer.echo(json.dumps(summary, ensure_ascii=False))
+    if summary["failed"]:
+        raise typer.Exit(1)
 
 
 @app.command()
