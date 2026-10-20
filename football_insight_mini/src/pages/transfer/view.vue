@@ -1,5 +1,5 @@
 <template>
-  <page-meta :page-style="navigationPageStyle" />
+  <page-meta :page-style="navigationPageStyle + (shareVisible ? 'overflow: hidden;' : '')" />
   <FiSecondaryNav @back="goBack" />
   <view class="transfer-page">
     <FiLoading v-if="loading && !view" title="提名加载中" caption="正在读取这张提名。" />
@@ -12,11 +12,13 @@
       </view>
       <text v-if="hint" class="transfer-caption">{{ hint }}</text>
       <view class="transfer-row">
-        <button class="transfer-action transfer-action--active" open-type="share">分享拉票</button>
+        <button class="transfer-action transfer-action--active" @tap="openShare">分享拉票</button>
         <button class="transfer-action" @tap="openBoard">看大家怎么投</button>
       </view>
       <button v-if="view.window.open" class="transfer-action" @tap="openNominate">我也来提名</button>
     </template>
+    <TransferShareSheet v-model:visible="shareVisible" :busy="shareBusy" :image-path="shareImage" :error="shareError" @generate="share.generate" @preview="share.preview" @save="share.save" />
+    <canvas canvas-id="transfer-share-canvas" class="transfer-canvas" :style="{ width: '750px', height: '1200px' }" />
   </view>
 </template>
 <script setup lang="ts">
@@ -33,6 +35,8 @@ import type { TransferCardView, TransferVoteValue } from '../../types/transfer'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { buildSharePath } from '../../utils/shareSource'
 import { TRANSFER_BOARD_LABELS, applyTally, buildTransferBoardUrl, buildTransferViewUrl, parseTransferCode, transferBlockedMessage, transferCardShareTitle, transferHint, transferStance } from '../../utils/transferLinks'
+import TransferShareSheet from './components/TransferShareSheet.vue'
+import { useTransferShare } from './useTransferShare'
 
 const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
@@ -40,6 +44,9 @@ const voteDeps = transferVoteDeps()
 const votes = createTransferVotes(voteDeps)
 const pending = votes.pending
 const code = ref(''), view = ref<TransferCardView | null>(null), loading = ref(false), error = ref('')
+const share = useTransferShare(() => `${code.value}:${session.revision.value}`, () => buildTransferViewUrl(code.value))
+const { visible: shareVisible, busy: shareBusy, error: shareError, imagePath: shareImage } = share
+function openShare(): void { if (view.value) share.open(view.value) }
 let generation = 0, loadedRevision = -1
 const eligibility = () => view.value
   ? { loggedIn: voteDeps.loggedIn(), canVote: view.value.can_vote, open: view.value.window.open }
