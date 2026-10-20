@@ -9,6 +9,8 @@
 - 原因：`docs/superpowers/specs/2026-10-20-lineup-consensus-design.md`——让每套阵容都有参照，排阵容从“自己排着玩”变成“和其他球迷比一比”。
 - 验证：后端 domain 先写 6 个失败测试（门槛 9/10 套、阵型与选人平票、按名单位置归类、补齐恰为 11 人、百分比四舍五入），实现后 `cargo test` 全量 527 passed 0 failed；一次性本地库（docker postgres:16）集成测试 15 passed 0 failed，含新增“停用账号与不足 11 人不计入样本”。小程序先写重合度/独家/文案/摆位与加载器失败测试，实现后 `bun test` 1344 pass 0 fail，`type-check`、`check:boundaries`、`build:mp-weixin`、`verify:mp-components` 通过。共识卡片观感（动画、红框、球场比例）需真机确认。
 - 发布状态：无数据库迁移；生产后端未部署；小程序未上传。线上公开阵容少于 10 套时前端显示进度与“去排一套”。
+- Review（负责人委托 Kimi 在独立工作目录 `feat/lineup-consensus` 实现，`851b9d7`..`2e8a964`）：独立重跑后端 630 项、一次性数据库集成 15 项（含"只统计公开且满 11 人的阵容"）、小程序 1344 项与类型、边界、构建、组件注册均通过；交互要求（进度动画、"去排一套"、我选的红框其他变淡、点球员提示、更扁的球场、减少动态效果）已落实，引用的 token 均存在。Kimi 的 6 处偏离均合理（含计划测试期望笔误 9→8）。review 通过后快进合并到 main 并推送，未部署、未上传。
+- 遗留：`auth` 模块 `decrypt_message_accepts_plus_signs_replaced_with_spaces` 是既有的不稳定测试（加密使用随机前缀，偶发失败；与本功能无关，本次未改），之后单独修。
 
 ## 2026-10-20 · 上传体验版（转会第二期：拉票海报）
 
