@@ -141,4 +141,17 @@ auth/domain 定义三态判定，auth/ports 定义身份端口；match_id_unlock
 | 本地服务 | 最新业务代码已编译并重启 `football-insight-local-backend.service`，18092 `/api/health` 返回 ok |
 | 只读审查 | 获取/换绑同步和注册继承问题已修复复核，无剩余实质性发现 |
 
-生产迁移及补记均未执行，生产后端未部署/未重启；未向真实公众号发消息或发合成 webhook，未改真实用户、会员、订单或支付数据。小程序与安卓均未修改。部署前仍需先迁移，使公众号及注册逻辑具备新 schema。
+开发验证完成时，生产迁移及补记尚未执行，生产后端未部署/未重启；当时未向真实公众号发消息或发合成 webhook，未改真实用户、会员、订单或支付数据。后续生产迁移和部署结果见下一节。
+
+
+## 2026-10-20 生产上线记录
+
+- main 已从 `2715515` 快进合并至 `061c46b` 并推送；包含首次获取规则及已验证绑定时补齐缺失关注记录的修复。
+- 合并前后 `cargo test` 均为 634 passed / 112 ignored，最新显式独立 PostgreSQL 测试为 9 passed。未在生产调用合成公众号消息或替真实用户消耗免费机会。
+- 迁移前核对 72 条已应用迁移，SHA-384 全部一致；相关表（用户、关注者、邀请码、迁移记账）备份在 peiqian `/root/backups/football-insight/official-id-061c46b-20261020T121842Z/pre-migration.dump`，权限 0600，大小 5,065,684 字节。
+- 在 local233 构建发布镜像，传至 peiqian。两端镜像配置 ID 存在差异，但主程序、迁移程序及新增迁移 SQL 的 SHA-256 完全相同；使用唯一发布标签 `football-insight-service-backend-rs:061c46b-95ae416b` 防止同名标签混淆。
+- 在 peiqian 使用该镜像中的标准 `/usr/local/bin/run_migrations`（同仓库入口，SQLx 记账）执行迁移，输出 `migrations applied successfully`。`_sqlx_migrations` 的 `20261020160000` 为 success=true；969/969 个存量账号已标记，historical 身份 557 个，已知身份未补记数 0，新账号列默认值 false。
+- 迁移后切换生产容器：host 网络、原运行环境文件、PORT=8092、原日志卷；容器 healthy、RestartCount=0、启动 ERROR=0。运行中主程序 SHA-256 为 `0472fefe858d78d9f02101c35bcb65727539c857f950dda740ef36e5a18fd421`，与构建端一致。
+- 线上 `https://match.oryjk.cn/api/health` 和 `/api/v1/ticket-watch/current-board` 均为 200；公众号查询开关为 true。local233 后端也已重新启动且 18092 健康。
+- 原镜像 `football-insight-service-backend-rs:3925206` 和原容器 `football-insight-service-backend-rs-rollback-3925206-20261020T1225` 保留。如需回滚，停止/移除新容器，将原容器重命名回 `football-insight-service-backend-rs` 并启动；新增 schema 和已获取历史保留，不能重跑回填或删除历史记录重置免费机会。
+- 本次未修改 jd/Nginx、monitor 容器或生产环境文件，未上传小程序。并行任务中的其他未提交源码未纳入本次生产镜像或上线记录提交。
