@@ -8,7 +8,8 @@
 - 根因：我新建 `static/home/switch-team.svg` 时，在 XML 注释里写了 CSS 变量名 `--fi-color-text-secondary`；XML 规定注释内不能出现 `--`，整个 SVG 解析失败（`not well-formed`，第 2 行），小程序 `image` 加载失败就什么都不显示。换座页同款图标的注释里没有 `--`，所以那边正常。之前只验证了图标已打包，没有验证 SVG 本身合法。
 - 改法：注释去掉 `--`；按钮改为固定高度（`--fi-space-44`）、内容上下左右居中、行高 1，不再依赖 `button` 默认行高撑高度。
 - 守护：新增 `scripts/static-svg.test.ts`，扫描全部静态 SVG：注释里不得有 `--`、必须有 `<svg>` 根元素。修改前该测试准确指出 `home/switch-team.svg`（全仓仅此一个），修改后通过。
-- 验证：`bun test` 1324 通过，`type-check`、`build:mp-weixin` 通过，构建产物里的 SVG 用 XML 解析器校验合法。需重新上传体验版后真机确认。
+- 验证：`bun test` 1324 通过，`type-check`、`build:mp-weixin` 通过，构建产物里的 SVG 用 XML 解析器校验合法。
+- 上传：从干净且同步的 main `f8d4231` 上传 **1.1.0** robot 2，未提审；主包 1,685,325 字节，完整包 2,277,258 字节。待真机确认图标显示与居中。
 
 ## 2026-10-20 · 转会投票第一期上线（迁移、生产部署、体验版上传）
 
