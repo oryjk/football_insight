@@ -23,6 +23,7 @@ import { ReviewExemptPage } from "./features/review/ReviewExemptPage";
 import { BrandPage } from "./features/brand/BrandPage";
 import { SupportBasesPage } from "./features/support/SupportBasesPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
+import { StudentConfigPage } from "./features/student/StudentConfigPage";
 import { completeCredentialsChange } from "./features/settings/credentialsModel";
 import { AdminSetupForm } from "./features/setup/AdminSetupForm";
 const session = new AuthSession(browserSessionStorage());
@@ -276,6 +277,13 @@ export function App() {
           />
         ) : page === "supportBases" ? (
           <SupportBasesPage
+            key={token}
+            api={api}
+            token={token}
+            onBusyChange={onProductBusy}
+          />
+        ) : page === "studentConfig" ? (
+          <StudentConfigPage
             key={token}
             api={api}
             token={token}

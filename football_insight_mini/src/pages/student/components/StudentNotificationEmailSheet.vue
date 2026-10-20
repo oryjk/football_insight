@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import FiBottomSheet from '../../../components/FiBottomSheet.vue'
-import { isValidNotificationEmail } from '../helpers'
+import { isValidNotificationEmail } from '../../../utils/notificationEmail'
 
 const props = defineProps<{
   visible: boolean
@@ -72,19 +72,19 @@ function submit(): void {
 <style scoped lang="css">
 .account-form-panel__summary {
   display: block;
-  margin-top: 18rpx;
-  color: #6b707b;
+  margin-top: var(--fi-space-18);
+  color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-28);
-  line-height: 1.7;
+  line-height: var(--fi-leading-relaxed);
 }
 
 .auth-input {
   width: 100%;
   height: 92rpx;
   padding: 0 var(--fi-space-24);
-  border-radius: 22rpx;
-  border: 2rpx solid var(--page-border);
-  background: #f7f8fb;
+  border-radius: var(--fi-radius-md);
+  border: var(--fi-border-card);
+  background: var(--fi-color-page);
   font-size: var(--fi-font-28);
 }
 
@@ -95,11 +95,11 @@ function submit(): void {
   align-self: flex-start;
   padding: var(--fi-space-20) var(--fi-space-30);
   border-radius: var(--fi-radius-round);
-  background: var(--fi-primitive-ink);
-  color: var(--fi-primitive-white);
+  background: var(--fi-color-text-primary);
+  color: var(--fi-color-surface);
   font-size: var(--fi-font-28);
   white-space: nowrap;
-  line-height: 1;
+  line-height: var(--fi-leading-none);
 }
 
 .primary-action--ghost {

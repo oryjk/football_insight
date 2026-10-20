@@ -43,6 +43,13 @@
 			}
 		},
 		{
+			"path": "pages/student/index",
+			"style": {
+				"navigationBarTitleText": "学员功能",
+				"navigationStyle": "custom"
+			}
+		},
+		{
 			"path": "pages/user/settings/index",
 			"style": {
 				"navigationBarTitleText": "设置",

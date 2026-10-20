@@ -517,9 +517,6 @@ describe('revision 监听与认证表单上下文（真实 Vue watcher）', () =
     const state: UserAccountEffectsState = {
       loading: ref(false),
       isReviewController: ref(false),
-      notificationEmail: ref('a@example.com'),
-      notificationEmailSheetVisible: ref(false),
-      notificationEmailSaving: ref(false),
       miniWechatBindState: fixture.state.miniWechatBindState,
       passwordLoginSheetVisible: fixture.state.passwordLoginSheetVisible,
       passwordLoginSubmitting: fixture.state.passwordLoginSubmitting,
@@ -527,9 +524,6 @@ describe('revision 监听与认证表单上下文（真实 Vue watcher）', () =
     ;(fixture as unknown as { accountState: UserAccountEffectsState }).accountState = state
     return createUserAccountEffects(fixture.session, state, {
       canControlMiniReview: () => Promise.resolve({ allowed: false }),
-      getNotificationEmail: () => Promise.resolve({ email: null }),
-      updateNotificationEmail: () => Promise.resolve({ email: null }),
-      showToast: () => {},
     })
   }
 
@@ -800,9 +794,6 @@ describe('revision 监听与认证表单上下文（watcher 联动）', () => {
     const state: UserAccountEffectsState = {
       loading: ref(false),
       isReviewController: ref(false),
-      notificationEmail: ref('a@example.com'),
-      notificationEmailSheetVisible: ref(false),
-      notificationEmailSaving: ref(false),
       miniWechatBindState: fixture.state.miniWechatBindState,
       passwordLoginSheetVisible: fixture.state.passwordLoginSheetVisible,
       passwordLoginSubmitting: fixture.state.passwordLoginSubmitting,
@@ -810,9 +801,6 @@ describe('revision 监听与认证表单上下文（watcher 联动）', () => {
     ;(fixture as unknown as { accountState: UserAccountEffectsState }).accountState = state
     return createUserAccountEffects(fixture.session, state, {
       canControlMiniReview: () => Promise.resolve({ allowed: false }),
-      getNotificationEmail: () => Promise.resolve({ email: null }),
-      updateNotificationEmail: () => Promise.resolve({ email: null }),
-      showToast: () => {},
     })
   }
 
@@ -860,7 +848,7 @@ describe('revision 监听与认证表单上下文（watcher 联动）', () => {
     watchRevision(flow, effects, fixture.session.revision.value)
 
     // 旧账号展示数据被清理，但绑定表单与 token 保留。
-    expect(accountState.notificationEmail.value).toBe('')
+    expect(accountState.isReviewController.value).toBe(false)
     expect(fixture.state.miniWechatBindState.value?.bind_token).toBe('bind-token')
 
     // 邀请码无效失败：提示错误，表单与 token 仍在，可修改后重试。

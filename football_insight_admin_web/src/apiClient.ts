@@ -60,7 +60,15 @@ export class ApiClient {
         403: "当前管理员没有账号查询权限",
         404: "账号不存在，已有 UUID 已保留",
       };
+      const studentConfigMessages: Record<number, string> = {
+        400: "学员功能配置无效，请检查说明、二维码和商品 ID",
+        404: "学员功能配置暂不可用，请重新加载",
+        409: "学员功能配置冲突，请检查微信商品 ID 后重试",
+      };
       const message =
+        (path === "/student/config"
+          ? studentConfigMessages[response.status]
+          : undefined) ||
         (path.startsWith("/users")
           ? accountMessages[response.status]
           : undefined) ||

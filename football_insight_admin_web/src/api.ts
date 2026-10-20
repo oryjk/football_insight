@@ -1,5 +1,6 @@
 import { ApiClient, ApiError } from "./apiClient";
 import { productPath } from "./features/products/productsModel";
+import { parseStudentConfig, studentConfigPayload, type StudentConfig } from "./features/student/studentConfigModel";
 export interface Admin {
   id: string;
   username: string;
@@ -235,6 +236,14 @@ export function createApi(client: ApiClient) {
       ),
     brandSubtitle: (token: string, signal?: AbortSignal) =>
       client.request<BrandSubtitle>("/brand/subtitle", token, { signal }),
+    studentConfig: async (token: string, signal?: AbortSignal) =>
+      parseStudentConfig(await client.request<unknown>("/student/config", token, { signal })),
+    setStudentConfig: async (token: string, config: StudentConfig, signal?: AbortSignal) =>
+      parseStudentConfig(await client.request<unknown>("/student/config", token, {
+        method: "PUT",
+        body: JSON.stringify(studentConfigPayload(config)),
+        signal,
+      })),
     setBrandSubtitle: (
       token: string,
       subtitle: string,

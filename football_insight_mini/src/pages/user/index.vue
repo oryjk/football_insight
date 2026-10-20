@@ -33,10 +33,8 @@
           <UserAccountInfoPanel
             :items="accountInfoItems"
             :icon-map="accountInfoIconMap"
-            :email-label="notificationEmailLabel"
-            :has-email="!!notificationEmail"
             :show-official-bind="canOpenOfficialBind"
-            @edit-email="openNotificationEmailSheet"
+            @open-student="openStudentPage"
             @bind-official="officialBind.open"
           />
 
@@ -71,14 +69,6 @@
       </view>
       </view>
     </view>
-
-    <UserNotificationEmailSheet
-      v-if="!systemConfigUnderReview"
-      v-model:visible="notificationEmailSheetVisible"
-      :email="notificationEmail"
-      :saving="notificationEmailSaving"
-      @save="saveNotificationEmail"
-    />
 
     <UserOfficialBindSheet
       :visible="officialBindVisible"
@@ -131,7 +121,6 @@ import UserAccountHero from './components/UserAccountHero.vue'
 import UserAccountInfoPanel from './components/UserAccountInfoPanel.vue'
 import UserPasswordLoginSheet from './components/UserPasswordLoginSheet.vue'
 import UserWechatBindSheet from './components/UserWechatBindSheet.vue'
-import UserNotificationEmailSheet from './components/UserNotificationEmailSheet.vue'
 import UserOfficialBindSheet from '../../components/FiOfficialBindSheet.vue'
 import UserH5TestLoginPanel from './components/UserH5TestLoginPanel.vue'
 import badgeCheckIcon from '../../static/user/badge-check.svg'
@@ -152,7 +141,6 @@ import { createUserLoginFlow, type MiniWechatBindForm } from './loginFlow'
 import {
   buildUserAccountInfoItems,
   canShowMembershipPurchaseEntry,
-  formatNotificationEmailLabel,
   resolveCurrentUserInviteCode,
   resolveUserMembershipMeta,
   type UserAccountInfoItem,
@@ -192,22 +180,16 @@ const {
 const pageStyle = computed(() => `${navigationPageStyle.value};${officialBindVisible.value ? 'overflow: hidden;' : ''}`)
 onHide(officialBind.handlePageHide)
 onUnmounted(officialBind.dispose)
-const notificationEmail = ref('')
-const notificationEmailSheetVisible = ref(false)
-const notificationEmailSaving = ref(false)
 
 const miniWechatBindState = ref<MiniWechatBindingRequiredResponse | null>(null)
 const passwordLoginSheetVisible = ref(false)
 const passwordLoginSubmitting = ref(false)
 
-// 账号读写（白名单/邮箱）收口到 effects：内部按 session revision 防护，
+// 账号读取（白名单）收口到 effects：内部按 session revision 防护，
 // 旧会话的迟到响应不写状态、不弹 toast。
 const accountEffects = createUserAccountEffects(session, {
   loading,
   isReviewController,
-  notificationEmail,
-  notificationEmailSheetVisible,
-  notificationEmailSaving,
   miniWechatBindState,
   passwordLoginSheetVisible,
   passwordLoginSubmitting,
@@ -252,7 +234,6 @@ const isGuestPage = computed(() => !hasAccessToken.value || (!loading.value && !
 const hasOpenSheet = computed(() =>
   passwordLoginSheetVisible.value
   || Boolean(miniWechatBindState.value)
-  || notificationEmailSheetVisible.value
   || officialBindVisible.value,
 )
 // H5 测试登录面板展开时，隐藏游客歌词墙和登录浮窗，避免遮挡测试账号列表。
@@ -269,10 +250,6 @@ const joinedAtLabel = computed(() => {
   const date = new Date(currentUser.value.created_at)
   return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
 })
-
-const notificationEmailLabel = computed(() =>
-  formatNotificationEmailLabel(notificationEmail.value),
-)
 
 const currentMembershipMeta = computed(() => resolveUserMembershipMeta(currentUser.value?.membership_tier))
 const canPurchaseMembership = computed(() =>
@@ -324,12 +301,9 @@ async function loadUser(): Promise<void> {
   await accountEffects.loadUser()
 }
 
-function openNotificationEmailSheet(): void {
-  notificationEmailSheetVisible.value = true
-}
-
-async function saveNotificationEmail(email: string): Promise<void> {
-  await accountEffects.saveNotificationEmail(email)
+function openStudentPage(): void {
+  if (!currentUser.value || systemConfigUnderReview.value) return
+  uni.navigateTo({ url: '/pages/student/index' })
 }
 
 async function handleLogout(): Promise<void> {

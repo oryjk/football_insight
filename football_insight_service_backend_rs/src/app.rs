@@ -94,6 +94,13 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         auth.token_port.clone(),
         payment.event_recorder.clone(),
     );
+    let student_routes = crate::student::bootstrap::build_student_routes(
+        pool.clone(),
+        payment.order_repository.clone(),
+        user_membership_port.clone(),
+        payment.wechat_pay_port.clone(),
+        auth.token_port.clone(),
+    );
     let match_id_unlock_routes = build_match_id_unlock_routes(
         pool.clone(),
         ticket_watch.ticket_monitor_port.clone(),
@@ -114,6 +121,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
     let push_notification_routes = build_push_notification_routes(pool, auth.token_port.clone());
 
     Router::new()
+        .merge(student_routes)
         .route("/", get(|| async { "football insight service" }))
         .merge(health_routes)
         .merge(match_outlook_routes)

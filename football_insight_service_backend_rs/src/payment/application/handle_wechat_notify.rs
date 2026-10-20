@@ -91,7 +91,14 @@ impl HandleWechatNotifyUseCase {
 
         let out_trade_no = &order.order_no;
 
-        if let Some(product) = parse_reflux_subscription_product_type(&order.product_type) {
+        if let Some(code) = crate::student::domain::ServiceCode::from_product_type(&order.product_type) {
+            if order.amount_cents != code.price() {
+                anyhow::bail!("invalid student service price");
+            }
+            self.payment_settlement_port
+                .settle_student_service_order(out_trade_no, transaction_id, order.user_id, code)
+                .await?;
+        } else if let Some(product) = parse_reflux_subscription_product_type(&order.product_type) {
             self.payment_settlement_port
                 .settle_reflux_subscription_order(
                     out_trade_no,

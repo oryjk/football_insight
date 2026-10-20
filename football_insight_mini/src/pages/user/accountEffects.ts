@@ -1,17 +1,12 @@
 import type { Ref } from 'vue'
-import { getNotificationEmail, updateNotificationEmail } from '../../api/auth'
 import { canControlMiniReview } from '../../api/miniReview'
 import { useAppSession, type AppSession } from '../../stores/appSession'
-import type { MiniWechatBindingRequiredResponse, NotificationEmailResponse } from '../../types/auth'
-import { extractApiErrorMessage } from '../../utils/apiError'
+import type { MiniWechatBindingRequiredResponse } from '../../types/auth'
 
 /** user 页会话私有状态（全部以 ref 注入，页面持有所有权）。 */
 export interface UserAccountEffectsState {
   loading: Ref<boolean>
   isReviewController: Ref<boolean>
-  notificationEmail: Ref<string>
-  notificationEmailSheetVisible: Ref<boolean>
-  notificationEmailSaving: Ref<boolean>
   miniWechatBindState: Ref<MiniWechatBindingRequiredResponse | null>
   passwordLoginSheetVisible: Ref<boolean>
   passwordLoginSubmitting: Ref<boolean>
@@ -19,22 +14,15 @@ export interface UserAccountEffectsState {
 
 export interface UserAccountEffectsDeps {
   canControlMiniReview: () => Promise<{ allowed: boolean }>
-  getNotificationEmail: () => Promise<NotificationEmailResponse>
-  updateNotificationEmail: (email: string) => Promise<NotificationEmailResponse>
-  showToast: (title: string, icon: 'success' | 'none') => void
 }
 
 const defaultDeps: UserAccountEffectsDeps = {
   canControlMiniReview,
-  getNotificationEmail,
-  updateNotificationEmail,
-  showToast: (title, icon) => uni.showToast({ title, icon }),
 }
 
 export interface UserAccountEffects {
   loadUser(): Promise<void>
-  saveNotificationEmail(email: string): Promise<void>
-  /** 只清旧账号的私有展示数据（邮箱/白名单/loading），保留正在提交的认证表单。 */
+  /** 只清旧账号的私有展示数据（白名单/loading），保留正在提交的认证表单。 */
   resetPrivateViewState(): void
   /** 清认证表单上下文（密码弹层/绑定 token）；用于退出或被其他认证操作替代时。 */
   resetAuthFormState(): void
@@ -48,7 +36,7 @@ export interface UserAccountEffects {
 }
 
 /**
- * user 页账号数据的读写入口。所有异步结果（白名单判定、邮箱读取/保存、finally）
+ * user 页账号数据的读写入口。所有异步结果（白名单判定、账号恢复）
  * 都核对捕获的 revision，旧会话的请求在会话被替代后不写状态、不弹 toast；
  * 用户读取走共享 session.ensureSessionReady（401/断网语义由 session 统一处理）。
  */
@@ -58,7 +46,7 @@ export function createUserAccountEffects(
   deps: UserAccountEffectsDeps = defaultDeps,
 ): UserAccountEffects {
   // 页面 onShow 初始化与会话恢复通知可能同时触发 loadUser：同一会话（revision）的
-  // 并发加载合并为一个请求，避免白名单/邮箱接口被重复调用。
+  // 并发加载合并为一个请求，避免白名单接口被重复调用。
   let inFlightLoad: { revision: number; promise: Promise<void> } | null = null
 
   async function performLoadUser(): Promise<void> {
@@ -86,55 +74,22 @@ export function createUserAccountEffects(
 
     if (!session.hasAccessToken.value) {
       if (isCurrent()) {
-        state.notificationEmail.value = ''
         state.loading.value = false
       }
       return
     }
 
-    const [, notificationEmailResult] = await Promise.allSettled([
-      // 用户读取走共享会话：401 由 session 清会话，断网/5xx 由 session 保留旧态并记录 errorMessage。
-      session.ensureSessionReady(),
-      deps.getNotificationEmail(),
-    ])
+    // 用户读取走共享会话；401 / 断网语义由 session 统一处理。
+    await Promise.allSettled([session.ensureSessionReady()])
 
     if (!isCurrent()) {
       return
     }
 
-    state.notificationEmail.value = notificationEmailResult.status === 'fulfilled'
-      ? notificationEmailResult.value.email?.trim() || ''
-      : ''
     state.loading.value = false
   }
 
-  async function saveNotificationEmail(email: string): Promise<void> {
-    const requestRevision = session.revision.value
-    state.notificationEmailSaving.value = true
-    try {
-      const result = await deps.updateNotificationEmail(email)
-      if (session.revision.value !== requestRevision) {
-        return
-      }
-      state.notificationEmail.value = result.email?.trim() || email
-      state.notificationEmailSheetVisible.value = false
-      deps.showToast('邮箱已保存', 'success')
-    } catch (error) {
-      if (session.revision.value !== requestRevision) {
-        return
-      }
-      deps.showToast(extractApiErrorMessage(error, '邮箱保存失败'), 'none')
-    } finally {
-      if (session.revision.value === requestRevision) {
-        state.notificationEmailSaving.value = false
-      }
-    }
-  }
-
   function resetPrivateViewState(): void {
-    state.notificationEmail.value = ''
-    state.notificationEmailSheetVisible.value = false
-    state.notificationEmailSaving.value = false
     state.isReviewController.value = false
     state.loading.value = false
   }
@@ -180,7 +135,6 @@ export function createUserAccountEffects(
 
   return {
     loadUser,
-    saveNotificationEmail,
     resetPrivateViewState,
     resetAuthFormState,
     resetSessionScopedState,

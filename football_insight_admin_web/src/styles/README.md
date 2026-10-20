@@ -11,6 +11,7 @@
 | workspace.css  | Main Content Card、分区、表单、反馈                                          |
 | products.css   | 商品筛选、表格、分页、详情、编辑、购买账号选择器、购买记录弹窗和页面响应规则 |
 | settings.css   | 当前管理员账号/密码设置                                                      |
+| student.css    | 学员服务说明、微信联系二维码与支付商品配置                                    |
 | responsive.css | 跨页面壳层 breakpoints                                                       |
 
 业务类仅组织布局；控件使用 `components/ui`，按钮外观归 foundation。

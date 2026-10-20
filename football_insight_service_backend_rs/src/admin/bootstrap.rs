@@ -106,10 +106,13 @@ pub fn build_admin_routes(pool: PgPool, config: &AppConfig) -> Router {
     )));
 
     let audit_service = Arc::new(AdminAuditService::new(Arc::new(
-        PostgresAdminAuditRepository::new(pool),
+        PostgresAdminAuditRepository::new(pool.clone()),
     )));
 
     admin_auth_routes(auth_service.clone())
+        .merge(crate::student::bootstrap::build_admin_student_routes(
+            pool.clone(), auth_service.clone(),
+        ))
         .merge(admin_setup_routes(setup_service))
         .merge(admin_credentials_routes(
             auth_service.clone(),

@@ -19,14 +19,12 @@
       </view>
     </view>
 
-    <view class="panel notification-email-panel">
-      <view class="notification-email-panel__body">
-        <text class="notification-email-panel__title">回流提醒邮箱</text>
-        <text class="notification-email-panel__value">{{ emailLabel }}</text>
+    <view class="panel student-entry-panel" hover-class="student-entry-panel--pressed" @tap="emit('open-student')">
+      <view class="student-entry-panel__body">
+        <text class="student-entry-panel__title">学员功能</text>
+        <text class="student-entry-panel__value">服务购买、购买记录与提醒邮箱</text>
       </view>
-      <button class="notification-email-panel__action" @click="emit('edit-email')">
-        {{ hasEmail ? '编辑' : '填写' }}
-      </button>
+      <text class="student-entry-panel__action">进入 ›</text>
     </view>
   </view>
 </template>
@@ -37,13 +35,11 @@ import type { UserAccountInfoItem } from '../helpers'
 defineProps<{
   items: UserAccountInfoItem[]
   iconMap: Record<UserAccountInfoItem['iconName'], string>
-  emailLabel: string
-  hasEmail: boolean
   showOfficialBind: boolean
 }>()
 
 const emit = defineEmits<{
-  (e: 'edit-email'): void
+  (e: 'open-student'): void
   (e: 'bind-official'): void
 }>()
 </script>
@@ -58,60 +54,61 @@ const emit = defineEmits<{
 .hero-card, .panel {
   position: relative;
   z-index: 1;
-  background: rgba(255,255,255,0.72);
+  background: var(--fi-color-surface-frosted);
   border-radius: var(--fi-radius-xl);
   padding: var(--fi-space-20);
-  border: 2rpx solid rgba(255,255,255,0.55);
-  box-shadow: 0 20rpx 48rpx rgba(26,28,36,0.06);
+  border: var(--fi-border-card);
+  box-shadow: var(--fi-shadow-card);
   backdrop-filter: blur(18rpx);
   -webkit-backdrop-filter: blur(18rpx);
 }
 
-.notification-email-panel {
+.student-entry-panel {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--fi-space-18);
-  border-color: rgba(229, 232, 238, 0.96);
-  background: rgba(255, 255, 255, 0.94);
+  border-color: var(--fi-color-border-card);
+  background: var(--fi-color-surface-panel);
 }
 
-.notification-email-panel__body {
+.student-entry-panel--pressed {
+  opacity: var(--fi-opacity-pressed);
+}
+
+.student-entry-panel__body {
   min-width: 0;
   display: grid;
   gap: var(--fi-space-10);
 }
 
-.notification-email-panel__title {
-  color: var(--fi-primitive-ink);
+.student-entry-panel__title {
+  color: var(--fi-color-text-primary);
   font-size: var(--fi-font-30);
-  font-weight: 800;
+  font-weight: var(--fi-weight-extrabold);
 }
 
-.notification-email-panel__value {
-  color: #747985;
+.student-entry-panel__value {
+  color: var(--fi-color-text-caption);
   font-size: var(--fi-font-24);
-  line-height: 1.4;
+  line-height: var(--fi-leading-normal);
   word-break: break-all;
 }
 
-.notification-email-panel__action {
+.student-entry-panel__action {
   flex-shrink: 0;
   margin: 0 0 0 auto;
   min-width: 128rpx;
   height: 68rpx;
-  padding: 0 26rpx;
+  padding: 0 var(--fi-space-24);
   border-radius: var(--fi-radius-round);
-  background: var(--fi-primitive-ink);
-  color: var(--fi-primitive-white);
+  background: var(--fi-color-text-primary);
+  color: var(--fi-color-surface);
   font-size: var(--fi-font-26);
-  font-weight: 800;
+  font-weight: var(--fi-weight-extrabold);
   line-height: 68rpx;
+  text-align: center;
   box-shadow: none;
-}
-
-.notification-email-panel__action::after {
-  border: none;
 }
 
 .info-panel,
@@ -123,8 +120,8 @@ const emit = defineEmits<{
 
 .info-panel,
 .privilege-panel {
-  border-color: rgba(229, 232, 238, 0.96);
-  background: rgba(255, 255, 255, 0.94);
+  border-color: var(--fi-color-border-card);
+  background: var(--fi-color-surface-panel);
 }
 
 .info-panel {
@@ -134,10 +131,10 @@ const emit = defineEmits<{
 .info-panel__title,
 .privilege-panel__title,
 .upgrade-panel__title {
-  color: #1b1c20;
+  color: var(--fi-color-text-primary);
   font-size: var(--fi-font-30);
-  font-weight: 800;
-  line-height: 1;
+  font-weight: var(--fi-weight-extrabold);
+  line-height: var(--fi-leading-none);
 }
 
 .account-info-list {

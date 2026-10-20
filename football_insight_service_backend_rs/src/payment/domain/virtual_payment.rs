@@ -89,6 +89,8 @@ pub fn product_key(product_type: &str, amount_cents: i32) -> Result<String, Virt
     }
     let parts: Vec<_> = product_type.split(':').collect();
     let key = match parts.as_slice() {
+        ["student_service", _] if crate::student::domain::ServiceCode::from_product_type(product_type)
+            .is_some_and(|code| code.price() == amount_cents) => product_type.to_owned(),
         ["membership", tier] if super::product_kind::is_valid_membership_tier(tier) => {
             format!("membership:{tier}")
         }

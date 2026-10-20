@@ -146,6 +146,24 @@ mod tests {
 
 #[async_trait::async_trait]
 impl PaymentSettlementPort for PostgresPaymentSettlementPort {
+    async fn settle_student_service_order(
+        &self,
+        order_no: &str,
+        transaction_id: &str,
+        user_id: Uuid,
+        code: crate::student::domain::ServiceCode,
+    ) -> anyhow::Result<()> {
+        // Payment confirmation records the purchase, not completion of manual service delivery.
+        sqlx::query("UPDATE f_i_payment_orders SET status='paid',transaction_id=COALESCE(transaction_id,$2),paid_at=COALESCE(paid_at,NOW()),updated_at=NOW() WHERE order_no=$1 AND user_id=$3 AND product_type=$4 AND amount_cents=$5 AND status='pending'")
+            .bind(order_no)
+            .bind(transaction_id)
+            .bind(user_id)
+            .bind(code.product_type())
+            .bind(code.price())
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
     async fn settle_membership_order(
         &self,
         order_no: &str,

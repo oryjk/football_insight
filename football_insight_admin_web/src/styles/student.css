@@ -1,0 +1,48 @@
+.student-config-workspace,
+.student-config-form,
+.student-config-contact,
+.student-config-feedback {
+  display: grid;
+  gap: var(--page-section-gap);
+  min-width: 0;
+}
+.student-config-form {
+  width: min(100%, var(--student-config-form-width));
+}
+.student-config-feedback > [data-slot="button"] {
+  justify-self: start;
+}
+.student-contact-qr {
+  display: block;
+  width: var(--student-contact-qr-size);
+  max-width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border: var(--space-px) solid var(--border-subtle);
+  border-radius: var(--radius-control);
+}
+.student-service-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--student-service-min-width)), 1fr));
+  gap: var(--space-6);
+}
+.student-service-fields {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-4) 0 0;
+  gap: var(--space-4);
+  border: 0;
+  border-top: var(--space-px) solid var(--border-subtle);
+}
+.student-service-fields legend {
+  padding: 0 var(--space-3) 0 0;
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+}
+.student-service-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}

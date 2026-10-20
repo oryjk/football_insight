@@ -28,10 +28,8 @@ const LEGACY_OFF_SCALE = {
   'pages/rankings/components/RankingsTeamSeasonSheet.vue': 5, // border-radius: 32rpx, padding: 62rpx, padding-right: 128rpx, border-radius: 16rpx, border-radius: 16rpx
   'pages/seat-swap/components/StadiumMap.vue': 3, // gap: 7rpx, border-radius: 7rpx, padding: 11rpx
   'pages/seat-swap/index.vue': 1, // padding-bottom: 240rpx
-  'pages/user/components/UserAccountInfoPanel.vue': 1, // padding: 26rpx
   'pages/user/components/UserGuestChantWall.vue': 3, // font-size: 42rpx, font-size: 31rpx, font-size: 39rpx
   'pages/user/components/UserH5TestLoginPanel.vue': 4, // font-size: 25rpx, font-size: 25rpx, border-radius: 22rpx, font-size: 25rpx
-  'pages/user/components/UserNotificationEmailSheet.vue': 1, // border-radius: 22rpx
   'pages/user/components/UserPasswordLoginSheet.vue': 1, // border-radius: 22rpx
   'pages/user/components/UserSkeleton.vue': 4, // border-radius: 22rpx, border-radius: 22rpx, border-radius: 22rpx, border-radius: 42rpx
   'pages/user/components/UserWechatBindSheet.vue': 1, // border-radius: 22rpx

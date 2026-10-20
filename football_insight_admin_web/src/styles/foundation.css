@@ -17,6 +17,9 @@
   --page-content-padding: var(--space-4);
   --page-section-gap: var(--space-4);
   --support-base-card-min-width: 420px;
+  --student-config-form-width: 960px;
+  --student-service-min-width: 320px;
+  --student-contact-qr-size: 180px;
   --page-content-min-height: calc(
     100dvh - var(--shell-header-height) - var(--shell-gutter) * 3
   );

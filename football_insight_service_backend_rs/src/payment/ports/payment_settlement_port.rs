@@ -5,6 +5,15 @@ use crate::payment::domain::order::RefluxSubscriptionProductType;
 
 #[async_trait]
 pub trait PaymentSettlementPort: Send + Sync {
+    async fn settle_student_service_order(
+        &self,
+        _order_no: &str,
+        _transaction_id: &str,
+        _user_id: Uuid,
+        _code: crate::student::domain::ServiceCode,
+    ) -> anyhow::Result<()> {
+        anyhow::bail!("student settlement is not configured")
+    }
     async fn settle_membership_order(
         &self,
         order_no: &str,

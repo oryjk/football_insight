@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import {
   Eye,
+  GraduationCap,
   LogOut,
   Menu,
   Package,
@@ -25,6 +26,7 @@ export type AdminPage =
   | "topicReaders"
   | "supportBases"
   | "brand"
+  | "studentConfig"
   | "reviewExempt"
   | "settings";
 const PAGE_TITLES: Record<AdminPage, { title: string; subtitle: string }> = {
@@ -35,6 +37,7 @@ const PAGE_TITLES: Record<AdminPage, { title: string; subtitle: string }> = {
     subtitle: "给比赛的助力数加运营基础值",
   },
   brand: { title: "品牌文案", subtitle: "小程序顶部品牌栏副标题" },
+  studentConfig: { title: "学员功能配置", subtitle: "服务说明、联系微信与支付商品" },
   reviewExempt: {
     title: "审核豁免",
     subtitle: "审核期间仍能看到完整功能的测试账号",
@@ -76,6 +79,19 @@ export function AdminShell({
       >
         <Package />
         商品管理
+      </Button>
+      <Button
+        variant="ghost"
+        className="sidebar-nav-item"
+        aria-current={page === "studentConfig" ? "page" : undefined}
+        disabled={navigationLocked}
+        onClick={() => {
+          onNavigate("studentConfig");
+          setDrawer(false);
+        }}
+      >
+        <GraduationCap />
+        学员功能配置
       </Button>
       <Button
         variant="ghost"

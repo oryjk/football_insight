@@ -189,6 +189,8 @@ impl VirtualOrderRepository for PostgresVirtualOrderRepository {
                     sqlx::query("INSERT INTO f_i_user_match_id_unlocks(user_id,match_id,order_no) SELECT user_id,$2,order_no FROM f_i_payment_orders WHERE user_id=$1 AND product_type=$3 AND status='paid' AND order_no<>$4 ORDER BY paid_at DESC LIMIT 1 ON CONFLICT(user_id,match_id) DO NOTHING")
                         .bind(user_id).bind(match_id).bind(&product_type).bind(&refund.order_no).execute(&mut *tx).await?;
                 }
+            } else if crate::student::domain::ServiceCode::from_product_type(&product_type).is_some() {
+                // Manual services do not grant membership or digital entitlements; the refunded order is the record.
             } else {
                 return Err(VirtualPaymentError::InvalidOrder.into());
             }

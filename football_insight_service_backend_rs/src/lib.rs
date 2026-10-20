@@ -19,6 +19,7 @@ pub mod season_recap;
 pub mod seat_swap;
 pub mod share_code;
 pub mod support;
+pub mod student;
 pub mod system_config;
 pub mod team_board;
 pub mod ticket_watch;
