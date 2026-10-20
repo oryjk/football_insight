@@ -9,6 +9,8 @@
 - 小程序：新增 `utils/avatarThumb.ts` 与共享组件 `FiAvatar`（先小图、失败回退原图、再失败显示首字；只对 MinIO 球员目录地址换算，用户头像/队徽/外部地址原样使用），替换提名弹层、转会卡、选人弹层、球场圆点、共识卡片 5 处头像；转会与战术板海报绘制前优先取 240 小图、回退原图；长列表 lazy 守护改为检查 `FiAvatar` 带 `lazy`（作者微信头像 `FiLineupCommunityCard` 不在球员目录，仍用 `<image lazy-load>`）。
 - 验证：抓取器先写失败测试再实现，`uv run pytest` 全量 253 passed、22 skipped（基线 245 passed、22 skipped，跳过数不变）；`sync-avatar-thumbs --help` 正常。小程序 `bun test` 1347 pass 0 fail，`type-check`、`check:boundaries`、`MINI_REVIEW_SKIP=1 bun run build:mp-weixin`、`verify:mp-components` 均通过。测试全部使用假下载器与存储，未连接生产 MinIO 或生产数据库。
 - 发布状态：**小图尚未补生成**——负责人确认后先 `uv run sina-csl-scraper sync-avatar-thumbs --dry-run` 看统计，再正式执行（写生产 MinIO）；补生成前小程序会自动回退原图，不会显示坏图。小程序未上传。
+- Review（负责人委托 Kimi 在独立工作目录 `feat/avatar-thumbnails` 实现，`53ba73c`..`9a88b78`；第一次运行在 Task 3 中途到达单次运行上限退出，续用同一会话补完）：独立重跑抓取器 253 项（小图 14 项）、小程序 1347 项与类型、边界、构建、组件注册均通过；补生成命令只读数据库、`--dry-run` 不需要 MinIO 凭据且不下载不上传；`FiAvatar` 回退顺序（小图→原图→首字）与 5 处外层圆角裁剪均核对。日志中无任何写生产的命令。快进合并到 main 并推送。
+- 预演：`sync-avatar-thumbs --dry-run`（只读生产数据库）→ 619 张候选、0 张忽略，与库中不重复头像数一致。**正式补生成会向生产 MinIO 新增 1238 个小图文件（不改原图），待负责人确认后执行。**
 
 ## 2026-10-20 · 长列表头像延迟加载（提名弹层等）
 
