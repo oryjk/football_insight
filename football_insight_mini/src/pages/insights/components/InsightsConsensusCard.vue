@@ -23,8 +23,7 @@
         hover-class="consensus__player--pressed"
         @tap="explain(entry.player)"
       >
-        <image v-if="entry.player.avatar_url" class="consensus__avatar" :src="entry.player.avatar_url" mode="aspectFill" />
-        <view v-else class="consensus__avatar consensus__avatar--fallback"><text>{{ entry.player.name.slice(0, 1) }}</text></view>
+        <view class="consensus__avatar"><FiAvatar :src="entry.player.avatar_url" :size="96" :name="entry.player.name" /></view>
         <text class="consensus__name">{{ entry.player.name }}</text>
         <text class="consensus__rate">{{ entry.player.pick_rate }}%</text>
       </view>
@@ -34,6 +33,7 @@
 </template>
 <script setup lang="ts">
 import { computed } from 'vue'
+import FiAvatar from '../../../components/FiAvatar.vue'
 import type { LineupConsensus, LineupConsensusPlayer } from '../../../types/lineup'
 import { consensusPlayerHint, consensusProgressText, placeConsensus } from '../../../utils/lineupConsensus'
 const props = defineProps<{ consensus: LineupConsensus; myPlayerIds: number[] }>()
@@ -62,9 +62,8 @@ function explain(player: LineupConsensusPlayer): void { emit('explain', consensu
 .consensus__player { position: absolute; display: flex; flex-direction: column; align-items: center; gap: var(--fi-space-2); width: var(--fi-space-96); transform: translate(-50%, -50%); transition: opacity var(--fi-motion-duration-fast) var(--fi-motion-ease-out); }
 .consensus__player--other { opacity: var(--fi-opacity-pressed); }
 .consensus__player--pressed { transform: translate(-50%, -50%) scale(0.94); }
-.consensus__avatar { width: var(--fi-space-48); height: var(--fi-space-48); border: var(--fi-border-width) solid var(--fi-color-surface); border-radius: var(--fi-radius-round); background: var(--fi-color-surface); }
+.consensus__avatar { overflow: hidden; width: var(--fi-space-48); height: var(--fi-space-48); border: var(--fi-border-width) solid var(--fi-color-surface); border-radius: var(--fi-radius-round); background: var(--fi-color-surface); font-size: var(--fi-font-22); }
 .consensus__player--mine .consensus__avatar { border-color: var(--fi-color-primary); box-shadow: 0 0 0 var(--fi-border-width) var(--fi-color-primary); }
-.consensus__avatar--fallback { display: flex; align-items: center; justify-content: center; color: var(--fi-color-text-secondary); font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); }
 .consensus__name { max-width: 100%; overflow: hidden; color: var(--fi-color-surface); font-size: var(--fi-font-20); font-weight: var(--fi-weight-bold); text-overflow: ellipsis; white-space: nowrap; }
 .consensus__rate { color: var(--fi-color-surface); font-size: var(--fi-font-18); }
 @media (prefers-reduced-motion: reduce) {

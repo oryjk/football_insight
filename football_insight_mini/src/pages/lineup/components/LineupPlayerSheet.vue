@@ -23,7 +23,7 @@
       hover-class="row--pressed"
       @tap="emit('pick', item.player_id)"
     >
-      <image v-if="item.avatar_url" class="row__avatar" :src="item.avatar_url" mode="aspectFill" lazy-load />
+      <view v-if="item.avatar_url" class="row__avatar"><FiAvatar :src="item.avatar_url" :size="96" :name="item.name" lazy /></view>
       <view v-else class="row__avatar row__avatar--fallback">
         <text>{{ item.shirt_number ?? item.name.slice(0, 1) }}</text>
       </view>
@@ -43,6 +43,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import FiBottomSheet from '../../../components/FiBottomSheet.vue'
+import FiAvatar from '../../../components/FiAvatar.vue'
 import FiSegmented from '../../../components/FiSegmented.vue'
 import type { LineupPosition } from '../../../types/lineup'
 import { buildSheetTabs, resolveSheetTab, type SheetGroup } from '../lineupViewModel'
@@ -111,6 +112,7 @@ watch(() => props.visible, (open) => {
 
 .row__avatar {
   flex-shrink: 0;
+  overflow: hidden;
   width: var(--fi-space-64);
   height: var(--fi-space-64);
   border-radius: var(--fi-radius-round);

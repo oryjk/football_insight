@@ -14,8 +14,7 @@
     <view v-for="group in visibleGroups" :key="group.key" class="nominate__group">
       <text class="nominate__group-title">{{ group.title }}</text>
       <view v-for="player in group.players" :key="player.player_id" class="nominate__row" hover-class="nominate__row--pressed" @tap="!submitting && emit('pick', player.player_id)">
-        <image v-if="player.avatar_url" class="nominate__avatar" :src="player.avatar_url" mode="aspectFill" lazy-load />
-        <view v-else class="nominate__avatar nominate__avatar--fallback"><text>{{ player.name.slice(0, 1) }}</text></view>
+        <view class="nominate__avatar"><FiAvatar :src="player.avatar_url" :size="96" :name="player.name" lazy /></view>
         <view class="nominate__body">
           <text class="nominate__name">{{ player.name }}</text>
           <text class="nominate__meta">{{ [positionLabel(player.position), player.current_team?.team_name ?? ''].filter(Boolean).join(' · ') }}</text>
@@ -27,6 +26,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import FiBottomSheet from '../../../components/FiBottomSheet.vue'
+import FiAvatar from '../../../components/FiAvatar.vue'
 import FiSegmented from '../../../components/FiSegmented.vue'
 import type { TransferCandidateGroup, TransferIntent } from '../../../types/transfer'
 import { positionLabel } from '../../../utils/transferLinks'
@@ -52,8 +52,7 @@ watch(() => props.visible, open => { if (open) keyword.value = '' })
 .nominate__group-title { display: block; padding: var(--fi-space-12) var(--fi-space-4); color: var(--fi-color-text-secondary); font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); }
 .nominate__row { display: flex; align-items: center; gap: var(--fi-space-18); padding: var(--fi-space-14) var(--fi-space-4); border-top: var(--fi-border-width) solid var(--fi-color-divider-soft); }
 .nominate__row--pressed { opacity: var(--fi-opacity-pressed); }
-.nominate__avatar { flex-shrink: 0; width: var(--fi-space-64); height: var(--fi-space-64); border-radius: var(--fi-radius-round); background: var(--fi-color-page); }
-.nominate__avatar--fallback { display: flex; align-items: center; justify-content: center; color: var(--fi-color-text-secondary); font-size: var(--fi-font-26); font-weight: var(--fi-weight-bold); }
+.nominate__avatar { flex-shrink: 0; overflow: hidden; width: var(--fi-space-64); height: var(--fi-space-64); border-radius: var(--fi-radius-round); background: var(--fi-color-page); font-size: var(--fi-font-26); }
 .nominate__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--fi-space-4); }
 .nominate__name { color: var(--fi-color-text-strong); font-size: var(--fi-font-28); font-weight: var(--fi-weight-bold); }
 .nominate__meta { color: var(--fi-color-text-muted); font-size: var(--fi-font-22); }

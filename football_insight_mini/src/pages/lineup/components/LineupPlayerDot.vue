@@ -2,7 +2,7 @@
   <view class="dot" :class="{ 'dot--selected': selected, 'dot--empty': !player.player, 'dot--compact': compact }">
     <view class="dot__face">
       <template v-if="player.player">
-        <image v-if="player.player.avatar_url" class="dot__avatar" :src="player.player.avatar_url" mode="aspectFill" />
+        <view v-if="player.player.avatar_url" class="dot__avatar"><FiAvatar :src="player.player.avatar_url" :size="96" :name="player.player.name" /></view>
         <text v-else class="dot__fallback">{{ player.player.shirt_number ?? player.player.name.slice(0, 1) }}</text>
         <text v-if="player.player.shirt_number !== null && player.player.avatar_url" class="dot__number">
           {{ player.player.shirt_number }}
@@ -17,6 +17,7 @@
 </template>
 
 <script setup lang="ts">
+import FiAvatar from '../../../components/FiAvatar.vue'
 import type { PitchPlayer } from '../lineupViewModel'
 
 defineProps<{
@@ -62,6 +63,7 @@ defineProps<{
 }
 
 .dot__avatar {
+  overflow: hidden;
   width: 100%;
   height: 100%;
   border-radius: var(--fi-radius-round);

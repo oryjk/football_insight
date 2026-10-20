@@ -2,6 +2,7 @@ import { computed, getCurrentInstance, nextTick, onScopeDispose, ref, watch } fr
 import { getLineupCode } from '../../api/lineup'
 import type { PublicLineup } from '../../types/lineup'
 import { extractApiErrorMessage, isUnauthorizedError } from '../../utils/apiError'
+import { avatarCandidates } from '../../utils/avatarThumb'
 import { exportCanvasToTempFile, flushCanvas, materializePosterCode, savePosterWithPermission } from '../../utils/canvasPoster'
 import { communityDeps } from '../../composables/useLineupCommunity'
 import { useAppSession } from '../../stores/appSession'
@@ -28,7 +29,7 @@ export function useLineupShare(contextKey: () => string, returnUrl: () => string
       if (!current()) return ''
       const urls = [...new Set([...lineup.players.map(player => player.avatar_url), sharer.avatar_url, lineup.team.avatar_url].filter((url): url is string => Boolean(url)))]
       const images = new Map<string, string>()
-      await Promise.all(urls.map(async url => { try { const path = await imageInfo(url); images.set(url, path) } catch { /* number fallback */ } }))
+      await Promise.all(urls.map(async url => { try { const path = await loadImage(url); images.set(url, path) } catch { /* number fallback */ } }))
       await nextTick()
       if (!current()) return ''
       const size = card ? LINEUP_CARD : LINEUP_POSTER
@@ -42,6 +43,13 @@ export function useLineupShare(contextKey: () => string, returnUrl: () => string
   }
   function imageInfo(src: string): Promise<string> {
     return new Promise((resolve, reject) => uni.getImageInfo({ src, success: result => resolve(result.path), fail: reject }))
+  }
+  // 海报大头像优先取 240px 小图，小图缺失或加载失败时回退原图；结果仍以原地址为键，绘制函数不用改。
+  async function loadImage(url: string): Promise<string> {
+    for (const candidate of avatarCandidates(url, 240)) {
+      try { return await imageInfo(candidate) } catch { /* 试下一个 */ }
+    }
+    throw new Error('image unavailable')
   }
   async function open(lineup: PublicLineup): Promise<void> {
     if (disposed || busy.value) return

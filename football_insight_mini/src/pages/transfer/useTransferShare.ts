@@ -4,6 +4,7 @@ import { transferVoteDeps } from '../../composables/useTransferVotes'
 import { useAppSession } from '../../stores/appSession'
 import type { TransferCardView } from '../../types/transfer'
 import { extractApiErrorMessage, isUnauthorizedError } from '../../utils/apiError'
+import { avatarCandidates } from '../../utils/avatarThumb'
 import { exportCanvasToTempFile, flushCanvas, materializePosterCode, savePosterWithPermission } from '../../utils/canvasPoster'
 import { drawTransferPoster, TRANSFER_POSTER, type TransferSharer } from './transferPoster'
 
@@ -20,6 +21,13 @@ export function useTransferShare(contextKey: () => string, returnUrl: () => stri
   function imageInfo(src: string): Promise<string> {
     return new Promise((resolve, reject) => uni.getImageInfo({ src, success: result => resolve(result.path), fail: reject }))
   }
+  // 海报大头像优先取 240px 小图，小图缺失或加载失败时回退原图；结果仍以原地址为键，绘制函数不用改。
+  async function loadImage(url: string): Promise<string> {
+    for (const candidate of avatarCandidates(url, 240)) {
+      try { return await imageInfo(candidate) } catch { /* 试下一个 */ }
+    }
+    throw new Error('image unavailable')
+  }
   async function render(view: TransferCardView, codePath: string, sharer: TransferSharer, current: () => boolean): Promise<string> {
     const previous = rendering
     let release: () => void = () => {}
@@ -30,7 +38,7 @@ export function useTransferShare(contextKey: () => string, returnUrl: () => stri
       const urls = [...new Set([view.team.avatar_url, view.card.player.avatar_url, sharer.avatar_url].filter((url): url is string => Boolean(url)))]
       const images = new Map<string, string>()
       // 头像或队徽加载失败不阻断海报，绘制时用文字占位。
-      await Promise.all(urls.map(async url => { try { images.set(url, await imageInfo(url)) } catch { /* fallback */ } }))
+      await Promise.all(urls.map(async url => { try { images.set(url, await loadImage(url)) } catch { /* fallback */ } }))
       await nextTick()
       if (!current()) return ''
       const canvas = uni.createCanvasContext(TRANSFER_POSTER.canvasId, instance)
