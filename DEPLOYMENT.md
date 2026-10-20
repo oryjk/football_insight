@@ -291,6 +291,7 @@ ssh peiqian 'curl -s http://127.0.0.1:8092/api/v1/ticket-watch/best-windows'
 - 接口：`GET/PUT /api/v1/lineups/me/{team_id}` 需要登录；`GET /api/v1/lineups/squads/{team_id}` 公开。
 - 部署：沿用 local233 构建镜像 → `docker save | gzip | ssh peiqian 'gunzip | docker load'` → 用现有运行参数重启容器；回滚用上一个镜像 tag（当前 `97b025f`）。
 - 核对：只读 `curl https://match.oryjk.cn/api/v1/lineups/squads/77680`；`/lineups/me/…` 未登录应为 401。验证写入需要登录令牌，不要用真实用户令牌。
+- 球迷共识阵容（2026-10-20 代码完成）：**无数据库迁移**，上线只需 ① 部署并重启生产后端 → ② 上传小程序体验版。部署后核对 `curl -i https://match.oryjk.cn/api/v1/lineups/teams/77680/consensus` 匿名应为 200（未达 10 套时 `unlocked=false` 只返回进度）。
 
 ## 转会投票（`f_i_transfer_*`）
 
