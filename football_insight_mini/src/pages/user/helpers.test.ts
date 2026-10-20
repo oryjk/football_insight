@@ -69,12 +69,24 @@ describe('buildUserAccountInfoItems', () => {
   test('builds the account summary items for a bound wechat member', () => {
     expect(buildUserAccountInfoItems({
       hasWechatBinding: true,
+      officialWechatBound: true,
       joinedAtLabel: '2026-4-8',
     })).toEqual([
       { key: 'identity', iconName: 'badge-check', label: '身份状态', value: '微信会员' },
       { key: 'joined-at', iconName: 'calendar-days', label: '加入时间', value: '2026-4-8' },
-      { key: 'login', iconName: 'log-in', label: '登录状态', value: '已绑定微信' },
+      { key: 'official-bind', iconName: 'log-in', label: '公众号绑定状态', value: '已绑定公众号' },
     ])
+  })
+
+  test('uses official binding independently of mini-program wechat login binding', () => {
+    for (const [hasWechatBinding, officialWechatBound, value] of [
+      [true, false, '未绑定公众号'],
+      [true, undefined, '未绑定公众号'],
+      [false, true, '已绑定公众号'],
+    ] as const) {
+      const items = buildUserAccountInfoItems({ hasWechatBinding, officialWechatBound, joinedAtLabel: '' })
+      expect(items.find(item => item.key === 'official-bind')?.value).toBe(value)
+    }
   })
 
   test('does not repeat the membership expiry, which the membership card already shows', () => {

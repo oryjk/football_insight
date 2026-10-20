@@ -166,6 +166,31 @@ describe('official account bind flow', () => {
 })
 
 describe('return from official account binding', () => {
+  test('closing without a code refreshes once; internal cleanup does not refresh', async () => {
+    const { flow, refreshes, session } = setup()
+    flow.open()
+    expect(refreshes).toEqual([])
+    await flow.close()
+    expect(flow.visible.value).toBe(false)
+    expect(refreshes).toEqual([{ force: true }])
+    await flow.close()
+    flow.open()
+    session.revision.value += 1
+    flow.open()
+    flow.dispose()
+    expect(refreshes).toEqual([{ force: true }])
+  })
+
+  test('a failed close refresh keeps the sheet closed and existing user data', async () => {
+    const { flow, session } = setup()
+    const before = session.currentUser.value
+    session.ensureSessionReady = async () => { throw new Error('offline') }
+    flow.open()
+    await flow.close()
+    expect(flow.visible.value).toBe(false)
+    expect(session.currentUser.value).toBe(before)
+  })
+
   test('does not force ordinary page shows or merely opening the sheet', async () => {
     const { flow, refreshes } = setup()
     await flow.handlePageShow()
@@ -175,7 +200,7 @@ describe('return from official account binding', () => {
     expect(refreshes).toEqual([])
   })
 
-  test('refreshes once after issuing a code and leaving, even when the sheet was closed', async () => {
+  test('refreshes on close and again after leaving with an issued code', async () => {
     const { flow, pending, refreshes } = setup()
     flow.open()
     const request = flow.getCode()
@@ -183,12 +208,12 @@ describe('return from official account binding', () => {
     await request
     await flow.handlePageShow()
     expect(refreshes).toEqual([])
-    flow.close()
+    await flow.close()
     flow.handlePageHide()
     await flow.handlePageShow()
     flow.handlePageHide()
     await flow.handlePageShow()
-    expect(refreshes).toEqual([{ force: true }])
+    expect(refreshes).toEqual([{ force: true }, { force: true }])
   })
 
   test('cannot carry a pending return refresh to a replacement session', async () => {
@@ -214,97 +239,105 @@ describe('return from official account binding', () => {
     expect(refreshes).toEqual([{ force: true }])
   })
 
-  test('bypasses the real appSession 60-second cache on binding return and removes the entry', async () => {
-    const globalWithUni = globalThis as unknown as { uni: unknown }
-    const previousUni = globalWithUni.uni
-    const storage = new Map<string, unknown>([[AUTH_TOKEN_STORAGE_KEY, 'test-token']])
-    globalWithUni.uni = {
-      getStorageSync: (key: string) => storage.get(key),
-      setStorageSync: (key: string, value: unknown) => storage.set(key, value),
-      removeStorageSync: (key: string) => storage.delete(key),
-    }
-    try {
-      const initial: CurrentUser = {
-        id: 'a', display_name: 'A', account_identifier: 'a', avatar_url: null,
-        has_wechat_binding: true, membership_tier: 'V6', created_at: '', official_wechat_bound: false,
+  for (const trigger of ['return', 'close']) {
+    test(`bypasses real appSession cache on binding ${trigger} and removes the entry`, async () => {
+      const globalWithUni = globalThis as unknown as { uni: unknown }
+      const previousUni = globalWithUni.uni
+      const storage = new Map<string, unknown>([[AUTH_TOKEN_STORAGE_KEY, 'test-token']])
+      globalWithUni.uni = {
+        getStorageSync: (key: string) => storage.get(key),
+        setStorageSync: (key: string, value: unknown) => storage.set(key, value),
+        removeStorageSync: (key: string) => storage.delete(key),
       }
-      let serverUser = initial
-      let meCalls = 0
-      const session = createAppSession({
-        ...authApi,
-        getCurrentUser: async () => { meCalls += 1; return serverUser },
-      })
-      await session.ensureSessionReady()
-      const flow = createUserOfficialBindFlow(session, ref(false), {
-        createCode: async () => ({ code: 'ABC234', expires_in_seconds: 600 }),
-        now: () => Date.now(), copy: () => {},
-      })
-      flow.open()
-      await flow.getCode()
-      serverUser = { ...initial, official_wechat_bound: true }
-      // A normal page refresh still has a fresh cached user.
-      await session.ensureSessionReady()
-      expect(meCalls).toBe(1)
-      expect(flow.canOpen.value).toBe(true)
-      flow.handlePageHide()
-      await flow.handlePageShow()
-      expect(meCalls).toBe(2)
-      expect(session.currentUser.value?.official_wechat_bound).toBe(true)
-      expect(flow.canOpen.value).toBe(false)
-      expect(flow.visible.value).toBe(false)
-      await flow.handlePageShow()
-      expect(meCalls).toBe(2)
-      flow.dispose()
-    } finally {
-      globalWithUni.uni = previousUni
-    }
-  })
+      try {
+        const initial: CurrentUser = {
+          id: 'a', display_name: 'A', account_identifier: 'a', avatar_url: null,
+          has_wechat_binding: true, membership_tier: 'V6', created_at: '', official_wechat_bound: false,
+        }
+        let serverUser = initial
+        let meCalls = 0
+        const session = createAppSession({
+          ...authApi,
+          getCurrentUser: async () => { meCalls += 1; return serverUser },
+        })
+        await session.ensureSessionReady()
+        const flow = createUserOfficialBindFlow(session, ref(false), {
+          createCode: async () => ({ code: 'ABC234', expires_in_seconds: 600 }),
+          now: () => Date.now(), copy: () => {},
+        })
+        flow.open()
+        await flow.getCode()
+        serverUser = { ...initial, official_wechat_bound: true }
+        // A normal page refresh still has a fresh cached user.
+        await session.ensureSessionReady()
+        expect(meCalls).toBe(1)
+        expect(flow.canOpen.value).toBe(true)
+        if (trigger === 'close') {
+          await flow.close()
+        } else {
+          flow.handlePageHide()
+          await flow.handlePageShow()
+        }
+        expect(meCalls).toBe(2)
+        expect(session.currentUser.value?.official_wechat_bound).toBe(true)
+        expect(flow.canOpen.value).toBe(false)
+        expect(flow.visible.value).toBe(false)
+        await flow.handlePageShow()
+        expect(meCalls).toBe(2)
+        flow.dispose()
+      } finally {
+        globalWithUni.uni = previousUni
+      }
+    })
+  }
 
-  test('real appSession discards a binding refresh response after another account logs in', async () => {
-    const globalWithUni = globalThis as unknown as { uni: unknown }
-    const previousUni = globalWithUni.uni
-    const storage = new Map<string, unknown>([[AUTH_TOKEN_STORAGE_KEY, 'a-token']])
-    globalWithUni.uni = {
-      getStorageSync: (key: string) => storage.get(key),
-      setStorageSync: (key: string, value: unknown) => storage.set(key, value),
-      removeStorageSync: (key: string) => storage.delete(key),
-    }
-    try {
-      const a: CurrentUser = {
-        id: 'a', display_name: 'A', account_identifier: 'a', avatar_url: null,
-        has_wechat_binding: true, membership_tier: 'V6', created_at: '', official_wechat_bound: false,
+  for (const trigger of ['return', 'close']) {
+    test(`real appSession discards a binding ${trigger} response after another account logs in`, async () => {
+      const globalWithUni = globalThis as unknown as { uni: unknown }
+      const previousUni = globalWithUni.uni
+      const storage = new Map<string, unknown>([[AUTH_TOKEN_STORAGE_KEY, 'a-token']])
+      globalWithUni.uni = {
+        getStorageSync: (key: string) => storage.get(key),
+        setStorageSync: (key: string, value: unknown) => storage.set(key, value),
+        removeStorageSync: (key: string) => storage.delete(key),
       }
-      const b: CurrentUser = { ...a, id: 'b', display_name: 'B', account_identifier: 'b' }
-      const lateRefresh = deferred<CurrentUser | null>()
-      let meCalls = 0
-      const session = createAppSession({
-        ...authApi,
-        getCurrentUser: () => ++meCalls === 1 ? Promise.resolve(a) : lateRefresh.promise,
-        login: async () => ({ user: b, access_token: 'b-token', expires_at: '2099-01-01T00:00:00Z' }),
-      })
-      await session.ensureSessionReady()
-      const flow = createUserOfficialBindFlow(session, ref(false), {
-        createCode: async () => ({ code: 'ABC234', expires_in_seconds: 600 }),
-        now: () => Date.now(), copy: () => {},
-      })
-      flow.open()
-      await flow.getCode()
-      flow.handlePageHide()
-      const returning = flow.handlePageShow()
-      expect(meCalls).toBe(2)
-      await session.loginWithPassword({ account_identifier: 'b', password: 'test' })
-      lateRefresh.resolve({ ...a, official_wechat_bound: true })
-      await returning
-      expect(session.currentUser.value?.id).toBe('b')
-      expect(session.currentUser.value?.official_wechat_bound).toBe(false)
-      expect(flow.code.value).toBe('')
-      expect(flow.visible.value).toBe(false)
-      flow.handlePageHide()
-      await flow.handlePageShow()
-      expect(meCalls).toBe(2)
-      flow.dispose()
-    } finally {
-      globalWithUni.uni = previousUni
-    }
-  })
+      try {
+        const a: CurrentUser = {
+          id: 'a', display_name: 'A', account_identifier: 'a', avatar_url: null,
+          has_wechat_binding: true, membership_tier: 'V6', created_at: '', official_wechat_bound: false,
+        }
+        const b: CurrentUser = { ...a, id: 'b', display_name: 'B', account_identifier: 'b' }
+        const lateRefresh = deferred<CurrentUser | null>()
+        let meCalls = 0
+        const session = createAppSession({
+          ...authApi,
+          getCurrentUser: () => ++meCalls === 1 ? Promise.resolve(a) : lateRefresh.promise,
+          login: async () => ({ user: b, access_token: 'b-token', expires_at: '2099-01-01T00:00:00Z' }),
+        })
+        await session.ensureSessionReady()
+        const flow = createUserOfficialBindFlow(session, ref(false), {
+          createCode: async () => ({ code: 'ABC234', expires_in_seconds: 600 }),
+          now: () => Date.now(), copy: () => {},
+        })
+        flow.open()
+        await flow.getCode()
+        if (trigger === 'return') flow.handlePageHide()
+        const returning = trigger === 'close' ? flow.close() : flow.handlePageShow()
+        expect(meCalls).toBe(2)
+        await session.loginWithPassword({ account_identifier: 'b', password: 'test' })
+        lateRefresh.resolve({ ...a, official_wechat_bound: true })
+        await returning
+        expect(session.currentUser.value?.id).toBe('b')
+        expect(session.currentUser.value?.official_wechat_bound).toBe(false)
+        expect(flow.code.value).toBe('')
+        expect(flow.visible.value).toBe(false)
+        flow.handlePageHide()
+        await flow.handlePageShow()
+        expect(meCalls).toBe(2)
+        flow.dispose()
+      } finally {
+        globalWithUni.uni = previousUni
+      }
+    })
+  }
 })

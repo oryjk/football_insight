@@ -41,7 +41,7 @@ export function createUserOfficialBindFlow(
   let pageHidden = false
   let refreshOnReturn = false
 
-  function close(): void {
+  function resetSheet(): void {
     requestId += 1
     visible.value = false
     code.value = ''
@@ -54,7 +54,7 @@ export function createUserOfficialBindFlow(
 
   // Synchronous invalidation prevents render/copy between the actor change and Vue's next tick.
   const stopWatching = watch([actor, canOpen], () => {
-    close()
+    resetSheet()
     issuedForActor = ''
     refreshOnReturn = false
   }, { flush: 'sync' })
@@ -63,8 +63,23 @@ export function createUserOfficialBindFlow(
     return visible.value && canOpen.value && owner === actor.value
   }
 
+  async function refreshUser(): Promise<void> {
+    try {
+      // appSession owns request deduplication, publication and session/token guards.
+      await session.ensureSessionReady({ force: true })
+    } catch {
+      // Keep existing account data on transient errors; 401 remains appSession's responsibility.
+    }
+  }
+
+  async function close(): Promise<void> {
+    const shouldRefresh = isCurrent()
+    resetSheet()
+    if (shouldRefresh) await refreshUser()
+  }
+
   function open(): void {
-    close()
+    resetSheet()
     if (!canOpen.value) return
     owner = actor.value
     visible.value = true
@@ -114,7 +129,7 @@ export function createUserOfficialBindFlow(
 
   function dispose(): void {
     stopWatching()
-    close()
+    resetSheet()
     issuedForActor = ''
     refreshOnReturn = false
   }
@@ -132,12 +147,7 @@ export function createUserOfficialBindFlow(
     refreshOnReturn = false
     issuedForActor = ''
     if (!shouldRefresh) return
-    try {
-      // appSession retains its revision/token guard and owns publication and 401 handling.
-      await session.ensureSessionReady({ force: true })
-    } catch {
-      // Session errors keep existing account data; a superseded response is discarded there.
-    }
+    await refreshUser()
   }
 
   return {
