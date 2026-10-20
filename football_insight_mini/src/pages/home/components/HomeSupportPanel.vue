@@ -23,7 +23,7 @@
             @click="emit('select-team')"
           >
             <image class="support-home-panel__switch-icon" :src="switchIcon" mode="aspectFit" aria-hidden="true" />
-            <text>切换</text>
+            <text class="support-home-panel__switch-text">切换</text>
           </button>
         </view>
         <view v-if="daysRemaining !== null || saleDaysRemaining !== null" class="support-home-panel__countdowns">
@@ -434,21 +434,28 @@ const awayRankLabel = computed(() => {
   gap: var(--fi-space-12);
   min-width: 0;
 }
-/* 切换主队：标题旁的小描边胶囊（图标 + "切换"），字号与倒计时一致，层级低于标题。 */
+/* 切换主队：标题旁的小描边胶囊（图标 + "切换"），字号与倒计时一致，层级低于标题。
+   固定高度 + 上下左右居中 + 行高 1：微信 button 自带行高与中文字形留白会让文字偏离中线，不靠行高撑高度。 */
 .support-home-panel__switch {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
+  justify-content: center;
   gap: var(--fi-space-6);
+  box-sizing: border-box;
+  height: var(--fi-space-44);
   margin: 0;
-  padding: var(--fi-space-6) var(--fi-space-14);
+  padding: 0 var(--fi-space-14);
   border: var(--fi-border-card);
   border-radius: var(--fi-radius-round);
   background: var(--fi-color-surface);
   color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-22);
   font-weight: var(--fi-weight-bold);
-  line-height: var(--fi-leading-normal);
+  line-height: var(--fi-leading-none);
+}
+.support-home-panel__switch-text {
+  line-height: var(--fi-leading-none);
 }
 .support-home-panel__switch--pressed { opacity: var(--fi-opacity-pressed); }
 .support-home-panel__switch--disabled { opacity: var(--fi-opacity-pressed); }

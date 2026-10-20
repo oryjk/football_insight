@@ -1,5 +1,5 @@
 <!-- Lucide arrow-left-right: https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/arrow-left-right.svg
-     Copyright (c) 2026 Lucide Icons and Contributors. ISC License; see lucide-LICENSE.txt. Stroke uses --fi-color-text-secondary (#6d7280). -->
+     Copyright (c) 2026 Lucide Icons and Contributors. ISC License; see lucide-LICENSE.txt. Stroke matches the secondary text color token (#6d7280). -->
 <svg
   xmlns="http://www.w3.org/2000/svg"
   width="24"
