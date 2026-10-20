@@ -6,17 +6,17 @@
       <view v-else class="avatar avatar--fallback">{{ item.author.display_name.charAt(0) }}</view>
       <view class="identity"><text class="name">{{ item.author.display_name }}</text><text class="date">{{ createdLabel }}</text></view>
       <text class="formation">{{ item.formation }}</text>
-      <view v-if="compact" class="reaction-slot"><FiLineupReactionBar :count="item.likes_count" :liked="item.liked_by_me" :disliked="item.disliked_by_me" :pending="pending" @like="emit('like')" @dislike="emit('dislike')" /></view>
+      <view v-if="compact" class="reaction-slot"><FiReactionBar :count="item.likes_count" :liked="item.liked_by_me" :disliked="item.disliked_by_me" :pending="pending" @like="emit('like')" @dislike="emit('dislike')" /></view>
     </view>
     <view v-if="!compact" class="card-row card-row--footer">
       <text class="caption">查看完整 11 人阵容 ›</text>
-      <view class="reaction-slot"><FiLineupReactionBar :count="item.likes_count" :liked="item.liked_by_me" :disliked="item.disliked_by_me" :pending="pending" @like="emit('like')" @dislike="emit('dislike')" /></view>
+      <view class="reaction-slot"><FiReactionBar :count="item.likes_count" :liked="item.liked_by_me" :disliked="item.disliked_by_me" :pending="pending" @like="emit('like')" @dislike="emit('dislike')" /></view>
     </view>
   </view>
 </template>
 <script setup lang="ts">
 import { computed } from 'vue'
-import FiLineupReactionBar from './FiLineupReactionBar.vue'
+import FiReactionBar from './FiReactionBar.vue'
 import type { PublicLineupSummary } from '../types/lineup'
 import { lineupDateLabel } from '../utils/lineupPresentation'
 const props = withDefaults(defineProps<{ item: PublicLineupSummary; rank?: number; pending: boolean; compact?: boolean }>(), { compact: false })

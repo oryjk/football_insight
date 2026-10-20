@@ -20,7 +20,7 @@
       </view>
       <LineupPitch :players="pitchPlayers" readonly />
       <view class="community-row">
-        <view class="reaction-slot"><FiLineupReactionBar size="md" :count="detail.likes_count" :liked="detail.liked_by_me" :disliked="detail.disliked_by_me" :pending="pendingLikes.length > 0" @like="like(returnUrl)" @dislike="dislike(returnUrl)" /></view>
+        <view class="reaction-slot"><FiReactionBar size="md" :count="detail.likes_count" :liked="detail.liked_by_me" :disliked="detail.disliked_by_me" :pending="pendingLikes.length > 0" @like="like(returnUrl)" @dislike="dislike(returnUrl)" /></view>
         <button class="community-action" @tap="openShare">分享阵容</button>
       </view>
       <view class="community-row">
@@ -39,7 +39,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import FiLoading from '../../components/FiLoading.vue'
-import FiLineupReactionBar from '../../components/FiLineupReactionBar.vue'
+import FiReactionBar from '../../components/FiReactionBar.vue'
 import LineupPitch from './components/LineupPitch.vue'
 import LineupShareSheet from './components/LineupShareSheet.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
