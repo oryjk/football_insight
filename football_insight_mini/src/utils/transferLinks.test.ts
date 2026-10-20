@@ -50,3 +50,22 @@ describe('transfer links', () => {
     expect([positionLabel('GK'), positionLabel('DF'), positionLabel('MF'), positionLabel('FW'), positionLabel(null)]).toEqual(['门将', '后卫', '中场', '前锋', ''])
   })
 })
+
+describe('transfer eligibility messages', () => {
+  test('logged-in users who cannot vote are told why; guests and voters get nothing', async () => {
+    const { transferBlockedMessage, TRANSFER_HINTS } = await import('./transferLinks')
+    expect(transferBlockedMessage({ loggedIn: true, canVote: false, open: true })).toBe(TRANSFER_HINTS.notFan)
+    expect(transferBlockedMessage({ loggedIn: true, canVote: false, open: false })).toBe(TRANSFER_HINTS.closed)
+    expect(transferBlockedMessage({ loggedIn: false, canVote: false, open: true })).toBe('')
+    expect(transferBlockedMessage({ loggedIn: true, canVote: true, open: true })).toBe('')
+    expect(TRANSFER_HINTS.notFan).toBe('只能为你的主队投票，可在首页「我的主队」设置')
+  })
+
+  test('the inline hint only shows while voting is open and the viewer cannot vote', async () => {
+    const { transferHint, TRANSFER_HINTS } = await import('./transferLinks')
+    expect(transferHint({ loggedIn: true, canVote: false, open: true })).toBe(TRANSFER_HINTS.notFan)
+    expect(transferHint({ loggedIn: false, canVote: false, open: true })).toBe(TRANSFER_HINTS.guest)
+    expect(transferHint({ loggedIn: true, canVote: false, open: false })).toBe('')
+    expect(transferHint({ loggedIn: true, canVote: true, open: true })).toBe('')
+  })
+})

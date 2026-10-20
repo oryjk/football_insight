@@ -4,7 +4,7 @@ import { createTransferVotes, transferVoteDeps } from '../../composables/useTran
 import type { AppSession } from '../../stores/appSession'
 import type { TransferCard, TransferSummary, TransferTally, TransferVoteValue } from '../../types/transfer'
 import { extractApiErrorMessage, isUnauthorizedError } from '../../utils/apiError'
-import { applyTally } from '../../utils/transferLinks'
+import { applyTally, transferBlockedMessage, transferHint } from '../../utils/transferLinks'
 
 const RETURN_URL = '/pages/insights/index'
 
@@ -44,11 +44,19 @@ export function useInsightsTransfer(options: InsightsTransferOptions) {
   const identity = () => `${session.revision.value}:${session.currentUser.value ? 'user' : 'guest'}`
   const enabled = () => !disposed && active.value && Boolean(teamId())
 
-  const hint = computed(() => {
+  const eligibility = () => {
     const value = summary.value
-    if (!value || !value.window?.open || value.can_vote) return ''
-    return loggedIn() ? '只能为你的主队投票' : '登录并设置主队后可以投票'
+    return value ? { loggedIn: loggedIn(), canVote: value.can_vote, open: Boolean(value.window?.open) } : null
+  }
+  const hint = computed(() => {
+    const input = eligibility()
+    return input ? transferHint(input) : ''
   })
+  /** 提名前的拦截：已登录却不能投时返回原因（不打开提名页），游客与能投的人返回空。 */
+  function nominateBlocked(): string {
+    const input = eligibility()
+    return input ? transferBlockedMessage(input) : ''
+  }
 
   async function refresh(): Promise<void> {
     if (!enabled()) return
@@ -72,8 +80,9 @@ export function useInsightsTransfer(options: InsightsTransferOptions) {
   async function vote(card: TransferCard, value: TransferVoteValue): Promise<void> {
     const value_ = summary.value
     if (!value_ || !enabled()) return
-    if (loggedIn() && !value_.can_vote) {
-      notify(value_.window?.open ? '只能为你的主队投票' : '本期投票已结束')
+    const blocked = nominateBlocked()
+    if (blocked) {
+      notify(blocked)
       return
     }
     const id = teamId()
@@ -97,5 +106,5 @@ export function useInsightsTransfer(options: InsightsTransferOptions) {
   }, { immediate: true })
 
   function dispose(): void { disposed = true; generation++; stop(); votes.reset() }
-  return { summary, loading, error, hint, pending: votes.pending, refresh, vote, dispose }
+  return { summary, loading, error, hint, pending: votes.pending, refresh, vote, nominateBlocked, dispose }
 }

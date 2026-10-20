@@ -62,9 +62,11 @@ describe('insights transfer', () => {
       summary: async id => summary(id, false), vote: async () => { throw new Error('should not be called') }, notify: m => notices.push(m),
     } })
     await flush()
-    expect(rival.hint.value).toBe('只能为你的主队投票')
+    expect(rival.hint.value).toBe('只能为你的主队投票，可在首页「我的主队」设置')
     await rival.vote(rival.summary.value!.boards[0].items[0], 1)
-    expect(notices).toEqual(['只能为你的主队投票'])
+    expect(notices).toEqual(['只能为你的主队投票，可在首页「我的主队」设置'])
+    // 提名同样先拦截，不打开弹层
+    expect(rival.nominateBlocked()).toBe('只能为你的主队投票，可在首页「我的主队」设置')
     rival.dispose()
   })
 
@@ -75,6 +77,8 @@ describe('insights transfer', () => {
     } })
     await flush()
     expect(guest.hint.value).toBe('登录并设置主队后可以投票')
+    // 游客提名交给登录流程，不在这里拦
+    expect(guest.nominateBlocked()).toBe('')
     await guest.vote(guest.summary.value!.boards[0].items[0], -1)
     expect(logins).toEqual(['/pages/insights/index'])
     guest.dispose()

@@ -32,7 +32,7 @@ import { useAppSession } from '../../stores/appSession'
 import type { TransferCardView, TransferVoteValue } from '../../types/transfer'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { buildSharePath } from '../../utils/shareSource'
-import { TRANSFER_BOARD_LABELS, applyTally, buildTransferBoardUrl, buildTransferViewUrl, parseTransferCode, transferCardShareTitle, transferStance } from '../../utils/transferLinks'
+import { TRANSFER_BOARD_LABELS, applyTally, buildTransferBoardUrl, buildTransferViewUrl, parseTransferCode, transferBlockedMessage, transferCardShareTitle, transferHint, transferStance } from '../../utils/transferLinks'
 
 const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
@@ -41,11 +41,18 @@ const votes = createTransferVotes(voteDeps)
 const pending = votes.pending
 const code = ref(''), view = ref<TransferCardView | null>(null), loading = ref(false), error = ref('')
 let generation = 0, loadedRevision = -1
+const eligibility = () => view.value
+  ? { loggedIn: voteDeps.loggedIn(), canVote: view.value.can_vote, open: view.value.window.open }
+  : null
 const hint = computed(() => {
-  const value = view.value
-  if (!value || !value.window.open || value.can_vote) return ''
-  return voteDeps.loggedIn() ? '只能为你的主队投票' : '登录并设置主队后可以投票'
+  const input = eligibility()
+  return input ? transferHint(input) : ''
 })
+/** 已登录却不能投时返回原因；游客与能投的人返回空。 */
+function blockedMessage(): string {
+  const input = eligibility()
+  return input ? transferBlockedMessage(input) : ''
+}
 
 async function load(): Promise<void> {
   if (!code.value) { error.value = '分享链接无效'; return }
@@ -63,8 +70,9 @@ async function load(): Promise<void> {
 async function vote(value: TransferVoteValue): Promise<void> {
   const current = view.value
   if (!current) return
-  if (voteDeps.loggedIn() && !current.can_vote) {
-    uni.showToast({ title: current.window.open ? '只能为你的主队投票' : '本期投票已结束', icon: 'none' })
+  const blocked = blockedMessage()
+  if (blocked) {
+    uni.showToast({ title: blocked, icon: 'none' })
     return
   }
   const owner = generation
@@ -87,7 +95,13 @@ onShareAppMessage(() => ({
 onBeforeUnmount(() => { generation++; votes.reset() })
 
 function openBoard(): void { if (view.value) uni.navigateTo({ url: buildTransferBoardUrl(view.value.team.team_id, view.value.card.intent) }) }
-function openNominate(): void { if (view.value) uni.navigateTo({ url: buildTransferBoardUrl(view.value.team.team_id, view.value.card.intent, { nominate: true }) }) }
+function openNominate(): void {
+  if (!view.value) return
+  // 不能投的已登录用户在这里就提示，不再跳到榜单页打开提名弹层。
+  const blocked = blockedMessage()
+  if (blocked) { uni.showToast({ title: blocked, icon: 'none' }); return }
+  uni.navigateTo({ url: buildTransferBoardUrl(view.value.team.team_id, view.value.card.intent, { nominate: true }) })
+}
 function goBack(): void { uni.navigateBack({ fail: () => uni.switchTab({ url: '/pages/insights/index' }) }) }
 </script>
 <style scoped src="./transfer.css"></style>

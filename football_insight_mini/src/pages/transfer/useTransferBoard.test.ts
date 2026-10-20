@@ -49,4 +49,16 @@ describe('transfer board page', () => {
     await open.vote(open.items.value[1], 1)
     expect(open.items.value[1].up).toBe(9)
   })
+
+  test('non-fans are stopped before the nominate sheet opens; fans and guests are not', async () => {
+    const fan = createTransferBoard({ ...base, board: async (_, intent, p) => page(intent, p ?? 1, 2) })
+    await fan.load(1, 'out')
+    expect(fan.nominateBlocked()).toBe('')
+    const rival = createTransferBoard({ ...base, board: async (_, intent, p) => ({ ...page(intent, p ?? 1, 2), can_vote: false }) })
+    await rival.load(1, 'out')
+    expect(rival.nominateBlocked()).toBe('只能为你的主队投票，可在首页「我的主队」设置')
+    const guest = createTransferBoard({ ...base, loggedIn: () => false, board: async (_, intent, p) => ({ ...page(intent, p ?? 1, 2), can_vote: false }) })
+    await guest.load(1, 'out')
+    expect(guest.nominateBlocked()).toBe('')
+  })
 })

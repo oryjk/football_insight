@@ -46,3 +46,24 @@ export function applyTally(card: TransferCard, tally: TransferTally): TransferCa
 export function positionLabel(position: TransferPlayer['position']): string {
   return position ? POSITION_LABELS[position] : ''
 }
+
+/** 转会投票的资格提示：洞察页、完整榜单页、单卡页共用同一套判断与文案。 */
+export const TRANSFER_HINTS = {
+  notFan: '只能为你的主队投票，可在首页「我的主队」设置',
+  guest: '登录并设置主队后可以投票',
+  closed: '本期投票已结束',
+} as const
+
+interface TransferEligibility { loggedIn: boolean; canVote: boolean; open: boolean }
+
+/** 点赞踩或提名时：已登录却不能投就给出原因；游客返回空（交给登录流程），能投返回空。 */
+export function transferBlockedMessage(input: TransferEligibility): string {
+  if (!input.loggedIn || input.canVote) return ''
+  return input.open ? TRANSFER_HINTS.notFan : TRANSFER_HINTS.closed
+}
+
+/** 页面上常驻的提示：只在本期开放、且当前浏览者不能投时显示。 */
+export function transferHint(input: TransferEligibility): string {
+  if (!input.open || input.canVote) return ''
+  return input.loggedIn ? TRANSFER_HINTS.notFan : TRANSFER_HINTS.guest
+}

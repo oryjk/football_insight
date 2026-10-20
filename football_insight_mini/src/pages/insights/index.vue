@@ -187,7 +187,11 @@ function openTransferBoard(intent: TransferIntent): void {
   if (selectedTeamId.value !== null) uni.navigateTo({ url: buildTransferBoardUrl(selectedTeamId.value, intent) })
 }
 function openTransferNominate(): void {
-  if (selectedTeamId.value !== null) uni.navigateTo({ url: buildTransferBoardUrl(selectedTeamId.value, 'out', { nominate: true }) })
+  if (selectedTeamId.value === null) return
+  // 已登录却不能投（非主队）时只提示，不跳去打开提名弹层。
+  const blocked = transfer.nominateBlocked()
+  if (blocked) { uni.showToast({ title: blocked, icon: 'none' }); return }
+  uni.navigateTo({ url: buildTransferBoardUrl(selectedTeamId.value, 'out', { nominate: true }) })
 }
 const ticketWatchNavigating = ref(false)
 const systemConfigUnderReview = ref(false)

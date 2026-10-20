@@ -3,7 +3,7 @@ import { getTransferBoard, setTransferVote } from '../../api/transfer'
 import { createTransferVotes, transferVoteDeps, type TransferVoteDeps } from '../../composables/useTransferVotes'
 import type { TransferBoard, TransferCard, TransferIntent, TransferVoteValue } from '../../types/transfer'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { applyTally, buildTransferBoardUrl } from '../../utils/transferLinks'
+import { applyTally, buildTransferBoardUrl, transferBlockedMessage } from '../../utils/transferLinks'
 
 export interface TransferBoardDeps extends Partial<TransferVoteDeps> {
   board?: typeof getTransferBoard
@@ -52,12 +52,19 @@ export function createTransferBoard(deps: TransferBoardDeps = {}) {
     if (which === intent.value && board.value && !error.value) return Promise.resolve()
     return load(teamId.value, which)
   }
+  /** 提名或赞踩前的拦截：已登录却不能投时返回原因，游客与能投的人返回空。 */
+  function nominateBlocked(): string {
+    const current = board.value
+    if (!current) return ''
+    return transferBlockedMessage({ loggedIn: voteDeps.loggedIn(), canVote: current.can_vote, open: Boolean(current.window?.open) })
+  }
   async function vote(card: TransferCard, value: TransferVoteValue): Promise<void> {
     const current = board.value
     if (!current) return
     // 已登录但不能投（非主队或已截止）给提示；游客交给 toggle 去登录。
-    if (voteDeps.loggedIn() && !current.can_vote) {
-      notify(current.window?.open ? '只能为你的主队投票' : '本期投票已结束')
+    const blocked = nominateBlocked()
+    if (blocked) {
+      notify(blocked)
       return
     }
     const owner = generation
@@ -69,5 +76,5 @@ export function createTransferBoard(deps: TransferBoardDeps = {}) {
     if (message) notify(message)
   }
   function dispose(): void { disposed = true; generation++; votes.reset() }
-  return { teamId, intent, board, items, loading, error, hasMore, pending: votes.pending, load, more, changeIntent, vote, dispose }
+  return { teamId, intent, board, items, loading, error, hasMore, pending: votes.pending, load, more, changeIntent, vote, nominateBlocked, dispose }
 }

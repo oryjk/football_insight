@@ -56,7 +56,7 @@ onShow(() => {
   if (!teamId.value) return
   // 返回本页（例如从单卡页赞踩后）重新读当前榜，保持名次与票数一致。
   void state.load(teamId.value, intent.value).then(() => {
-    if (!started && wantsNominate.value && board.value?.window?.open) void nominate.open(teamId.value, intent.value)
+    if (!started && wantsNominate.value && board.value?.window?.open) openNominate()
     started = true
   })
 })
@@ -70,7 +70,12 @@ onBeforeUnmount(state.dispose)
 function changeIntent(which: TransferIntent): void { void state.changeIntent(which) }
 function retry(): void { if (error.value) void state.load(teamId.value, intent.value); else void state.more() }
 function openCard(code: string): void { const url = buildTransferViewUrl(code); if (url) uni.navigateTo({ url }) }
-function openNominate(): void { void nominate.open(teamId.value, intent.value) }
+function openNominate(): void {
+  // 已登录却不能投（非主队）时只提示，不打开提名弹层；游客由 nominate.open 引导登录。
+  const blocked = state.nominateBlocked()
+  if (blocked) { uni.showToast({ title: blocked, icon: 'none' }); return }
+  void nominate.open(teamId.value, intent.value)
+}
 async function pick(playerId: number): Promise<void> {
   const result = await nominate.submit(playerId)
   if (result) void state.load(teamId.value, nominate.intent.value)
