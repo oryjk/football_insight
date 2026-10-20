@@ -50,7 +50,12 @@ impl Database {
                 membership_tier TEXT NOT NULL DEFAULT 'V1', membership_expires_at TIMESTAMPTZ,
                 status TEXT NOT NULL DEFAULT 'active'
              );
-             CREATE TABLE f_i_wechat_followers (open_id VARCHAR(128) PRIMARY KEY, unsubscribed_at TIMESTAMPTZ);
+             CREATE TABLE f_i_wechat_followers (
+                id UUID NOT NULL UNIQUE, open_id VARCHAR(128) PRIMARY KEY,
+                latest_invite_code_id UUID, subscribe_count INT NOT NULL DEFAULT 1,
+                subscribed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), unsubscribed_at TIMESTAMPTZ,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+             );
              CREATE TABLE f_i_invite_codes (issued_for_wechat_open_id VARCHAR(128));
              CREATE TABLE f_i_user_match_id_unlocks (user_id UUID, match_id BIGINT, UNIQUE(user_id, match_id));"
         ).execute(&pool).await.unwrap();
@@ -99,9 +104,14 @@ async fn migration_marks_every_existing_account_and_known_official_identity_as_r
     db.user(Some("linked-old"), "V6").await;
     let unbound = db.user(None, "V1").await;
     sqlx::raw_sql(
-        "INSERT INTO f_i_wechat_followers VALUES ('old-follower', NULL), ('old-unfollowed', NOW()), ('linked-old', NULL);
-         INSERT INTO f_i_invite_codes VALUES ('old-invite'), (NULL), ('');"
-    ).execute(&db.pool).await.unwrap();
+        "INSERT INTO f_i_wechat_followers (id, open_id, unsubscribed_at) VALUES
+            (gen_random_uuid(), 'old-follower', NULL), (gen_random_uuid(), 'old-unfollowed', NOW()),
+            (gen_random_uuid(), 'linked-old', NULL);
+         INSERT INTO f_i_invite_codes VALUES ('old-invite'), (NULL), ('');",
+    )
+    .execute(&db.pool)
+    .await
+    .unwrap();
     db.migrate().await;
     let sources: Vec<(String, String)> = sqlx::query_as(
         "SELECT official_open_id, source FROM f_i_official_match_id_acquisitions ORDER BY official_open_id"
@@ -549,6 +559,116 @@ async fn registration_and_reactivation_inherit_history_in_all_invited_identity_f
                     .bind(registered.user.id).execute(&db.pool).await.unwrap();
             }
         }
+    }
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires explicit disposable localhost PostgreSQL database"]
+async fn verified_binding_records_missing_followers_including_already_bound_accounts() {
+    use chrono::{Duration, Utc};
+    use football_insight_service_backend_rs::auth::{
+        adapters::persistence::postgres_official_bind_repository::PostgresOfficialBindRepository,
+        domain::official_bind::ConsumeBindCodeOutcome,
+        ports::official_bind_repository::OfficialBindRepository,
+    };
+    let db = Database::new().await;
+    db.migrate().await;
+    sqlx::raw_sql(include_str!(
+        "../migrations/20261016150000_add_wechat_official_bind_codes.sql"
+    ))
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    let binding = PostgresOfficialBindRepository::new(db.pool.clone());
+    for (prior, openid, code, expected) in [
+        (
+            None,
+            "new-follower",
+            "new-code",
+            ConsumeBindCodeOutcome::Success,
+        ),
+        (
+            Some("already-bound"),
+            "already-bound",
+            "same-code",
+            ConsumeBindCodeOutcome::AlreadyBound,
+        ),
+    ] {
+        let user = db.user(prior, "V9").await;
+        let now = Utc::now();
+        binding
+            .issue(user, code, now, now + Duration::minutes(10))
+            .await
+            .unwrap();
+        assert_eq!(binding.consume(code, openid).await.unwrap(), expected);
+        let follower: Option<(bool, i32, Option<Uuid>)> = sqlx::query_as(
+            "SELECT unsubscribed_at IS NULL, subscribe_count, latest_invite_code_id FROM f_i_wechat_followers WHERE open_id=$1"
+        ).bind(openid).fetch_optional(&db.pool).await.unwrap();
+        assert_eq!(
+            follower,
+            Some((true, 1, None)),
+            "verified binding must supply the missing active follow without issuing invites"
+        );
+    }
+    assert_eq!(
+        binding
+            .consume("invalid-code", "invalid-follower")
+            .await
+            .unwrap(),
+        ConsumeBindCodeOutcome::Invalid
+    );
+    let invalid_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM f_i_wechat_followers WHERE open_id='invalid-follower'",
+    )
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    assert_eq!(invalid_count, 0);
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires explicit disposable localhost PostgreSQL database"]
+async fn binding_preserves_existing_follow_history_and_explicit_unsubscribe() {
+    use chrono::{Duration, Utc};
+    use football_insight_service_backend_rs::auth::{
+        adapters::persistence::postgres_official_bind_repository::PostgresOfficialBindRepository,
+        ports::official_bind_repository::OfficialBindRepository,
+    };
+    let db = Database::new().await;
+    db.migrate().await;
+    sqlx::raw_sql(include_str!(
+        "../migrations/20261016150000_add_wechat_official_bind_codes.sql"
+    ))
+    .execute(&db.pool)
+    .await
+    .unwrap();
+    let binding = PostgresOfficialBindRepository::new(db.pool.clone());
+    for (openid, unsubscribed) in [("active-follow", false), ("unsubscribed-follow", true)] {
+        let follower_id = Uuid::new_v4();
+        sqlx::query("INSERT INTO f_i_wechat_followers (id, open_id, subscribe_count, unsubscribed_at) VALUES ($1,$2,4,CASE WHEN $3 THEN NOW() ELSE NULL END)")
+            .bind(follower_id).bind(openid).bind(unsubscribed).execute(&db.pool).await.unwrap();
+        let before: serde_json::Value =
+            sqlx::query_scalar("SELECT to_jsonb(f) FROM f_i_wechat_followers f WHERE open_id=$1")
+                .bind(openid)
+                .fetch_one(&db.pool)
+                .await
+                .unwrap();
+        let user = db.user(None, "V9").await;
+        let now = Utc::now();
+        binding
+            .issue(user, openid, now, now + Duration::minutes(10))
+            .await
+            .unwrap();
+        binding.consume(openid, openid).await.unwrap();
+        let after: serde_json::Value =
+            sqlx::query_scalar("SELECT to_jsonb(f) FROM f_i_wechat_followers f WHERE open_id=$1")
+                .bind(openid)
+                .fetch_one(&db.pool)
+                .await
+                .unwrap();
+        assert_eq!(before, after);
     }
     db.close().await;
 }

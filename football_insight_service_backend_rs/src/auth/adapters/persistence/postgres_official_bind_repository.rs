@@ -27,6 +27,14 @@ SET official_wechat_open_id=$2,
     )
 WHERE id=$1 AND status='active'
 "#;
+// A verified binding message proves the sender can interact with the official account.
+// Older followers may predate subscribe-event ingestion. Supply only missing rows:
+// never replace a real unsubscribe event or reset existing follow/invite history.
+const INSERT_MISSING_FOLLOWER_SQL: &str = r#"
+INSERT INTO f_i_wechat_followers (id, open_id)
+VALUES ($1, $2)
+ON CONFLICT (open_id) DO NOTHING
+"#;
 
 pub struct PostgresOfficialBindRepository {
     pool: PgPool,
@@ -147,6 +155,11 @@ impl OfficialBindRepository for PostgresOfficialBindRepository {
                 return Ok(ConsumeBindCodeOutcome::Invalid);
             }
         }
+        sqlx::query(INSERT_MISSING_FOLLOWER_SQL)
+            .bind(Uuid::new_v4())
+            .bind(verified_official_open_id)
+            .execute(&mut *tx)
+            .await?;
         tx.commit().await?;
         Ok(if already_bound {
             ConsumeBindCodeOutcome::AlreadyBound
