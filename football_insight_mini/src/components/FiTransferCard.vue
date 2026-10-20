@@ -12,7 +12,8 @@
       </view>
       <text class="transfer-card__meta">{{ meta }}</text>
     </view>
-    <view class="transfer-card__reaction">
+    <!-- 胶囊外围一圈安全区：点在胶囊附近的空白处不会误开单卡页。 -->
+    <view class="transfer-card__reaction" @tap.stop>
       <FiReactionBar :size="size" :count="card.up" :dislike-count="card.down" :liked="card.my_vote === 1" :disliked="card.my_vote === -1"
         :pending="pending" @like="emit('vote', 1)" @dislike="emit('vote', -1)" />
     </view>
@@ -41,5 +42,5 @@ const meta = computed(() => [positionLabel(props.card.player.position), props.ca
 .transfer-card__tag { flex-shrink: 0; padding: var(--fi-space-2) var(--fi-space-10); border-radius: var(--fi-radius-round); background: var(--fi-color-page-soft); color: var(--fi-color-text-secondary); font-size: var(--fi-font-20); font-weight: var(--fi-weight-bold); }
 .transfer-card__tag--accent { background: var(--fi-color-reaction-like-bg); color: var(--fi-color-primary); }
 .transfer-card__meta { overflow: hidden; color: var(--fi-color-text-muted); font-size: var(--fi-font-22); text-overflow: ellipsis; white-space: nowrap; }
-.transfer-card__reaction { flex-shrink: 0; }
+.transfer-card__reaction { flex-shrink: 0; align-self: stretch; display: flex; align-items: center; padding-left: var(--fi-space-16); }
 </style>
