@@ -5,8 +5,11 @@ summary/players/<file> -> summary/players/thumbs/<size>/<file>.jpg
 from __future__ import annotations
 
 import io
+import logging
 
 from PIL import Image, ImageOps
+
+logger = logging.getLogger(__name__)
 
 THUMB_SIZES = (96, 240)
 THUMB_CACHE_CONTROL = "public, max-age=31536000, immutable"
@@ -41,3 +44,16 @@ def make_thumbnail(content: bytes, size: int) -> bytes:
         out = io.BytesIO()
         square.save(out, "JPEG", quality=_JPEG_QUALITY, optimize=True)
         return out.getvalue()
+
+
+def upload_thumbnails(target, object_name: str, content: bytes) -> list[str]:
+    """Upload every thumbnail size for one original; raises on the first failure."""
+    return [
+        target.upload_bytes(
+            thumb_object_name(object_name, size),
+            make_thumbnail(content, size),
+            "image/jpeg",
+            cache_control=THUMB_CACHE_CONTROL,
+        )
+        for size in THUMB_SIZES
+    ]

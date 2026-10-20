@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 from typing import Protocol
 from urllib.parse import urlparse, urlunparse
@@ -10,7 +11,10 @@ import requests
 
 from .models import PlayerProfile, TeamProfile
 
+from .avatar_thumbs import upload_thumbnails
 from .player_portraits import PLAYER_AVATAR_OVERRIDES
+
+logger = logging.getLogger(__name__)
 
 
 class AssetFetchError(RuntimeError):
@@ -22,7 +26,9 @@ class AssetFetcher(Protocol):
 
 
 class AssetTarget(Protocol):
-    def upload_bytes(self, object_name: str, content: bytes, content_type: str) -> str: ...
+    def upload_bytes(
+        self, object_name: str, content: bytes, content_type: str, cache_control: str | None = None
+    ) -> str: ...
 
 
 def upload_player_avatar(
@@ -37,7 +43,12 @@ def upload_player_avatar(
     content, content_type = fetcher.fetch(source_url)
     filename = override[1] if override else f"{player_id}{_extension_for(source_url, content_type)}"
     object_name = f"{prefix.strip('/')}/players/{filename}"
-    return source_url, object_name, target.upload_bytes(object_name, content, content_type)
+    storage_url = target.upload_bytes(object_name, content, content_type)
+    try:
+        upload_thumbnails(target, object_name, content)
+    except Exception:  # noqa: BLE001 - 小图是增强，失败不影响原图与名单同步
+        logger.warning("avatar thumbnails failed for %s", object_name, exc_info=True)
+    return source_url, object_name, storage_url
 
 
 class HttpAssetFetcher:
@@ -124,16 +135,21 @@ class MinioAssetTarget:
     def build_public_url(self, object_name: str) -> str:
         return f"{self.public_base_url}/{object_name.lstrip('/')}"
 
-    def upload_bytes(self, object_name: str, content: bytes, content_type: str) -> str:
+    def upload_bytes(
+        self, object_name: str, content: bytes, content_type: str, cache_control: str | None = None
+    ) -> str:
         if self.client is None:
             return self.build_public_url(object_name)
 
-        self.client.put_object(
-            Bucket=self.bucket,
-            Key=object_name,
-            Body=content,
-            ContentType=content_type,
-        )
+        kwargs = {
+            "Bucket": self.bucket,
+            "Key": object_name,
+            "Body": content,
+            "ContentType": content_type,
+        }
+        if cache_control:
+            kwargs["CacheControl"] = cache_control
+        self.client.put_object(**kwargs)
         return self.build_public_url(object_name)
 
 

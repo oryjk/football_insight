@@ -25,7 +25,9 @@ class FakeTarget:
     def __init__(self) -> None:
         self.calls: list[tuple[str, bytes, str]] = []
 
-    def upload_bytes(self, object_name: str, content: bytes, content_type: str) -> str:
+    def upload_bytes(
+        self, object_name: str, content: bytes, content_type: str, cache_control: str | None = None
+    ) -> str:
         self.calls.append((object_name, content, content_type))
         return f"https://cdn.example.com/{object_name}"
 
