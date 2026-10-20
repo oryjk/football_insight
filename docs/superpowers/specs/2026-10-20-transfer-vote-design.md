@@ -83,7 +83,7 @@ PRIMARY KEY (`nomination_id`, `user_id`)：每人每卡一行，赞踩天然互�
 1. **资格**（提名与投票共用）：已登录、账号 `status = 'active'`、请求的球队等于用户 `favorite_team_id`、该期处于开放中。改主队后已投的票保留，不追溯。
 2. **候选资格**（后端按名单表校验，不信任前端）：
    - `out` / `stay`：该球队 `active = true` 的球员。
-   - `in`：其他球队 `active = true` 的球员，或本队 `active = false` 的旧将（展示为"希望回归"）。若某旧将已在其他中超队现役，按"其他队现役"处理，仍可提名。
+   - `in`：其他球队 `active = true` 的球员，或本队 `active = false` 的旧将（展示为"希望回归"）。"旧将"指名单表里有该球员在本队 `active = false` 的记录；即使他现在在其他中超队现役，也按旧将处理：`returning = true`，显示"希望回归"，并显示他当前所在队。
 3. **提名**：卡不存在则创建并为提名人记 +1；卡已存在则为提名人记 +1（若已投 −1 则改为 +1），返回 `created = false`，前端提示"已有球迷提名，已为你加一票"。
 4. **提名上限**：每人每期每种意向最多**新建** 3 张卡；投票不限。上限只按 `created_by` 计数，为已存在卡加票不占名额。
 5. **投票**：`PUT` 设为 +1 或 −1（覆盖原值），`DELETE` 删除。提名人可以取消或改投自己的卡。
@@ -107,7 +107,7 @@ PRIMARY KEY (`nomination_id`, `user_id`)：每人每卡一行，赞踩天然互�
 | DELETE | `/nominations/{share_code}/vote` | → `{ up, down, my_vote: 0 }` |
 | GET | `/nominations/{share_code}/wxacode` | 第二期；返回 base64 PNG |
 
-**卡片对象**：`share_code`、`intent`、`returning`（`in` 且为本队旧将）、`player { player_id, name, avatar_url, position, shirt_number, current_team { team_id, team_name } | null, departed }`、`up`、`down`、`my_vote`（−1/0/1）、`rank`、`created_at`。
+**卡片对象**：`share_code`、`intent`、`returning`（`in` 且为本队旧将，定义见第 5 节第 2 条）、`player { player_id, name, avatar_url, position, shirt_number, current_team { team_id, team_name } | null, departed }`、`up`、`down`、`my_vote`（−1/0/1）、`rank`、`created_at`。
 
 **错误**（`code` 字段供前端给出明确文案）：
 
