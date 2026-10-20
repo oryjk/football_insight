@@ -24,6 +24,7 @@ export interface UserUpgradeStep {
 interface BuildUserAccountInfoOptions {
   hasWechatBinding: boolean
   officialWechatBound?: boolean
+  officialWechatSubscribed?: boolean
   joinedAtLabel: string
 }
 
@@ -54,8 +55,10 @@ export function buildUserAccountInfoItems(
     {
       key: 'official-bind',
       iconName: 'log-in',
-      label: '公众号绑定状态',
-      value: options.officialWechatBound === true ? '已绑定公众号' : '未绑定公众号',
+      label: '公众号状态',
+      value: options.officialWechatBound !== true ? '未绑定公众号'
+        : options.officialWechatSubscribed === true ? '已关注'
+        : options.officialWechatSubscribed === false ? '已取关' : '关注状态待确认',
     },
   ]
 }

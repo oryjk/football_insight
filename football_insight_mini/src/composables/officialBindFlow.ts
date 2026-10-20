@@ -139,10 +139,11 @@ export function createUserOfficialBindFlow(
     refreshOnReturn = canOpen.value && issuedForActor === actor.value
   }
 
-  async function handlePageShow(): Promise<void> {
+  async function handlePageShow(forceRefresh = false): Promise<void> {
     pageHidden = false
-    if (!refreshOnReturn) return
-    const shouldRefresh = canOpen.value && issuedForActor === actor.value
+    if (!forceRefresh && !refreshOnReturn) return
+    const shouldRefresh = forceRefresh ? session.hasAccessToken.value
+      : canOpen.value && issuedForActor === actor.value
     // Consume before awaiting: overlapping onShow events cannot repeat the refresh.
     refreshOnReturn = false
     issuedForActor = ''

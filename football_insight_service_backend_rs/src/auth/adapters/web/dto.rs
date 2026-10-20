@@ -21,6 +21,8 @@ pub struct CurrentUserDto {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub official_wechat_bound: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub official_wechat_subscribed: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub official_wechat_binding_required: Option<bool>,
     pub membership_tier: String,
     pub membership_expires_at: Option<String>,
@@ -41,6 +43,7 @@ impl From<AuthUser> for CurrentUserDto {
             avatar_url: value.avatar_url,
             has_wechat_binding: value.has_wechat_binding,
             official_wechat_bound: None,
+            official_wechat_subscribed: None,
             official_wechat_binding_required: None,
             membership_tier: value.membership_tier,
             membership_expires_at: value
@@ -165,6 +168,12 @@ mod tests {
         );
         assert!(json.get("phone_number").is_none());
         assert!(json.get("official_wechat_bound").is_none());
+        assert!(json.get("official_wechat_subscribed").is_none());
+        dto.official_wechat_subscribed = Some(false);
+        assert_eq!(
+            serde_json::to_value(&dto).unwrap()["official_wechat_subscribed"],
+            false
+        );
         assert!(json.get("official_wechat_binding_required").is_none());
         dto.official_wechat_binding_required = Some(true);
         assert_eq!(

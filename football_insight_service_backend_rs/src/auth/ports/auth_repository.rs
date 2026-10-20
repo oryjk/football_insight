@@ -220,14 +220,26 @@ pub trait AuthRepository: Send + Sync {
         anyhow::bail!("create mini program wechat user without invite is not supported")
     }
     async fn get_user_by_id(&self, user_id: Uuid) -> anyhow::Result<Option<AuthUser>>;
-    async fn official_wechat_bound(&self, _user_id: Uuid) -> anyhow::Result<Option<bool>> {
+    async fn official_wechat_access(
+        &self,
+        _user_id: Uuid,
+    ) -> anyhow::Result<Option<crate::auth::domain::user::OfficialWechatAccess>> {
         Ok(None)
+    }
+    async fn official_wechat_bound(&self, user_id: Uuid) -> anyhow::Result<Option<bool>> {
+        Ok(self
+            .official_wechat_access(user_id)
+            .await?
+            .map(|status| status.bound))
     }
     async fn official_wechat_binding_required(
         &self,
-        _user_id: Uuid,
+        user_id: Uuid,
     ) -> anyhow::Result<Option<bool>> {
-        Ok(None)
+        Ok(self
+            .official_wechat_access(user_id)
+            .await?
+            .map(|status| status.binding_required))
     }
     async fn record_user_login(&self, user_id: Uuid) -> anyhow::Result<()> {
         let _ = user_id;

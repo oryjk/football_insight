@@ -22,7 +22,7 @@
       </view>
       <text v-else class="official-bind__caption">获取绑定码后，打开「<text class="official-bind__account-link" @tap="emit('open-official')">何止编程</text>」公众号，发送“绑定 + 绑定码”。</text>
       <text v-if="error" class="official-bind__error">{{ error }}</text>
-      <text class="official-bind__warning">绑定后请保持关注公众号，取关后会员权益会暂停。</text>
+      <text class="official-bind__warning">非付费会员请保持关注公众号，取关后会员权益会暂停。</text>
     </view>
     <template #footer>
       <button class="official-bind__action" :disabled="loading" @tap="emit('get-code')">

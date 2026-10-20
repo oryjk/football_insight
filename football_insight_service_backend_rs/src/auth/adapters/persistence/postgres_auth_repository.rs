@@ -20,8 +20,6 @@ use crate::system_config::domain::public_system_config::parse_membership_tier_ru
 // Shared with official-account acquisition and binding; take before account/invite row locks.
 const OFFICIAL_HISTORY_LOCK_SQL: &str = "SELECT pg_advisory_xact_lock(hashtextextended('football_insight:official-match-id-history', 0))";
 
-const OFFICIAL_BOUND_SQL: &str = r#"SELECT (official_wechat_open_id IS NOT NULL) FROM f_i_users WHERE id=$1 AND status='active'"#;
-
 #[derive(Clone)]
 pub struct PostgresAuthRepository {
     pool: PgPool,
@@ -1543,20 +1541,25 @@ impl StoredAuthUserRow {
 
 #[async_trait]
 impl AuthRepository for PostgresAuthRepository {
-    async fn official_wechat_binding_required(
+    async fn official_wechat_access(
         &self,
         user_id: Uuid,
-    ) -> anyhow::Result<Option<bool>> {
-        let row = sqlx::query_as::<_, (bool, String, Option<DateTime<Utc>>)>(
-            "SELECT official_wechat_open_id IS NOT NULL, membership_origin, membership_expires_at
-             FROM f_i_users WHERE id=$1 AND status='active'",
+    ) -> anyhow::Result<Option<crate::auth::domain::user::OfficialWechatAccess>> {
+        let row = sqlx::query_as::<_, (bool, Option<bool>, String, Option<DateTime<Utc>>)>(
+            "SELECT u.official_wechat_open_id IS NOT NULL,
+                CASE WHEN f.open_id IS NULL THEN NULL ELSE f.unsubscribed_at IS NULL END,
+                u.membership_origin, u.membership_expires_at
+             FROM f_i_users u
+             LEFT JOIN f_i_wechat_followers f ON f.open_id=u.official_wechat_open_id
+             WHERE u.id=$1 AND u.status='active'",
         )
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await?;
-        Ok(row.map(|(bound, origin, expiry)| {
-            crate::auth::domain::user::requires_official_wechat_binding(
+        Ok(row.map(|(bound, subscribed, origin, expiry)| {
+            crate::auth::domain::user::resolve_official_wechat_access(
                 bound,
+                subscribed,
                 &origin,
                 expiry,
                 Utc::now(),
@@ -1632,12 +1635,6 @@ impl AuthRepository for PostgresAuthRepository {
                     .await
             }
         }
-    }
-    async fn official_wechat_bound(&self, user_id: Uuid) -> anyhow::Result<Option<bool>> {
-        Ok(sqlx::query_scalar::<_, bool>(OFFICIAL_BOUND_SQL)
-            .bind(user_id)
-            .fetch_optional(&self.pool)
-            .await?)
     }
     async fn create_user_with_invite(
         &self,

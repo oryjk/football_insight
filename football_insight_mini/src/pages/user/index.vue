@@ -306,6 +306,7 @@ const accountInfoItems = computed<UserAccountInfoItem[]>(() => {
   return buildUserAccountInfoItems({
     hasWechatBinding: currentUser.value.has_wechat_binding,
     officialWechatBound: currentUser.value.official_wechat_bound,
+    officialWechatSubscribed: currentUser.value.official_wechat_subscribed,
     joinedAtLabel: joinedAtLabel.value,
   })
 })

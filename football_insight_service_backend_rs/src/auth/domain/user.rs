@@ -88,9 +88,36 @@ pub fn requires_official_wechat_binding(
     expires_at: Option<DateTime<Utc>>,
     now: DateTime<Utc>,
 ) -> bool {
-    let active_purchase =
-        membership_origin == "purchase" && expires_at.is_none_or(|expiry| expiry > now);
+    let active_purchase = is_active_purchase(membership_origin, expires_at, now);
     !bound && !active_purchase
+}
+
+fn is_active_purchase(origin: &str, expiry: Option<DateTime<Utc>>, now: DateTime<Utc>) -> bool {
+    origin == "purchase" && expiry.is_none_or(|at| at > now)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OfficialWechatAccess {
+    pub bound: bool,
+    pub subscribed: Option<bool>,
+    pub binding_required: bool,
+    pub benefits_enabled: bool,
+}
+
+pub fn resolve_official_wechat_access(
+    bound: bool,
+    subscribed: Option<bool>,
+    origin: &str,
+    expiry: Option<DateTime<Utc>>,
+    now: DateTime<Utc>,
+) -> OfficialWechatAccess {
+    let paid = is_active_purchase(origin, expiry, now);
+    OfficialWechatAccess {
+        bound,
+        subscribed: if bound { subscribed } else { None },
+        binding_required: !bound && !paid,
+        benefits_enabled: paid || (bound && subscribed == Some(true)),
+    }
 }
 
 pub fn resolve_effective_membership_tier(

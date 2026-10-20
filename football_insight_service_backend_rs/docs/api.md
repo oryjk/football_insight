@@ -185,6 +185,8 @@ The migration only adds catalog/snapshot fields, backfills new catalog metadata 
 
 `official_wechat_binding_required?: boolean` 表示当前账号是否需要先绑定公众号：未绑定，且当前会员不是 `membership_origin=purchase` 的有效购买权益时为 true（V1–V9 一视同仁）；已绑定、未到期购买会员或购买来源的长期会员为 false。推荐升级即使有到期时间也不属于购买豁免，付费到期后需绑定。小程序据此弹出绑定窗口，并区分“未绑定”与原有“已取关暂停”；原有功能等级限制继续生效。此字段仅在 `/auth/me` 补充，读取异常省略，登录响应仍需通过 `/auth/me` 确认。
 
+`official_wechat_subscribed?: boolean` 是绑定公众号身份的真实关注状态：有关注记录且未取关为 true，有明确取关记录为 false，未绑定或没有关注记录时省略。它不等于 `official_wechat_bound`，取关不会解除绑定。绑定、关注、是否需要绑定与最终权益从同一份查询结果生成：`/auth/me.membership_benefits_enabled` 对有效购买会员为 true，对非付费账号只在已绑定且关注时为 true。关注记录缺失不会当成明确取关，也不会放行非付费权益；关注状态查询异常时不补这些可选字段。小程序在我的/洞察/回流页显示时强制刷新 `/auth/me`，不等待账号成功缓存到期。
+
 ### 公众号绑定指令
 
 仅在现有 webhook 签名/加密校验成功后处理文本：去空白并忽略大小写，`绑定ABC234`、`绑定 abc234` 均可。缺码给格式提示；错误、过期、已用或非 active 一律回复同一失败文案。按公众号身份限制十分钟内五次失败（包含在途预约），第六次停止校验。码消耗与账号绑定在同一事务完成；相同 openid 仍消耗码并回复已绑定，换微信号可覆盖，同一 openid 可关联多个账号。

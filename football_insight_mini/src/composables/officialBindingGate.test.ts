@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { ref } from 'vue'
 import type { CurrentUser } from '../types/auth'
 import { createOfficialBindingGate } from './officialBindingGate'
+import { resolveMembershipBenefitsLocked } from '../utils/membershipBenefits'
 
 function setup(required: boolean | null = true) {
   const currentUser = ref<CurrentUser | null>({
@@ -25,6 +26,29 @@ function setup(required: boolean | null = true) {
 }
 
 describe('official binding gate', () => {
+  test('refreshes a bound account on return so unsubscribe locks and re-follow restores benefits', async () => {
+    const { gate, ready, session } = setup(false)
+    let serverUser = { ...session.currentUser.value!, official_wechat_bound: true, official_wechat_subscribed: true }
+    session.currentUser.value = serverUser
+    session.ensureSessionReady = async () => {
+      session.currentUser.value = { ...serverUser }
+      return session.currentUser.value
+    }
+    try {
+      ready.value = true
+      await gate.handlePageShow()
+      gate.handlePageHide()
+      serverUser = { ...serverUser, official_wechat_subscribed: false, membership_benefits_enabled: false }
+      await gate.handlePageShow()
+      expect(session.currentUser.value?.official_wechat_subscribed).toBe(false)
+      expect(resolveMembershipBenefitsLocked(session.currentUser.value)).toBe(true)
+      expect(gate.visible.value).toBe(false)
+      gate.handlePageHide()
+      serverUser = { ...serverUser, official_wechat_subscribed: true, membership_benefits_enabled: true }
+      await gate.handlePageShow()
+      expect(resolveMembershipBenefitsLocked(session.currentUser.value)).toBe(false)
+    } finally { gate.dispose() }
+  })
   test('waits for confirmed page state, prompts once per visit, and allows manual reopening', async () => {
     const { gate, ready, session, refreshes } = setup()
     try {
@@ -33,7 +57,7 @@ describe('official binding gate', () => {
       ready.value = true
       expect(gate.visible.value).toBe(true)
       await gate.close()
-      expect(refreshes()).toBe(1)
+      expect(refreshes()).toBe(2)
       expect(gate.visible.value).toBe(false)
       session.currentUser.value = { ...session.currentUser.value! }
       expect(gate.visible.value).toBe(false)

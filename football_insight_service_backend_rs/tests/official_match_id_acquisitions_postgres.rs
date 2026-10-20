@@ -99,6 +99,82 @@ impl Database {
 
 #[tokio::test]
 #[ignore = "requires explicit disposable localhost PostgreSQL database"]
+async fn official_status_retains_binding_on_unsubscribe_and_only_paid_members_keep_benefits() {
+    use football_insight_service_backend_rs::auth::{
+        adapters::persistence::postgres_auth_repository::PostgresAuthRepository,
+        ports::auth_repository::AuthRepository,
+    };
+    let db = Database::new().await;
+    let repository = PostgresAuthRepository::new(db.pool.clone());
+    for (origin, expired, enabled_after_unsubscribe) in [
+        ("referral", false, false),
+        ("purchase", false, true),
+        ("purchase", true, false),
+    ] {
+        let openid = Uuid::new_v4().to_string();
+        let user = db.user(Some(&openid), "V9").await;
+        sqlx::query("UPDATE f_i_users SET membership_origin=$2,membership_expires_at=CASE WHEN $3 THEN NOW()-INTERVAL '1 day' ELSE NULL END WHERE id=$1")
+            .bind(user).bind(origin).bind(expired).execute(&db.pool).await.unwrap();
+        let unknown = repository
+            .official_wechat_access(user)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(unknown.subscribed, None);
+        assert_eq!(unknown.benefits_enabled, enabled_after_unsubscribe);
+        sqlx::query("INSERT INTO f_i_wechat_followers (id,open_id) VALUES ($1,$2)")
+            .bind(Uuid::new_v4())
+            .bind(&openid)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        let following = repository
+            .official_wechat_access(user)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(following.bound && following.benefits_enabled);
+        assert_eq!(following.subscribed, Some(true));
+        repository
+            .mark_wechat_follower_unsubscribed(&openid)
+            .await
+            .unwrap();
+        let unfollowed = repository
+            .official_wechat_access(user)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(unfollowed.bound);
+        assert_eq!(unfollowed.subscribed, Some(false));
+        assert!(!unfollowed.binding_required);
+        assert_eq!(unfollowed.benefits_enabled, enabled_after_unsubscribe);
+        sqlx::query("UPDATE f_i_wechat_followers SET unsubscribed_at=NULL WHERE open_id=$1")
+            .bind(&openid)
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        let restored = repository
+            .official_wechat_access(user)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(restored.bound && restored.benefits_enabled);
+        assert_eq!(restored.subscribed, Some(true));
+    }
+    let user = db.user(None, "V1").await;
+    let unbound = repository
+        .official_wechat_access(user)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(unbound.binding_required);
+    assert!(!unbound.benefits_enabled);
+    assert_eq!(unbound.subscribed, None);
+    db.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires explicit disposable localhost PostgreSQL database"]
 async fn unbound_accounts_require_official_binding_except_active_purchase_memberships() {
     use football_insight_service_backend_rs::auth::{
         adapters::persistence::postgres_auth_repository::PostgresAuthRepository,

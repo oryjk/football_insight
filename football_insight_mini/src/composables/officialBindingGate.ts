@@ -36,12 +36,9 @@ export function createOfficialBindingGate(
     checking.value = true
     active.value = true
     try {
-      await flow.handlePageShow()
-      // Login responses omit /auth/me enrichment; bypass its success cache before prompting.
-      if (shown === visit && session.currentUser.value
-        && session.currentUser.value.official_wechat_binding_required === undefined) {
-        await session.ensureSessionReady({ force: true })
-      }
+      // Subscription changes arrive through the webhook while this page is hidden.
+      // Refresh even a bound account, bypassing the session's 60-second success cache.
+      await flow.handlePageShow(true)
     } catch {
       // appSession owns failure and session handling; no prompt without confirmed server state.
     } finally {

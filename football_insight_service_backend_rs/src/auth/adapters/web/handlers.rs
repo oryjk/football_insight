@@ -175,23 +175,20 @@ pub async fn get_current_user_handler(
         .map_err(|error| (StatusCode::UNAUTHORIZED, error.to_string()))?
         .ok_or((StatusCode::UNAUTHORIZED, "not logged in".to_string()))?;
 
-    let official_wechat_bound = use_case
-        .official_wechat_bound(user.id)
+    let official_access = use_case
+        .official_wechat_access(user.id)
         .await
         .unwrap_or_else(|_| {
-            tracing::warn!("failed to read official-account binding status");
-            None
-        });
-    let binding_required = use_case
-        .official_wechat_binding_required(user.id)
-        .await
-        .unwrap_or_else(|_| {
-            tracing::warn!("failed to read official-account binding requirement");
+            tracing::warn!("failed to read official-account subscription and access status");
             None
         });
     let mut dto = CurrentUserDto::from(user);
-    dto.official_wechat_bound = official_wechat_bound;
-    dto.official_wechat_binding_required = binding_required;
+    if let Some(access) = official_access {
+        dto.official_wechat_bound = Some(access.bound);
+        dto.official_wechat_subscribed = access.subscribed;
+        dto.official_wechat_binding_required = Some(access.binding_required);
+        dto.membership_benefits_enabled = access.benefits_enabled;
+    }
     Ok(Json(dto))
 }
 

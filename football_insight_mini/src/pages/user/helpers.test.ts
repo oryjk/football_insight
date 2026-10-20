@@ -70,11 +70,12 @@ describe('buildUserAccountInfoItems', () => {
     expect(buildUserAccountInfoItems({
       hasWechatBinding: true,
       officialWechatBound: true,
+      officialWechatSubscribed: true,
       joinedAtLabel: '2026-4-8',
     })).toEqual([
       { key: 'identity', iconName: 'badge-check', label: '身份状态', value: '微信会员' },
       { key: 'joined-at', iconName: 'calendar-days', label: '加入时间', value: '2026-4-8' },
-      { key: 'official-bind', iconName: 'log-in', label: '公众号绑定状态', value: '已绑定公众号' },
+      { key: 'official-bind', iconName: 'log-in', label: '公众号状态', value: '已关注' },
     ])
   })
 
@@ -82,10 +83,21 @@ describe('buildUserAccountInfoItems', () => {
     for (const [hasWechatBinding, officialWechatBound, value] of [
       [true, false, '未绑定公众号'],
       [true, undefined, '未绑定公众号'],
-      [false, true, '已绑定公众号'],
+      [false, true, '关注状态待确认'],
     ] as const) {
       const items = buildUserAccountInfoItems({ hasWechatBinding, officialWechatBound, joinedAtLabel: '' })
       expect(items.find(item => item.key === 'official-bind')?.value).toBe(value)
+    }
+  })
+
+  test('distinguishes a bound follower, a bound unfollower and an unbound account', () => {
+    for (const [officialWechatBound, officialWechatSubscribed, expected] of [
+      [true, true, '已关注'],
+      [true, false, '已取关'],
+      [false, true, '未绑定公众号'],
+    ] as const) {
+      const items = buildUserAccountInfoItems({ hasWechatBinding: true, officialWechatBound, officialWechatSubscribed, joinedAtLabel: '' })
+      expect(items.find(item => item.key === 'official-bind')?.value).toBe(expected)
     }
   })
 
