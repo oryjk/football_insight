@@ -125,6 +125,25 @@
 					}
 				}
 			]
+		},
+		{
+			"root": "pages/transfer",
+			"pages": [
+				{
+					"path": "board",
+					"style": {
+						"navigationBarTitleText": "转会榜",
+						"navigationStyle": "custom"
+					}
+				},
+				{
+					"path": "view",
+					"style": {
+						"navigationBarTitleText": "转会提名",
+						"navigationStyle": "custom"
+					}
+				}
+			]
 		}
 	],
 	"preloadRule": {
@@ -132,13 +151,15 @@
 			"network": "all",
 			"packages": [
 				"pages/ticket-watch",
-				"pages/lineup"
+				"pages/lineup",
+				"pages/transfer"
 			]
 		},
 		"pages/home/index": {
 			"network": "all",
 			"packages": [
-				"pages/lineup"
+				"pages/lineup",
+				"pages/transfer"
 			]
 		}
 	},
