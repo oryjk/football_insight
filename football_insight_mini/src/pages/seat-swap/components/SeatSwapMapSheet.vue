@@ -1,8 +1,7 @@
 <template>
   <FiBottomSheet
     :visible="visible"
-    eyebrow="球场图"
-    title="点分区筛选意向"
+    title="球场图"
     height="80vh"
     fit-content
     @update:visible="emit('update:visible', $event)"

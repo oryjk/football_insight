@@ -20,20 +20,14 @@
       />
     </view>
     <view class="legend">
-      <view class="legend__items">
-        <template v-if="hasMyRequest">
-          <view class="legend__item">
-            <view class="legend__dot legend__dot--current"></view>
-            <text>当前座位</text>
-          </view>
-          <view class="legend__item">
-            <view class="legend__dot legend__dot--desired"></view>
-            <text>目标座位</text>
-          </view>
-        </template>
-        <view v-else class="legend__item">
-          <view class="legend__dot legend__dot--hot"></view>
-          <text>有发布</text>
+      <view v-if="hasMyRequest" class="legend__items">
+        <view class="legend__item">
+          <view class="legend__dot legend__dot--current"></view>
+          <text>当前座位</text>
+        </view>
+        <view class="legend__item">
+          <view class="legend__dot legend__dot--desired"></view>
+          <text>目标座位</text>
         </view>
       </view>
       <text class="legend__hint">点分区可筛选</text>
@@ -174,10 +168,6 @@ const emit = defineEmits<{
 
 .legend__dot--desired {
   background: var(--fi-color-seat-desired);
-}
-
-.legend__dot--hot {
-  background: var(--fi-primitive-ink);
 }
 
 .legend__hint {
