@@ -65,3 +65,23 @@ export interface TeamLineups {
   page_size: number
 }
 export interface LineupCodeImage { image_base64: string; mime_type: 'image/png' | 'image/jpeg' }
+
+export interface LineupConsensusPlayer {
+  player_id: number
+  name: string
+  avatar_url: string | null
+  shirt_number: number | null
+  position: LineupPosition | null
+  /** 在共识里占用的位置类；补齐的球员可能与名单位置不同 */
+  group: LineupPosition
+  pick_rate: number
+}
+export interface LineupConsensus {
+  team: SquadResponse['team']
+  total: number
+  threshold: number
+  unlocked: boolean
+  formation: string | null
+  formation_share: number
+  players: LineupConsensusPlayer[]
+}

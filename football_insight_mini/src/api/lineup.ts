@@ -1,4 +1,4 @@
-import type { LineupSlotDto, SavedLineupDraft, LineupEditorResponse, SavedLineup, SquadResponse, LineupSort, TeamLineups, PublicLineup, LineupLikes, LineupCodeImage } from '../types/lineup'
+import type { LineupSlotDto, SavedLineupDraft, LineupEditorResponse, SavedLineup, SquadResponse, LineupSort, TeamLineups, PublicLineup, LineupLikes, LineupCodeImage, LineupConsensus } from '../types/lineup'
 import { request } from '../utils/request'
 
 export function getSquad(teamId: number): Promise<SquadResponse> {
@@ -24,6 +24,9 @@ export function saveMyLineup(
 
 export function getTeamLineups(teamId: number, sort: LineupSort, page = 1, pageSize = 20): Promise<TeamLineups> {
   return request({ url: `/lineups/teams/${teamId}?sort=${sort}&page=${page}&page_size=${pageSize}`, auth: true })
+}
+export function getLineupConsensus(teamId: number): Promise<LineupConsensus> {
+  return request({ url: `/lineups/teams/${teamId}/consensus` })
 }
 export function getSharedLineup(code: string): Promise<PublicLineup> {
   return request({ url: `/lineups/shared/${encodeURIComponent(code)}`, auth: true })
