@@ -24,12 +24,13 @@
         <text class="student-entry-panel__title">学员功能</text>
         <text class="student-entry-panel__value">服务购买、购买记录与提醒邮箱</text>
       </view>
-      <text class="student-entry-panel__action">进入 ›</text>
+      <image :src="chevronIcon" class="student-entry-panel__arrow" mode="aspectFit" aria-hidden="true" />
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
+import chevronIcon from '../../../static/rankings/chevron-right.svg'
 import type { UserAccountInfoItem } from '../helpers'
 
 defineProps<{
@@ -95,20 +96,11 @@ const emit = defineEmits<{
   word-break: break-all;
 }
 
-.student-entry-panel__action {
+.student-entry-panel__arrow {
+  display: block;
   flex-shrink: 0;
-  margin: 0 0 0 auto;
-  min-width: 128rpx;
-  height: 68rpx;
-  padding: 0 var(--fi-space-24);
-  border-radius: var(--fi-radius-round);
-  background: var(--fi-color-text-primary);
-  color: var(--fi-color-surface);
-  font-size: var(--fi-font-26);
-  font-weight: var(--fi-weight-extrabold);
-  line-height: 68rpx;
-  text-align: center;
-  box-shadow: none;
+  width: var(--fi-space-36);
+  height: var(--fi-space-36);
 }
 
 .info-panel,
