@@ -1,6 +1,7 @@
 <template>
   <view class="tactics-panel">
-    <InsightsMyTacticsCard :team-name="teamName" :authenticated="authenticated" :loading="mineLoading" :error="mineError" :draft="draft" :published="published" @edit="emit('edit')" @retry="emit('retry-mine')" />
+    <InsightsMyTacticsCard :team-name="teamName" :authenticated="authenticated" :loading="mineLoading" :error="mineError" :draft="draft" :published="published" :overlap="myOverlap" @edit="emit('edit')" @retry="emit('retry-mine')" />
+    <InsightsConsensusCard v-if="consensus" :consensus="consensus" :my-player-ids="myPlayerIds" @edit="emit('edit')" @explain="emit('explain', $event)" />
     <view class="community">
       <view class="community__header"><text class="community__title">大家排的阵容<text v-if="total" class="community__count">{{ total }}</text></text>
         <view class="community__sort"><FiSegmented :items="sortItems" :model-value="sort" compact aria-label="战术排序" @update:model-value="changeSort" /></view>
@@ -19,9 +20,10 @@
 import FiSegmented from '../../../components/FiSegmented.vue'
 import FiLineupCommunityCard from '../../../components/FiLineupCommunityCard.vue'
 import InsightsMyTacticsCard from './InsightsMyTacticsCard.vue'
-import type { LineupSort, PublicLineupSummary, SavedLineup, SavedLineupDraft } from '../../../types/lineup'
-defineProps<{ teamName: string; authenticated: boolean; mineLoading: boolean; mineError: string; draft: SavedLineupDraft | null; published: SavedLineup | null; items: PublicLineupSummary[]; total: number; sort: LineupSort; loading: boolean; error: string; pendingLikes: string[] }>()
-const emit = defineEmits<{ (e: 'edit' | 'retry-mine' | 'retry-list' | 'more'): void; (e: 'open', code: string): void; (e: 'like' | 'dislike', item: PublicLineupSummary): void; (e: 'sort', order: LineupSort): void }>()
+import InsightsConsensusCard from './InsightsConsensusCard.vue'
+import type { LineupConsensus, LineupSort, PublicLineupSummary, SavedLineup, SavedLineupDraft } from '../../../types/lineup'
+defineProps<{ teamName: string; authenticated: boolean; mineLoading: boolean; mineError: string; draft: SavedLineupDraft | null; published: SavedLineup | null; items: PublicLineupSummary[]; total: number; sort: LineupSort; loading: boolean; error: string; pendingLikes: string[]; consensus: LineupConsensus | null; myOverlap: string; myPlayerIds: number[] }>()
+const emit = defineEmits<{ (e: 'edit' | 'retry-mine' | 'retry-list' | 'more'): void; (e: 'open', code: string): void; (e: 'like' | 'dislike', item: PublicLineupSummary): void; (e: 'sort', order: LineupSort): void; (e: 'explain', message: string): void }>()
 const sortItems = [{ key: 'latest', label: '最新' }, { key: 'likes', label: '点赞榜' }]
 function changeSort(value: string) { if (value === 'latest' || value === 'likes') emit('sort', value) }
 </script>

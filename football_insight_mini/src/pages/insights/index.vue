@@ -34,6 +34,7 @@
                 :mine-loading="mineLoading" :mine-error="mineError" :draft="mineDraft" :published="minePublished"
                 :items="communityItems" :total="communityTotal" :sort="communitySort"
                 :loading="communityLoading || teamLoading" :error="teamError || communityError" :pending-likes="communityPendingLikes"
+                :consensus="consensus" :my-overlap="myOverlap" :my-player-ids="myPlayerIds" @explain="showHint"
                 @edit="goToTeamBoard" @retry-mine="tactics.retryMine()" @retry-list="retryTacticsList"
                 @sort="tactics.changeSort" @like="tactics.like" @dislike="tactics.dislike" @open="openPublicTactics" @more="tactics.more()"
               />
@@ -158,6 +159,8 @@ import { buildTransferBoardUrl, buildTransferViewUrl, transferBoardShareTitle } 
 import type { TransferIntent } from '../../types/transfer'
 import { createInsightsSessionSync, runInsightsShow } from './sessionEffects'
 import { useInsightsData } from './useInsightsData'
+import { createLineupConsensus } from '../../composables/useLineupConsensus'
+import { lineupOverlap, overlapText } from '../../utils/lineupConsensus'
 
 const { navigationPageStyle, navigationHeightPx } = useNavigationLayout()
 
@@ -179,6 +182,17 @@ const { teams: selectableTeams, selectedTeamId, loading: teamLoading, error: tea
 const tactics = useInsightsTactics({ session, selectedTeamId, active: computed(() => pageVisible.value && mainTab.value === 'tactics') })
 const { mineLoading, mineError, mineDraft, minePublished, authenticated: tacticsAuthenticated } = tactics
 const { items: communityItems, total: communityTotal, sort: communitySort, loading: communityLoading, error: communityError, pendingLikes: communityPendingLikes } = tactics.community
+const lineupConsensus = createLineupConsensus()
+const consensus = lineupConsensus.consensus
+// 多数据源 watch：球队变化或"排阵容"胶囊被激活（含 onShow 时 pageVisible 变化）时刷新共识
+watch([selectedTeamId, () => pageVisible.value && mainTab.value === 'tactics'], ([id, active]) => {
+  if (active && id !== null) void lineupConsensus.load(id)
+}, { immediate: true })
+const myPlayerIds = computed(() => (minePublished.value?.slots ?? []).map(slot => slot.player_id).filter((id): id is number => id !== null))
+const myOverlap = computed(() => minePublished.value
+  ? overlapText(lineupOverlap(minePublished.value.slots.map(slot => slot.player_id), consensus.value), '你')
+  : '')
+function showHint(message: string): void { uni.showToast({ title: message, icon: 'none' }) }
 const selectedTeamName = computed(() => selectableTeams.value.find(team => team.team_id === selectedTeamId.value)?.team_name ?? '')
 const transfer = useInsightsTransfer({ session, selectedTeamId, active: computed(() => pageVisible.value && mainTab.value === 'transfer') })
 const { summary: transferSummary, loading: transferLoading, error: transferError, hint: transferHint, pending: transferPending } = transfer

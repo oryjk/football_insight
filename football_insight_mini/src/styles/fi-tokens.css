@@ -334,6 +334,8 @@ page {
   /* 战术板：球场宽高比 3:4（padding-top 百分比）与球员圆点直径 */
   --fi-component-lineup-pitch-ratio: 133.33%;
   --fi-component-lineup-dot-size: 84rpx;
+  /* 洞察页共识卡片的球场：比编辑页（133.33%）扁，避免一张卡占满一屏；坐标按比例压缩仍可读。 */
+  --fi-component-consensus-pitch-ratio: 105%;
   /* 赞踩胶囊两档高度：sm 与列表行头像同高；md 与详情页 community-action 按钮同高（上下内边距 + 一行 26 号字 + 上下边框）。 */
   --fi-component-reaction-height-sm: var(--fi-space-48);
   --fi-component-reaction-height-md: calc(var(--fi-space-20) * 2 + var(--fi-font-26) * var(--fi-leading-normal) + var(--fi-border-width) * 2);

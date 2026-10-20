@@ -3,6 +3,7 @@
     <!-- 表态卡：先问用户的想法，再给主按钮；不是"我的战术"这种功能名。 -->
     <text class="my-tactics__question">你心中的{{ teamName || '主队' }}最佳 11 人是谁？</text>
     <text class="my-tactics__lead">排好发布出去，看谁的阵容最受球迷认同</text>
+    <text v-if="overlap" class="my-tactics__overlap">{{ overlap }}</text>
     <view v-if="loading" class="my-tactics__skeleton fi-skeleton-block" />
     <view v-else-if="error" class="my-tactics__body">
       <text class="my-tactics__hint">{{ error }}</text><button class="my-tactics__action" @tap="emit('retry')">重试</button>
@@ -26,7 +27,7 @@
 import { computed } from 'vue'
 import type { SavedLineup, SavedLineupDraft } from '../../../types/lineup'
 import { miniPitchPosition, myTacticsSummary } from '../tacticsPresentation'
-const props = defineProps<{ authenticated: boolean; loading: boolean; error: string; draft: SavedLineupDraft | null; published: SavedLineup | null; teamName: string }>()
+const props = defineProps<{ authenticated: boolean; loading: boolean; error: string; draft: SavedLineupDraft | null; published: SavedLineup | null; teamName: string; overlap: string }>()
 const emit = defineEmits<{ (e: 'edit'): void; (e: 'retry'): void }>()
 const summary = computed(() => myTacticsSummary(props.draft, props.published))
 </script>
@@ -35,6 +36,7 @@ const summary = computed(() => myTacticsSummary(props.draft, props.published))
 .my-tactics { padding:var(--fi-space-20); border-radius:var(--fi-radius-md); background:var(--fi-color-page-soft); }
 .my-tactics__question { display:block; color:var(--fi-color-text-strong); font-size:var(--fi-font-30); font-weight:var(--fi-weight-extrabold); line-height:var(--fi-leading-snug); }
 .my-tactics__lead { display:block; margin-top:var(--fi-space-8); color:var(--fi-color-text-secondary); font-size:var(--fi-font-24); line-height:var(--fi-leading-normal); }
+.my-tactics__overlap { display:block; margin-top:var(--fi-space-8); color:var(--fi-color-primary); font-size:var(--fi-font-24); font-weight:var(--fi-weight-bold); }
 .my-tactics__body { margin-top:var(--fi-space-20); display:flex; align-items:center; gap:var(--fi-space-16); }
 .my-tactics__copy { display:flex; flex-direction:column; gap:var(--fi-space-8); flex:1; min-width:0; }
 .my-tactics__formation { font-size:var(--fi-font-28); color:var(--fi-color-text-primary); font-weight:var(--fi-weight-bold); }

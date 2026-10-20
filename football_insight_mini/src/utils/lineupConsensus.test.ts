@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { LineupConsensus } from '../types/lineup'
-import { consensusProgressText, exclusivePlayerIds, lineupOverlap, overlapText, placeConsensus } from './lineupConsensus'
+import { consensusPlayerHint, consensusProgressText, exclusivePlayerIds, lineupOverlap, overlapText, placeConsensus } from './lineupConsensus'
 
 const ids = [1, 10, 11, 12, 13, 20, 21, 22, 30, 31, 32]
 const consensus: LineupConsensus = {
@@ -32,6 +32,12 @@ describe('lineup consensus helpers', () => {
     expect(overlapText(null, '你')).toBe('')
     expect(consensusProgressText(2, 10)).toBe('已有 2 套阵容，再有 8 套就能看到大家心中的最佳 11 人')
     expect(consensusProgressText(12, 10)).toBe('已有 12 套阵容，再有 0 套就能看到大家心中的最佳 11 人')
+  })
+
+  test('player hint explains the pick rate and whether I picked them', () => {
+    const player = { name: '某某', pick_rate: 78 }
+    expect(consensusPlayerHint(player, true)).toBe('78% 的球迷选了某某 · 你也选了')
+    expect(consensusPlayerHint(player, false)).toBe('78% 的球迷选了某某')
   })
 
   test('players are placed into the consensus formation by group', () => {
