@@ -141,6 +141,17 @@
       <text class="support-home-panel__lineup-title">排{{ favoriteTeam ? `${favoriteTeam.team_name}的` : '我的' }}最佳阵容</text>
       <text class="support-home-panel__lineup-action">前往战术板</text>
     </view>
+
+    <!-- 转会投票同样围绕主队，第二行入口；加载/出错时不显示。 -->
+    <view
+      v-if="!showLoading && !errorMessage"
+      class="support-home-panel__lineup support-home-panel__lineup--follow"
+      hover-class="support-home-panel__lineup--pressed"
+      @click="emit('open-transfer')"
+    >
+      <text class="support-home-panel__lineup-title">{{ favoriteTeam ? `${favoriteTeam.team_name}` : '' }}转会投票</text>
+      <text class="support-home-panel__lineup-action">去表态</text>
+    </view>
   </FiPanel>
 </template>
 
@@ -181,6 +192,7 @@ const emit = defineEmits<{
   (e: 'open-match'): void
   (e: 'vote', teamId: number): void
   (e: 'open-lineup'): void
+  (e: 'open-transfer'): void
 }>()
 
 const favoriteTeam = computed(() => props.profile?.favorite_team ?? null)
@@ -523,6 +535,12 @@ const awayRankLabel = computed(() => {
   gap: var(--fi-space-16);
 }
 .support-home-panel__lineup--pressed { opacity: var(--fi-opacity-pressed); }
+/* 转会投票是第二行入口，跟在排阵容后面，不再重复分割线与上内边距。 */
+.support-home-panel__lineup--follow {
+  margin-top: var(--fi-space-16);
+  padding-top: 0;
+  border-top: 0;
+}
 .support-home-panel__lineup-title {
   min-width: 0;
   color: var(--fi-color-text-strong);

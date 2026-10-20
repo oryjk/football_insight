@@ -292,6 +292,20 @@ ssh peiqian 'curl -s http://127.0.0.1:8092/api/v1/ticket-watch/best-windows'
 - 部署：沿用 local233 构建镜像 → `docker save | gzip | ssh peiqian 'gunzip | docker load'` → 用现有运行参数重启容器；回滚用上一个镜像 tag（当前 `97b025f`）。
 - 核对：只读 `curl https://match.oryjk.cn/api/v1/lineups/squads/77680`；`/lineups/me/…` 未登录应为 401。验证写入需要登录令牌，不要用真实用户令牌。
 
+## 转会投票（`f_i_transfer_*`）
+
+- 迁移：`20261020120000_add_transfer_votes.sql`，创建窗口、提名卡、投票三张表，并写入第一期“2026 冬窗”。**尚未在生产执行**。
+- 上线顺序（三步都要做，顺序不能换）：① 在 peiqian 用 `cargo run --bin run_migrations` 应用 `20261020120000`（peiqian 后端目录没有 `.env`，先 `set -a; . ../football-insight-service-backend-rs.env; set +a`）→ ② 部署并重启生产后端 → ③ 上传小程序体验版。
+- 迁移应用前，已含新代码的后端上 `/api/v1/transfers/**` 会返回 503（表不存在），这是预期状态。
+- 新开一期：往 `f_i_transfer_windows` 插入一行即可，无需改代码。示例（2027 夏窗）：
+
+```sql
+INSERT INTO f_i_transfer_windows (code, name, opens_at, closes_at)
+VALUES ('2027-summer', '2027 夏窗', '2027-06-01T00:00:00+08:00', '2027-08-01T00:00:00+08:00');
+```
+
+- 核对：迁移并部署后 `curl https://match.oryjk.cn/api/v1/transfers/windows/current` 应返回当期窗口 JSON；榜单接口 `GET /api/v1/transfers/teams/{team_id}/board` 公开，提名与投票接口需要登录。
+
 ## 日志查看
 
 应用代码会把 tracing 日志写入 `logs/` 目录，并按 10MB 滚动；这是排查业务日志时的优先入口（线上流量在 `peiqian`，排查线上问题优先看 peiqian；jd 备用容器同理把 `ssh peiqian` 换成 `ssh jd`）：

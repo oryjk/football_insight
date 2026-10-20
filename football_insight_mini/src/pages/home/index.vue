@@ -52,6 +52,7 @@
           @open-match="openSupportMatch"
           @vote="handleHomeSupportVote"
           @open-lineup="openLineupBoard"
+          @open-transfer="openTransferBoard"
         />
 
         <!-- 回到页面的后台刷新沿用已有内容，只有还没有总览数据时才显示骨架 -->
@@ -156,6 +157,7 @@ import { extractApiErrorMessage } from '../../utils/apiError'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
 import { buildLineupPageUrl } from '../../utils/lineupLinks'
+import { buildTransferBoardUrl } from '../../utils/transferLinks'
 import { useRuntimeConfig } from '../../stores/runtimeConfig'
 import { buildHeadlineTitleParts } from '../../utils/homeViewText'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
@@ -521,6 +523,10 @@ async function handleHomeSupportVote(teamId: number) {
 
 function openLineupBoard() {
   uni.navigateTo({ url: buildLineupPageUrl(supportFavoriteTeam.value?.team_id) })
+}
+
+function openTransferBoard() {
+  uni.navigateTo({ url: buildTransferBoardUrl(supportFavoriteTeam.value?.team_id ?? 0) })
 }
 
 onShow(() => {
