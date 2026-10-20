@@ -989,8 +989,6 @@ page {
   --fi-primitive-topic-hero-control: rgba(255, 255, 255, 0.14);
   --fi-primitive-topic-hero-disabled: rgba(255, 255, 255, 0.08);
   --fi-primitive-topic-hero-track: rgba(255, 255, 255, 0.16);
-  --fi-primitive-topic-heat-start: #ff875b;
-  --fi-primitive-topic-heat-end: #ff3d45;
   --fi-primitive-topic-hero-radius: 56rpx;
   --fi-primitive-topic-hero-crest-size: 380rpx;
   --fi-primitive-topic-hero-crest-opacity: 0.14;
@@ -1005,14 +1003,11 @@ page {
   --fi-color-topic-hero-control: var(--fi-primitive-topic-hero-control);
   --fi-color-topic-hero-disabled: var(--fi-primitive-topic-hero-disabled);
   --fi-color-topic-hero-track: var(--fi-primitive-topic-hero-track);
-  --fi-color-topic-heat-start: var(--fi-primitive-topic-heat-start);
-  --fi-color-topic-heat-end: var(--fi-primitive-topic-heat-end);
   --fi-radius-topic-hero: var(--fi-primitive-topic-hero-radius);
   --fi-space-topic-hero-crest: var(--fi-primitive-topic-hero-crest-size);
   --fi-opacity-topic-hero-crest: var(--fi-primitive-topic-hero-crest-opacity);
   --fi-opacity-topic-history-crest: var(--fi-primitive-topic-history-crest-opacity);
   --fi-gradient-topic-hero: radial-gradient(ellipse at top right, var(--fi-color-topic-hero-glow), transparent 62%), linear-gradient(150deg, var(--fi-color-topic-hero-top), var(--fi-color-topic-hero-bg) 65%);
-  --fi-gradient-topic-heat: linear-gradient(90deg, var(--fi-color-topic-heat-start), var(--fi-color-topic-heat-end));
 
   --fi-component-topic-hero-bg: var(--fi-gradient-topic-hero);
   --fi-component-topic-hero-radius: var(--fi-radius-topic-hero);

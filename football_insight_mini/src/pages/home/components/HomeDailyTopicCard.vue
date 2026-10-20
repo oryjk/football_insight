@@ -11,12 +11,7 @@
     </view>
     <!-- 整张卡片的正文区已可点开阅读，底部不再单独放「查看」；只留热度/阅读时长与收听。 -->
     <view class="topic-card__footer">
-      <!-- 热度直接写在卡片里而不是嵌 FiTopicHeat：小程序组件宿主节点按基线排，和旁边文字对不齐。 -->
-      <view class="topic-card__meta">
-        <image class="topic-card__heat-icon" :src="fireIcon" mode="aspectFit" aria-hidden="true" />
-        <text class="topic-card__heat">热度 {{ formatTopicHeat(heat) }}</text>
-        <text class="topic-card__minutes">约 {{ item.readMinutes }} 分钟读完</text>
-      </view>
+      <view class="topic-card__meta"><FiTopicMeta tone="dark" :heat="heat" :minutes="item.readMinutes" /></view>
       <view class="topic-card__audio"><FiTopicAudioEntry variant="hero" label="听" :ready="audioReady" :playing="audioPlaying" :loading="audioLoading" @play="emit('play', item.id)" /></view>
     </view>
   </view>
@@ -24,11 +19,10 @@
 
 <script setup lang="ts">
 import FiTopicCrest from '../../../components/topics/FiTopicCrest.vue'
-import fireIcon from '../../../static/home/topic-heat-flame.svg'
+import FiTopicMeta from '../../../components/topics/FiTopicMeta.vue'
 import FiTopicAudioEntry from '../../../components/topics/FiTopicAudioEntry.vue'
 import type { DailyTopicItem } from '../../../types/dailyTopic'
 import { homeTopicCategory } from '../dailyTopics'
-import { formatTopicHeat } from '../../../utils/dailyTopics'
 defineProps<{ item: DailyTopicItem; heat: number; indexLabel: string; audioReady: boolean; audioPlaying: boolean; audioLoading: boolean }>()
 const emit = defineEmits<{ (e: 'read', id: string): void; (e: 'play', id: string): void }>()
 </script>
@@ -44,10 +38,6 @@ const emit = defineEmits<{ (e: 'read', id: string): void; (e: 'play', id: string
 .topic-card__title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--fi-component-topic-hero-title); font-size: var(--fi-font-36); line-height: var(--fi-leading-normal); font-weight: var(--fi-weight-extrabold); }
 .topic-card__summary { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; margin-top: var(--fi-space-12); color: var(--fi-component-topic-hero-copy); font-size: var(--fi-font-26); line-height: var(--fi-leading-normal); }
 .topic-card__footer { display: flex; align-items: center; gap: var(--fi-space-16); margin-top: var(--fi-space-16); }
-/* 图标、热度、阅读时长同字号同行高，在一行 flex 里居中对齐。 */
-.topic-card__meta { flex: 1; min-width: 0; display: flex; align-items: center; color: var(--fi-color-topic-hero-muted); font-size: var(--fi-font-22); line-height: var(--fi-leading-normal); white-space: nowrap; overflow: hidden; }
-.topic-card__heat-icon { flex-shrink: 0; width: var(--fi-space-24); height: var(--fi-space-24); margin-right: var(--fi-space-6); }
-.topic-card__heat { flex-shrink: 0; }
-.topic-card__minutes { min-width: 0; margin-left: var(--fi-space-16); overflow: hidden; text-overflow: ellipsis; }
+.topic-card__meta { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
 .topic-card__audio { flex-shrink: 0; }
 </style>

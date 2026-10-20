@@ -9,10 +9,10 @@
       <FiTopicTeamTags v-if="timeline.tags.value.length" :tags="timeline.tags.value" :selected-team-id="timeline.selectedTeamId.value" @select="selectTimelineTeam" />
       <text class="topic-detail__title">{{ item.title }}</text>
       <view class="topic-detail__meta-row">
-        <text class="topic-detail__meta">{{ item.publishedLabel }} · 约 {{ item.readMinutes }} 分钟阅读</text>
+        <text class="topic-detail__meta">{{ item.publishedLabel }}</text>
         <view class="topic-detail__size"><FiSegmented compact :items="READING_SIZE_ITEMS" :model-value="readingSize" aria-label="文字大小" @update:model-value="setReadingSize" /></view>
       </view>
-      <view class="topic-detail__heat"><FiTopicHeat :value="topicHeatValue(item.id, item.heat)" /></view>
+      <view class="topic-detail__heat"><FiTopicMeta :heat="topicHeatValue(item.id, item.heat)" :minutes="item.readMinutes" /></view>
       <view class="topic-detail__audio"><FiTopicAudioEntry :ready="audio.availableIds.value.includes(item.id)" :playing="audio.status.value === 'playing'" :loading="audio.status.value === 'loading'" @play="audio.toggle(item.id)" /></view>
       <FiTopicAudioPlayer v-if="audio.activeId.value" :title="item.title" :status="audio.status.value" :current-time="audio.currentTime.value" :duration="audio.duration.value" :error-message="audio.errorMessage.value" @toggle="audio.toggle(item.id)" @seek="audio.seek" @close="audio.stop" />
       <view v-if="item.images?.length" class="topic-detail__gallery">
@@ -44,7 +44,7 @@ import { computed, onScopeDispose, ref } from 'vue'
 import { onLoad, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import { topicVisitorId } from '../../utils/topicVisitor'
 import { topicHeatValue, setTopicHeat, syncTopicHeat } from '../../stores/topicHeat'
-import FiTopicHeat from '../../components/topics/FiTopicHeat.vue'
+import FiTopicMeta from '../../components/topics/FiTopicMeta.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { getTopicDetail, recordTopicVisit } from '../../api/dailyTopics'
 import { useDailyTopicAudio } from '../../composables/useDailyTopicAudio'
@@ -148,7 +148,7 @@ function setReadingSize(key: string) {
 .topic-detail__meta-row .topic-detail__meta { margin-top: 0; }
 .topic-detail__size { flex-shrink: 0; width: calc(var(--fi-space-100) * 2 + var(--fi-space-64)); }
 .topic-detail__meta { display: block; margin-top: var(--fi-space-18); color: var(--fi-color-text-caption); font-size: var(--fi-font-22); line-height: var(--fi-leading-normal); }
-.topic-detail__heat { margin-top: var(--fi-space-16); }
+.topic-detail__heat { display: flex; align-items: center; margin-top: var(--fi-space-16); }
 .topic-detail__audio { margin: var(--fi-space-24) 0; }
 .topic-detail__gallery { margin-top: var(--fi-space-24); }
 .topic-detail__paragraph { display: block; margin-top: var(--fi-space-28); color: var(--fi-color-text-primary); font-size: var(--fi-font-32); line-height: var(--fi-leading-relaxed); white-space: pre-wrap; }

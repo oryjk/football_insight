@@ -8,7 +8,7 @@
     <text class="topic-row__title">{{ item.title }}</text>
     <text class="topic-row__summary">{{ item.summary }}</text>
     <view class="topic-row__footer">
-      <view class="topic-row__meta"><FiTopicHeat :value="heat" /><text>约 {{ item.readMinutes }} 分钟阅读</text></view>
+      <view class="topic-row__meta"><FiTopicMeta :heat="heat" :minutes="item.readMinutes" /></view>
       <view class="topic-row__read-entry"><FiTopicReadEntry @read="emit('read', item.id)" /></view>
     </view>
   </view>
@@ -16,7 +16,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import FiTopicCrest from '../../../components/topics/FiTopicCrest.vue'
-import FiTopicHeat from '../../../components/topics/FiTopicHeat.vue'
+import FiTopicMeta from '../../../components/topics/FiTopicMeta.vue'
 import FiTopicReadEntry from '../../../components/topics/FiTopicReadEntry.vue'
 import type { DailyTopicItem } from '../../../types/dailyTopic'
 import { topicCardPresentation } from '../presentation'
@@ -37,6 +37,6 @@ const presentation = computed(() => topicCardPresentation(props.item.title))
 .topic-row__title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: var(--fi-space-20); color: var(--fi-color-text-primary); font-size: var(--fi-font-32); font-weight: var(--fi-weight-bold); line-height: var(--fi-leading-normal); }
 .topic-row__summary { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: var(--fi-space-16); color: var(--fi-color-text-secondary); font-size: var(--fi-font-26); line-height: var(--fi-leading-relaxed); }
 .topic-row__footer { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-16); margin-top: var(--fi-space-24); padding-top: var(--fi-space-18); border-top: var(--fi-border-divider); }
-.topic-row__meta { min-width: 0; display: flex; flex-direction: column; gap: var(--fi-space-6); color: var(--fi-color-text-caption); font-size: var(--fi-font-22); line-height: var(--fi-leading-normal); }
+.topic-row__meta { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
 .topic-row__read-entry { flex-shrink: 0; margin-left: auto; }
 </style>
