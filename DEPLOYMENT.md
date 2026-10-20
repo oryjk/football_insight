@@ -294,7 +294,7 @@ ssh peiqian 'curl -s http://127.0.0.1:8092/api/v1/ticket-watch/best-windows'
 
 ## 转会投票（`f_i_transfer_*`）
 
-- 迁移：`20261020120000_add_transfer_votes.sql`，创建窗口、提名卡、投票三张表，并写入第一期“2026 冬窗”。**尚未在生产执行**。
+- 迁移：`20261020120000_add_transfer_votes.sql`，创建窗口、提名卡、投票三张表，并写入第一期“2026 冬窗”。**2026-10-20 已在 peiqian 执行并登记**；生产后端已部署为 `82e643f`（回滚镜像 `cd3fcc4`），小程序 1.1.0 robot 2 已上传。
 - 上线顺序（三步都要做，顺序不能换）：① 在 peiqian 用 `cargo run --bin run_migrations` 应用 `20261020120000`（peiqian 后端目录没有 `.env`，先 `set -a; . ../football-insight-service-backend-rs.env; set +a`）→ ② 部署并重启生产后端 → ③ 上传小程序体验版。
 - 迁移应用前，已含新代码的后端上 `/api/v1/transfers/**` 会返回 503（表不存在），这是预期状态。
 - 新开一期：往 `f_i_transfer_windows` 插入一行即可，无需改代码。示例（2027 夏窗）：
