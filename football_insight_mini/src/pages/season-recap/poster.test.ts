@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { buildRecapPosterContent, recapBadge, recapConversion, recapRoute, saveRecapPoster } from './poster'
+import { buildRecapPosterContent, recapBadge, recapConversion, recapRoute, recapRouteEntries, saveRecapPoster, supportsRecapWebp } from './poster'
 import type { RecapMatch, SeasonRecap } from '../../types/seasonRecap'
 const zero={away_km:0,home_km:null,total_km:0,matches:0,home_matches:0,away_matches:0,cities:0}
 function match(id:number,is_home:boolean,city?:string):RecapMatch {
@@ -37,6 +37,31 @@ test('route hides when a selected away match has no city from a legacy backend',
  const matches=[match(1,false),match(2,false,'上海')]
  expect(recapRoute(matches,[1,2])).toBe(null)
  expect(recapRoute(matches,[2])).toBe('成都 → 上海')
+})
+test('route entries order by date, aggregate unique same-city crests and tolerate missing avatars',()=>{
+ const matches=[
+  {...match(4,false,' 上海 '),opponent_avatar_url:' https://cdn/shenhua.png '},
+  {...match(3,false,'上海'),opponent_avatar_url:'https://cdn/haigang.png'},
+  {...match(2,false,'北京'),opponent_avatar_url:null},
+  {...match(1,true,'成都'),opponent_avatar_url:'https://cdn/unused.png'},
+  {...match(5,false,'上海'),opponent_avatar_url:'https://cdn/shenhua.png'},
+  {...match(6,false,'天津'),opponent_avatar_url:'https://cdn/unselected.png'},
+ ]
+ expect(recapRouteEntries(matches,[5,4,3,2,1])).toEqual({entries:[
+  {city:'北京',avatarUrls:[]},
+  {city:'上海',avatarUrls:['https://cdn/haigang.png','https://cdn/shenhua.png']},
+ ],totalCities:2})
+ expect(recapRouteEntries(matches,[1])).toBeNull()
+ expect(matches.map(m=>m.match_id)).toEqual([4,3,2,1,5,6])
+ const far=Array.from({length:8},(_,i)=>match(i+1,false,`城${i+1}`))
+ expect(recapRouteEntries(far,far.map(m=>m.match_id))).toEqual({entries:far.slice(0,6).map(m=>({city:m.city!,avatarUrls:[]})),totalCities:8})
+})
+test('webp is conservative on unknown platforms and older iOS',()=>{
+ expect(supportsRecapWebp('android','Android 13')).toBe(true)
+ expect(supportsRecapWebp('ios','iOS 14.0')).toBe(true)
+ expect(supportsRecapWebp('ios','iOS 13.7')).toBe(false)
+ expect(supportsRecapWebp('devtools','Windows 10')).toBe(false)
+ expect(supportsRecapWebp('ios','unknown')).toBe(false)
 })
 test('poster content composes backend summary without recomputing mileage',()=>{
  const view:SeasonRecap={season:2026,matches:[match(1,true,'成都'),match(2,false,'北京')],selected_match_ids:[1,2],home_one_way_km:12.25,summary:{away_km:3016,home_km:25,total_km:3041,matches:2,home_matches:1,away_matches:1,cities:2}}

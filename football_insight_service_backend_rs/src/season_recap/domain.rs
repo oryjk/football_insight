@@ -4,6 +4,7 @@ pub struct RecapMatch {
     pub match_id: i64,
     pub match_date: String,
     pub opponent: String,
+    pub opponent_avatar_url: Option<String>,
     pub is_home: bool,
     /// 主场为成都，客场为对手城市；由 application 填充，persistence 给默认值。
     pub city: String,

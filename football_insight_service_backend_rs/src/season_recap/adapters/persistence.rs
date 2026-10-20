@@ -14,12 +14,14 @@ impl PostgresRecapRepository {
     }
 }
 // An exact first-team name prevents B-team matches entering either selection or mileage.
-pub const MATCHES_SQL: &str = r#"SELECT match_id,match_date::text AS match_date,
- CASE WHEN home_team_name='成都蓉城' THEN away_team_name ELSE home_team_name END AS opponent,
- home_team_name='成都蓉城' AS is_home FROM f_i_matches
- WHERE season=$1 AND source_active=TRUE AND status='3'
- AND (home_team_name='成都蓉城' OR away_team_name='成都蓉城')
- ORDER BY match_date,match_time,match_id"#;
+pub const MATCHES_SQL: &str = r#"SELECT m.match_id,m.match_date::text AS match_date,
+ CASE WHEN m.home_team_name='成都蓉城' THEN m.away_team_name ELSE m.home_team_name END AS opponent,
+ COALESCE(NULLIF(t.avatar_storage_url,''),NULLIF(t.avatar_source_url,'')) AS opponent_avatar_url,
+ m.home_team_name='成都蓉城' AS is_home FROM f_i_matches m
+ LEFT JOIN f_i_teams t ON t.team_id=CASE WHEN m.home_team_name='成都蓉城' THEN m.away_team_id ELSE m.home_team_id END
+ WHERE m.season=$1 AND m.source_active=TRUE AND m.status='3'
+ AND (m.home_team_name='成都蓉城' OR m.away_team_name='成都蓉城')
+ ORDER BY m.match_date,m.match_time,m.match_id"#;
 pub const PREF_SQL: &str = "SELECT home_one_way_km FROM f_i_season_recap_profiles WHERE user_id=$1";
 pub const SELECTED_SQL: &str = "SELECT a.match_id FROM f_i_season_recap_attendances a JOIN f_i_matches m USING(match_id) WHERE a.user_id=$1 AND m.season=$2 ORDER BY a.match_id";
 pub const UPSERT_SQL: &str = "INSERT INTO f_i_season_recap_profiles(user_id,home_one_way_km) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET home_one_way_km=COALESCE(EXCLUDED.home_one_way_km,f_i_season_recap_profiles.home_one_way_km)";
@@ -30,6 +32,7 @@ struct MatchRow {
     match_id: i64,
     match_date: String,
     opponent: String,
+    opponent_avatar_url: Option<String>,
     is_home: bool,
 }
 async fn snapshot(
@@ -46,7 +49,7 @@ async fn snapshot_with_lock(
     lock: bool,
 ) -> Result<Snapshot, RecapError> {
     let query = if lock {
-        format!("{MATCHES_SQL} FOR SHARE")
+        format!("{MATCHES_SQL} FOR SHARE OF m")
     } else {
         MATCHES_SQL.to_string()
     };
@@ -60,8 +63,9 @@ async fn snapshot_with_lock(
             match_id: m.match_id,
             match_date: m.match_date,
             opponent: m.opponent,
+            opponent_avatar_url: m.opponent_avatar_url,
             is_home: m.is_home,
-            // 城市与往返里程由 application 层填充（match_trip），SQL 只取赛程字段。
+            // 城市与往返里程由 application 层填充（match_trip），SQL 只取赛程及队徽字段。
             city: String::new(),
             round_trip_km: None,
         })
@@ -177,7 +181,7 @@ mod tests {
         assert_eq!(parsed.host_str(), Some("127.0.0.1"));
         assert_eq!(parsed.path(), "/season_recap_test");
         let pool = PgPool::connect(&url).await.unwrap();
-        sqlx::raw_sql("CREATE TABLE f_i_users(id UUID PRIMARY KEY); CREATE TABLE f_i_matches(match_id BIGINT PRIMARY KEY,season INT,match_date DATE,match_time TEXT,home_team_name TEXT,away_team_name TEXT,status TEXT,source_active BOOL);").execute(&pool).await.unwrap();
+        sqlx::raw_sql("CREATE TABLE f_i_users(id UUID PRIMARY KEY); CREATE TABLE f_i_matches(match_id BIGINT PRIMARY KEY,season INT,match_date DATE,match_time TEXT,home_team_name TEXT,away_team_name TEXT,status TEXT,source_active BOOL,home_team_id BIGINT,away_team_id BIGINT); CREATE TABLE f_i_teams(team_id BIGINT PRIMARY KEY,avatar_storage_url TEXT,avatar_source_url TEXT);").execute(&pool).await.unwrap();
         let migration = include_str!("../../../migrations/20261018130000_add_season_recap.sql");
         let mut tx = pool.begin().await.unwrap();
         sqlx::query("SET LOCAL lock_timeout='2s'")
@@ -202,10 +206,36 @@ mod tests {
             .execute(&pool)
             .await
             .unwrap();
-        sqlx::raw_sql("INSERT INTO f_i_matches VALUES (1,2026,'2026-01-01','19:35','成都蓉城','北京国安','3',true),(2,2026,'2026-01-02','19:35','上海申花','成都蓉城','3',true),(3,2026,'2026-01-03','19:35','成都蓉城希拉谷','北京国安','3',true),(4,2026,'2026-01-04','19:35','成都蓉城','上海申花','1',true),(5,2026,'2026-01-05','19:35','成都蓉城','上海申花','3',false),(6,2027,'2027-01-01','19:35','成都蓉城','上海申花','3',true)").execute(&pool).await.unwrap();
+        sqlx::raw_sql("INSERT INTO f_i_matches(match_id,season,match_date,match_time,home_team_name,away_team_name,status,source_active) VALUES (1,2026,'2026-01-01','19:35','成都蓉城','北京国安','3',true),(2,2026,'2026-01-02','19:35','上海申花','成都蓉城','3',true),(3,2026,'2026-01-03','19:35','成都蓉城希拉谷','北京国安','3',true),(4,2026,'2026-01-04','19:35','成都蓉城','上海申花','1',true),(5,2026,'2026-01-05','19:35','成都蓉城','上海申花','3',false),(6,2027,'2027-01-01','19:35','成都蓉城','上海申花','3',true)").execute(&pool).await.unwrap();
+        sqlx::raw_sql("INSERT INTO f_i_teams VALUES (1,'https://cdn.example.com/beijing.png','https://source.example.com/beijing.png'),(2,NULL,'https://source.example.com/shanghai.png'); UPDATE f_i_matches SET home_team_id=CASE WHEN home_team_name='上海申花' THEN 2 ELSE 77680 END,away_team_id=CASE WHEN away_team_name='北京国安' THEN 1 ELSE 77680 END;").execute(&pool).await.unwrap();
         let repo = PostgresRecapRepository::new(pool.clone());
         let initial = repo.load(a, 2026).await.unwrap();
         assert_eq!(initial.matches.len(), 2);
+        assert_eq!(
+            initial.matches[0].opponent_avatar_url.as_deref(),
+            Some("https://cdn.example.com/beijing.png")
+        );
+        assert_eq!(
+            initial.matches[1].opponent_avatar_url.as_deref(),
+            Some("https://source.example.com/shanghai.png")
+        );
+        sqlx::query("UPDATE f_i_teams SET avatar_storage_url='' WHERE team_id=2")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            repo.load(a, 2026).await.unwrap().matches[1]
+                .opponent_avatar_url
+                .as_deref(),
+            Some("https://source.example.com/shanghai.png")
+        );
+        sqlx::query("DELETE FROM f_i_teams WHERE team_id=2")
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(repo.load(a, 2026).await.unwrap().matches[1]
+            .opponent_avatar_url
+            .is_none());
         let saved = save(&repo, a, 2026, &[1, 1, 2], Some(12.25)).await.unwrap();
         let mut read_tx = pool.begin().await.unwrap();
         snapshot(&mut read_tx, a, 2026).await.unwrap();

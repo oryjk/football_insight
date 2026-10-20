@@ -3,10 +3,12 @@
 </template>
 <script setup lang="ts">
 import { getCurrentInstance, onMounted, nextTick } from 'vue'
+import { CHENGDU_RONGCHENG_CREST_IMAGE_URL, SEASON_RECAP_POSTER_BG_IMAGE_URL } from '../../../config/assets'
 import { exportCanvasToTempFile, flushCanvas } from '../../../utils/canvasPoster'
 import type { RecapPosterPayload } from '../flow'
-import { buildRecapPosterContent, materializeCode, POSTER_WIDTH, POSTER_HEIGHT } from '../poster'
+import { buildRecapPosterContent, materializeCode, POSTER_WIDTH, POSTER_HEIGHT, supportsRecapWebp } from '../poster'
 import { drawRecapPoster } from '../posterDrawing'
+import { loadRecapPosterImages } from '../posterImages'
 const props=defineProps<{payload:RecapPosterPayload}>()
 const emit=defineEmits<{(event:'ready',key:number,path:string):void;(event:'failed',key:number):void}>()
 const instance=getCurrentInstance()
@@ -17,10 +19,18 @@ onMounted(async()=>{
  let cleanup=()=>{}
  try {
   await nextTick()
+  const content=buildRecapPosterContent(payload.view)
+  let allowWebp=false
+  try { const info=uni.getSystemInfoSync();allowWebp=supportsRecapWebp(info.platform,info.system) } catch { /* use PNG/JPEG only */ }
+  const decorations=loadRecapPosterImages([
+   SEASON_RECAP_POSTER_BG_IMAGE_URL,
+   CHENGDU_RONGCHENG_CREST_IMAGE_URL,
+   ...(content.routeEntries?.entries.flatMap(entry=>entry.avatarUrls) ?? []),
+  ],allowWebp)
   const code=await materializeCode(payload.code);cleanup=code.cleanup
   const image=await new Promise<UniApp.GetImageInfoSuccessData>((resolve,reject)=>uni.getImageInfo({src:code.path,success:resolve,fail:reject}))
   const context=uni.createCanvasContext('seasonRecapCanvas',instance)
-  drawRecapPoster(context,buildRecapPosterContent(payload.view),image.path)
+  drawRecapPoster(context,content,image.path,await decorations)
   await flushCanvas(context)
   const path=await exportCanvasToTempFile({canvasId:'seasonRecapCanvas',width:POSTER_WIDTH,height:POSTER_HEIGHT,instance})
   emit('ready',payload.key,path)

@@ -45,6 +45,7 @@ mod tests {
             match_id: id,
             match_date: "2026-10-01".into(),
             opponent: opponent.into(),
+            opponent_avatar_url: Some(format!("https://cdn.example.com/{id}.png")),
             is_home: home,
             city: String::new(),
             round_trip_km: None,
@@ -223,6 +224,7 @@ mod service_tests {
             match_id: id,
             match_date: "2026-10-01".into(),
             opponent: opponent.into(),
+            opponent_avatar_url: Some(format!("https://cdn.example.com/{id}.png")),
             is_home: home,
             city: String::new(),
             round_trip_km: None,
@@ -242,6 +244,15 @@ mod service_tests {
         .unwrap();
         let home = view.matches.iter().find(|m| m.match_id == 1).unwrap();
         assert_eq!(home.city, "成都");
+        assert_eq!(
+            home.opponent_avatar_url.as_deref(),
+            Some("https://cdn.example.com/1.png")
+        );
+        let json = serde_json::to_value(&view).unwrap();
+        assert_eq!(
+            json["matches"][1]["opponent_avatar_url"],
+            "https://cdn.example.com/2.png"
+        );
         assert_eq!(home.round_trip_km, None);
         let beijing = view.matches.iter().find(|m| m.match_id == 2).unwrap();
         assert_eq!(beijing.city, "北京");
@@ -313,6 +324,7 @@ mod transactional_tests {
                     match_id: 1,
                     match_date: "2026-01-01".into(),
                     opponent: "北京国安".into(),
+                    opponent_avatar_url: None,
                     is_home: false,
                     city: String::new(),
                     round_trip_km: None,
@@ -334,6 +346,7 @@ mod transactional_tests {
                     match_id: 1,
                     match_date: "2026-01-01".into(),
                     opponent: "北京国安".into(),
+                    opponent_avatar_url: None,
                     is_home: true,
                     city: String::new(),
                     round_trip_km: None,
