@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { filterRecapMatches, formatRecapDate, isFilterFullySelected, parseHomeDistance, previewRecapSummary, recapFilterCounts, recapSelectionStats, recapSharePath, resolveRecapSeason, toggleFilterSelection } from './helpers'
+import { filterRecapMatches, formatRecapDate, isFilterFullySelected, parseHomeDistance, previewRecapSummary, recapFilterCounts, recapSelectionStats, recapSharePath, resolveRecapSeason, shouldShowHomeDistance, toggleFilterSelection } from './helpers'
 import { parseAcquisitionLaunch } from '../../utils/acquisitionSource'
 import type { RecapMatch } from '../../types/seasonRecap'
 describe('season recap inputs and attribution', () => {
@@ -59,11 +59,19 @@ describe('recap filter and selection helpers', () => {
   expect(toggleFilterSelection(matches, [], 'all')).toEqual([1, 2, 3])
   expect(toggleFilterSelection(matches, [1, 2, 3], 'all')).toEqual([])
  })
- test('formatRecapDate trims ISO dates to MM-DD and keeps malformed input as-is', () => {
-  expect(formatRecapDate('2026-03-01')).toBe('03-01')
-  expect(formatRecapDate('2026-12-31')).toBe('12-31')
-  for (const input of ['2026/03/01', '03-01', '2026-3-1', '']) expect(formatRecapDate(input)).toBe(input)
- })
+  test('formatRecapDate trims ISO dates to MM-DD and keeps malformed input as-is', () => {
+    expect(formatRecapDate('2026-03-01')).toBe('03-01')
+    expect(formatRecapDate('2026-12-31')).toBe('12-31')
+    for (const input of ['2026/03/01', '03-01', '2026-3-1', '']) expect(formatRecapDate(input)).toBe(input)
+  })
+  test('shouldShowHomeDistance hides on away, always shows on home, requires home selection on all', () => {
+    expect(shouldShowHomeDistance('away', true)).toBe(false)
+    expect(shouldShowHomeDistance('away', false)).toBe(false)
+    expect(shouldShowHomeDistance('home', false)).toBe(true)
+    expect(shouldShowHomeDistance('home', true)).toBe(true)
+    expect(shouldShowHomeDistance('all', true)).toBe(true)
+    expect(shouldShowHomeDistance('all', false)).toBe(false)
+  })
 })
 
 describe('previewRecapSummary live preview', () => {

@@ -15,6 +15,12 @@ export function resolveRecapSeason(query: Record<string, unknown>): number {
  return Number.isInteger(year) && year >= 2026 && year <= new Date().getFullYear() ? year : 2026
 }
 export type RecapFilter = 'all' | 'home' | 'away'
+// 距离行显示规则：客场筛选下不显示；主场筛选下始终显示（方便先填）；全部筛选下需已选主场。
+export function shouldShowHomeDistance(filter: RecapFilter, hasHomeSelected: boolean): boolean {
+  if (filter === 'away') return false
+  if (filter === 'home') return true
+  return hasHomeSelected
+}
 export function filterRecapMatches(matches: RecapMatch[], filter: RecapFilter): RecapMatch[] {
  if (filter === 'home') return matches.filter(match => match.is_home)
  if (filter === 'away') return matches.filter(match => !match.is_home)

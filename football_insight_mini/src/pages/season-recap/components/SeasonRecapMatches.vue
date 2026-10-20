@@ -24,26 +24,26 @@
  </view>
 </template>
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import FiSegmented from '../../../components/FiSegmented.vue'
 import type { RecapMatch } from '../../../types/seasonRecap'
 import { filterRecapMatches, formatRecapDate, isFilterFullySelected, recapFilterCounts, recapSelectionStats, toggleFilterSelection, type RecapFilter } from '../helpers'
-const props = defineProps<{matches:RecapMatch[];selected:number[];disabled:boolean}>()
-const emit = defineEmits<{(event:'toggle',id:number):void;(event:'select',ids:number[]):void}>()
-const filter = ref<RecapFilter>('all')
+// 筛选状态由页面持有（页面用它决定距离行显隐），这里只受控展示。
+const props = defineProps<{matches:RecapMatch[];selected:number[];disabled:boolean;filter:RecapFilter}>()
+const emit = defineEmits<{(event:'toggle',id:number):void;(event:'select',ids:number[]):void;(event:'update:filter',value:RecapFilter):void}>()
 const counts = computed(() => recapFilterCounts(props.matches))
 const segmentItems = computed(() => [
- {key:'all',label:`全部 ${counts.value.all}`},
- {key:'home',label:`主场 ${counts.value.home}`},
- {key:'away',label:`客场 ${counts.value.away}`},
+  {key:'all',label:`全部 ${counts.value.all}`},
+  {key:'home',label:`主场 ${counts.value.home}`},
+  {key:'away',label:`客场 ${counts.value.away}`},
 ])
-const filtered = computed(() => filterRecapMatches(props.matches, filter.value))
+const filtered = computed(() => filterRecapMatches(props.matches, props.filter))
 const stats = computed(() => recapSelectionStats(props.matches, props.selected))
-const fullySelected = computed(() => isFilterFullySelected(props.matches, props.selected, filter.value))
-const bulkLabel = computed(() => fullySelected.value ? '清空' : filter.value === 'home' ? '全选主场' : filter.value === 'away' ? '全选客场' : '全选')
+const fullySelected = computed(() => isFilterFullySelected(props.matches, props.selected, props.filter))
+const bulkLabel = computed(() => fullySelected.value ? '清空' : props.filter === 'home' ? '全选主场' : props.filter === 'away' ? '全选客场' : '全选')
 function isSelected(id: number) { return props.selected.includes(id) }
-function changeFilter(key: string) { if (!props.disabled) filter.value = key as RecapFilter }
-function bulkToggle() { if (!props.disabled) emit('select', toggleFilterSelection(props.matches, props.selected, filter.value)) }
+function changeFilter(key: string) { if (!props.disabled) emit('update:filter', key as RecapFilter) }
+function bulkToggle() { if (!props.disabled) emit('select', toggleFilterSelection(props.matches, props.selected, props.filter)) }
 </script>
 <style scoped>
 .matches__head {display:flex;align-items:center;justify-content:space-between;gap:var(--fi-space-12);}

@@ -20,11 +20,11 @@
     <SeasonRecapSummary :summary="summaryPreview" :season="season" :dirty="dirty" />
    </FiPanel>
    <FiPanel>
-    <SeasonRecapMatches :matches="view.matches" :selected="selected" :disabled="generating" @toggle="toggle" @select="setSelected" />
-    <view v-if="hasHomeSelected" class="distance">
+    <SeasonRecapMatches v-model:filter="filter" :matches="view.matches" :selected="selected" :disabled="generating" @toggle="toggle" @select="setSelected" />
+    <view v-if="showHomeDistance" class="distance">
      <view class="distance__field">
       <text class="distance__label">去主场单边距离</text>
-      <input class="distance__input" type="digit" :value="distance" :disabled="generating" maxlength="6" placeholder="0–500" aria-label="去主场的单边距离，公里" @input="handleDistanceInput" />
+      <input class="distance__input" type="digit" :value="distance" :disabled="generating" maxlength="6" placeholder="0–500" placeholder-class="distance__placeholder" aria-label="去主场的单边距离，公里" @input="handleDistanceInput" />
       <text class="distance__unit">公里</text>
      </view>
      <text class="distance__hint">填一次即可，会记住</text>
@@ -63,7 +63,8 @@ import { getSeasonRecap,saveSeasonRecap,getSeasonRecapCode } from '../../api/sea
 import { setPostLoginRedirectTarget } from '../../utils/authStorage'
 import { copyPageShareLink,goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import type { RecapSummary } from '../../types/seasonRecap'
-import { recapSharePath,recapSelectionStats,previewRecapSummary,resolveRecapSeason } from './helpers'
+import { recapSharePath,recapSelectionStats,previewRecapSummary,resolveRecapSeason,shouldShowHomeDistance } from './helpers'
+import type { RecapFilter } from './helpers'
 import { createRecapFlow } from './flow'
 import { saveRecapPoster } from './poster'
 const session=useAppSession()
@@ -76,6 +77,9 @@ const formulaOpen=ref(false)
 const pageLockStyle=computed(()=>posterSheetVisible.value?'overflow: hidden;':'')
 const showDock=computed(()=>session.hasAccessToken.value&&!loading.value&&!!view.value)
 const hasHomeSelected=computed(()=>!!view.value&&view.value.matches.some(m=>m.is_home&&selected.value.includes(m.match_id)))
+// 筛选由页面持有：客场不显示距离行，主场始终显示（可先填），全部需已选主场。
+const filter=ref<RecapFilter>('all')
+const showHomeDistance=computed(()=>shouldShowHomeDistance(filter.value,hasHomeSelected.value))
 const selectionStats=computed(()=>recapSelectionStats(view.value?.matches??[],selected.value))
 // 勾选/距离修改实时联动总览卡；旧后端缺 city/round_trip_km 时回退到已保存结果。
 const EMPTY_SUMMARY:RecapSummary={away_km:0,home_km:null,total_km:0,matches:0,home_matches:0,away_matches:0,cities:0}
@@ -117,15 +121,19 @@ onShareTimeline(()=>({title:`我的 ${season.value} 蓉城赛季足迹`,query:`s
 .action::after {border:0;}
 .pressed {opacity:var(--fi-opacity-pressed);}
 .distance {margin-top:var(--fi-space-16);padding-top:var(--fi-space-16);border-top:var(--fi-border-width) solid var(--fi-color-divider-soft);}
-.distance__field {display:flex;align-items:center;gap:var(--fi-space-16);font-size:var(--fi-font-28);}
-.distance__label {flex-shrink:0;font-size:var(--fi-font-26);font-weight:var(--fi-weight-bold);color:var(--fi-color-text-primary);}
-.distance__input {flex:1;min-width:0;height:var(--fi-space-64);box-sizing:border-box;padding:0 var(--fi-space-20);background:var(--fi-color-page);border-radius:var(--fi-radius-sm);font-size:var(--fi-font-32);line-height:var(--fi-leading-normal);}
+.distance__field {display:flex;align-items:center;gap:var(--fi-space-16);}
+.distance__label {flex-shrink:0;font-size:var(--fi-font-26);font-weight:var(--fi-weight-bold);color:var(--fi-color-text-secondary);}
+.distance__input {flex:1;min-width:0;height:var(--fi-space-64);box-sizing:border-box;padding:0 var(--fi-space-20);background:var(--fi-color-page);border-radius:var(--fi-radius-sm);font-size:var(--fi-font-26);line-height:var(--fi-space-64);color:var(--fi-color-text-primary);}
 .distance__unit {flex-shrink:0;font-size:var(--fi-font-26);color:var(--fi-color-text-secondary);}
-.distance__hint {display:block;margin-top:var(--fi-space-8);font-size:var(--fi-font-22);color:var(--fi-color-text-muted);}
+.distance__hint {display:block;margin-top:var(--fi-space-8);font-size:var(--fi-font-22);line-height:var(--fi-leading-normal);color:var(--fi-color-text-muted);}
 .formula__toggle {display:flex;align-items:center;gap:var(--fi-space-8);margin:0;padding:var(--fi-space-8) var(--fi-space-4);background:transparent;border:0;line-height:var(--fi-leading-normal);}
 .formula__toggle::after {border:0;}
 .formula__label {font-size:var(--fi-font-26);color:var(--fi-color-text-secondary);}
 .formula__arrow {font-size:var(--fi-font-26);color:var(--fi-color-text-muted);transition:transform var(--fi-motion-duration-base) var(--fi-motion-ease-out);}
 .formula__arrow--open {transform:rotate(90deg);}
 .formula__body {display:block;padding:var(--fi-space-4) var(--fi-space-4) 0;font-size:var(--fi-font-24);line-height:var(--fi-leading-relaxed);color:var(--fi-color-text-muted);}
+</style>
+<style>
+/* 小程序 placeholder-class 作用在原生占位节点上，不带 scoped 属性，必须用非 scoped 选择器才能命中。 */
+.distance__placeholder {font-size:var(--fi-font-26);color:var(--fi-color-text-muted);}
 </style>
