@@ -19,6 +19,8 @@ export function createTransferBoard(deps: TransferBoardDeps = {}) {
   const teamId = ref(0), intent = ref<TransferIntent>('out')
   const board = ref<TransferBoard | null>(null), items = ref<TransferCard[]>([])
   const loading = ref(false), error = ref('')
+  /** 切换意向时保留上一个榜的列表直到新数据回来（页面不塌），期间标记为过期，页面可淡化显示。 */
+  const stale = ref(false)
   let generation = 0, disposed = false
   const hasMore = computed(() => !board.value || items.value.length < board.value.total)
 
@@ -30,27 +32,43 @@ export function createTransferBoard(deps: TransferBoardDeps = {}) {
       const result = await read(id, which, pageNo)
       if (owner !== generation || disposed) return
       board.value = result
+      stale.value = false
       const known = new Set(pageNo === 1 ? [] : items.value.map(item => item.share_code))
       items.value = [...(pageNo === 1 ? [] : items.value), ...result.items.filter(item => !known.has(item.share_code))]
     } catch (cause) {
-      if (owner === generation && !disposed) error.value = extractApiErrorMessage(cause, '转会榜加载失败，请重试')
+      if (owner === generation && !disposed) {
+        error.value = extractApiErrorMessage(cause, '转会榜加载失败，请重试')
+        // 过期列表属于上一个榜，失败时不能继续冒充当前榜
+        if (stale.value) { items.value = []; stale.value = false }
+      }
     } finally {
       if (owner === generation) loading.value = false
     }
   }
 
+  /** 首次进入或换球队：清空后加载。 */
   function load(id: number, which: TransferIntent): Promise<void> {
     teamId.value = id; intent.value = which
-    board.value = null; items.value = []; votes.reset()
+    board.value = null; items.value = []; stale.value = false; votes.reset()
+    return fetch(1)
+  }
+  /** 返回页面时刷新：保留当前列表，新数据回来再替换。 */
+  function refresh(): Promise<void> {
+    if (!board.value) return load(teamId.value, intent.value)
     return fetch(1)
   }
   function more(): Promise<void> {
-    if (loading.value || !hasMore.value || !board.value) return Promise.resolve()
+    if (loading.value || stale.value || !hasMore.value || !board.value) return Promise.resolve()
     return fetch(board.value.page + 1)
   }
   function changeIntent(which: TransferIntent): Promise<void> {
     if (which === intent.value && board.value && !error.value) return Promise.resolve()
-    return load(teamId.value, which)
+    if (!board.value) return load(teamId.value, which)
+    // 保留标题、说明与旧列表，避免切换时页面先塌再撑开造成抖动。
+    intent.value = which
+    stale.value = items.value.length > 0
+    votes.reset()
+    return fetch(1)
   }
   /** 提名或赞踩前的拦截：已登录却不能投时返回原因，游客与能投的人返回空。 */
   function nominateBlocked(): string {
@@ -76,5 +94,5 @@ export function createTransferBoard(deps: TransferBoardDeps = {}) {
     if (message) notify(message)
   }
   function dispose(): void { disposed = true; generation++; votes.reset() }
-  return { teamId, intent, board, items, loading, error, hasMore, pending: votes.pending, load, more, changeIntent, vote, nominateBlocked, dispose }
+  return { teamId, intent, board, items, loading, error, stale, hasMore, pending: votes.pending, load, refresh, more, changeIntent, vote, nominateBlocked, dispose }
 }

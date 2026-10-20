@@ -61,4 +61,29 @@ describe('transfer board page', () => {
     await guest.load(1, 'out')
     expect(guest.nominateBlocked()).toBe('')
   })
+
+  test('switching intent keeps the current header and list until the new page arrives', async () => {
+    let release: (b: TransferBoard) => void = () => {}
+    const state = createTransferBoard({ ...base, board: (_, intent, p) => intent === 'out' ? Promise.resolve(page(intent, p ?? 1, 3)) : new Promise(r => { release = r }) })
+    await state.load(1, 'out')
+    const pending = state.changeIntent('in')
+    // 等待期间：球队、窗口信息和旧列表都还在，只标记为过期，页面不塌
+    expect(state.intent.value).toBe('in')
+    expect(state.board.value?.team.team_id).toBe(1)
+    expect(state.items.value.length).toBe(3)
+    expect(state.stale.value).toBe(true)
+    release(page('in', 1, 2)); await pending
+    expect(state.items.value.map(item => item.intent)).toEqual(['in', 'in'])
+    expect(state.stale.value).toBe(false)
+  })
+
+  test('refresh on return keeps the list visible while reloading', async () => {
+    let release: (b: TransferBoard) => void = () => {}, calls = 0
+    const state = createTransferBoard({ ...base, board: (_, intent, p) => ++calls === 1 ? Promise.resolve(page(intent, p ?? 1, 3)) : new Promise(r => { release = r }) })
+    await state.load(1, 'out')
+    const pending = state.refresh()
+    expect(state.items.value.length).toBe(3)
+    release(page('out', 1, 4)); await pending
+    expect(state.items.value.length).toBe(4)
+  })
 })

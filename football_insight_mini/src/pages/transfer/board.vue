@@ -6,10 +6,12 @@
     <text v-if="!teamId" class="transfer-caption">先在首页选择你的主队，再来给转会表态。</text>
     <template v-else>
       <text v-if="board?.window" class="transfer-caption">{{ board.window.name }} · {{ board.window.open ? '表态中，提名一位球员或给大家的提名点赞成 / 反对' : '本期已结束' }}</text>
-      <FiSegmented :items="intentItems" :model-value="intent" aria-label="转会榜" @update:model-value="changeIntent($event as TransferIntent)" />
+      <view id="transfer-tabs">
+        <FiSegmented :items="intentItems" :model-value="intent" aria-label="转会榜" @update:model-value="changeIntent($event as TransferIntent)" />
+      </view>
       <text v-if="error" class="transfer-error">{{ error }}</text>
       <FiLoading v-if="loading && !items.length" title="转会榜加载中" caption="正在读取球迷的提名。" />
-      <view v-if="items.length" class="transfer-panel">
+      <view v-if="items.length" class="transfer-panel" :class="{ 'transfer-panel--stale': stale }">
         <view v-for="card in items" :key="card.share_code" class="transfer-item">
           <FiTransferCard :card="card" :pending="pending.includes(card.share_code)" @open="openCard(card.share_code)" @vote="vote(card, $event)" />
         </view>
@@ -34,15 +36,16 @@ import FiSegmented from '../../components/FiSegmented.vue'
 import FiTransferCard from '../../components/FiTransferCard.vue'
 import TransferNominateSheet from './components/TransferNominateSheet.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { anchorTabsToTop } from '../../composables/useTabAnchor'
 import type { TransferIntent } from '../../types/transfer'
 import { buildSharePath } from '../../utils/shareSource'
 import { TRANSFER_BOARD_LABELS, TRANSFER_INTENTS, buildTransferBoardUrl, buildTransferViewUrl, parseTransferBoardQuery, transferBoardShareTitle } from '../../utils/transferLinks'
 import { createTransferBoard } from './useTransferBoard'
 import { createTransferNominate } from './useTransferNominate'
 
-const { navigationPageStyle } = useNavigationLayout()
+const { navigationPageStyle, navigationHeightPx } = useNavigationLayout()
 const state = createTransferBoard()
-const { teamId, intent, board, items, loading, error, hasMore, pending, vote } = state
+const { teamId, intent, board, items, loading, error, stale, hasMore, pending, vote } = state
 const nominate = createTransferNominate()
 const intentItems = TRANSFER_INTENTS.map(key => ({ key, label: TRANSFER_BOARD_LABELS[key] }))
 const wantsNominate = ref(false)
@@ -54,8 +57,8 @@ onLoad(query => {
 })
 onShow(() => {
   if (!teamId.value) return
-  // 返回本页（例如从单卡页赞踩后）重新读当前榜，保持名次与票数一致。
-  void state.load(teamId.value, intent.value).then(() => {
+  // 首次进入加载；返回本页（例如从单卡页赞踩后）只刷新、不清空，保持名次与票数一致又不抖动。
+  void (started ? state.refresh() : state.load(teamId.value, intent.value)).then(() => {
     if (!started && wantsNominate.value && board.value?.window?.open) openNominate()
     started = true
   })
@@ -67,7 +70,10 @@ onShareAppMessage(() => ({
 }))
 onBeforeUnmount(state.dispose)
 
-function changeIntent(which: TransferIntent): void { void state.changeIntent(which) }
+function changeIntent(which: TransferIntent): void {
+  void state.changeIntent(which)
+  anchorTabsToTop('#transfer-tabs', () => navigationHeightPx.value)
+}
 function retry(): void { if (error.value) void state.load(teamId.value, intent.value); else void state.more() }
 function openCard(code: string): void { const url = buildTransferViewUrl(code); if (url) uni.navigateTo({ url }) }
 function openNominate(): void {

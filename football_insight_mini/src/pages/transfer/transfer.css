@@ -11,3 +11,4 @@
 .transfer-action[disabled] { opacity: var(--fi-opacity-pressed); }
 .transfer-item + .transfer-item { border-top: var(--fi-border-width) solid var(--fi-color-divider-soft); }
 .transfer-dock { position: fixed; left: var(--fi-space-24); right: var(--fi-space-24); bottom: calc(var(--fi-space-24) + env(safe-area-inset-bottom)); }
+.transfer-panel--stale { opacity: var(--fi-opacity-pressed); transition: opacity var(--fi-motion-duration-fast) var(--fi-motion-ease-out); }

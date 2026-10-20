@@ -23,7 +23,7 @@
               <text>{{ teamError || '正在加载球队…' }}</text>
               <button v-if="teamError" @tap="teamBrowser.load()">重试</button>
             </view>
-            <view>
+            <view id="insights-tabs">
               <FiSegmented :items="mainTabs" :model-value="mainTab" aria-label="洞察内容" @update:model-value="changeMainTab" />
             </view>
             <view class="insights-content">
@@ -119,6 +119,7 @@
 <script setup lang="ts">
 import { buildSharePath } from '../../utils/shareSource'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { anchorTabsToTop } from '../../composables/useTabAnchor'
 import { computed, ref, watch } from 'vue'
 import { onHide, onReachBottom, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
@@ -158,7 +159,7 @@ import type { TransferIntent } from '../../types/transfer'
 import { createInsightsSessionSync, runInsightsShow } from './sessionEffects'
 import { useInsightsData } from './useInsightsData'
 
-const { navigationPageStyle } = useNavigationLayout()
+const { navigationPageStyle, navigationHeightPx } = useNavigationLayout()
 
 // 登录用户共享自 appSession：读取走会话缓存，401 清理由 session 统一处理。
 const session = useAppSession()
@@ -167,7 +168,10 @@ const mainTab = ref<'data' | 'tactics' | 'transfer'>('data')
 // 胶囊用动作命名，告诉用户进来做什么：排阵容、对转会表态。
 const mainTabs = [{ key: 'data', label: '数据洞察' }, { key: 'tactics', label: '排阵容' }, { key: 'transfer', label: '转会表态' }]
 function changeMainTab(value: string): void {
-  if (value === 'data' || value === 'tactics' || value === 'transfer') mainTab.value = value
+  if (value !== 'data' && value !== 'tactics' && value !== 'transfer') return
+  mainTab.value = value
+  // 三个胶囊的内容高度差别很大：已滚过胶囊栏时把它定位到导航下方，避免切到较短内容时页面回弹抖动。
+  anchorTabsToTop('#insights-tabs', () => navigationHeightPx.value)
 }
 const pageVisible = ref(false)
 const teamBrowser = useInsightsTeams(session)
@@ -418,6 +422,8 @@ onShow(async () => {
 .page-root { position: relative; min-height: 100vh; background: var(--fi-color-page-soft); }
 .insights-workspace { display: flex; flex-direction: column; gap: var(--fi-space-24); min-width: 0; }
 .insights-content {
+  /* 至少一屏高：切到较短的胶囊内容时页面不往回缩，配合切换时的滚动定位消除抖动。 */
+  min-height: calc(100vh - var(--fi-brand-nav-height, 0px));
   /* FiPanel 的组件 token 可继承穿过小程序宿主节点，内层作为同一底板的内容区。 */
   --fi-component-panel-bg: transparent;
   --fi-component-panel-radius: 0;
