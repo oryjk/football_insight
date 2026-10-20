@@ -16,11 +16,11 @@
         <button class="official-bind__copy" :disabled="remainingSeconds <= 0 || loading" @tap="emit('copy')">复制绑定指令</button>
       </view>
       <view v-if="code && remainingSeconds > 0" class="official-bind__steps">
-        <text>1. 复制绑定指令，打开「足球洞察」公众号。</text>
+        <text>1. 复制绑定指令，打开「<text class="official-bind__account-link" @tap="emit('open-official')">何止编程</text>」公众号。</text>
         <text>2. 回复：绑定 {{ code }}</text>
         <text>3. 收到绑定成功回复后，返回小程序即可。</text>
       </view>
-      <text v-else class="official-bind__caption">获取绑定码后，打开「足球洞察」公众号，发送“绑定 + 绑定码”。</text>
+      <text v-else class="official-bind__caption">获取绑定码后，打开「<text class="official-bind__account-link" @tap="emit('open-official')">何止编程</text>」公众号，发送“绑定 + 绑定码”。</text>
       <text v-if="error" class="official-bind__error">{{ error }}</text>
       <text class="official-bind__warning">绑定后请保持关注公众号，取关后会员权益会暂停。</text>
     </view>
@@ -48,6 +48,7 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'get-code'): void
   (e: 'copy'): void
+  (e: 'open-official'): void
 }>()
 const countdown = computed(() => formatOfficialWechatBindCountdown(props.remainingSeconds))
 </script>
@@ -98,6 +99,11 @@ const countdown = computed(() => formatOfficialWechatBindCountdown(props.remaini
   border-radius: var(--fi-radius-sm);
   background: var(--fi-color-page);
   color: var(--fi-color-text-secondary);
+}
+
+.official-bind__account-link {
+  color: var(--fi-color-primary);
+  text-decoration: underline;
 }
 
 .official-bind__error {

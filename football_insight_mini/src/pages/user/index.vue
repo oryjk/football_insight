@@ -89,6 +89,7 @@
       @close="officialBind.close"
       @get-code="officialBind.getCode"
       @copy="officialBind.copyCode"
+      @open-official="openUserOfficialAccount"
     />
 
     <!-- #ifdef H5 -->
@@ -146,6 +147,7 @@ import { reportPageActivity } from '../../utils/userActivity'
 import { beginPaywallVisit, reportPaywallImpression, reportPaywallTap } from '../../composables/usePaywallTelemetry'
 import { createUserAccountEffects } from './accountEffects'
 import { createUserOfficialBindFlow } from './officialBindFlow'
+import { openUserOfficialAccount } from './officialAccountNavigation'
 import { createUserLoginFlow, type MiniWechatBindForm } from './loginFlow'
 import {
   buildUserAccountInfoItems,
