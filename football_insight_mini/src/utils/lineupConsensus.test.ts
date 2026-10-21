@@ -30,8 +30,8 @@ describe('lineup consensus helpers', () => {
     expect(overlapText(8, '你')).toBe('你和大家重合 8 / 11')
     expect(overlapText(6, 'TA')).toBe('TA和大家重合 6 / 11')
     expect(overlapText(null, '你')).toBe('')
-    expect(consensusProgressText(2, 10)).toBe('已有 2 套阵容，再有 8 套就能看到大家心中的最佳 11 人')
-    expect(consensusProgressText(12, 10)).toBe('已有 12 套阵容，再有 0 套就能看到大家心中的最佳 11 人')
+    expect(consensusProgressText(2, 10)).toBe('已有 2 套阵容，再有 8 套，这里会汇总出大家心中的最佳 11 人')
+    expect(consensusProgressText(12, 10)).toBe('已有 12 套阵容，再有 0 套，这里会汇总出大家心中的最佳 11 人')
   })
 
   test('player hint explains the pick rate and whether I picked them', () => {

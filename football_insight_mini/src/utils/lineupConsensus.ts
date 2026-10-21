@@ -20,7 +20,7 @@ export function overlapText(count: number | null, who: '你' | 'TA'): string {
 }
 
 export function consensusProgressText(total: number, threshold: number): string {
-  return `已有 ${total} 套阵容，再有 ${Math.max(0, threshold - total)} 套就能看到大家心中的最佳 11 人`
+  return `已有 ${total} 套阵容，再有 ${Math.max(0, threshold - total)} 套，这里会汇总出大家心中的最佳 11 人`
 }
 
 export function consensusPlayerHint(player: { name: string; pick_rate: number }, mine: boolean): string {

@@ -1,15 +1,16 @@
 <template>
-  <!-- 大家心中的最佳 11 人：未解锁时进度 + "去排一套"（把进度变成行动）；
+  <!-- 大家心中的最佳 11 人：未解锁时是样本进度，并明确说明不影响查看别人的阵容；
        解锁后在小球场展示共识，我也选了的球员红色描边、没选的变淡，点球员看被选比例。 -->
   <view class="consensus">
     <view class="consensus__head">
-      <text class="consensus__title">大家心中的最佳 11 人</text>
+      <text class="consensus__title">{{ consensus.unlocked ? '大家心中的最佳 11 人' : '最佳 11 人 · 样本积累中' }}</text>
       <text v-if="consensus.unlocked" class="consensus__meta">基于 {{ consensus.total }} 套阵容 · {{ consensus.formation }}（{{ consensus.formation_share }}% 的人用）</text>
     </view>
     <view v-if="!consensus.unlocked" class="consensus__locked">
       <text class="consensus__progress-text">{{ consensusProgressText(consensus.total, consensus.threshold) }}</text>
+      <text class="consensus__progress-text">不影响查看：别人排的阵容在下方可以直接看，不用先排。</text>
       <view class="consensus__bar"><view class="consensus__bar-fill" :style="{ width: `${progress}%` }" /></view>
-      <button class="consensus__action" hover-class="consensus__action--pressed" @tap="emit('edit')">去排一套</button>
+      <button class="consensus__action" hover-class="consensus__action--pressed" @tap="emit('edit')">我也排一套</button>
     </view>
     <view v-else class="consensus__pitch">
       <view class="consensus__half" />
