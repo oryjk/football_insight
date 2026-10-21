@@ -1,6 +1,9 @@
 import type { RecapMatch, RecapSummary, RecapSeasonTotals, SeasonRecap } from '../../types/seasonRecap'
 export const POSTER_WIDTH = 750
-export const POSTER_HEIGHT = 1536
+// 背景位图 941×1672 按原比例铺满上部；下方另接页脚条承载品牌和小程序码。
+export const POSTER_BACKGROUND_HEIGHT = 1333
+export const POSTER_FOOTER_HEIGHT = 170
+export const POSTER_HEIGHT = POSTER_BACKGROUND_HEIGHT + POSTER_FOOTER_HEIGHT
 /* decorative：海报位图的酒红、香槟金与纸感纹理，不属于结构 UI token。 */
 export const POSTER_PALETTE = {
  nightTop: '#611724',
@@ -18,11 +21,23 @@ export const POSTER_PALETTE = {
 }
 export type RecapPosterTheme = 'dark' | 'light'
 export const POSTER_PALETTES = {
- dark: { ...POSTER_PALETTE, track: 'rgba(255,237,219,0.18)', progressStart: '#ffe9ac', progressMid: '#ff9b48', progressEnd: '#d90016' },
+ dark: {
+  ...POSTER_PALETTE, kicker: '#edcca0', footer: '#1c0a0e', footerClear: 'rgba(28,10,14,0)',
+  numberTop: '#fff1c9', numberMid: '#f0c46a', numberBottom: '#b9802a',
+  badgeBorder: '#d9b26a', badgeText: '#fff5e9', badgeFill: 'rgba(20,4,8,0.35)',
+  cardFill: 'rgba(40,8,12,0.55)', cardBorder: 'rgba(217,178,106,0.75)',
+  routeRule: 'rgba(233,196,151,0.6)', chevron: '#e9c497',
+  track: 'rgba(255,237,219,0.18)', progressStart: '#ffe9ac', progressMid: '#ff9b48', progressEnd: '#d90016',
+ },
  light: {
   ...POSTER_PALETTE, nightTop: '#fff5e5', nightMid: '#fff9f0', nightBottom: '#fff7eb',
   ink: '#6c1619', muted: '#7e4437', faint: '#855e4d', gold: '#a8000c', goldDim: '#86561e',
   rule: 'rgba(139,81,32,0.25)', glass: 'rgba(255,253,247,0.5)', glassBorder: 'rgba(197,132,66,0.35)',
+  kicker: '#7a3d12', footer: '#fbf3e9', footerClear: 'rgba(251,243,233,0)',
+  numberTop: '#e8202a', numberMid: '#c40f19', numberBottom: '#8e0a10',
+  badgeBorder: '#b3121b', badgeText: '#9c0a12', badgeFill: 'rgba(255,255,255,0.45)',
+  cardFill: 'rgba(255,252,246,0.6)', cardBorder: 'rgba(214,150,90,0.45)',
+  routeRule: 'rgba(139,81,32,0.45)', chevron: '#c8102e',
   track: '#ede0cf', progressStart: '#ffda79', progressMid: '#ff963d', progressEnd: '#e90016',
  },
 } as const

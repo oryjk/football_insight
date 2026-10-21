@@ -6,7 +6,7 @@ export async function loadRecapPosterImages(
  urls: string[],
  allowWebp: boolean,
  // H5 按 uni.xxx 的直接调用提取 API；传整个 uni 对象会漏掉 getImageInfo。
- platform: ImagePlatform = { getImageInfo: options => uni.getImageInfo(options) },
+ platform: ImagePlatform = { getImageInfo: (options: UniApp.GetImageInfoOptions) => uni.getImageInfo(options) },
  timeoutMs = 4000,
 ): Promise<Map<string, RecapPosterImage>> {
  const entries = await Promise.all([...new Set(urls)].map(url => new Promise<[string, RecapPosterImage] | null>(resolve => {

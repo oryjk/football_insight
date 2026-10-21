@@ -13,8 +13,8 @@ function canvas(rejectImages = false) {
   drawImage(path:string, ...args:number[]) { calls.push(['image',path,...args]); if(rejectImages && path!=='/code') throw new Error('decode') },
   fillText(value:string) { calls.push(['text',value]) },
   fillRect(...args:number[]) { calls.push(['rect',...args]) },
-  createLinearGradient() { return {addColorStop(){}} },
-  setFillStyle(){}, setStrokeStyle(){}, setLineWidth(){}, setTextAlign(){}, setTextBaseline(){}, setGlobalAlpha(){},
+  createLinearGradient(...args:number[]) { calls.push(['gradient',...args]); return {addColorStop(){}} },
+  setFillStyle(){}, setStrokeStyle(){}, setLineWidth(){}, setLineCap(){}, setLineJoin(){}, setTextAlign(){}, setTextBaseline(){}, setGlobalAlpha(){},
   beginPath(){}, moveTo(){}, lineTo(){}, arc(){}, arcTo(){}, closePath(){}, fill(){}, stroke(){},
   clip(){ calls.push(['clip']) },
   save(){ depth++ }, restore(){ depth-- },
@@ -31,7 +31,7 @@ test('photo is drawn first with local paths, route crests are clipped and all in
   [CHENGDU_RONGCHENG_CREST_IMAGE_URL,image('/chengdu')],
   ['https://crest',image('/beijing')],
  ]))
- expect(c.calls[0]).toEqual(['image','/bg',0,0,750,1536])
+ expect(c.calls[0]).toEqual(['image','/bg',0,0,750,1333])
  expect(c.calls.filter(call=>call[0]==='image').map(call=>call[1])).toEqual(['/bg','/chengdu','/beijing','/code'])
  expect(c.calls.filter(call=>call[0]==='clip').length).toBe(0)
  const texts=c.calls.filter(call=>call[0]==='text').map(call=>call[1])
@@ -49,9 +49,9 @@ test('missing decorations or image decode errors still render city, stats and co
  ])]) {
   const c=canvas(true)
   drawRecapPoster(c.context,content,'/code',images)
-  expect(c.calls.find(call=>call[0]==='rect')).toEqual(['rect',0,0,750,1536])
+  expect(c.calls.find(call=>call[0]==='rect')).toEqual(['rect',0,0,750,1503])
   expect(c.calls.find(call=>call[0]==='text'&&call[1]==='北京')).toEqual(['text','北京'])
-  expect(c.calls.find(call=>call[0]==='image'&&call[1]==='/code')).toEqual(['image','/code',582,1416,100,100])
+  expect(c.calls.find(call=>call[0]==='image'&&call[1]==='/code')).toEqual(['image','/code',593,1369,100,100])
   expect(c.depth()).toBe(0)
  }
 })
@@ -61,10 +61,33 @@ test('both themes draw real progress without exposing algorithm or caption text'
   const c=canvas()
   const withProgress={...content,progress:{away:2/15,home:14/15,total:16/30}}
   drawRecapPoster(c.context,withProgress,'/code',new Map([[SEASON_RECAP_POSTER_BACKGROUNDS[theme],image('/background')]]),theme)
-  expect(c.calls[0]).toEqual(['image','/background',0,0,750,1536])
+  expect(c.calls[0]).toEqual(['image','/background',0,0,750,1333])
   expect(c.calls.filter(call=>call[0]==='clip').length).toBe(3)
   const texts=c.calls.filter(call=>call[0]==='text').map(call=>String(call[1]))
   expect(texts.some(value=>value.includes('已赴')||value.includes('加权')||value.includes('%'))).toBe(false)
   expect(c.depth()).toBe(0)
  }
+})
+
+test('background keeps its aspect ratio above a footer strip, bars fade over their filled length',()=>{
+ const c=canvas()
+ const withProgress={...content,progress:{away:0.25,home:null,total:0.5}}
+ drawRecapPoster(c.context,withProgress,'/code',new Map([[SEASON_RECAP_POSTER_BACKGROUNDS.light,image('/background')]]),'light')
+ expect(c.calls.filter(call=>call[0]==='rect').slice(0,2)).toEqual([['rect',0,1263,750,70],['rect',0,1333,750,170]])
+ // 进度条渐变：x=73，轨道宽 604，按已填充长度结束。
+ const bars=c.calls.filter(call=>call[0]==='gradient'&&call[2]===0&&call[4]===0)
+ expect(bars).toEqual([['gradient',73,0,73+604*0.25,0],['gradient',73,0,73+604*0.5,0]])
+})
+
+test('route chevrons are stroked instead of a glyph that some fonts render as a bracket',()=>{
+ const c=canvas()
+ const twoCities=buildRecapPosterContent({season:2026,matches:[
+  {match_id:1,match_date:'2026-03-01',opponent:'重庆铜梁龙',opponent_avatar_url:null,is_home:false,city:'重庆'},
+  {match_id:2,match_date:'2026-04-01',opponent:'武汉三镇',opponent_avatar_url:null,is_home:false,city:'武汉'},
+ ],selected_match_ids:[1,2],home_one_way_km:null,summary:{away_km:2490,home_km:null,total_km:2490,matches:2,home_matches:0,away_matches:2,cities:2}})
+ drawRecapPoster(c.context,twoCities,'/code')
+ const texts=c.calls.filter(call=>call[0]==='text').map(call=>String(call[1]))
+ expect(texts.includes('重庆')).toBe(true)
+ expect(texts.includes('武汉')).toBe(true)
+ expect(texts.some(value=>value.includes('›'))).toBe(false)
 })
