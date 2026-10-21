@@ -35,6 +35,8 @@
         <text>{{ errorMessage }}</text>
       </view>
 
+      <FiCrestProgress v-if="!posterImagePath && !errorMessage" class="standings-sheet__progress" title="正在生成积分榜图片" :stages="['读取积分榜…','加载球队队徽…','绘制榜单…','导出图片…']" />
+
       <scroll-view scroll-y class="standings-sheet__scroll">
         <view class="standings-sheet__list">
           <view v-for="entry in table.entries" :key="`${table.slug}-${entry.team_id}`" class="standings-sheet__row" :class="resolveAclQualification(entry.rank_no) ? `standings-sheet__row--acl-${resolveAclQualification(entry.rank_no)?.tier}` : ''">
@@ -64,6 +66,7 @@
 </template>
 
 <script setup lang="ts">
+import FiCrestProgress from '../../../components/FiCrestProgress.vue'
 import { resolveAclQualification } from '../../../utils/aclQualification'
 import { getCurrentInstance, ref, watch } from 'vue'
 import shareIcon from '../../../static/rankings/share.svg'
@@ -476,6 +479,8 @@ function savePosterImage(): void {
 .standings-sheet__error {
   margin-top: var(--fi-space-18);
 }
+
+.standings-sheet__progress { display: block; margin-top: var(--fi-space-18); }
 
 .standings-sheet__scroll {
   flex: 1;
