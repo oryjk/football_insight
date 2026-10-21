@@ -39,7 +39,10 @@
         <view class="standings-sheet__list">
           <view v-for="entry in table.entries" :key="`${table.slug}-${entry.team_id}`" class="standings-sheet__row">
             <text class="standings-sheet__rank">{{ entry.rank_no }}</text>
-            <text class="standings-sheet__name">{{ entry.team_name }}</text>
+            <view class="standings-sheet__identity">
+              <text class="standings-sheet__name">{{ entry.team_name }}</text>
+              <text v-if="resolveAclQualification(entry.rank_no)" class="standings-sheet__acl" :class="`standings-sheet__acl--${resolveAclQualification(entry.rank_no)?.tier}`">{{ resolveAclQualification(entry.rank_no)?.label }}</text>
+            </view>
             <view class="standings-sheet__metrics">
               <view
                 v-for="metric in buildStandingsFallbackMetrics(table, entry)"
@@ -61,6 +64,7 @@
 </template>
 
 <script setup lang="ts">
+import { resolveAclQualification } from '../../../utils/aclQualification'
 import { getCurrentInstance, ref, watch } from 'vue'
 import shareIcon from '../../../static/rankings/share.svg'
 import downloadIcon from '../../../static/rankings/download.svg'
@@ -499,6 +503,10 @@ function savePosterImage(): void {
   font-size: var(--fi-font-28);
 }
 
+.standings-sheet__identity { min-width: 0; display: flex; align-items: center; gap: var(--fi-space-10); }
+.standings-sheet__acl { flex-shrink: 0; padding: var(--fi-space-4) var(--fi-space-10); border-radius: var(--fi-radius-round); font-size: var(--fi-font-20); line-height: var(--fi-leading-none); font-weight: var(--fi-weight-bold); white-space: nowrap; }
+.standings-sheet__acl--elite { background: #fbeec2; color: #8a6200; }
+.standings-sheet__acl--second { background: #dfe8f6; color: #3f5f8f; }
 .standings-sheet__name {
   color: var(--fi-color-text-strong);
   font-weight: var(--fi-weight-bold);

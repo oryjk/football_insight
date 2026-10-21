@@ -26,6 +26,7 @@
     <FiStandingsTable
       v-if="isStandingsTeamCategory"
       :teams="standingsTeams"
+      qualification
       @select="openStandingsTeam"
     />
     <template v-else>
