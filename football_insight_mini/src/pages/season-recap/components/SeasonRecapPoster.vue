@@ -32,7 +32,7 @@ onMounted(async()=>{
   const context=uni.createCanvasContext('seasonRecapCanvas',instance)
   drawRecapPoster(context,content,image.path,await decorations,payload.theme)
   await flushCanvas(context)
-  const path=await exportCanvasToTempFile({canvasId:'seasonRecapCanvas',width:POSTER_WIDTH,height:POSTER_HEIGHT,instance})
+  const path=await exportCanvasToTempFile({canvasId:'seasonRecapCanvas',width:POSTER_WIDTH,height:POSTER_HEIGHT,scale:2,instance})
   emit('ready',payload.key,path)
  } catch {emit('failed',payload.key)} finally {cleanup()}
 })

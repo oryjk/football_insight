@@ -19,7 +19,7 @@ function fitText(context: UniApp.CanvasContext, value: string, maxWidth: number,
   fitted = `${fitted.replace(/…$/, '').slice(0, -1)}…`
   if (fitted === '…') break
  }
- return { value: fitted, size: current }
+ return { value: fitted, size: current, width: context.measureText(fitted).width }
 }
 
 /** 装饰图失败仍能导出真实数据；队徽等比绘制，保留原有形状。 */
@@ -55,7 +55,7 @@ export function drawRecapPoster(
   const fitted = fitText(context, value, maxWidth, size, bold)
   context.font = font(bold, fitted.size)
   context.setFillStyle(fill)
-  const width = align === 'left' ? 0 : context.measureText(fitted.value).width
+  const width = fitted.width
   context.setTextAlign('left')
   context.fillText(fitted.value, align === 'center' ? x - width / 2 : align === 'right' ? x - width : x, y)
  }

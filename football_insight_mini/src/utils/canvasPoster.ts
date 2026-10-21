@@ -32,19 +32,21 @@ export interface CanvasExportOptions {
   width: number
   height: number
   fileType?: 'png' | 'jpg'
+  /** 导出位图相对绘制坐标的倍数，默认 1；高分屏上提高清晰度。 */
+  scale?: number
   /** 组件内 canvas 需要传组件实例，页面级 canvas 省略。 */
   instance?: ComponentInternalInstance | null
 }
 
 export function exportCanvasToTempFile(options: CanvasExportOptions): Promise<string> {
-  const { canvasId, width, height, fileType, instance } = options
+  const { canvasId, width, height, fileType, instance, scale = 1 } = options
   return new Promise((resolve, reject) => {
     uni.canvasToTempFilePath({
       canvasId,
       width,
       height,
-      destWidth: width,
-      destHeight: height,
+      destWidth: Math.round(width * scale),
+      destHeight: Math.round(height * scale),
       ...(fileType ? { fileType } : {}),
       success: result => resolve(result.tempFilePath),
       fail: reject,
