@@ -1,5 +1,5 @@
 <template>
-  <page-meta :page-style="pageStyle" />
+  <page-meta :page-style="navigationPageStyle" />
   <view class="page-root">
     <FiBrandNav />
     <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
@@ -43,7 +43,7 @@
 
                   <InsightsLockedPanel v-else-if="!currentUser" mode="guest" />
 
-                  <InsightsLockedPanel v-else-if="membershipBenefitsLocked" :mode="officialBindingRequired ? 'binding' : 'membership'" @action="officialBindingRequired ? officialBind.open() : goToUserPage()" />
+                  <InsightsLockedPanel v-else-if="membershipBenefitsLocked" mode="membership" @action="goToUserPage()" />
 
                   <InsightsSkeleton
                     v-else-if="loading"
@@ -92,26 +92,11 @@
       </view>
     </view>
 
-    <FiOfficialBindSheet
-      :visible="officialBind.visible.value"
-      :code="officialBind.code.value"
-      :remaining-seconds="officialBind.remainingSeconds.value"
-      :loading="officialBind.loading.value"
-      :error="officialBind.error.value"
-      @close="officialBind.close"
-      @get-code="officialBind.getCode"
-      @copy="officialBind.copyCode"
-      @open-official="openUserOfficialAccount"
-    />
     <FiLoginFloat v-if="showLoginFloat" :desc="systemConfigUnderReview ? '登录后，可以关注主队并参与赛前助力。' : undefined" @action="goToLogin" />
   </view>
 </template>
 
 <script setup lang="ts">
-import FiOfficialBindSheet from '../../components/FiOfficialBindSheet.vue'
-import { createOfficialBindingGate } from '../../composables/officialBindingGate'
-import { openUserOfficialAccount } from '../../utils/officialAccountNavigation'
-
 import { buildSharePath } from '../../utils/shareSource'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, ref, watch } from 'vue'
@@ -132,7 +117,6 @@ import InsightsContributionSurface from './components/InsightsContributionSurfac
 import type { TeamInsight } from '../../types/insight'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
-import { resolveMembershipBenefitsLocked } from '../../utils/membershipBenefits'
 import { isMembershipTierAtLeast } from '../../utils/membershipRules'
 import { beginPaywallVisit, reportPaywallImpression, reportPaywallTap } from '../../composables/usePaywallTelemetry'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
@@ -160,9 +144,8 @@ function openSecondary(target: 'tactics' | 'transfer'): void {
 const ticketWatchNavigating = ref(false)
 const systemConfigUnderReview = ref(false)
 const outlookReviewReady = ref(false)
-const membershipBenefitsLocked = computed(() =>
-  resolveMembershipBenefitsLocked(currentUser.value),
-)
+// 洞察页不处理公众号绑定：只看权益开关本身，绑定检查只在进入回流看板时做。
+const membershipBenefitsLocked = computed(() => currentUser.value?.membership_benefits_enabled === false)
 // 会员洞察（账号私有数据）的加载编排：onShow 与 currentUser watcher 同会话合并请求，
 // 旧账号结果不发布、旧 finally 不清新 loading；会话身份变化同步清旧缓存。
 const {
@@ -183,9 +166,6 @@ const {
   isMembershipLocked: () => membershipBenefitsLocked.value,
   selectedTeamId,
 })
-const officialBind = createOfficialBindingGate(session, systemConfigUnderReview, computed(() => !userLoading.value && outlookReviewReady.value))
-const officialBindingRequired = computed(() => currentUser.value?.official_wechat_binding_required === true)
-const pageStyle = computed(() => `${navigationPageStyle.value};${officialBind.visible.value ? 'overflow: hidden;' : ''}`)
 const outlookLoader = createOutlookLoader({
   authenticated: () => Boolean(currentUser.value),
   identity: () => currentUser.value,
@@ -201,8 +181,8 @@ const {
   loading: outlookLoading,
   error: outlookError,
 } = outlookLoader
-onUnload(() => { outlookLoader.dispose(); teamBrowser.dispose(); officialBind.dispose() })
-onHide(() => { pageVisible.value = false; officialBind.handlePageHide() })
+onUnload(() => { outlookLoader.dispose(); teamBrowser.dispose() })
+onHide(() => { pageVisible.value = false })
 
 const showLoginFloat = computed(() => !userLoading.value && !currentUser.value)
 const shouldLockTicketWatchEntry = computed(() =>
@@ -298,7 +278,7 @@ function openTicketWatch(): void {
   }
 
   // 公众号绑定检查只在进入回流看板时做：需要绑定的账号直接跳转，由回流看板页自己刷新状态并弹出绑定。
-  if (membershipBenefitsLocked.value && !officialBindingRequired.value) {
+  if (membershipBenefitsLocked.value) {
     uni.showToast({
       title: '当前账号已取关公众号，会员权益已暂停',
       icon: 'none',
