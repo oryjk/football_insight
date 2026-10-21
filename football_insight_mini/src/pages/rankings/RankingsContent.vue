@@ -4,10 +4,7 @@
     <view class="page-bg-fade"></view>
     <view class="page-scroll" :class="{ 'page-scroll--locked': selectedRankingTeam || selectedRankingPlayer || selectedStandingsTable || selectedGoalMatch }">
       <view class="page">
-      <template v-if="loading">
-        <FiCrestProgress title="正在加载积分榜" />
-        <RankingsSkeleton />
-      </template>
+      <RankingsSkeleton v-if="loading" />
 
       <view v-else-if="errorMessage" class="state-card state-card--error">
         <text>{{ errorMessage }}</text>
@@ -78,7 +75,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import FiCrestProgress from '../../components/FiCrestProgress.vue'
 import RankingsSkeleton from './components/RankingsSkeleton.vue'
 import FiGoalMatchDialog from '../../components/FiGoalMatchDialog.vue'
 import RankingsStandingsLauncher from './components/RankingsStandingsLauncher.vue'
