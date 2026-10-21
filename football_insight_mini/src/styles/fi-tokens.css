@@ -23,6 +23,13 @@ page {
   --fi-primitive-ink: #15161b;
   --fi-primitive-ink-deep: #121212;
   --fi-primitive-member-gold: #e9c477;
+  --fi-primitive-member-pass-silver: #d5dce3;
+  --fi-primitive-member-pass-champagne: #e7d7b8;
+  --fi-primitive-member-pass-shine: #fff4dc;
+  --fi-primitive-member-pass-muted: rgba(255, 255, 255, 0.72);
+  --fi-primitive-member-pass-border: rgba(255, 255, 255, 0.18);
+  --fi-primitive-member-pass-avatar: rgba(255, 255, 255, 0.1);
+  --fi-primitive-member-pass-shade: linear-gradient(90deg, rgba(8, 14, 20, 0.18), rgba(8, 14, 20, 0) 70%), linear-gradient(0deg, rgba(8, 14, 20, 0.86), rgba(8, 14, 20, 0) 60%);
   --fi-primitive-segmented-track: rgba(246, 247, 251, 0.92);
   --fi-primitive-segmented-idle: #7f8490;
   --fi-primitive-opacity-pressed: 0.7;
@@ -144,6 +151,13 @@ page {
   --fi-color-primary: var(--fi-primitive-red);
   --fi-color-member-card-bg: var(--fi-primitive-ink);
   --fi-color-member-card-accent: var(--fi-primitive-member-gold);
+  --fi-color-member-pass-silver: var(--fi-primitive-member-pass-silver);
+  --fi-color-member-pass-champagne: var(--fi-primitive-member-pass-champagne);
+  --fi-color-member-pass-shine: var(--fi-primitive-member-pass-shine);
+  --fi-color-member-pass-muted: var(--fi-primitive-member-pass-muted);
+  --fi-color-member-pass-border: var(--fi-primitive-member-pass-border);
+  --fi-color-member-pass-avatar: var(--fi-primitive-member-pass-avatar);
+  --fi-color-member-pass-shade: var(--fi-primitive-member-pass-shade);
   --fi-color-segmented-track: var(--fi-primitive-segmented-track);
   --fi-color-segmented-idle: var(--fi-primitive-segmented-idle);
   --fi-opacity-pressed: var(--fi-primitive-opacity-pressed);
