@@ -10,7 +10,7 @@ interface Client {
 }
 export interface RecapPosterPayload { key: number; view: SeasonRecap; code: RecapCodeImage; theme: RecapPosterTheme }
 export function createRecapFlow(session: { revision: Ref<number>; hasAccessToken: Ref<boolean>; invalidateSession?: (expectedRevision: number) => void }, client: Client) {
- const theme = ref<RecapPosterTheme>('dark')
+ const theme = ref<RecapPosterTheme>('light')
  const season = ref(2026), view = ref<SeasonRecap | null>(null), selected = ref<number[]>([]), distance = ref('')
  const loading = ref(false), generating = ref(false), error = ref(''), posterPath = ref('')
  const generated = ref<RecapPosterPayload | null>(null), key = ref(0)

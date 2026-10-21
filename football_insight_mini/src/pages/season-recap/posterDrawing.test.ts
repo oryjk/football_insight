@@ -62,7 +62,7 @@ test('both themes draw real progress without exposing algorithm or caption text'
   const withProgress={...content,progress:{away:2/15,home:14/15,total:16/30}}
   drawRecapPoster(c.context,withProgress,'/code',new Map([[SEASON_RECAP_POSTER_BACKGROUNDS[theme],image('/background')]]),theme)
   expect(c.calls[0]).toEqual(['image','/background',0,0,750,1333])
-  expect(c.calls.filter(call=>call[0]==='gradient'&&call[2]===0&&call[4]===0).length).toBe(3)
+  for(const barY of [859,973,1087]) expect(c.calls.some(call=>call[0]==='rect'&&call[2]===barY)).toBe(true)
   const texts=c.calls.filter(call=>call[0]==='text').map(call=>String(call[1]))
   expect(texts.some(value=>value.includes('已赴')||value.includes('加权')||value.includes('%'))).toBe(false)
   expect(c.depth()).toBe(0)
@@ -74,9 +74,11 @@ test('background keeps its aspect ratio above a footer strip, bars fade over the
  const withProgress={...content,progress:{away:0.25,home:null,total:0.5}}
  drawRecapPoster(c.context,withProgress,'/code',new Map([[SEASON_RECAP_POSTER_BACKGROUNDS.light,image('/background')]]),'light')
  expect(c.calls.filter(call=>call[0]==='rect').slice(0,2)).toEqual([['rect',0,1263,750,70],['rect',0,1333,750,170]])
- // 进度条渐变：x=73，轨道宽 604，按已填充长度结束。
- const bars=c.calls.filter(call=>call[0]==='gradient'&&call[2]===0&&call[4]===0)
- expect(bars).toEqual([['gradient',73,0,73+604*0.25,0],['gradient',73,0,73+604*0.5,0]])
+ // 进度条按段铺色：x=73，轨道宽 604；第一、三条按进度结束，主场缺数据不画。
+ const barEnd=(barY:number)=>Math.max(...c.calls.filter(call=>call[0]==='rect'&&call[2]===barY).map(call=>Number(call[1])+Number(call[3])))
+ expect(Math.abs(barEnd(859)-(73+604*0.25-8))).toBeLessThan(6)
+ expect(c.calls.some(call=>call[0]==='rect'&&call[2]===973)).toBe(false)
+ expect(Math.abs(barEnd(1087)-(73+604*0.5-8))).toBeLessThan(6)
 })
 
 test('route chevrons are stroked instead of a glyph that some fonts render as a bracket',()=>{

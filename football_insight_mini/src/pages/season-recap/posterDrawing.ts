@@ -7,6 +7,10 @@ const MARGIN = 49
 const CONTENT_WIDTH = POSTER_WIDTH - MARGIN * 2
 const font = (bold: boolean, size: number) => `${bold ? 'bold ' : ''}${size}px sans-serif`
 
+function hexToRgb(hex: string): number[] {
+ const value = hex.replace('#', '')
+ return [0, 2, 4].map(i => parseInt(value.slice(i, i + 2), 16))
+}
 function fitText(context: UniApp.CanvasContext, value: string, maxWidth: number, size: number, bold: boolean) {
  let current = size
  context.font = font(bold, current)
@@ -25,7 +29,7 @@ function fitText(context: UniApp.CanvasContext, value: string, maxWidth: number,
 /** 装饰图失败仍能导出真实数据；队徽等比绘制，保留原有形状。 */
 function drawImage(context: UniApp.CanvasContext, image: RecapPosterImage | undefined, x: number, y: number, width: number, height: number): boolean {
  if (!image) return false
- try { context.drawImage(image.path, x, y, width, height); return true } catch { return false }
+ try { context.setGlobalAlpha(1); context.drawImage(image.path, x, y, width, height); return true } catch { return false }
 }
 function drawCrest(context: UniApp.CanvasContext, image: RecapPosterImage, x: number, y: number, size: number): void {
  const scale = size / Math.max(image.width, image.height)
@@ -53,6 +57,7 @@ export function drawRecapPoster(
  let align: 'left' | 'center' | 'right' = 'left'
  const text = (value: string, x: number, y: number, size: number, fill: string | CanvasGradient, bold = false, maxWidth = CONTENT_WIDTH) => {
   const fitted = fitText(context, value, maxWidth, size, bold)
+  context.setGlobalAlpha(1)
   context.font = font(bold, fitted.size)
   context.setFillStyle(fill)
   const width = fitted.width
@@ -127,21 +132,27 @@ export function drawRecapPoster(
   traceRoundRect(context, x, barY, width, height, height / 2); context.fill()
   const progress = Math.max(0, Math.min(1, card.progress))
   if (progress <= 0) return
-  // 不用 clip / arcTo 填渐变（真机上会出现楔形和红点）：主体是渐变矩形，两端用实心圆帽。
+  // 不用渐变对象 / clip / arcTo（真机上深色主题会变淡、出现红点）：按段铺不透明纯色，两端用实心圆帽。
+  context.setGlobalAlpha(1)
   const radius = height / 2
   const filled = Math.max(height, width * progress)
+  const stops = [color.progressStart, color.progressMid, color.progressEnd].map(hexToRgb)
+  const colorAt = (t: number) => {
+   const scaled = Math.max(0, Math.min(1, t)) * 2, i = Math.min(1, Math.floor(scaled)), f = scaled - i
+   const [from, to] = [stops[i], stops[i + 1]]
+   return `rgb(${[0, 1, 2].map(c => Math.round(from[c] + (to[c] - from[c]) * f)).join(',')})`
+  }
   const bodyStart = x + radius, bodyEnd = x + filled - radius
-  if (bodyEnd > bodyStart) {
-   const gradient = context.createLinearGradient(x, 0, x + filled, 0)
-   gradient.addColorStop(0, color.progressStart); gradient.addColorStop(0.5, color.progressMid); gradient.addColorStop(1, color.progressEnd)
-   context.setFillStyle(gradient)
-   context.fillRect(bodyStart, barY, bodyEnd - bodyStart, height)
+  const step = 4
+  for (let at = bodyStart; at < bodyEnd; at += step) {
+   context.setFillStyle(colorAt((at - x) / filled))
+   context.fillRect(at, barY, Math.min(step + 1, bodyEnd - at + 1), height)
   }
   const cap = (cx: number, fill: string) => {
    context.setFillStyle(fill); context.beginPath()
    context.arc(cx, barY + radius, radius, 0, Math.PI * 2); context.fill()
   }
-  cap(bodyStart, color.progressStart); cap(bodyEnd > bodyStart ? bodyEnd : bodyStart, bodyEnd > bodyStart ? color.progressEnd : color.progressStart)
+  cap(bodyStart, colorAt(radius / filled)); cap(Math.max(bodyEnd, bodyStart), colorAt(1 - radius / filled))
  })
 
  const route = content.routeEntries

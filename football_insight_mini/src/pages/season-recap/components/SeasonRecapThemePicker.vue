@@ -13,7 +13,7 @@
 import type { RecapPosterTheme } from '../poster'
 defineProps<{modelValue:RecapPosterTheme;disabled:boolean}>()
 const emit=defineEmits<{(event:'update:modelValue',value:RecapPosterTheme):void}>()
-const options: Array<{key:RecapPosterTheme;label:string}>=[{key:'dark',label:'深色 · 热血夜场'},{key:'light',label:'浅色 · 赛季珍藏'}]
+const options: Array<{key:RecapPosterTheme;label:string}>=[{key:'light',label:'浅色 · 赛季珍藏'},{key:'dark',label:'深色 · 热血夜场'}]
 </script>
 <style scoped>
 .theme-picker {display:flex;flex-direction:column;gap:var(--fi-space-16);}
