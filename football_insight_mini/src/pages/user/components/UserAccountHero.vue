@@ -25,9 +25,14 @@
         :hover-class="canPurchase ? 'membership-card--pressed' : 'none'"
         @click="emit('membership-action')"
       >
-        <view class="membership-card__badge">
-          <text class="membership-card__level">{{ code }}</text>
-        </view>
+        <image
+          v-if="membershipTierImage"
+          class="membership-card__tier-image"
+          :src="membershipTierImage"
+          :aria-label="code"
+          mode="aspectFit"
+        />
+        <text v-else class="membership-card__level">{{ code }}</text>
         <view class="membership-card__main">
           <text class="membership-card__title">{{ tierTitle }}</text>
           <text class="membership-card__expire">{{ heroExpiryLabel }}</text>
@@ -57,6 +62,7 @@ import { computed } from 'vue'
 import memberStadiumBackground from '../../../static/user/member-stadium-v2.jpg'
 import type { CurrentUser } from '../../../types/auth'
 import { formatMembershipCardExpiry } from '../helpers'
+import { MEMBERSHIP_TIER_IMAGES } from '../membershipImages'
 
 const props = defineProps<{
   user: CurrentUser
@@ -78,7 +84,9 @@ const displayName = computed(() => props.user.display_name?.trim() || '会员')
 
 const avatarFallbackLabel = computed(() => displayName.value.slice(0, 1).toUpperCase())
 
-// 等级代码放在会员栏的标识内，标题只展示名称。
+const membershipTierImage = computed(() => MEMBERSHIP_TIER_IMAGES[props.code])
+
+// 等级代码由独立图片展示，标题只展示名称。
 const tierTitle = computed(() => (props.code === 'V9' ? '至尊会员' : props.badgeLabel.replace(/^V\d+\s*/, '')))
 
 const heroExpiryLabel = computed(() => formatMembershipCardExpiry(props.user.membership_expires_at))
@@ -208,28 +216,16 @@ const heroActionText = computed(() => (props.canRenewV9 ? '续费' : '升级'))
   opacity: var(--fi-opacity-pressed);
 }
 
-.membership-card__badge {
+.membership-card__tier-image {
   position: relative;
   width: 64rpx;
-  height: 68rpx;
+  height: 48rpx;
   flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: var(--fi-border-width) solid var(--fi-color-member-ribbon-line);
-  border-radius: var(--fi-radius-xs) var(--fi-radius-xs) var(--fi-radius-md) var(--fi-radius-md);
-  background: var(--fi-color-member-ribbon-sheen);
-}
-
-.membership-card__badge::before {
-  content: '';
-  position: absolute;
-  inset: 4rpx;
-  border: var(--fi-border-width) solid var(--fi-color-member-ribbon-line);
-  border-radius: var(--fi-radius-xs) var(--fi-radius-xs) var(--fi-radius-sm) var(--fi-radius-sm);
 }
 
 .membership-card__level {
+  position: relative;
+  flex-shrink: 0;
   font-size: var(--fi-font-26);
   font-weight: var(--fi-weight-black);
   line-height: var(--fi-leading-none);
