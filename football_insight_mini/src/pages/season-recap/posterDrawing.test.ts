@@ -76,9 +76,9 @@ test('background keeps its aspect ratio above a footer strip, bars fade over the
  expect(c.calls.filter(call=>call[0]==='rect').slice(0,2)).toEqual([['rect',0,1263,750,70],['rect',0,1333,750,170]])
  // 进度条按段铺色：x=73，轨道宽 604；第一、三条按进度结束，主场缺数据不画。
  const barEnd=(barY:number)=>Math.max(...c.calls.filter(call=>call[0]==='rect'&&call[2]===barY).map(call=>Number(call[1])+Number(call[3])))
- expect(Math.abs(barEnd(859)-(73+604*0.25-8))).toBeLessThan(6)
+ expect(Math.abs(barEnd(859)-(73+604*0.25-8))<6).toBe(true)
  expect(c.calls.some(call=>call[0]==='rect'&&call[2]===973)).toBe(false)
- expect(Math.abs(barEnd(1087)-(73+604*0.5-8))).toBeLessThan(6)
+ expect(Math.abs(barEnd(1087)-(73+604*0.5-8))<6).toBe(true)
 })
 
 test('route chevrons are stroked instead of a glyph that some fonts render as a bracket',()=>{
