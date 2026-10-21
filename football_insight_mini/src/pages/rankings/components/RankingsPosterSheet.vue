@@ -37,7 +37,7 @@
 
       <FiCrestProgress v-if="!posterImagePath && !errorMessage" class="standings-sheet__progress" title="正在生成积分榜图片" :stages="['读取积分榜…','加载球队队徽…','绘制榜单…','导出图片…']" />
 
-      <scroll-view scroll-y class="standings-sheet__scroll">
+      <scroll-view v-else scroll-y class="standings-sheet__scroll">
         <view class="standings-sheet__list">
           <view v-for="entry in table.entries" :key="`${table.slug}-${entry.team_id}`" class="standings-sheet__row" :class="resolveAclQualification(entry.rank_no) ? `standings-sheet__row--acl-${resolveAclQualification(entry.rank_no)?.tier}` : ''">
             <text class="standings-sheet__rank">{{ entry.rank_no }}</text>
