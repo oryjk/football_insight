@@ -49,11 +49,15 @@ export function drawRecapPoster(
 ): void {
  const color = POSTER_PALETTES[theme]
  const centerX = POSTER_WIDTH / 2
+ // 不依赖 canvas 的 textAlign 状态（真机上会滞后一次绘制导致错位）：对齐在这里按量出的宽度换算，fillText 永远左对齐。
+ let align: 'left' | 'center' | 'right' = 'left'
  const text = (value: string, x: number, y: number, size: number, fill: string | CanvasGradient, bold = false, maxWidth = CONTENT_WIDTH) => {
   const fitted = fitText(context, value, maxWidth, size, bold)
   context.font = font(bold, fitted.size)
   context.setFillStyle(fill)
-  context.fillText(fitted.value, x, y)
+  const width = align === 'left' ? 0 : context.measureText(fitted.value).width
+  context.setTextAlign('left')
+  context.fillText(fitted.value, align === 'center' ? x - width / 2 : align === 'right' ? x - width : x, y)
  }
  // 背景保持位图原比例，只铺上部；底边渐隐到页脚底色，避免拼接硬边。
  const background = images.get(SEASON_RECAP_POSTER_BACKGROUNDS[theme])
@@ -69,7 +73,7 @@ export function drawRecapPoster(
   base.addColorStop(0, color.nightTop); base.addColorStop(0.55, color.nightMid); base.addColorStop(1, color.nightBottom)
   context.setFillStyle(base)
   context.fillRect(0, 0, POSTER_WIDTH, POSTER_HEIGHT)
-  context.setTextAlign('center')
+  align = 'center'
   text('我的赛季', centerX, 210, 78, color.gold, true)
  }
  context.setTextBaseline('normal')
@@ -79,20 +83,20 @@ export function drawRecapPoster(
  const crest = images.get(CHENGDU_RONGCHENG_CREST_IMAGE_URL)
  const headingLeft = (POSTER_WIDTH - headingWidth - (crest ? 48 : 0)) / 2
  if (crest) drawCrest(context, crest, headingLeft, 41, 36)
- context.setTextAlign('left')
+ align = 'left'
  text(heading.value, headingLeft + (crest ? 48 : 0), 67, heading.size, color.kicker, true)
 
- context.setTextAlign('center')
+ align = 'center'
  text('我为蓉城走过', centerX, 540, 24, color.ink, true)
  const total = fitText(context, String(content.totalKm), 420, 146, true)
  const numberWidth = context.measureText(total.value).width
  const numberX = (POSTER_WIDTH - numberWidth - 14 - 56) / 2
  const numberGradient = context.createLinearGradient(0, 666 - total.size * 0.75, 0, 666)
  numberGradient.addColorStop(0, color.numberTop); numberGradient.addColorStop(0.5, color.numberMid); numberGradient.addColorStop(1, color.numberBottom)
- context.setTextAlign('left')
+ align = 'left'
  text(total.value, numberX, 666, total.size, numberGradient, true, 420)
  text('公里', numberX + numberWidth + 14, 660, 28, color.ink, false, 56)
- context.setTextAlign('center')
+ align = 'center'
  if (content.conversion) text(content.conversion, centerX, 701, 24, color.ink)
  const badge = fitText(context, content.badge, CONTENT_WIDTH - 72, 26, true)
  const badgeWidth = context.measureText(badge.value).width + 72
@@ -113,9 +117,9 @@ export function drawRecapPoster(
   context.setFillStyle(color.cardFill); context.setStrokeStyle(color.cardBorder); context.setLineWidth(2)
   traceRoundRect(context, MARGIN, y, CONTENT_WIDTH, 102, 14)
   context.fill(); context.stroke()
-  context.setTextAlign('left')
+  align = 'left'
   text(card.label, MARGIN + 24, y + 40, 27, color.ink, true, 180)
-  context.setTextAlign('right')
+  align = 'right'
   text(card.value, POSTER_WIDTH - MARGIN - 24, y + 40, 30, color.ink, true, CONTENT_WIDTH - 228)
   if (card.progress === null) return // 旧后端缺整季赛程，不伪造“零进度”。
   const x = MARGIN + 24, width = CONTENT_WIDTH - 48, barY = y + 56, height = 16
@@ -123,19 +127,27 @@ export function drawRecapPoster(
   traceRoundRect(context, x, barY, width, height, height / 2); context.fill()
   const progress = Math.max(0, Math.min(1, card.progress))
   if (progress <= 0) return
-  // 渐变只跨已填充部分：短条也从暖黄过渡到正红。不用 clip——微信 canvas 里 clip 后渐变填充会丢失。
+  // 不用 clip / arcTo 填渐变（真机上会出现楔形和红点）：主体是渐变矩形，两端用实心圆帽。
+  const radius = height / 2
   const filled = Math.max(height, width * progress)
-  const gradient = context.createLinearGradient(x, 0, x + filled, 0)
-  gradient.addColorStop(0, color.progressStart); gradient.addColorStop(0.5, color.progressMid); gradient.addColorStop(1, color.progressEnd)
-  context.setFillStyle(gradient)
-  traceRoundRect(context, x, barY, filled, height, height / 2)
-  context.fill()
+  const bodyStart = x + radius, bodyEnd = x + filled - radius
+  if (bodyEnd > bodyStart) {
+   const gradient = context.createLinearGradient(x, 0, x + filled, 0)
+   gradient.addColorStop(0, color.progressStart); gradient.addColorStop(0.5, color.progressMid); gradient.addColorStop(1, color.progressEnd)
+   context.setFillStyle(gradient)
+   context.fillRect(bodyStart, barY, bodyEnd - bodyStart, height)
+  }
+  const cap = (cx: number, fill: string) => {
+   context.setFillStyle(fill); context.beginPath()
+   context.arc(cx, barY + radius, radius, 0, Math.PI * 2); context.fill()
+  }
+  cap(bodyStart, color.progressStart); cap(bodyEnd > bodyStart ? bodyEnd : bodyStart, bodyEnd > bodyStart ? color.progressEnd : color.progressStart)
  })
 
  const route = content.routeEntries
  if (route) {
   const title = `成都出发${route.totalCities > route.entries.length ? ` · 等 ${route.totalCities} 城` : ''}`
-  context.setTextAlign('center')
+  align = 'center'
   text(title, centerX, 1157, 19, color.goldDim)
   const titleHalf = context.measureText(title).width / 2 + 16
   context.setStrokeStyle(color.routeRule); context.setLineWidth(1.5)
@@ -151,7 +163,7 @@ export function drawRecapPoster(
    const size = Math.min(64, (cellWidth - 16) / Math.max(1, crests.length) - 4)
    const groupWidth = crests.length * (size + 4) - 4
    crests.forEach((image, i) => drawCrest(context, image, x - groupWidth / 2 + i * (size + 4), 1170, size))
-   context.setTextAlign('center')
+   align = 'center'
    text(entry.city, x, 1285, 24, color.ink, true, cellWidth - 16)
    if (index < route.entries.length - 1) drawChevron(context, left + cellWidth * (index + 1), 1202, color.chevron)
   })
@@ -160,7 +172,7 @@ export function drawRecapPoster(
  // 保留可扫码回流的分享页脚；它不参与称号或进度计算。
  context.setStrokeStyle(color.rule); context.setLineWidth(1)
  context.beginPath(); context.moveTo(MARGIN, 1345); context.lineTo(POSTER_WIDTH - MARGIN, 1345); context.stroke()
- context.setTextAlign('left')
+ align = 'left'
  text('足球洞察', MARGIN, 1395, 28, color.ink, true, 390)
  text('这一年，与你同场', MARGIN, 1430, 22, color.muted, false, 390)
  text('自报观赛 · 客场为城市间直线往返估算', MARGIN, 1470, 15, color.faint, false, 490)
