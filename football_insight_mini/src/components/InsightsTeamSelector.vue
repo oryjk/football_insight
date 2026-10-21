@@ -34,7 +34,7 @@
 
 <script setup lang="ts">
 import { getCurrentInstance, nextTick, ref, watch } from 'vue'
-import type { SupportTeam } from '../../../types/support'
+import type { SupportTeam } from '../types/support'
 
 const props = defineProps<{
   teams: SupportTeam[]

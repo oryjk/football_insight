@@ -11,6 +11,7 @@
           :locked="shouldLockTicketWatchEntry"
           @open="openTicketWatch"
         />
+        <InsightsSecondaryEntries @open="openSecondary" />
         <FiPanel>
           <view class="insights-workspace">
             <InsightsTeamSelector
@@ -23,28 +24,7 @@
               <text>{{ teamError || '正在加载球队…' }}</text>
               <button v-if="teamError" @tap="teamBrowser.load()">重试</button>
             </view>
-            <view id="insights-tabs">
-              <FiSegmented :items="mainTabs" :model-value="mainTab" aria-label="洞察内容" @update:model-value="changeMainTab" />
-            </view>
             <view class="insights-content">
-              <InsightsTacticsPanel
-                v-if="mainTab === 'tactics'"
-                :team-name="selectedTeamName"
-                :authenticated="tacticsAuthenticated"
-                :mine-loading="mineLoading" :mine-error="mineError" :draft="mineDraft" :published="minePublished"
-                :items="communityItems" :total="communityTotal" :sort="communitySort"
-                :loading="communityLoading || teamLoading" :error="teamError || communityError" :pending-likes="communityPendingLikes"
-                :consensus="consensus" :my-overlap="myOverlap" :my-player-ids="myPlayerIds" @explain="showHint"
-                @edit="goToTeamBoard" @retry-mine="tactics.retryMine()" @retry-list="retryTacticsList"
-                @sort="tactics.changeSort" @like="tactics.like" @dislike="tactics.dislike" @open="openPublicTactics" @more="tactics.more()"
-              />
-              <InsightsTransferPanel
-                v-else-if="mainTab === 'transfer'"
-                :summary="transferSummary" :loading="transferLoading || teamLoading" :error="teamError || transferError"
-                :hint="transferHint" :pending="transferPending"
-                @retry="retryTransfer" @vote="transfer.vote" @open="openTransferCard" @more="openTransferBoard" @nominate="openTransferNominate"
-              />
-              <template v-else>
                 <view v-if="outlookReviewReady && !systemConfigUnderReview && currentUser" class="workspace-section">
                   <InsightsMatchOutlook
                     :matches="outlookMatches"
@@ -106,7 +86,6 @@
                     <text>当前还没有可展示的球队洞察数据。</text>
                   </view>
                 </view>
-              </template>
             </view>
           </view>
         </FiPanel>
@@ -135,25 +114,20 @@ import { openUserOfficialAccount } from '../../utils/officialAccountNavigation'
 
 import { buildSharePath } from '../../utils/shareSource'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
-import { anchorTabsToTop } from '../../composables/useTabAnchor'
 import { computed, ref, watch } from 'vue'
-import { onHide, onReachBottom, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
+import { onHide, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
-import FiSegmented from '../../components/FiSegmented.vue'
 import FiPanel from '../../components/FiPanel.vue'
-import InsightsTacticsPanel from './components/InsightsTacticsPanel.vue'
-import InsightsTransferPanel from './components/InsightsTransferPanel.vue'
-import { useInsightsTeams } from './useInsightsTeams'
-import { useInsightsTactics } from './useInsightsTactics'
-import { useInsightsTransfer } from './useInsightsTransfer'
+import InsightsSecondaryEntries from './components/InsightsSecondaryEntries.vue'
+import { useInsightsTeams } from '../../composables/useInsightsTeams'
 import InsightsSkeleton from './components/InsightsSkeleton.vue'
 import InsightsTicketWatchEntry from './components/InsightsTicketWatchEntry.vue'
 import InsightsLockedPanel from './components/InsightsLockedPanel.vue'
 import InsightsMatchOutlook from './components/InsightsMatchOutlook.vue'
 import { createOutlookLoader } from './useMatchOutlook'
 import InsightsTeamPanel from './components/InsightsTeamPanel.vue'
-import InsightsTeamSelector from './components/InsightsTeamSelector.vue'
+import InsightsTeamSelector from '../../components/InsightsTeamSelector.vue'
 import InsightsContributionSurface from './components/InsightsContributionSurface.vue'
 import type { TeamInsight } from '../../types/insight'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
@@ -169,65 +143,19 @@ import {
   buildOpponentContributionRows,
   buildPlayerContributionRows,
 } from './helpers'
-import { buildLineupPageUrl, buildLineupViewUrl } from '../../utils/lineupLinks'
-import { buildTransferBoardUrl, buildTransferViewUrl, transferBoardShareTitle } from '../../utils/transferLinks'
-import type { TransferIntent } from '../../types/transfer'
 import { createInsightsSessionSync, runInsightsShow } from './sessionEffects'
 import { useInsightsData } from './useInsightsData'
-import { createLineupConsensus } from '../../composables/useLineupConsensus'
-import { lineupOverlap, overlapText } from '../../utils/lineupConsensus'
 
-const { navigationPageStyle, navigationHeightPx } = useNavigationLayout()
+const { navigationPageStyle } = useNavigationLayout()
 
 // 登录用户共享自 appSession：读取走会话缓存，401 清理由 session 统一处理。
 const session = useAppSession()
 const currentUser = session.currentUser
-const mainTab = ref<'data' | 'tactics' | 'transfer'>('data')
-// 胶囊用动作命名，告诉用户进来做什么：排阵容、对转会表态。
-const mainTabs = [{ key: 'data', label: '数据洞察' }, { key: 'tactics', label: '排阵容' }, { key: 'transfer', label: '转会表态' }]
-function changeMainTab(value: string): void {
-  if (value !== 'data' && value !== 'tactics' && value !== 'transfer') return
-  mainTab.value = value
-  // 三个胶囊的内容高度差别很大：已滚过胶囊栏时把它定位到导航下方，避免切到较短内容时页面回弹抖动。
-  anchorTabsToTop('#insights-tabs', () => navigationHeightPx.value)
-}
 const pageVisible = ref(false)
 const teamBrowser = useInsightsTeams(session)
 const { teams: selectableTeams, selectedTeamId, loading: teamLoading, error: teamError } = teamBrowser
-const tactics = useInsightsTactics({ session, selectedTeamId, active: computed(() => pageVisible.value && mainTab.value === 'tactics') })
-const { mineLoading, mineError, mineDraft, minePublished, authenticated: tacticsAuthenticated } = tactics
-const { items: communityItems, total: communityTotal, sort: communitySort, loading: communityLoading, error: communityError, pendingLikes: communityPendingLikes } = tactics.community
-const lineupConsensus = createLineupConsensus()
-const consensus = lineupConsensus.consensus
-// 多数据源 watch：球队变化或"排阵容"胶囊被激活（含 onShow 时 pageVisible 变化）时刷新共识
-watch([selectedTeamId, () => pageVisible.value && mainTab.value === 'tactics'], ([id, active]) => {
-  if (active && id !== null) void lineupConsensus.load(id)
-}, { immediate: true })
-const myPlayerIds = computed(() => (minePublished.value?.slots ?? []).map(slot => slot.player_id).filter((id): id is number => id !== null))
-const myOverlap = computed(() => minePublished.value
-  ? overlapText(lineupOverlap(minePublished.value.slots.map(slot => slot.player_id), consensus.value), '你')
-  : '')
-function showHint(message: string): void { uni.showToast({ title: message, icon: 'none' }) }
-const selectedTeamName = computed(() => selectableTeams.value.find(team => team.team_id === selectedTeamId.value)?.team_name ?? '')
-const transfer = useInsightsTransfer({ session, selectedTeamId, active: computed(() => pageVisible.value && mainTab.value === 'transfer') })
-const { summary: transferSummary, loading: transferLoading, error: transferError, hint: transferHint, pending: transferPending } = transfer
-function retryTransfer(): void {
-  if (teamError.value) void teamBrowser.load()
-  else void transfer.refresh()
-}
-function openTransferCard(code: string): void {
-  const url = buildTransferViewUrl(code)
-  if (url) uni.navigateTo({ url })
-}
-function openTransferBoard(intent: TransferIntent): void {
-  if (selectedTeamId.value !== null) uni.navigateTo({ url: buildTransferBoardUrl(selectedTeamId.value, intent) })
-}
-function openTransferNominate(): void {
-  if (selectedTeamId.value === null) return
-  // 已登录却不能投（非主队）时只提示，不跳去打开提名弹层。
-  const blocked = transfer.nominateBlocked()
-  if (blocked) { uni.showToast({ title: blocked, icon: 'none' }); return }
-  uni.navigateTo({ url: buildTransferBoardUrl(selectedTeamId.value, 'out', { nominate: true }) })
+function openSecondary(target: 'tactics' | 'transfer'): void {
+  uni.navigateTo({ url: target === 'tactics' ? '/pages/insights-tactics/index' : '/pages/insights-transfer/index' })
 }
 const ticketWatchNavigating = ref(false)
 const systemConfigUnderReview = ref(false)
@@ -273,11 +201,10 @@ const {
   loading: outlookLoading,
   error: outlookError,
 } = outlookLoader
-onUnload(() => { outlookLoader.dispose(); tactics.dispose(); transfer.dispose(); teamBrowser.dispose(); officialBind.dispose() })
+onUnload(() => { outlookLoader.dispose(); teamBrowser.dispose(); officialBind.dispose() })
 onHide(() => { pageVisible.value = false; officialBind.handlePageHide() })
-onReachBottom(() => { if (mainTab.value === 'tactics') void tactics.more() })
 
-const showLoginFloat = computed(() => mainTab.value === 'data' && !userLoading.value && !currentUser.value)
+const showLoginFloat = computed(() => !userLoading.value && !currentUser.value)
 const shouldLockTicketWatchEntry = computed(() =>
   !userLoading.value && (!currentUser.value || membershipBenefitsLocked.value),
 )
@@ -318,13 +245,8 @@ const goalsAgainstByOpponentRows = computed(() =>
 )
 
 onShareAppMessage(() => {
-  const teamName = selectableTeams.value.find(team => team.team_id === selectedTeamId.value)?.team_name ?? '球队'
-  const windowName = transferSummary.value?.window?.name
-  if (mainTab.value === 'transfer' && windowName && selectedTeamId.value !== null) {
-    return { title: transferBoardShareTitle(teamName, windowName, 'out'), path: buildSharePath(buildTransferBoardUrl(selectedTeamId.value, 'out'), 'transfer_board') }
-  }
   return {
-    title: mainTab.value === 'tactics' ? `${teamName}战术，看看大家怎么排` : selectedInsight.value
+    title: selectedInsight.value
       ? `${selectedInsight.value.team_name} 的贡献结构，看看这队靠谁赢球`
       : '球队洞察：不是榜单，而是贡献结构',
     path: buildSharePath('/pages/insights/index', 'insights'),
@@ -415,24 +337,10 @@ function goToLogin(): void {
   goToUserPage()
 }
 
-function goToTeamBoard(): void {
-  if (selectedTeamId.value === null) return
-  uni.navigateTo({ url: buildLineupPageUrl(selectedTeamId.value) })
-}
-function openPublicTactics(code: string): void {
-  uni.navigateTo({ url: buildLineupViewUrl(code) })
-}
-function retryTacticsList(): void {
-  if (teamError.value) void teamBrowser.load()
-  else void tactics.refresh()
-}
-
 onShow(async () => {
   void officialBind.handlePageShow()
   pageVisible.value = true
   void teamBrowser.load()
-  void tactics.refresh()
-  void transfer.refresh()
   outlookReviewReady.value = false
   reportPageActivity('insights')
   beginPaywallVisit()

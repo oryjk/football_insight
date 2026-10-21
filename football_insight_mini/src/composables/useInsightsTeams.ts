@@ -1,8 +1,8 @@
 import { ref, watch } from 'vue'
-import { getSupportProfile, listSupportTeams } from '../../api/support'
-import type { AppSession } from '../../stores/appSession'
-import type { SupportTeam } from '../../types/support'
-import { extractApiErrorMessage } from '../../utils/apiError'
+import { getSupportProfile, listSupportTeams } from '../api/support'
+import type { AppSession } from '../stores/appSession'
+import type { SupportTeam } from '../types/support'
+import { extractApiErrorMessage } from '../utils/apiError'
 
 interface Dependencies {
   list?: typeof listSupportTeams

@@ -108,6 +108,30 @@
 			]
 		},
 		{
+			"root": "pages/insights-tactics",
+			"pages": [
+				{
+					"path": "index",
+					"style": {
+						"navigationBarTitleText": "排阵容",
+						"navigationStyle": "custom"
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/insights-transfer",
+			"pages": [
+				{
+					"path": "index",
+					"style": {
+						"navigationBarTitleText": "转会表态",
+						"navigationStyle": "custom"
+					}
+				}
+			]
+		},
+		{
 			"root": "pages/lineup",
 			"pages": [
 				{
@@ -158,6 +182,8 @@
 			"network": "all",
 			"packages": [
 				"pages/ticket-watch",
+				"pages/insights-tactics",
+				"pages/insights-transfer",
 				"pages/lineup",
 				"pages/transfer"
 			]

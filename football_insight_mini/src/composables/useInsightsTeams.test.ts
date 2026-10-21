@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { nextTick, ref } from 'vue'
-import type { AppSession, SessionStatus } from '../../stores/appSession'
-import type { CurrentUser } from '../../types/auth'
-import type { SupportProfile, SupportTeam } from '../../types/support'
+import type { AppSession, SessionStatus } from '../stores/appSession'
+import type { CurrentUser } from '../types/auth'
+import type { SupportProfile, SupportTeam } from '../types/support'
 import { useInsightsTeams } from './useInsightsTeams'
 
 const TEAM_KEY = 'fi-insights-selected-team'

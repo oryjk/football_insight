@@ -13,7 +13,7 @@ const listFiles = (dir, ext) => readdirSync(dir, { withFileTypes: true }).flatMa
 const FILES = [
   ...listFiles(join(SRC, 'pages/transfer'), ['.vue', '.css']),
   join(SRC, 'components/FiTransferCard.vue'),
-  join(SRC, 'pages/insights/components/InsightsTransferPanel.vue'),
+  join(SRC, 'pages/insights-transfer/components/InsightsTransferPanel.vue'),
 ]
 function styleOf(path) {
   const source = readFileSync(path, 'utf8')
