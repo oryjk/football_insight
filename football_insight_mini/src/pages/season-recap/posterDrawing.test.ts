@@ -62,7 +62,7 @@ test('both themes draw real progress without exposing algorithm or caption text'
   const withProgress={...content,progress:{away:2/15,home:14/15,total:16/30}}
   drawRecapPoster(c.context,withProgress,'/code',new Map([[SEASON_RECAP_POSTER_BACKGROUNDS[theme],image('/background')]]),theme)
   expect(c.calls[0]).toEqual(['image','/background',0,0,750,1333])
-  expect(c.calls.filter(call=>call[0]==='clip').length).toBe(3)
+  expect(c.calls.filter(call=>call[0]==='gradient'&&call[2]===0&&call[4]===0).length).toBe(3)
   const texts=c.calls.filter(call=>call[0]==='text').map(call=>String(call[1]))
   expect(texts.some(value=>value.includes('已赴')||value.includes('加权')||value.includes('%'))).toBe(false)
   expect(c.depth()).toBe(0)

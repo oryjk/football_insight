@@ -123,14 +123,13 @@ export function drawRecapPoster(
   traceRoundRect(context, x, barY, width, height, height / 2); context.fill()
   const progress = Math.max(0, Math.min(1, card.progress))
   if (progress <= 0) return
-  // 渐变只跨已填充部分：短条也从暖黄过渡到正红。
-  const filled = width * progress
+  // 渐变只跨已填充部分：短条也从暖黄过渡到正红。不用 clip——微信 canvas 里 clip 后渐变填充会丢失。
+  const filled = Math.max(height, width * progress)
   const gradient = context.createLinearGradient(x, 0, x + filled, 0)
   gradient.addColorStop(0, color.progressStart); gradient.addColorStop(0.5, color.progressMid); gradient.addColorStop(1, color.progressEnd)
-  context.save()
-  traceRoundRect(context, x, barY, filled, height, Math.min(height / 2, filled / 2))
-  context.clip(); context.setFillStyle(gradient); context.fillRect(x, barY, filled, height)
-  context.restore()
+  context.setFillStyle(gradient)
+  traceRoundRect(context, x, barY, filled, height, height / 2)
+  context.fill()
  })
 
  const route = content.routeEntries
