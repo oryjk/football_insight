@@ -297,9 +297,8 @@ function openTicketWatch(): void {
     return
   }
 
-  if (officialBindingRequired.value) { officialBind.open(); return }
-
-  if (membershipBenefitsLocked.value) {
+  // 公众号绑定检查只在进入回流看板时做：需要绑定的账号直接跳转，由回流看板页自己刷新状态并弹出绑定。
+  if (membershipBenefitsLocked.value && !officialBindingRequired.value) {
     uni.showToast({
       title: '当前账号已取关公众号，会员权益已暂停',
       icon: 'none',
@@ -338,7 +337,6 @@ function goToLogin(): void {
 }
 
 onShow(async () => {
-  void officialBind.handlePageShow()
   pageVisible.value = true
   void teamBrowser.load()
   outlookReviewReady.value = false
