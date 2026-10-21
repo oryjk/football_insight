@@ -26,6 +26,7 @@ page {
   --fi-primitive-member-pass-silver: #d5dce3;
   --fi-primitive-member-pass-champagne: #e7d7b8;
   --fi-primitive-member-pass-shine: #fff4dc;
+  --fi-primitive-member-corner-radius: 72rpx;
   --fi-primitive-member-pass-muted: rgba(255, 255, 255, 0.72);
   --fi-primitive-member-pass-border: rgba(255, 255, 255, 0.18);
   --fi-primitive-member-pass-avatar: rgba(255, 255, 255, 0.1);
@@ -303,6 +304,7 @@ page {
   --fi-weight-black: var(--fi-primitive-weight-black);
 
   /* ===== Component：组件契约 ===== */
+  --fi-component-member-corner-radius: var(--fi-primitive-member-corner-radius);
   --fi-component-btn-bg: var(--fi-color-primary);
   --fi-component-btn-bg-deep: var(--fi-color-primary-deep);
   --fi-component-card-bg: var(--fi-primitive-white);

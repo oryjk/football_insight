@@ -3,6 +3,15 @@
     <image class="account-hero__background" :src="memberStadiumBackground" mode="aspectFill" aria-hidden="true" />
     <view class="account-hero__shade" aria-hidden="true" />
 
+    <view
+      class="membership-corner"
+      :hover-class="canPurchase ? 'membership-card--pressed' : 'none'"
+      @click="emit('membership-action')"
+    >
+      <text class="membership-corner__level">{{ code }}</text>
+      <text class="membership-corner__title">{{ tierTitle }}</text>
+    </view>
+
     <view class="member-identity">
       <view class="member-identity__avatar">
         <image
@@ -14,7 +23,6 @@
         <text v-else class="member-identity__avatar-fallback">{{ avatarFallbackLabel }}</text>
       </view>
       <text class="member-identity__name">{{ displayName }}</text>
-      <text class="member-identity__label">球迷会员</text>
     </view>
 
     <view
@@ -23,10 +31,7 @@
       @click="emit('membership-action')"
     >
       <view class="membership-card__main">
-        <view class="membership-card__heading">
-          <text class="membership-card__level">{{ code }}</text>
-          <text class="membership-card__title">{{ tierTitle }}</text>
-        </view>
+        <text class="membership-card__caption">会员有效期</text>
         <text class="membership-card__expire">{{ heroExpiryLabel }}</text>
       </view>
       <view v-if="canPurchase" class="membership-card__action">
@@ -74,7 +79,7 @@ const displayName = computed(() => props.user.display_name?.trim() || '会员')
 
 const avatarFallbackLabel = computed(() => displayName.value.slice(0, 1).toUpperCase())
 
-// 等级代码由徽章展示，标题只保留会员名称。
+// 右上角同时展示等级代码和会员名称。
 const tierTitle = computed(() => (props.code === 'V9' ? '至尊会员' : props.badgeLabel.replace(/^V\d+\s*/, '')))
 
 const heroExpiryLabel = computed(() => formatMembershipCardExpiry(props.user.membership_expires_at))
@@ -115,12 +120,47 @@ const heroActionText = computed(() => (props.canRenewV9 ? '续费' : '升级'))
   background: var(--fi-color-member-pass-shade);
 }
 
+.membership-corner {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  width: 46%;
+  min-height: 116rpx;
+  padding: var(--fi-space-28) var(--fi-space-20) var(--fi-space-28) var(--fi-space-40);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fi-space-10);
+  border-bottom-left-radius: var(--fi-component-member-corner-radius);
+  background: linear-gradient(120deg, var(--fi-color-member-pass-shine), var(--member-accent));
+  color: var(--fi-color-member-card-bg);
+  box-sizing: border-box;
+}
+
+.membership-corner__level {
+  flex-shrink: 0;
+  font-size: var(--fi-font-36);
+  font-weight: var(--fi-weight-black);
+  font-style: italic;
+  line-height: var(--fi-leading-tight);
+}
+
+.membership-corner__title {
+  font-size: var(--fi-font-28);
+  font-weight: var(--fi-weight-bold);
+  line-height: var(--fi-leading-snug);
+}
+
 .member-identity {
   position: relative;
-  padding: var(--fi-space-28) var(--fi-space-28) 0;
+  width: 54%;
+  min-height: 116rpx;
+  padding: var(--fi-space-28) var(--fi-space-20) var(--fi-space-24) var(--fi-space-28);
   display: flex;
   align-items: center;
   gap: var(--fi-space-16);
+  box-sizing: border-box;
 }
 
 .member-identity__avatar {
@@ -158,16 +198,9 @@ const heroActionText = computed(() => (props.canRenewV9 ? '续费' : '升级'))
   word-break: break-all;
 }
 
-.member-identity__label {
-  flex-shrink: 0;
-  color: var(--fi-color-member-pass-muted);
-  font-size: var(--fi-font-20);
-  letter-spacing: 3rpx;
-}
-
 .membership-card {
   position: relative;
-  padding: var(--fi-space-40) var(--fi-space-28) var(--fi-space-32);
+  padding: var(--fi-space-28) var(--fi-space-28) var(--fi-space-32);
   display: flex;
   align-items: center;
   gap: var(--fi-space-20);
@@ -186,26 +219,10 @@ const heroActionText = computed(() => (props.canRenewV9 ? '续费' : '升级'))
   gap: var(--fi-space-12);
 }
 
-.membership-card__heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--fi-space-12);
-  color: var(--member-accent);
-}
-
-.membership-card__level {
-  font-size: var(--fi-font-44);
-  font-weight: var(--fi-weight-black);
-  font-style: italic;
-  line-height: var(--fi-leading-tight);
-}
-
-.membership-card__title {
-  font-size: var(--fi-font-36);
-  font-weight: var(--fi-weight-bold);
-  line-height: var(--fi-leading-snug);
-  letter-spacing: 2rpx;
+.membership-card__caption {
+  color: var(--fi-color-member-pass-muted);
+  font-size: var(--fi-font-20);
+  line-height: var(--fi-leading-normal);
 }
 
 .membership-card__expire {
