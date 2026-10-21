@@ -2,6 +2,33 @@
 
 基于新浪体育移动端 JSON 接口抓取中超数据的 Python 项目，使用 `uv` 管理。
 
+## 球员头像小图补生成
+
+`sync-avatar-thumbs` 为名单库中已有头像补生成 96/240px JPEG，只读取数据库，不改原图；已有两种小图则跳过。小图命名为 `summary/players/thumbs/<尺寸>/<原文件名>.jpg`，因此原文件名含 `.jpg` 时，小图以 `.jpg.jpg` 结尾，与小程序 URL 换算一致。
+
+2026-10-20 验证：公开 `https://oryjk.cn:82/minio` 可匿名读图，但带签名的 S3 请求经代理后返回 `SignatureDoesNotMatch`。补生成使用 SSH 隧道直连 out109 的原有 MinIO，公开地址单独指定，不修改 Nginx。以下在 local233 执行：
+
+```bash
+# 独立终端保持连接；仅绑定本机回环。
+ssh -N -L 127.0.0.1:19091:127.0.0.1:9000 -o ExitOnForwardFailure=yes out109
+```
+
+另一个终端在 `sina_csl_scraper` 目录加载现有私有配置后执行：
+
+```bash
+set -a
+source ../football_insight_service_backend_rs/.env
+source .env.sync
+set +a
+export FI_DATABASE_URL="${FI_DATABASE_URL:-${DATABASE_URL:-}}"
+uv run sina-csl-scraper sync-avatar-thumbs --dry-run
+uv run sina-csl-scraper sync-avatar-thumbs \
+  --minio-endpoint http://127.0.0.1:19091 \
+  --minio-public-base-url https://oryjk.cn:82/minio/football-insight
+```
+
+任务结束后关闭隧道终端；失败时重跑同一命令续补，可用 `--limit` 限制处理数量。
+
 ## 赛前数据倾向（Elo V2，服务端已启用）
 
 `match_outlook/` 只使用比分、球队 ID、开赛时间和中立场地标记。每次 `scrape --write-db` 核心事务提交后，用独立连接重放历史、为未开赛比赛生成概率、为已冻结且完赛的记录计分；附加流程失败只记录错误类型，不改变核心同步结果。选参时 τ=1，最终重放用最近 150 场校准 τ；同一开赛时刻先统一预测再更新，避免同时比赛结果泄漏。
