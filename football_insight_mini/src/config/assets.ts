@@ -6,3 +6,9 @@ export const CHENGDU_RONGCHENG_CREST_IMAGE_URL =
 
 export const SEASON_RECAP_POSTER_BG_IMAGE_URL =
   'https://oryjk.cn:82/minio/football-insight/static/season-recap/poster-bg-v1.jpg'
+
+// 独立版本对象，更新素材不覆盖已发布海报背景。
+export const SEASON_RECAP_POSTER_BACKGROUNDS = {
+  dark: 'https://oryjk.cn:82/minio/football-insight/static/season-recap/poster-dark-v2.jpg',
+  light: 'https://oryjk.cn:82/minio/football-insight/static/season-recap/poster-light-v2.jpg',
+} as const

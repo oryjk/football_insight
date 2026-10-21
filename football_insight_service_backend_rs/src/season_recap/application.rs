@@ -120,6 +120,7 @@ use uuid::Uuid;
 #[derive(Debug, Serialize)]
 pub struct RecapView {
     pub season: i32,
+    pub season_totals: ScheduleTotals,
     pub matches: Vec<RecapMatch>,
     pub selected_match_ids: Vec<i64>,
     pub home_one_way_km: Option<f64>,
@@ -158,6 +159,7 @@ impl RecapService {
         let summary = calculate(&matches, &selected, snapshot.home_one_way_km)?;
         Ok(RecapView {
             season,
+            season_totals: snapshot.season_totals,
             matches,
             selected_match_ids: selected,
             home_one_way_km: snapshot.home_one_way_km,
@@ -209,6 +211,7 @@ mod service_tests {
         let result = RecapService::view(
             2026,
             Snapshot {
+                season_totals: ScheduleTotals::default(),
                 matches: vec![],
                 selected: vec![99],
                 home_one_way_km: Some(10.0),
@@ -232,6 +235,7 @@ mod service_tests {
         let view = RecapService::view(
             2026,
             Snapshot {
+                season_totals: ScheduleTotals::default(),
                 matches: vec![
                     fixture(1, true, "上海申花"),
                     fixture(2, false, "北京国安"),
@@ -264,6 +268,28 @@ mod service_tests {
             .filter_map(|m| m.round_trip_km)
             .sum();
         assert_eq!(round_trips, view.summary.away_km);
+    }
+    #[test]
+    fn complete_schedule_totals_survive_even_when_no_matches_have_finished() {
+        let view = RecapService::view(
+            2026,
+            Snapshot {
+                matches: vec![],
+                selected: vec![],
+                home_one_way_km: None,
+                season_totals: ScheduleTotals {
+                    home_matches: 15,
+                    away_matches: 15,
+                    completed_matches: 0,
+                },
+            },
+        )
+        .unwrap();
+        let json = serde_json::to_value(view).unwrap();
+        assert_eq!(json["season_totals"]["home_matches"], 15);
+        assert_eq!(json["season_totals"]["away_matches"], 15);
+        assert_eq!(json["season_totals"]["completed_matches"], 0);
+        assert_eq!(json["matches"], serde_json::json!([]));
     }
     #[test]
     fn spherical_formula_has_known_one_degree_baseline_and_symmetry() {
@@ -320,6 +346,7 @@ mod transactional_tests {
     impl RecapRepository for ReconciledRepository {
         async fn load(&self, _: Uuid, _: i32) -> Result<Snapshot, RecapError> {
             Ok(Snapshot {
+                season_totals: ScheduleTotals::default(),
                 matches: vec![RecapMatch {
                     match_id: 1,
                     match_date: "2026-01-01".into(),
@@ -342,6 +369,7 @@ mod transactional_tests {
             validate: &crate::season_recap::ports::ValidateSnapshot<'_>,
         ) -> Result<Snapshot, RecapError> {
             let snapshot = Snapshot {
+                season_totals: ScheduleTotals::default(),
                 matches: vec![RecapMatch {
                     match_id: 1,
                     match_date: "2026-01-01".into(),

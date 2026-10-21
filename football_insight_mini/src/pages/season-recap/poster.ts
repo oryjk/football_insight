@@ -1,6 +1,6 @@
-import type { RecapMatch, RecapSummary, SeasonRecap } from '../../types/seasonRecap'
+import type { RecapMatch, RecapSummary, RecapSeasonTotals, SeasonRecap } from '../../types/seasonRecap'
 export const POSTER_WIDTH = 750
-export const POSTER_HEIGHT = 1334
+export const POSTER_HEIGHT = 1536
 /* decorative：海报位图的酒红、香槟金与纸感纹理，不属于结构 UI token。 */
 export const POSTER_PALETTE = {
  nightTop: '#611724',
@@ -16,6 +16,16 @@ export const POSTER_PALETTE = {
  glassBorder: 'rgba(233, 196, 151, 0.18)',
  codeCard: '#ffffff',
 }
+export type RecapPosterTheme = 'dark' | 'light'
+export const POSTER_PALETTES = {
+ dark: { ...POSTER_PALETTE, track: 'rgba(255,237,219,0.18)', progressStart: '#ffe9ac', progressMid: '#ff9b48', progressEnd: '#d90016' },
+ light: {
+  ...POSTER_PALETTE, nightTop: '#fff5e5', nightMid: '#fff9f0', nightBottom: '#fff7eb',
+  ink: '#6c1619', muted: '#7e4437', faint: '#855e4d', gold: '#a8000c', goldDim: '#86561e',
+  rule: 'rgba(139,81,32,0.25)', glass: 'rgba(255,253,247,0.5)', glassBorder: 'rgba(197,132,66,0.35)',
+  track: '#ede0cf', progressStart: '#ffda79', progressMid: '#ff963d', progressEnd: '#e90016',
+ },
+} as const
 export interface RecapRouteEntry {
  city: string
  // 同城不同球队保留全部队徽；绘制时以并列圆徽展示。
@@ -27,6 +37,7 @@ export interface RecapPosterRoute {
 }
 export interface RecapPosterContent {
  kicker: string
+ progress: { home: number | null; away: number | null; total: number | null }
  totalKm: number
  awayKm: number
  homeKm: number | null
@@ -45,13 +56,37 @@ export function recapConversion(totalKm: number): string | null {
  if (totalKm >= EQUATOR_KM / 10) return `相当于绕赤道 ${(totalKm / EQUATOR_KM).toFixed(2)} 圈`
  return `相当于跑了 ${Math.max(1, Math.round(totalKm / MARATHON_KM))} 个马拉松`
 }
-// 称号优先级：远征场次 > 全勤场次 > 主场专一 > 默认同行；文案保持体面，不出现贬义。
-export function recapBadge(summary: Pick<RecapSummary, 'matches' | 'away_matches'>): string {
- if (summary.away_matches >= 8) return '铁血远征军'
- if (summary.away_matches >= 3) return '远征先锋'
- if (summary.matches >= 15) return '全勤死忠'
- if (summary.matches > 0 && summary.away_matches === 0) return '主场守护者'
+// 客场权重为主场的两倍；算法只用于内部称号判定，不上屏。
+export function recapBadge(
+ summary: Pick<RecapSummary, 'matches' | 'home_matches' | 'away_matches'>,
+ totals?: RecapSeasonTotals,
+): string {
+ const home = summary.home_matches, away = summary.away_matches
+ if (home + away === 0) return '尚未启程'
+ if (totals) {
+  const all = totals.home_matches + totals.away_matches
+  if (all > 0 && totals.completed_matches === all
+   && home === totals.home_matches && away === totals.away_matches) return '全勤死忠'
+ }
+ if (home >= 10 && away === 0) return '主场守护者'
+ // 兼容旧后端：不把已结束的比赛误当成整个赛季，也不颁发全勤。
+ if (!totals || home > totals.home_matches || away > totals.away_matches) return '蓉城同行者'
+ const possible = totals.home_matches + totals.away_matches * 2
+ if (possible <= 0) return '蓉城同行者'
+ const earned = home + away * 2
+ if (earned * 4 >= possible * 3) return '铁血死忠'
+ if (earned * 2 >= possible) return '蓉城铁杆'
+ if (earned * 4 >= possible) return '主场死忠'
  return '蓉城同行者'
+}
+export function recapProgress(summary: RecapSummary, totals?: RecapSeasonTotals): RecapPosterContent['progress'] {
+ if (!totals) return { home: null, away: null, total: null }
+ const ratio = (attended: number, total: number) => total > 0 ? Math.max(0, Math.min(1, attended / total)) : 0
+ return {
+  home: ratio(summary.home_matches, totals.home_matches),
+  away: ratio(summary.away_matches, totals.away_matches),
+  total: ratio(summary.matches, totals.home_matches + totals.away_matches),
+ }
 }
 const ROUTE_MAX_CITIES = 6
 // 足迹路线：已选客场按日期排序、城市去重；旧后端缺 city 时保留隐藏路线的行为。
@@ -93,7 +128,8 @@ export function buildRecapPosterContent(view: SeasonRecap): RecapPosterContent {
   matches: summary.matches,
   cities: summary.cities,
   conversion: recapConversion(summary.total_km),
-  badge: recapBadge(summary),
+  badge: recapBadge(summary, view.season_totals),
+  progress: recapProgress(summary, view.season_totals),
   route: recapRoute(view.matches, view.selected_match_ids),
   routeEntries: recapRouteEntries(view.matches, view.selected_match_ids),
  }

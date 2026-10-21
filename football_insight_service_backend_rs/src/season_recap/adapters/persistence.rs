@@ -1,5 +1,5 @@
 use super::super::{
-    domain::{RecapError, RecapMatch},
+    domain::{RecapError, RecapMatch, ScheduleTotals},
     ports::{RecapRepository, Snapshot, ValidateSnapshot},
 };
 use async_trait::async_trait;
@@ -23,6 +23,13 @@ pub const MATCHES_SQL: &str = r#"SELECT m.match_id,m.match_date::text AS match_d
  AND (m.home_team_name='成都蓉城' OR m.away_team_name='成都蓉城')
  ORDER BY m.match_date,m.match_time,m.match_id"#;
 pub const PREF_SQL: &str = "SELECT home_one_way_km FROM f_i_season_recap_profiles WHERE user_id=$1";
+// Same exact first-team scope as MATCHES_SQL; 4 = postponed, still part of the season.
+pub const TOTALS_SQL: &str = r#"SELECT
+ COUNT(*) FILTER (WHERE home_team_name='成都蓉城') AS home_matches,
+ COUNT(*) FILTER (WHERE away_team_name='成都蓉城') AS away_matches,
+ COUNT(*) FILTER (WHERE status='3') AS completed_matches
+ FROM f_i_matches WHERE season=$1 AND source_active=TRUE AND status IN ('1','2','3','4')
+ AND (home_team_name='成都蓉城' OR away_team_name='成都蓉城')"#;
 pub const SELECTED_SQL: &str = "SELECT a.match_id FROM f_i_season_recap_attendances a JOIN f_i_matches m USING(match_id) WHERE a.user_id=$1 AND m.season=$2 ORDER BY a.match_id";
 pub const UPSERT_SQL: &str = "INSERT INTO f_i_season_recap_profiles(user_id,home_one_way_km) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET home_one_way_km=COALESCE(EXCLUDED.home_one_way_km,f_i_season_recap_profiles.home_one_way_km)";
 pub const DELETE_SQL: &str = "DELETE FROM f_i_season_recap_attendances a USING f_i_matches m WHERE a.match_id=m.match_id AND a.user_id=$1 AND m.season=$2";
@@ -82,7 +89,18 @@ async fn snapshot_with_lock(
         .fetch_all(&mut **tx)
         .await
         .map_err(db_error)?;
+    let (home_matches, away_matches, completed_matches) =
+        sqlx::query_as::<_, (i64, i64, i64)>(TOTALS_SQL)
+            .bind(season)
+            .fetch_one(&mut **tx)
+            .await
+            .map_err(db_error)?;
     Ok(Snapshot {
+        season_totals: ScheduleTotals {
+            home_matches,
+            away_matches,
+            completed_matches,
+        },
         matches,
         selected,
         home_one_way_km,
@@ -211,6 +229,15 @@ mod tests {
         let repo = PostgresRecapRepository::new(pool.clone());
         let initial = repo.load(a, 2026).await.unwrap();
         assert_eq!(initial.matches.len(), 2);
+        assert_eq!(initial.season_totals.home_matches, 2);
+        assert_eq!(initial.season_totals.away_matches, 1);
+        assert_eq!(initial.season_totals.completed_matches, 2);
+        // Postponed fixtures remain in the denominator; cancelled / retired do not.
+        sqlx::raw_sql("INSERT INTO f_i_matches(match_id,season,match_date,match_time,home_team_name,away_team_name,status,source_active) VALUES (7,2026,'2026-12-01','19:35','北京国安','成都蓉城','4',true),(8,2026,'2026-12-02','19:35','成都蓉城','北京国安','5',true)").execute(&pool).await.unwrap();
+        let totals = repo.load(a, 2026).await.unwrap().season_totals;
+        assert_eq!(totals.home_matches, 2);
+        assert_eq!(totals.away_matches, 2);
+        assert_eq!(totals.completed_matches, 2);
         assert_eq!(
             initial.matches[0].opponent_avatar_url.as_deref(),
             Some("https://cdn.example.com/beijing.png")
@@ -233,9 +260,11 @@ mod tests {
             .execute(&pool)
             .await
             .unwrap();
-        assert!(repo.load(a, 2026).await.unwrap().matches[1]
-            .opponent_avatar_url
-            .is_none());
+        assert!(
+            repo.load(a, 2026).await.unwrap().matches[1]
+                .opponent_avatar_url
+                .is_none()
+        );
         let saved = save(&repo, a, 2026, &[1, 1, 2], Some(12.25)).await.unwrap();
         let mut read_tx = pool.begin().await.unwrap();
         snapshot(&mut read_tx, a, 2026).await.unwrap();

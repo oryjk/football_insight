@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { CHENGDU_RONGCHENG_CREST_IMAGE_URL, SEASON_RECAP_POSTER_BG_IMAGE_URL } from '../../config/assets'
+import { CHENGDU_RONGCHENG_CREST_IMAGE_URL, SEASON_RECAP_POSTER_BACKGROUNDS } from '../../config/assets'
 import { buildRecapPosterContent } from './poster'
 import { drawRecapPoster } from './posterDrawing'
 import type { RecapPosterImage } from './posterImages'
@@ -14,7 +14,7 @@ function canvas(rejectImages = false) {
   fillText(value:string) { calls.push(['text',value]) },
   fillRect(...args:number[]) { calls.push(['rect',...args]) },
   createLinearGradient() { return {addColorStop(){}} },
-  setFillStyle(){}, setStrokeStyle(){}, setLineWidth(){}, setTextAlign(){}, setGlobalAlpha(){},
+  setFillStyle(){}, setStrokeStyle(){}, setLineWidth(){}, setTextAlign(){}, setTextBaseline(){}, setGlobalAlpha(){},
   beginPath(){}, moveTo(){}, lineTo(){}, arc(){}, arcTo(){}, closePath(){}, fill(){}, stroke(){},
   clip(){ calls.push(['clip']) },
   save(){ depth++ }, restore(){ depth-- },
@@ -27,13 +27,13 @@ const image=(path:string):RecapPosterImage=>({path,width:100,height:100})
 test('photo is drawn first with local paths, route crests are clipped and all information survives',()=>{
  const c=canvas()
  drawRecapPoster(c.context,content,'/code',new Map([
-  [SEASON_RECAP_POSTER_BG_IMAGE_URL,image('/bg')],
+  [SEASON_RECAP_POSTER_BACKGROUNDS.dark,image('/bg')],
   [CHENGDU_RONGCHENG_CREST_IMAGE_URL,image('/chengdu')],
   ['https://crest',image('/beijing')],
  ]))
- expect(c.calls[0]).toEqual(['image','/bg',0,0,750,1334])
- expect(c.calls.filter(call=>call[0]==='image').map(call=>call[1])).toEqual(['/bg','/beijing','/code'])
- expect(c.calls.filter(call=>call[0]==='clip').length).toBe(1)
+ expect(c.calls[0]).toEqual(['image','/bg',0,0,750,1536])
+ expect(c.calls.filter(call=>call[0]==='image').map(call=>call[1])).toEqual(['/bg','/chengdu','/beijing','/code'])
+ expect(c.calls.filter(call=>call[0]==='clip').length).toBe(0)
  const texts=c.calls.filter(call=>call[0]==='text').map(call=>call[1])
  expect(texts.filter(value=>['3000','北京','主场里程','蓉城同行者','自报观赛 · 客场为城市间直线往返估算'].includes(String(value)))).toEqual([
   '3000','蓉城同行者','主场里程','北京','自报观赛 · 客场为城市间直线往返估算',
@@ -43,15 +43,28 @@ test('photo is drawn first with local paths, route crests are clipped and all in
 
 test('missing decorations or image decode errors still render city, stats and code',()=>{
  for(const images of [new Map<string,RecapPosterImage>(),new Map([
-  [SEASON_RECAP_POSTER_BG_IMAGE_URL,image('/bad-bg')],
+  [SEASON_RECAP_POSTER_BACKGROUNDS.dark,image('/bad-bg')],
   [CHENGDU_RONGCHENG_CREST_IMAGE_URL,image('/bad-chengdu')],
   ['https://crest',image('/bad-opponent')],
  ])]) {
   const c=canvas(true)
   drawRecapPoster(c.context,content,'/code',images)
-  expect(c.calls.find(call=>call[0]==='rect')).toEqual(['rect',0,0,750,1334])
+  expect(c.calls.find(call=>call[0]==='rect')).toEqual(['rect',0,0,750,1536])
   expect(c.calls.find(call=>call[0]==='text'&&call[1]==='北京')).toEqual(['text','北京'])
-  expect(c.calls.find(call=>call[0]==='image'&&call[1]==='/code')).toEqual(['image','/code',536,1124,144,144])
+  expect(c.calls.find(call=>call[0]==='image'&&call[1]==='/code')).toEqual(['image','/code',582,1416,100,100])
+  expect(c.depth()).toBe(0)
+ }
+})
+
+test('both themes draw real progress without exposing algorithm or caption text',()=>{
+ for(const theme of ['dark','light'] as const) {
+  const c=canvas()
+  const withProgress={...content,progress:{away:2/15,home:14/15,total:16/30}}
+  drawRecapPoster(c.context,withProgress,'/code',new Map([[SEASON_RECAP_POSTER_BACKGROUNDS[theme],image('/background')]]),theme)
+  expect(c.calls[0]).toEqual(['image','/background',0,0,750,1536])
+  expect(c.calls.filter(call=>call[0]==='clip').length).toBe(3)
+  const texts=c.calls.filter(call=>call[0]==='text').map(call=>String(call[1]))
+  expect(texts.some(value=>value.includes('已赴')||value.includes('加权')||value.includes('%'))).toBe(false)
   expect(c.depth()).toBe(0)
  }
 })

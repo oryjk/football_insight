@@ -20,6 +20,9 @@
     <SeasonRecapSummary :summary="summaryPreview" :season="season" :dirty="dirty" />
    </FiPanel>
    <FiPanel>
+    <SeasonRecapThemePicker :model-value="theme" :disabled="generating" @update:model-value="setTheme" />
+   </FiPanel>
+   <FiPanel>
     <SeasonRecapMatches v-model:filter="filter" :matches="view.matches" :selected="selected" :disabled="generating" @toggle="toggle" @select="setSelected" />
     <view v-if="showHomeDistance" class="distance">
      <view class="distance__field">
@@ -57,6 +60,7 @@ import SeasonRecapMatches from './components/SeasonRecapMatches.vue'
 import SeasonRecapDock from './components/SeasonRecapDock.vue'
 import SeasonRecapPosterSheet from './components/SeasonRecapPosterSheet.vue'
 import SeasonRecapPoster from './components/SeasonRecapPoster.vue'
+import SeasonRecapThemePicker from './components/SeasonRecapThemePicker.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { useAppSession } from '../../stores/appSession'
 import { getSeasonRecap,saveSeasonRecap,getSeasonRecapCode } from '../../api/seasonRecap'
@@ -70,7 +74,7 @@ import { saveRecapPoster } from './poster'
 const session=useAppSession()
 const {navigationPageStyle}=useNavigationLayout()
 const flow=createRecapFlow(session,{load:getSeasonRecap,save:saveSeasonRecap,code:getSeasonRecapCode})
-const {season,view,selected,distance,loading,generating,error,posterPath,generated,dirty,load,toggle,setSelected,editDistance,generate,posterReady,posterFailed}=flow
+const {theme,setTheme,season,view,selected,distance,loading,generating,error,posterPath,generated,dirty,load,toggle,setSelected,editDistance,generate,posterReady,posterFailed}=flow
 const sharePath=computed(()=>recapSharePath(season.value))
 const posterSheetVisible=ref(false)
 const formulaOpen=ref(false)

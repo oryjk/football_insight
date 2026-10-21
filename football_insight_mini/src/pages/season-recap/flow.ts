@@ -2,13 +2,15 @@ import { ref, watch, computed, type Ref } from 'vue'
 import type { SeasonRecap, SaveSeasonRecap, RecapCodeImage } from '../../types/seasonRecap'
 import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
 import { parseHomeDistance } from './helpers'
+import type { RecapPosterTheme } from './poster'
 interface Client {
  load(season: number): Promise<SeasonRecap>
  save(season: number, payload: SaveSeasonRecap): Promise<SeasonRecap>
  code(season: number): Promise<RecapCodeImage>
 }
-export interface RecapPosterPayload { key: number; view: SeasonRecap; code: RecapCodeImage }
+export interface RecapPosterPayload { key: number; view: SeasonRecap; code: RecapCodeImage; theme: RecapPosterTheme }
 export function createRecapFlow(session: { revision: Ref<number>; hasAccessToken: Ref<boolean>; invalidateSession?: (expectedRevision: number) => void }, client: Client) {
+ const theme = ref<RecapPosterTheme>('dark')
  const season = ref(2026), view = ref<SeasonRecap | null>(null), selected = ref<number[]>([]), distance = ref('')
  const loading = ref(false), generating = ref(false), error = ref(''), posterPath = ref('')
  const generated = ref<RecapPosterPayload | null>(null), key = ref(0)
@@ -54,6 +56,10 @@ export function createRecapFlow(session: { revision: Ref<number>; hasAccessToken
   return km !== current.home_one_way_km
  })
  function editDistance(value: string) { if(generating.value)return;distance.value=value;invalidatePoster() }
+ function setTheme(value: RecapPosterTheme) {
+  if (generating.value || theme.value === value) return
+  theme.value = value; invalidatePoster()
+ }
  async function generate() {
   if(generating.value||loading.value||!view.value||!session.hasAccessToken.value)return
   error.value='';invalidatePoster()
@@ -67,11 +73,11 @@ export function createRecapFlow(session: { revision: Ref<number>; hasAccessToken
    view.value=result
    const code=await client.code(season.value)
    if(id!==operation||revision!==session.revision.value)return
-   generated.value={key:key.value,view:result,code}
+   generated.value={key:key.value,view:result,code,theme:theme.value}
   } catch(cause) {if(id===operation){handleError(cause,revision);generating.value=false}}
  }
  function posterReady(generation: number, path: string) {if(generation!==key.value||!generated.value)return;posterPath.value=path;generating.value=false}
  function posterFailed(generation: number) {if(generation!==key.value)return;error.value='海报生成失败，请重试';generated.value=null;generating.value=false}
  function dispose() {stop();invalidate()}
- return {season,view,selected,distance,loading,generating,error,posterPath,generated,key,client,dirty,load,toggle,setSelected,editDistance,generate,posterReady,posterFailed,dispose}
+ return {theme,setTheme,season,view,selected,distance,loading,generating,error,posterPath,generated,key,client,dirty,load,toggle,setSelected,editDistance,generate,posterReady,posterFailed,dispose}
 }

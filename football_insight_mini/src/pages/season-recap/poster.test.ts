@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { buildRecapPosterContent, recapBadge, recapConversion, recapRoute, recapRouteEntries, saveRecapPoster, supportsRecapWebp } from './poster'
+import { buildRecapPosterContent, recapBadge, recapProgress, recapConversion, recapRoute, recapRouteEntries, saveRecapPoster, supportsRecapWebp } from './poster'
 import type { RecapMatch, SeasonRecap } from '../../types/seasonRecap'
 const zero={away_km:0,home_km:null,total_km:0,matches:0,home_matches:0,away_matches:0,cities:0}
 function match(id:number,is_home:boolean,city?:string):RecapMatch {
@@ -15,13 +15,38 @@ test('conversion switches from marathon to equator at one tenth of a lap and hid
  expect(recapConversion(4007.5)).toBe('相当于绕赤道 0.10 圈')
  expect(recapConversion(8015)).toBe('相当于绕赤道 0.20 圈')
 })
-test('badge tiers prefer expedition over attendance and stay dignified',()=>{
- expect(recapBadge({...zero,matches:20,away_matches:8})).toBe('铁血远征军')
- expect(recapBadge({...zero,matches:16,away_matches:3})).toBe('远征先锋')
- expect(recapBadge({...zero,matches:15,away_matches:2})).toBe('全勤死忠')
- expect(recapBadge({...zero,matches:5,away_matches:0})).toBe('主场守护者')
- expect(recapBadge({...zero,matches:2,away_matches:1})).toBe('蓉城同行者')
- expect(recapBadge(zero)).toBe('蓉城同行者')
+const totals={home_matches:15,away_matches:15,completed_matches:28}
+const attendance=(home:number,away:number)=>({...zero,home_matches:home,away_matches:away,matches:home+away})
+test('weighted tiers give away matches twice the weight without rounding thresholds',()=>{
+ expect(recapBadge(attendance(1,0),totals)).toBe('蓉城同行者')
+ expect(recapBadge(attendance(0,6),totals)).toBe('主场死忠')
+ expect(recapBadge(attendance(0,12),totals)).toBe('蓉城铁杆')
+ expect(recapBadge(attendance(10,12),totals)).toBe('铁血死忠')
+ expect(recapBadge(attendance(15,14),totals)).toBe('铁血死忠')
+ const sixteen={home_matches:8,away_matches:8,completed_matches:16}
+ expect(recapBadge(attendance(4,1),sixteen)).toBe('主场死忠') // exact 25%
+ expect(recapBadge(attendance(4,4),sixteen)).toBe('蓉城铁杆') // exact 50%
+ expect(recapBadge(attendance(4,7),sixteen)).toBe('铁血死忠') // exact 75%
+ expect(recapBadge(attendance(14,2),totals)).toBe('主场死忠')
+})
+test('full attendance requires every home and away match and the complete schedule finished',()=>{
+ expect(recapBadge(attendance(15,15),{...totals,completed_matches:30})).toBe('全勤死忠')
+ expect(recapBadge(attendance(15,15),totals)).toBe('铁血死忠')
+ expect(recapBadge(attendance(15,14),{...totals,completed_matches:30})).toBe('铁血死忠')
+ expect(recapBadge(attendance(0,0),{home_matches:0,away_matches:0,completed_matches:0})).toBe('尚未启程')
+ expect(recapBadge(attendance(15,15))).toBe('蓉城同行者')
+})
+test('home specialist starts at ten home matches and no away attendance',()=>{
+ expect(recapBadge(attendance(9,0),totals)).toBe('蓉城同行者')
+ expect(recapBadge(attendance(10,0),totals)).toBe('主场守护者')
+ expect(recapBadge(attendance(15,0),totals)).toBe('主场守护者')
+ expect(recapBadge(attendance(10,1),totals)).toBe('主场死忠')
+})
+test('unweighted progress uses full schedule, tolerates zero totals and missing legacy metadata',()=>{
+ expect(recapProgress(attendance(14,2),totals)).toEqual({home:14/15,away:2/15,total:16/30})
+ expect(recapProgress(zero,{home_matches:0,away_matches:0,completed_matches:0})).toEqual({home:0,away:0,total:0})
+ expect(recapProgress(zero)).toEqual({home:null,away:null,total:null})
+ expect(recapProgress(attendance(20,20),totals)).toEqual({home:1,away:1,total:1})
 })
 test('route dedupes away cities in match date order and caps with 等 N 城',()=>{
  const matches=[match(3,true,'成都'),match(1,false,'北京'),match(2,false,'上海'),match(4,false,'北京')]

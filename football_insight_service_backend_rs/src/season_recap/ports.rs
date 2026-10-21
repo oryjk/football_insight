@@ -1,8 +1,9 @@
-use super::domain::{RecapError, RecapMatch};
+use super::domain::{RecapError, RecapMatch, ScheduleTotals};
 use async_trait::async_trait;
 use uuid::Uuid;
 #[derive(Clone, Debug)]
 pub struct Snapshot {
+    pub season_totals: ScheduleTotals,
     pub matches: Vec<RecapMatch>,
     pub selected: Vec<i64>,
     pub home_one_way_km: Option<f64>,

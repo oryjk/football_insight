@@ -88,3 +88,21 @@ test('dirty tracks edits against the last loaded or saved record',async()=>{
  flow.editDistance('12.25');expect(flow.dirty.value).toBe(true)
  flow.dispose()
 })
+
+test('theme changes invalidate an old bitmap and are captured by the next generation',async()=>{
+ const {flow}=setup();await flow.load()
+ await flow.generate()
+ expect(flow.generated.value?.theme).toBe('dark')
+ flow.setTheme('light')
+ expect(flow.theme.value).toBe('dark')
+ flow.posterReady(flow.key.value,'dark.png')
+ const oldKey=flow.key.value
+ flow.setTheme('light')
+ expect(flow.posterPath.value).toBe('')
+ expect(flow.generated.value).toBeNull()
+ flow.posterReady(oldKey,'late-dark.png')
+ expect(flow.posterPath.value).toBe('')
+ await flow.generate()
+ expect(flow.generated.value?.theme).toBe('light')
+ flow.dispose()
+})

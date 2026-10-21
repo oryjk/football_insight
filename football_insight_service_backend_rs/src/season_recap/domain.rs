@@ -1,4 +1,11 @@
 use serde::Serialize;
+/// Complete active season schedule, including fixtures and postponed matches.
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct ScheduleTotals {
+    pub home_matches: i64,
+    pub away_matches: i64,
+    pub completed_matches: i64,
+}
 #[derive(Clone, Debug, Serialize)]
 pub struct RecapMatch {
     pub match_id: i64,
