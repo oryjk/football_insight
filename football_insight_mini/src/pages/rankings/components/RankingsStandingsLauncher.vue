@@ -23,7 +23,7 @@
       </view>
 
       <view class="standings-launcher-card__podium">
-        <view v-for="item in facts(table).podium" :key="item.teamId" class="standings-launcher-card__place" :class="item.rank <= 2 ? `standings-launcher-card__place--acl-${item.rank}` : ''">
+        <view v-for="item in facts(table).podium" :key="item.teamId" class="standings-launcher-card__place">
           <text class="standings-launcher-card__rank" :class="`standings-launcher-card__rank--${item.rank}`">{{ item.rank }}</text>
           <image v-if="item.avatar" :src="item.avatar" class="standings-launcher-card__avatar" mode="aspectFit" />
           <text class="standings-launcher-card__name">{{ item.teamName }}</text>
@@ -153,9 +153,6 @@ function facts(table: StandingsTable) {
   border-radius: var(--fi-radius-md);
   background: var(--fi-color-page);
 }
-
-.standings-launcher-card__place--acl-1 { background: linear-gradient(90deg, rgba(212, 160, 23, 0.2), rgba(212, 160, 23, 0.04)); box-shadow: inset 4rpx 0 0 #d4a017; }
-.standings-launcher-card__place--acl-2 { background: linear-gradient(90deg, rgba(84, 118, 168, 0.18), rgba(84, 118, 168, 0.04)); box-shadow: inset 4rpx 0 0 #6b8cc0; }
 
 .standings-launcher-card__rank {
   flex-shrink: 0;
