@@ -149,6 +149,15 @@ class RankingDataset:
 
 
 @dataclass(frozen=True)
+class TeamCoach:
+    """新浪球队资料里的现任主教练；新浪不给教练 ID，以英文名（缺失时中文名）作自然键。"""
+
+    team_id: int
+    coach_key: str
+    coach_name: str
+
+
+@dataclass(frozen=True)
 class SquadPlayer:
     team_id: int
     player_id: int

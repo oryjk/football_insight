@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,7 @@ from .match_outlook.cli import app as outlook_app
 from .match_outlook.service import refresh_match_outlooks
 from .schedule import fetch_reconciled_schedule
 from .squad_sync import PostgresSquadStore, make_avatar_uploader, sync_squads
+from .coach_sync import PostgresCoachStore, make_coach_avatar_uploader, sync_coaches
 from .sync import InsightSyncService, SyncPayload
 from .topics.cli import app as topics_app
 
@@ -274,21 +276,21 @@ def sync_squads_command(
     client = SinaCslClient()
     target_season = season or client.fetch_league_info().current_season
     avatars = None
+    coach_avatars = None
     if upload_avatars:
         if not minio_access_key or not minio_secret_key:
             raise typer.BadParameter("upload_avatars enabled but MinIO credentials are missing")
-        avatars = make_avatar_uploader(
-            HttpAssetFetcher(),
-            MinioAssetTarget.from_credentials(
-                endpoint=minio_endpoint,
-                access_key=minio_access_key,
-                secret_key=minio_secret_key,
-                bucket=minio_bucket,
-                region=minio_region,
-                public_base_url=minio_public_base_url,
-            ),
-            minio_prefix,
+        fetcher = HttpAssetFetcher()
+        target = MinioAssetTarget.from_credentials(
+            endpoint=minio_endpoint,
+            access_key=minio_access_key,
+            secret_key=minio_secret_key,
+            bucket=minio_bucket,
+            region=minio_region,
+            public_base_url=minio_public_base_url,
         )
+        avatars = make_avatar_uploader(fetcher, target, minio_prefix)
+        coach_avatars = make_coach_avatar_uploader(fetcher, target, minio_prefix)
     with psycopg.connect(database_url, autocommit=True) as connection:
         summary = sync_squads(
             fetch=lambda team_id, s: client.fetch_team_squad(team_id, season=s),
@@ -297,6 +299,17 @@ def sync_squads_command(
             backfill_seasons=backfill_seasons,
             avatars=avatars,
         )
+        # 主教练（转会许愿用）跟名单同一次调度；失败只记在摘要里，不影响名单结果。
+        try:
+            summary.update(sync_coaches(
+                fetch=client.fetch_team_coach,
+                store=PostgresCoachStore(connection),
+                prefix=minio_prefix,
+                avatars=coach_avatars,
+            ))
+        except Exception as error:
+            print(f"[coaches] skipped: {type(error).__name__}: {error}", file=sys.stderr)
+            summary["coaches_error"] = type(error).__name__
     typer.echo(json.dumps({"season": target_season, **summary}, ensure_ascii=False))
 
 

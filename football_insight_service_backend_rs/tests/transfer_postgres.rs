@@ -59,6 +59,12 @@ async fn setup() -> Db {
     .execute(&pool)
     .await
     .unwrap();
+    sqlx::raw_sql(include_str!(
+        "../migrations/20261021120000_add_team_coaches.sql"
+    ))
+    .execute(&pool)
+    .await
+    .unwrap();
     Db {
         admin,
         pool,
@@ -324,6 +330,104 @@ async fn returning_departed_and_current_team_flags() {
     let stay = repo.card("STAY0012", None).await.unwrap().unwrap().card;
     assert!(stay.player.departed);
     assert!(stay.player.current_team.is_none());
+    teardown(db).await;
+}
+
+#[tokio::test]
+#[ignore = "requires explicit disposable local TRANSFER_TEST_DATABASE_URL"]
+async fn coach_cards_use_the_coach_table_and_mark_departure() {
+    let db = setup().await;
+    let repo = PostgresTransferRepository::new(db.pool.clone());
+    let coach: i64 = sqlx::query_scalar(
+        "INSERT INTO f_i_team_coaches (coach_key, coach_name, team_id, avatar_storage_url)
+         VALUES ('Coach A', '教练甲', 1, 'https://cdn/coach.jpg') RETURNING coach_id",
+    )
+    .fetch_one(&db.pool)
+    .await
+    .unwrap();
+    assert_eq!(coach, 9_000_000_001);
+    // 同队同时只能有一位现任主教练。
+    assert!(
+        sqlx::query("INSERT INTO f_i_team_coaches (coach_key, coach_name, team_id) VALUES ('Coach B', '教练乙', 1)")
+            .execute(&db.pool)
+            .await
+            .is_err()
+    );
+    assert_eq!(repo.coach_rows(coach).await.unwrap(), vec![(1, true)]);
+    assert!(repo.coach_rows(9_000_000_999).await.unwrap().is_empty());
+    let candidate = repo.team_coach(1).await.unwrap().unwrap();
+    assert_eq!(
+        (
+            candidate.player_id,
+            candidate.name.as_str(),
+            candidate.position.clone(),
+            candidate.shirt_number,
+            candidate.avatar_url.as_deref(),
+            candidate.current_team.as_ref().map(|t| t.team_id)
+        ),
+        (
+            coach,
+            "教练甲",
+            None,
+            None,
+            Some("https://cdn/coach.jpg"),
+            Some(1)
+        )
+    );
+    assert!(repo.team_coach(2).await.unwrap().is_none());
+
+    let a = fan(&db.pool).await;
+    repo.nominate(command(a, coach, TransferIntent::Out, "COACHOUT"))
+        .await
+        .unwrap();
+    let card = repo.card("COACHOUT", None).await.unwrap().unwrap().card;
+    assert_eq!(card.player.name, "教练甲");
+    assert_eq!(
+        card.player.avatar_url.as_deref(),
+        Some("https://cdn/coach.jpg")
+    );
+    assert_eq!(card.player.position, None);
+    assert!(!card.player.departed);
+    assert!(!card.returning);
+    assert_eq!(
+        card.player
+            .current_team
+            .as_ref()
+            .map(|t| t.team_name.as_str()),
+        Some("Alpha")
+    );
+    let (items, total) = repo
+        .board(1, 1, TransferIntent::Out, 0, 10, None)
+        .await
+        .unwrap();
+    assert_eq!((total, items[0].player.name.as_str()), (1, "教练甲"));
+
+    // 主教练转去 Bravo：旧卡标记离队，现所在队跟着变。
+    sqlx::query("UPDATE f_i_team_coaches SET team_id = 2 WHERE coach_id = $1")
+        .bind(coach)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    let moved = repo.card("COACHOUT", None).await.unwrap().unwrap().card;
+    assert!(moved.player.departed);
+    assert_eq!(
+        moved
+            .player
+            .current_team
+            .as_ref()
+            .map(|t| t.team_name.as_str()),
+        Some("Bravo")
+    );
+    // 下课后不在任何队：仍保留姓名与头像，没有现所在队。
+    sqlx::query("UPDATE f_i_team_coaches SET active = false WHERE coach_id = $1")
+        .bind(coach)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    let gone = repo.card("COACHOUT", None).await.unwrap().unwrap().card;
+    assert!(gone.player.departed);
+    assert_eq!(gone.player.name, "教练甲");
+    assert!(gone.player.current_team.is_none());
     teardown(db).await;
 }
 

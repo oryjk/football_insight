@@ -52,18 +52,25 @@ const RANKED: &str = "WITH tally AS (
     FROM tally t
 )";
 
+/// 主教练卡（player_id 为 f_i_team_coaches.coach_id）与球员卡共用：名字、头像、现所在队都回落到主教练表。
 const CARD_SELECT: &str = "SELECT r.share_code, r.intent, r.player_id, r.up, r.down, r.my_vote, r.rank, r.created_at,
-    p.player_name, p.avatar_storage_url AS avatar_url, p.position, p.shirt_number,
-    ct.team_id AS current_team_id, ct.team_name AS current_team_name, ct.avatar_storage_url AS current_team_avatar,
+    COALESCE(p.player_name, c.coach_name) AS player_name,
+    COALESCE(p.avatar_storage_url, c.avatar_storage_url) AS avatar_url, p.position, p.shirt_number,
+    COALESCE(ct.team_id, cteam.team_id) AS current_team_id,
+    COALESCE(ct.team_name, cteam.team_name) AS current_team_name,
+    CASE WHEN ct.team_id IS NOT NULL THEN ct.avatar_storage_url ELSE cteam.avatar_storage_url END AS current_team_avatar,
     EXISTS(SELECT 1 FROM f_i_squad_players f WHERE f.player_id = r.player_id AND f.team_id = r.team_id AND NOT f.active) AS former_of_team,
-    EXISTS(SELECT 1 FROM f_i_squad_players a WHERE a.player_id = r.player_id AND a.team_id = r.team_id AND a.active) AS active_in_team
+    (EXISTS(SELECT 1 FROM f_i_squad_players a WHERE a.player_id = r.player_id AND a.team_id = r.team_id AND a.active)
+        OR COALESCE(c.active AND c.team_id = r.team_id, FALSE)) AS active_in_team
 FROM ranked r
 LEFT JOIN LATERAL (SELECT sp.player_name, sp.avatar_storage_url, sp.position, sp.shirt_number
     FROM f_i_squad_players sp WHERE sp.player_id = r.player_id
     ORDER BY sp.active DESC, sp.last_season DESC LIMIT 1) p ON TRUE
 LEFT JOIN LATERAL (SELECT t.team_id, t.team_name, t.avatar_storage_url
     FROM f_i_squad_players sp JOIN f_i_teams t ON t.team_id = sp.team_id
-    WHERE sp.player_id = r.player_id AND sp.active LIMIT 1) ct ON TRUE";
+    WHERE sp.player_id = r.player_id AND sp.active LIMIT 1) ct ON TRUE
+LEFT JOIN f_i_team_coaches c ON c.coach_id = r.player_id
+LEFT JOIN f_i_teams cteam ON cteam.team_id = c.team_id AND c.active";
 
 #[derive(FromRow)]
 struct CardRow {
@@ -457,6 +464,29 @@ impl TransferCandidateDirectory for PostgresTransferRepository {
             .fetch_all(&self.pool)
             .await
             .map_err(unavailable)
+    }
+
+    async fn coach_rows(&self, coach_id: i64) -> Result<Vec<(i64, bool)>, TransferError> {
+        sqlx::query_as("SELECT team_id, active FROM f_i_team_coaches WHERE coach_id = $1")
+            .bind(coach_id)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(unavailable)
+    }
+
+    async fn team_coach(&self, team_id: i64) -> Result<Option<CandidatePlayer>, TransferError> {
+        // 主教练没有号码和位置；前端只显示姓名与球队。
+        sqlx::query_as::<_, CandidateRow>(
+            "SELECT c.coach_id, c.coach_name, NULL::INT, NULL::TEXT, c.avatar_storage_url,
+                    t.team_id, t.team_name, t.avatar_storage_url
+             FROM f_i_team_coaches c JOIN f_i_teams t ON t.team_id = c.team_id
+             WHERE c.team_id = $1 AND c.active",
+        )
+        .bind(team_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map(|row| row.map(candidate))
+        .map_err(unavailable)
     }
 
     async fn team_players(&self, team_id: i64) -> Result<Vec<CandidatePlayer>, TransferError> {

@@ -21,6 +21,7 @@ from .models import (
     RankingDataset,
     SquadPlayer,
     StandingEntry,
+    TeamCoach,
     TeamRankingEntry,
 )
 
@@ -34,6 +35,16 @@ _SQUAD_POSITIONS = {"守门员": "GK", "后卫": "DF", "中场": "MF", "前锋":
 
 def map_squad_position(raw: str | None) -> str | None:
     return _SQUAD_POSITIONS.get((raw or "").strip())
+
+
+def parse_team_coach(team_id: int, data: dict[str, Any]) -> TeamCoach | None:
+    """优先 active_manager（赛季中换帅后的在任者），整组缺失才回落 manager；中英文名成对取，不混用。"""
+    for prefix in ("active_manager", "manager"):
+        english = str(data.get(prefix) or "").strip()
+        chinese = str(data.get(f"{prefix}_cn") or "").strip()
+        if english or chinese:
+            return TeamCoach(team_id=team_id, coach_key=english or chinese, coach_name=chinese or english)
+    return None
 
 
 def parse_squad_player(team_id: int, item: dict[str, Any]) -> SquadPlayer | None:
@@ -104,6 +115,10 @@ class SinaCslClient:
         items = data.get("players") if isinstance(data, dict) else None
         players = [parse_squad_player(team_id, item) for item in items or [] if isinstance(item, dict)]
         return [player for player in players if player is not None]
+
+    def fetch_team_coach(self, team_id: int) -> TeamCoach | None:
+        data = self._request("/op/api/team", {"tid": team_id})
+        return parse_team_coach(team_id, data if isinstance(data, dict) else {})
 
     def fetch_league_info(self) -> LeagueInfo:
         data = self._request("/op/api/league", {"lid": self.league_id})

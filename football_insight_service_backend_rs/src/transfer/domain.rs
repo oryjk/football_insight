@@ -104,6 +104,19 @@ pub fn candidate_allowed(intent: TransferIntent, membership: Membership) -> bool
     }
 }
 
+/// 主教练与球员共用提名卡的 `player_id`；主教练编号从这里开始（见 f_i_team_coaches 迁移）。
+pub const COACH_ID_MIN: i64 = 9_000_000_001;
+
+pub fn is_coach_id(id: i64) -> bool {
+    id >= COACH_ID_MIN
+}
+
+/// 主教练只能被提名「走 / 留」，且必须是本队现任。
+pub fn coach_allowed(intent: TransferIntent, membership: Membership) -> bool {
+    matches!(intent, TransferIntent::Out | TransferIntent::Stay)
+        && membership == Membership::Current
+}
+
 pub fn is_returning(intent: TransferIntent, former_of_team: bool) -> bool {
     intent == TransferIntent::In && former_of_team
 }
@@ -269,6 +282,21 @@ mod tests {
             (TransferIntent::In, [false, true, true, false]),
         ] {
             let got = [Current, Former, Elsewhere, Unknown].map(|m| candidate_allowed(intent, m));
+            assert_eq!(got, allowed, "{intent:?}");
+        }
+    }
+
+    #[test]
+    fn coaches_can_only_be_voted_out_or_kept_by_their_current_team() {
+        use Membership::*;
+        assert!(!is_coach_id(9_000_000_000));
+        assert!(is_coach_id(COACH_ID_MIN));
+        for (intent, allowed) in [
+            (TransferIntent::Out, [true, false, false, false]),
+            (TransferIntent::Stay, [true, false, false, false]),
+            (TransferIntent::In, [false, false, false, false]),
+        ] {
+            let got = [Current, Former, Elsewhere, Unknown].map(|m| coach_allowed(intent, m));
             assert_eq!(got, allowed, "{intent:?}");
         }
     }

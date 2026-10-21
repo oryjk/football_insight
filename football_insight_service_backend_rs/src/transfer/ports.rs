@@ -77,6 +77,10 @@ pub trait TransferCandidateDirectory: Send + Sync {
     async fn find_team(&self, team_id: i64) -> Result<Option<TransferTeam>, TransferError>;
     /// 该球员在名单表里的全部 (team_id, active)。
     async fn player_rows(&self, player_id: i64) -> Result<Vec<(i64, bool)>, TransferError>;
+    /// 主教练的 (team_id, active)；没有这位主教练为空。
+    async fn coach_rows(&self, coach_id: i64) -> Result<Vec<(i64, bool)>, TransferError>;
+    /// 本队现任主教练
+    async fn team_coach(&self, team_id: i64) -> Result<Option<CandidatePlayer>, TransferError>;
     /// 本队现役
     async fn team_players(&self, team_id: i64) -> Result<Vec<CandidatePlayer>, TransferError>;
     /// 本队旧将（current_team 为其现役所在队，可能为空）

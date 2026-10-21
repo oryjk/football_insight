@@ -2,7 +2,7 @@ use super::{
     domain::{
         CandidatePlayer, NOMINATION_LIMIT, NominationCard, TransferCodeImage, TransferError,
         TransferIntent, TransferTeam, TransferWindow, VoteTally, VoteValue, candidate_allowed,
-        generate_share_code, membership_from, valid_share_code,
+        coach_allowed, generate_share_code, is_coach_id, membership_from, valid_share_code,
     },
     ports::{
         NominateCommand, TransferCandidateDirectory, TransferCodePort, TransferRepository,
@@ -277,11 +277,26 @@ impl TransferService {
         let intent = TransferIntent::parse(intent).ok_or(TransferError::Invalid)?;
         let team = self.team(team_id).await?;
         let groups = match intent {
-            TransferIntent::Out | TransferIntent::Stay => vec![CandidateGroup {
-                key: "squad".into(),
-                title: team.team_name.clone(),
-                players: self.directory.team_players(team_id).await?,
-            }],
+            TransferIntent::Out | TransferIntent::Stay => {
+                // 主教练单独一组放在最前；前端按后端分组原样展示，不需要改版。
+                let coach = self.directory.team_coach(team_id).await?;
+                let squad = CandidateGroup {
+                    key: "squad".into(),
+                    title: team.team_name.clone(),
+                    players: self.directory.team_players(team_id).await?,
+                };
+                match coach {
+                    Some(coach) => vec![
+                        CandidateGroup {
+                            key: "coach".into(),
+                            title: "主教练".into(),
+                            players: vec![coach],
+                        },
+                        squad,
+                    ],
+                    None => vec![squad],
+                }
+            }
             TransferIntent::In => {
                 let mut groups = vec![CandidateGroup {
                     key: "former".into(),
@@ -327,8 +342,14 @@ impl TransferService {
             .await?
             .ok_or(TransferError::WindowClosed)?;
         self.require_voter(user_id, team_id, &window).await?;
-        let rows = self.directory.player_rows(player_id).await?;
-        if !candidate_allowed(intent, membership_from(team_id, &rows)) {
+        let allowed = if is_coach_id(player_id) {
+            let rows = self.directory.coach_rows(player_id).await?;
+            coach_allowed(intent, membership_from(team_id, &rows))
+        } else {
+            let rows = self.directory.player_rows(player_id).await?;
+            candidate_allowed(intent, membership_from(team_id, &rows))
+        };
+        if !allowed {
             return Err(TransferError::InvalidCandidate);
         }
         for _ in 0..SHARE_CODE_ATTEMPTS {
@@ -408,6 +429,8 @@ pub(crate) mod tests {
 
     pub(crate) const FAN: Uuid = Uuid::from_u128(1);
     pub(crate) const RIVAL: Uuid = Uuid::from_u128(2);
+    const COACH_ONE: i64 = crate::transfer::domain::COACH_ID_MIN;
+    const COACH_TWO: i64 = crate::transfer::domain::COACH_ID_MIN + 1;
 
     pub(crate) fn at(day: u32) -> DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 11, day, 12, 0, 0).unwrap()
@@ -562,6 +585,17 @@ pub(crate) mod tests {
                 _ => vec![],
             })
         }
+        async fn coach_rows(&self, coach: i64) -> Result<Vec<(i64, bool)>, TransferError> {
+            // COACH_ONE = 1 队现任；COACH_TWO = 2 队现任
+            Ok(match coach {
+                COACH_ONE => vec![(1, true)],
+                COACH_TWO => vec![(2, true)],
+                _ => vec![],
+            })
+        }
+        async fn team_coach(&self, id: i64) -> Result<Option<CandidatePlayer>, TransferError> {
+            Ok((id == 1).then(|| candidate(COACH_ONE, Some(team(1)))))
+        }
         async fn team_players(&self, _: i64) -> Result<Vec<CandidatePlayer>, TransferError> {
             Ok(vec![candidate(10, Some(team(1)))])
         }
@@ -679,6 +713,12 @@ pub(crate) mod tests {
             (30, "in", true),
             (30, "out", false),
             (40, "in", false),
+            (COACH_ONE, "out", true),
+            (COACH_ONE, "stay", true),
+            (COACH_ONE, "in", false),
+            (COACH_TWO, "out", false),
+            (COACH_TWO, "in", false),
+            (COACH_ONE + 9, "out", false),
         ] {
             let result = service.nominate(FAN, 1, player, intent).await;
             assert_eq!(result.is_ok(), ok, "{player} {intent}: {result:?}");
@@ -686,7 +726,7 @@ pub(crate) mod tests {
                 assert_eq!(result.unwrap_err(), TransferError::InvalidCandidate);
             }
         }
-        assert_eq!(repo.nominations.lock().unwrap().len(), 4);
+        assert_eq!(repo.nominations.lock().unwrap().len(), 6);
         assert!(
             repo.nominations
                 .lock()
@@ -849,6 +889,17 @@ pub(crate) mod tests {
         let squad = service.candidates(1, "out").await.unwrap();
         assert_eq!(
             squad
+                .groups
+                .iter()
+                .map(|g| (g.key.as_str(), g.title.as_str(), g.players.len()))
+                .collect::<Vec<_>>(),
+            vec![("coach", "主教练", 1), ("squad", "Team 1", 1)]
+        );
+        assert_eq!(squad.groups[0].players[0].player_id, COACH_ONE);
+        // 没有主教练数据的球队只有球员组。
+        let without_coach = service.candidates(2, "stay").await.unwrap();
+        assert_eq!(
+            without_coach
                 .groups
                 .iter()
                 .map(|g| g.key.as_str())
