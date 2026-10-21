@@ -1,44 +1,43 @@
 <template>
   <view class="account-hero" :class="[heroClass, toneClass]">
-    <image class="account-hero__background" :src="memberStadiumBackground" mode="aspectFill" aria-hidden="true" />
-    <view class="account-hero__shade" aria-hidden="true" />
+    <view class="account-hero__scene">
+      <image class="account-hero__background" :src="memberStadiumBackground" mode="aspectFill" aria-hidden="true" />
+      <view class="account-hero__shade" aria-hidden="true" />
 
-    <view
-      class="membership-corner"
-      :hover-class="canPurchase ? 'membership-card--pressed' : 'none'"
-      @click="emit('membership-action')"
-    >
-      <text class="membership-corner__level">{{ code }}</text>
-      <text class="membership-corner__title">{{ tierTitle }}</text>
-    </view>
+      <view class="member-identity">
+        <view class="member-identity__avatar">
+          <image
+            v-if="user.avatar_url"
+            :src="user.avatar_url"
+            mode="aspectFill"
+            class="member-identity__avatar-image"
+          />
+          <text v-else class="member-identity__avatar-fallback">{{ avatarFallbackLabel }}</text>
+        </view>
+        <view class="member-identity__copy">
+          <text class="member-identity__name">{{ displayName }}</text>
+          <text class="member-identity__caption">足球洞察 · 球迷档案</text>
+        </view>
+      </view>
 
-    <view class="member-identity">
-      <view class="member-identity__avatar">
-        <image
-          v-if="user.avatar_url"
-          :src="user.avatar_url"
-          mode="aspectFill"
-          class="member-identity__avatar-image"
-        />
-        <text v-else class="member-identity__avatar-fallback">{{ avatarFallbackLabel }}</text>
+      <view
+        class="membership-card"
+        :hover-class="canPurchase ? 'membership-card--pressed' : 'none'"
+        @click="emit('membership-action')"
+      >
+        <view class="membership-card__badge">
+          <text class="membership-card__level">{{ code }}</text>
+        </view>
+        <view class="membership-card__main">
+          <text class="membership-card__title">{{ tierTitle }}</text>
+          <text class="membership-card__expire">{{ heroExpiryLabel }}</text>
+        </view>
+        <view v-if="canPurchase" class="membership-card__action">
+          <text>{{ heroActionText }}</text>
+          <text class="membership-card__arrow" aria-hidden="true">›</text>
+        </view>
+        <text v-else class="membership-card__status">已开通</text>
       </view>
-      <text class="member-identity__name">{{ displayName }}</text>
-    </view>
-
-    <view
-      class="membership-card"
-      :hover-class="canPurchase ? 'membership-card--pressed' : 'none'"
-      @click="emit('membership-action')"
-    >
-      <view class="membership-card__main">
-        <text class="membership-card__caption">会员有效期</text>
-        <text class="membership-card__expire">{{ heroExpiryLabel }}</text>
-      </view>
-      <view v-if="canPurchase" class="membership-card__action">
-        <text>{{ heroActionText }}</text>
-        <text class="membership-card__arrow" aria-hidden="true">›</text>
-      </view>
-      <text v-else class="membership-card__status">已开通</text>
     </view>
 
     <view v-if="inviteCode" class="member-invite">
@@ -79,7 +78,7 @@ const displayName = computed(() => props.user.display_name?.trim() || '会员')
 
 const avatarFallbackLabel = computed(() => displayName.value.slice(0, 1).toUpperCase())
 
-// 右上角同时展示等级代码和会员名称。
+// 等级代码放在会员栏的标识内，标题只展示名称。
 const tierTitle = computed(() => (props.code === 'V9' ? '至尊会员' : props.badgeLabel.replace(/^V\d+\s*/, '')))
 
 const heroExpiryLabel = computed(() => formatMembershipCardExpiry(props.user.membership_expires_at))
@@ -89,22 +88,20 @@ const heroActionText = computed(() => (props.canRenewV9 ? '续费' : '升级'))
 
 <style scoped lang="css">
 .account-hero {
-  --member-accent: var(--fi-color-member-card-accent);
   position: relative;
   z-index: 1;
   overflow: hidden;
   border-radius: var(--fi-radius-xl);
-  border: var(--fi-border-width) solid var(--fi-color-member-pass-border);
-  background: var(--fi-color-member-card-bg);
-  box-shadow: var(--fi-shadow-card-strong);
+  background: var(--fi-color-surface);
+  box-shadow: var(--fi-shadow-card);
 }
 
-.tier-tone--v1 {
-  --member-accent: var(--fi-color-member-pass-silver);
-}
-
-.tier-tone--v2 {
-  --member-accent: var(--fi-color-member-pass-champagne);
+.account-hero__scene {
+  position: relative;
+  overflow: hidden;
+  padding: var(--fi-space-32) var(--fi-space-28) 0;
+  border-radius: 0 0 50% 50% / 0 0 var(--fi-component-member-scene-curve) var(--fi-component-member-scene-curve);
+  background: var(--fi-color-member-profile-bg);
 }
 
 .account-hero__background,
@@ -116,64 +113,34 @@ const heroActionText = computed(() => (props.canRenewV9 ? '续费' : '升级'))
   pointer-events: none;
 }
 
+.account-hero__background {
+  opacity: 0.1;
+}
+
 .account-hero__shade {
-  background: var(--fi-color-member-pass-shade);
-}
-
-.membership-corner {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 1;
-  width: 46%;
-  min-height: 116rpx;
-  padding: var(--fi-space-28) var(--fi-space-20) var(--fi-space-28) var(--fi-space-40);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--fi-space-10);
-  border-bottom-left-radius: var(--fi-component-member-corner-radius);
-  background: linear-gradient(120deg, var(--fi-color-member-pass-shine), var(--member-accent));
-  color: var(--fi-color-member-card-bg);
-  box-sizing: border-box;
-}
-
-.membership-corner__level {
-  flex-shrink: 0;
-  font-size: var(--fi-font-36);
-  font-weight: var(--fi-weight-black);
-  font-style: italic;
-  line-height: var(--fi-leading-tight);
-}
-
-.membership-corner__title {
-  font-size: var(--fi-font-28);
-  font-weight: var(--fi-weight-bold);
-  line-height: var(--fi-leading-snug);
+  background: var(--fi-color-member-profile-shade);
 }
 
 .member-identity {
   position: relative;
-  width: 54%;
-  min-height: 116rpx;
-  padding: var(--fi-space-28) var(--fi-space-20) var(--fi-space-24) var(--fi-space-28);
+  padding: var(--fi-space-12) var(--fi-space-8) var(--fi-space-32);
   display: flex;
   align-items: center;
-  gap: var(--fi-space-16);
-  box-sizing: border-box;
+  gap: var(--fi-space-24);
 }
 
 .member-identity__avatar {
-  width: 64rpx;
-  height: 64rpx;
+  width: var(--fi-avatar-md);
+  height: var(--fi-avatar-md);
   flex-shrink: 0;
   border-radius: var(--fi-radius-round);
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--fi-color-member-pass-avatar);
-  border: var(--fi-border-width) solid var(--fi-color-member-pass-border);
+  background: var(--fi-color-surface);
+  border: var(--fi-border-width) solid var(--fi-color-surface);
+  box-shadow: var(--fi-shadow-soft);
   box-sizing: border-box;
 }
 
@@ -183,35 +150,12 @@ const heroActionText = computed(() => (props.canRenewV9 ? '续费' : '升级'))
 }
 
 .member-identity__avatar-fallback {
-  color: var(--fi-color-surface);
-  font-size: var(--fi-font-28);
+  color: var(--fi-color-member-ribbon-text);
+  font-size: var(--fi-font-36);
   font-weight: var(--fi-weight-bold);
 }
 
-.member-identity__name {
-  min-width: 0;
-  flex: 1;
-  color: var(--fi-color-surface);
-  font-size: var(--fi-font-28);
-  font-weight: var(--fi-weight-bold);
-  line-height: var(--fi-leading-normal);
-  word-break: break-all;
-}
-
-.membership-card {
-  position: relative;
-  padding: var(--fi-space-28) var(--fi-space-28) var(--fi-space-32);
-  display: flex;
-  align-items: center;
-  gap: var(--fi-space-20);
-  box-sizing: border-box;
-}
-
-.membership-card--pressed {
-  opacity: var(--fi-opacity-pressed);
-}
-
-.membership-card__main {
+.member-identity__copy {
   min-width: 0;
   flex: 1;
   display: flex;
@@ -219,34 +163,108 @@ const heroActionText = computed(() => (props.canRenewV9 ? '续费' : '升级'))
   gap: var(--fi-space-12);
 }
 
-.membership-card__caption {
-  color: var(--fi-color-member-pass-muted);
-  font-size: var(--fi-font-20);
-  line-height: var(--fi-leading-normal);
+.member-identity__name {
+  color: var(--fi-color-text-strong);
+  font-size: var(--fi-font-34);
+  font-weight: var(--fi-weight-bold);
+  line-height: var(--fi-leading-snug);
+  word-break: break-all;
 }
 
-.membership-card__expire {
-  color: var(--fi-color-member-pass-muted);
+.member-identity__caption {
+  color: var(--fi-color-text-caption);
   font-size: var(--fi-font-22);
   line-height: var(--fi-leading-normal);
 }
 
-.membership-card__action {
+.membership-card {
+  position: relative;
+  min-height: 136rpx;
+  padding: var(--fi-space-24) var(--fi-space-24) var(--fi-space-40);
+  display: flex;
+  align-items: center;
+  gap: var(--fi-space-16);
+  overflow: hidden;
+  border-radius: var(--fi-radius-md) var(--fi-radius-md) 0 0;
+  background: linear-gradient(105deg, var(--fi-color-member-ribbon-start), var(--fi-color-member-ribbon-end));
+  color: var(--fi-color-member-ribbon-text);
+  box-sizing: border-box;
+}
+
+.membership-card::before {
+  content: '';
+  position: absolute;
+  top: -140rpx;
+  left: -160rpx;
+  width: 460rpx;
+  height: 320rpx;
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-member-ribbon-sheen);
+  transform: rotate(28deg);
+  pointer-events: none;
+}
+
+.membership-card--pressed {
+  opacity: var(--fi-opacity-pressed);
+}
+
+.membership-card__badge {
+  position: relative;
+  width: 64rpx;
+  height: 68rpx;
   flex-shrink: 0;
-  min-width: 112rpx;
-  min-height: 60rpx;
-  padding: var(--fi-space-12) var(--fi-space-20);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--fi-space-12);
-  border-radius: var(--fi-radius-round);
-  background: linear-gradient(110deg, var(--fi-color-member-pass-shine), var(--member-accent));
-  color: var(--fi-color-member-card-bg);
-  font-size: var(--fi-font-24);
-  font-weight: var(--fi-weight-extrabold);
+  border: var(--fi-border-width) solid var(--fi-color-member-ribbon-line);
+  border-radius: var(--fi-radius-xs) var(--fi-radius-xs) var(--fi-radius-md) var(--fi-radius-md);
+  background: var(--fi-color-member-ribbon-sheen);
+}
+
+.membership-card__badge::before {
+  content: '';
+  position: absolute;
+  inset: 4rpx;
+  border: var(--fi-border-width) solid var(--fi-color-member-ribbon-line);
+  border-radius: var(--fi-radius-xs) var(--fi-radius-xs) var(--fi-radius-sm) var(--fi-radius-sm);
+}
+
+.membership-card__level {
+  font-size: var(--fi-font-26);
+  font-weight: var(--fi-weight-black);
+  line-height: var(--fi-leading-none);
+}
+
+.membership-card__main {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fi-space-8);
+}
+
+.membership-card__title {
+  font-size: var(--fi-font-28);
+  font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-snug);
-  box-sizing: border-box;
+}
+
+.membership-card__expire {
+  color: var(--fi-color-member-ribbon-caption);
+  font-size: var(--fi-font-20);
+  line-height: var(--fi-leading-normal);
+}
+
+.membership-card__action {
+  position: relative;
+  flex-shrink: 0;
+  min-height: 64rpx;
+  display: flex;
+  align-items: center;
+  gap: var(--fi-space-12);
+  font-size: var(--fi-font-24);
+  line-height: var(--fi-leading-snug);
 }
 
 .membership-card__arrow {
@@ -255,20 +273,19 @@ const heroActionText = computed(() => (props.canRenewV9 ? '续费' : '升级'))
 }
 
 .membership-card__status {
+  position: relative;
   flex-shrink: 0;
-  color: var(--member-accent);
+  color: var(--fi-color-member-ribbon-caption);
   font-size: var(--fi-font-22);
 }
 
 .member-invite {
   position: relative;
-  margin: 0 var(--fi-space-28);
-  padding: var(--fi-space-18) 0 var(--fi-space-20);
+  padding: var(--fi-space-20) var(--fi-space-32) var(--fi-space-24);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--fi-space-16);
-  border-top: var(--fi-border-width) solid var(--fi-color-member-pass-border);
 }
 
 .member-invite__body {
@@ -282,13 +299,13 @@ const heroActionText = computed(() => (props.canRenewV9 ? '续费' : '升级'))
 }
 
 .member-invite__label {
-  color: var(--fi-color-member-pass-muted);
+  color: var(--fi-color-text-caption);
   font-size: var(--fi-font-22);
   line-height: var(--fi-leading-normal);
 }
 
 .member-invite__code {
-  color: var(--fi-color-surface);
+  color: var(--fi-color-text-primary);
   font-size: var(--fi-font-24);
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-snug);
@@ -301,17 +318,17 @@ const heroActionText = computed(() => (props.canRenewV9 ? '续费' : '升级'))
   min-height: 52rpx;
   margin: 0;
   padding: var(--fi-space-10) var(--fi-space-16);
-  border: var(--fi-border-width) solid var(--fi-color-member-pass-border);
+  border: var(--fi-border-divider);
   border-radius: var(--fi-radius-round);
-  background: transparent;
-  color: var(--fi-color-member-pass-muted);
+  background: var(--fi-color-surface);
+  color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-22);
   line-height: var(--fi-leading-snug);
   box-sizing: border-box;
 }
 
 .member-invite__copy--pressed {
-  background: var(--fi-color-member-pass-avatar);
+  background: var(--fi-color-page);
 }
 
 .member-invite__copy::after {

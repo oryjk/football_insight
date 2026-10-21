@@ -23,14 +23,15 @@ page {
   --fi-primitive-ink: #15161b;
   --fi-primitive-ink-deep: #121212;
   --fi-primitive-member-gold: #e9c477;
-  --fi-primitive-member-pass-silver: #d5dce3;
-  --fi-primitive-member-pass-champagne: #e7d7b8;
-  --fi-primitive-member-pass-shine: #fff4dc;
-  --fi-primitive-member-corner-radius: 72rpx;
-  --fi-primitive-member-pass-muted: rgba(255, 255, 255, 0.72);
-  --fi-primitive-member-pass-border: rgba(255, 255, 255, 0.18);
-  --fi-primitive-member-pass-avatar: rgba(255, 255, 255, 0.1);
-  --fi-primitive-member-pass-shade: linear-gradient(90deg, rgba(8, 14, 20, 0.18), rgba(8, 14, 20, 0) 70%), linear-gradient(0deg, rgba(8, 14, 20, 0.86), rgba(8, 14, 20, 0) 60%);
+  --fi-primitive-member-profile-bg: #f1efeb;
+  --fi-primitive-member-profile-shade: linear-gradient(110deg, rgba(249, 247, 243, 0.72), rgba(241, 240, 238, 0.42));
+  --fi-primitive-member-ribbon-start: #eed8bb;
+  --fi-primitive-member-ribbon-end: #dbb486;
+  --fi-primitive-member-ribbon-text: #604125;
+  --fi-primitive-member-ribbon-caption: #795938;
+  --fi-primitive-member-ribbon-sheen: rgba(255, 248, 235, 0.24);
+  --fi-primitive-member-ribbon-line: rgba(130, 87, 43, 0.22);
+  --fi-primitive-member-scene-curve: 28rpx;
   --fi-primitive-segmented-track: rgba(246, 247, 251, 0.92);
   --fi-primitive-segmented-idle: #7f8490;
   --fi-primitive-opacity-pressed: 0.7;
@@ -152,13 +153,14 @@ page {
   --fi-color-primary: var(--fi-primitive-red);
   --fi-color-member-card-bg: var(--fi-primitive-ink);
   --fi-color-member-card-accent: var(--fi-primitive-member-gold);
-  --fi-color-member-pass-silver: var(--fi-primitive-member-pass-silver);
-  --fi-color-member-pass-champagne: var(--fi-primitive-member-pass-champagne);
-  --fi-color-member-pass-shine: var(--fi-primitive-member-pass-shine);
-  --fi-color-member-pass-muted: var(--fi-primitive-member-pass-muted);
-  --fi-color-member-pass-border: var(--fi-primitive-member-pass-border);
-  --fi-color-member-pass-avatar: var(--fi-primitive-member-pass-avatar);
-  --fi-color-member-pass-shade: var(--fi-primitive-member-pass-shade);
+  --fi-color-member-profile-bg: var(--fi-primitive-member-profile-bg);
+  --fi-color-member-profile-shade: var(--fi-primitive-member-profile-shade);
+  --fi-color-member-ribbon-start: var(--fi-primitive-member-ribbon-start);
+  --fi-color-member-ribbon-end: var(--fi-primitive-member-ribbon-end);
+  --fi-color-member-ribbon-text: var(--fi-primitive-member-ribbon-text);
+  --fi-color-member-ribbon-caption: var(--fi-primitive-member-ribbon-caption);
+  --fi-color-member-ribbon-sheen: var(--fi-primitive-member-ribbon-sheen);
+  --fi-color-member-ribbon-line: var(--fi-primitive-member-ribbon-line);
   --fi-color-segmented-track: var(--fi-primitive-segmented-track);
   --fi-color-segmented-idle: var(--fi-primitive-segmented-idle);
   --fi-opacity-pressed: var(--fi-primitive-opacity-pressed);
@@ -304,7 +306,7 @@ page {
   --fi-weight-black: var(--fi-primitive-weight-black);
 
   /* ===== Component：组件契约 ===== */
-  --fi-component-member-corner-radius: var(--fi-primitive-member-corner-radius);
+  --fi-component-member-scene-curve: var(--fi-primitive-member-scene-curve);
   --fi-component-btn-bg: var(--fi-color-primary);
   --fi-component-btn-bg-deep: var(--fi-color-primary-deep);
   --fi-component-card-bg: var(--fi-primitive-white);
