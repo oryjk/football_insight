@@ -37,7 +37,7 @@
 
       <scroll-view scroll-y class="standings-sheet__scroll">
         <view class="standings-sheet__list">
-          <view v-for="entry in table.entries" :key="`${table.slug}-${entry.team_id}`" class="standings-sheet__row">
+          <view v-for="entry in table.entries" :key="`${table.slug}-${entry.team_id}`" class="standings-sheet__row" :class="resolveAclQualification(entry.rank_no) ? `standings-sheet__row--acl-${resolveAclQualification(entry.rank_no)?.tier}` : ''">
             <text class="standings-sheet__rank">{{ entry.rank_no }}</text>
             <view class="standings-sheet__identity">
               <text class="standings-sheet__name">{{ entry.team_name }}</text>
@@ -498,6 +498,8 @@ function savePosterImage(): void {
   border-bottom: var(--fi-primitive-border-width) solid #eff1f5;
 }
 
+.standings-sheet__row--acl-elite { padding-left: var(--fi-space-12); padding-right: var(--fi-space-12); background: linear-gradient(90deg, rgba(212, 160, 23, 0.14), rgba(212, 160, 23, 0) 70%); box-shadow: inset 6rpx 0 0 #d4a017; }
+.standings-sheet__row--acl-second { padding-left: var(--fi-space-12); padding-right: var(--fi-space-12); background: linear-gradient(90deg, rgba(84, 118, 168, 0.12), rgba(84, 118, 168, 0) 70%); box-shadow: inset 6rpx 0 0 #6b8cc0; }
 .standings-sheet__rank {
   color: var(--fi-color-text-muted);
   font-size: var(--fi-font-28);

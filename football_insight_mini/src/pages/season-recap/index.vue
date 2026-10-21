@@ -46,7 +46,7 @@
   <SeasonRecapPoster v-if="generated" :key="generated.key" :payload="generated" @ready="handlePosterReady" @failed="handlePosterFailed" />
  </view>
  <SeasonRecapDock v-if="showDock" :stats="selectionStats" :generating="generating" :has-poster="!!posterPath" @generate="handleGenerate" @open="posterSheetVisible=true" />
- <SeasonRecapProgress v-if="generating" />
+ <FiCrestProgress v-if="generating" overlay title="正在生成赛季海报" :stages="['保存你的勾选…','准备二维码与队徽…','绘制海报…','导出高清图片…']" />
  <SeasonRecapPosterSheet v-model:visible="posterSheetVisible" :poster-path="posterPath" @save="saveImage" @preview="preview" @copy="copyPageShareLink(sharePath)" />
 </template>
 <script setup lang="ts">
@@ -60,7 +60,7 @@ import SeasonRecapSummary from './components/SeasonRecapSummary.vue'
 import SeasonRecapMatches from './components/SeasonRecapMatches.vue'
 import SeasonRecapDock from './components/SeasonRecapDock.vue'
 import SeasonRecapPosterSheet from './components/SeasonRecapPosterSheet.vue'
-import SeasonRecapProgress from './components/SeasonRecapProgress.vue'
+import FiCrestProgress from '../../components/FiCrestProgress.vue'
 import SeasonRecapPoster from './components/SeasonRecapPoster.vue'
 import SeasonRecapThemePicker from './components/SeasonRecapThemePicker.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
