@@ -226,7 +226,7 @@ curl https://match.oryjk.cn/api/v1/system/public-config
 
 ## 最佳盯盘时段（离线统计）部署
 
-功能：当前比赛页的「最佳盯盘时段」面板。数据由 ticket-monitor 的离线批处理按历史主场比赛统计，football 后端每 10 分钟后台聚合，前台只读缓存。设计见 `docs/superpowers/specs/2026-10-16-best-watch-windows-design.md`。
+功能：当前比赛页的「最佳盯盘时段」面板。数据由 ticket-monitor 的离线批处理按历史主场比赛统计，**写入 football_data 的 `f_i_ticket_restock_profiles`（每场一行，按 match_id 幂等 upsert）**；football 后端每 10 分钟后台聚合，优先读这张表，库里没有或不可用时才回退到下面的 4001 读接口，前台只读内存缓存。设计见 `docs/superpowers/specs/2026-10-16-best-watch-windows-design.md`。
 
 全部运行在 `peiqian`。peiqian 上的 monitor 抢票容器（`ticket-monitor-axum`，镜像停在旧版本）**不动**，统计功能走独立镜像，避免把 monitor master 上未上线的改动带到抢票服务。
 
@@ -235,7 +235,7 @@ curl https://match.oryjk.cn/api/v1/system/public-config
 | 镜像 `ticket-restock-profiles` | peiqian 本地 | 由 monitor 仓库 `Dockerfile.restock` 构建，只含 `rebuild-restock-profiles` 和 `restock-profile-server`，不含抢票程序 |
 | 快照读取容器 `ticket-restock-profile-server` | host 网络，`127.0.0.1:4001` | 只读挂载 `/root/projects/ticket-monitor-axum/data`，快照在 `data/restock-profiles/<match_id>.json`；不连数据库 |
 | 批处理 | systemd `ticket-restock-profiles.service` + `.timer`（`/etc/systemd/system/`） | `*-*-1/2 04:00:00 Asia/Shanghai`，即每两天北京时间凌晨 4 点；peiqian 系统时区是 UTC，所以必须带 `Asia/Shanghai`。已有快照的比赛自动跳过，`--force` 才强制重算 |
-| 批处理凭据 | `/root/projects/ticket-monitor-axum/restock.env`（0600） | 只含 `RS_DATABASE_URL`；批处理会话强制 `READ ONLY`，单条查询上限 60 秒 |
+| 批处理凭据 | `/root/projects/ticket-monitor-axum/restock.env`（0600） | `RS_DATABASE_URL`（监控 MySQL，批处理会话强制 `READ ONLY`，单条查询上限 60 秒）+ `FOOTBALL_DATABASE_URL`（football_data，复用后端账号，用于写快照表；不设则退回只写文件）。批处理写库成功后仍镜像一份 JSON，供 4001 读接口过渡期使用 |
 | football 配置 | `football-insight-service-backend-rs.env` 里的 `TICKET_RESTOCK_PROFILE_BASE_URL=http://127.0.0.1:4001` | 只用于读快照；未设置时回退 `TICKET_MONITOR_BASE_URL` |
 
 统计口径：只统计已结束的成都蓉城主场、开售后 10 分钟起算、按北京时间小时分桶；批处理遇到正在售票或 2 分钟内开售的比赛会整轮跳过，不影响抢票。非 V6 用户的预览响应里不含具体小时（`start_hour`/`end_hour` 为 null）。
@@ -271,7 +271,8 @@ ssh peiqian 'curl -s http://127.0.0.1:8092/api/v1/ticket-watch/best-windows'
 ### 回滚与排查
 
 - 关闭功能：`systemctl disable --now ticket-restock-profiles.timer` 并 `docker stop ticket-restock-profile-server`；football 后端刷新失败时会保留上一次成功的聚合结果继续展示，重启 football 容器后（缓存清空且读不到快照）面板才会静默隐藏，其他功能不受影响。
-- 面板消失：先看 `best-windows` 接口的 `status`（`ok` / `insufficient` / `unavailable`），再看 4001 读接口和 `data/restock-profiles` 是否有最新比赛的快照；最近 8 场里没就绪的比赛会被跳过，不影响其余样本。
+- 本地后端（local233，连生产 `football_data`）不再需要到 peiqian 的隧道：快照在库里，直接读表。
+- 面板消失：先看 `best-windows` 接口的 `status`（`ok` / `insufficient` / `unavailable`），再看 `f_i_ticket_restock_profiles` 是否有最新比赛的行（或 4001 读接口 / `data/restock-profiles`）；最近 8 场里没就绪的比赛会被跳过，不影响其余样本。
 - 批处理失败：单场失败只记录并继续，整轮结束时才以非零退出；`journalctl -u ticket-restock-profiles.service` 看是哪场、什么原因。
 
 ## 球队名单同步（战术板）
