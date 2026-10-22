@@ -282,24 +282,35 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
   overflow: hidden;
   border-radius: var(--fi-radius-ticket-20);
   padding: var(--fi-space-18) var(--fi-space-16);
-  background: rgba(var(--fi-component-ticket-tone-rgb), 0.08);
-  border: var(--fi-border-width) solid
-    rgba(var(--fi-component-ticket-tone-rgb), 0.14);
+  background: var(--fi-color-surface);
+  border: var(--fi-border-card);
   box-shadow: var(--fi-shadow-ticket-focus-chip);
+}
+
+/* 价位只用左侧色带区分；底色与文字统一，避免多色底上文字看不清。 */
+.focus-chip::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: var(--fi-space-14);
+  bottom: var(--fi-space-14);
+  width: var(--fi-space-6);
+  border-radius: 0 var(--fi-radius-round) var(--fi-radius-round) 0;
+  background: rgba(var(--fi-component-ticket-tone-strong-rgb), 0.85);
 }
 
 .focus-chip--compact {
   min-height: calc(var(--fi-space-100) + var(--fi-space-18));
-  padding: var(--fi-space-16) var(--fi-space-14);
+  padding: var(--fi-space-16) var(--fi-space-14) var(--fi-space-16) var(--fi-space-20);
   border-radius: var(--fi-radius-sm);
 }
 
 
 .focus-chip__name {
   display: block;
-  color: var(--fi-component-ticket-tone-text);
+  color: var(--fi-color-text-strong);
   font-size: var(--fi-font-30);
-  font-weight: var(--fi-weight-normal);
+  font-weight: var(--fi-weight-extrabold);
   line-height: var(--fi-leading-none);
 }
 
@@ -312,7 +323,7 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
 .focus-chip__meta {
   display: block;
   margin-top: var(--fi-space-8);
-  color: rgba(var(--fi-component-ticket-tone-strong-rgb), 0.7);
+  color: var(--fi-color-text-muted);
   font-size: var(--fi-font-18);
   font-weight: var(--fi-weight-bold);
 }
@@ -324,7 +335,7 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
 .focus-chip__count {
   display: block;
   margin-top: var(--fi-space-8);
-  color: var(--fi-component-ticket-tone-text);
+  color: var(--fi-color-text-strong);
   font-size: var(--fi-font-24);
   font-weight: var(--fi-weight-extrabold);
 }
@@ -333,8 +344,5 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
   font-size: var(--fi-font-28);
 }
 
-.focus-chip__count--interest {
-  color: var(--fi-component-ticket-tone-text);
-}
 
 </style>
