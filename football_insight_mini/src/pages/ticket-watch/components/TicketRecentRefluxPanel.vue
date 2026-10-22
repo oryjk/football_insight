@@ -1,5 +1,14 @@
 <template>
-  <view class="panel recent-reflux-panel">
+  <TicketLockedEntry
+    v-if="mode !== 'unlocked'"
+    title="最近回流速览"
+    summary="V6 及以上会员可看具体座位区域，邀请好友就能免费升级"
+    detail="V6 可查看 30 分钟内，V7 可查看 10 分钟内，V8/V9 可查看 3 分钟内的具体座位区域。"
+    :hint="inviteHint"
+    @invite="emit('invite')"
+    @purchase="emit('upgrade')"
+  />
+  <view v-else class="panel recent-reflux-panel">
     <view class="section-heading section-heading--compact">
       <view class="recent-reflux-panel__heading">
         <view class="recent-reflux-panel__icon">
@@ -11,12 +20,10 @@
         </view>
         <text class="section-title">最近回流速览</text>
       </view>
-      <text class="meta-pill">{{
-        mode === 'unlocked' ? '分档可见' : 'V6 及以上'
-      }}</text>
+      <text class="meta-pill">分档可见</text>
     </view>
 
-    <view v-if="mode === 'unlocked'" class="recent-reflux-buckets">
+    <view class="recent-reflux-buckets">
       <view
         v-for="bucket in buckets"
         :key="bucket.key"
@@ -77,12 +84,11 @@
       </view>
     </view>
 
-    <TicketRecentRefluxLock v-else :invite-hint="inviteHint" @upgrade="emit('upgrade')" @invite="emit('invite')" />
   </view>
 </template>
 
 <script setup lang="ts">
-import TicketRecentRefluxLock from './TicketRecentRefluxLock.vue'
+import TicketLockedEntry from './TicketLockedEntry.vue'
 import type {
   TicketWatchRecentRefluxBucket,
   TicketWatchRecentRefluxPanelMode,

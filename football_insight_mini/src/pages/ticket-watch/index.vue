@@ -50,8 +50,18 @@
           <view v-else class="state-card state-card--empty"
             ><text>{{ currentMessage }}</text></view
           >
+          <TicketFocusPanel
+            v-if="
+              currentMatch &&
+              (currentFocusBlocks.length || currentInterestFocusBlocks.length)
+            "
+            :focus-blocks="currentFocusBlocks"
+            :interest-blocks="currentInterestFocusBlocks"
+            :collapsed="isCurrentSectionCollapsed('focus')"
+            @toggle="toggleCurrentSectionCollapsed('focus')"
+          />
           <TicketTrackedInterests
-            v-if="currentMatch && currentUser && currentTrackedInterests.length > 0"
+            v-if="currentMatch && currentUser"
             :interests="currentTrackedInterests"
             :summary="currentTrackedInterestSummary"
             :collapsed="isCurrentSectionCollapsed('tracked-interests')"
@@ -74,23 +84,6 @@
             :invite-hint="inviteUpgradeHint"
             @upgrade="handleBestWindowsUpgrade"
             @invite="handleInviteUpgrade"
-          />
-          <TicketFocusPanel
-            v-if="
-              currentMatch &&
-              (currentFocusBlocks.length || currentInterestFocusBlocks.length)
-            "
-            :focus-blocks="currentFocusBlocks"
-            :interest-blocks="currentInterestFocusBlocks"
-            :collapsed="isCurrentSectionCollapsed('focus')"
-            @toggle="toggleCurrentSectionCollapsed('focus')"
-          />
-          <TicketTrackedInterests
-            v-if="currentMatch && currentUser && !currentTrackedInterests.length"
-            :interests="currentTrackedInterests"
-            :summary="currentTrackedInterestSummary"
-            :collapsed="isCurrentSectionCollapsed('tracked-interests')"
-            @toggle="toggleCurrentSectionCollapsed('tracked-interests')"
           />
           <view
             v-if="currentMatch && prioritizedCurrentSections.length"

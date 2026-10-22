@@ -64,16 +64,21 @@ test('full renders exactly 24 bars, top three and one current marker with exact 
  touch('touchmove', 999); await nextTick()
  expect(panel.text()).toContain('23 点：')
 })
-test('preview has no distribution or secondary peaks and emits upgrade', () => {
+test('preview is a compact locked entry that expands into invite and purchase actions', async () => {
  let taps = 0, invites = 0
  const panel = mount({ data: { ...full, access: 'preview', hours: [], top_windows: [{ ...full.top_windows[0], start_hour: null, end_hour: null }] }, onUpgrade: () => { taps++ }, onInvite: () => { invites++ }, inviteHint: '累计邀请 3 位好友注册，就能免费升到 V6。' })
  expect(panel.bars()).toHaveLength(0)
- expect(panel.text()).toContain('最容易出票的时段：**:**–**:**')
+ expect(panel.text()).toContain('最佳盯盘时段')
+ expect(panel.text()).toContain('近 5 场主场补票分布')
+ expect(panel.text()).not.toContain('**:**')
  expect(panel.text()).not.toContain('12:00')
- expect(panel.text()).toContain('V6 及以上会员可查看全天分布和前三个高峰时段')
- expect(panel.text()).toContain('累计邀请 3 位好友注册')
  expect(panel.text()).not.toContain('柱子越高')
  expect(panel.text()).not.toContain('11:00–12:00')
+ // 默认收起：看不到升级按钮；点开后才出现两种升级方式。
+ expect(byClass(panel.root, 'upgrade-actions__button--invite')).toHaveLength(0)
+ byClass(panel.root, 'locked-entry__row')[0].props.onTap()
+ await nextTick()
+ expect(panel.text()).toContain('累计邀请 3 位好友注册')
  byClass(panel.root, 'upgrade-actions__button--purchase')[0].props.onTap()
  expect(taps).toBe(1)
  byClass(panel.root, 'upgrade-actions__button--invite')[0].props.onTap()

@@ -4,6 +4,15 @@
     <view class="fi-skeleton-block best-windows__skeleton-chart" />
     <view class="fi-skeleton-block" />
   </view>
+  <TicketLockedEntry
+    v-else-if="data && data.access !== 'full'"
+    title="最佳盯盘时段"
+    :summary="`近 ${data.sample_size} 场主场补票分布，V6 及以上会员可看高峰时段`"
+    detail="V6 及以上会员可查看全天分布和前三个高峰时段。"
+    :hint="inviteHint"
+    @invite="emit('invite')"
+    @purchase="emit('upgrade')"
+  />
   <FiPanel v-else-if="data">
     <view class="best-windows">
       <FiSectionHeading title="最佳盯盘时段" />
@@ -41,13 +50,6 @@
         <text v-if="selectedBar" class="best-windows__detail">{{ bestWindowsHourDetail(selectedBar.hour, data.sample_size, selectedBar.hit_matches, selectedBar.share) }}</text>
         <text class="best-windows__note">按历史补票次数统计，仅供参考，不代表之后一定出票。</text>
       </template>
-      <template v-else>
-        <text class="best-windows__conclusion">最容易出票的时段：{{ formatBestWindow(data.top_windows[0]) }}</text>
-        <view class="best-windows__lock">
-          <text class="best-windows__lock-copy">V6 及以上会员可查看全天分布和前三个高峰时段</text>
-          <TicketUpgradeActions :hint="inviteHint" @invite="emit('invite')" @purchase="emit('upgrade')" />
-        </view>
-      </template>
     </view>
   </FiPanel>
 </template>
@@ -56,7 +58,7 @@
 import { computed, getCurrentInstance, onUnmounted, ref, watch } from 'vue'
 import FiPanel from '../../../components/FiPanel.vue'
 import FiSectionHeading from '../../../components/FiSectionHeading.vue'
-import TicketUpgradeActions from './TicketUpgradeActions.vue'
+import TicketLockedEntry from './TicketLockedEntry.vue'
 import type { TicketWatchBestWindowsResponse } from '../../../types/ticketWatch'
 import {
   bestWindowsHourDetail,
@@ -185,21 +187,6 @@ onUnmounted(() => {
 .best-windows__column--selected .best-windows__now-line { background: var(--fi-color-bg); }
 .best-windows__conclusion,
 .best-windows__detail,
-.best-windows__lock-copy {
-  color: var(--fi-color-text-primary);
-  font-size: var(--fi-font-26);
-  line-height: var(--fi-leading-normal);
-  overflow-wrap: anywhere;
-}
-.best-windows__lock {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fi-space-16);
-  padding: var(--fi-space-24);
-  border-radius: var(--fi-radius-md);
-  border: var(--fi-border-card);
-  background: var(--fi-color-page);
-}
 .best-windows__skeleton {
   display: flex;
   flex-direction: column;
