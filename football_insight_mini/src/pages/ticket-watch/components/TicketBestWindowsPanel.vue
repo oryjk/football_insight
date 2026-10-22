@@ -186,7 +186,11 @@ onUnmounted(() => {
 }
 .best-windows__column--selected .best-windows__now-line { background: var(--fi-color-bg); }
 .best-windows__conclusion,
-.best-windows__detail,
+.best-windows__detail {
+  color: var(--fi-color-text-primary);
+  font-size: var(--fi-font-28);
+  line-height: var(--fi-leading-normal);
+}
 .best-windows__skeleton {
   display: flex;
   flex-direction: column;
