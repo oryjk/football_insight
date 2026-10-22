@@ -12,11 +12,13 @@
           分钟内的具体座位区域。</text
         >
       </view>
-      <TicketUpgradeActions
-        :hint="inviteHint"
-        @invite="emit('invite')"
-        @purchase="emit('upgrade')"
-      />
+      <view class="recent-reflux-lock__actions">
+        <TicketUpgradeActions
+          :hint="inviteHint"
+          @invite="emit('invite')"
+          @purchase="emit('upgrade')"
+        />
+      </view>
     </view>
 </template>
 <script setup lang="ts">
@@ -110,24 +112,11 @@ const emit = defineEmits<{ (e: 'upgrade'): void; (e: 'invite'): void }>()
   line-height: var(--fi-leading-normal);
 }
 
-.recent-reflux-lock__action {
+.recent-reflux-lock__actions {
   position: relative;
   z-index: 1;
   grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--fi-space-72);
-  line-height: var(--fi-leading-none);
-  border-radius: var(--fi-radius-round);
-  background: var(--fi-color-text-primary);
-  color: var(--fi-color-bg);
-  font-size: var(--fi-font-26);
-  font-weight: var(--fi-weight-extrabold);
-  text-align: center;
 }
 
-.recent-reflux-lock__action::after {
-  border: none;
-}
+
 </style>
