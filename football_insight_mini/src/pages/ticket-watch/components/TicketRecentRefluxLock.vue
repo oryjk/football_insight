@@ -6,19 +6,23 @@
         <view class="recent-reflux-lock__bar recent-reflux-lock__bar--green" />
       </view>
       <view class="recent-reflux-lock__body">
-        <text class="recent-reflux-lock__title">V6 及以上会员可以查看</text>
+        <text class="recent-reflux-lock__title">V6 及以上会员可查看，邀请好友就能免费升级</text>
         <text class="recent-reflux-lock__copy"
           >V6 可查看 30 分钟内，V7 可查看 10 分钟内，V8/V9 可查看 3
           分钟内的具体座位区域。</text
         >
       </view>
-      <button class="recent-reflux-lock__action" @tap="emit('upgrade')">
-        升级查看
-      </button>
+      <TicketUpgradeActions
+        :hint="inviteHint"
+        @invite="emit('invite')"
+        @purchase="emit('upgrade')"
+      />
     </view>
 </template>
 <script setup lang="ts">
-const emit = defineEmits<{ (e: 'upgrade'): void }>()
+import TicketUpgradeActions from './TicketUpgradeActions.vue'
+defineProps<{ inviteHint: string }>()
+const emit = defineEmits<{ (e: 'upgrade'): void; (e: 'invite'): void }>()
 </script>
 <style scoped lang="css">
 .recent-reflux-lock {

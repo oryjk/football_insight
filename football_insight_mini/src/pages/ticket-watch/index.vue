@@ -62,14 +62,18 @@
             :mode="currentRecentRefluxPanelMode"
             :buckets="currentRecentRefluxBuckets"
             :membership-tier="viewerMembershipTier"
+            :invite-hint="inviteUpgradeHint"
             @upgrade="handleRecentRefluxUpgrade"
+            @invite="handleInviteUpgrade"
           />
           <TicketBestWindowsPanel
             v-if="bestWindowsLoading || bestWindowsData"
             :data="bestWindowsData"
             :loading="bestWindowsLoading"
             :visible="bestWindowsVisible"
+            :invite-hint="inviteUpgradeHint"
             @upgrade="handleBestWindowsUpgrade"
+            @invite="handleInviteUpgrade"
           />
           <TicketFocusPanel
             v-if="
@@ -276,6 +280,8 @@ import {
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
 import { reportPageActivity } from '../../utils/userActivity'
+import { formatInviteUpgradeHint } from '../../utils/membershipRules'
+import { useRuntimeConfig } from '../../stores/runtimeConfig'
 import { beginPaywallVisit, reportPaywallImpression, reportPaywallTap } from '../../composables/usePaywallTelemetry'
 import { useAppSession } from '../../stores/appSession'
 import type { TicketWatchGroupedInventoryItem } from '../../types/ticketWatch'
@@ -404,6 +410,9 @@ const bestWindowsVisible = computed(() =>
   && !currentLoading.value && !currentErrorMessage.value
   && !bestWindowsLoading.value && bestWindowsData.value !== null,
 )
+const inviteUpgradeHint = computed(() =>
+  formatInviteUpgradeHint(useRuntimeConfig().config.value?.membership_tier_rules, 'V6'),
+)
 function handleBestWindowsUpgrade(): void {
   if (!bestWindowsVisible.value || bestWindowsData.value?.access !== 'preview') return
   reportPaywallTap('ticket_watch_best_window_lock', { matchId: currentMatch.value?.match_id })
@@ -514,6 +523,12 @@ function goToMembershipPurchase(): void {
   }
 
   uni.navigateTo({ url: '/pages/membership-purchase/index' })
+}
+
+// 邀请升级：邀请码在「我的」页，锁定卡片直接带用户过去。
+function handleInviteUpgrade(): void {
+  if (systemConfigUnderReview.value) return
+  goToUserPage()
 }
 
 // 付费引导度量：只在原有 goToMembershipPurchase 之前补记点击，原有逻辑不变。

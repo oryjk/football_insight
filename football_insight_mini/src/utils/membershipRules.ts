@@ -200,3 +200,13 @@ export function resolveMembershipTierGuide(
     pipCount: presentation.pipCount,
   }
 }
+
+/** 锁定卡片上的「邀请升级」说明；人数取自后端当前配置，缺失时不写具体数字。 */
+export function formatInviteUpgradeHint(rules: MembershipTierRule[] | null | undefined, tier: string): string {
+  const code = normalizeMembershipTierCode(tier)
+  const referrals = rules?.find(rule => normalizeMembershipTierCode(rule.code) === code)?.min_referrals
+  const target = typeof referrals === 'number' && referrals > 0
+    ? `累计邀请 ${referrals} 位好友注册，就能免费升到 ${code}`
+    : `邀请好友注册，累计达标就能免费升到 ${code}`
+  return `${target}。好友注册时填你的邀请码即可。`
+}

@@ -77,7 +77,7 @@
       </view>
     </view>
 
-    <TicketRecentRefluxLock v-else @upgrade="emit('upgrade')" />
+    <TicketRecentRefluxLock v-else :invite-hint="inviteHint" @upgrade="emit('upgrade')" @invite="emit('invite')" />
   </view>
 </template>
 
@@ -99,8 +99,9 @@ const props = defineProps<{
   mode: TicketWatchRecentRefluxPanelMode
   buckets: TicketWatchRecentRefluxBucket[]
   membershipTier: string
+  inviteHint: string
 }>()
-const emit = defineEmits<{ (e: 'upgrade'): void }>()
+const emit = defineEmits<{ (e: 'upgrade'): void; (e: 'invite'): void }>()
 function isUnlocked(key: TicketWatchRecentRefluxBucketKey) {
   return isRecentRefluxBucketUnlocked(key, props.membershipTier)
 }

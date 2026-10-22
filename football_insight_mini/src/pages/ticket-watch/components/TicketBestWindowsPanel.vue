@@ -44,8 +44,8 @@
       <template v-else>
         <text class="best-windows__conclusion">最容易出票的时段：{{ formatBestWindow(data.top_windows[0]) }}</text>
         <view class="best-windows__lock">
-          <text class="best-windows__lock-copy">开通 V6 查看全天分布和前三个高峰时段</text>
-          <button class="best-windows__upgrade" @tap="emit('upgrade')">升级查看</button>
+          <text class="best-windows__lock-copy">V6 及以上会员可查看全天分布和前三个高峰时段</text>
+          <TicketUpgradeActions :hint="inviteHint" @invite="emit('invite')" @purchase="emit('upgrade')" />
         </view>
       </template>
     </view>
@@ -56,6 +56,7 @@
 import { computed, getCurrentInstance, onUnmounted, ref, watch } from 'vue'
 import FiPanel from '../../../components/FiPanel.vue'
 import FiSectionHeading from '../../../components/FiSectionHeading.vue'
+import TicketUpgradeActions from './TicketUpgradeActions.vue'
 import type { TicketWatchBestWindowsResponse } from '../../../types/ticketWatch'
 import {
   bestWindowsHourDetail,
@@ -69,8 +70,9 @@ const props = defineProps<{
   data: TicketWatchBestWindowsResponse | null
   loading: boolean
   visible: boolean
+  inviteHint: string
 }>()
-const emit = defineEmits<{ (e: 'upgrade'): void }>()
+const emit = defineEmits<{ (e: 'upgrade'): void; (e: 'invite'): void }>()
 // Statistics use Beijing hours, independent of the device's timezone.
 const beijingHour = () => new Date(Date.now() + 8 * 60 * 60 * 1000).getUTCHours()
 const currentHour = ref(beijingHour())
@@ -198,20 +200,6 @@ onUnmounted(() => {
   border: var(--fi-border-card);
   background: var(--fi-color-page);
 }
-.best-windows__upgrade {
-  align-self: stretch;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--fi-space-72);
-  border-radius: var(--fi-radius-round);
-  background: var(--fi-color-text-primary);
-  color: var(--fi-color-bg);
-  font-size: var(--fi-font-26);
-  font-weight: var(--fi-weight-extrabold);
-}
-.best-windows__upgrade::after { border: none; }
 .best-windows__skeleton {
   display: flex;
   flex-direction: column;
