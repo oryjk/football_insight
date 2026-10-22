@@ -12,11 +12,12 @@ use crate::{
                 noop_tracked_interest_cache_port::NoopTrackedInterestCachePort,
                 redis_tracked_interest_cache_port::RedisTrackedInterestCachePort,
             },
+            persistence::PostgresRestockProfileStore,
             web::{handlers::TicketWatchWebState, routes::ticket_watch_routes},
         },
         application::{
             current_board_cache::CurrentTicketWatchBoardCache,
-            get_best_watch_windows::{GetBestWatchWindowsUseCase, BEST_WINDOWS_RETRY_SECONDS},
+            get_best_watch_windows::{BEST_WINDOWS_RETRY_SECONDS, GetBestWatchWindowsUseCase},
             get_current_ticket_watch_board::GetCurrentTicketWatchBoardUseCase,
             get_current_ticket_watch_match::GetCurrentTicketWatchMatchUseCase,
             get_match_block_interests::GetMatchBlockInterestsUseCase,
@@ -31,7 +32,7 @@ use crate::{
             toggle_match_block_interest::ToggleMatchBlockInterestUseCase,
         },
         ports::{
-            ticket_monitor_port::TicketMonitorPort,
+            restock_profile_store::RestockProfileStore, ticket_monitor_port::TicketMonitorPort,
             tracked_interest_cache_port::TrackedInterestCachePort,
         },
     },
@@ -43,6 +44,7 @@ pub struct TicketWatchBootstrap {
 }
 
 pub fn build_ticket_watch(
+    pool: sqlx::PgPool,
     config: &AppConfig,
     token_port: Arc<dyn TokenPort>,
     membership_port: Arc<dyn crate::auth::ports::user_membership_port::UserMembershipPort>,
@@ -59,8 +61,9 @@ pub fn build_ticket_watch(
                 Arc::new(NoopTrackedInterestCachePort)
             }
         };
-    let state = build_ticket_watch_state(
+    let state = build_ticket_watch_state_with_store(
         ticket_monitor_port.clone(),
+        Some(Arc::new(PostgresRestockProfileStore::new(pool))),
         tracked_interest_cache_port,
         token_port,
         membership_port,
@@ -89,11 +92,29 @@ pub fn build_ticket_watch_state(
     token_port: Arc<dyn TokenPort>,
     membership_port: Arc<dyn crate::auth::ports::user_membership_port::UserMembershipPort>,
 ) -> Arc<TicketWatchWebState> {
+    build_ticket_watch_state_with_store(
+        ticket_monitor_port,
+        None,
+        tracked_interest_cache_port,
+        token_port,
+        membership_port,
+    )
+}
+
+pub fn build_ticket_watch_state_with_store(
+    ticket_monitor_port: Arc<dyn TicketMonitorPort>,
+    restock_profile_store: Option<Arc<dyn RestockProfileStore>>,
+    tracked_interest_cache_port: Arc<dyn TrackedInterestCachePort>,
+    token_port: Arc<dyn TokenPort>,
+    membership_port: Arc<dyn crate::auth::ports::user_membership_port::UserMembershipPort>,
+) -> Arc<TicketWatchWebState> {
+    let mut best_windows =
+        GetBestWatchWindowsUseCase::new(ticket_monitor_port.clone(), membership_port);
+    if let Some(store) = restock_profile_store {
+        best_windows = best_windows.with_store(store);
+    }
     Arc::new(TicketWatchWebState {
-        get_best_watch_windows_use_case: Arc::new(GetBestWatchWindowsUseCase::new(
-            ticket_monitor_port.clone(),
-            membership_port,
-        )),
+        get_best_watch_windows_use_case: Arc::new(best_windows),
         get_current_ticket_watch_board_use_case: Arc::new(GetCurrentTicketWatchBoardUseCase::new(
             Arc::new(CurrentTicketWatchBoardCache::new(
                 std::time::Duration::from_secs(2),

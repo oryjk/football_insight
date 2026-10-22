@@ -67,10 +67,12 @@ use crate::{
     },
     ticket_watch::{
         domain::best_watch_windows::{
-            BestWindowsAggregate, RestockProfile, RestockProfileNotReady,
-            RESTOCK_PROFILE_SCHEMA_VERSION,
+            BestWindowsAggregate, RESTOCK_PROFILE_SCHEMA_VERSION, RestockProfile,
+            RestockProfileNotReady,
         },
-        ports::ticket_monitor_port::TicketMonitorPort,
+        ports::{
+            restock_profile_store::RestockProfileStore, ticket_monitor_port::TicketMonitorPort,
+        },
     },
 };
 use std::{collections::HashMap, sync::Arc};
@@ -81,6 +83,7 @@ pub const BEST_WINDOWS_RETRY_SECONDS: i64 = 60;
 pub struct GetBestWatchWindowsUseCase {
     monitor: Arc<dyn TicketMonitorPort>,
     membership: Arc<dyn UserMembershipPort>,
+    store: Option<Arc<dyn RestockProfileStore>>,
     cache: RwLock<Option<(DateTime<Utc>, BestWindowsAggregate)>>,
     profiles: Mutex<HashMap<(i64, u8), RestockProfile>>,
     refresh_lock: Mutex<Option<DateTime<Utc>>>,
@@ -93,10 +96,16 @@ impl GetBestWatchWindowsUseCase {
         Self {
             monitor,
             membership,
+            store: None,
             cache: RwLock::new(None),
             profiles: Mutex::new(HashMap::new()),
             refresh_lock: Mutex::new(None),
         }
+    }
+    /// 快照以数据库为准（离线批处理写入）；库里没有时才回退到监控侧读接口。
+    pub fn with_store(mut self, store: Arc<dyn RestockProfileStore>) -> Self {
+        self.store = Some(store);
+        self
     }
     /// Foreground: only aggregate cache and effective membership. No monitor calls.
     pub async fn execute(&self, viewer: Option<Uuid>) -> (bool, BestWindowsAggregate) {
@@ -140,6 +149,19 @@ impl GetBestWatchWindowsUseCase {
             }
         }
     }
+    async fn load_stored(&self, item: &BestWindowsCandidate) -> Option<RestockProfile> {
+        let store = self.store.as_ref()?;
+        let since = DateTime::parse_from_rfc3339(&item.since).ok()?;
+        let mut ids = vec![item.match_id];
+        ids.extend(item.fallback_match_id.filter(|id| *id != item.match_id));
+        match store.load(&ids, since).await {
+            Ok(profile) => profile,
+            Err(error) => {
+                tracing::warn!(%error, match_id = item.match_id, "restock profile store unavailable; falling back to monitor");
+                None
+            }
+        }
+    }
     async fn build_aggregate(&self, now: DateTime<Utc>) -> anyhow::Result<BestWindowsAggregate> {
         let matches = self.monitor.fetch_all_matches().await?;
         let candidates = select_best_windows_matches(&matches, now);
@@ -148,6 +170,9 @@ impl GetBestWatchWindowsUseCase {
             let key = (item.match_id, RESTOCK_PROFILE_SCHEMA_VERSION);
             let cached = { self.profiles.lock().await.get(&key).cloned() };
             let profile = if let Some(value) = cached {
+                value
+            } else if let Some(value) = self.load_stored(&item).await {
+                self.profiles.lock().await.insert(key, value.clone());
                 value
             } else {
                 let value = match self
@@ -241,8 +266,8 @@ mod tests {
     use crate::ticket_watch::domain::{best_watch_windows::BestWindowsStatus, ticket_watch::*};
     use async_trait::async_trait;
     use std::sync::{
-        atomic::{AtomicUsize, Ordering},
         Mutex as StdMutex,
+        atomic::{AtomicUsize, Ordering},
     };
     struct Fake {
         calls: AtomicUsize,
@@ -395,6 +420,59 @@ mod tests {
         uc.refresh_at(now() + chrono::Duration::seconds(600)).await;
         assert_eq!(fake.calls.load(Ordering::SeqCst), 2);
         assert_eq!(fake.profiles.load(Ordering::SeqCst), 3);
+    }
+    struct FakeStore {
+        ids: StdMutex<Vec<Vec<i64>>>,
+        fail: bool,
+    }
+    #[async_trait]
+    impl RestockProfileStore for FakeStore {
+        async fn load(
+            &self,
+            ids: &[i64],
+            _: DateTime<chrono::FixedOffset>,
+        ) -> anyhow::Result<Option<RestockProfile>> {
+            self.ids.lock().unwrap().push(ids.to_vec());
+            if self.fail {
+                anyhow::bail!("db down")
+            }
+            let mut hourly = [0; 24];
+            hourly[9] = 30;
+            Ok(Some(RestockProfile {
+                total_events: 30,
+                appear_events: 30,
+                up_events: 0,
+                seats_with_events: 1,
+                hourly,
+            }))
+        }
+    }
+    #[tokio::test]
+    async fn best_windows_prefers_stored_snapshots_and_falls_back_to_monitor_when_store_fails() {
+        let fake = Arc::new(Fake::new(false));
+        let store = Arc::new(FakeStore {
+            ids: StdMutex::new(vec![]),
+            fail: false,
+        });
+        let uc =
+            GetBestWatchWindowsUseCase::new(fake.clone(), fake.clone()).with_store(store.clone());
+        uc.refresh_at(now()).await;
+        assert_eq!(fake.profiles.load(Ordering::SeqCst), 0);
+        assert_eq!(store.ids.lock().unwrap().len(), 3);
+        assert_eq!(
+            uc.execute(Some(Uuid::nil())).await.1.top_windows[0].start_hour,
+            9
+        );
+
+        let fake = Arc::new(Fake::new(false));
+        let broken = Arc::new(FakeStore {
+            ids: StdMutex::new(vec![]),
+            fail: true,
+        });
+        let uc = GetBestWatchWindowsUseCase::new(fake.clone(), fake.clone()).with_store(broken);
+        uc.refresh_at(now()).await;
+        assert_eq!(fake.profiles.load(Ordering::SeqCst), 3);
+        assert_eq!(uc.execute(None).await.1.status, BestWindowsStatus::Ok);
     }
     #[tokio::test]
     async fn best_windows_monitor_failure_is_unavailable_and_identity_failure_is_preview() {

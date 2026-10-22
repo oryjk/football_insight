@@ -68,6 +68,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         dyn crate::auth::ports::user_membership_port::UserMembershipPort,
     > = auth.auth_repository.clone();
     let ticket_watch = build_ticket_watch(
+        pool.clone(),
         config,
         auth.token_port.clone(),
         user_membership_port.clone(),
