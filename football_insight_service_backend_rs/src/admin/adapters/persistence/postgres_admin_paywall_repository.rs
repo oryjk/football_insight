@@ -44,7 +44,10 @@ fn map_error(error: sqlx::Error) -> AdminPaywallError {
 
 #[async_trait]
 impl AdminPaywallRepository for PostgresAdminPaywallRepository {
-    async fn funnel(&self, range: &PaywallRange) -> Result<Vec<PaywallFunnelRow>, AdminPaywallError> {
+    async fn funnel(
+        &self,
+        range: &PaywallRange,
+    ) -> Result<Vec<PaywallFunnelRow>, AdminPaywallError> {
         let rows = sqlx::query(FUNNEL_SQL)
             .bind(range.from)
             .bind(range.to)
@@ -67,7 +70,10 @@ impl AdminPaywallRepository for PostgresAdminPaywallRepository {
             .map_err(map_error)
     }
 
-    async fn by_tier(&self, range: &PaywallRange) -> Result<Vec<PaywallTierRow>, AdminPaywallError> {
+    async fn by_tier(
+        &self,
+        range: &PaywallRange,
+    ) -> Result<Vec<PaywallTierRow>, AdminPaywallError> {
         let rows = sqlx::query(BY_TIER_SQL)
             .bind(range.from)
             .bind(range.to)

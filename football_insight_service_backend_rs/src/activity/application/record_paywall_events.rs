@@ -11,7 +11,9 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::activity::{
-    domain::paywall::{NewPaywallEvent, PaywallAction, normalize_tier, sanitize_detail, valid_surface},
+    domain::paywall::{
+        NewPaywallEvent, PaywallAction, normalize_tier, sanitize_detail, valid_surface,
+    },
     ports::paywall_event_repository::PaywallEventRepository,
 };
 
@@ -78,7 +80,8 @@ impl RecordPaywallEvents {
         let repository = self.repository.clone();
         tokio::spawn(async move {
             let _permit = permit;
-            let write = AssertUnwindSafe(async move { repository.record(events).await }).catch_unwind();
+            let write =
+                AssertUnwindSafe(async move { repository.record(events).await }).catch_unwind();
             match tokio::time::timeout(WRITE_TIMEOUT, write).await {
                 Ok(Ok(())) => {}
                 Ok(Err(_)) => tracing::warn!("paywall telemetry write panicked"),

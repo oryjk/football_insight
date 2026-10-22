@@ -365,9 +365,16 @@ async fn table_offer_never_displaces_a_legacy_annual_option_of_the_same_tier() {
         .unwrap();
     let annual = catalog.find_option("V6").expect("annual V6 stays visible");
     assert_eq!(annual.price_cents, 3900, "annual price is untouched");
-    assert!(annual.presentation.spec.is_none(), "V6 is still the legacy annual option");
+    assert!(
+        annual.presentation.spec.is_none(),
+        "V6 is still the legacy annual option"
+    );
     assert_eq!(
-        catalog.products.iter().filter(|p| p.target_tier == "V6").count(),
+        catalog
+            .products
+            .iter()
+            .filter(|p| p.target_tier == "V6")
+            .count(),
         1,
         "one option per tier"
     );

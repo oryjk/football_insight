@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
 use crate::mini_review::{
-    domain::mini_review_status::{
-        AllocationInput, MiniReviewStatus, Version, decide_next_version,
-    },
+    domain::mini_review_status::{AllocationInput, MiniReviewStatus, Version, decide_next_version},
     ports::mini_review_repository::{MiniReviewRepository, VersionConflictError},
 };
 
@@ -69,7 +67,11 @@ impl AllocateReviewVersionUseCase {
         }
     }
 
-    async fn allocate_explicit(&self, project_code: &str, raw_version: &str) -> anyhow::Result<MiniReviewStatus> {
+    async fn allocate_explicit(
+        &self,
+        project_code: &str,
+        raw_version: &str,
+    ) -> anyhow::Result<MiniReviewStatus> {
         let version = Version::parse(raw_version)?;
         if let Some(existing) = self
             .repository
@@ -150,7 +152,10 @@ mod tests {
 
     #[async_trait]
     impl MiniReviewRepository for FakeRepository {
-        async fn find_latest(&self, project_code: &str) -> anyhow::Result<Option<MiniReviewStatus>> {
+        async fn find_latest(
+            &self,
+            project_code: &str,
+        ) -> anyhow::Result<Option<MiniReviewStatus>> {
             let records = self.records.lock().unwrap();
             Ok(records
                 .iter()
@@ -173,10 +178,9 @@ mod tests {
 
         async fn create(&self, mut status: MiniReviewStatus) -> anyhow::Result<MiniReviewStatus> {
             let mut records = self.records.lock().unwrap();
-            if records
-                .iter()
-                .any(|record| record.project_code == status.project_code && record.version == status.version)
-            {
+            if records.iter().any(|record| {
+                record.project_code == status.project_code && record.version == status.version
+            }) {
                 return Err(anyhow::Error::new(VersionConflictError));
             }
             status.id = records.len() as i64 + 1;
@@ -184,7 +188,10 @@ mod tests {
             Ok(status)
         }
 
-        async fn update_status(&self, status: MiniReviewStatus) -> anyhow::Result<MiniReviewStatus> {
+        async fn update_status(
+            &self,
+            status: MiniReviewStatus,
+        ) -> anyhow::Result<MiniReviewStatus> {
             let mut records = self.records.lock().unwrap();
             let record = records
                 .iter_mut()
@@ -195,7 +202,11 @@ mod tests {
         }
     }
 
-    fn command(project_code: &str, current_version: &str, explicit: Option<&str>) -> AllocateCommand {
+    fn command(
+        project_code: &str,
+        current_version: &str,
+        explicit: Option<&str>,
+    ) -> AllocateCommand {
         AllocateCommand {
             project_code: project_code.to_string(),
             current_version: current_version.to_string(),

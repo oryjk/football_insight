@@ -32,7 +32,9 @@ impl AdminSupportBasesService {
         actor: Uuid,
     ) -> Result<SupportBaseMatch, AdminSupportBasesError> {
         if match_id <= 0 {
-            return Err(AdminSupportBasesError::InvalidInput("invalid match_id".into()));
+            return Err(AdminSupportBasesError::InvalidInput(
+                "invalid match_id".into(),
+            ));
         }
         let input = SupportBaseInput::new(home_base, away_base)?;
         self.repository

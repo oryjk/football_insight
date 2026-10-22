@@ -1,7 +1,7 @@
 //! Explicit local-only integration: real monitor file router/HTTP adapter, fixture identities, no DB.
 use async_trait::async_trait;
 use axum::{
-    body::{to_bytes, Body},
+    body::{Body, to_bytes},
     http::{Request, StatusCode},
 };
 use chrono::{DateTime, Utc};

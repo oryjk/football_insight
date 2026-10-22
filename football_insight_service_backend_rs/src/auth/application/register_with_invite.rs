@@ -144,10 +144,11 @@ mod tests {
             tokio::task::yield_now().await;
             assert!(sources.0.lock().unwrap().is_empty());
             input.password = "x".into();
-            assert!(uc
-                .execute_with_acquisition(input, AcquisitionSource::new(Some("xhs"), None, None))
-                .await
-                .is_err());
+            assert!(
+                uc.execute_with_acquisition(input, AcquisitionSource::new(Some("xhs"), None, None))
+                    .await
+                    .is_err()
+            );
             tokio::task::yield_now().await;
             assert!(sources.0.lock().unwrap().is_empty());
         }

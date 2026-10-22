@@ -590,8 +590,14 @@ async fn logged_in_visits_are_listed_as_readers_and_anonymous_visits_are_not() {
         .unwrap()
         .with_user(user_id)
     };
-    repository.record_visit(&visit("a", Some(user))).await.unwrap();
-    repository.record_visit(&visit("a", Some(user))).await.unwrap();
+    repository
+        .record_visit(&visit("a", Some(user)))
+        .await
+        .unwrap();
+    repository
+        .record_visit(&visit("a", Some(user)))
+        .await
+        .unwrap();
     repository.record_visit(&visit("b", None)).await.unwrap();
 
     let admin = PostgresAdminTopicReadersRepository::new(database.pool.clone());

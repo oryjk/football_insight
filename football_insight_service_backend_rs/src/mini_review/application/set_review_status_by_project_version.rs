@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::mini_review::{
-    domain::mini_review_status::{MiniReviewStatus, Version, DEFAULT_REVIEWING_STATUS_TEXT},
+    domain::mini_review_status::{DEFAULT_REVIEWING_STATUS_TEXT, MiniReviewStatus, Version},
     ports::mini_review_repository::MiniReviewRepository,
 };
 
@@ -31,7 +31,10 @@ impl SetReviewStatusByProjectVersionUseCase {
     }
 
     /// 按 项目编码 + 版本号 切换审核结论（过审后标记 false，重新提审标记 true）。
-    pub async fn execute(&self, command: SetReviewStatusCommand) -> anyhow::Result<MiniReviewStatus> {
+    pub async fn execute(
+        &self,
+        command: SetReviewStatusCommand,
+    ) -> anyhow::Result<MiniReviewStatus> {
         let project_code = command.project_code.trim().to_string();
         let version = Version::parse(&command.version)
             .map_err(|_| anyhow::anyhow!("project code or version is invalid"))?;
@@ -77,7 +80,10 @@ mod tests {
 
     #[async_trait]
     impl MiniReviewRepository for FakeRepository {
-        async fn find_latest(&self, _project_code: &str) -> anyhow::Result<Option<MiniReviewStatus>> {
+        async fn find_latest(
+            &self,
+            _project_code: &str,
+        ) -> anyhow::Result<Option<MiniReviewStatus>> {
             Ok(self.record.clone())
         }
 
@@ -97,7 +103,10 @@ mod tests {
             unreachable!("set review status never creates")
         }
 
-        async fn update_status(&self, status: MiniReviewStatus) -> anyhow::Result<MiniReviewStatus> {
+        async fn update_status(
+            &self,
+            status: MiniReviewStatus,
+        ) -> anyhow::Result<MiniReviewStatus> {
             Ok(status)
         }
     }
@@ -123,7 +132,10 @@ mod tests {
             record: Some(record),
         }));
 
-        let status = use_case.execute(command(false, None)).await.expect("update");
+        let status = use_case
+            .execute(command(false, None))
+            .await
+            .expect("update");
 
         assert!(!status.is_reviewing);
         assert_eq!(status.status_text, "已过审");
@@ -152,9 +164,8 @@ mod tests {
 
     #[tokio::test]
     async fn execute_rejects_unregistered_version() {
-        let use_case = SetReviewStatusByProjectVersionUseCase::new(Arc::new(FakeRepository {
-            record: None,
-        }));
+        let use_case =
+            SetReviewStatusByProjectVersionUseCase::new(Arc::new(FakeRepository { record: None }));
 
         let error = use_case
             .execute(command(false, None))

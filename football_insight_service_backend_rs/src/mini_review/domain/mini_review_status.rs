@@ -117,7 +117,12 @@ impl MiniReviewStatus {
     }
 
     /// 更新审核结论：标记通过（is_reviewing=false，附结论文案）或重新打开审核。
-    pub fn set_status(&mut self, is_reviewing: bool, status_text: &str, now: DateTime<Utc>) -> anyhow::Result<()> {
+    pub fn set_status(
+        &mut self,
+        is_reviewing: bool,
+        status_text: &str,
+        now: DateTime<Utc>,
+    ) -> anyhow::Result<()> {
         let trimmed = status_text.trim();
         if trimmed.is_empty() {
             anyhow::bail!("审核状态文案不能为空");
@@ -158,8 +163,8 @@ pub fn decide_next_version(input: &AllocationInput) -> Version {
 #[cfg(test)]
 mod tests {
     use super::{
-        DEFAULT_REVIEWING_STATUS_TEXT, MiniReviewStatus, Version, decide_next_version,
-        AllocationInput,
+        AllocationInput, DEFAULT_REVIEWING_STATUS_TEXT, MiniReviewStatus, Version,
+        decide_next_version,
     };
     use chrono::{TimeZone, Utc};
 
@@ -176,16 +181,27 @@ mod tests {
 
     #[test]
     fn version_parse_rejects_invalid_input() {
-        for raw in ["1.2", "1.2.3.4", "a.b.c", "1.100.0", "1.2.100", "-1.2.3", ""] {
+        for raw in [
+            "1.2", "1.2.3.4", "a.b.c", "1.100.0", "1.2.100", "-1.2.3", "",
+        ] {
             assert!(Version::parse(raw).is_err(), "should reject {raw}");
         }
     }
 
     #[test]
     fn version_next_patch_carries_over_at_99() {
-        assert_eq!(Version::parse("1.2.3").unwrap().next_patch().to_string(), "1.2.4");
-        assert_eq!(Version::parse("1.2.99").unwrap().next_patch().to_string(), "1.3.0");
-        assert_eq!(Version::parse("1.99.99").unwrap().next_patch().to_string(), "2.0.0");
+        assert_eq!(
+            Version::parse("1.2.3").unwrap().next_patch().to_string(),
+            "1.2.4"
+        );
+        assert_eq!(
+            Version::parse("1.2.99").unwrap().next_patch().to_string(),
+            "1.3.0"
+        );
+        assert_eq!(
+            Version::parse("1.99.99").unwrap().next_patch().to_string(),
+            "2.0.0"
+        );
     }
 
     fn reviewing_status(version: &str, is_reviewing: bool) -> MiniReviewStatus {

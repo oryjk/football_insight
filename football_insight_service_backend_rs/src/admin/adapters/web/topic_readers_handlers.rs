@@ -41,7 +41,11 @@ pub async fn readers(
     Path((team_id, topic_id)): Path<(i64, String)>,
 ) -> Result<Json<Value>, HttpError> {
     authorize(&state, &headers).await?;
-    let rows = state.service.readers(team_id, &topic_id).await.map_err(map_error)?;
+    let rows = state
+        .service
+        .readers(team_id, &topic_id)
+        .await
+        .map_err(map_error)?;
     Ok(Json(json!({
         "items": rows.into_iter().map(|r| json!({
             "user_id": r.user_id, "display_name": r.display_name, "avatar_url": r.avatar_url,
@@ -50,7 +54,10 @@ pub async fn readers(
     })))
 }
 
-async fn authorize(state: &AdminTopicReadersWebState, headers: &HeaderMap) -> Result<(), HttpError> {
+async fn authorize(
+    state: &AdminTopicReadersWebState,
+    headers: &HeaderMap,
+) -> Result<(), HttpError> {
     let token = headers
         .get(AUTHORIZATION)
         .and_then(|v| v.to_str().ok())

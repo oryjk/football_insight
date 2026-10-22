@@ -44,7 +44,10 @@ fn input(surface: &str, action: &str) -> PaywallEventInput {
     }
 }
 
-fn service() -> (RecordPaywallEvents, mpsc::UnboundedReceiver<NewPaywallEvent>) {
+fn service() -> (
+    RecordPaywallEvents,
+    mpsc::UnboundedReceiver<NewPaywallEvent>,
+) {
     let (tx, rx) = mpsc::unbounded_channel();
     (RecordPaywallEvents::new(Arc::new(Recording(tx))), rx)
 }
@@ -62,7 +65,10 @@ async fn drain(rx: &mut mpsc::UnboundedReceiver<NewPaywallEvent>) -> Vec<NewPayw
 async fn records_valid_events_with_sanitized_detail_for_the_caller() {
     let (service, mut rx) = service();
     let user = Uuid::new_v4();
-    service.execute(user, vec![input("ticket_watch_recent_reflux_lock", "impression")]);
+    service.execute(
+        user,
+        vec![input("ticket_watch_recent_reflux_lock", "impression")],
+    );
     let events = drain(&mut rx).await;
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].user_id, user);
@@ -92,7 +98,9 @@ async fn drops_unknown_surfaces_and_actions_but_keeps_the_valid_ones() {
 #[tokio::test]
 async fn an_oversized_batch_is_ignored_entirely() {
     let (service, mut rx) = service();
-    let batch = (0..11).map(|_| input("user_membership_entry", "tap")).collect();
+    let batch = (0..11)
+        .map(|_| input("user_membership_entry", "tap"))
+        .collect();
     service.execute(Uuid::new_v4(), batch);
     assert!(drain(&mut rx).await.is_empty());
 }
@@ -103,7 +111,12 @@ async fn each_user_is_limited_to_sixty_events_per_minute() {
     let noisy = Uuid::new_v4();
     let quiet = Uuid::new_v4();
     for _ in 0..7 {
-        service.execute(noisy, (0..10).map(|_| input("user_membership_entry", "tap")).collect());
+        service.execute(
+            noisy,
+            (0..10)
+                .map(|_| input("user_membership_entry", "tap"))
+                .collect(),
+        );
     }
     service.execute(quiet, vec![input("user_membership_entry", "tap")]);
     let events = drain(&mut rx).await;
@@ -113,7 +126,10 @@ async fn each_user_is_limited_to_sixty_events_per_minute() {
 
 #[tokio::test]
 async fn a_blocked_or_panicking_store_never_delays_or_breaks_the_caller() {
-    for repo in [Arc::new(Blocked) as Arc<dyn PaywallEventRepository>, Arc::new(Panicking)] {
+    for repo in [
+        Arc::new(Blocked) as Arc<dyn PaywallEventRepository>,
+        Arc::new(Panicking),
+    ] {
         let service = RecordPaywallEvents::new(repo);
         let started = std::time::Instant::now();
         service.execute(Uuid::new_v4(), vec![input("user_membership_entry", "tap")]);

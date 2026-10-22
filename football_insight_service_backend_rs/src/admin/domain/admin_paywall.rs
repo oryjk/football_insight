@@ -31,7 +31,9 @@ impl PaywallRange {
         let parse = |value: &str| {
             DateTime::parse_from_rfc3339(value)
                 .map(|v| v.to_utc())
-                .map_err(|_| AdminPaywallError::InvalidInput("from and to must be RFC3339 timestamps".into()))
+                .map_err(|_| {
+                    AdminPaywallError::InvalidInput("from and to must be RFC3339 timestamps".into())
+                })
         };
         let to = to.map(parse).transpose()?.unwrap_or(now);
         let from = from
@@ -43,8 +45,13 @@ impl PaywallRange {
                 "time range must be positive and at most 92 days".into(),
             ));
         }
-        if surface.as_deref().is_some_and(|value| !valid_surface(value)) {
-            return Err(AdminPaywallError::InvalidInput("invalid paywall surface".into()));
+        if surface
+            .as_deref()
+            .is_some_and(|value| !valid_surface(value))
+        {
+            return Err(AdminPaywallError::InvalidInput(
+                "invalid paywall surface".into(),
+            ));
         }
         Ok(Self { from, to, surface })
     }
@@ -100,14 +107,33 @@ mod tests {
             now(),
         )
         .unwrap();
-        assert_eq!(range.from, Utc.with_ymd_and_hms(2026, 9, 30, 16, 0, 0).unwrap());
+        assert_eq!(
+            range.from,
+            Utc.with_ymd_and_hms(2026, 9, 30, 16, 0, 0).unwrap()
+        );
         assert_eq!(range.surface.as_deref(), Some("user_membership_entry"));
     }
 
     #[test]
     fn rejects_inverted_oversized_malformed_ranges_and_unknown_surfaces() {
-        assert!(PaywallRange::parse(Some("2026-10-10T00:00:00Z"), Some("2026-10-01T00:00:00Z"), None, now()).is_err());
-        assert!(PaywallRange::parse(Some("2026-01-01T00:00:00Z"), Some("2026-10-01T00:00:00Z"), None, now()).is_err());
+        assert!(
+            PaywallRange::parse(
+                Some("2026-10-10T00:00:00Z"),
+                Some("2026-10-01T00:00:00Z"),
+                None,
+                now()
+            )
+            .is_err()
+        );
+        assert!(
+            PaywallRange::parse(
+                Some("2026-01-01T00:00:00Z"),
+                Some("2026-10-01T00:00:00Z"),
+                None,
+                now()
+            )
+            .is_err()
+        );
         assert!(PaywallRange::parse(Some("yesterday"), None, None, now()).is_err());
         assert!(PaywallRange::parse(None, None, Some("home".into()), now()).is_err());
     }

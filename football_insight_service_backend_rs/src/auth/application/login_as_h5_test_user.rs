@@ -59,11 +59,9 @@ impl LoginAsH5TestUserUseCase {
             .ok_or_else(|| anyhow::anyhow!("user not found or inactive"))?;
 
         let expires_at = Utc::now() + self.session_ttl;
-        let access_token = self.token_port.issue_token(
-            user.id,
-            &user.account_identifier,
-            expires_at,
-        )?;
+        let access_token =
+            self.token_port
+                .issue_token(user.id, &user.account_identifier, expires_at)?;
 
         Ok(AuthTokenBundle {
             user,
@@ -119,7 +117,9 @@ mod tests {
     fn use_case(allowed: Vec<Uuid>, existing: Vec<AuthUser>) -> LoginAsH5TestUserUseCase {
         LoginAsH5TestUserUseCase::new(
             Arc::new(FakeUserPort { users: existing }),
-            Arc::new(JwtTokenPort::new("test-secret-for-h5-test-login".to_string())),
+            Arc::new(JwtTokenPort::new(
+                "test-secret-for-h5-test-login".to_string(),
+            )),
             allowed,
             chrono::Duration::days(30),
         )
@@ -128,9 +128,13 @@ mod tests {
     #[tokio::test]
     async fn issues_token_for_whitelisted_user() {
         let admin = Uuid::new_v4();
-        let token_port = Arc::new(JwtTokenPort::new("test-secret-for-h5-test-login".to_string()));
+        let token_port = Arc::new(JwtTokenPort::new(
+            "test-secret-for-h5-test-login".to_string(),
+        ));
         let use_case = LoginAsH5TestUserUseCase::new(
-            Arc::new(FakeUserPort { users: vec![fake_user(admin, "admin")] }),
+            Arc::new(FakeUserPort {
+                users: vec![fake_user(admin, "admin")],
+            }),
             token_port.clone(),
             vec![admin],
             chrono::Duration::days(30),
@@ -140,7 +144,9 @@ mod tests {
 
         assert_eq!(bundle.user.id, admin);
         assert!(!bundle.access_token.is_empty());
-        let claims = token_port.verify_token(&bundle.access_token).expect("verified");
+        let claims = token_port
+            .verify_token(&bundle.access_token)
+            .expect("verified");
         assert_eq!(claims.sub, admin);
     }
 

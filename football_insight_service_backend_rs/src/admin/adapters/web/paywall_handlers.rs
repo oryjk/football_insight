@@ -69,9 +69,18 @@ pub async fn by_tier(
     })))
 }
 
-fn parse_range(query: Result<Query<PaywallQuery>, QueryRejection>) -> Result<PaywallRange, HttpError> {
-    let Query(query) = query.map_err(|_| (StatusCode::BAD_REQUEST, "invalid paywall query".into()))?;
-    PaywallRange::parse(query.from.as_deref(), query.to.as_deref(), query.surface, Utc::now()).map_err(map_error)
+fn parse_range(
+    query: Result<Query<PaywallQuery>, QueryRejection>,
+) -> Result<PaywallRange, HttpError> {
+    let Query(query) =
+        query.map_err(|_| (StatusCode::BAD_REQUEST, "invalid paywall query".into()))?;
+    PaywallRange::parse(
+        query.from.as_deref(),
+        query.to.as_deref(),
+        query.surface,
+        Utc::now(),
+    )
+    .map_err(map_error)
 }
 
 async fn authorize(state: &AdminPaywallWebState, headers: &HeaderMap) -> Result<(), HttpError> {

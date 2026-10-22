@@ -1,5 +1,5 @@
 use crate::ticket_watch::domain::best_watch_windows::RestockProfile;
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use chrono::DateTime;
 use serde::Deserialize;
 #[derive(Deserialize)]

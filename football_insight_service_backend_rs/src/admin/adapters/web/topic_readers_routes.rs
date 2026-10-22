@@ -13,11 +13,17 @@ pub fn admin_topic_readers_routes(
     auth_service: Arc<AdminAuthService>,
 ) -> Router {
     Router::new()
-        .route("/api/v1/admin/daily-topics/topics", get(topic_readers_handlers::topics))
+        .route(
+            "/api/v1/admin/daily-topics/topics",
+            get(topic_readers_handlers::topics),
+        )
         .route(
             "/api/v1/admin/daily-topics/{team_id}/{topic_id}/readers",
             get(topic_readers_handlers::readers),
         )
-        .with_state(AdminTopicReadersWebState { service, auth_service })
+        .with_state(AdminTopicReadersWebState {
+            service,
+            auth_service,
+        })
         .layer(axum::middleware::map_response(product_no_store))
 }

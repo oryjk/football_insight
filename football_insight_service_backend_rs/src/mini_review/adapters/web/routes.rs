@@ -243,7 +243,10 @@ mod tests {
     }
 
     /// Returns `is_reviewing` as seen by a caller presenting `token` (or none).
-    async fn reviewing_status_for(token: Option<String>, exemption: FakeExemption) -> (bool, String) {
+    async fn reviewing_status_for(
+        token: Option<String>,
+        exemption: FakeExemption,
+    ) -> (bool, String) {
         let payload = status_payload_for(token, exemption).await;
         (
             payload["is_reviewing"].as_bool().unwrap(),
@@ -251,7 +254,10 @@ mod tests {
         )
     }
 
-    async fn status_payload_for(token: Option<String>, exemption: FakeExemption) -> serde_json::Value {
+    async fn status_payload_for(
+        token: Option<String>,
+        exemption: FakeExemption,
+    ) -> serde_json::Value {
         let repository = Arc::new(FakeRepository::default());
         repository
             .create(MiniReviewStatus {
@@ -273,16 +279,21 @@ mod tests {
             Vec::new(),
             Arc::new(exemption),
         );
-        let mut request = Request::builder()
-            .method(Method::GET)
-            .uri("/api/v1/mini-review/review-status?project_code=football_insight_mini&version=1.0.98");
+        let mut request = Request::builder().method(Method::GET).uri(
+            "/api/v1/mini-review/review-status?project_code=football_insight_mini&version=1.0.98",
+        );
         if let Some(token) = token {
             request = request.header("authorization", format!("Bearer {token}"));
         }
-        let response = app.oneshot(request.body(Body::empty()).unwrap()).await.unwrap();
+        let response = app
+            .oneshot(request.body(Body::empty()).unwrap())
+            .await
+            .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         let payload: serde_json::Value = serde_json::from_slice(
-            &axum::body::to_bytes(response.into_body(), 1024 * 64).await.unwrap(),
+            &axum::body::to_bytes(response.into_body(), 1024 * 64)
+                .await
+                .unwrap(),
         )
         .unwrap();
         payload
@@ -292,8 +303,14 @@ mod tests {
     async fn exempt_user_sees_a_non_reviewing_status_while_the_version_is_in_review() {
         let user_id = Uuid::new_v4();
         let token = issue_user_token(&test_token_port(), user_id);
-        let (reviewing, text) =
-            reviewing_status_for(Some(token), FakeExemption { exempt: vec![user_id], fail: false }).await;
+        let (reviewing, text) = reviewing_status_for(
+            Some(token),
+            FakeExemption {
+                exempt: vec![user_id],
+                fail: false,
+            },
+        )
+        .await;
         assert!(!reviewing);
         assert_eq!(text, "审核豁免账号");
     }
@@ -302,15 +319,27 @@ mod tests {
     async fn exempt_user_still_gets_the_real_registry_status_in_explicit_fields() {
         let user_id = Uuid::new_v4();
         let token = issue_user_token(&test_token_port(), user_id);
-        let payload =
-            status_payload_for(Some(token), FakeExemption { exempt: vec![user_id], fail: false }).await;
+        let payload = status_payload_for(
+            Some(token),
+            FakeExemption {
+                exempt: vec![user_id],
+                fail: false,
+            },
+        )
+        .await;
         assert_eq!(payload["registry_is_reviewing"], true);
         assert_eq!(payload["viewer_is_reviewing"], false);
         assert_eq!(payload["viewer_is_exempt"], true);
         assert_eq!(payload["is_reviewing"], false);
 
-        let anonymous =
-            status_payload_for(None, FakeExemption { exempt: vec![user_id], fail: false }).await;
+        let anonymous = status_payload_for(
+            None,
+            FakeExemption {
+                exempt: vec![user_id],
+                fail: false,
+            },
+        )
+        .await;
         assert_eq!(anonymous["registry_is_reviewing"], true);
         assert_eq!(anonymous["viewer_is_reviewing"], true);
         assert_eq!(anonymous["viewer_is_exempt"], false);
@@ -319,18 +348,31 @@ mod tests {
     #[tokio::test]
     async fn non_exempt_anonymous_and_invalid_token_callers_still_see_the_review_status() {
         let other = issue_user_token(&test_token_port(), Uuid::new_v4());
-        let exempt_list = || FakeExemption { exempt: vec![Uuid::new_v4()], fail: false };
+        let exempt_list = || FakeExemption {
+            exempt: vec![Uuid::new_v4()],
+            fail: false,
+        };
         assert!(reviewing_status_for(Some(other), exempt_list()).await.0);
         assert!(reviewing_status_for(None, exempt_list()).await.0);
-        assert!(reviewing_status_for(Some("not-a-token".to_string()), exempt_list()).await.0);
+        assert!(
+            reviewing_status_for(Some("not-a-token".to_string()), exempt_list())
+                .await
+                .0
+        );
     }
 
     #[tokio::test]
     async fn exemption_lookup_failure_keeps_the_review_status() {
         let user_id = Uuid::new_v4();
         let token = issue_user_token(&test_token_port(), user_id);
-        let (reviewing, _) =
-            reviewing_status_for(Some(token), FakeExemption { exempt: vec![user_id], fail: true }).await;
+        let (reviewing, _) = reviewing_status_for(
+            Some(token),
+            FakeExemption {
+                exempt: vec![user_id],
+                fail: true,
+            },
+        )
+        .await;
         assert!(reviewing);
     }
 

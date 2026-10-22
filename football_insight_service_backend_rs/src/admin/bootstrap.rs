@@ -30,9 +30,9 @@ use crate::{
                 payment_routes::admin_payment_routes,
                 paywall_routes::admin_paywall_routes,
                 product_routes::admin_product_routes,
+                review_exempt_routes::admin_review_exempt_routes,
                 routes::{admin_audit_routes, admin_auth_routes, admin_user_routes},
                 setup_routes::admin_setup_routes,
-                review_exempt_routes::admin_review_exempt_routes,
                 support_bases_routes::admin_support_bases_routes,
                 topic_readers_routes::admin_topic_readers_routes,
             },
@@ -41,10 +41,10 @@ use crate::{
             admin_audit_service::AdminAuditService, admin_auth_service::AdminAuthService,
             admin_brand_service::AdminBrandService,
             admin_credentials_service::AdminCredentialsService,
-            admin_payment_service::AdminPaymentService,
-            admin_paywall_service::AdminPaywallService, admin_product_service::AdminProductService,
-            admin_setup_service::AdminSetupService,
+            admin_payment_service::AdminPaymentService, admin_paywall_service::AdminPaywallService,
+            admin_product_service::AdminProductService,
             admin_review_exempt_service::AdminReviewExemptService,
+            admin_setup_service::AdminSetupService,
             admin_support_bases_service::AdminSupportBasesService,
             admin_topic_readers_service::AdminTopicReadersService,
             admin_user_service::AdminUserService,
@@ -111,7 +111,8 @@ pub fn build_admin_routes(pool: PgPool, config: &AppConfig) -> Router {
 
     admin_auth_routes(auth_service.clone())
         .merge(crate::student::bootstrap::build_admin_student_routes(
-            pool.clone(), auth_service.clone(),
+            pool.clone(),
+            auth_service.clone(),
         ))
         .merge(admin_setup_routes(setup_service))
         .merge(admin_credentials_routes(

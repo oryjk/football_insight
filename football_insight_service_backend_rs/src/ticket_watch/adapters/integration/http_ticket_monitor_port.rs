@@ -154,7 +154,7 @@ impl TicketMonitorPort for HttpTicketMonitorPort {
                         .filter_map(|source| source.downcast_ref::<reqwest::Error>())
                         .any(|source| source.status() == Some(reqwest::StatusCode::NOT_FOUND)) =>
                 {
-                    continue
+                    continue;
                 }
                 Err(error) => return Err(error),
             }
@@ -889,10 +889,10 @@ mod tests {
     async fn best_windows_http_adapter_encodes_since_and_falls_back_only_to_legacy_snapshot() {
         use crate::ticket_watch::ports::ticket_monitor_port::TicketMonitorPort;
         use axum::{
+            Json, Router,
             extract::{Path, Query},
             http::StatusCode,
             routing::get,
-            Json, Router,
         };
         use std::{
             collections::HashMap,
@@ -902,32 +902,40 @@ mod tests {
         let captured = calls.clone();
         let app = Router::new().route(
             "/api/match/restock-profile/{id}",
-            get(move |Path(id): Path<i64>, Query(query): Query<HashMap<String, String>>| {
-                let calls = captured.clone();
-                async move {
-                    calls.lock().unwrap().push((id, query.get("since").cloned()));
-                    if id == 570 {
-                        return (StatusCode::NOT_FOUND, Json(serde_json::json!({})));
-                    }
-                    let hourly: Vec<_> = (0..24)
-                        .map(|hour| serde_json::json!({"hour": hour, "events": 1}))
-                        .collect();
-                    (StatusCode::OK, Json(serde_json::json!({
-                        "success": true,
-                        "data": {
-                            "schema_version": 2,
-                            "stat_unit": "seat_restock_event",
-                            "match_id": id,
-                            "since": "2026-10-08T14:10:00+08:00",
-                            "total_events": 24,
-                            "appear_events": 20,
-                            "up_events": 4,
-                            "seats_with_events": 2,
-                            "hourly": hourly
+            get(
+                move |Path(id): Path<i64>, Query(query): Query<HashMap<String, String>>| {
+                    let calls = captured.clone();
+                    async move {
+                        calls
+                            .lock()
+                            .unwrap()
+                            .push((id, query.get("since").cloned()));
+                        if id == 570 {
+                            return (StatusCode::NOT_FOUND, Json(serde_json::json!({})));
                         }
-                    })))
-                }
-            }),
+                        let hourly: Vec<_> = (0..24)
+                            .map(|hour| serde_json::json!({"hour": hour, "events": 1}))
+                            .collect();
+                        (
+                            StatusCode::OK,
+                            Json(serde_json::json!({
+                                "success": true,
+                                "data": {
+                                    "schema_version": 2,
+                                    "stat_unit": "seat_restock_event",
+                                    "match_id": id,
+                                    "since": "2026-10-08T14:10:00+08:00",
+                                    "total_events": 24,
+                                    "appear_events": 20,
+                                    "up_events": 4,
+                                    "seats_with_events": 2,
+                                    "hourly": hourly
+                                }
+                            })),
+                        )
+                    }
+                },
+            ),
         );
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
@@ -951,7 +959,7 @@ mod tests {
     #[tokio::test]
     async fn best_windows_use_separate_restock_origin_when_configured() {
         use crate::ticket_watch::ports::ticket_monitor_port::TicketMonitorPort;
-        use axum::{extract::Path, routing::get, Json, Router};
+        use axum::{Json, Router, extract::Path, routing::get};
         let app = Router::new().route(
             "/api/match/restock-profile/{id}",
             get(|Path(id): Path<i64>| async move {
@@ -992,7 +1000,7 @@ mod tests {
     async fn best_windows_missing_snapshots_have_typed_error_but_server_errors_do_not() {
         use crate::ticket_watch::domain::best_watch_windows::RestockProfileNotReady;
         use crate::ticket_watch::ports::ticket_monitor_port::TicketMonitorPort;
-        use axum::{extract::Path, http::StatusCode, routing::get, Router};
+        use axum::{Router, extract::Path, http::StatusCode, routing::get};
         let app = Router::new().route(
             "/api/match/restock-profile/{id}",
             get(|Path(id): Path<i64>| async move {
@@ -1007,16 +1015,19 @@ mod tests {
         let address = listener.local_addr().unwrap();
         let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
         let port = super::HttpTicketMonitorPort::new(Some(format!("http://{address}")));
-        assert!(port
-            .fetch_restock_profile(570, Some(72), "2026-10-08T14:10:00+08:00")
-            .await
-            .unwrap_err()
-            .is::<RestockProfileNotReady>());
-        assert!(!port
-            .fetch_restock_profile(500, Some(72), "2026-10-08T14:10:00+08:00")
-            .await
-            .unwrap_err()
-            .is::<RestockProfileNotReady>());
+        assert!(
+            port.fetch_restock_profile(570, Some(72), "2026-10-08T14:10:00+08:00")
+                .await
+                .unwrap_err()
+                .is::<RestockProfileNotReady>()
+        );
+        assert!(
+            !port
+                .fetch_restock_profile(500, Some(72), "2026-10-08T14:10:00+08:00")
+                .await
+                .unwrap_err()
+                .is::<RestockProfileNotReady>()
+        );
         server.abort();
     }
 }

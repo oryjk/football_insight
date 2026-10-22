@@ -20,11 +20,19 @@ impl AdminReviewExemptService {
         self.repository.list().await
     }
 
-    pub async fn add(&self, user_id: Uuid, admin_id: Uuid) -> Result<ReviewExemptUser, AdminReviewExemptError> {
+    pub async fn add(
+        &self,
+        user_id: Uuid,
+        admin_id: Uuid,
+    ) -> Result<ReviewExemptUser, AdminReviewExemptError> {
         self.repository.add(user_id, admin_id).await
     }
 
-    pub async fn remove(&self, user_id: Uuid, admin_id: Uuid) -> Result<(), AdminReviewExemptError> {
+    pub async fn remove(
+        &self,
+        user_id: Uuid,
+        admin_id: Uuid,
+    ) -> Result<(), AdminReviewExemptError> {
         self.repository.remove(user_id, admin_id).await
     }
 }

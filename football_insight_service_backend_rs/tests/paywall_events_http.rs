@@ -42,11 +42,15 @@ impl PaywallEventRepository for Store {
 fn app() -> (axum::Router, String, Uuid, Arc<Mutex<Vec<NewPaywallEvent>>>) {
     let tokens = Arc::new(JwtTokenPort::new("isolated-test-key".into()));
     let user = Uuid::new_v4();
-    let token = tokens.issue_token(user, "test", Utc::now() + Duration::hours(1)).unwrap();
+    let token = tokens
+        .issue_token(user, "test", Utc::now() + Duration::hours(1))
+        .unwrap();
     let stored = Arc::new(Mutex::new(Vec::new()));
     let state = Arc::new(ActivityWebState {
         record_page_activity_use_case: Arc::new(RecordPageActivityUseCase::new(Arc::new(Pages))),
-        record_paywall_events_use_case: Arc::new(RecordPaywallEvents::new(Arc::new(Store(stored.clone())))),
+        record_paywall_events_use_case: Arc::new(RecordPaywallEvents::new(Arc::new(Store(
+            stored.clone(),
+        )))),
         token_port: tokens,
     });
     (activity_routes(state), token, user, stored)
@@ -60,17 +64,36 @@ async fn post(app: &axum::Router, token: Option<&str>, body: String) -> StatusCo
     if let Some(token) = token {
         request = request.header("authorization", format!("Bearer {token}"));
     }
-    app.clone().oneshot(request.body(Body::from(body)).unwrap()).await.unwrap().status()
+    app.clone()
+        .oneshot(request.body(Body::from(body)).unwrap())
+        .await
+        .unwrap()
+        .status()
 }
 
 #[tokio::test]
 async fn only_a_missing_or_invalid_token_is_an_error() {
     let (app, token, _, stored) = app();
-    assert_eq!(post(&app, None, "{}".into()).await, StatusCode::UNAUTHORIZED);
-    assert_eq!(post(&app, Some("bad"), "{}".into()).await, StatusCode::UNAUTHORIZED);
-    assert_eq!(post(&app, Some(&token), "not json".into()).await, StatusCode::NO_CONTENT);
-    assert_eq!(post(&app, Some(&token), "a".repeat(4097)).await, StatusCode::NO_CONTENT);
-    assert_eq!(post(&app, Some(&token), r#"{"events":"x"}"#.into()).await, StatusCode::NO_CONTENT);
+    assert_eq!(
+        post(&app, None, "{}".into()).await,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        post(&app, Some("bad"), "{}".into()).await,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        post(&app, Some(&token), "not json".into()).await,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        post(&app, Some(&token), "a".repeat(4097)).await,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        post(&app, Some(&token), r#"{"events":"x"}"#.into()).await,
+        StatusCode::NO_CONTENT
+    );
     tokio::time::sleep(std::time::Duration::from_millis(60)).await;
     assert!(stored.lock().unwrap().is_empty());
 }

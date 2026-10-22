@@ -44,7 +44,10 @@ impl SupportBaseInput {
                 )));
             }
         }
-        Ok(Self { home_base, away_base })
+        Ok(Self {
+            home_base,
+            away_base,
+        })
     }
 }
 

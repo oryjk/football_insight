@@ -7,7 +7,10 @@ use crate::admin::domain::admin_support_bases::{
 #[async_trait]
 pub trait AdminSupportBasesRepository: Send + Sync {
     /// Recent and upcoming matches with their real counts and current bases.
-    async fn list_matches(&self, limit: i64) -> Result<Vec<SupportBaseMatch>, AdminSupportBasesError>;
+    async fn list_matches(
+        &self,
+        limit: i64,
+    ) -> Result<Vec<SupportBaseMatch>, AdminSupportBasesError>;
     async fn set_bases(
         &self,
         match_id: i64,

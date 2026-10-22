@@ -3,7 +3,6 @@ use std::sync::Arc;
 use axum::{Json, extract::Query, http::HeaderMap, http::StatusCode};
 
 use crate::mini_review::{
-    ports::review_exemption_port::ReviewExemptionPort,
     adapters::web::dto::{
         AllocateRequest, CanControlReviewResponse, ReviewStatusDto, ReviewStatusQuery,
         SetReviewStatusRequest,
@@ -15,6 +14,7 @@ use crate::mini_review::{
             SetReviewStatusByProjectVersionUseCase, SetReviewStatusCommand,
         },
     },
+    ports::review_exemption_port::ReviewExemptionPort,
 };
 
 fn map_use_case_error(error: anyhow::Error) -> (StatusCode, String) {

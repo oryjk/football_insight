@@ -1,7 +1,8 @@
 //! Only run against an explicit disposable localhost database ending in _test.
 use chrono::DateTime;
 use football_insight_service_backend_rs::ticket_watch::{
-    adapters::persistence::PostgresRestockProfileStore, ports::restock_profile_store::RestockProfileStore,
+    adapters::persistence::PostgresRestockProfileStore,
+    ports::restock_profile_store::RestockProfileStore,
 };
 use sqlx::{
     PgPool,
@@ -25,17 +26,35 @@ async fn insert(pool: &PgPool, match_id: i64, since: &str, total: i64, version: 
 #[tokio::test]
 #[ignore = "requires explicit disposable localhost PostgreSQL database"]
 async fn restock_store_matches_since_schema_and_prefers_first_non_empty_id() {
-    let url = std::env::var("RESTOCK_TEST_DATABASE_URL").expect("explicit disposable test database URL required");
+    let url = std::env::var("RESTOCK_TEST_DATABASE_URL")
+        .expect("explicit disposable test database URL required");
     let parsed = url::Url::parse(&url).unwrap();
-    assert!(matches!(parsed.host_str(), Some("localhost" | "127.0.0.1" | "[::1]")));
+    assert!(matches!(
+        parsed.host_str(),
+        Some("localhost" | "127.0.0.1" | "[::1]")
+    ));
     assert!(parsed.path().ends_with("_test"));
     let admin = PgPool::connect(&url).await.unwrap();
     let schema = format!("restock_{}", Uuid::new_v4().simple());
-    sqlx::raw_sql(&format!("CREATE SCHEMA {schema}")).execute(&admin).await.unwrap();
-    let options = url.parse::<PgConnectOptions>().unwrap().options([("search_path", schema.as_str())]);
-    let pool = PgPoolOptions::new().max_connections(4).connect_with(options).await.unwrap();
-    sqlx::raw_sql(include_str!("../migrations/20261022160000_add_ticket_restock_profiles.sql"))
-        .execute(&pool).await.unwrap();
+    sqlx::raw_sql(&format!("CREATE SCHEMA {schema}"))
+        .execute(&admin)
+        .await
+        .unwrap();
+    let options = url
+        .parse::<PgConnectOptions>()
+        .unwrap()
+        .options([("search_path", schema.as_str())]);
+    let pool = PgPoolOptions::new()
+        .max_connections(4)
+        .connect_with(options)
+        .await
+        .unwrap();
+    sqlx::raw_sql(include_str!(
+        "../migrations/20261022160000_add_ticket_restock_profiles.sql"
+    ))
+    .execute(&pool)
+    .await
+    .unwrap();
 
     let store = PostgresRestockProfileStore::new(pool.clone());
     let since = DateTime::parse_from_rfc3339("2026-10-08T14:10:00+08:00").unwrap();
@@ -46,7 +65,15 @@ async fn restock_store_matches_since_schema_and_prefers_first_non_empty_id() {
     let profile = store.load(&[583, 9583], since).await.unwrap().unwrap();
     assert_eq!((profile.total_events, profile.hourly[9]), (40, 40));
     // 只有空快照时返回空快照，而不是 None。
-    assert_eq!(store.load(&[583], since).await.unwrap().unwrap().total_events, 0);
+    assert_eq!(
+        store
+            .load(&[583], since)
+            .await
+            .unwrap()
+            .unwrap()
+            .total_events,
+        0
+    );
     // 统计起点不一致、schema 版本不匹配都视为没有快照。
     let other = DateTime::parse_from_rfc3339("2026-10-08T14:20:00+08:00").unwrap();
     assert!(store.load(&[9583], other).await.unwrap().is_none());
@@ -57,6 +84,9 @@ async fn restock_store_matches_since_schema_and_prefers_first_non_empty_id() {
         .execute(&pool).await.is_err());
 
     pool.close().await;
-    sqlx::raw_sql(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin).await.unwrap();
+    sqlx::raw_sql(&format!("DROP SCHEMA {schema} CASCADE"))
+        .execute(&admin)
+        .await
+        .unwrap();
     admin.close().await;
 }

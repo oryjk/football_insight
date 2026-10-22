@@ -104,7 +104,9 @@ impl MiniReviewRepository for PostgresMiniReviewRepository {
 
         match row {
             Ok(row) => Ok(map_row(&row)),
-            Err(error) if is_unique_violation(&error) => Err(anyhow::Error::new(VersionConflictError)),
+            Err(error) if is_unique_violation(&error) => {
+                Err(anyhow::Error::new(VersionConflictError))
+            }
             Err(error) => Err(error.into()),
         }
     }

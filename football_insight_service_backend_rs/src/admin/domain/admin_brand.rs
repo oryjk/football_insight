@@ -46,7 +46,12 @@ mod tests {
 
     #[test]
     fn subtitle_is_trimmed_and_blank_means_default() {
-        assert_eq!(BrandSubtitle::new("  成都蓉城球迷的数据主场 ").unwrap().value(), Some("成都蓉城球迷的数据主场"));
+        assert_eq!(
+            BrandSubtitle::new("  成都蓉城球迷的数据主场 ")
+                .unwrap()
+                .value(),
+            Some("成都蓉城球迷的数据主场")
+        );
         assert_eq!(BrandSubtitle::new("   ").unwrap().value(), None);
     }
 

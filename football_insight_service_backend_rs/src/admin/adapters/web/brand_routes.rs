@@ -17,6 +17,9 @@ pub fn admin_brand_routes(
             "/api/v1/admin/brand/subtitle",
             get(brand_handlers::get_subtitle).put(brand_handlers::set_subtitle),
         )
-        .with_state(AdminBrandWebState { service, auth_service })
+        .with_state(AdminBrandWebState {
+            service,
+            auth_service,
+        })
         .layer(axum::middleware::map_response(product_no_store))
 }

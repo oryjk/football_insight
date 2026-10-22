@@ -102,7 +102,10 @@ mod tests {
 
     #[test]
     fn actions_are_a_closed_set() {
-        assert_eq!(PaywallAction::parse("impression"), Some(PaywallAction::Impression));
+        assert_eq!(
+            PaywallAction::parse("impression"),
+            Some(PaywallAction::Impression)
+        );
         assert_eq!(PaywallAction::parse("tap"), Some(PaywallAction::Tap));
         assert_eq!(PaywallAction::parse("click"), None);
         assert_eq!(PaywallAction::Tap.as_str(), "tap");
@@ -124,7 +127,10 @@ mod tests {
             "mini_version": "1.0.77", "platform": "android", "match_id": "583",
             "token": "secret", "openid": "o123", "nested": {"a": 1}
         }));
-        assert_eq!(cleaned, json!({"mini_version": "1.0.77", "platform": "android", "match_id": 583}));
+        assert_eq!(
+            cleaned,
+            json!({"mini_version": "1.0.77", "platform": "android", "match_id": 583})
+        );
     }
 
     #[test]

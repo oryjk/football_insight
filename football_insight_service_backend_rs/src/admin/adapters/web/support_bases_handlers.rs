@@ -50,7 +50,9 @@ pub async fn list_matches(
 ) -> Result<Json<Value>, HttpError> {
     authorize(&state, &headers).await?;
     let rows = state.service.list_matches().await.map_err(map_error)?;
-    Ok(Json(json!({ "items": rows.into_iter().map(match_json).collect::<Vec<_>>() })))
+    Ok(Json(
+        json!({ "items": rows.into_iter().map(match_json).collect::<Vec<_>>() }),
+    ))
 }
 
 pub async fn set_bases(
@@ -60,7 +62,8 @@ pub async fn set_bases(
     body: Result<Json<SetBasesBody>, JsonRejection>,
 ) -> Result<Json<Value>, HttpError> {
     let principal = authorize(&state, &headers).await?;
-    let Json(body) = body.map_err(|_| (StatusCode::BAD_REQUEST, "invalid request body".to_string()))?;
+    let Json(body) =
+        body.map_err(|_| (StatusCode::BAD_REQUEST, "invalid request body".to_string()))?;
     let updated = state
         .service
         .set_bases(match_id, body.home_base, body.away_base, principal.admin_id)

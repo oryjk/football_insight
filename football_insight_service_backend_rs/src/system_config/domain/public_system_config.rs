@@ -173,10 +173,16 @@ mod brand_subtitle_tests {
 
     #[test]
     fn brand_subtitle_trims_and_ignores_blank_or_overlong_values() {
-        assert_eq!(parse_brand_subtitle(Some(" 球迷的数据主场 ")).as_deref(), Some("球迷的数据主场"));
+        assert_eq!(
+            parse_brand_subtitle(Some(" 球迷的数据主场 ")).as_deref(),
+            Some("球迷的数据主场")
+        );
         assert_eq!(parse_brand_subtitle(Some("   ")), None);
         assert_eq!(parse_brand_subtitle(None), None);
-        assert_eq!(parse_brand_subtitle(Some(&"蓉".repeat(MAX_BRAND_SUBTITLE_CHARS + 1))), None);
+        assert_eq!(
+            parse_brand_subtitle(Some(&"蓉".repeat(MAX_BRAND_SUBTITLE_CHARS + 1))),
+            None
+        );
         assert!(parse_brand_subtitle(Some(&"蓉".repeat(MAX_BRAND_SUBTITLE_CHARS))).is_some());
     }
 }

@@ -43,8 +43,8 @@ fn official_account_access_reuses_effective_membership_and_match_unlock_rules() 
 
 #[test]
 fn a_shared_official_openid_is_granted_when_any_linked_account_qualifies() {
-    use football_insight_service_backend_rs::match_id_unlock::domain::official_account_access::resolve_official_account_access_for_users;
     use OfficialAccountMatchIdAccess::{Granted, NotMember, Unrecognized};
+    use football_insight_service_backend_rs::match_id_unlock::domain::official_account_access::resolve_official_account_access_for_users;
     let now = Utc.with_ymd_and_hms(2026, 10, 16, 12, 0, 0).unwrap();
     let user = |tier: &str, unlocked: bool| OfficialAccountUser {
         membership_tier: tier.to_owned(),
@@ -52,12 +52,27 @@ fn a_shared_official_openid_is_granted_when_any_linked_account_qualifies() {
         has_unlock_for_match: unlocked,
     };
     // Order must not matter: a V9 account and a V1 duplicate behind the same openid.
-    assert_eq!(resolve_official_account_access_for_users(&[user("V1", false), user("V9", false)], now), Granted);
-    assert_eq!(resolve_official_account_access_for_users(&[user("V9", false), user("V1", false)], now), Granted);
+    assert_eq!(
+        resolve_official_account_access_for_users(&[user("V1", false), user("V9", false)], now),
+        Granted
+    );
+    assert_eq!(
+        resolve_official_account_access_for_users(&[user("V9", false), user("V1", false)], now),
+        Granted
+    );
     // A purchased unlock on any linked account also grants.
-    assert_eq!(resolve_official_account_access_for_users(&[user("V1", false), user("V3", true)], now), Granted);
+    assert_eq!(
+        resolve_official_account_access_for_users(&[user("V1", false), user("V3", true)], now),
+        Granted
+    );
     // Only non-qualifying accounts: recognized, but not a member.
-    assert_eq!(resolve_official_account_access_for_users(&[user("V1", false), user("V5", false)], now), NotMember);
+    assert_eq!(
+        resolve_official_account_access_for_users(&[user("V1", false), user("V5", false)], now),
+        NotMember
+    );
     // No linked account at all.
-    assert_eq!(resolve_official_account_access_for_users(&[], now), Unrecognized);
+    assert_eq!(
+        resolve_official_account_access_for_users(&[], now),
+        Unrecognized
+    );
 }

@@ -66,16 +66,24 @@ impl AdminReviewExemptRepository for PostgresAdminReviewExemptRepository {
             .fetch_all(&self.pool)
             .await
             .map_err(map_error)?;
-        rows.iter().map(read).collect::<Result<_, _>>().map_err(map_error)
+        rows.iter()
+            .map(read)
+            .collect::<Result<_, _>>()
+            .map_err(map_error)
     }
 
-    async fn add(&self, user_id: Uuid, admin_id: Uuid) -> Result<ReviewExemptUser, AdminReviewExemptError> {
+    async fn add(
+        &self,
+        user_id: Uuid,
+        admin_id: Uuid,
+    ) -> Result<ReviewExemptUser, AdminReviewExemptError> {
         let mut tx = self.pool.begin().await.map_err(map_error)?;
-        let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM f_i_users WHERE id = $1)")
-            .bind(user_id)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(map_error)?;
+        let exists: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM f_i_users WHERE id = $1)")
+                .bind(user_id)
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(map_error)?;
         if !exists {
             return Err(AdminReviewExemptError::NotFound);
         }
@@ -89,7 +97,9 @@ impl AdminReviewExemptRepository for PostgresAdminReviewExemptRepository {
         .map_err(map_error)?
         .rows_affected();
         if inserted > 0 {
-            audit(&mut tx, admin_id, "review_exempt.add", user_id).await.map_err(map_error)?;
+            audit(&mut tx, admin_id, "review_exempt.add", user_id)
+                .await
+                .map_err(map_error)?;
         }
         let row = sqlx::query(&format!("{SELECT_EXEMPT} WHERE e.user_id = $1"))
             .bind(user_id)
@@ -110,7 +120,9 @@ impl AdminReviewExemptRepository for PostgresAdminReviewExemptRepository {
             .map_err(map_error)?
             .rows_affected();
         if removed > 0 {
-            audit(&mut tx, admin_id, "review_exempt.remove", user_id).await.map_err(map_error)?;
+            audit(&mut tx, admin_id, "review_exempt.remove", user_id)
+                .await
+                .map_err(map_error)?;
         }
         tx.commit().await.map_err(map_error)?;
         Ok(())

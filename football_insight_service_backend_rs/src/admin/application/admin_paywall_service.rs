@@ -14,11 +14,17 @@ impl AdminPaywallService {
         Self { repository }
     }
 
-    pub async fn funnel(&self, range: &PaywallRange) -> Result<Vec<PaywallFunnelRow>, AdminPaywallError> {
+    pub async fn funnel(
+        &self,
+        range: &PaywallRange,
+    ) -> Result<Vec<PaywallFunnelRow>, AdminPaywallError> {
         self.repository.funnel(range).await
     }
 
-    pub async fn by_tier(&self, range: &PaywallRange) -> Result<Vec<PaywallTierRow>, AdminPaywallError> {
+    pub async fn by_tier(
+        &self,
+        range: &PaywallRange,
+    ) -> Result<Vec<PaywallTierRow>, AdminPaywallError> {
         self.repository.by_tier(range).await
     }
 }

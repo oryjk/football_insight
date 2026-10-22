@@ -52,8 +52,15 @@ fn map_error(error: sqlx::Error) -> AdminTopicReadersError {
 
 #[async_trait]
 impl AdminTopicReadersRepository for PostgresAdminTopicReadersRepository {
-    async fn recent_topics(&self, limit: i64) -> Result<Vec<TopicReaderTopic>, AdminTopicReadersError> {
-        let rows = sqlx::query(RECENT_TOPICS_SQL).bind(limit).fetch_all(&self.pool).await.map_err(map_error)?;
+    async fn recent_topics(
+        &self,
+        limit: i64,
+    ) -> Result<Vec<TopicReaderTopic>, AdminTopicReadersError> {
+        let rows = sqlx::query(RECENT_TOPICS_SQL)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(map_error)?;
         rows.iter()
             .map(|row| {
                 Ok(TopicReaderTopic {
@@ -68,8 +75,17 @@ impl AdminTopicReadersRepository for PostgresAdminTopicReadersRepository {
             .map_err(map_error)
     }
 
-    async fn readers(&self, team_id: i64, topic_id: &str) -> Result<Vec<TopicReader>, AdminTopicReadersError> {
-        let rows = sqlx::query(READERS_SQL).bind(team_id).bind(topic_id).fetch_all(&self.pool).await.map_err(map_error)?;
+    async fn readers(
+        &self,
+        team_id: i64,
+        topic_id: &str,
+    ) -> Result<Vec<TopicReader>, AdminTopicReadersError> {
+        let rows = sqlx::query(READERS_SQL)
+            .bind(team_id)
+            .bind(topic_id)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(map_error)?;
         rows.iter()
             .map(|row| {
                 Ok(TopicReader {

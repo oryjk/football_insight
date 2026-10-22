@@ -1,2 +1,2 @@
-pub mod postgres_user_activity_repository;
 pub mod postgres_paywall_event_repository;
+pub mod postgres_user_activity_repository;

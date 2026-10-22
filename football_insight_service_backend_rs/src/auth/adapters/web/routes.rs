@@ -19,10 +19,9 @@ use crate::auth::application::{
 use super::{
     handlers::{
         AuthWebConfig, get_current_user_handler, h5_test_login_handler,
-        h5_test_login_users_handler, login_handler, logout_handler,
-        mini_wechat_bind_handler, mini_wechat_login_handler, register_handler,
-        reset_password_handler, wechat_authorize_handler, wechat_bind_handler,
-        wechat_callback_handler,
+        h5_test_login_users_handler, login_handler, logout_handler, mini_wechat_bind_handler,
+        mini_wechat_login_handler, register_handler, reset_password_handler,
+        wechat_authorize_handler, wechat_bind_handler, wechat_callback_handler,
     },
     wechat_handlers::{wechat_message_handler, wechat_verify_handler},
 };

@@ -39,7 +39,9 @@ pub async fn list_exempt_users(
 ) -> Result<Json<Value>, HttpError> {
     authorize(&state, &headers).await?;
     let rows = state.service.list().await.map_err(map_error)?;
-    Ok(Json(json!({ "items": rows.into_iter().map(user_json).collect::<Vec<_>>() })))
+    Ok(Json(
+        json!({ "items": rows.into_iter().map(user_json).collect::<Vec<_>>() }),
+    ))
 }
 
 pub async fn add_exempt_user(
@@ -48,7 +50,11 @@ pub async fn add_exempt_user(
     Path(user_id): Path<Uuid>,
 ) -> Result<Json<Value>, HttpError> {
     let principal = authorize(&state, &headers).await?;
-    let user = state.service.add(user_id, principal.admin_id).await.map_err(map_error)?;
+    let user = state
+        .service
+        .add(user_id, principal.admin_id)
+        .await
+        .map_err(map_error)?;
     Ok(Json(user_json(user)))
 }
 
@@ -58,7 +64,11 @@ pub async fn remove_exempt_user(
     Path(user_id): Path<Uuid>,
 ) -> Result<StatusCode, HttpError> {
     let principal = authorize(&state, &headers).await?;
-    state.service.remove(user_id, principal.admin_id).await.map_err(map_error)?;
+    state
+        .service
+        .remove(user_id, principal.admin_id)
+        .await
+        .map_err(map_error)?;
     Ok(StatusCode::NO_CONTENT)
 }
 

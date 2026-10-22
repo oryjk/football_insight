@@ -5,7 +5,10 @@ use super::{
 use crate::admin::application::{
     admin_auth_service::AdminAuthService, admin_review_exempt_service::AdminReviewExemptService,
 };
-use axum::{Router, routing::{get, put}};
+use axum::{
+    Router,
+    routing::{get, put},
+};
 use std::sync::Arc;
 
 pub fn admin_review_exempt_routes(
@@ -22,6 +25,9 @@ pub fn admin_review_exempt_routes(
             put(review_exempt_handlers::add_exempt_user)
                 .delete(review_exempt_handlers::remove_exempt_user),
         )
-        .with_state(AdminReviewExemptWebState { service, auth_service })
+        .with_state(AdminReviewExemptWebState {
+            service,
+            auth_service,
+        })
         .layer(axum::middleware::map_response(product_no_store))
 }

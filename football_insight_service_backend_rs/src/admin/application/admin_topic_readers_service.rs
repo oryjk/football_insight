@@ -20,9 +20,15 @@ impl AdminTopicReadersService {
         self.repository.recent_topics(TOPIC_LIMIT).await
     }
 
-    pub async fn readers(&self, team_id: i64, topic_id: &str) -> Result<Vec<TopicReader>, AdminTopicReadersError> {
+    pub async fn readers(
+        &self,
+        team_id: i64,
+        topic_id: &str,
+    ) -> Result<Vec<TopicReader>, AdminTopicReadersError> {
         if team_id <= 0 || topic_id.trim().is_empty() || topic_id.len() > 200 {
-            return Err(AdminTopicReadersError::InvalidInput("invalid team_id or topic_id".into()));
+            return Err(AdminTopicReadersError::InvalidInput(
+                "invalid team_id or topic_id".into(),
+            ));
         }
         self.repository.readers(team_id, topic_id).await
     }

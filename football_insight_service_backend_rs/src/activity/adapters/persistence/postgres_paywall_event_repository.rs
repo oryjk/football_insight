@@ -1,7 +1,9 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::activity::{domain::paywall::NewPaywallEvent, ports::paywall_event_repository::PaywallEventRepository};
+use crate::activity::{
+    domain::paywall::NewPaywallEvent, ports::paywall_event_repository::PaywallEventRepository,
+};
 
 pub struct PostgresPaywallEventRepository {
     pool: PgPool,

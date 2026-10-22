@@ -15,7 +15,11 @@ impl GetReviewStatusUseCase {
     }
 
     /// 小程序运行时查询；未登记的版本视为不在审核（已过审或从未提审）。
-    pub async fn execute(&self, project_code: &str, raw_version: &str) -> anyhow::Result<MiniReviewStatus> {
+    pub async fn execute(
+        &self,
+        project_code: &str,
+        raw_version: &str,
+    ) -> anyhow::Result<MiniReviewStatus> {
         let project_code = project_code.trim();
         let version = Version::parse(raw_version)
             .map_err(|_| anyhow::anyhow!("project code or version is invalid"))?;
@@ -63,7 +67,10 @@ mod tests {
 
     #[async_trait]
     impl MiniReviewRepository for FakeRepository {
-        async fn find_latest(&self, _project_code: &str) -> anyhow::Result<Option<MiniReviewStatus>> {
+        async fn find_latest(
+            &self,
+            _project_code: &str,
+        ) -> anyhow::Result<Option<MiniReviewStatus>> {
             Ok(self.record.clone())
         }
 
@@ -83,7 +90,10 @@ mod tests {
             unreachable!("get review status never writes")
         }
 
-        async fn update_status(&self, _status: MiniReviewStatus) -> anyhow::Result<MiniReviewStatus> {
+        async fn update_status(
+            &self,
+            _status: MiniReviewStatus,
+        ) -> anyhow::Result<MiniReviewStatus> {
             unreachable!("get review status never writes")
         }
     }
@@ -132,6 +142,11 @@ mod tests {
         let use_case = GetReviewStatusUseCase::new(Arc::new(FakeRepository { record: None }));
 
         assert!(use_case.execute("", "1.0.55").await.is_err());
-        assert!(use_case.execute("football_insight_mini", "1.0").await.is_err());
+        assert!(
+            use_case
+                .execute("football_insight_mini", "1.0")
+                .await
+                .is_err()
+        );
     }
 }

@@ -71,9 +71,19 @@ fn read(row: &PgRow) -> Result<SupportBaseMatch, sqlx::Error> {
 
 #[async_trait]
 impl AdminSupportBasesRepository for PostgresAdminSupportBasesRepository {
-    async fn list_matches(&self, limit: i64) -> Result<Vec<SupportBaseMatch>, AdminSupportBasesError> {
-        let rows = sqlx::query(&list_sql()).bind(limit).fetch_all(&self.pool).await.map_err(map_error)?;
-        rows.iter().map(read).collect::<Result<_, _>>().map_err(map_error)
+    async fn list_matches(
+        &self,
+        limit: i64,
+    ) -> Result<Vec<SupportBaseMatch>, AdminSupportBasesError> {
+        let rows = sqlx::query(&list_sql())
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(map_error)?;
+        rows.iter()
+            .map(read)
+            .collect::<Result<_, _>>()
+            .map_err(map_error)
     }
 
     async fn set_bases(
@@ -117,7 +127,11 @@ impl AdminSupportBasesRepository for PostgresAdminSupportBasesRepository {
         .execute(&mut *tx)
         .await
         .map_err(map_error)?;
-        let after = sqlx::query(&one_sql()).bind(match_id).fetch_one(&mut *tx).await.map_err(map_error)?;
+        let after = sqlx::query(&one_sql())
+            .bind(match_id)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(map_error)?;
         let after = read(&after).map_err(map_error)?;
         tx.commit().await.map_err(map_error)?;
         Ok(after)

@@ -135,11 +135,15 @@ mod tests {
             .unwrap();
         assert_eq!(
             forms[&10],
-            vec![Loss, Draw, Win, Win, Win, Loss, Draw, Win, Draw, Loss, Win, Loss]
+            vec![
+                Loss, Draw, Win, Win, Win, Loss, Draw, Win, Draw, Loss, Win, Loss
+            ]
         );
         assert_eq!(
             forms[&20],
-            vec![Win, Draw, Loss, Loss, Loss, Win, Draw, Loss, Draw, Win, Loss, Win]
+            vec![
+                Win, Draw, Loss, Loss, Loss, Win, Draw, Loss, Draw, Win, Loss, Win
+            ]
         );
         assert!(!forms.contains_key(&999));
         pool.close().await;
