@@ -9,18 +9,10 @@
             mode="aspectFit"
           />
           <text class="focus-panel__headline-title">热区速览</text>
-          <text class="focus-panel__headline-subtitle">先看双榜热区</text>
+          <text v-if="switching" class="focus-panel__headline-subtitle">切换中…</text>
         </view>
       </view>
       <view class="section-heading__actions">
-        <text class="meta-pill">
-          <image
-            class="inline-image-icon inline-image-icon--small"
-            :src="swapArrowsIcon"
-            mode="aspectFit"
-          />
-          <text>{{ switching ? '切换中' : '回流 + 钓友' }}</text>
-        </text>
         <button class="collapse-pill" @tap="emit('toggle')">
           {{ collapsed ? '展开' : '收起' }}
         </button>
@@ -49,14 +41,7 @@
             class="focus-chip focus-chip--compact"
             :class="resolvePriceToneClass(block.price)"
           >
-            <view class="focus-chip__name-row">
-              <text class="focus-chip__name">{{ block.block_name }}</text>
-              <image
-                class="focus-chip__name-icon-image"
-                :src="fireIcon"
-                mode="aspectFit"
-              />
-            </view>
+            <text class="focus-chip__name">{{ block.block_name }}</text>
             <text class="focus-chip__meta">¥{{ block.price }}</text>
             <text class="focus-chip__count">{{ block.occurrences }} 张</text>
           </view>
@@ -84,14 +69,7 @@
             class="focus-chip focus-chip--compact focus-chip--interest"
             :class="resolvePriceToneClass(block.price)"
           >
-            <view class="focus-chip__name-row">
-              <text class="focus-chip__name">{{ block.block_name }}</text>
-              <image
-                class="focus-chip__name-icon-image"
-                :src="fireIcon"
-                mode="aspectFit"
-              />
-            </view>
+            <text class="focus-chip__name">{{ block.block_name }}</text>
             <text class="focus-chip__meta">¥{{ block.price }}</text>
             <text class="focus-chip__count focus-chip__count--interest"
               >{{ block.interested_user_count }} 位钓友</text
@@ -100,11 +78,6 @@
         </view>
       </view>
 
-      <text class="focus-copy"
-        >先扫回流前三，再看钓友都蹲哪几个区，{{
-          history ? '下面再看完整价位分布。' : '下面再看完整分区看板。'
-        }}</text
-      >
     </FiCollapse>
   </view>
 </template>
@@ -115,10 +88,9 @@ import type {
   TicketWatchBoardTopBlock,
   TicketWatchBoardTopInterestBlock,
 } from '../helpers'
-import fireIcon from '../../../static/ticket-watch/fire.svg'
-import friendUserIcon from '../../../static/ticket-watch/friend-user.svg'
-import swapArrowsIcon from '../../../static/ticket-watch/swap-arrows.svg'
-import refluxBarsIcon from '../../../static/ticket-watch/reflux-bars.svg'
+import fireIcon from '../../../static/ticket-watch/lucide-flame.svg'
+import friendUserIcon from '../../../static/ticket-watch/lucide-users.svg'
+import refluxBarsIcon from '../../../static/ticket-watch/lucide-chart-column.svg'
 import { resolvePriceToneClass } from '../presentation'
 defineProps<{
   focusBlocks: TicketWatchBoardTopBlock[]
@@ -241,7 +213,7 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
 .focus-panel__headline-title {
   color: var(--fi-color-ticket-focus-panel-headline-title-color);
   font-size: var(--fi-font-34);
-  font-weight: var(--fi-weight-normal);
+  font-weight: var(--fi-weight-extrabold);
   line-height: var(--fi-leading-tight);
   flex-shrink: 0;
 }
@@ -296,8 +268,8 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
 
 .focus-section__title {
   color: var(--fi-color-ticket-focus-panel-headline-title-color);
-  font-size: var(--fi-font-24);
-  font-weight: var(--fi-weight-normal);
+  font-size: var(--fi-font-26);
+  font-weight: var(--fi-weight-bold);
 }
 
 .focus-section__meta {
@@ -322,11 +294,6 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
   border-radius: var(--fi-radius-sm);
 }
 
-.focus-chip__name-row {
-  display: flex;
-  align-items: center;
-  gap: var(--fi-space-6);
-}
 
 .focus-chip__name {
   display: block;
@@ -336,14 +303,10 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
   line-height: var(--fi-leading-none);
 }
 
-.focus-chip__name-icon-image {
-  width: var(--fi-icon-sm);
-  height: var(--fi-icon-sm);
-  flex-shrink: 0;
-}
 
 .focus-chip--compact .focus-chip__name {
   font-size: var(--fi-font-28);
+  font-weight: var(--fi-weight-extrabold);
 }
 
 .focus-chip__meta {
@@ -374,11 +337,4 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
   color: var(--fi-component-ticket-tone-text);
 }
 
-.focus-copy {
-  display: block;
-  margin-top: var(--fi-space-14);
-  color: var(--fi-color-ticket-focus-copy-color);
-  font-size: var(--fi-font-24);
-  line-height: var(--fi-leading-normal);
-}
 </style>
