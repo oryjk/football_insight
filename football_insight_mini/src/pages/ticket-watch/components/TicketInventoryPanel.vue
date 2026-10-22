@@ -49,15 +49,22 @@
               formatLatestTime(item.latest_time)
             }}</text>
           </view>
-          <view
-            v-if="item.interested_user_count > 0"
-            class="inventory-cell__interest"
-            :class="{
-              'inventory-cell__interest--hot':
-                resolveBlockInterestHeatLevel(item.interested_user_count) >= 3,
-            }"
-          >
-            <text>{{ item.interested_user_count }} 位钓友</text>
+          <view v-if="item.interested_user_count > 0" class="inventory-cell__interest">
+            <view class="inventory-cell__interest-meter">
+              <text
+                v-for="barIndex in 4"
+                :key="`interest-bar-${resolveInventoryBlockKey(item)}-${barIndex}`"
+                class="inventory-cell__interest-bar"
+                :class="{
+                  'inventory-cell__interest-bar--active':
+                    barIndex <=
+                    resolveBlockInterestHeatLevel(item.interested_user_count),
+                }"
+              />
+            </view>
+            <text class="inventory-cell__interest-label"
+              >{{ item.interested_user_count }}位钓友</text
+            >
           </view>
         </view>
       </view>
@@ -371,24 +378,37 @@ function cellClasses(item: TicketWatchGroupedInventoryItem) {
 }
 
 .inventory-cell__interest {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--fi-space-6);
+}
+
+.inventory-cell__interest-meter {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: var(--fi-space-4);
-  max-width: 100%;
-  padding: var(--fi-space-4) var(--fi-space-10);
+}
+
+.inventory-cell__interest-bar {
+  width: var(--fi-space-12);
+  height: var(--fi-space-5);
   border-radius: var(--fi-radius-round);
-  background: var(--fi-color-surface);
+  background: var(--fi-color-ticket-inventory-cell-interest-bar-background);
+}
+
+.inventory-cell__interest-bar--active {
+  background: var(
+    --fi-color-ticket-inventory-cell-interest-bar-active-background
+  );
+  box-shadow: var(--fi-shadow-ticket-inventory-cell-interest-bar-active);
+}
+
+.inventory-cell__interest-label {
   color: var(--fi-color-ticket-inventory-cell-interest-bar-active-background);
-  font-size: var(--fi-font-20);
+  font-size: var(--fi-font-18);
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-none);
-  white-space: nowrap;
 }
-
-.inventory-cell__interest--hot {
-  background: var(--fi-color-ticket-inventory-cell-interest-bar-active-background);
-  color: var(--fi-color-surface);
-}
-
 </style>
