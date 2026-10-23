@@ -162,7 +162,7 @@ function normalizeInputValue(event: Event): string {
   flex: 1;
   padding: var(--fi-space-20);
   border-radius: var(--fi-radius-round);
-  background: var(--fi-primitive-ink);
+  background: var(--fi-component-btn-bg);
   color: var(--fi-primitive-white);
   font-size: var(--fi-font-28);
   font-weight: var(--fi-weight-bold);

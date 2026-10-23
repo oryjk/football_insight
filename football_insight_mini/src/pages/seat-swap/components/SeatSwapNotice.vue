@@ -41,7 +41,7 @@ const emit = defineEmits<{ (e: 'action'): void }>()
   margin: 0;
   padding: var(--fi-space-10) var(--fi-space-20);
   border-radius: var(--fi-radius-round);
-  background: var(--fi-primitive-ink);
+  background: var(--fi-component-btn-bg);
   color: var(--fi-primitive-white);
   font-size: var(--fi-font-22);
   font-weight: var(--fi-weight-bold);
