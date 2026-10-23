@@ -51,8 +51,8 @@
             @toggle-group="toggleRegionGroup"
             @clear-filter="clearFilter"
             @confirm="confirmCandidate"
+            @view="openCandidateView"
             @cancel-confirmation="cancelCandidateConfirmation"
-            @matched-cancel="openMatchedCancelForCandidate"
             @preview-seat="openSeatPreview"
           />
         </view>
@@ -106,13 +106,29 @@
       @submit="submitForm"
     />
 
+    <SeatSwapApplicantSheet
+      v-model:visible="applicantSheetVisible"
+      :applicants="peerConfirmedCandidates"
+      @close="applicantSheetVisible = false"
+      @confirm="confirmApplicant"
+    />
+
+    <SeatSwapMatchedSheet
+      v-model:visible="matchedSheetVisible"
+      :candidate="viewingMatchedCandidate"
+      @close="matchedSheetVisible = false"
+      @cancel-match="cancelMatchFromSheet"
+    />
+
     <SeatSwapManageSheet
       v-model:visible="manageSheetVisible"
       v-model:cancel-reason="cancelReason"
       :request="currentView?.my_request"
+      :applicants="peerConfirmedCandidates"
       :status-label="myRequestStatusLabel"
       :desired-summary="myDesiredSummary"
       @close="closeManageSheet"
+      @confirm-applicant="confirmApplicant"
       @edit="openEditFromManage"
       @delete="deleteRequest"
       @submit-matched-cancel="submitMatchedCancel"
@@ -124,6 +140,8 @@
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { onHide, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
+import SeatSwapApplicantSheet from './components/SeatSwapApplicantSheet.vue'
+import SeatSwapMatchedSheet from './components/SeatSwapMatchedSheet.vue'
 import SeatSwapManageSheet from './components/SeatSwapManageSheet.vue'
 import SeatSwapNotice from './components/SeatSwapNotice.vue'
 import SeatSwapSkeleton from './components/SeatSwapSkeleton.vue'
@@ -159,6 +177,9 @@ const isLoggedIn = useAppSession().hasAccessToken
 const submitting = ref(false)
 const publishSheetVisible = ref(false)
 const manageSheetVisible = ref(false)
+const applicantSheetVisible = ref(false)
+const matchedSheetVisible = ref(false)
+const viewingMatchedId = ref('')
 const pendingConfirmTarget = ref<SeatSwapCandidate | null>(null)
 const pendingMatchedCancelTargetId = ref('')
 const miniProgramNoticeEnabled = ref(false)
@@ -169,7 +190,7 @@ const seatSheetVisible = ref(false)
 const seatPreviewId = ref('')
 // 任一弹层打开：锁页面滚动，并隐藏地图浮窗。
 const anySheetOpen = computed(() =>
-  publishSheetVisible.value || manageSheetVisible.value || mapSheetVisible.value || seatSheetVisible.value,
+  publishSheetVisible.value || manageSheetVisible.value || applicantSheetVisible.value || matchedSheetVisible.value || mapSheetVisible.value || seatSheetVisible.value,
 )
 const pageLockStyle = computed(() => anySheetOpen.value ? 'overflow: hidden;' : '')
 
@@ -361,6 +382,36 @@ function openPublishSheet(): void {
 function openPublishSheetForCandidate(candidate: SeatSwapCandidate): void {
   pendingConfirmTarget.value = candidate
   publishSheetVisible.value = true
+}
+
+const peerConfirmedCandidates = computed<SeatSwapCandidate[]>(() =>
+  (currentView.value?.candidates ?? []).filter((candidate) => candidate.status === 'peer_confirmed_me'),
+)
+
+const viewingMatchedCandidate = computed<SeatSwapCandidate | null>(() =>
+  currentView.value?.candidates.find((candidate) => candidate.request_id === viewingMatchedId.value) ?? null,
+)
+
+// 列表里的「查看」：已匹配的看对方联系方式，对方邀请的进申请人列表确认换座。
+function openCandidateView(requestId: string): void {
+  const candidate = currentView.value?.candidates.find((item) => item.request_id === requestId)
+  if (candidate?.status === 'matched') {
+    viewingMatchedId.value = requestId
+    matchedSheetVisible.value = true
+    return
+  }
+  applicantSheetVisible.value = true
+}
+
+function cancelMatchFromSheet(requestId: string): void {
+  matchedSheetVisible.value = false
+  openMatchedCancelForCandidate(requestId)
+}
+
+async function confirmApplicant(requestId: string): Promise<void> {
+  await confirmCandidate(requestId)
+  // 邀请人都处理完（或已匹配）后收起弹层；确认失败时仍保留列表。
+  if (!peerConfirmedCandidates.value.length) applicantSheetVisible.value = false
 }
 
 function openManageSheet(): void {

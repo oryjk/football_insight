@@ -50,8 +50,8 @@
               :candidate="candidate"
               :action="candidateAction(candidate)"
               @confirm="(id: string) => emit('confirm', id)"
+              @view="(id: string) => emit('view', id)"
               @cancel-confirmation="(id: string) => emit('cancel-confirmation', id)"
-              @matched-cancel="(id: string) => emit('matched-cancel', id)"
             @preview-seat="(id: string) => emit('preview-seat', id)"
             />
           </view>
@@ -74,8 +74,8 @@
             :candidate="candidate"
             :action="candidateAction(candidate)"
             @confirm="(id: string) => emit('confirm', id)"
+              @view="(id: string) => emit('view', id)"
             @cancel-confirmation="(id: string) => emit('cancel-confirmation', id)"
-            @matched-cancel="(id: string) => emit('matched-cancel', id)"
             @preview-seat="(id: string) => emit('preview-seat', id)"
           />
         </view>
@@ -110,8 +110,8 @@ const emit = defineEmits<{
   (e: 'toggle-group', key: string): void
   (e: 'clear-filter'): void
   (e: 'confirm', requestId: string): void
+  (e: 'view', requestId: string): void
   (e: 'cancel-confirmation', requestId: string): void
-  (e: 'matched-cancel', requestId: string): void
   (e: 'preview-seat', requestId: string): void
 }>()
 
@@ -129,8 +129,8 @@ function candidateAction(candidate: SeatSwapCandidate): ReturnType<typeof resolv
 .candidate-list {
   display: flex;
   flex-direction: column;
-  gap: var(--fi-space-card-gap);
-  margin: var(--fi-space-12) 0 var(--fi-space-card-gap);
+  gap: var(--fi-space-12);
+  margin: 0 0 var(--fi-space-16);
 }
 
 .candidate-list__item {
@@ -193,8 +193,8 @@ function candidateAction(candidate: SeatSwapCandidate): ReturnType<typeof resolv
   align-items: center;
   justify-content: space-between;
   gap: var(--fi-space-18);
-  margin-top: var(--fi-space-12);
-  padding: var(--fi-space-22) var(--fi-space-4);
+  margin-top: var(--fi-space-4);
+  padding: var(--fi-space-18) var(--fi-space-4);
   border-top: var(--fi-border-width) solid var(--fi-color-divider-soft);
 }
 

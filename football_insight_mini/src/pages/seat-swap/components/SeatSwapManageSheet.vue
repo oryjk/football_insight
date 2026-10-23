@@ -22,6 +22,13 @@
       </view>
 
       <template v-if="request.status !== 'matched'">
+        <!-- 对方已确认你的申请人：在这里直接选择和谁换座。 -->
+        <SeatSwapApplicantList
+          v-if="applicants.length"
+          class="seat-swap-manage__applicants"
+          :applicants="applicants"
+          @confirm="(id: string) => emit('confirm-applicant', id)"
+        />
         <text class="seat-swap-manage__note">你可以编辑或撤销当前发布。撤销后已发出的"确认换座"会一并失效。</text>
       </template>
       <template v-else>
@@ -57,12 +64,14 @@
 
 <script setup lang="ts">
 import FiBottomSheet from '../../../components/FiBottomSheet.vue'
-import type { SeatSwapRequest } from '../../../types/seatSwap'
+import SeatSwapApplicantList from './SeatSwapApplicantList.vue'
+import type { SeatSwapCandidate, SeatSwapRequest } from '../../../types/seatSwap'
 import { formatSeatSwapSeatLabel } from '../../../utils/stadiumRegions'
 
 defineProps<{
   visible: boolean
   request?: SeatSwapRequest | null
+  applicants: SeatSwapCandidate[]
   statusLabel: string
   desiredSummary: string
   cancelReason: string
@@ -72,6 +81,7 @@ const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
   (e: 'update:cancelReason', value: string): void
   (e: 'close'): void
+  (e: 'confirm-applicant', requestId: string): void
   (e: 'edit'): void
   (e: 'delete'): void
   (e: 'submit-matched-cancel'): void
@@ -115,6 +125,10 @@ function normalizeInputValue(event: Event): string {
   font-size: var(--fi-font-24);
   font-weight: var(--fi-weight-bold);
   text-align: right;
+}
+
+.seat-swap-manage__applicants {
+  margin-top: var(--fi-space-18);
 }
 
 .seat-swap-manage__note {

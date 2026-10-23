@@ -53,7 +53,7 @@ onBeforeUnmount(() => {
 .map-fab {
   position: fixed;
   right: var(--fi-space-24);
-  bottom: calc(var(--fi-space-24) + var(--window-bottom) + var(--fi-component-seat-swap-dock-height) + var(--fi-space-16));
+  bottom: calc(var(--fi-space-12) + var(--window-bottom) + var(--fi-component-seat-swap-dock-height) + var(--fi-space-16));
   z-index: 9;
   display: flex;
   align-items: center;

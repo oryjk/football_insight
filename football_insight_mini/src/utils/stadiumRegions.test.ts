@@ -67,7 +67,8 @@ describe('stadium region utilities', () => {
       { region_name: '102', desired_row: '', desired_seat_no: '' },
       { region_name: '103', desired_row: '9', desired_seat_no: '10' },
     ])).toBe('102、103 9排 10号')
-    expect(seatSwapStatusLabel('peer_confirmed_me')).toBe('对方已确认你')
+    expect(seatSwapStatusLabel('taken')).toBe('已被匹配')
+    expect(seatSwapStatusLabel('peer_confirmed_me')).toBe('对方邀请了你')
     expect(seatSwapStatusLabel('display_only')).toBe('')
   })
 })

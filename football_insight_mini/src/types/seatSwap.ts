@@ -34,7 +34,7 @@ export interface SeatSwapRequest {
 }
 
 export interface SeatSwapCandidate extends SeatSwapRequest {
-  status: 'communicable' | 'waiting_peer_confirmation' | 'peer_confirmed_me' | 'matched' | 'display_only'
+  status: 'communicable' | 'waiting_peer_confirmation' | 'peer_confirmed_me' | 'matched' | 'taken' | 'display_only'
 }
 
 export interface SeatSwapCurrentResponse {

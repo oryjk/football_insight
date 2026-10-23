@@ -104,9 +104,11 @@ export function seatSwapStatusLabel(status: string): string {
     case 'waiting_peer_confirmation':
       return '等待对方确认'
     case 'peer_confirmed_me':
-      return '对方已确认你'
+      return '对方邀请了你'
     case 'matched':
       return '已匹配成功'
+    case 'taken':
+      return '已被匹配'
     default:
       return ''
   }

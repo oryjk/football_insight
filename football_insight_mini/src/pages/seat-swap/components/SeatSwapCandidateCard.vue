@@ -3,6 +3,7 @@
     <view class="candidate__main">
       <!-- 卡片内的球场缩略图：红=当前座位、绿=目标座位，点开看大图。 -->
       <SeatSwapSeatThumb
+        class="candidate__thumb"
         :current-key="candidate.current_region_key"
         :desired-keys="desiredKeys"
         @open="emit('preview-seat', candidate.request_id)"
@@ -10,10 +11,6 @@
       <view class="candidate__content">
         <view class="candidate__user">
           <text class="candidate__name">{{ candidate.display_name }}</text>
-          <view v-if="statusText" class="candidate__status" :class="statusClass">
-            <view class="candidate__status-dot" />
-            <text>{{ statusText }}</text>
-          </view>
         </view>
         <view class="candidate__seat">
           <text class="candidate__seat-label">当前</text>
@@ -23,47 +20,51 @@
           <text class="candidate__wants-label">目标</text>
           <text class="candidate__wants-value">{{ desiredSeatText }}</text>
         </view>
-        <view v-if="candidate.contact" class="candidate__contact">
-          <text v-if="candidate.contact.wechat_id" class="candidate__contact-line">
-            微信:{{ candidate.contact.wechat_id }}
-          </text>
-          <text v-if="candidate.contact.phone_number" class="candidate__contact-line">
-            手机:{{ candidate.contact.phone_number }}
-          </text>
+      </view>
+      <!-- 右列：状态标签贴顶、操作按钮贴底，按钮不再垂直居中。 -->
+      <view class="candidate__side">
+        <view v-if="statusText" class="candidate__status" :class="statusClass">
+          <view class="candidate__status-dot" />
+          <text>{{ statusText }}</text>
+        </view>
+        <button
+          v-if="action === 'confirm'"
+          class="candidate__action candidate__action--primary"
+          :class="{ 'candidate__action--urgent': candidate.status !== 'display_only' }"
+          hover-class="candidate__action--pressed"
+          @tap.stop="emit('confirm', candidate.request_id)"
+        >
+          <!-- lucide arrow-left-right：带互换图标，一眼看出是可点的换座操作。 -->
+          <image
+            class="candidate__action-icon"
+            :src="candidate.status === 'display_only' ? '/static/seat-swap/arrow-left-right-ink.svg' : '/static/seat-swap/arrow-left-right-white.svg'"
+            mode="aspectFit"
+            aria-hidden="true"
+          />
+          <text>{{ candidate.status === 'display_only' ? '换到这' : '确认换座' }}</text>
+        </button>
+        <button
+          v-else-if="action === 'view'"
+          class="candidate__action candidate__action--primary candidate__action--urgent"
+          hover-class="candidate__action--pressed"
+          @tap.stop="emit('view', candidate.request_id)"
+        >
+          查看
+        </button>
+        <button
+          v-else-if="action === 'cancel_confirmation'"
+          class="candidate__action candidate__action--secondary"
+          hover-class="candidate__action--pressed"
+          @tap.stop="emit('cancel-confirmation', candidate.request_id)"
+        >
+          取消匹配
+        </button>
+        <!-- 已被别人匹配：原按钮位置放一个匹配成功的标记，卡片不再空着。 -->
+        <view v-else-if="candidate.status === 'taken'" class="candidate__taken-mark">
+          <image class="candidate__taken-icon" src="/static/seat-swap/circle-check-green.svg" mode="aspectFit" aria-hidden="true" />
+          <text class="candidate__taken-text">已匹配</text>
         </view>
       </view>
-      <button
-        v-if="action === 'confirm'"
-        class="candidate__action candidate__action--primary"
-        :class="{ 'candidate__action--urgent': candidate.status !== 'display_only' }"
-        hover-class="candidate__action--pressed"
-        @tap.stop="emit('confirm', candidate.request_id)"
-      >
-        <!-- lucide arrow-left-right：带互换图标，一眼看出是可点的换座操作。 -->
-        <image
-          class="candidate__action-icon"
-          :src="candidate.status === 'display_only' ? '/static/seat-swap/arrow-left-right-ink.svg' : '/static/seat-swap/arrow-left-right-white.svg'"
-          mode="aspectFit"
-          aria-hidden="true"
-        />
-        <text>{{ candidate.status === 'display_only' ? '换到这' : '确认换座' }}</text>
-      </button>
-      <button
-        v-else-if="action === 'cancel_confirmation'"
-        class="candidate__action candidate__action--secondary"
-        hover-class="candidate__action--pressed"
-        @tap.stop="emit('cancel-confirmation', candidate.request_id)"
-      >
-        取消匹配
-      </button>
-      <button
-        v-else-if="action === 'matched_cancel'"
-        class="candidate__action candidate__action--matched-cancel"
-        hover-class="candidate__action--pressed"
-        @tap.stop="emit('matched-cancel', candidate.request_id)"
-      >
-        取消匹配
-      </button>
     </view>
   </view>
 </template>
@@ -80,13 +81,13 @@ import {
 
 const props = defineProps<{
   candidate: SeatSwapCandidate
-  action: 'confirm' | 'cancel_confirmation' | 'matched_cancel' | 'none'
+  action: 'confirm' | 'view' | 'cancel_confirmation' | 'none'
 }>()
 
 const emit = defineEmits<{
   (e: 'confirm', requestId: string): void
+  (e: 'view', requestId: string): void
   (e: 'cancel-confirmation', requestId: string): void
-  (e: 'matched-cancel', requestId: string): void
   (e: 'preview-seat', requestId: string): void
 }>()
 
@@ -95,6 +96,7 @@ const statusText = computed(() => seatSwapStatusLabel(props.candidate.status))
 const isMatched = computed(() => props.candidate.status === 'matched')
 const cardClass = computed(() => ({
   'candidate--matched': isMatched.value,
+  'candidate--taken': props.candidate.status === 'taken',
 }))
 // 状态色只保留中性、可沟通（绿点）与"对方已确认你"（主色强调，需要你去操作）。
 const statusClass = computed(() => ({
@@ -106,17 +108,20 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 
 <style scoped>
 .candidate {
-  padding: var(--fi-space-22);
+  padding: var(--fi-space-16);
   border-radius: var(--fi-radius-md);
   border: var(--fi-border-card);
   background: var(--fi-color-surface);
-  box-shadow: var(--fi-shadow-card);
 }
 
 .candidate__main {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: var(--fi-space-16);
+}
+
+.candidate__thumb {
+  align-self: flex-start;
 }
 
 .candidate__content {
@@ -127,8 +132,17 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 .candidate__user {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--fi-space-12);
+}
+
+.candidate__side {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: var(--fi-space-12);
+  width: var(--fi-component-seat-swap-action-width);
 }
 
 
@@ -204,10 +218,13 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 
 .candidate__status {
   flex-shrink: 0;
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   gap: var(--fi-space-8);
-  padding: var(--fi-space-6) var(--fi-space-14);
+  padding: var(--fi-space-6) var(--fi-space-10);
+  white-space: nowrap;
   border-radius: var(--fi-radius-round);
   background: var(--fi-color-page);
   color: var(--fi-color-text-secondary);
@@ -236,33 +253,16 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   background: var(--fi-color-primary);
 }
 
-.candidate__contact {
-  display: flex;
-  flex-direction: column;
-  gap: var(--fi-space-4);
-  margin-top: var(--fi-space-12);
-  padding: var(--fi-space-16) var(--fi-space-18);
-  border-radius: var(--fi-radius-sm);
-  background: var(--fi-color-page);
-  color: var(--fi-color-text-secondary);
-  font-size: var(--fi-font-22);
-}
-
-.candidate__contact-line {
-  display: block;
-}
-
 /* 卡片内操作是次级按钮：单行胶囊、竖直居中，不再是撑满整卡高度的黑块。 */
 .candidate__action {
   flex-shrink: 0;
-  align-self: center;
   display: flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  width: var(--fi-component-seat-swap-action-width);
+  width: 100%;
   min-height: var(--fi-component-seat-swap-action-min-height);
-  margin: 0;
+  margin: auto 0 0;
   padding: 0 var(--fi-space-12);
   border-radius: var(--fi-radius-round);
   color: var(--fi-primitive-white);
@@ -308,30 +308,71 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   border: var(--fi-border-width) solid rgba(var(--fi-primitive-ink-rgb), 0.16);
 }
 
-.candidate__action--matched-cancel {
-  background: rgba(var(--fi-primitive-white-rgb), 0.18);
-  border: var(--fi-border-width) solid rgba(var(--fi-primitive-white-rgb), 0.28);
+.candidate--matched .candidate__action--primary {
+  background: var(--fi-primitive-white);
+  border-color: var(--fi-primitive-white);
+  color: var(--fi-primitive-green-deep);
 }
 
-/* 已匹配：纯色主色卡（原红色渐变） */
+.candidate__taken-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fi-space-6);
+  margin: auto 0 0;
+  min-height: var(--fi-component-seat-swap-action-min-height);
+}
+
+.candidate__taken-icon {
+  width: var(--fi-space-44);
+  height: var(--fi-space-44);
+}
+
+.candidate__taken-text {
+  color: var(--fi-primitive-green-deep);
+  font-size: var(--fi-font-20);
+  font-weight: var(--fi-weight-bold);
+  line-height: var(--fi-leading-none);
+}
+
+/* 已被别人匹配：灰底降权，和可操作的白色卡片区分开。 */
+.candidate--taken {
+  background: rgba(var(--fi-primitive-ink-rgb), 0.06);
+  border-color: transparent;
+}
+
+.candidate--taken .candidate__thumb,
+.candidate--taken .candidate__seat,
+.candidate--taken .candidate__wants {
+  opacity: 0.6;
+}
+
+.candidate--taken .candidate__name {
+  color: var(--fi-color-text-secondary);
+}
+
+.candidate--taken .candidate__status {
+  background: rgba(var(--fi-primitive-ink-rgb), 0.08);
+}
+
+/* 已匹配：成功绿卡片，和红色的「需要处理」邀请区分开。 */
 .candidate--matched {
-  background: var(--fi-color-primary);
-  border-color: var(--fi-color-primary-deep);
-  box-shadow: var(--fi-shadow-card-strong);
+  background: var(--fi-primitive-green);
+  border-color: var(--fi-primitive-green-deep);
+  box-shadow: var(--fi-shadow-card);
 }
 
 .candidate--matched .candidate__name,
 .candidate--matched .candidate__seat,
 .candidate--matched .candidate__wants,
-.candidate--matched .candidate__contact,
 .candidate--matched .candidate__status {
   color: var(--fi-primitive-white);
 }
 
 .candidate--matched .candidate__seat,
 .candidate--matched .candidate__wants,
-.candidate--matched .candidate__status,
-.candidate--matched .candidate__contact {
+.candidate--matched .candidate__status {
   background: rgba(var(--fi-primitive-white-rgb), 0.14);
 }
 
@@ -342,13 +383,5 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 
 .candidate--matched .candidate__status-dot {
   background: var(--fi-primitive-white);
-}
-
-.candidate--matched .candidate__contact {
-  margin-top: var(--fi-space-16);
-  padding: var(--fi-space-20) var(--fi-space-22);
-  border: var(--fi-border-width) solid rgba(var(--fi-primitive-white-rgb), 0.16);
-  font-size: var(--fi-font-26);
-  gap: var(--fi-space-8);
 }
 </style>

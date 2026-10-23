@@ -41,7 +41,7 @@ const emit = defineEmits<{
   position: fixed;
   left: var(--fi-space-24);
   right: var(--fi-space-24);
-  bottom: calc(var(--fi-space-24) + var(--window-bottom));
+  bottom: calc(var(--fi-space-12) + var(--window-bottom));
   z-index: 8;
 }
 
@@ -95,7 +95,7 @@ const emit = defineEmits<{
   align-items: center;
   min-height: var(--fi-component-seat-swap-dock-height);
   box-sizing: border-box;
-  padding: var(--fi-space-20) var(--fi-space-22);
+  padding: var(--fi-space-12) var(--fi-space-22);
   border-radius: var(--fi-radius-md);
   /* 已发布后是状态条而非主操作：白底承载红/绿座位块；唯一的操作「管理」用品牌红。 */
   background: var(--fi-color-surface);

@@ -31,7 +31,7 @@ export interface SeatSwapFormErrors {
 }
 
 export type SeatSwapSelectionStep = 'select_current' | 'select_desired' | 'ready_to_publish'
-export type SeatSwapCandidateAction = 'confirm' | 'cancel_confirmation' | 'matched_cancel' | 'none'
+export type SeatSwapCandidateAction = 'confirm' | 'view' | 'cancel_confirmation' | 'none'
 
 export interface SeatSwapRegionGroup<TRequest extends SeatSwapRegionGroupItem> {
   region_key: string
@@ -251,8 +251,14 @@ export function resolveSeatSwapCandidateAction(input: {
     return 'cancel_confirmation'
   }
 
-  if (input.candidateStatus === 'matched') {
-    return 'matched_cancel'
+  // 对方已和别人匹配：第三方没有任何操作。
+  if (input.candidateStatus === 'taken') {
+    return 'none'
+  }
+
+  // 已匹配 / 对方已邀请我：列表里只给「查看」，联系方式和确认换座都放进弹层里。
+  if (input.candidateStatus === 'matched' || input.candidateStatus === 'peer_confirmed_me') {
+    return 'view'
   }
 
   return 'confirm'

@@ -240,13 +240,31 @@ describe('seat swap candidate actions', () => {
     })).toBe('cancel_confirmation')
   })
 
-  test('does not show an inline action for matched candidates', () => {
+  test('sends peer invitations to the applicant view instead of confirming inline', () => {
+    expect(resolveSeatSwapCandidateAction({
+      candidateStatus: 'peer_confirmed_me',
+      candidateRequestId: 'target-request',
+      myRequestId: 'my-request',
+      isLoggedIn: true,
+    })).toBe('view')
+  })
+
+  test('gives third parties no action on candidates already matched with someone else', () => {
+    expect(resolveSeatSwapCandidateAction({
+      candidateStatus: 'taken',
+      candidateRequestId: 'target-request',
+      myRequestId: 'my-request',
+      isLoggedIn: true,
+    })).toBe('none')
+  })
+
+  test('sends matched candidates to the view sheet instead of showing contact inline', () => {
     expect(resolveSeatSwapCandidateAction({
       candidateStatus: 'matched',
       candidateRequestId: 'target-request',
       myRequestId: 'my-request',
       isLoggedIn: true,
-    })).toBe('matched_cancel')
+    })).toBe('view')
   })
 })
 
