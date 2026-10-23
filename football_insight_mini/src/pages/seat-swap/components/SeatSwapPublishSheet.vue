@@ -53,12 +53,12 @@
       <view class="row-input">
         <view class="row-input__field">
           <text class="row-input__label">当前排</text>
-          <input v-model="form.current_row" :adjust-position="false" class="input-box" placeholder="如 8" />
+          <input v-model="form.current_row" :adjust-position="false" type="number" class="input-box" placeholder="如 8" />
           <text v-if="formErrors.current_row" class="field-error">{{ formErrors.current_row }}</text>
         </view>
         <view class="row-input__field">
           <text class="row-input__label">当前号</text>
-          <input v-model="form.current_seat_no" :adjust-position="false" class="input-box" placeholder="如 15" />
+          <input v-model="form.current_seat_no" :adjust-position="false" type="number" class="input-box" placeholder="如 15" />
           <text v-if="formErrors.current_seat_no" class="field-error">{{ formErrors.current_seat_no }}</text>
         </view>
       </view>
