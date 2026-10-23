@@ -84,8 +84,10 @@
           :key="`desired-${seat.region_key}`"
           class="desired-rows__item tag--region"
           :class="regionTagClass(seat.region_name)"
+          @tap="handleSheetMapTap(seat.region_key)"
         >
           <text class="desired-rows__name">{{ seat.region_name }}</text>
+          <text class="desired-rows__remove">✕</text>
         </view>
       </view>
       <text v-if="formErrors.desired_seats" class="field-error">{{ formErrors.desired_seats }}</text>
@@ -391,6 +393,14 @@ function handleVisibleChange(value: boolean): void {
 .desired-rows__name {
   font-size: var(--fi-font-24);
   font-weight: var(--fi-weight-black);
+}
+
+/* 第二步可编辑：点卡片取消该目标座位 */
+.desired-rows__remove {
+  margin-left: var(--fi-space-10);
+  font-size: var(--fi-font-20);
+  line-height: var(--fi-leading-none);
+  opacity: 0.85;
 }
 
 .field-error {
