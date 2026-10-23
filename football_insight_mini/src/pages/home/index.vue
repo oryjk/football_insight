@@ -4,7 +4,7 @@
     <FiLaunchSplash :phase="splash.phase.value" />
     <!-- 冷启动宽限期内（启动幕尚未决定是否出现）背景图和导航都不显示，免得先于启动幕闪现 -->
     <FiBrandNav v-show="!launchPending" />
-    <image v-if="!launchPending" class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
+    <view v-if="!launchPending" class="page-bg-img" :style="{ backgroundImage: `url(${bgImage})` }"></view>
     <view v-if="!launchPending" class="page-bg-fade"></view>
     <view class="page-scroll">
       <view class="page">
@@ -578,6 +578,9 @@ onShow(() => {
   left: 0;
   width: 100%;
   height: var(--fi-space-600);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center top;
   pointer-events: none;
   z-index: 0;
 }
