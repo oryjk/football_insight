@@ -99,22 +99,27 @@ function resolveMembershipTierPresentation(code?: string | null): MembershipTier
   return MEMBERSHIP_TIER_PRESENTATION.V1
 }
 
+function isReferralRule(rule: MembershipTierRule): boolean {
+  return rule.kind === 'referral' && typeof rule.min_referrals === 'number' && rule.min_referrals > 0
+}
+
+// 后端只在目标档位为 referral 时按邀请人数升级；standard/invite 档位上的 min_referrals 不生效，不能写成升级条件。
 function buildMembershipCondition(rule: MembershipTierRule): string {
   const normalizedCode = normalizeMembershipTierCode(rule.code)
 
   if (normalizedCode === 'V1' || (rule.kind === 'standard' && rule.min_referrals == null)) {
-    return '默认等级：未走邀请码链路时进入 V1。'
-  }
-
-  if (typeof rule.min_referrals === 'number') {
-    return `升级条件：累计推荐 ${rule.min_referrals} 人。`
+    return '默认等级：注册时没有填邀请码的账号为 V1。'
   }
 
   if (rule.kind === 'invite') {
-    return '升级条件：使用邀请码完成注册或首次微信绑定。'
+    return '升级条件：用公众号领取的邀请码注册。'
   }
 
-  return '升级条件：以后端当前配置为准。'
+  if (isReferralRule(rule)) {
+    return `升级条件：累计邀请 ${rule.min_referrals} 位好友注册。`
+  }
+
+  return '升级条件：暂未开放。'
 }
 
 function buildMembershipDescription(rule: MembershipTierRule, refreshLabel: string): string {
@@ -208,5 +213,59 @@ export function formatInviteUpgradeHint(rules: MembershipTierRule[] | null | und
   const target = typeof referrals === 'number' && referrals > 0
     ? `累计邀请 ${referrals} 位好友注册，就能免费升到 ${code}`
     : `邀请好友注册，累计达标就能免费升到 ${code}`
-  return `${target}。好友注册时填你的邀请码即可。`
+  return `${target}。好友第一次登录时在「推荐码」一栏填你的邀请码即可。`
+}
+
+export interface MembershipLevelRow {
+  code: string
+  name: string
+  /** 获得方式，如「邀请 20 人 / 开通」。 */
+  ways: string
+  refreshLabel: string
+}
+
+/**
+ * 会员等级说明表：每个等级怎么拿到。没有任何获得途径的档位（如配置里的 V2）不展示。
+ * purchasableTiers 为当前可购买的年度档位。
+ */
+export function buildMembershipLevelRows(
+  rules: MembershipTierRule[] | null | undefined,
+  purchasableTiers: string[],
+): MembershipLevelRow[] {
+  const purchasable = new Set(purchasableTiers.map(normalizeMembershipTierCode))
+  return [...(rules ?? [])]
+    .sort((left, right) => membershipTierRank(left.code) - membershipTierRank(right.code))
+    .flatMap((rule) => {
+      const code = normalizeMembershipTierCode(rule.code)
+      const ways: string[] = []
+      if (code === 'V1') ways.push('注册即有')
+      if (rule.kind === 'invite') ways.push('用邀请码注册')
+      if (isReferralRule(rule)) ways.push(`邀请 ${rule.min_referrals} 人`)
+      if (purchasable.has(code)) ways.push('开通')
+      if (!ways.length) return []
+      return [{
+        code,
+        name: resolveMembershipTierPresentation(code).name,
+        ways: ways.join(' / '),
+        refreshLabel: formatTicketWatchPollIntervalLabel(rule.ticket_watch_poll_interval_seconds),
+      }]
+    })
+}
+
+export interface InviteMilestone {
+  code: string
+  referrals: number
+  refreshLabel: string
+}
+
+/** 邀请人数对应的免费升级档位（只含后端会按人数自动升级的 referral 档位）。 */
+export function buildInviteMilestones(rules: MembershipTierRule[] | null | undefined): InviteMilestone[] {
+  return (rules ?? [])
+    .filter(isReferralRule)
+    .map(rule => ({
+      code: normalizeMembershipTierCode(rule.code),
+      referrals: rule.min_referrals as number,
+      refreshLabel: formatTicketWatchPollIntervalLabel(rule.ticket_watch_poll_interval_seconds),
+    }))
+    .sort((left, right) => left.referrals - right.referrals)
 }

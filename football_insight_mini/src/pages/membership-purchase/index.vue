@@ -32,8 +32,15 @@
       />
 
       <FiPanel flush>
-        <view class="link-row" @tap="rulesSheetVisible = true">
-          <text class="link-row__label">会员等级与邀请升级规则</text>
+        <view class="link-row" @tap="levelsSheetVisible = true">
+          <text class="link-row__label">会员等级说明</text>
+          <text class="link-row__arrow">›</text>
+        </view>
+        <view class="link-row link-row--divided" @tap="openInviteSheet">
+          <view class="link-row__main">
+            <text class="link-row__label">邀请好友免费升级</text>
+            <text v-if="inviteLinkCaption" class="link-row__caption">{{ inviteLinkCaption }}</text>
+          </view>
           <text class="link-row__arrow">›</text>
         </view>
       </FiPanel>
@@ -67,11 +74,18 @@
       </view>
     </view>
 
-    <MembershipRulesSheet
-      v-model:visible="rulesSheetVisible"
-      :summary="membershipRuleSummary"
-      :guides="membershipTierGuides"
+    <MembershipLevelsSheet
+      v-model:visible="levelsSheetVisible"
+      :rows="membershipLevelRows"
       :selected-tier="selectedProduct?.target_tier ?? ''"
+      @open-invite="openInviteSheet"
+    />
+    <MembershipInviteSheet
+      v-model:visible="inviteSheetVisible"
+      :invite-code="currentUser?.invite_code?.trim() ?? ''"
+      :milestones="inviteMilestones"
+      @copy="copyInviteCode"
+      @open-official="openUserOfficialAccount"
     />
     <MembershipAgreementSheet
       v-model:visible="agreementSheetVisible"
@@ -91,7 +105,8 @@ import FiPanel from '../../components/FiPanel.vue'
 import FiSectionHeading from '../../components/FiSectionHeading.vue'
 import MembershipAgreementSheet from './components/MembershipAgreementSheet.vue'
 import MembershipBenefitsPanel from './components/MembershipBenefitsPanel.vue'
-import MembershipRulesSheet from './components/MembershipRulesSheet.vue'
+import MembershipInviteSheet from './components/MembershipInviteSheet.vue'
+import MembershipLevelsSheet from './components/MembershipLevelsSheet.vue'
 import MembershipTierList from './components/MembershipTierList.vue'
 import { buildMembershipBenefitPreview, buildMembershipPassSummary, buildMembershipTierSummary } from '../../utils/membershipBenefits'
 import { goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
@@ -106,10 +121,8 @@ import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../con
 import { useAppSession } from '../../stores/appSession'
 import { reportPageActivity } from '../../utils/userActivity'
 import { useMiniReviewStatus } from '../../stores/miniReview'
-import {
-  buildMembershipTierGuides,
-  type MembershipTierGuide,
-} from '../../utils/membershipRules'
+import { buildInviteMilestones, buildMembershipLevelRows } from '../../utils/membershipRules'
+import { openUserOfficialAccount } from '../../utils/officialAccountNavigation'
 import {
   buildMembershipPurchaseAgreement,
   filterMembershipProductOptionsForUpgrade,
@@ -137,12 +150,13 @@ const currentUser = session.currentUser
 const loading = ref(false)
 const selectedTier = ref('')
 const agreementAccepted = ref(false)
-const rulesSheetVisible = ref(false)
+const levelsSheetVisible = ref(false)
+const inviteSheetVisible = ref(false)
 const agreementSheetVisible = ref(false)
 // 声明弹层是否由「确认开通」触发（决定是否显示「开通前需要先同意」提示）。
 const agreementRequired = ref(false)
 // 弹层打开时锁住页面滚动（小程序需由页面 page-meta 承担）。
-const pageLockStyle = computed(() => rulesSheetVisible.value || agreementSheetVisible.value ? 'overflow: hidden;' : '')
+const pageLockStyle = computed(() => levelsSheetVisible.value || inviteSheetVisible.value || agreementSheetVisible.value ? 'overflow: hidden;' : '')
 const agreementPoints = computed(() => buildMembershipPurchaseAgreement(selectedProduct.value))
 const paymentAvailable = ref(false)
 // 首次检查完成前不展示「暂未开放」；之后的刷新沿用上次结果，避免卡片闪现导致页面抖动。
@@ -165,17 +179,17 @@ const emptyProductBody = computed(() =>
     ? '你当前没有需要继续购买的更高档位。'
     : '请稍后重试，会员价格和可购买档位以后端配置为准。',
 )
-const membershipTierGuides = computed<MembershipTierGuide[]>(() =>
-  buildMembershipTierGuides(publicConfig.value?.membership_tier_rules),
-)
-const membershipRuleSummary = computed(() => {
-  const codes = membershipTierGuides.value.map((item) => item.code).join('、')
-
-  if (!codes) {
-    return '会员升级条件和对应刷新速度以后端当前配置为准。'
-  }
-
-  return `当前开放 ${codes}。会员等级会影响余票监控刷新频率和最近回流速览可查看的时间范围，具体以后台当前配置为准。`
+// 等级说明里的「开通」只标年度档位；体验卡是限时商品，不算获得等级的长期途径。
+const membershipLevelRows = computed(() => buildMembershipLevelRows(
+  publicConfig.value?.membership_tier_rules,
+  allProductOptions.value.filter(option => !option.is_pass && option.group_key?.trim() !== 'pass').map(option => option.target_tier),
+))
+const inviteMilestones = computed(() => buildInviteMilestones(publicConfig.value?.membership_tier_rules))
+const inviteLinkCaption = computed(() => {
+  const first = inviteMilestones.value[0]
+  const last = inviteMilestones.value[inviteMilestones.value.length - 1]
+  if (!first || !last) return ''
+  return first === last ? `邀请 ${first.referrals} 人升 ${first.code}` : `邀请 ${first.referrals} 人升 ${first.code}，最高 ${last.code}`
 })
 
 const selectedProduct = computed(() =>
@@ -251,6 +265,22 @@ async function loadPurchaseData() {
   }
 
   selectedTier.value = resolveSelectedTier(selectedTier.value, productOptions.value)
+}
+
+// 从等级说明跳到邀请规则时先关掉等级弹层，避免两层叠在一起。
+function openInviteSheet(): void {
+  levelsSheetVisible.value = false
+  inviteSheetVisible.value = true
+}
+
+function copyInviteCode(): void {
+  const code = currentUser.value?.invite_code?.trim()
+  if (!code) return
+  uni.setClipboardData({
+    data: code,
+    success: () => uni.showToast({ title: '邀请码已复制', icon: 'success' }),
+    fail: () => uni.showToast({ title: '复制失败，请稍后重试', icon: 'none' }),
+  })
 }
 
 function selectTier(targetTier: string): void {
@@ -403,6 +433,22 @@ async function handlePurchase() {
   align-items: center;
   justify-content: space-between;
   padding: var(--fi-space-24) var(--fi-component-panel-padding);
+}
+
+.link-row--divided {
+  border-top: var(--fi-border-divider);
+}
+
+.link-row__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fi-space-4);
+}
+
+.link-row__caption {
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-22);
 }
 
 .link-row__label {
