@@ -124,7 +124,7 @@
         </view>
         <view class="row-input__field">
           <text class="row-input__label">手机号</text>
-          <input v-model="form.phone_number" :adjust-position="false" @focus="onInputFocus" @blur="onInputBlur" @keyboardheightchange="onKeyboardHeightChange" class="input-box" type="number" placeholder="11 位手机号" />
+          <input v-model="form.phone_number" :adjust-position="false" :maxlength="11" @focus="onInputFocus" @blur="handlePhoneBlur" @input="clearPhoneError" @keyboardheightchange="onKeyboardHeightChange" class="input-box" :class="{ 'input-box--error': formErrors.phone_number }" type="number" placeholder="11 位手机号" />
         </view>
       </view>
       <text v-if="formErrors.contact" class="field-error">{{ formErrors.contact }}</text>
@@ -187,7 +187,7 @@ const {
   stagedCurrentRegionName, stagedDesiredKeys, confirmedDesiredKeys,
   canConfirmCurrentSelection, canConfirmDesiredSelection, regionTagClass,
   handleSheetMapTap, confirmCurrentSelection, confirmDesiredSelection,
-  goPreviousSelectionStep, jumpToStep, submit,
+  goPreviousSelectionStep, jumpToStep, submit, validatePhoneField, clearPhoneError,
 } = useSeatSwapPublishForm(props, (payload) => emit('submit', payload))
 
 const { keyboardHeight, onInputFocus, onInputBlur, onKeyboardHeightChange, resetKeyboard } = useSheetKeyboard()
@@ -195,6 +195,11 @@ const { keyboardHeight, onInputFocus, onInputBlur, onKeyboardHeightChange, reset
 watch(() => props.visible, (visible) => {
   if (!visible) resetKeyboard()
 })
+
+function handlePhoneBlur(): void {
+  onInputBlur()
+  validatePhoneField()
+}
 
 function handleVisibleChange(value: boolean): void {
   emit('update:visible', value)
@@ -383,6 +388,10 @@ function handleVisibleChange(value: boolean): void {
   font-size: var(--fi-font-26);
   color: var(--fi-color-text-strong);
   box-sizing: border-box;
+}
+
+.input-box--error {
+  border-color: var(--fi-color-primary-deep);
 }
 
 .desired-rows {

@@ -9,6 +9,7 @@ import {
   previousSeatSwapStep,
   toggleDesiredSeatRegion,
   validateSeatSwapForm,
+  validateSeatSwapPhoneNumber,
   type SeatSwapFormErrors,
   type SeatSwapFormState,
   type SeatSwapSelectionStep,
@@ -263,12 +264,23 @@ export function useSeatSwapPublishForm(
       presetCandidate: props.presetCandidate,
     })
   }
+  // 离开手机号输入框时即时校验，不用等到点发布才发现格式不对；重新输入时先清掉旧错误。
+  function validatePhoneField(): void {
+    formErrors.value = { ...formErrors.value, phone_number: validateSeatSwapPhoneNumber(form.phone_number) }
+  }
+
+  function clearPhoneError(): void {
+    if (formErrors.value.phone_number) {
+      formErrors.value = { ...formErrors.value, phone_number: undefined }
+    }
+  }
+
   return {
     selectionStep, stagedCurrentRegionKey, stagedDesiredSeats, formErrors, form,
     selectionSteps, selectionStepIndex, sheetEyebrow, sheetTitle, sheetMapMode,
     stagedCurrentRegionName, stagedDesiredKeys, confirmedDesiredKeys,
     canConfirmCurrentSelection, canConfirmDesiredSelection, regionTagClass,
     handleSheetMapTap, confirmCurrentSelection, confirmDesiredSelection,
-    goPreviousSelectionStep, jumpToStep, submit,
+    goPreviousSelectionStep, jumpToStep, submit, validatePhoneField, clearPhoneError,
   }
 }

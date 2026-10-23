@@ -31,6 +31,7 @@ import {
   shouldShowSeatSwapMapFab,
   toggleDesiredSeatRegion,
   validateSeatSwapForm,
+  validateSeatSwapPhoneNumber,
   type SeatSwapDesiredSeatFormState,
   type SeatSwapFormState,
 } from './helpers'
@@ -65,6 +66,15 @@ describe('seat swap form validation', () => {
     })
 
     expect(errors.contact).toBe('请至少填写微信号或手机号')
+  })
+
+  test('validates the phone number format only when provided', () => {
+    expect(validateSeatSwapPhoneNumber('')).toBe(undefined)
+    expect(validateSeatSwapPhoneNumber(' 13812345678 ')).toBe(undefined)
+    expect(validateSeatSwapPhoneNumber('1381234567')).toBe('手机号应为 11 位，当前 10 位')
+    expect(validateSeatSwapPhoneNumber('12812345678')).toBe('手机号格式不正确')
+    expect(validateSeatSwapPhoneNumber('1381234567a')).toBe('手机号只能是数字')
+    expect(validateSeatSwapForm({ ...validForm(), phone_number: '23812345678' }).phone_number).toBe('手机号格式不正确')
   })
 
   test('requires current row and seat number', () => {

@@ -85,11 +85,22 @@ export function validateSeatSwapForm(form: SeatSwapFormState): SeatSwapFormError
     errors.contact = '请至少填写微信号或手机号'
   }
 
-  if (phone && !/^1\d{10}$/.test(phone)) {
-    errors.phone_number = '请输入 11 位手机号'
+  const phoneError = validateSeatSwapPhoneNumber(phone)
+  if (phoneError) {
+    errors.phone_number = phoneError
   }
 
   return errors
+}
+
+/** 手机号可不填（微信号二选一）；填了就必须是 11 位、1 开头、第二位 3-9 的大陆手机号。 */
+export function validateSeatSwapPhoneNumber(value: string): string | undefined {
+  const phone = value.trim()
+  if (!phone) return undefined
+  if (!/^\d+$/.test(phone)) return '手机号只能是数字'
+  if (phone.length !== 11) return `手机号应为 11 位，当前 ${phone.length} 位`
+  if (!/^1[3-9]\d{9}$/.test(phone)) return '手机号格式不正确'
+  return undefined
 }
 
 export function canConfirmCurrentSeatRegion(
