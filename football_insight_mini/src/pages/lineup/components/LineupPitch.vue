@@ -12,6 +12,8 @@
       <view class="pitch__circle" />
       <view class="pitch__box pitch__box--top" />
       <view class="pitch__box pitch__box--bottom" />
+      <!-- 品牌水印：用户截图分享时能看出阵容来自足球洞察；放在球员层之下，不挡拖动 -->
+      <text class="pitch__watermark">足球洞察</text>
 
       <movable-area v-if="measured" class="pitch__area" :style="areaStyle">
         <movable-view
@@ -350,6 +352,19 @@ function onTap(slot: number): void {
 .pitch__box--bottom {
   bottom: 2%;
   border-bottom: 0;
+}
+
+/* 右下角：落在底线禁区右侧与边线之间的空白里 */
+.pitch__watermark {
+  position: absolute;
+  right: 5%;
+  bottom: 3.5%;
+  color: var(--fi-color-lineup-markings);
+  font-size: var(--fi-font-22);
+  font-weight: var(--fi-weight-bold);
+  letter-spacing: 4rpx;
+  line-height: var(--fi-leading-none);
+  pointer-events: none;
 }
 
 /* movable-area 必须显式写宽高：微信默认 10px，只靠 top/right/bottom/left 拉伸不会生效，
