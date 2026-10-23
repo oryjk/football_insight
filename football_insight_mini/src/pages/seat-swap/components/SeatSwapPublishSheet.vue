@@ -5,6 +5,7 @@
     :title="sheetTitle"
     height="76vh"
     compact-footer
+    avoid-keyboard
     @update:visible="handleVisibleChange"
   >
     <view v-if="presetCandidate" class="candidate-target">
@@ -52,12 +53,12 @@
       <view class="row-input">
         <view class="row-input__field">
           <text class="row-input__label">当前排</text>
-          <input v-model="form.current_row" class="input-box" placeholder="如 8" />
+          <input v-model="form.current_row" :adjust-position="false" class="input-box" placeholder="如 8" />
           <text v-if="formErrors.current_row" class="field-error">{{ formErrors.current_row }}</text>
         </view>
         <view class="row-input__field">
           <text class="row-input__label">当前号</text>
-          <input v-model="form.current_seat_no" class="input-box" placeholder="如 15" />
+          <input v-model="form.current_seat_no" :adjust-position="false" class="input-box" placeholder="如 15" />
           <text v-if="formErrors.current_seat_no" class="field-error">{{ formErrors.current_seat_no }}</text>
         </view>
       </view>
@@ -113,11 +114,11 @@
       <view class="row-input row-input--contact">
         <view class="row-input__field">
           <text class="row-input__label">微信号</text>
-          <input v-model="form.wechat_id" class="input-box" placeholder="至少填一项" />
+          <input v-model="form.wechat_id" :adjust-position="false" class="input-box" placeholder="至少填一项" />
         </view>
         <view class="row-input__field">
           <text class="row-input__label">手机号</text>
-          <input v-model="form.phone_number" class="input-box" type="number" placeholder="11 位手机号" />
+          <input v-model="form.phone_number" :adjust-position="false" class="input-box" type="number" placeholder="11 位手机号" />
         </view>
       </view>
       <text v-if="formErrors.contact" class="field-error">{{ formErrors.contact }}</text>
