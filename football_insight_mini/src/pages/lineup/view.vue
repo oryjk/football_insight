@@ -19,7 +19,7 @@
         <text class="community-caption">发布 {{ lineupDateLabel(detail.created_at) }} · 更新 {{ lineupDateLabel(detail.updated_at) }}</text>
         <text v-if="overlapLine" class="community-caption community-caption--overlap">{{ overlapLine }}</text>
       </view>
-      <LineupPitch :players="pitchPlayers" :exclusive-ids="exclusiveIds" readonly />
+      <LineupPitch :players="pitchPlayers" :exclusive-ids="exclusiveIds" :code-src="pitchCodeSrc" readonly />
       <view class="community-row">
         <view class="reaction-slot"><FiReactionBar size="md" :count="detail.likes_count" :liked="detail.liked_by_me" :disliked="detail.disliked_by_me" :pending="pendingLikes.length > 0" @like="like(returnUrl)" @dislike="dislike(returnUrl)" /></view>
         <button class="community-action" @tap="openShare">分享阵容</button>
@@ -53,11 +53,13 @@ import { publicPitch, lineupSharePayload } from './lineupPoster'
 import { lineupDateLabel } from '../../utils/lineupPresentation'
 import { useLineupShare } from './useLineupShare'
 import { useLineupOwnership } from './useLineupOwnership'
+import { useLineupPitchCode } from './useLineupPitchCode'
 const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
 const state = createLineupDetail()
 const { detail, loading, error, pendingLikes, like, dislike } = state
 const ownership = useLineupOwnership(detail, session)
+const { codeSrc: pitchCodeSrc } = useLineupPitchCode(() => detail.value?.share_code)
 const { isOwner, loading: ownershipLoading } = ownership
 const code = ref('')
 const returnUrl = computed(() => buildLineupViewUrl(code.value))

@@ -12,8 +12,11 @@
       <view class="pitch__circle" />
       <view class="pitch__box pitch__box--top" />
       <view class="pitch__box pitch__box--bottom" />
-      <!-- 品牌水印：用户截图分享时能看出阵容来自足球洞察；放在球员层之下，不挡拖动 -->
-      <text class="pitch__watermark">足球洞察</text>
+      <!-- 品牌水印 + 小程序码：用户截图分享时能看出阵容来自足球洞察、扫码可直达；放在球员层之下，不挡拖动 -->
+      <view class="pitch__brand">
+        <image v-if="codeSrc" class="pitch__code" :src="codeSrc" mode="aspectFit" />
+        <text class="pitch__watermark">足球洞察</text>
+      </view>
 
       <movable-area v-if="measured" class="pitch__area" :style="areaStyle">
         <movable-view
@@ -58,11 +61,14 @@ const props = withDefaults(defineProps<{
   selectedSlot?: number | null
   /** 共识之外的"独家"球员 id（只读展示用；编辑页不传，外观不变）。 */
   exclusiveIds?: number[]
+  /** 已发布阵容的小程序码图片路径；为空只显示文字水印 */
+  codeSrc?: string
 }>(), {
   readonly: false,
   fitContainer: false,
   selectedSlot: null,
   exclusiveIds: () => [],
+  codeSrc: '',
 })
 
 const emit = defineEmits<{
@@ -355,16 +361,33 @@ function onTap(slot: number): void {
 }
 
 /* 右下角：落在底线禁区右侧与边线之间的空白里 */
-.pitch__watermark {
+.pitch__brand {
   position: absolute;
   right: 5%;
   bottom: 3.5%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--fi-space-8);
+  pointer-events: none;
+}
+
+/* 白底留出静区，截图后才扫得出 */
+.pitch__code {
+  width: 112rpx;
+  height: 112rpx;
+  padding: var(--fi-space-6);
+  box-sizing: border-box;
+  border-radius: var(--fi-radius-xs);
+  background: var(--fi-primitive-white);
+}
+
+.pitch__watermark {
   color: var(--fi-color-lineup-markings);
   font-size: var(--fi-font-22);
   font-weight: var(--fi-weight-bold);
   letter-spacing: 4rpx;
   line-height: var(--fi-leading-none);
-  pointer-events: none;
 }
 
 /* movable-area 必须显式写宽高：微信默认 10px，只靠 top/right/bottom/left 拉伸不会生效，

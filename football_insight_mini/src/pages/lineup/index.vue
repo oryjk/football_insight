@@ -44,6 +44,7 @@
             :players="pitchPlayers"
             :selected-slot="editor.selectedSlot.value"
             fit-container
+            :code-src="pitchCodeSrc"
             @tap="openSheet"
             @drag="editor.applyDrag"
           />
@@ -114,6 +115,7 @@ import { buildLineupListUrl, buildLineupPageUrl, parseLineupPageQuery } from '..
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
 import { buildPitchPlayers, buildSheetGroups, positionIndex } from './lineupViewModel'
 import { useLineupPage } from './useLineupPage'
+import { useLineupPitchCode } from './useLineupPitchCode'
 import LineupFormationBar from './components/LineupFormationBar.vue'
 import LineupPitch from './components/LineupPitch.vue'
 import LineupPlayerSheet from './components/LineupPlayerSheet.vue'
@@ -124,6 +126,7 @@ const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
 
 const { teamId, squad, loading, errorMessage, notice, saving, savingDraft, publishing, saveState, savedLineup, hasUnpublishedChanges, editor, load, saveDraft, publish, fillStartingEleven, dispose } = useLineupPage()
+const { codeSrc: pitchCodeSrc } = useLineupPitchCode(() => savedLineup.value?.share_code)
 
 const teams = ref<Array<{ team_id: number; team_name: string; avatar_url: string | null }>>([])
 const sheetVisible = ref(false)
