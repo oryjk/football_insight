@@ -78,7 +78,7 @@
         <text v-if="!stagedDesiredSeats.length" class="tag tag--empty">先点球场中的目标分区(可多选)</text>
       </view>
       <view v-if="stagedDesiredSeats.length" class="desired-rows">
-        <text class="seat-selection-group__title seat-selection-group__title--full">目标座位</text>
+        <text class="seat-selection-group__title">目标座位</text>
         <view
           v-for="seat in stagedDesiredSeats"
           :key="`desired-${seat.region_key}`"
@@ -101,7 +101,7 @@
         </view>
       </view>
       <view class="desired-rows desired-rows--summary">
-        <text class="seat-selection-group__title seat-selection-group__title--full">目标座位</text>
+        <text class="seat-selection-group__title">目标座位</text>
         <view
           v-for="seat in form.desired_seats"
           :key="`summary-desired-${seat.region_key}`"
@@ -313,10 +313,6 @@ function handleVisibleChange(value: boolean): void {
   line-height: var(--fi-leading-none);
 }
 
-.seat-selection-group__title--full {
-  width: 100%;
-}
-
 .current-seat-card {
   display: inline-flex;
   align-items: center;
@@ -374,6 +370,7 @@ function handleVisibleChange(value: boolean): void {
   margin-top: var(--fi-space-12);
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--fi-space-10);
 }
 
