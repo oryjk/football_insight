@@ -3,6 +3,9 @@
     :visible="visible"
     eyebrow="我的发布"
     :title="statusLabel"
+    fit-content
+    compact-footer
+    respect-window-bottom
     @update:visible="emit('update:visible', $event)"
     @close="emit('close')"
   >
