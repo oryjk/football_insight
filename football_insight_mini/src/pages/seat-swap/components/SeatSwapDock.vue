@@ -168,8 +168,10 @@ const emit = defineEmits<{
 .dock-status__manage {
   flex: 0 0 auto;
   margin-left: auto;
-  padding: var(--fi-space-12) var(--fi-space-18);
-  border-radius: var(--fi-radius-round);
+  /* 与左侧座位块同高：同样的纵向内边距和 leading-none */
+  padding: var(--fi-space-8) var(--fi-space-16);
+  border-radius: var(--fi-radius-xs);
+  line-height: var(--fi-leading-none);
   background: var(--fi-component-btn-bg);
   color: var(--fi-primitive-white);
   font-size: var(--fi-font-22);
