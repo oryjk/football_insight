@@ -4,6 +4,7 @@ import type { TicketWatchRegion } from '../../types/ticketWatch'
 import { formatSeatSwapSeatLabel, seatSwapStatusLabel } from '../../utils/stadiumRegions'
 import {
   countSeatSwapDesiredRegions,
+  countSeatSwapPeerConfirmations,
   filterOutMySeatSwapRequest,
   filterSeatSwapRequestsByDesiredRegion,
   formatSeatSwapKickoffShort,
@@ -51,6 +52,7 @@ export function useSeatSwapBrowse(input: {
     if (!key) return ''
     return regions.value.find((r) => regionKey(r) === key)?.block_name || key
   })
+  const peerConfirmedCount = computed(() => countSeatSwapPeerConfirmations(displayCandidates.value))
   const regionBadgeCounts = computed<Record<string, number>>(() => countSeatSwapDesiredRegions(displayCandidates.value))
   const myDesiredKeys = computed<string[]>(() =>
     currentView.value?.my_request?.desired_seats.map((s) => s.region_key) || [],
@@ -116,6 +118,7 @@ export function useSeatSwapBrowse(input: {
     filteredCandidates,
     browsingFilterName,
     regionBadgeCounts,
+    peerConfirmedCount,
     myDesiredKeys,
     myDesiredSummary,
     myRequestSeatLabel,

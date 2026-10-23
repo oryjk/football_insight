@@ -5,6 +5,7 @@
       <text class="dock-cta__label">{{ isLoggedIn ? '发布我的换座' : '登录后发布' }}</text>
     </button>
     <view v-else class="dock-status" @tap="emit('manage')">
+      <text v-if="interestedCount > 0" class="dock-status__badge">{{ formatSeatSwapBadgeCount(interestedCount) }}</text>
       <view class="dock-status__body">
         <view class="dock-status__dot"></view>
         <text class="dock-status__seat dock-status__seat--current">{{ currentSeatLabel }}</text>
@@ -17,11 +18,15 @@
 </template>
 
 <script setup lang="ts">
+import { formatSeatSwapBadgeCount } from '../helpers'
+
 defineProps<{
   hasMyRequest: boolean
   isLoggedIn: boolean
   currentSeatLabel: string
   desiredSummary: string
+  /** 已确认想和我换座、等我确认的人数，> 0 时在右上角显示红色气泡 */
+  interestedCount: number
 }>()
 
 const emit = defineEmits<{
@@ -84,6 +89,7 @@ const emit = defineEmits<{
 }
 
 .dock-status {
+  position: relative;
   display: flex;
   align-items: center;
   min-height: var(--fi-component-seat-swap-dock-height);
@@ -139,6 +145,24 @@ const emit = defineEmits<{
 .dock-status__arrow {
   flex: 0 0 auto;
   color: rgba(var(--fi-primitive-white-rgb), 0.4);
+}
+
+.dock-status__badge {
+  position: absolute;
+  top: -14rpx;
+  right: -8rpx;
+  min-width: 36rpx;
+  height: 36rpx;
+  padding: 0 var(--fi-space-8);
+  box-sizing: border-box;
+  border-radius: var(--fi-radius-round);
+  border: 3rpx solid var(--fi-primitive-white);
+  background: var(--fi-color-primary);
+  color: var(--fi-primitive-white);
+  font-size: var(--fi-font-20);
+  font-weight: var(--fi-weight-bold);
+  line-height: 30rpx;
+  text-align: center;
 }
 
 .dock-status__manage {

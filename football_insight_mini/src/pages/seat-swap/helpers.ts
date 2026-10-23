@@ -312,6 +312,16 @@ export function groupSeatSwapRequestsByRegion<TRequest extends SeatSwapRegionGro
     .sort((a, b) => a.region_name.localeCompare(b.region_name, 'zh-Hans-CN', { numeric: true }))
 }
 
+/** 已确认想和我换座、等我确认的人数（候选状态 peer_confirmed_me）。 */
+export function countSeatSwapPeerConfirmations(candidates: Array<{ status: string }>): number {
+  return candidates.filter((candidate) => candidate.status === 'peer_confirmed_me').length
+}
+
+/** 角标数字超过 99 显示 99+。 */
+export function formatSeatSwapBadgeCount(count: number): string {
+  return count > 99 ? '99+' : String(count)
+}
+
 export function countSeatSwapDesiredRegions<TRequest extends SeatSwapDesiredRegionItem>(
   requests: TRequest[],
 ): Record<string, number> {

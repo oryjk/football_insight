@@ -65,6 +65,7 @@
       :is-logged-in="isLoggedIn"
       :current-seat-label="myRequestSeatLabel"
       :desired-summary="myDesiredSummary"
+      :interested-count="peerConfirmedCount"
       @cta="handleDockCtaTap"
       @manage="openManageSheet"
     />
@@ -187,6 +188,7 @@ const {
   filteredCandidates,
   browsingFilterName,
   regionBadgeCounts,
+  peerConfirmedCount,
   myDesiredKeys,
   myDesiredSummary,
   myRequestSeatLabel,

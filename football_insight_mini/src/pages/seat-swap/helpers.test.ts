@@ -10,6 +10,8 @@ import {
   filterSeatSwapRequestsByDesiredRegion,
   groupSeatSwapRequestsByRegion,
   countSeatSwapDesiredRegions,
+  countSeatSwapPeerConfirmations,
+  formatSeatSwapBadgeCount,
   previousSeatSwapStep,
   resolveSeatSwapBrowseFilterKey,
   resolveDefaultExpandedSeatSwapRegionKeys,
@@ -824,5 +826,24 @@ describe('seat swap swap summary', () => {
     expect(summary.current.price).toBe('')
     expect(summary.desired[0].delta).toBe('')
     expect(summary.desired[0].deltaKind).toBe('unknown')
+  })
+})
+
+describe('seat swap peer confirmation badge', () => {
+  test('counts only candidates who already confirmed me', () => {
+    expect(countSeatSwapPeerConfirmations([
+      { status: 'peer_confirmed_me' },
+      { status: 'communicable' },
+      { status: 'waiting_peer_confirmation' },
+      { status: 'peer_confirmed_me' },
+      { status: 'matched' },
+    ])).toBe(2)
+    expect(countSeatSwapPeerConfirmations([])).toBe(0)
+  })
+
+  test('caps the badge text at 99+', () => {
+    expect(formatSeatSwapBadgeCount(3)).toBe('3')
+    expect(formatSeatSwapBadgeCount(99)).toBe('99')
+    expect(formatSeatSwapBadgeCount(120)).toBe('99+')
   })
 })
