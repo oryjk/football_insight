@@ -37,6 +37,8 @@ pub enum SeatSwapCandidateStatus {
     WaitingPeerConfirmation,
     PeerConfirmedMe,
     Matched,
+    /// 对方已经和别人匹配成功，第三方不能再向其发起确认。
+    Taken,
     DisplayOnly,
 }
 
@@ -47,6 +49,7 @@ impl SeatSwapCandidateStatus {
             Self::WaitingPeerConfirmation => "waiting_peer_confirmation",
             Self::PeerConfirmedMe => "peer_confirmed_me",
             Self::Matched => "matched",
+            Self::Taken => "taken",
             Self::DisplayOnly => "display_only",
         }
     }

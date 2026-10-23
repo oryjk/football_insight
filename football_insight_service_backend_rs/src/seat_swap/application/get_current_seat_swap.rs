@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::seat_swap::{
     domain::{
         SeatSwapCandidateStatus, SeatSwapContact, SeatSwapCurrentMatch, SeatSwapDesiredSeat,
-        SeatSwapRequest,
+        SeatSwapRequest, SeatSwapRequestStatus,
     },
     ports::{
         current_match_port::CurrentSeatSwapMatchPort,
@@ -147,13 +147,21 @@ fn resolve_candidate_status(
     my_confirmations: &[SeatSwapConfirmation],
     peer_confirmation: Option<&SeatSwapConfirmation>,
 ) -> SeatSwapCandidateStatus {
+    let matched_with_me = my_request.is_some_and(|mine| {
+        mine.matched_request_id == Some(peer.id) && peer.matched_request_id == Some(mine.id)
+    });
+    if matched_with_me {
+        return SeatSwapCandidateStatus::Matched;
+    }
+
+    // 对方已和别人匹配成功：其他人看到的是「已被匹配」，不再有确认换座操作。
+    if peer.status == SeatSwapRequestStatus::Matched {
+        return SeatSwapCandidateStatus::Taken;
+    }
+
     let Some(mine) = my_request else {
         return SeatSwapCandidateStatus::DisplayOnly;
     };
-
-    if mine.matched_request_id == Some(peer.id) && peer.matched_request_id == Some(mine.id) {
-        return SeatSwapCandidateStatus::Matched;
-    }
 
     let i_confirmed_peer = my_confirmations
         .iter()
@@ -415,6 +423,22 @@ mod tests {
             view.candidates[0].status,
             SeatSwapCandidateStatus::DisplayOnly
         );
+        assert!(view.candidates[0].contact.is_none());
+    }
+
+    #[tokio::test]
+    async fn marks_peer_matched_with_someone_else_as_taken_for_third_parties() {
+        let mut matched = request_fixture(2, USER_B, "B", vec!["A"]);
+        matched.status = SeatSwapRequestStatus::Matched;
+        matched.matched_request_id = Some(Uuid::from_u128(9));
+        let use_case = build_use_case_with_pool(vec![
+            request_fixture(1, USER_A, "A", vec!["B"]),
+            matched,
+        ]);
+
+        let view = use_case.execute(Some(USER_A)).await.expect("view");
+
+        assert_eq!(view.candidates[0].status, SeatSwapCandidateStatus::Taken);
         assert!(view.candidates[0].contact.is_none());
     }
 
