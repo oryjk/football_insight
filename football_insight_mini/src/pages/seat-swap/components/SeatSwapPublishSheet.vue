@@ -113,10 +113,14 @@
           <text class="desired-rows__name">{{ seat.region_name }}</text>
         </view>
       </view>
+      <view class="contact-heading">
+        <text class="seat-selection-group__title">联系方式</text>
+        <text class="contact-heading__hint">微信号、手机号至少填一项</text>
+      </view>
       <view class="row-input row-input--contact">
         <view class="row-input__field">
           <text class="row-input__label">微信号</text>
-          <input v-model="form.wechat_id" :adjust-position="false" @focus="onInputFocus" @blur="onInputBlur" @keyboardheightchange="onKeyboardHeightChange" class="input-box" placeholder="至少填一项" />
+          <input v-model="form.wechat_id" :adjust-position="false" @focus="onInputFocus" @blur="onInputBlur" @keyboardheightchange="onKeyboardHeightChange" class="input-box" placeholder="你的微信号" />
         </view>
         <view class="row-input__field">
           <text class="row-input__label">手机号</text>
@@ -339,6 +343,19 @@ function handleVisibleChange(value: boolean): void {
   display: flex;
   gap: var(--fi-space-16);
   margin-top: var(--fi-space-12);
+}
+
+.contact-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--fi-space-10);
+  margin-top: var(--fi-space-22);
+}
+
+.contact-heading__hint {
+  color: var(--fi-color-text-caption);
+  font-size: var(--fi-font-20);
+  line-height: var(--fi-leading-none);
 }
 
 .row-input--contact {
