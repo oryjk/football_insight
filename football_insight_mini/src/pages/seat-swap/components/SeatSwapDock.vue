@@ -111,20 +111,21 @@ const emit = defineEmits<{
   gap: var(--fi-space-12);
   flex-wrap: nowrap;
   min-width: 0;
-  font-size: var(--fi-font-22);
+  /* 与换座卡片里「xxx x 排 x 号」同字号 */
+  font-size: var(--fi-font-26);
 }
 
 .dock-status__icon {
   flex: 0 0 auto;
-  width: var(--fi-space-32);
-  height: var(--fi-space-32);
+  width: var(--fi-space-36);
+  height: var(--fi-space-36);
 }
 
 .dock-status__seat {
   min-width: 0;
-  padding: var(--fi-space-8) var(--fi-space-14);
+  padding: var(--fi-space-10) var(--fi-space-16);
   border-radius: var(--fi-radius-xs);
-  font-weight: var(--fi-weight-bold);
+  font-weight: var(--fi-weight-extrabold);
   line-height: var(--fi-leading-none);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -169,12 +170,12 @@ const emit = defineEmits<{
   flex: 0 0 auto;
   margin-left: auto;
   /* 与左侧座位块同高：同样的纵向内边距和 leading-none */
-  padding: var(--fi-space-8) var(--fi-space-16);
+  padding: var(--fi-space-10) var(--fi-space-18);
   border-radius: var(--fi-radius-xs);
   line-height: var(--fi-leading-none);
   background: var(--fi-component-btn-bg);
   color: var(--fi-primitive-white);
-  font-size: var(--fi-font-22);
+  font-size: var(--fi-font-26);
   font-weight: var(--fi-weight-bold);
 }
 </style>
