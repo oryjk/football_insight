@@ -7,7 +7,8 @@
     <view v-else class="dock-status" @tap="emit('manage')">
       <text v-if="interestedCount > 0" class="dock-status__badge">{{ formatSeatSwapBadgeCount(interestedCount) }}</text>
       <view class="dock-status__body">
-        <view class="dock-status__dot"></view>
+        <!-- lucide armchair：标明这一条是"我的座位"发布 -->
+        <image class="dock-status__icon" src="/static/seat-swap/armchair-ink.svg" mode="aspectFit" aria-hidden="true" />
         <text class="dock-status__seat dock-status__seat--current">{{ currentSeatLabel }}</text>
         <text class="dock-status__arrow">→</text>
         <text class="dock-status__seat dock-status__seat--desired">{{ desiredSummary }}</text>
@@ -96,8 +97,10 @@ const emit = defineEmits<{
   box-sizing: border-box;
   padding: var(--fi-space-20) var(--fi-space-22);
   border-radius: var(--fi-radius-md);
-  background: var(--fi-primitive-ink);
-  color: var(--fi-primitive-white);
+  /* 已发布后是状态条而非主操作：白底承载红/绿座位块；唯一的操作「管理」用品牌红。 */
+  background: var(--fi-color-surface);
+  border: var(--fi-border-width) solid var(--fi-color-border-chip);
+  color: var(--fi-color-text-strong);
   box-shadow: var(--fi-shadow-floating);
 }
 
@@ -111,13 +114,10 @@ const emit = defineEmits<{
   font-size: var(--fi-font-22);
 }
 
-.dock-status__dot {
+.dock-status__icon {
   flex: 0 0 auto;
-  width: var(--fi-space-14);
-  height: var(--fi-space-14);
-  border-radius: var(--fi-radius-round);
-  background: var(--fi-color-text-caption);
-  box-shadow: 0 0 0 var(--fi-space-6) rgba(var(--fi-primitive-white-rgb), 0.12);
+  width: var(--fi-space-32);
+  height: var(--fi-space-32);
 }
 
 .dock-status__seat {
@@ -144,7 +144,7 @@ const emit = defineEmits<{
 
 .dock-status__arrow {
   flex: 0 0 auto;
-  color: rgba(var(--fi-primitive-white-rgb), 0.4);
+  color: var(--fi-color-text-caption);
 }
 
 .dock-status__badge {
@@ -170,8 +170,8 @@ const emit = defineEmits<{
   margin-left: auto;
   padding: var(--fi-space-12) var(--fi-space-18);
   border-radius: var(--fi-radius-round);
-  background: rgba(var(--fi-primitive-white-rgb), 0.12);
-  color: rgba(var(--fi-primitive-white-rgb), 0.84);
+  background: var(--fi-component-btn-bg);
+  color: var(--fi-primitive-white);
   font-size: var(--fi-font-22);
   font-weight: var(--fi-weight-bold);
 }
