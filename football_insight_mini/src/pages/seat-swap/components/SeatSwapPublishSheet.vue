@@ -5,7 +5,7 @@
     :title="sheetTitle"
     height="76vh"
     compact-footer
-    avoid-keyboard
+    :keyboard-height="keyboardHeight"
     @update:visible="handleVisibleChange"
   >
     <view v-if="presetCandidate" class="candidate-target">
@@ -53,12 +53,12 @@
       <view class="row-input">
         <view class="row-input__field">
           <text class="row-input__label">当前排</text>
-          <input v-model="form.current_row" :adjust-position="false" type="number" class="input-box" placeholder="如 8" />
+          <input v-model="form.current_row" :adjust-position="false" @focus="onInputFocus" @blur="onInputBlur" @keyboardheightchange="onKeyboardHeightChange" type="number" class="input-box" placeholder="如 8" />
           <text v-if="formErrors.current_row" class="field-error">{{ formErrors.current_row }}</text>
         </view>
         <view class="row-input__field">
           <text class="row-input__label">当前号</text>
-          <input v-model="form.current_seat_no" :adjust-position="false" type="number" class="input-box" placeholder="如 15" />
+          <input v-model="form.current_seat_no" :adjust-position="false" @focus="onInputFocus" @blur="onInputBlur" @keyboardheightchange="onKeyboardHeightChange" type="number" class="input-box" placeholder="如 15" />
           <text v-if="formErrors.current_seat_no" class="field-error">{{ formErrors.current_seat_no }}</text>
         </view>
       </view>
@@ -114,11 +114,11 @@
       <view class="row-input row-input--contact">
         <view class="row-input__field">
           <text class="row-input__label">微信号</text>
-          <input v-model="form.wechat_id" :adjust-position="false" class="input-box" placeholder="至少填一项" />
+          <input v-model="form.wechat_id" :adjust-position="false" @focus="onInputFocus" @blur="onInputBlur" @keyboardheightchange="onKeyboardHeightChange" class="input-box" placeholder="至少填一项" />
         </view>
         <view class="row-input__field">
           <text class="row-input__label">手机号</text>
-          <input v-model="form.phone_number" :adjust-position="false" class="input-box" type="number" placeholder="11 位手机号" />
+          <input v-model="form.phone_number" :adjust-position="false" @focus="onInputFocus" @blur="onInputBlur" @keyboardheightchange="onKeyboardHeightChange" class="input-box" type="number" placeholder="11 位手机号" />
         </view>
       </view>
       <text v-if="formErrors.contact" class="field-error">{{ formErrors.contact }}</text>
@@ -152,7 +152,9 @@
 </template>
 
 <script setup lang="ts">
+import { watch } from 'vue'
 import FiBottomSheet from '../../../components/FiBottomSheet.vue'
+import { useSheetKeyboard } from '../../../composables/useSheetKeyboard'
 import StadiumMap from './StadiumMap.vue'
 import type { SeatSwapCandidate, SeatSwapRequest } from '../../../types/seatSwap'
 import type { TicketWatchRegion } from '../../../types/ticketWatch'
@@ -181,6 +183,12 @@ const {
   handleSheetMapTap, confirmCurrentSelection, confirmDesiredSelection,
   goPreviousSelectionStep, jumpToStep, submit,
 } = useSeatSwapPublishForm(props, (payload) => emit('submit', payload))
+
+const { keyboardHeight, onInputFocus, onInputBlur, onKeyboardHeightChange, resetKeyboard } = useSheetKeyboard()
+
+watch(() => props.visible, (visible) => {
+  if (!visible) resetKeyboard()
+})
 
 function handleVisibleChange(value: boolean): void {
   emit('update:visible', value)

@@ -47,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, useSlots, watch } from 'vue'
+import { computed, ref, useSlots, watch } from 'vue'
 
 interface Props {
   visible: boolean
@@ -59,8 +59,8 @@ interface Props {
   fitContent?: boolean
   zIndex?: number
   respectWindowBottom?: boolean
-  /** 小程序里内容含输入框时开启：自己按键盘高度抬起面板，输入框需配 :adjust-position="false" */
-  avoidKeyboard?: boolean
+  /** 键盘高度（px）。内容含输入框时由父组件根据输入框事件传入，遮罩底边抬到键盘上沿 */
+  keyboardHeight?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -72,7 +72,7 @@ const props = withDefaults(defineProps<Props>(), {
   fitContent: false,
   zIndex: 40,
   respectWindowBottom: false,
-  avoidKeyboard: false,
+  keyboardHeight: 0,
 })
 
 const emit = defineEmits<{
@@ -82,11 +82,10 @@ const emit = defineEmits<{
 
 const slots = useSlots()
 const hasFooter = computed(() => !!slots.footer)
-const keyboardHeight = ref(0)
 const maskStyle = computed(() => ({
   zIndex: props.zIndex,
-  bottom: keyboardHeight.value > 0
-    ? `${keyboardHeight.value}px`
+  bottom: props.keyboardHeight > 0
+    ? `${props.keyboardHeight}px`
     : (props.respectWindowBottom ? 'var(--window-bottom, 0px)' : undefined),
 }))
 const cardStyle = computed(() => ({
@@ -121,35 +120,6 @@ watch(
     }, 220)
   },
 )
-
-// 面板是 fixed 定位、正文在 scroll-view 里，小程序原生 adjust-position 推页面推不到位，
-// 键盘会盖住面板底部的输入框；改为监听键盘高度，把遮罩底边抬到键盘上沿。
-function handleKeyboardHeightChange(result: { height: number }) {
-  keyboardHeight.value = Math.max(0, result.height || 0)
-}
-
-let keyboardListening = false
-
-function syncKeyboardListener(active: boolean) {
-  // #ifdef MP-WEIXIN
-  if (active && !keyboardListening) {
-    uni.onKeyboardHeightChange(handleKeyboardHeightChange)
-    keyboardListening = true
-  } else if (!active && keyboardListening) {
-    uni.offKeyboardHeightChange(handleKeyboardHeightChange)
-    keyboardListening = false
-  }
-  // #endif
-  if (!active) keyboardHeight.value = 0
-}
-
-watch(
-  () => props.visible && props.avoidKeyboard,
-  syncKeyboardListener,
-  { immediate: true },
-)
-
-onBeforeUnmount(() => syncKeyboardListener(false))
 
 function handleClose() {
   emit('update:visible', false)
