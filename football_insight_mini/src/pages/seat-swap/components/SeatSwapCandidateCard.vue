@@ -11,7 +11,6 @@
       <view class="candidate__content">
         <view class="candidate__user">
           <text class="candidate__name">{{ candidate.display_name }}</text>
-          <text v-if="match" class="candidate__match" :class="`candidate__match--${match.level}`">匹配度 {{ match.score }}%</text>
         </view>
         <text v-if="match" class="candidate__match-hint">{{ match.label }}：{{ match.hint }}</text>
         <view class="candidate__seat">
@@ -25,9 +24,15 @@
       </view>
       <!-- 右列：状态标签贴顶、操作按钮贴底，按钮不再垂直居中。 -->
       <view class="candidate__side">
-        <view v-if="statusText" class="candidate__status" :class="statusClass">
-          <view class="candidate__status-dot" />
-          <text>{{ statusText }}</text>
+        <view v-if="match || statusText" class="candidate__side-top">
+          <view v-if="match" class="candidate__match" :class="`candidate__match--${match.level}`">
+            <text class="candidate__match-label">匹配度</text>
+            <text class="candidate__match-score">{{ match.score }}%</text>
+          </view>
+          <view v-if="statusText" class="candidate__status" :class="statusClass">
+            <view class="candidate__status-dot" />
+            <text>{{ statusText }}</text>
+          </view>
         </view>
         <button
           v-if="action === 'confirm'"
@@ -151,14 +156,33 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 
 
 
+.candidate__side-top {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--fi-space-8);
+}
+
 .candidate__match {
-  flex-shrink: 0;
-  padding: var(--fi-space-2) var(--fi-space-12);
-  border-radius: var(--fi-radius-round);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--fi-space-4);
+  padding: var(--fi-space-8) var(--fi-space-8);
+  border-radius: var(--fi-radius-md);
   background: var(--fi-color-page);
   color: var(--fi-color-text-muted);
+}
+
+.candidate__match-label {
   font-size: var(--fi-font-20);
   font-weight: var(--fi-weight-bold);
+}
+
+.candidate__match-score {
+  font-size: var(--fi-font-30);
+  font-weight: var(--fi-weight-extrabold);
+  line-height: var(--fi-leading-none);
 }
 
 .candidate__match--perfect {
