@@ -167,6 +167,11 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   color: var(--fi-color-seat-desired);
 }
 
+.candidate__match--high {
+  background: var(--fi-color-primary-soft);
+  color: var(--fi-color-primary);
+}
+
 .candidate__match--partial {
   background: var(--fi-color-primary-soft);
   color: var(--fi-color-primary);

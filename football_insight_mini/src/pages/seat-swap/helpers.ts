@@ -571,15 +571,15 @@ export function buildSeatSwapSwapSummary(
   }
 }
 
-export type SeatSwapMatchLevel = 'perfect' | 'partial' | 'low'
+export type SeatSwapMatchLevel = 'perfect' | 'high' | 'partial' | 'low'
 
 export interface SeatSwapMatch {
-  /** 0-100，像拼车匹配度：双向各占一半。 */
+  /** 0-100，按 10 取整，共 10 档（0/20/30/40/50/60/70/80/90/100）。 */
   score: number
   level: SeatSwapMatchLevel
-  /** 对方的座位在我想要的分区里（或紧邻）。 */
+  /** 对方的座位在我想要的分区里（含邻近）。 */
   theyHaveMine: boolean
-  /** 我的座位在对方想要的分区里（或紧邻）。 */
+  /** 我的座位在对方想要的分区里（含邻近）。 */
   iHaveTheirs: boolean
   label: string
   hint: string
@@ -590,7 +590,7 @@ interface SeatSwapMatchRegion {
   region_name: string
 }
 
-// 看台是一圈：内环 101-132、外环 501-536，同环相邻（含首尾相接）的分区算"紧邻"。
+// 看台是一圈：内环 101-132、外环 501-536，同环按圈上的间隔算远近（含首尾相接）。
 function seatSwapRegionRing(name: string): { base: number; size: number; index: number } | null {
   const number = Number.parseInt(name, 10)
   if (Number.isNaN(number)) return null
@@ -599,26 +599,36 @@ function seatSwapRegionRing(name: string): { base: number; size: number; index: 
   return null
 }
 
-export function areSeatSwapRegionsAdjacent(nameA: string, nameB: string): boolean {
+/** 同环两个分区之间隔了几格；不同环、VIP 等没有编号的返回 null。 */
+export function seatSwapRegionDistance(nameA: string, nameB: string): number | null {
   const a = seatSwapRegionRing(nameA)
   const b = seatSwapRegionRing(nameB)
-  if (!a || !b || a.base !== b.base) return false
+  if (!a || !b || a.base !== b.base) return null
   const gap = Math.abs(a.index - b.index)
-  return gap === 1 || gap === a.size - 1
+  return Math.min(gap, a.size - gap)
 }
 
-/** 某个分区对一组目标分区的满足度：命中 1，紧邻 0.5，其余 0。 */
+export function areSeatSwapRegionsAdjacent(nameA: string, nameB: string): boolean {
+  return seatSwapRegionDistance(nameA, nameB) === 1
+}
+
+/** 某个分区对一组目标分区的满足度：命中 1，隔 1 格 0.6，隔 2 格 0.3，其余 0。 */
 function seatSwapRegionFit(region: SeatSwapMatchRegion, wanted: SeatSwapMatchRegion[]): number {
-  if (wanted.some((item) => item.region_key === region.region_key)) return 1
-  if (wanted.some((item) => areSeatSwapRegionsAdjacent(item.region_name, region.region_name))) return 0.5
-  return 0
+  let best = 0
+  for (const item of wanted) {
+    if (item.region_key === region.region_key) return 1
+    const distance = seatSwapRegionDistance(item.region_name, region.region_name)
+    if (distance === 1) best = Math.max(best, 0.6)
+    else if (distance === 2) best = Math.max(best, 0.3)
+  }
+  return best
 }
 
 /**
  * 我和对方的换座匹配度：
- * - 对方的座位在我想要的分区 → 我能换到想要的（占一半）；
- * - 我的座位在对方想要的分区 → 对方也愿意换（占一半）；
- * - 紧邻分区按一半算。两边都命中是 100%。
+ * - 看两边各自的满足度：对方的座位是不是我想去的、我的座位是不是对方想去的；
+ * - 较好的一边占 70%，较差的一边占 30%：一边命中另一边完全不沾边是 70%，两边都命中是 100%；
+ * - 邻近分区按距离打折（隔 1 格 0.6、隔 2 格 0.3），结果按 10 取整。
  */
 export function computeSeatSwapMatch(
   mine: { current_region_key: string; current_region_name: string; desired_seats: SeatSwapMatchRegion[] },
@@ -632,13 +642,17 @@ export function computeSeatSwapMatch(
     { region_key: mine.current_region_key, region_name: mine.current_region_name },
     peer.desired_seats,
   )
-  const score = Math.round((theyHave + iHave) * 50)
-  const level: SeatSwapMatchLevel = score >= 100 ? 'perfect' : score >= 50 ? 'partial' : 'low'
-  const label = level === 'perfect' ? '双向匹配' : level === 'partial' ? '部分匹配' : '匹配度低'
+  const strong = Math.max(theyHave, iHave)
+  const weak = Math.min(theyHave, iHave)
+  const score = Math.round((strong * 70 + weak * 30) / 10) * 10
+  const level: SeatSwapMatchLevel =
+    score >= 100 ? 'perfect' : score >= 70 ? 'high' : score >= 40 ? 'partial' : 'low'
+  const label =
+    level === 'perfect' ? '双向匹配' : level === 'high' ? '高度匹配' : level === 'partial' ? '部分匹配' : '匹配度低'
   let hint = '你们的座位和彼此的目标都不在同一片区域'
   if (theyHave === 1 && iHave === 1) hint = '对方的座位正是你想去的，你的座位也正是对方想去的'
-  else if (theyHave === 1) hint = '对方的座位是你想去的，但你的座位不在对方的目标里'
-  else if (iHave === 1) hint = '你的座位在对方的目标里，但对方的座位不是你想去的'
-  else if (score > 0) hint = '座位在彼此目标的相邻分区，可以沟通看看'
+  else if (theyHave === 1) hint = '对方的座位是你想去的，你的座位不完全在对方的目标里'
+  else if (iHave === 1) hint = '你的座位在对方的目标里，对方的座位不完全是你想去的'
+  else if (score > 0) hint = '座位在彼此目标的附近分区，可以沟通看看'
   return { score, level, theyHaveMine: theyHave > 0, iHaveTheirs: iHave > 0, label, hint }
 }

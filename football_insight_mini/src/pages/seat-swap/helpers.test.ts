@@ -38,6 +38,7 @@ import {
   type SeatSwapFormState,
   areSeatSwapRegionsAdjacent,
   computeSeatSwapMatch,
+  seatSwapRegionDistance,
 } from './helpers'
 import { buildSeatSwapMockCurrentResponse, buildSeatSwapMockRegions } from './fixtures'
 import { formatSeatSwapSeatLabel, resolveSeatSwapRegionLayout, seatSwapStatusLabel } from '../../utils/stadiumRegions'
@@ -882,25 +883,40 @@ describe('computeSeatSwapMatch', () => {
     expect(m.level).toBe('perfect')
   })
 
-  test('scores 50 when only one side hits', () => {
-    const m = computeSeatSwapMatch(side('101', ['105']), side('105', ['110']))
-    expect(m.score).toBe(50)
-    expect(m.level).toBe('partial')
+  test('scores 70 when exactly one side hits and the other is unrelated', () => {
+    const m = computeSeatSwapMatch(side('101', ['105']), side('105', ['120']))
+    expect(m.score).toBe(70)
+    expect(m.level).toBe('high')
     expect(m.theyHaveMine).toBe(true)
     expect(m.iHaveTheirs).toBe(false)
   })
 
-  test('counts neighbouring regions as half a hit, wrapping around the ring', () => {
-    expect(computeSeatSwapMatch(side('101', ['132']), side('131', ['120'])).score).toBe(25)
-    expect(areSeatSwapRegionsAdjacent('101', '132')).toBe(true)
+  test('discounts nearby regions by distance, wrapping around the ring', () => {
+    expect(seatSwapRegionDistance('101', '132')).toBe(1)
+    expect(seatSwapRegionDistance('101', '103')).toBe(2)
+    expect(seatSwapRegionDistance('101', '501')).toBeNull()
+    expect(seatSwapRegionDistance('VIP1', 'VIP2')).toBeNull()
     expect(areSeatSwapRegionsAdjacent('101', '102')).toBe(true)
-    expect(areSeatSwapRegionsAdjacent('101', '501')).toBe(false)
-    expect(areSeatSwapRegionsAdjacent('VIP1', 'VIP2')).toBe(false)
+    expect(computeSeatSwapMatch(side('101', ['132']), side('131', ['120'])).score).toBe(40)
+    expect(computeSeatSwapMatch(side('101', ['105']), side('107', ['120'])).score).toBe(20)
+  })
+
+  test('mixes a hit with a nearby region', () => {
+    expect(computeSeatSwapMatch(side('101', ['105']), side('105', ['102'])).score).toBe(90)
   })
 
   test('scores 0 when nothing lines up', () => {
     const m = computeSeatSwapMatch(side('101', ['105']), side('120', ['125']))
     expect(m.score).toBe(0)
     expect(m.level).toBe('low')
+  })
+
+  test('only produces the ten documented score steps', () => {
+    const fits = [0, 0.3, 0.6, 1]
+    const scores = new Set<number>()
+    for (const a of fits) for (const b of fits) {
+      scores.add(Math.round((Math.max(a, b) * 70 + Math.min(a, b) * 30) / 10) * 10)
+    }
+    expect([...scores].sort((x, y) => x - y)).toEqual([0, 20, 30, 40, 50, 60, 70, 80, 90, 100])
   })
 })
