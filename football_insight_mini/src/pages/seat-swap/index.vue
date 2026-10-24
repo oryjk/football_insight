@@ -48,6 +48,7 @@
             :my-desired-keys="myDesiredKeys"
             :is-logged-in="isLoggedIn"
             :my-request-id="currentView?.my_request?.request_id ?? null"
+            :my-request="currentView?.my_request ?? null"
             @toggle-group="toggleRegionGroup"
             @clear-filter="clearFilter"
             @confirm="confirmCandidate"

@@ -36,6 +36,8 @@ import {
   validateSeatSwapPhoneNumber,
   type SeatSwapDesiredSeatFormState,
   type SeatSwapFormState,
+  areSeatSwapRegionsAdjacent,
+  computeSeatSwapMatch,
 } from './helpers'
 import { buildSeatSwapMockCurrentResponse, buildSeatSwapMockRegions } from './fixtures'
 import { formatSeatSwapSeatLabel, resolveSeatSwapRegionLayout, seatSwapStatusLabel } from '../../utils/stadiumRegions'
@@ -863,5 +865,42 @@ describe('seat swap peer confirmation badge', () => {
     expect(formatSeatSwapBadgeCount(3)).toBe('3')
     expect(formatSeatSwapBadgeCount(99)).toBe('99')
     expect(formatSeatSwapBadgeCount(120)).toBe('99+')
+  })
+})
+
+describe('computeSeatSwapMatch', () => {
+  const region = (name: string) => ({ region_key: `k${name}`, region_name: name })
+  const side = (current: string, desired: string[]) => ({
+    current_region_key: `k${current}`,
+    current_region_name: current,
+    desired_seats: desired.map(region),
+  })
+
+  test('scores 100 when both sides hit the other target', () => {
+    const m = computeSeatSwapMatch(side('101', ['105']), side('105', ['101']))
+    expect(m.score).toBe(100)
+    expect(m.level).toBe('perfect')
+  })
+
+  test('scores 50 when only one side hits', () => {
+    const m = computeSeatSwapMatch(side('101', ['105']), side('105', ['110']))
+    expect(m.score).toBe(50)
+    expect(m.level).toBe('partial')
+    expect(m.theyHaveMine).toBe(true)
+    expect(m.iHaveTheirs).toBe(false)
+  })
+
+  test('counts neighbouring regions as half a hit, wrapping around the ring', () => {
+    expect(computeSeatSwapMatch(side('101', ['132']), side('131', ['120'])).score).toBe(25)
+    expect(areSeatSwapRegionsAdjacent('101', '132')).toBe(true)
+    expect(areSeatSwapRegionsAdjacent('101', '102')).toBe(true)
+    expect(areSeatSwapRegionsAdjacent('101', '501')).toBe(false)
+    expect(areSeatSwapRegionsAdjacent('VIP1', 'VIP2')).toBe(false)
+  })
+
+  test('scores 0 when nothing lines up', () => {
+    const m = computeSeatSwapMatch(side('101', ['105']), side('120', ['125']))
+    expect(m.score).toBe(0)
+    expect(m.level).toBe('low')
   })
 })

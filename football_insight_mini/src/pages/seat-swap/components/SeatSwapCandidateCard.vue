@@ -11,7 +11,9 @@
       <view class="candidate__content">
         <view class="candidate__user">
           <text class="candidate__name">{{ candidate.display_name }}</text>
+          <text v-if="match" class="candidate__match" :class="`candidate__match--${match.level}`">匹配度 {{ match.score }}%</text>
         </view>
+        <text v-if="match" class="candidate__match-hint">{{ match.label }}：{{ match.hint }}</text>
         <view class="candidate__seat">
           <text class="candidate__seat-label">当前</text>
           <text class="candidate__seat-value">{{ formatSeatSwapSeatLabel(candidate) }}</text>
@@ -73,6 +75,7 @@
 import { computed } from 'vue'
 import SeatSwapSeatThumb from './SeatSwapSeatThumb.vue'
 import type { SeatSwapCandidate } from '../../../types/seatSwap'
+import type { SeatSwapMatch } from '../helpers'
 import {
   formatSeatSwapDesiredSeats,
   formatSeatSwapSeatLabel,
@@ -82,6 +85,7 @@ import {
 const props = defineProps<{
   candidate: SeatSwapCandidate
   action: 'confirm' | 'view' | 'cancel_confirmation' | 'none'
+  match?: SeatSwapMatch | null
 }>()
 
 const emit = defineEmits<{
@@ -147,6 +151,34 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
 
 
 
+
+.candidate__match {
+  flex-shrink: 0;
+  padding: var(--fi-space-2) var(--fi-space-12);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-page);
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-20);
+  font-weight: var(--fi-weight-bold);
+}
+
+.candidate__match--perfect {
+  background: var(--fi-color-seat-desired-bg);
+  color: var(--fi-color-seat-desired);
+}
+
+.candidate__match--partial {
+  background: var(--fi-color-primary-soft);
+  color: var(--fi-color-primary);
+}
+
+.candidate__match-hint {
+  display: block;
+  margin-top: var(--fi-space-4);
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-22);
+  line-height: var(--fi-leading-snug);
+}
 
 .candidate__name {
   min-width: 0;

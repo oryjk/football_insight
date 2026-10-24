@@ -570,3 +570,75 @@ export function buildSeatSwapSwapSummary(
     }),
   }
 }
+
+export type SeatSwapMatchLevel = 'perfect' | 'partial' | 'low'
+
+export interface SeatSwapMatch {
+  /** 0-100，像拼车匹配度：双向各占一半。 */
+  score: number
+  level: SeatSwapMatchLevel
+  /** 对方的座位在我想要的分区里（或紧邻）。 */
+  theyHaveMine: boolean
+  /** 我的座位在对方想要的分区里（或紧邻）。 */
+  iHaveTheirs: boolean
+  label: string
+  hint: string
+}
+
+interface SeatSwapMatchRegion {
+  region_key: string
+  region_name: string
+}
+
+// 看台是一圈：内环 101-132、外环 501-536，同环相邻（含首尾相接）的分区算"紧邻"。
+function seatSwapRegionRing(name: string): { base: number; size: number; index: number } | null {
+  const number = Number.parseInt(name, 10)
+  if (Number.isNaN(number)) return null
+  if (number >= 101 && number <= 132) return { base: 101, size: 32, index: number - 101 }
+  if (number >= 501 && number <= 536) return { base: 501, size: 36, index: number - 501 }
+  return null
+}
+
+export function areSeatSwapRegionsAdjacent(nameA: string, nameB: string): boolean {
+  const a = seatSwapRegionRing(nameA)
+  const b = seatSwapRegionRing(nameB)
+  if (!a || !b || a.base !== b.base) return false
+  const gap = Math.abs(a.index - b.index)
+  return gap === 1 || gap === a.size - 1
+}
+
+/** 某个分区对一组目标分区的满足度：命中 1，紧邻 0.5，其余 0。 */
+function seatSwapRegionFit(region: SeatSwapMatchRegion, wanted: SeatSwapMatchRegion[]): number {
+  if (wanted.some((item) => item.region_key === region.region_key)) return 1
+  if (wanted.some((item) => areSeatSwapRegionsAdjacent(item.region_name, region.region_name))) return 0.5
+  return 0
+}
+
+/**
+ * 我和对方的换座匹配度：
+ * - 对方的座位在我想要的分区 → 我能换到想要的（占一半）；
+ * - 我的座位在对方想要的分区 → 对方也愿意换（占一半）；
+ * - 紧邻分区按一半算。两边都命中是 100%。
+ */
+export function computeSeatSwapMatch(
+  mine: { current_region_key: string; current_region_name: string; desired_seats: SeatSwapMatchRegion[] },
+  peer: { current_region_key: string; current_region_name: string; desired_seats: SeatSwapMatchRegion[] },
+): SeatSwapMatch {
+  const theyHave = seatSwapRegionFit(
+    { region_key: peer.current_region_key, region_name: peer.current_region_name },
+    mine.desired_seats,
+  )
+  const iHave = seatSwapRegionFit(
+    { region_key: mine.current_region_key, region_name: mine.current_region_name },
+    peer.desired_seats,
+  )
+  const score = Math.round((theyHave + iHave) * 50)
+  const level: SeatSwapMatchLevel = score >= 100 ? 'perfect' : score >= 50 ? 'partial' : 'low'
+  const label = level === 'perfect' ? '双向匹配' : level === 'partial' ? '部分匹配' : '匹配度低'
+  let hint = '你们的座位和彼此的目标都不在同一片区域'
+  if (theyHave === 1 && iHave === 1) hint = '对方的座位正是你想去的，你的座位也正是对方想去的'
+  else if (theyHave === 1) hint = '对方的座位是你想去的，但你的座位不在对方的目标里'
+  else if (iHave === 1) hint = '你的座位在对方的目标里，但对方的座位不是你想去的'
+  else if (score > 0) hint = '座位在彼此目标的相邻分区，可以沟通看看'
+  return { score, level, theyHaveMine: theyHave > 0, iHaveTheirs: iHave > 0, label, hint }
+}

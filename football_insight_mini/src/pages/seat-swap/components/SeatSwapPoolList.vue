@@ -41,7 +41,7 @@
         </view>
         <view v-if="expandedKeys.includes(group.region_key)" :key="`group-${group.region_key}`" class="candidate-list">
           <view
-            v-for="(candidate, index) in group.requests"
+            v-for="(candidate, index) in sortByMatch(group.requests)"
             :key="candidate.request_id"
             class="candidate-list__item"
             :style="{ animationDelay: `${resolveSeatSwapStaggerDelayMs(index)}ms` }"
@@ -49,6 +49,7 @@
             <SeatSwapCandidateCard
               :candidate="candidate"
               :action="candidateAction(candidate)"
+              :match="matchFor(candidate)"
               @confirm="(id: string) => emit('confirm', id)"
               @view="(id: string) => emit('view', id)"
               @cancel-confirmation="(id: string) => emit('cancel-confirmation', id)"
@@ -65,7 +66,7 @@
       </view>
       <view v-if="filteredCandidates.length" :key="`filter-${filterKey}`" class="candidate-list">
         <view
-          v-for="(candidate, index) in filteredCandidates"
+          v-for="(candidate, index) in sortByMatch(filteredCandidates)"
           :key="candidate.request_id"
           class="candidate-list__item"
           :style="{ animationDelay: `${resolveSeatSwapStaggerDelayMs(index)}ms` }"
@@ -73,6 +74,7 @@
           <SeatSwapCandidateCard
             :candidate="candidate"
             :action="candidateAction(candidate)"
+            :match="matchFor(candidate)"
             @confirm="(id: string) => emit('confirm', id)"
               @view="(id: string) => emit('view', id)"
             @cancel-confirmation="(id: string) => emit('cancel-confirmation', id)"
@@ -87,9 +89,11 @@
 <script setup lang="ts">
 import FiPanel from '../../../components/FiPanel.vue'
 import SeatSwapCandidateCard from './SeatSwapCandidateCard.vue'
-import type { SeatSwapCandidate } from '../../../types/seatSwap'
+import type { SeatSwapCandidate, SeatSwapRequest } from '../../../types/seatSwap'
 import {
   buildSeatSwapRegionAnchorId,
+  computeSeatSwapMatch,
+  type SeatSwapMatch,
   resolveSeatSwapCandidateAction,
   resolveSeatSwapStaggerDelayMs,
 } from '../helpers'
@@ -104,6 +108,7 @@ const props = defineProps<{
   myDesiredKeys: string[]
   isLoggedIn: boolean
   myRequestId: string | null
+  myRequest: SeatSwapRequest | null
 }>()
 
 const emit = defineEmits<{
@@ -114,6 +119,18 @@ const emit = defineEmits<{
   (e: 'cancel-confirmation', requestId: string): void
   (e: 'preview-seat', requestId: string): void
 }>()
+
+// 没发布自己的意向时没有可比对的座位，不显示匹配度。
+function matchFor(candidate: SeatSwapCandidate): SeatSwapMatch | null {
+  return props.myRequest ? computeSeatSwapMatch(props.myRequest, candidate) : null
+}
+
+// 匹配度高的排前面；同分保持原来的（最新发布优先）顺序。
+function sortByMatch(requests: SeatSwapCandidate[]): SeatSwapCandidate[] {
+  if (!props.myRequest) return requests
+  const scores = new Map(requests.map((item) => [item.request_id, matchFor(item)?.score ?? 0]))
+  return [...requests].sort((a, b) => (scores.get(b.request_id) ?? 0) - (scores.get(a.request_id) ?? 0))
+}
 
 function candidateAction(candidate: SeatSwapCandidate): ReturnType<typeof resolveSeatSwapCandidateAction> {
   return resolveSeatSwapCandidateAction({
