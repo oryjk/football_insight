@@ -102,9 +102,8 @@ const cardClass = computed(() => ({
   'candidate--matched': isMatched.value,
   'candidate--taken': props.candidate.status === 'taken',
 }))
-// 状态色只保留中性、可沟通（绿点）与"对方已确认你"（主色强调，需要你去操作）。
+// 状态色只保留中性与"对方已确认你"（主色强调，需要你去操作）。
 const statusClass = computed(() => ({
-  'candidate__status--ready': props.candidate.status === 'communicable',
   'candidate__status--attention': props.candidate.status === 'peer_confirmed_me',
 }))
 const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidate.desired_seats))
@@ -275,10 +274,6 @@ const desiredSeatText = computed(() => formatSeatSwapDesiredSeats(props.candidat
   height: var(--fi-space-12);
   border-radius: var(--fi-radius-round);
   background: var(--fi-color-text-muted);
-}
-
-.candidate__status--ready .candidate__status-dot {
-  background: var(--fi-color-seat-desired);
 }
 
 .candidate__status--attention {

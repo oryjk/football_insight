@@ -97,10 +97,9 @@ export function formatSeatSwapDesiredSeats(
     .join('、')
 }
 
+// 默认状态（可沟通）不显示徽标：发了意向就都能沟通，只有需要用户留意的状态才标出来。
 export function seatSwapStatusLabel(status: string): string {
   switch (status) {
-    case 'communicable':
-      return '可沟通'
     case 'waiting_peer_confirmation':
       return '等待对方确认'
     case 'peer_confirmed_me':
