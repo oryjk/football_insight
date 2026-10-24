@@ -29,7 +29,7 @@
           <view class="group-row__main">
             <text class="group-row__name">{{ group.region_name }}</text>
             <text class="group-row__count">{{ group.requests.length }} 条</text>
-            <text v-if="myDesiredKeys.includes(group.region_key)" class="group-row__hit">命中目标座位</text>
+            <text v-if="myDesiredKeys.includes(group.region_key)" class="group-row__hit">你想换到这里</text>
           </view>
           <image
             class="group-row__caret"

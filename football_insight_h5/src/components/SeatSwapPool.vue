@@ -25,7 +25,7 @@
           <div class="pool__group-main">
             <span class="pool__group-name">{{ group.region_name }}</span>
             <span class="pool__group-count">{{ group.requests.length }} 条发布</span>
-            <span v-if="myDesiredKeys.includes(group.region_key)" class="pool__group-hit">命中我的目标</span>
+            <span v-if="myDesiredKeys.includes(group.region_key)" class="pool__group-hit">你想换到这里</span>
           </div>
           <span class="pool__group-caret">{{ collapsedKeys.includes(group.region_key) ? '展开' : '收起' }}</span>
         </div>
