@@ -1,7 +1,7 @@
 <template>
   <view class="account-hero" :class="[heroClass, toneClass]">
     <view class="account-hero__scene">
-      <image class="account-hero__background" :src="memberStadiumBackground" mode="aspectFill" aria-hidden="true" />
+      <image class="account-hero__background" :src="memberStadiumBackgroundUrl" mode="aspectFill" aria-hidden="true" />
       <view class="account-hero__shade" aria-hidden="true" />
 
       <view class="member-identity">
@@ -59,7 +59,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import memberStadiumBackground from '../../../static/user/member-stadium-v2.jpg'
+import { MEMBER_STADIUM_BG_IMAGE_URL as memberStadiumBackgroundUrl } from '../../../config/assets'
 import type { CurrentUser } from '../../../types/auth'
 import { formatMembershipCardExpiry } from '../helpers'
 import { MEMBERSHIP_TIER_IMAGES } from '../membershipImages'
