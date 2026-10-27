@@ -41,7 +41,7 @@
         <text>赛季走势 · 已赛 {{ finishedMatches.length }} 场</text>
         <text>点圆点看单场</text>
       </view>
-      <FiResultDots :items="formDots" interactive @select="emit('select-match', matchById.get($event.id as number)!)" />
+      <FiResultDots :items="formDots" interactive :per-row="15" @select="emit('select-match', matchById.get($event.id as number)!)" />
     </view>
 
     <scroll-view v-if="!loading && !errorMessage && matches.length" scroll-y class="team-season-sheet__list">
@@ -87,7 +87,7 @@ import { computed } from 'vue'
 import HomeSheetShell from './HomeSheetShell.vue'
 import FiLoading from '../../../components/FiLoading.vue'
 import FiResultDots from '../../../components/FiResultDots.vue'
-import type { ResultDotItem } from '../../../utils/resultDots'
+import { padUpcomingDots, type ResultDotItem } from '../../../utils/resultDots'
 import type { OverviewStanding } from '../../../types/insight'
 import { formatHomeTeamSeasonRecord, type HomeTeamSeasonMatch } from '../helpers'
 
@@ -108,11 +108,13 @@ const finishedMatches = computed(() =>
 )
 const matchById = computed(() => new Map(finishedMatches.value.map((match) => [match.matchId, match])))
 const formDots = computed<ResultDotItem[]>(() =>
-  finishedMatches.value.map((match) => ({
-    id: match.matchId,
-    tone: match.resultTone as ResultDotItem['tone'],
-    ariaLabel: `第${match.roundNumber}轮 ${match.resultLabel} ${match.scoreText}，查看单场详情`,
-  })),
+  padUpcomingDots(
+    finishedMatches.value.map((match) => ({
+      id: match.matchId,
+      tone: match.resultTone as ResultDotItem['tone'],
+      ariaLabel: `第${match.roundNumber}轮 ${match.resultLabel} ${match.scoreText}，查看单场详情`,
+    })),
+  ),
 )
 const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
 </script>

@@ -3,7 +3,7 @@
     <view class="result-dots__row" :class="{ 'result-dots__row--grid': perRow }" :style="perRow ? { '--result-columns': perRow } : undefined" :role="interactive ? undefined : 'img'" :aria-label="interactive ? undefined : summary">
       <template v-for="(item, index) in items" :key="item.id">
         <view
-          v-if="interactive"
+          v-if="interactive && item.tone !== 'upcoming'"
           class="result-dots__cell"
           role="button"
           :aria-label="item.ariaLabel || RESULT_DOT_LABELS[item.tone]"
@@ -30,7 +30,7 @@ import { RESULT_DOT_LABELS, type ResultDotItem } from '../utils/resultDots'
 const props = withDefaults(
   defineProps<{
     items: ResultDotItem[]
-    /** md: 28rpx dots with tappable cells; sm: compact dots for list rows. */
+    /** md: 32rpx dots with tappable cells; sm: compact dots for list rows. */
     size?: 'md' | 'sm'
     /** end keeps short records on the right, with the same spacing as a full record. */
     align?: 'start' | 'end'
@@ -66,7 +66,7 @@ const summary = computed(
   gap: var(--fi-space-8);
   width: 100%;
   min-width: 0;
-  --result-dot-size: var(--fi-space-28);
+  --result-dot-size: var(--fi-space-32);
   --result-cell-height: var(--fi-space-44);
   --result-cell-max: 52rpx;
 }

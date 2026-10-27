@@ -23,10 +23,14 @@ export function buildOutcomeDots(input: readonly unknown[] | undefined, limit?: 
 
 /** Played results followed by upcoming placeholders, so a full season always renders `total` dots. */
 export function buildSeasonDots(input: readonly unknown[] | undefined, total = CSL_SEASON_TOTAL_ROUNDS): ResultDotItem[] {
-  const played = buildOutcomeDots(input, total)
-  const upcomingCount = Math.max(0, total - played.length)
+  return padUpcomingDots(buildOutcomeDots(input, total), total)
+}
+
+/** Append upcoming placeholders to already-built dots so the row always shows `total` entries. */
+export function padUpcomingDots(dots: ResultDotItem[], total = CSL_SEASON_TOTAL_ROUNDS): ResultDotItem[] {
+  const upcomingCount = Math.max(0, total - dots.length)
   return [
-    ...played,
+    ...dots,
     ...Array.from({ length: upcomingCount }, (_, index) => ({ id: `upcoming-${index}`, tone: 'upcoming' as const })),
   ]
 }

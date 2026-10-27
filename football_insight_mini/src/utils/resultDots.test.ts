@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { buildOutcomeDots, buildSeasonDots, CSL_SEASON_TOTAL_ROUNDS } from './resultDots'
+import { buildOutcomeDots, buildSeasonDots, CSL_SEASON_TOTAL_ROUNDS, padUpcomingDots } from './resultDots'
 
 describe('result dots', () => {
   test('keeps the newest valid results in oldest-to-newest order', () => {
@@ -23,5 +23,10 @@ describe('result dots', () => {
     expect(buildSeasonDots(undefined).length).toBe(CSL_SEASON_TOTAL_ROUNDS)
     const full = Array.from({ length: CSL_SEASON_TOTAL_ROUNDS }, () => 'win')
     expect(buildSeasonDots(full).length).toBe(CSL_SEASON_TOTAL_ROUNDS)
+  })
+
+  test('padUpcomingDots keeps played ids untouched for interactive sheets', () => {
+    const dots = padUpcomingDots([{ id: 12345, tone: 'win' }, { id: 12346, tone: 'loss' }], 4)
+    expect(dots.map(dot => dot.id)).toEqual([12345, 12346, 'upcoming-0', 'upcoming-1'])
   })
 })
