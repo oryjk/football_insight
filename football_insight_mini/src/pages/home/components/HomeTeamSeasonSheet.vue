@@ -39,17 +39,27 @@
     <view v-if="!loading && !errorMessage && finishedMatches.length" class="team-season-form">
       <view class="team-season-form__caption">
         <text>赛季走势 · 已赛 {{ finishedMatches.length }} 场</text>
-        <text>点圆点看单场</text>
+        <text>点圆点定位比赛，点比赛看单场</text>
       </view>
-      <FiResultDots :items="formDots" interactive :per-row="15" @select="emit('select-match', matchById.get($event.id as number)!)" />
+      <FiResultDots :items="formDots" interactive :per-row="15" @select="locateMatch" />
     </view>
 
-    <scroll-view v-if="!loading && !errorMessage && matches.length" scroll-y class="team-season-sheet__list">
+    <scroll-view
+      v-if="!loading && !errorMessage && matches.length"
+      scroll-y
+      scroll-with-animation
+      :scroll-into-view="scrollTargetId"
+      class="team-season-sheet__list"
+    >
       <view
         v-for="(match, index) in matches"
         :key="match.matchId"
+        :id="`team-season-match-${match.matchId}`"
         class="team-season-match-row"
+        :class="{ 'team-season-match-row--located': locatedMatchId === match.matchId }"
         :style="{ '--team-match-delay': `${100 + index * 55}ms` }"
+        hover-class="team-season-match-row--pressed"
+        @tap="emit('select-match', match)"
       >
         <view class="team-season-match-row__meta">
           <text>第 {{ match.roundNumber }} 轮 · {{ match.matchDate }} {{ match.matchTime }}</text>
@@ -83,7 +93,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import HomeSheetShell from './HomeSheetShell.vue'
 import FiLoading from '../../../components/FiLoading.vue'
 import FiResultDots from '../../../components/FiResultDots.vue'
@@ -117,6 +127,26 @@ const formDots = computed<ResultDotItem[]>(() =>
   ),
 )
 const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
+
+const scrollTargetId = ref('')
+const locatedMatchId = ref<number | null>(null)
+let locateTimer: ReturnType<typeof setTimeout> | undefined
+
+function locateMatch(item: ResultDotItem) {
+  const match = matchById.value.get(item.id as number)
+  if (!match) return
+  locatedMatchId.value = match.matchId
+  const target = `team-season-match-${match.matchId}`
+  // scroll-into-view only reacts to value changes; reset first so re-tapping the same dot scrolls again.
+  scrollTargetId.value = ''
+  nextTick(() => {
+    scrollTargetId.value = target
+  })
+  clearTimeout(locateTimer)
+  locateTimer = setTimeout(() => {
+    locatedMatchId.value = null
+  }, 1600)
+}
 </script>
 
 <style scoped lang="css">
@@ -246,6 +276,19 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
 
 .team-season-match-row:first-child {
   border-top: none;
+}
+
+.team-season-match-row--pressed {
+  opacity: 0.72;
+}
+
+.team-season-match-row--located {
+  background: var(--fi-color-primary-soft);
+  border-radius: var(--fi-radius-md);
+  padding-left: var(--fi-space-10);
+  padding-right: var(--fi-space-10);
+  margin-left: calc(-1 * var(--fi-space-10));
+  margin-right: calc(-1 * var(--fi-space-10));
 }
 
 .team-season-match-row__meta {
