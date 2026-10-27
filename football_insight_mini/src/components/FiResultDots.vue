@@ -11,10 +11,10 @@
           hover-stay-time="80"
           @tap="emit('select', item)"
         >
-          <view class="result-dots__dot" :class="[`result-dots__dot--${item.tone}`, { 'result-dots__dot--latest': highlightLatest && index === items.length - 1 }]" />
+          <view class="result-dots__dot" :class="[`result-dots__dot--${item.tone}`, { 'result-dots__dot--latest': isLatestPlayed(index) }]" />
         </view>
         <view v-else class="result-dots__cell" aria-hidden="true">
-          <view class="result-dots__dot" :class="[`result-dots__dot--${item.tone}`, { 'result-dots__dot--latest': highlightLatest && index === items.length - 1 }]" />
+          <view class="result-dots__dot" :class="[`result-dots__dot--${item.tone}`, { 'result-dots__dot--latest': isLatestPlayed(index) }]" />
         </view>
       </template>
     </view>
@@ -47,6 +47,13 @@ const props = withDefaults(
 const emit = defineEmits<{ (event: 'select', item: ResultDotItem): void }>()
 
 const latestLabel = computed(() => RESULT_DOT_LABELS[props.items[props.items.length - 1]!.tone])
+const lastPlayedIndex = computed(() => {
+  for (let index = props.items.length - 1; index >= 0; index -= 1) {
+    if (props.items[index]!.tone !== 'upcoming') return index
+  }
+  return -1
+})
+const isLatestPlayed = (index: number) => props.highlightLatest && index === lastPlayedIndex.value
 const summary = computed(
   () => `共${props.items.length}场，从旧到新：${props.items.map(item => RESULT_DOT_LABELS[item.tone]).join('、')}`,
 )
@@ -98,17 +105,20 @@ const summary = computed(
   background: var(--fi-color-divider-soft);
 }
 .result-dots__dot {
-  --result-dot-color: var(--fi-color-team-form-line);
+  --result-dot-color: var(--fi-color-result-upcoming);
   width: var(--result-dot-size);
   height: var(--result-dot-size);
   border-radius: var(--fi-radius-round);
   background: var(--result-dot-color);
 }
 .result-dots__dot--win {
-  --result-dot-color: var(--fi-color-primary);
+  --result-dot-color: var(--fi-color-result-win);
+}
+.result-dots__dot--draw {
+  --result-dot-color: var(--fi-color-result-draw);
 }
 .result-dots__dot--loss {
-  --result-dot-color: var(--fi-color-success-accent);
+  --result-dot-color: var(--fi-color-result-loss);
 }
 .result-dots__dot--latest {
   box-shadow: 0 0 0 4rpx var(--fi-color-divider-soft);

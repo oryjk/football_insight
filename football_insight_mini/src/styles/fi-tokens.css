@@ -43,6 +43,10 @@ page {
   --fi-primitive-grey-text-deep: #6d7280;
   --fi-primitive-grey-text-soft: #7a7f8b;
   --fi-primitive-team-form-line: #a8afb9;
+  --fi-primitive-result-win: #2e9e5b;
+  --fi-primitive-result-draw: #e0a526;
+  --fi-primitive-result-loss: #d64545;
+  --fi-primitive-result-upcoming: #9aa0a6;
   --fi-primitive-team-form-halo: rgba(220, 38, 38, 0.10);
   --fi-primitive-team-form-pressed: rgba(220, 38, 38, 0.04);
   --fi-primitive-space-72: 72rpx;
@@ -189,6 +193,10 @@ page {
   --fi-color-text-muted: var(--fi-primitive-grey-text);
   --fi-color-text-caption: var(--fi-primitive-grey-text-soft);
   --fi-color-team-form-line: var(--fi-primitive-team-form-line);
+  --fi-color-result-win: var(--fi-primitive-result-win);
+  --fi-color-result-draw: var(--fi-primitive-result-draw);
+  --fi-color-result-loss: var(--fi-primitive-result-loss);
+  --fi-color-result-upcoming: var(--fi-primitive-result-upcoming);
   --fi-color-team-form-pressed: var(--fi-primitive-team-form-pressed);
   --fi-color-surface: var(--fi-primitive-white);
   --fi-shadow-team-form-latest: var(--fi-primitive-shadow-team-form-latest);

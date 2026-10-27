@@ -23,7 +23,7 @@
           <text v-if="aclOf(team.rank_no)" class="standings__acl" :class="`standings__acl--${aclOf(team.rank_no)?.tier}`">{{ aclOf(team.rank_no)?.label }}</text>
         </view>
         <view class="standings__form">
-          <FiResultDots :items="buildOutcomeDots(team.recent_form)" size="sm" align="end" :per-row="15" highlight-latest empty-text="近期战绩待更新" />
+          <FiResultDots :items="buildSeasonDots(team.recent_form)" size="sm" align="end" :per-row="15" highlight-latest empty-text="近期战绩待更新" />
         </view>
         <text class="standings__points">{{ team.points }}</text>
       </view>
@@ -42,7 +42,7 @@
 <script setup lang="ts">
 // 走势线组件 FiTeamFormTrend 保留，需要折线形态时在此换回：<FiTeamFormTrend :outcomes="team.recent_form" />
 import FiResultDots from './FiResultDots.vue'
-import { buildOutcomeDots } from '../utils/resultDots'
+import { buildSeasonDots } from '../utils/resultDots'
 import { resolveAclQualification } from '../utils/aclQualification'
 import type { OverviewStanding } from '../types/insight'
 

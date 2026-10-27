@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { buildOutcomeDots } from './resultDots'
+import { buildOutcomeDots, buildSeasonDots, CSL_SEASON_TOTAL_ROUNDS } from './resultDots'
 
 describe('result dots', () => {
   test('keeps the newest valid results in oldest-to-newest order', () => {
@@ -10,5 +10,18 @@ describe('result dots', () => {
   test('returns nothing for missing or invalid records', () => {
     expect(buildOutcomeDots(undefined)).toEqual([])
     expect(buildOutcomeDots(['live', 'scheduled'])).toEqual([])
+  })
+
+  test('season dots pad unplayed rounds with upcoming placeholders to 30', () => {
+    const dots = buildSeasonDots(['win', 'loss', 'draw'])
+    expect(dots.length).toBe(CSL_SEASON_TOTAL_ROUNDS)
+    expect(dots.map(dot => dot.tone).slice(0, 3)).toEqual(['win', 'loss', 'draw'])
+    expect(dots.slice(3).every(dot => dot.tone === 'upcoming')).toBe(true)
+  })
+
+  test('season dots never exceed the total and handle empty records', () => {
+    expect(buildSeasonDots(undefined).length).toBe(CSL_SEASON_TOTAL_ROUNDS)
+    const full = Array.from({ length: CSL_SEASON_TOTAL_ROUNDS }, () => 'win')
+    expect(buildSeasonDots(full).length).toBe(CSL_SEASON_TOTAL_ROUNDS)
   })
 })

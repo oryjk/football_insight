@@ -1,6 +1,6 @@
 import type { MatchOutcome } from '../types/insight'
 
-export type ResultDotTone = MatchOutcome
+export type ResultDotTone = MatchOutcome | 'upcoming'
 
 export interface ResultDotItem {
   id: string | number
@@ -8,7 +8,10 @@ export interface ResultDotItem {
   ariaLabel?: string
 }
 
-export const RESULT_DOT_LABELS: Record<ResultDotTone, string> = { win: '胜', draw: '平', loss: '负' }
+export const RESULT_DOT_LABELS: Record<ResultDotTone, string> = { win: '胜', draw: '平', loss: '负', upcoming: '未赛' }
+
+/** 中超单赛季每队 30 轮，用于把未赛轮次补成灰色圆点。 */
+export const CSL_SEASON_TOTAL_ROUNDS = 30
 
 /** Keep valid results (the newest `limit` when given), oldest to newest, without inventing matches. */
 export function buildOutcomeDots(input: readonly unknown[] | undefined, limit?: number): ResultDotItem[] {
@@ -16,4 +19,14 @@ export function buildOutcomeDots(input: readonly unknown[] | undefined, limit?: 
     (value): value is MatchOutcome => value === 'win' || value === 'draw' || value === 'loss',
   )
   return (limit === undefined ? outcomes : outcomes.slice(-limit)).map((tone, index) => ({ id: index, tone }))
+}
+
+/** Played results followed by upcoming placeholders, so a full season always renders `total` dots. */
+export function buildSeasonDots(input: readonly unknown[] | undefined, total = CSL_SEASON_TOTAL_ROUNDS): ResultDotItem[] {
+  const played = buildOutcomeDots(input, total)
+  const upcomingCount = Math.max(0, total - played.length)
+  return [
+    ...played,
+    ...Array.from({ length: upcomingCount }, (_, index) => ({ id: `upcoming-${index}`, tone: 'upcoming' as const })),
+  ]
 }
