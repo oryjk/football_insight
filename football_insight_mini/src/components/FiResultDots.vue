@@ -30,7 +30,7 @@ import { RESULT_DOT_LABELS, type ResultDotItem } from '../utils/resultDots'
 const props = withDefaults(
   defineProps<{
     items: ResultDotItem[]
-    /** md: 22rpx dots with tappable cells; sm: compact dots for list rows. */
+    /** md: 28rpx dots with tappable cells; sm: compact dots for list rows. */
     size?: 'md' | 'sm'
     /** end keeps short records on the right, with the same spacing as a full record. */
     align?: 'start' | 'end'
@@ -59,12 +59,12 @@ const summary = computed(
   gap: var(--fi-space-8);
   width: 100%;
   min-width: 0;
-  --result-dot-size: var(--fi-space-22);
+  --result-dot-size: var(--fi-space-28);
   --result-cell-height: var(--fi-space-44);
   --result-cell-max: 52rpx;
 }
 .result-dots--sm {
-  --result-dot-size: 18rpx;
+  --result-dot-size: var(--fi-space-24);
   --result-cell-height: var(--fi-space-44);
   --result-cell-max: 28rpx;
 }
