@@ -65,13 +65,21 @@
         <text>{{ errorMessage }}</text>
       </view>
 
-      <scroll-view
-        v-else-if="matches.length"
-        scroll-y
-        class="team-season-sheet__list"
-        :scroll-top="scrollTop"
-        :scroll-with-animation="scrollAnimated"
-      >
+      <template v-if="!loading && !errorMessage && matches.length">
+        <view v-if="finishedMatches.length" class="team-season-form">
+          <view class="team-season-form__caption">
+            <text>赛季走势 · 已赛 {{ finishedMatches.length }} 场</text>
+            <text>点圆点定位比赛</text>
+          </view>
+          <FiResultDots :items="formDots" interactive :per-row="15" :selected-id="selectedMatchId" @select="locateMatch" />
+        </view>
+
+        <scroll-view
+          scroll-y
+          class="team-season-sheet__list"
+          :scroll-top="scrollTop"
+          :scroll-with-animation="scrollAnimated"
+        >
         <view
           v-for="(match, index) in matches"
           :key="match.matchId"
@@ -80,6 +88,7 @@
           :class="[
             match.isHomeTeam ? 'team-season-match-row--home' : 'team-season-match-row--away',
             match.focusKind ? `team-season-match-row--${match.focusKind}` : '',
+            locatedMatchId === match.matchId ? 'team-season-match-row--located' : '',
           ]"
           :style="{ '--team-match-delay': `${100 + index * 55}ms` }"
         >
@@ -108,8 +117,9 @@
           </view>
         </view>
       </scroll-view>
+      </template>
 
-      <view v-else class="team-season-sheet__empty">
+      <view v-else-if="!loading && !errorMessage" class="team-season-sheet__empty">
         <text>这支球队当前还没有可展示的赛季比赛记录。</text>
       </view>
     </view>
@@ -117,11 +127,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, getCurrentInstance, nextTick, ref, watch } from 'vue'
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import FiLoading from '../../../components/FiLoading.vue'
+import FiResultDots from '../../../components/FiResultDots.vue'
 import TeamAbilityHexagon from './TeamAbilityHexagon.vue'
 import type { TeamRankingEntry } from '../../../types/insight'
 import { TEAM_ABILITY_AXES } from '../ability'
+import { padUpcomingDots, type ResultDotItem } from '../../../utils/resultDots'
 import { buildTeamSeasonMatchRowId, formatTeamSeasonRecord, type TeamSeasonMatch } from '../../../utils/teamSeasonMatches'
 
 const props = defineProps<{
@@ -155,6 +167,72 @@ const recordText = computed(() => formatTeamSeasonRecord(props.matches))
 const nextScheduledMatch = computed(() =>
   props.matches.find((match) => match.focusKind === 'next-scheduled') ?? null,
 )
+
+const finishedMatches = computed(() =>
+  props.matches.filter((match) => ['win', 'draw', 'loss'].includes(match.resultTone)),
+)
+const matchById = computed(() => new Map(finishedMatches.value.map((match) => [match.matchId, match])))
+const formDots = computed<ResultDotItem[]>(() =>
+  padUpcomingDots(
+    finishedMatches.value.map((match) => ({
+      id: match.matchId,
+      tone: match.resultTone as ResultDotItem['tone'],
+      ariaLabel: `第${match.roundNumber}轮 ${match.resultLabel} ${match.scoreText}，定位到这场比赛`,
+    })),
+  ),
+)
+
+const selectedMatchId = ref<number | null>(null)
+const locatedMatchId = ref<number | null>(null)
+let locateTimer: ReturnType<typeof setTimeout> | undefined
+let scrollSyncSuppressedUntil = 0
+
+function locateMatch(item: ResultDotItem) {
+  const match = matchById.value.get(item.id as number)
+  if (!match) return
+  selectedMatchId.value = match.matchId
+  locatedMatchId.value = match.matchId
+  // The programmatic scroll sweeps other rows through the viewport; keep the tapped selection stable.
+  scrollSyncSuppressedUntil = Date.now() + 800
+  void centerMatch(match.matchId)
+  clearTimeout(locateTimer)
+  locateTimer = setTimeout(() => {
+    locatedMatchId.value = null
+  }, 1600)
+}
+
+// Scroll linkage: the topmost fully-visible match row selects its dot.
+const visibleMatchIds = new Set<number>()
+let rowObserver: { disconnect(): void } | null = null
+
+function syncSelectedFromVisible() {
+  if (Date.now() < scrollSyncSuppressedUntil) return
+  const topmost = props.matches.find((match) => visibleMatchIds.has(match.matchId))
+  if (topmost) selectedMatchId.value = topmost.matchId
+}
+
+function observeMatchRows() {
+  rowObserver?.disconnect()
+  rowObserver = null
+  visibleMatchIds.clear()
+  if (!instance || !props.matches.length) return
+  const observer = uni.createIntersectionObserver(instance, { thresholds: [0.55] }).relativeToViewport()
+  for (const match of props.matches) {
+    observer.observe(`#${buildTeamSeasonMatchRowId(match.matchId)}`, (result) => {
+      if (result.intersectionRatio >= 0.55) visibleMatchIds.add(match.matchId)
+      else visibleMatchIds.delete(match.matchId)
+      syncSelectedFromVisible()
+    })
+  }
+  rowObserver = observer
+}
+
+onMounted(() => nextTick(observeMatchRows))
+watch(() => props.matches, () => nextTick(observeMatchRows))
+onBeforeUnmount(() => {
+  rowObserver?.disconnect()
+  clearTimeout(locateTimer)
+})
 
 watch(
   nextScheduledMatch,
@@ -441,6 +519,22 @@ async function centerMatch(matchId: number): Promise<void> {
   font-size: var(--fi-font-24);
   font-weight: var(--fi-weight-extrabold);
   line-height: var(--fi-leading-none);
+}
+
+.team-season-form {
+  margin-top: var(--fi-space-18);
+}
+
+.team-season-form__caption {
+  display: flex;
+  justify-content: space-between;
+  color: var(--fi-color-text-muted);
+  font-size: var(--fi-font-22);
+  line-height: var(--fi-leading-normal);
+}
+
+.team-season-match-row--located {
+  box-shadow: 0 14rpx 30rpx rgba(17, 24, 39, 0.22), inset 0 0 0 5rpx rgba(255, 255, 255, 0.72);
 }
 
 /* 加载态预留与赛程列表相同的高度，避免数据到达时弹框高度突变造成抖动 */
