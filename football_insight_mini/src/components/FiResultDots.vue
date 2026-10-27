@@ -11,10 +11,10 @@
           hover-stay-time="80"
           @tap="emit('select', item)"
         >
-          <view class="result-dots__dot" :class="[`result-dots__dot--${item.tone}`, { 'result-dots__dot--latest': isLatestPlayed(index) }]" />
+          <view class="result-dots__dot" :class="[`result-dots__dot--${item.tone}`, { 'result-dots__dot--latest': isLatestPlayed(index), 'result-dots__dot--selected': item.id === selectedId }]" />
         </view>
         <view v-else class="result-dots__cell" aria-hidden="true">
-          <view class="result-dots__dot" :class="[`result-dots__dot--${item.tone}`, { 'result-dots__dot--latest': isLatestPlayed(index) }]" />
+          <view class="result-dots__dot" :class="[`result-dots__dot--${item.tone}`, { 'result-dots__dot--latest': isLatestPlayed(index), 'result-dots__dot--selected': item.id === selectedId }]" />
         </view>
       </template>
     </view>
@@ -38,10 +38,12 @@ const props = withDefaults(
     perRow?: number
     interactive?: boolean
     highlightLatest?: boolean
+    /** Dot with this id gets the selected ring; used to mirror an external selection. */
+    selectedId?: string | number | null
     showLatestLabel?: boolean
     emptyText?: string
   }>(),
-  { size: 'md', align: 'start', perRow: undefined, interactive: false, highlightLatest: false, showLatestLabel: false, emptyText: '' },
+  { size: 'md', align: 'start', perRow: undefined, interactive: false, highlightLatest: false, selectedId: null, showLatestLabel: false, emptyText: '' },
 )
 
 const emit = defineEmits<{ (event: 'select', item: ResultDotItem): void }>()
@@ -122,6 +124,11 @@ const summary = computed(
 }
 .result-dots__dot--latest {
   box-shadow: 0 0 0 4rpx var(--fi-color-divider-soft);
+}
+.result-dots__dot--selected {
+  box-shadow:
+    0 0 0 3rpx var(--fi-primitive-white),
+    0 0 0 7rpx var(--result-dot-color);
 }
 .result-dots__latest {
   min-width: var(--fi-space-20);

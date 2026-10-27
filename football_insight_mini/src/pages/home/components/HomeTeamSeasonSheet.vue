@@ -41,7 +41,7 @@
         <text>赛季走势 · 已赛 {{ finishedMatches.length }} 场</text>
         <text>点圆点定位比赛，点比赛看单场</text>
       </view>
-      <FiResultDots :items="formDots" interactive :per-row="15" @select="locateMatch" />
+      <FiResultDots :items="formDots" interactive :per-row="15" :selected-id="selectedMatchId" @select="locateMatch" />
     </view>
 
     <scroll-view
@@ -93,7 +93,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import HomeSheetShell from './HomeSheetShell.vue'
 import FiLoading from '../../../components/FiLoading.vue'
 import FiResultDots from '../../../components/FiResultDots.vue'
@@ -130,11 +130,14 @@ const recordText = computed(() => formatHomeTeamSeasonRecord(props.matches))
 
 const scrollTargetId = ref('')
 const locatedMatchId = ref<number | null>(null)
+const selectedMatchId = ref<number | null>(null)
 let locateTimer: ReturnType<typeof setTimeout> | undefined
+let scrollSyncSuppressedUntil = 0
 
 function locateMatch(item: ResultDotItem) {
   const match = matchById.value.get(item.id as number)
   if (!match) return
+  selectedMatchId.value = match.matchId
   locatedMatchId.value = match.matchId
   const target = `team-season-match-${match.matchId}`
   // scroll-into-view only reacts to value changes; reset first so re-tapping the same dot scrolls again.
@@ -142,11 +145,47 @@ function locateMatch(item: ResultDotItem) {
   nextTick(() => {
     scrollTargetId.value = target
   })
+  // The programmatic scroll sweeps other rows through the viewport; keep the tapped selection stable.
+  scrollSyncSuppressedUntil = Date.now() + 800
   clearTimeout(locateTimer)
   locateTimer = setTimeout(() => {
     locatedMatchId.value = null
   }, 1600)
 }
+
+// Scroll linkage: the topmost fully-visible match row selects its dot.
+const visibleMatchIds = new Set<number>()
+let rowObserver: { disconnect(): void } | null = null
+
+function syncSelectedFromVisible() {
+  if (Date.now() < scrollSyncSuppressedUntil) return
+  const topmost = props.matches.find((match) => visibleMatchIds.has(match.matchId))
+  if (topmost) selectedMatchId.value = topmost.matchId
+}
+
+function observeMatchRows() {
+  rowObserver?.disconnect()
+  rowObserver = null
+  visibleMatchIds.clear()
+  const instance = getCurrentInstance()?.proxy
+  if (!instance || !props.matches.length) return
+  const observer = uni.createIntersectionObserver(instance, { thresholds: [0.55] }).relativeToViewport()
+  for (const match of props.matches) {
+    observer.observe(`#team-season-match-${match.matchId}`, (result) => {
+      if (result.intersectionRatio >= 0.55) visibleMatchIds.add(match.matchId)
+      else visibleMatchIds.delete(match.matchId)
+      syncSelectedFromVisible()
+    })
+  }
+  rowObserver = observer
+}
+
+onMounted(() => nextTick(observeMatchRows))
+watch(() => props.matches, () => nextTick(observeMatchRows))
+onBeforeUnmount(() => {
+  rowObserver?.disconnect()
+  clearTimeout(locateTimer)
+})
 </script>
 
 <style scoped lang="css">
