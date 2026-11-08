@@ -6,14 +6,9 @@
 
 `sync-avatar-thumbs` 为名单库中已有头像补生成 96/240px JPEG，只读取数据库，不改原图；已有两种小图则跳过。小图命名为 `summary/players/thumbs/<尺寸>/<原文件名>.jpg`，因此原文件名含 `.jpg` 时，小图以 `.jpg.jpg` 结尾，与小程序 URL 换算一致。
 
-2026-10-20 验证：公开 `https://oryjk.cn:82/minio` 可匿名读图，但带签名的 S3 请求经代理后返回 `SignatureDoesNotMatch`。补生成使用 SSH 隧道直连 out109 的原有 MinIO，公开地址单独指定，不修改 Nginx。以下在 local233 执行：
+MinIO 位置（2026-11-08 起）：`football-insight` bucket 在 jd 的 `registration-minio` 容器里，使用专用账号 `football-insight-rw`（只能访问这个 bucket）。公网地址 `https://oryjk.cn:82/minio` 不变，由 jd 的 nginx 去掉 `/minio` 前缀并透传 Host 后转发，因此带签名的上传直接走 `.env.sync` 里的公网地址即可，不再需要 SSH 隧道。以前 bucket 在 out109 上，经反向 SSH 隧道对外，带签名的请求返回过 `SignatureDoesNotMatch`。
 
-```bash
-# 独立终端保持连接；仅绑定本机回环。
-ssh -N -L 127.0.0.1:19091:127.0.0.1:9000 -o ExitOnForwardFailure=yes out109
-```
-
-另一个终端在 `sina_csl_scraper` 目录加载现有私有配置后执行：
+在 `sina_csl_scraper` 目录加载现有私有配置后执行：
 
 ```bash
 set -a
@@ -22,12 +17,10 @@ source .env.sync
 set +a
 export FI_DATABASE_URL="${FI_DATABASE_URL:-${DATABASE_URL:-}}"
 uv run sina-csl-scraper sync-avatar-thumbs --dry-run
-uv run sina-csl-scraper sync-avatar-thumbs \
-  --minio-endpoint http://127.0.0.1:19091 \
-  --minio-public-base-url https://oryjk.cn:82/minio/football-insight
+uv run sina-csl-scraper sync-avatar-thumbs
 ```
 
-任务结束后关闭隧道终端；失败时重跑同一命令续补，可用 `--limit` 限制处理数量。
+失败时重跑同一命令续补，可用 `--limit` 限制处理数量。
 
 ## 赛前数据倾向（Elo V2，服务端已启用）
 

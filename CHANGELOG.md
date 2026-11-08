@@ -2,6 +2,14 @@
 
 > 按时间倒序记录用户可见变更。每条记录必须说明“原因”。
 
+## 2026-11-08 · MinIO 从 out109 迁到 jd
+
+- 变更：`football-insight` bucket 的 2433 个对象（136MiB）用 `mc mirror --preserve` 同步到 jd 现有的 `registration-minio`，沿用原来的匿名只读策略，并新建只能访问这个 bucket 的账号 `football-insight-rw`。jd nginx 的 `/minio/football-insight/` 改为转发到 `registration-minio:9000`，并透传 Host；公网地址 `oryjk.cn:82/minio/...` 不变，小程序、数据库里的链接和已发布版本都不用改。local233 抓取器的 `.env.sync` 已换成新账号。
+- 原因：原先线上图片和语音都依赖 out109 到 jd 的反向 SSH 隧道，隧道一断，小程序图片就会失效；带签名的上传也走不通公网地址。
+- 准备：迁移前清理了 jd 上没有任何容器引用的 Docker 镜像和构建缓存，磁盘使用率从 88% 降到 60%。
+- 验证：两边对象数和大小一致，`mc diff` 无差异；抽查 ETag 一致，`Cache-Control` 保留；公网请求经 MinIO trace 确认由 jd 响应；新账号经公网地址完成签名上传、读取、删除测试，测试对象已删除。nginx 原配置备份为 `nginx.conf.bak.minio-to-jd.20261108221628`，回滚时恢复这个备份并 reload。
+- 未做：out109 的 MinIO、反向隧道和 jd 上的 `minio-tunnel-fwd.service` 先保留不动，观察一段时间后再下线。
+
 ## 2026-10-27 · 会员卡片图片挪到 MinIO，主包回落
 
 - 变更：会员卡球场背景 `member-stadium-v2.jpg`（151.5KB）与 9 张会员档位图标（约 125KB）改从 MinIO 读取，源码与构建产物不再包含这些图片；MinIO 对象已上传并逐张匿名回读校验 SHA-256 一致，带 `Cache-Control: public, max-age=31536000, immutable`。主包 dist 口径从 1,424KB 降到 1,147KB。
