@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>足球洞察</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1d2129; --muted: #6b7280; --line: #e5e7eb;
+    --accent: #b4232c; --accent-soft: #fdf2f2; --win: #16a34a; --draw: #9ca3af; --loss: #dc2626;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --bg: #17181c; --fg: #f3f4f6; --muted: #9ca3af; --line: #2c2f36;
+    --accent: #f87171; --accent-soft: #2a1a1c; color-scheme: dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17181c; --fg: #f3f4f6; --muted: #9ca3af; --line: #2c2f36;
+      --accent: #f87171; --accent-soft: #2a1a1c; color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  main { padding: 14px 16px 16px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  h1 { font-size: 16px; margin: 0; }
+  .sub { color: var(--muted); font-size: 12px; }
+  .scroll { overflow-x: auto; border-top: 1px solid var(--line); }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 6px 6px; text-align: center; white-space: nowrap; border-bottom: 1px solid var(--line); }
+  th { position: sticky; top: 0; background: var(--bg); color: var(--muted); font-weight: 500; font-size: 12px; }
+  td.left, th.left { text-align: left; }
+  td.strong { font-weight: 600; }
+  .neg { color: var(--loss); font-size: 12px; }
+  .form span { display: inline-block; width: 16px; height: 16px; line-height: 16px; border-radius: 50%;
+    color: #fff; font-size: 10px; margin-right: 2px; }
+  .form .w { background: var(--win); } .form .d { background: var(--draw); } .form .l { background: var(--loss); }
+  .promo { display: flex; align-items: center; gap: 14px; margin-top: 14px; padding: 12px;
+    border-radius: 10px; background: var(--accent-soft); }
+  .promo img { width: 104px; height: 104px; border-radius: 8px; background: #fff; flex: none; }
+  .promo b { display: block; color: var(--accent); margin-bottom: 4px; }
+  .promo p { margin: 0 0 8px; font-size: 13px; }
+  .promo button { border: 1px solid var(--accent); color: var(--accent); background: transparent;
+    border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+  .empty { color: var(--muted); padding: 24px 0; text-align: center; }
+</style>
+</head>
+<body>
+<main id="app"><div class="empty">加载中…</div></main>
+<script>
+(() => {
+  const app = document.getElementById('app');
+  let nextId = 1;
+  const pending = new Map();
+
+  function post(message) { window.parent.postMessage(message, '*'); }
+  function request(method, params) {
+    const id = nextId++;
+    post({ jsonrpc: '2.0', id, method, params });
+    return new Promise((resolve) => pending.set(id, resolve));
+  }
+  function notify(method, params) { post({ jsonrpc: '2.0', method, params: params || {} }); }
+
+  function el(tag, attrs, children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (k === 'text') node.textContent = v; else node.setAttribute(k, v);
+    }
+    for (const child of children || []) if (child) node.appendChild(child);
+    return node;
+  }
+  function table(headers, rows) {
+    const head = el('tr', {}, headers.map(([label, cls]) => el('th', { class: cls || '', text: label })));
+    const body = rows.map((cells) => el('tr', {}, cells.map((cell) => {
+      if (cell instanceof Node) return el('td', {}, [cell]);
+      const [text, cls] = Array.isArray(cell) ? cell : [cell, ''];
+      return el('td', { class: cls, text: String(text) });
+    })));
+    return el('div', { class: 'scroll' }, [el('table', {}, [el('thead', {}, [head]), el('tbody', {}, body)])]);
+  }
+  function form(text) {
+    const box = el('span', { class: 'form' });
+    for (const ch of text || '') box.appendChild(el('span', { class: { '胜': 'w', '平': 'd', '负': 'l' }[ch] || 'd', text: ch }));
+    return box;
+  }
+
+  function renderStandings(d) {
+    return [
+      header(`${d.competition} ${d.season} 积分榜`, d.table),
+      table([['#'], ['球队', 'left'], ['赛'], ['胜/平/负'], ['进/失'], ['积分'], ['近5场', 'left']],
+        d.rows.map((r) => [r.rank, [r.team, 'left strong'], r.played, `${r.wins}/${r.draws}/${r.losses}`,
+          `${r.goals_for}/${r.goals_against}`,
+          r.points_adjustment ? pointsCell(r) : [r.points, 'strong'], form(r.recent_form)])),
+    ];
+  }
+  function pointsCell(r) {
+    const span = el('span', {}, [el('b', { text: String(r.points) }), el('span', { class: 'neg', text: ` (${r.points_adjustment})` })]);
+    return span;
+  }
+  function renderRound(d) {
+    return [
+      header(`${d.competition} ${d.season} 第 ${d.round} 轮`, `最新第 ${d.latest_round} 轮`),
+      table([['日期'], ['主队', 'left'], ['比分'], ['客队', 'left'], ['状态']],
+        d.matches.map((m) => [`${m.date.slice(5)} ${m.time}`, [m.home_team, 'left'],
+          [m.home_score != null ? `${m.home_score} - ${m.away_score}` : 'vs', 'strong'], [m.away_team, 'left'], m.status])),
+    ];
+  }
+  function renderLeaderboard(d) {
+    const goals = d.category === 'goals';
+    const headers = [['#'], ['球员', 'left'], ['球队', 'left'], [d.category_label.replace(/榜$/, '')]];
+    if (goals) headers.push(['点球']);
+    return [
+      header(`${d.competition} ${d.season} ${d.category_label}`, `前 ${d.rows.length} 名`),
+      table(headers, d.rows.map((r) => {
+        const row = [r.rank, [r.player, 'left strong'], [r.team, 'left'], [r.value, 'strong']];
+        if (goals) row.push(r.penalties || '0');
+        return row;
+      })),
+    ];
+  }
+  function header(title, sub) {
+    return el('header', {}, [el('h1', { text: title }), el('span', { class: 'sub', text: sub || '' })]);
+  }
+  function promo(p) {
+    if (!p) return null;
+    const open = el('button', { type: 'button', text: '在浏览器打开' });
+    open.addEventListener('click', () => {
+      if (window.openai && window.openai.openExternal) window.openai.openExternal({ href: p.landing_url });
+      else request('ui/open-link', { url: p.landing_url });
+    });
+    return el('div', { class: 'promo' }, [
+      el('img', { src: p.code_image_url, alt: `${p.mini_program}小程序码`, width: '104', height: '104' }),
+      el('div', {}, [el('b', { text: `「${p.mini_program}」小程序` }), el('p', { text: p.call_to_action }), open]),
+    ]);
+  }
+
+  let rendered = false;
+  function render(result) {
+    const d = result && (result.structuredContent || result);
+    if (!d || !d.kind) return;
+    const parts = d.kind === 'standings' ? renderStandings(d)
+      : d.kind === 'round_results' ? renderRound(d)
+      : d.kind === 'player_leaderboard' ? renderLeaderboard(d) : null;
+    if (!parts) return;
+    rendered = true;
+    app.replaceChildren(...parts.filter(Boolean), promo(d.promo));
+    reportSize();
+  }
+  function reportSize() {
+    requestAnimationFrame(() => notify('ui/notifications/size-changed', {
+      width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight,
+    }));
+  }
+  function applyTheme(ctx) {
+    const theme = ctx && ctx.theme;
+    if (theme === 'dark' || theme === 'light') document.documentElement.dataset.theme = theme;
+  }
+
+  window.addEventListener('message', (event) => {
+    const m = event.data;
+    if (!m || m.jsonrpc !== '2.0') return;
+    if (m.id != null && pending.has(m.id) && !m.method) {
+      pending.get(m.id)(m.result);
+      pending.delete(m.id);
+      return;
+    }
+    if (m.method === 'ui/notifications/tool-result') render(m.params);
+    else if (m.method === 'ui/notifications/host-context-changed') applyTheme(m.params);
+    else if (m.method === 'ui/resource-teardown' && m.id != null) post({ jsonrpc: '2.0', id: m.id, result: {} });
+  });
+  window.addEventListener('openai:set_globals', () => {
+    if (window.openai && window.openai.toolOutput) render(window.openai.toolOutput);
+  });
+
+  request('ui/initialize', {
+    protocolVersion: '2026-01-26',
+    appInfo: { name: 'football-insight-card', version: '1.0.0' },
+    clientInfo: { name: 'football-insight-card', version: '1.0.0' },
+    appCapabilities: {},
+  }).then((res) => {
+    applyTheme(res && res.hostContext);
+    notify('ui/notifications/initialized');
+  });
+  if (window.openai && window.openai.toolOutput) render(window.openai.toolOutput);
+  setTimeout(() => { if (!rendered) app.replaceChildren(el('div', { class: 'empty', text: '正在等待数据…' })); }, 4000);
+})();
+</script>
+</body>
+</html>

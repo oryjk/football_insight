@@ -11,6 +11,7 @@ pub mod http_cache;
 pub mod insight;
 pub mod logging;
 pub mod match_id_unlock;
+pub mod mcp;
 pub mod mini_review;
 pub mod payment;
 pub mod push_notification;

@@ -37,7 +37,7 @@ impl WechatMiniCode {
         )
     }
 
-    fn for_target(app_id: String, secret: String, scene: String, page: String) -> Self {
+    pub fn for_target(app_id: String, secret: String, scene: String, page: String) -> Self {
         Self {
             app_id,
             secret,

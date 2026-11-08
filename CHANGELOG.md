@@ -2,6 +2,16 @@
 
 > 按时间倒序记录用户可见变更。每条记录必须说明“原因”。
 
+## 2026-11-09 · 对外提供中超数据 MCP 服务
+
+- 变更：后端新增 `mcp` 模块，在 `https://match.oryjk.cn/api/v1/mcp` 提供公开、只读的 MCP 服务，含 3 个工具：
+  - `get_csl_standings`：当前积分榜（含罚分）
+  - `get_csl_round_results`：某轮赛果，默认最新一轮
+  - `get_csl_player_leaderboard`：射手榜、助攻榜等球员榜
+  支持 MCP Apps 的助手会在对话里显示榜单卡片和「足球洞察」小程序码；不支持的助手，文字结果末尾附落地页链接，页面上是小程序码。小程序码 scene 为 `s=mcp&c=rankings|home`，会进入获客来源统计。
+- 原因：让在 AI 助手里查中超数据的人发现并打开「足球洞察」小程序（引流）。第一版完全公开。
+- 验证：新增 17 项单元测试，后端全量 665 项通过；本地后端重启后用真实数据跑完整 MCP 会话（initialize、tools/list、resources/read、3 个工具、越界参数）；小程序码经微信接口真实生成；用 Playwright 模拟宿主渲染卡片，浅色和深色模式都检查过。
+
 ## 2026-11-08 · MinIO 从 out109 迁到 jd
 
 - 变更：`football-insight` bucket 的 2433 个对象（136MiB）用 `mc mirror --preserve` 同步到 jd 现有的 `registration-minio`，沿用原来的匿名只读策略，并新建只能访问这个 bucket 的账号 `football-insight-rw`。jd nginx 的 `/minio/football-insight/` 改为转发到 `registration-minio:9000`，并透传 Host；公网地址 `oryjk.cn:82/minio/...` 不变，小程序、数据库里的链接和已发布版本都不用改。local233 抓取器的 `.env.sync` 已换成新账号。
