@@ -5,7 +5,10 @@ from datetime import datetime
 from sina_csl_scraper.auto_sync import (
     AutoSyncState,
     build_auto_sync_decision,
+    load_auto_sync_state,
+    next_standings_pending_since,
     resolve_match_due_at,
+    save_auto_sync_state,
 )
 from sina_csl_scraper.models import MatchResult
 
@@ -136,3 +139,82 @@ def test_postponed_match_does_not_trigger_active_or_completed_sync() -> None:
     assert decision.should_run is False
     assert decision.newly_due_match_ids == ()
     assert decision.active_match_ids == ()
+
+
+def _finished_round() -> list[MatchResult]:
+    # Kicked off 15:30, due window closed at 17:40; nothing else scheduled.
+    return [build_match(match_id=301, date="2026-10-24", time="15:30", status="3")]
+
+
+def _pending_state(last_run: str) -> AutoSyncState:
+    return AutoSyncState(
+        last_processed_due_at=datetime.fromisoformat("2026-10-24T17:40:00+08:00"),
+        last_run_at=datetime.fromisoformat(last_run),
+        standings_pending_since=datetime.fromisoformat("2026-10-24T17:40:00+08:00"),
+    )
+
+
+def test_follow_up_sync_runs_every_five_minutes_while_standings_lag() -> None:
+    decision = build_auto_sync_decision(
+        _finished_round(),
+        now=datetime.fromisoformat("2026-10-24T17:45:00+08:00"),
+        state=_pending_state("2026-10-24T17:40:00+08:00"),
+    )
+    assert decision.should_run is True
+    assert decision.follow_up is True
+    assert decision.newly_due_match_ids == ()
+
+    too_soon = build_auto_sync_decision(
+        _finished_round(),
+        now=datetime.fromisoformat("2026-10-24T17:44:00+08:00"),
+        state=_pending_state("2026-10-24T17:40:00+08:00"),
+    )
+    assert too_soon.should_run is False
+
+
+def test_follow_up_sync_gives_up_after_a_day() -> None:
+    decision = build_auto_sync_decision(
+        _finished_round(),
+        now=datetime.fromisoformat("2026-10-25T17:41:00+08:00"),
+        state=_pending_state("2026-10-25T17:30:00+08:00"),
+    )
+    assert decision.should_run is False
+    assert decision.follow_up is False
+
+
+def test_no_follow_up_once_standings_are_consistent() -> None:
+    state = AutoSyncState(
+        last_processed_due_at=datetime.fromisoformat("2026-10-24T17:40:00+08:00"),
+        last_run_at=datetime.fromisoformat("2026-10-24T17:40:00+08:00"),
+    )
+    decision = build_auto_sync_decision(
+        _finished_round(), now=datetime.fromisoformat("2026-10-24T18:30:00+08:00"), state=state
+    )
+    assert decision.should_run is False
+
+
+def test_next_standings_pending_since_keeps_first_lag_and_clears_when_consistent() -> None:
+    now = datetime.fromisoformat("2026-10-24T17:50:00+08:00")
+    first = datetime.fromisoformat("2026-10-24T17:40:00+08:00")
+    assert next_standings_pending_since(AutoSyncState(), now=now, standings_consistent=False) == now
+    assert (
+        next_standings_pending_since(
+            AutoSyncState(standings_pending_since=first), now=now, standings_consistent=False
+        )
+        == first
+    )
+    assert (
+        next_standings_pending_since(
+            AutoSyncState(standings_pending_since=first), now=now, standings_consistent=True
+        )
+        is None
+    )
+
+
+def test_state_round_trips_standings_pending_since(tmp_path) -> None:
+    path = tmp_path / "state.json"
+    state = _pending_state("2026-10-24T17:40:00+08:00")
+    save_auto_sync_state(path, state)
+    assert load_auto_sync_state(path) == state
+    save_auto_sync_state(path, AutoSyncState())
+    assert load_auto_sync_state(path).standings_pending_since is None

@@ -224,3 +224,37 @@ def test_scrape_command_keeps_manual_corner_enrichment_unfiltered(monkeypatch, t
     assert result.exit_code == 0
     assert captured["enrich_corners"] is True
     assert "enrich_match_ids" not in captured
+
+
+def test_auto_sync_due_records_and_clears_lagging_standings(monkeypatch, tmp_path: Path) -> None:
+    from sina_csl_scraper.auto_sync import load_auto_sync_state
+
+    monkeypatch.setattr("sina_csl_scraper.cli.SinaCslClient", FakeSinaClient)
+    monkeypatch.setattr("sina_csl_scraper.cli.fetch_reconciled_schedule", lambda **kwargs: [])
+    monkeypatch.setattr(
+        "sina_csl_scraper.cli.build_auto_sync_decision",
+        lambda *args, **kwargs: AutoSyncDecision(
+            should_run=True, latest_due_at=None, newly_due_match_ids=(), follow_up=True
+        ),
+    )
+    consistent = {"value": False}
+    monkeypatch.setattr(
+        "sina_csl_scraper.cli.run_scrape",
+        lambda **kwargs: {"season": 2026, "run_id": "r", "matches": 0, "standings_consistent": consistent["value"]},
+    )
+    state_file = tmp_path / ".auto_sync_state.json"
+
+    result = CliRunner().invoke(app, ["auto-sync-due", "--state-file", str(state_file)])
+    assert result.exit_code == 0, result.output
+    assert "standings_follow_up=1" in result.output
+    assert "will re-sync" in result.output
+    pending = load_auto_sync_state(state_file).standings_pending_since
+    assert pending is not None
+
+    result = CliRunner().invoke(app, ["auto-sync-due", "--state-file", str(state_file)])
+    assert load_auto_sync_state(state_file).standings_pending_since == pending
+
+    consistent["value"] = True
+    result = CliRunner().invoke(app, ["auto-sync-due", "--state-file", str(state_file)])
+    assert result.exit_code == 0, result.output
+    assert load_auto_sync_state(state_file).standings_pending_since is None

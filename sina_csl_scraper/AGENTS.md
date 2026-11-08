@@ -33,6 +33,9 @@
 - 榜单数据本质上是“抓取时点的赛季累计值”，不是单轮统计
 - 当前球员完整主档还需要逐步从球队球员接口补齐
 - 球队洞察已实现，不是靠“当前快照 vs 上一轮最终快照”差分，而是按积分榜 + 球队榜/球员榜 + 已完场比赛直接累计
+- 新浪积分榜比比赛完场状态更新得晚，可能晚几分钟到几小时，而且是一场一场地更新。所以 `sync.py` 拍收官快照（`round_final`）之前，先用 `standings_match_results` 校验各队的场次、进球、失球是否和已完场比赛一致；不一致就不拍，`SyncResult.round_final_deferred_for` 记下这一轮。
+- `auto-sync-due` 发现积分榜还没追上时，在状态文件里写入 `standings_pending_since`，之后每 5 分钟补抓一次（`standings_follow_up=1`），直到一致为止，最多补 24 小时。
+- 2026-11-09 之前拍的收官快照，有不少是旧积分榜。所以后端「第 N 轮结束时积分榜」改为用比赛结果现算，不读这些快照。
 - 硬约束：每轮必须恰好 8 场比赛（`expected_matches_per_round`，默认 8，由 `sync.py` 的 `validate_complete_schedule` 校验），不满足时 sync 事务回滚
 
 ## 本地开发

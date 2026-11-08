@@ -14,6 +14,7 @@ from .auto_sync import (
     AutoSyncState,
     build_auto_sync_decision,
     load_auto_sync_state,
+    next_standings_pending_since,
     save_auto_sync_state,
 )
 from .assets import AssetUploader, HttpAssetFetcher, MinioAssetTarget, default_public_base_url
@@ -239,6 +240,7 @@ def run_scrape(
         "season": target_season,
         "run_id": sync_result.run_id if sync_result is not None else None,
         "matches": len(matches),
+        "standings_consistent": sync_result.standings_consistent if sync_result is not None else True,
     }
 
 
@@ -578,6 +580,8 @@ def auto_sync_due(
             "active_match_ids="
             + ",".join(str(item) for item in decision.active_match_ids)
         )
+    if decision.follow_up:
+        trigger_parts.append("standings_follow_up=1")
     latest_completed_due_at_text = decision.latest_due_at.isoformat() if decision.latest_due_at else "none"
     typer.echo(
         "Auto sync triggered for "
@@ -588,7 +592,7 @@ def auto_sync_due(
     if dry_run:
         return
 
-    run_scrape(
+    scrape_result = run_scrape(
         season=target_season,
         output_dir=output_dir,
         league_id=league_id,
@@ -606,7 +610,7 @@ def auto_sync_due(
         enrich_corners=enrich_corners,
         leisu_match_map=leisu_match_map,
         enrich_match_ids=set(decision.active_match_ids) | set(decision.newly_due_match_ids),
-    )
+    ) or {}
 
     save_auto_sync_state(
         state_file,
@@ -614,8 +618,15 @@ def auto_sync_due(
             last_processed_due_at=decision.latest_due_at or state.last_processed_due_at,
             last_run_at=now,
             last_run_match_ids=decision.active_match_ids or decision.newly_due_match_ids,
+            standings_pending_since=next_standings_pending_since(
+                state,
+                now=now,
+                standings_consistent=bool(scrape_result.get("standings_consistent", True)),
+            ),
         ),
     )
+    if scrape_result.get("standings_consistent", True) is False:
+        typer.echo("Standings still lag behind finished matches; will re-sync until they catch up.")
 
 
 def main() -> None:

@@ -18,6 +18,9 @@ class AutoSyncState:
     last_processed_due_at: datetime | None = None
     last_run_at: datetime | None = None
     last_run_match_ids: tuple[int, ...] = ()
+    # Set while Sina's standings lag behind finished results (see
+    # sync.standings_match_results); cleared by the first consistent sync.
+    standings_pending_since: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -26,6 +29,15 @@ class AutoSyncDecision:
     latest_due_at: datetime | None
     newly_due_match_ids: tuple[int, ...]
     active_match_ids: tuple[int, ...] = ()
+    follow_up: bool = False
+
+
+def next_standings_pending_since(
+    state: AutoSyncState, *, now: datetime, standings_consistent: bool
+) -> datetime | None:
+    if standings_consistent:
+        return None
+    return state.standings_pending_since or now
 
 
 def resolve_match_kickoff(match: MatchResult) -> datetime | None:
@@ -62,6 +74,8 @@ def build_auto_sync_decision(
     match_duration_minutes: int = 120,
     post_finish_delay_minutes: int = 10,
     active_sync_interval_minutes: int = 1,
+    follow_up_interval_minutes: int = 5,
+    follow_up_max_hours: int = 24,
 ) -> AutoSyncDecision:
     now_at = now.astimezone(SHANGHAI_TZ)
     due_matches: list[tuple[int, datetime]] = []
@@ -90,12 +104,22 @@ def build_auto_sync_decision(
         or now_at - last_run_at >= timedelta(minutes=active_sync_interval_minutes)
     )
 
+    pending_since = (
+        state.standings_pending_since.astimezone(SHANGHAI_TZ) if state.standings_pending_since else None
+    )
+    follow_up = (
+        pending_since is not None
+        and now_at - pending_since <= timedelta(hours=follow_up_max_hours)
+        and (last_run_at is None or now_at - last_run_at >= timedelta(minutes=follow_up_interval_minutes))
+    )
+
     if not due_matches and not active_sync_due:
         return AutoSyncDecision(
-            should_run=False,
+            should_run=follow_up,
             latest_due_at=None,
             newly_due_match_ids=(),
             active_match_ids=active_match_ids,
+            follow_up=follow_up,
         )
 
     latest_due_at = max((due_at for _, due_at in due_matches), default=None)
@@ -107,10 +131,11 @@ def build_auto_sync_decision(
     )
 
     return AutoSyncDecision(
-        should_run=bool(newly_due_match_ids) or active_sync_due,
+        should_run=bool(newly_due_match_ids) or active_sync_due or follow_up,
         latest_due_at=latest_due_at,
         newly_due_match_ids=newly_due_match_ids,
         active_match_ids=active_match_ids,
+        follow_up=follow_up,
     )
 
 
@@ -130,6 +155,7 @@ def load_auto_sync_state(path: Path) -> AutoSyncState:
         last_processed_due_at=parse_datetime(payload.get("last_processed_due_at")),
         last_run_at=parse_datetime(payload.get("last_run_at")),
         last_run_match_ids=tuple(int(item) for item in last_run_match_ids),
+        standings_pending_since=parse_datetime(payload.get("standings_pending_since")),
     )
 
 
@@ -138,4 +164,7 @@ def save_auto_sync_state(path: Path, state: AutoSyncState) -> None:
     payload = asdict(state)
     payload["last_processed_due_at"] = state.last_processed_due_at.isoformat() if state.last_processed_due_at else None
     payload["last_run_at"] = state.last_run_at.isoformat() if state.last_run_at else None
+    payload["standings_pending_since"] = (
+        state.standings_pending_since.isoformat() if state.standings_pending_since else None
+    )
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

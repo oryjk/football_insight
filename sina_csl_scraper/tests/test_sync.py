@@ -12,6 +12,7 @@ from sina_csl_scraper.sync import (
     SyncPayload,
     find_latest_completed_round,
     normalize_live_round_number,
+    standings_match_results,
 )
 
 
@@ -548,3 +549,57 @@ def test_sync_service_rejects_incomplete_snapshot_before_data_mutation() -> None
         "rollback_sync",
         "fail_scrape_run",
     ]
+
+
+def _stale_standings_payload() -> SyncPayload:
+    # Round 1 is finished (2-0) but Sina's table has not counted it yet.
+    payload = _sample_payload()
+    stale = replace(
+        payload.standings[0], played=0, wins=0, goals_for=0, goals_against=0, goal_difference=0, points=0
+    )
+    return replace(payload, standings=[stale])
+
+
+def test_sync_service_defers_round_final_while_standings_lag_behind_results() -> None:
+    repository = FakeRepository()
+    service = InsightSyncService(
+        repository=repository,
+        clock=lambda: datetime(2026, 4, 5, 8, 0, tzinfo=UTC),
+    )
+
+    result = service.sync(_stale_standings_payload())
+
+    assert result.standings_consistent is False
+    assert result.round_finalized_for is None
+    assert result.round_final_deferred_for == 1
+    assert result.round_final_standings_inserted == 0
+    names = [name for name, _ in repository.calls]
+    assert names.count("insert_standings") == 1  # live snapshot only
+    assert names[-2:] == ["commit_sync", "complete_scrape_run"]
+
+
+def test_sync_service_reports_consistent_standings_when_finalizing() -> None:
+    result = InsightSyncService(
+        repository=FakeRepository(),
+        clock=lambda: datetime(2026, 4, 5, 8, 0, tzinfo=UTC),
+    ).sync(_sample_payload())
+
+    assert result.standings_consistent is True
+    assert result.round_final_deferred_for is None
+    assert result.round_finalized_for == 1
+
+
+def test_standings_match_results_compares_played_and_goals_of_finished_matches() -> None:
+    payload = _sample_payload()
+    assert standings_match_results(payload.standings, payload.matches) is True
+    # Unfinished round-2 match (status "1") is ignored even though it has a score.
+    assert payload.matches[1].status == "1"
+
+    entry = payload.standings[0]
+    assert standings_match_results([replace(entry, goals_for=3)], payload.matches) is False
+    assert standings_match_results([replace(entry, goals_against=1)], payload.matches) is False
+    assert standings_match_results([replace(entry, played=2)], payload.matches) is False
+    assert standings_match_results([], payload.matches) is False
+
+    unscored = [replace(payload.matches[0], home_score="", away_score="")]
+    assert standings_match_results([replace(entry, played=0, goals_for=0)], unscored) is True

@@ -37,6 +37,10 @@ class SyncResult:
     round_final_standings_inserted: int
     round_final_team_ranking_categories: int
     round_final_player_ranking_categories: int
+    # False while Sina's standings table still lags behind finished match results.
+    standings_consistent: bool = True
+    # Round that was complete but not finalized because the standings lagged.
+    round_final_deferred_for: int | None = None
 
 
 class InsightSyncRepository(Protocol):
@@ -124,6 +128,37 @@ def find_latest_completed_round(matches: list[MatchResult]) -> int | None:
 
 def normalize_live_round_number(current_round: int) -> int | None:
     return current_round if current_round > 0 else None
+
+
+def standings_match_results(standings: list[StandingEntry], matches: list[MatchResult]) -> bool:
+    """Whether every team's played/goals in the standings equal its finished matches.
+
+    Sina marks a match finished minutes to hours before its standings table counts
+    it, so a round_final snapshot taken in between freezes a stale table.
+    """
+    if not standings:
+        return False
+    totals: dict[int, list[int]] = {}
+    for match in matches:
+        if match.status != "3":
+            continue
+        try:
+            home_goals = int(match.home_score.strip())
+            away_goals = int(match.away_score.strip())
+        except ValueError:
+            continue
+        for team_id, scored, conceded in (
+            (match.home_team_id, home_goals, away_goals),
+            (match.away_team_id, away_goals, home_goals),
+        ):
+            total = totals.setdefault(team_id, [0, 0, 0])
+            total[0] += 1
+            total[1] += scored
+            total[2] += conceded
+    return all(
+        totals.get(entry.team_id, [0, 0, 0]) == [entry.played, entry.goals_for, entry.goals_against]
+        for entry in standings
+    )
 
 
 def has_started_matches_beyond_round(matches: list[MatchResult], round_number: int) -> bool:
@@ -239,15 +274,21 @@ class InsightSyncService:
             round_final_team_ranking_categories = 0
             round_final_player_ranking_categories = 0
 
+            standings_consistent = standings_match_results(payload.standings, payload.matches)
+            round_final_deferred_for: int | None = None
             can_finalize_round = (
                 latest_completed_round is not None
                 and not has_started_matches_beyond_round(payload.matches, latest_completed_round)
             )
 
-            if can_finalize_round and not self.repository.round_final_exists(
+            needs_round_final = can_finalize_round and not self.repository.round_final_exists(
                 season=payload.season,
                 round_number=latest_completed_round,
-            ):
+            )
+            if needs_round_final and not standings_consistent:
+                # Keep the round open; auto sync retries until Sina's table catches up.
+                round_final_deferred_for = latest_completed_round
+            elif needs_round_final:
                 round_finalized_for = latest_completed_round
                 round_final_standings_inserted = self.repository.insert_standings(
                     run_id=run_id,
@@ -318,4 +359,6 @@ class InsightSyncService:
             round_final_standings_inserted=round_final_standings_inserted,
             round_final_team_ranking_categories=round_final_team_ranking_categories,
             round_final_player_ranking_categories=round_final_player_ranking_categories,
+            standings_consistent=standings_consistent,
+            round_final_deferred_for=round_final_deferred_for,
         )
