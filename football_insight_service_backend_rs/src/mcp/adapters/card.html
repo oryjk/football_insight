@@ -88,7 +88,7 @@
 
   function renderStandings(d) {
     return [
-      header(`${d.competition} ${d.season} 积分榜`, d.table),
+      header(`${d.competition} ${d.season} ${d.round ? `第 ${d.round} 轮结束时` : ''}积分榜`, d.table),
       table([['#'], ['球队', 'left'], ['赛'], ['胜/平/负'], ['进/失'], ['积分'], ['近5场', 'left']],
         d.rows.map((r) => [r.rank, [r.team, 'left strong'], r.played, `${r.wins}/${r.draws}/${r.losses}`,
           `${r.goals_for}/${r.goals_against}`,

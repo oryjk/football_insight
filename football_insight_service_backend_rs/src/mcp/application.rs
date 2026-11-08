@@ -44,6 +44,7 @@ pub struct McpQueryService {
     rankings: Mutex<Option<(Instant, RankingsView)>>,
     live_matches: Mutex<Option<(Instant, MatchListView)>>,
     round_matches: Mutex<HashMap<(i32, i32), (Instant, MatchListView)>>,
+    round_rankings: Mutex<HashMap<(i32, i32), (Instant, RankingsView)>>,
 }
 
 impl McpQueryService {
@@ -59,6 +60,7 @@ impl McpQueryService {
             rankings: Mutex::new(None),
             live_matches: Mutex::new(None),
             round_matches: Mutex::new(HashMap::new()),
+            round_rankings: Mutex::new(HashMap::new()),
         }
     }
 
@@ -66,18 +68,32 @@ impl McpQueryService {
         Promo::for_target(target, &self.public_base_url)
     }
 
-    pub async fn standings(&self) -> Result<StandingsResult, McpQueryError> {
-        let rankings = self.live_rankings().await?;
+    pub async fn standings(&self, round: Option<i32>) -> Result<StandingsResult, McpQueryError> {
+        let live = self.live_rankings().await?;
+        let season = live.current_season;
+        let rankings = match round {
+            None => live,
+            Some(round) => {
+                self.validate_round(season, round).await?;
+                self.round_rankings_cached(season, round).await?
+            }
+        };
         let table = rankings
             .standings_tables
             .iter()
             .find(|table| table.slug == STANDINGS_SLUG)
             .or_else(|| rankings.standings_tables.first())
-            .ok_or_else(|| McpQueryError::NotFound("当前赛季暂无积分榜数据".into()))?;
+            .ok_or_else(|| match round {
+                Some(round) => McpQueryError::NotFound(format!(
+                    "{season} 赛季第 {round} 轮尚未结束，暂无该轮结束时的积分榜"
+                )),
+                None => McpQueryError::NotFound("当前赛季暂无积分榜数据".into()),
+            })?;
         Ok(StandingsResult {
             kind: "standings",
             competition: COMPETITION,
-            season: rankings.current_season,
+            season,
+            round,
             table: table.label.clone(),
             note: table.note.clone(),
             rows: table
@@ -115,17 +131,7 @@ impl McpQueryService {
             None => live,
             Some(round) if round == latest_round => live,
             Some(round) => {
-                let rounds = self
-                    .repository
-                    .list_available_rounds(season)
-                    .await
-                    .map_err(unavailable)?;
-                let max_round = rounds.iter().map(|r| r.round_number).max().unwrap_or(0);
-                if round < 1 || (max_round > 0 && round > max_round) {
-                    return Err(McpQueryError::InvalidArgument(format!(
-                        "{season} 赛季中超共 {max_round} 轮，round 取值范围 1–{max_round}"
-                    )));
-                }
+                self.validate_round(season, round).await?;
                 self.round_matches_cached(season, round).await?
             }
         };
@@ -219,6 +225,41 @@ impl McpQueryService {
                 .collect(),
             promo: self.promo(PromoTarget::Rankings),
         })
+    }
+
+    async fn validate_round(&self, season: i32, round: i32) -> Result<(), McpQueryError> {
+        let rounds = self
+            .repository
+            .list_available_rounds(season)
+            .await
+            .map_err(unavailable)?;
+        let max_round = rounds.iter().map(|r| r.round_number).max().unwrap_or(0);
+        if round < 1 || (max_round > 0 && round > max_round) {
+            return Err(McpQueryError::InvalidArgument(format!(
+                "{season} 赛季中超共 {max_round} 轮，round 取值范围 1–{max_round}"
+            )));
+        }
+        Ok(())
+    }
+
+    async fn round_rankings_cached(
+        &self,
+        season: i32,
+        round: i32,
+    ) -> Result<RankingsView, McpQueryError> {
+        let mut cache = self.round_rankings.lock().await;
+        if let Some((at, view)) = cache.get(&(season, round))
+            && at.elapsed() < self.ttl
+        {
+            return Ok(view.clone());
+        }
+        let view = self
+            .repository
+            .get_round_rankings(season, round)
+            .await
+            .map_err(unavailable)?;
+        cache.insert((season, round), (Instant::now(), view.clone()));
+        Ok(view)
     }
 
     async fn live_rankings(&self) -> Result<RankingsView, McpQueryError> {

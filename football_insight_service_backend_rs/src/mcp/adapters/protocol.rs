@@ -138,11 +138,14 @@ impl McpProtocol {
             Some(_) => return Err((INVALID_PARAMS, "arguments must be an object".into())),
         };
         let outcome = match name {
-            TOOL_STANDINGS => self
-                .service
-                .standings()
-                .await
-                .map(|r| (render_standings(&r), to_value(&r))),
+            TOOL_STANDINGS => match optional_int(&args, "round") {
+                Ok(round) => self
+                    .service
+                    .standings(round.map(|r| r as i32))
+                    .await
+                    .map(|r| (render_standings(&r), to_value(&r))),
+                Err(error) => Err(error),
+            },
             TOOL_ROUND_RESULTS => match optional_int(&args, "round") {
                 Ok(round) => self
                     .service
@@ -258,8 +261,14 @@ pub fn tool_definitions() -> Value {
         {
             "name": TOOL_STANDINGS,
             "title": "中超积分榜",
-            "description": "查询中超当前赛季最新积分榜（实际积分，已计入罚分）。返回每支球队的排名、场次、胜平负、进失球、净胜球、积分、罚分和近 5 场战绩。",
-            "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+            "description": "查询中超当前赛季积分榜（实际积分，已计入罚分）。不传 round 返回最新积分榜；传 round 返回第 round 轮结束时的积分榜（当时尚未补赛的比赛不计入）。返回每支球队的排名、场次、胜平负、进失球、净胜球、积分、罚分和近 5 场战绩。",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "round": {"type": "integer", "minimum": 1, "description": "轮次，例如 20 表示第 20 轮结束时的积分榜；不传则为最新积分榜"}
+                },
+                "additionalProperties": false,
+            },
             "annotations": read_only_annotations("中超积分榜"),
             "_meta": tool_meta(),
         },
@@ -306,9 +315,13 @@ fn promo_footer(promo: &Promo) -> String {
 }
 
 pub fn render_standings(result: &StandingsResult) -> String {
+    let when = match result.round {
+        Some(round) => format!("第 {round} 轮结束时"),
+        None => "最新".to_string(),
+    };
     let mut out = format!(
-        "{} {} 赛季{}（{}）\n\n| 排名 | 球队 | 场次 | 胜 | 平 | 负 | 进球 | 失球 | 净胜球 | 积分 | 罚分 | 近5场 |\n|---|---|---|---|---|---|---|---|---|---|---|---|\n",
-        result.competition, result.season, result.table, result.note
+        "{} {} 赛季{}{}（{}）\n\n| 排名 | 球队 | 场次 | 胜 | 平 | 负 | 进球 | 失球 | 净胜球 | 积分 | 罚分 | 近5场 |\n|---|---|---|---|---|---|---|---|---|---|---|---|\n",
+        result.competition, result.season, when, result.table, result.note
     );
     for row in &result.rows {
         let adjustment = if row.points_adjustment == 0 {

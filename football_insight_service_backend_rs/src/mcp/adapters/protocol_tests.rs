@@ -124,6 +124,7 @@ async fn tools_list_declares_read_only_tools_linked_to_the_card() {
         names,
         [TOOL_STANDINGS, TOOL_ROUND_RESULTS, TOOL_PLAYER_LEADERBOARD]
     );
+    assert_eq!(tools[0]["inputSchema"]["properties"]["round"]["type"], "integer");
     for tool in tools {
         assert_eq!(tool["annotations"]["readOnlyHint"], true);
         assert_eq!(tool["_meta"]["ui"]["resourceUri"], CARD_RESOURCE_URI);
@@ -162,7 +163,17 @@ async fn standings_tool_returns_markdown_structured_content_and_promo_link() {
     );
     assert!(text.contains("https://match.example/api/v1/mcp/promo/rankings"));
     assert_eq!(result["structuredContent"]["kind"], "standings");
+    assert_eq!(result["structuredContent"]["round"], Value::Null);
     assert_eq!(result["structuredContent"]["rows"][0]["team"], "大连英博");
+    assert!(text.starts_with("中超 2026 赛季最新含罚分版积分榜"), "{text}");
+
+    let round = tool(TOOL_STANDINGS, json!({"round": 20})).await;
+    assert_eq!(round["structuredContent"]["round"], 20);
+    let text = round["content"][0]["text"].as_str().unwrap();
+    assert!(text.starts_with("中超 2026 赛季第 20 轮结束时含罚分版积分榜"), "{text}");
+
+    let error = tool(TOOL_STANDINGS, json!({"round": 99})).await;
+    assert_eq!(error["isError"], true);
 }
 
 #[tokio::test]

@@ -5,6 +5,7 @@ use std::{collections::HashMap, time::Instant};
 
 use super::recent_player_goals::fetch_recent_player_goals;
 use super::recent_team_form::fetch_recent_team_form;
+use super::round_standings_source::fetch_round_standings_input;
 
 use crate::insight::{
     domain::{
@@ -18,6 +19,7 @@ use crate::insight::{
             StandingsTableEntry, TeamRankingCategory, TeamRankingEntry,
         },
         round_reference::RoundReference,
+        round_standings::{compute_standings_tables, snapshot_agrees_with, standings_category},
         team_insight::{
             AssistContribution, OpponentContribution, PlayerContribution, TeamInsight,
             TeamInsightTeam, TeamInsightsView,
@@ -2081,9 +2083,7 @@ impl InsightQueryRepository for PostgresInsightQueryRepository {
         season: i32,
         round_number: i32,
     ) -> anyhow::Result<RankingsView> {
-        let Some(finalized_at) = self
-            .fetch_valid_round_finalized_at(season, round_number)
-            .await?
+        let Some(input) = fetch_round_standings_input(&self.pool, season, round_number).await?
         else {
             return Ok(Self::empty_rankings(
                 season,
@@ -2091,15 +2091,49 @@ impl InsightQueryRepository for PostgresInsightQueryRepository {
                 Some(round_number),
             ));
         };
+        let standings_tables = compute_standings_tables(
+            &input.teams,
+            &input.matches,
+            &format!("按第 {round_number} 轮结束时的已完赛比赛计算，之后补赛的比赛不计入。"),
+        );
 
-        self.fetch_rankings(
-            season,
-            "round_final",
-            Some(round_number),
-            "round_final",
-            Some(finalized_at),
-        )
-        .await
+        // Other leaderboards exist only as snapshots; trust them only when the
+        // snapshot was taken after Sina's table had caught up with the results.
+        let (mut team_categories, player_categories) = match self
+            .fetch_valid_round_finalized_at(season, round_number)
+            .await?
+        {
+            Some(finalized_at) => {
+                let snapshot = self
+                    .fetch_rankings(
+                        season,
+                        "round_final",
+                        Some(round_number),
+                        "round_final",
+                        Some(finalized_at),
+                    )
+                    .await?;
+                if snapshot_agrees_with(&snapshot.standings_tables, &standings_tables) {
+                    (snapshot.team_categories, snapshot.player_categories)
+                } else {
+                    (Vec::new(), Vec::new())
+                }
+            }
+            None => (Vec::new(), Vec::new()),
+        };
+        team_categories.retain(|category| category.slug != "standings");
+        if let Some(category) = standings_category(&standings_tables) {
+            team_categories.insert(0, category);
+        }
+
+        Ok(RankingsView {
+            view_kind: "round_final".to_string(),
+            round_number: Some(round_number),
+            current_season: season,
+            standings_tables,
+            team_categories,
+            player_categories,
+        })
     }
 
     async fn get_live_matches(&self) -> anyhow::Result<MatchListView> {

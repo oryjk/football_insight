@@ -40,7 +40,17 @@
 ## 对外 MCP 服务（mcp）
 
 - 端点：`POST https://match.oryjk.cn/api/v1/mcp`，公开、无鉴权、只读。传输方式是无状态的 Streamable HTTP：请求返回 JSON，通知返回 202；不发 `Mcp-Session-Id`，`GET`/`DELETE` 返回 405。因为路径在 `/api/v1/` 下，jd 的 nginx 不用改。
-- 工具：`get_csl_standings`（当前含罚分积分榜）、`get_csl_round_results`（某轮赛果，默认最新一轮）、`get_csl_player_leaderboard`（射手榜、助攻榜等 8 类）。数据复用 `insight` 的 `InsightQueryRepository`，应用层缓存 30 秒。历史轮次的积分榜快照不全，所以积分榜只提供当前这一份。
+- 工具：
+  - `get_csl_standings`：含罚分积分榜。可选参数 `round`，表示第 N 轮结束时的积分榜。
+  - `get_csl_round_results`：某轮赛果，默认最新一轮。
+  - `get_csl_player_leaderboard`：射手榜、助攻榜等 8 类，只提供当前数据。
+  - 数据复用 `insight` 的 `InsightQueryRepository`，应用层缓存 30 秒。
+- 轮次积分榜（`/api/v1/rounds/{season}/{round}/rankings`）：
+  - 积分榜由 `insight/domain/round_standings.rs` 用比赛结果现算，不读 `round_final` 快照，因为新浪积分榜更新滞后，快照常是旧的。
+  - 统计口径：第 1–N 轮中，在第 N+1 轮开赛前踢完的比赛；当时还没补赛的比赛不计入。
+  - 同分排序：两队之间主客场都踢完了，才先比相互战绩；否则比总净胜球、总进球。这条规则已用 2026 赛季第 4–10、19、30 轮的官方积分榜验证过。
+  - 罚分取当前实际积分榜。
+  - 球队榜、球员榜只在收官快照的场次和现算结果一致时才返回。
 - 引流：
   - 支持 MCP Apps 的助手：工具通过 `_meta.ui.resourceUri` 关联卡片资源 `ui://football-insight/card-v1.html`（`src/mcp/adapters/card.html`），在对话里显示榜单和小程序码。
   - 不支持卡片的助手：文字结果末尾附落地页链接 `/api/v1/mcp/promo/{rankings|home}`，页面上是小程序码。

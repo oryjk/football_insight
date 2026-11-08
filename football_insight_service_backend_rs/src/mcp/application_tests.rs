@@ -24,6 +24,7 @@ use crate::insight::domain::{
 pub(crate) struct FakeRepository {
     pub rankings_calls: AtomicUsize,
     pub round_calls: AtomicUsize,
+    pub round_rankings_calls: AtomicUsize,
 }
 
 pub(crate) fn standings_entry(rank: i32, team: &str, points: i32, adj: i32) -> StandingsTableEntry {
@@ -157,8 +158,27 @@ impl InsightQueryRepository for FakeRepository {
     async fn get_live_team_insights(&self) -> anyhow::Result<TeamInsightsView> {
         unreachable!()
     }
-    async fn get_round_rankings(&self, _: i32, _: i32) -> anyhow::Result<RankingsView> {
-        unreachable!()
+    async fn get_round_rankings(&self, season: i32, round: i32) -> anyhow::Result<RankingsView> {
+        self.round_rankings_calls.fetch_add(1, Ordering::SeqCst);
+        // Round 25 stands in for a round that has not ended yet.
+        let standings_tables = if round == 25 {
+            vec![]
+        } else {
+            vec![StandingsTable {
+                slug: "standings_with_penalty".into(),
+                label: "含罚分版积分榜".into(),
+                note: format!("按第 {round} 轮结束时的已完赛比赛计算。"),
+                entries: vec![standings_entry(1, "成都蓉城", round * 2, 0)],
+            }]
+        };
+        Ok(RankingsView {
+            view_kind: "round_final".into(),
+            round_number: Some(round),
+            current_season: season,
+            standings_tables,
+            team_categories: vec![],
+            player_categories: vec![],
+        })
     }
     async fn get_live_matches(&self) -> anyhow::Result<MatchListView> {
         Ok(MatchListView {
@@ -197,7 +217,7 @@ fn service(repo: Arc<FakeRepository>) -> McpQueryService {
 
 #[tokio::test]
 async fn standings_use_the_penalty_table_and_last_five_results() {
-    let result = service(Arc::default()).standings().await.unwrap();
+    let result = service(Arc::default()).standings(None).await.unwrap();
     assert_eq!(result.table, "含罚分版积分榜");
     assert_eq!(result.season, 2026);
     assert_eq!(result.rows.len(), 2);
@@ -265,7 +285,7 @@ async fn round_results_reject_out_of_range_and_report_empty_rounds() {
 async fn queries_are_cached_within_ttl() {
     let repo = Arc::new(FakeRepository::default());
     let svc = service(repo.clone());
-    svc.standings().await.unwrap();
+    svc.standings(None).await.unwrap();
     svc.player_leaderboard("goals", None).await.unwrap();
     svc.round_results(Some(12)).await.unwrap();
     svc.round_results(Some(12)).await.unwrap();
@@ -273,8 +293,8 @@ async fn queries_are_cached_within_ttl() {
     assert_eq!(repo.round_calls.load(Ordering::SeqCst), 1);
 
     let expired = McpQueryService::new(repo.clone(), "https://x".into(), Duration::ZERO);
-    expired.standings().await.unwrap();
-    expired.standings().await.unwrap();
+    expired.standings(None).await.unwrap();
+    expired.standings(None).await.unwrap();
     assert_eq!(repo.rankings_calls.load(Ordering::SeqCst), 3);
 }
 
@@ -302,5 +322,36 @@ async fn player_leaderboard_validates_arguments_and_empty_categories() {
     assert!(matches!(
         svc.player_leaderboard("assists", None).await.unwrap_err(),
         McpQueryError::NotFound(_)
+    ));
+}
+
+#[tokio::test]
+async fn standings_for_a_round_use_the_round_table_and_are_cached() {
+    let repo = Arc::new(FakeRepository::default());
+    let svc = service(repo.clone());
+    let result = svc.standings(Some(20)).await.unwrap();
+    assert_eq!(result.round, Some(20));
+    assert_eq!(result.season, 2026);
+    assert_eq!(result.rows[0].team, "成都蓉城");
+    assert_eq!(result.rows[0].points, 40);
+    assert!(result.note.contains("第 20 轮"));
+    assert!(result.promo.landing_url.ends_with("/promo/rankings"));
+    svc.standings(Some(20)).await.unwrap();
+    assert_eq!(repo.round_rankings_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(svc.standings(None).await.unwrap().round, None);
+}
+
+#[tokio::test]
+async fn standings_for_a_round_validate_range_and_unfinished_rounds() {
+    let svc = service(Arc::default());
+    for round in [0, 31] {
+        assert!(matches!(
+            svc.standings(Some(round)).await.unwrap_err(),
+            McpQueryError::InvalidArgument(msg) if msg.contains("1–30")
+        ));
+    }
+    assert!(matches!(
+        svc.standings(Some(25)).await.unwrap_err(),
+        McpQueryError::NotFound(msg) if msg.contains("尚未结束")
     ));
 }

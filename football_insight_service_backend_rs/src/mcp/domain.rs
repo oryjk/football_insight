@@ -85,6 +85,8 @@ pub struct StandingsResult {
     pub kind: &'static str,
     pub competition: &'static str,
     pub season: i32,
+    /// `None` for the current table, `Some(n)` for the table as round n ended.
+    pub round: Option<i32>,
     pub table: String,
     pub note: String,
     pub rows: Vec<StandingsRow>,
