@@ -10,12 +10,14 @@ from sina_csl_scraper.topics.roundup import (
     MAX_NEW_ENTRIES, RoundupGenerator, build_roundup_item, merge_entries, roundup_edition_id,
     roundup_item_id, roundup_narration, run_roundup_update,
 )
+from sina_csl_scraper.topics.categories import Watchlist
 from sina_csl_scraper.topics.scope import TeamTag
 from sina_csl_scraper.topics.tts import GeneratedAudio
 
 NOW = datetime.fromisoformat('2026-11-09T12:00:00+08:00')
 RONGCHENG, TAISHAN, SHENHUA = TeamTag(77680, '成都蓉城'), TeamTag(136, '山东泰山'), TeamTag(135, '上海申花')
 CATALOG = [RONGCHENG, TAISHAN, SHENHUA]
+WATCH = Watchlist(clubs=(('曼联', '曼彻斯特联'), ('皇马', '皇家马德里')), people=('姆巴佩',), overseas_players=('徐彬',))
 
 
 def source(number, body, published_at=None, title=None):
@@ -34,7 +36,7 @@ class Generator(RoundupGenerator):
 
     def __init__(self, responses):
         super().__init__(base_url='https://model.example/v1', model='test', team_catalog=CATALOG,
-                         selected_team_ids=[team.team_id for team in CATALOG])
+                         selected_team_ids=[team.team_id for team in CATALOG], watchlist=WATCH)
         self.responses, self.requests = list(responses), []
 
     def _complete(self, system, user):
@@ -95,7 +97,7 @@ def run(sources, generator, env, tmp_path, now=NOW):
     repository, audio, target = env
     return run_roundup_update(sources, repository=repository, generator_factory=lambda: generator,
                               tts_factory=lambda: audio, target_factory=lambda: target,
-                              cache_dir=tmp_path, now=now, selected_teams=CATALOG)
+                              cache_dir=tmp_path, now=now, selected_teams=CATALOG, watchlist=WATCH)
 
 
 def todays_item(repository):
@@ -116,7 +118,9 @@ def test_first_run_creates_one_item_per_day_with_entries_and_legacy_fields(env, 
     assert item['title'] == '申花主帅续约一年；泽卡与中超球队商谈'
     assert item['audio']['status'] == 'ready'
     assert {tag['name'] for tag in item['team_tags']} == {'上海申花', '山东泰山'}
-    assert env[1].texts[0].startswith('11月9日每日电报。\n申花主帅续约一年。')
+    assert env[1].texts[0].startswith('11月9日每日电报。\n国内。\n申花主帅续约一年。')
+    assert set(item['category_audio']) == {'domestic'}
+    assert all(entry['category'] == 'domestic' for entry in item['entries'])
 
 
 def test_later_run_appends_without_rewriting_published_entries(env, tmp_path):
@@ -238,3 +242,62 @@ def test_legacy_fields_are_bounded_for_old_clients():
     item = build_roundup_item(team_id=77680, edition_date='2026-11-09', entries=entries, now=NOW, audio=None)
     assert len(item['title']) <= 120 and len(item['summary']) <= 500
     assert json.dumps(item, ensure_ascii=False)
+
+
+WORLD_NEWS = '英超第11轮，曼联4比4战平阿斯顿维拉，球队仍处降级区。' * 3
+CRYSTAL_NEWS = '英超第11轮，水晶宫主帅下课，球队排名联赛垫底。' * 3
+ABROAD_NEWS = '狼队U21联赛，中国球员徐彬身披10号首发出场。' * 3
+
+
+def entries_with_category(*specs):
+    def respond(user):
+        ids = {item['url'].rsplit('/', 1)[1]: item['source_id'] for item in user['original_sources']}
+        return {'entries': [{'category': category, 'title': title, 'text': text, 'source_ids': [ids[str(n)] for n in numbers]}
+                            for category, title, text, numbers in specs]}
+    return respond
+
+
+def test_entries_are_categorised_from_evidence_not_the_model_label(env, tmp_path):
+    sources = [source(1, TAISHAN_NEWS), source(2, WORLD_NEWS), source(3, ABROAD_NEWS)]
+    generator = Generator([entries_with_category(
+        ('world', '泽卡与中超球队商谈', '据报道，山东泰山外援泽卡正在商谈。', [1]),   # 模型标错：证据只支持国内
+        ('world', '曼联4-4战平阿斯顿维拉', '曼联4比4战平维拉。', [2]),
+        ('domestic', '徐彬为狼队U21首发', '徐彬身披10号首发。', [3]),                 # 留洋优先于国内
+    )])
+    run(sources, generator, env, tmp_path)
+    by_title = {e['title']: e['category'] for e in todays_item(env[0])['entries']}
+    assert by_title == {'泽卡与中超球队商谈': 'domestic', '曼联4-4战平阿斯顿维拉': 'world', '徐彬为狼队U21首发': 'abroad'}
+    assert set(todays_item(env[0])['category_audio']) == {'domestic', 'world', 'abroad'}
+    assert '国际' in env[1].texts[0] and env[1].texts[2].startswith('11月9日每日电报，国际。')
+
+
+def test_world_news_outside_the_watchlist_never_reaches_the_model(env, tmp_path):
+    generator = Generator([])
+    result = run([source(1, CRYSTAL_NEWS)], generator, env, tmp_path)
+    assert result['status'] == 'no_new' and result['sources'][0]['decision'] == 'out_of_scope'
+    assert generator.requests == []
+
+
+def test_world_entries_are_capped_per_day(env, tmp_path, monkeypatch):
+    import sina_csl_scraper.topics.roundup as roundup
+    monkeypatch.setattr(roundup, 'WORLD_DAILY_LIMIT', 1)
+    first = Generator([entries_with_category(('world', '曼联4-4战平阿斯顿维拉', '曼联4比4战平维拉。', [2]),
+                                             ('world', '曼联仍处降级区', '曼联排名降级区。', [2]))])
+    run([source(2, WORLD_NEWS)], first, env, tmp_path)
+    assert [e['title'] for e in todays_item(env[0])['entries']] == ['曼联4-4战平阿斯顿维拉']
+    later = Generator([])
+    result = run([source(4, WORLD_NEWS.replace('4比4', '2比1'))], later, env, tmp_path, now=NOW + timedelta(hours=1))
+    assert result['sources'][0]['decision'] == 'world_quota_full' and later.requests == []
+
+
+def test_entries_published_before_categories_are_treated_as_domestic(env, tmp_path):
+    run([source(1, TAISHAN_NEWS)], Generator([entries_for(('泽卡与中超球队商谈', '据报道，泽卡正在商谈。', [1]))]),
+        env, tmp_path)
+    repository = env[0]
+    edition = repository.rows[roundup_edition_id(77680, '2026-11-09')]
+    for entry in edition['payload']['items'][0]['entries']:
+        entry.pop('category')
+    run([source(1, TAISHAN_NEWS), source(3, ABROAD_NEWS, NOW + timedelta(minutes=20))],
+        Generator([entries_with_category(('abroad', '徐彬为狼队U21首发', '徐彬身披10号首发。', [3]))]),
+        env, tmp_path, now=NOW + timedelta(hours=1))
+    assert [e['category'] for e in todays_item(repository)['entries']] == ['abroad', 'domestic']

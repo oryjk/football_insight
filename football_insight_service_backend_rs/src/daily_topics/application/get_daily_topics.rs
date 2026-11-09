@@ -68,6 +68,7 @@ impl GetDailyTopics {
         items.truncate(query.limit);
         for item in &mut items {
             normalize_audio(&mut item.audio);
+            item.category_audio.values_mut().for_each(normalize_audio);
             normalize_images(item);
             normalize_tags(item);
         }
@@ -120,6 +121,7 @@ impl GetDailyTopics {
         edition.items.truncate(query.limit());
         for item in &mut edition.items {
             normalize_audio(&mut item.audio);
+            item.category_audio.values_mut().for_each(normalize_audio);
             normalize_images(item);
             normalize_tags(item);
         }
@@ -149,6 +151,7 @@ impl GetDailyTopics {
         }
         for item in &mut edition.items {
             normalize_audio(&mut item.audio);
+            item.category_audio.values_mut().for_each(normalize_audio);
             normalize_images(item);
             normalize_tags(item);
         }
@@ -181,6 +184,7 @@ impl GetDailyTopics {
         }
         for item in &mut edition.items {
             normalize_audio(&mut item.audio);
+            item.category_audio.values_mut().for_each(normalize_audio);
             normalize_images(item);
             normalize_tags(item);
         }
@@ -208,6 +212,7 @@ impl GetDailyTopics {
         items.truncate(query.limit());
         for item in &mut items {
             normalize_audio(&mut item.audio);
+            item.category_audio.values_mut().for_each(normalize_audio);
             normalize_images(item);
             normalize_tags(item);
         }
@@ -241,6 +246,7 @@ impl GetDailyTopics {
                 return Err(DailyTopicsRepositoryError::InvalidEdition);
             }
             normalize_audio(&mut item.audio);
+            item.category_audio.values_mut().for_each(normalize_audio);
             normalize_images(item);
             normalize_tags(item);
             self.attach_heat(query.team_id(), std::slice::from_mut(item))

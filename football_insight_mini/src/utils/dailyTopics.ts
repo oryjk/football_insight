@@ -1,4 +1,4 @@
-import type { DailyTopicEdition, DailyTopicEntry, DailyTopicImage, DailyTopicItem, DailyTopicSource, DailyTopicTag } from '../types/dailyTopic'
+import type { DailyTopicAudio, DailyTopicEdition, DailyTopicEntry, DailyTopicImage, DailyTopicItem, DailyTopicSource, DailyTopicTag, TelegraphCategory } from '../types/dailyTopic'
 
 export const DAILY_TOPICS_TEAM_ID = 77680
 export const DAILY_TOPICS_LIMIT = 5
@@ -64,6 +64,46 @@ export function roundupEntryTimeLabel(entryAt: string, dayAt: string): string {
   const sameDay = entry.year === day.year && entry.month === day.month && entry.day === day.day
   return sameDay ? entry.time : `${entry.month}-${entry.day} ${entry.time}`
 }
+export const TELEGRAPH_CATEGORIES: { value: TelegraphCategory; label: string }[] = [
+  { value: 'domestic', label: '国内' },
+  { value: 'world', label: '国际' },
+  { value: 'abroad', label: '留洋' },
+]
+export function telegraphCategoryLabel(category: TelegraphCategory): string {
+  return TELEGRAPH_CATEGORIES.find(item => item.value === category)?.label ?? '国内'
+}
+function telegraphCategory(value: unknown): TelegraphCategory {
+  return value === 'world' || value === 'abroad' ? value : 'domestic'
+}
+export function telegraphCategoryCounts(item: Pick<DailyTopicItem, 'entries'>): Record<TelegraphCategory, number> {
+  const counts: Record<TelegraphCategory, number> = { domestic: 0, world: 0, abroad: 0 }
+  for (const entry of item.entries) counts[entry.category] += 1
+  return counts
+}
+/** 每个分类的条目 ID，播报某一类时用 `${item.id}-${category}` 作为播放 ID。 */
+export function telegraphAudioId(itemId: string, category: TelegraphCategory | null): string {
+  return category ? `${itemId}-${category}` : itemId
+}
+/**
+ * 播放用的批次：整期一个，加上每个分类各一个派生条目（同一篇文字、各自的分类语音），
+ * 这样播放器不用改就能分别播「全部」和「国际」。
+ */
+export function telegraphAudioEdition(item: DailyTopicItem | null): DailyTopicEdition {
+  const edition = editionForTopic(item)
+  if (!item || !isRoundupTopic(item)) return edition
+  const derived = TELEGRAPH_CATEGORIES.flatMap(({ value, label }) => {
+    const audio = item.categoryAudio[value]
+    return audio ? [{ ...item, id: telegraphAudioId(item.id, value), title: `每日电报 · ${label}`, audio }] : []
+  })
+  return { ...edition, items: [item, ...derived] }
+}
+/** 卡片用：每个有内容的分类一行，带条数和这一类最新的一条。 */
+export function telegraphCategoryLeads(item: Pick<DailyTopicItem, 'entries'>) {
+  const counts = telegraphCategoryCounts(item)
+  return TELEGRAPH_CATEGORIES.filter(({ value }) => counts[value] > 0).map(({ value, label }) => ({
+    category: value, label, count: counts[value], entry: item.entries.find(entry => entry.category === value)!,
+  }))
+}
 export function isRoundupTopic(item: Pick<DailyTopicItem, 'entries'>): boolean {
   return (item.entries?.length ?? 0) > 0
 }
@@ -77,7 +117,7 @@ function mapEntries(value: unknown, dayAt: string): DailyTopicEntry[] {
     if (!id || !title || !body || !publishedAt || seen.has(id)) continue
     seen.add(id)
     const sources = Array.isArray(entry.sources) ? entry.sources.map(mapSource).filter((source): source is DailyTopicSource => source !== null) : []
-    entries.push({ id, title, text: body, publishedAt, timeLabel: roundupEntryTimeLabel(publishedAt, dayAt), sources })
+    entries.push({ id, category: telegraphCategory(entry.category), title, text: body, publishedAt, timeLabel: roundupEntryTimeLabel(publishedAt, dayAt), sources })
   }
   return entries.sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))
 }
@@ -121,6 +161,24 @@ function mapTeamTags(value: unknown): DailyTopicTag[] {
   }
   return tags
 }
+function mapAudio(value: unknown): DailyTopicAudio {
+  const audio = record(value)
+  const ready = audio?.status === 'ready' && audio.dialect === 'sichuan' && isAudioUrl(audio.url)
+  return {
+    status: ready ? 'ready' : audio?.status === 'pending' ? 'pending' : 'failed',
+    url: ready ? audio!.url as string : null,
+    durationSeconds: ready && typeof audio?.duration_seconds === 'number' && Number.isFinite(audio.duration_seconds) && audio.duration_seconds > 0
+      ? audio.duration_seconds : null,
+  }
+}
+function mapCategoryAudio(value: unknown): Partial<Record<TelegraphCategory, DailyTopicAudio>> {
+  const audio = record(value), result: Partial<Record<TelegraphCategory, DailyTopicAudio>> = {}
+  for (const { value: category } of TELEGRAPH_CATEGORIES) {
+    const mapped = audio?.[category] ? mapAudio(audio[category]) : null
+    if (mapped?.status === 'ready') result[category] = mapped
+  }
+  return result
+}
 export function mapDailyTopicItem(value: unknown): DailyTopicItem | null {
   const item = record(value)
   if (!item || item.team_id !== DAILY_TOPICS_TEAM_ID) return null
@@ -128,8 +186,6 @@ export function mapDailyTopicItem(value: unknown): DailyTopicItem | null {
   const paragraphs = Array.isArray(item.paragraphs) ? item.paragraphs.map(text).filter(Boolean) : []
   const sources = Array.isArray(item.sources) ? item.sources.map(mapSource).filter((source): source is DailyTopicSource => source !== null) : []
   if (!id || !title || !summary || !publishedAt || !paragraphs.length || !sources.length) return null
-  const audio = record(item.audio)
-  const ready = audio?.status === 'ready' && audio.dialect === 'sichuan' && isAudioUrl(audio.url)
   return {
     id, teamId: DAILY_TOPICS_TEAM_ID, title, summary, paragraphs, publishedAt,
     publishedLabel: formatTopicTimestamp(publishedAt), sources,
@@ -138,13 +194,9 @@ export function mapDailyTopicItem(value: unknown): DailyTopicItem | null {
     sourceLabel: `${Array.from(new Set(sources.map(source => source.publisher))).join(' · ')} · ${sources.length} 个来源`,
     heat: typeof item.heat === 'number' && Number.isSafeInteger(item.heat) && item.heat >= 0 ? item.heat : 0,
     readMinutes: Math.max(1, Math.ceil(paragraphs.join('').length / 350)),
-    audio: {
-      status: ready ? 'ready' : audio?.status === 'pending' ? 'pending' : 'failed',
-      url: ready ? audio!.url as string : null,
-      durationSeconds: ready && typeof audio?.duration_seconds === 'number' && Number.isFinite(audio.duration_seconds) && audio.duration_seconds > 0
-        ? audio.duration_seconds : null,
-    },
+    audio: mapAudio(item.audio),
     entries: mapEntries(item.entries, publishedAt),
+    categoryAudio: mapCategoryAudio(item.category_audio),
   }
 }
 export function mapDailyTopicEdition(value: unknown): DailyTopicEdition {

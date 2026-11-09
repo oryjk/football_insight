@@ -203,7 +203,8 @@ def _feed_entries(text: str, feed: dict):
 
 
 def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, session=None,
-                    require_available: bool = False) -> list[SourceArticle]:
+                    require_available: bool = False, skip_urls=frozenset()) -> list[SourceArticle]:
+    """skip_urls：已经用过的原文，不再下载，把下载额度留给新文章。"""
     """Return at most 30 recent full originals; warn safely per failed source."""
     if now.tzinfo is None or now.utcoffset() is None or max_age_hours <= 0:
         raise ValueError("Collection requires aware now and positive maximum age")
@@ -227,10 +228,11 @@ def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, ses
         combined = article.title + '\n' + article.body
         keywords = config.get('team_keywords', ['蓉城'])
         if config.get('team_catalog'):
-            from .scope import TeamTag, is_chinese_overseas_football_news, tags_for_text
+            from .categories import Watchlist, candidate_categories
+            from .scope import TeamTag
             catalog = [TeamTag(**tag) for tag in config['team_catalog']]
-            matched_club = any(word in combined for word in keywords) and bool(tags_for_text(combined, catalog))
-            if not matched_club and not is_chinese_overseas_football_news(combined):
+            # 国内（关注球队、联赛、国足）、国际（五大联赛热门）、留洋，三类都没有证据就不收。
+            if not candidate_categories(combined, focus=catalog, watchlist=Watchlist.from_config(config)):
                 return
         elif not any(word in combined for word in keywords):
             return
@@ -285,7 +287,7 @@ def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, ses
             break
         try:
             url = canonical_url(item["url"])
-            if url in checked_urls or url in attempted_urls or url in seen_urls:
+            if url in checked_urls or url in attempted_urls or url in seen_urls or url in skip_urls:
                 continue
             checked_urls.add(url)
             route_date = re.search(r'/publish/app/data/(\d{4})/(\d{2})/(\d{2})/|/(\d{4})-(\d{2})-(\d{2})/', url)

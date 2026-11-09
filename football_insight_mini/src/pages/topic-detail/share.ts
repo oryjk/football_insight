@@ -1,6 +1,6 @@
 import type { DailyTopicItem } from '../../types/dailyTopic'
 import { buildSharePath, buildShareQuery } from '../../utils/shareSource'
-import { isRoundupTopic, topicDetailUrl } from '../../utils/dailyTopics'
+import { isRoundupTopic, TELEGRAPH_CATEGORIES, topicDetailUrl } from '../../utils/dailyTopics'
 import type { DailyTopicEntry } from '../../types/dailyTopic'
 
 export const TOPIC_SHARE_CARD = { width: 1000, height: 800 } as const
@@ -29,18 +29,29 @@ function impact(entry: DailyTopicEntry): number {
   const text = entry.title + entry.text
   return IMPACT_WORDS.reduce((score, [pattern, weight]) => score + (pattern.test(text) ? weight : 0), 0)
 }
-/** 分享用的几条看点：分量最重的优先，同分取更新的；输出仍按时间新到旧。 */
+function ranked(entries: DailyTopicEntry[]): DailyTopicEntry[] {
+  return entries.map((entry, index) => ({ entry, index, score: impact(entry) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index).map(({ entry }) => entry)
+}
+/**
+ * 分享卡片的看点：先让每个有内容的分类各出一条分量最重的（国内、国际、留洋顺序），
+ * 不足 count 条再用剩下分量最重的补齐。
+ */
 export function roundupShareHighlights(item: DailyTopicItem, count = 3): DailyTopicEntry[] {
-  const ranked = item.entries.map((entry, index) => ({ entry, index, score: impact(entry) }))
-    .sort((a, b) => b.score - a.score || a.index - b.index).slice(0, count)
-  return ranked.sort((a, b) => a.index - b.index).map(({ entry }) => entry)
+  const picks = TELEGRAPH_CATEGORIES.map(({ value }) => ranked(item.entries.filter(entry => entry.category === value))[0])
+    .filter((entry): entry is DailyTopicEntry => Boolean(entry)).slice(0, count)
+  for (const entry of ranked(item.entries)) {
+    if (picks.length >= count) break
+    if (!picks.includes(entry)) picks.push(entry)
+  }
+  return picks
 }
 function roundupDate(item: DailyTopicItem): string {
   const date = new Date(Date.parse(item.publishedAt) + 8 * 60 * 60 * 1000)
   return `${date.getUTCMonth() + 1}月${date.getUTCDate()}日`
 }
 export function roundupShareTitle(item: DailyTopicItem): string {
-  const [lead] = roundupShareHighlights(item, 1)
+  const [lead] = ranked(item.entries)
   return `${roundupDate(item)}足坛${item.entries.length}条快讯｜${lead.title}`
 }
 export function roundupShareDate(item: DailyTopicItem): string { return roundupDate(item) }

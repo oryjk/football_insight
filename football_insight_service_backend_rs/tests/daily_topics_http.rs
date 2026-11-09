@@ -92,6 +92,7 @@ fn edition() -> DailyTopicEdition {
                 heat: 0,
                 images: Vec::new(),
                 entries: Vec::new(),
+                category_audio: Default::default(),
                 title: format!("隔离测试文章 {index}"),
                 summary: "测试摘要".into(),
                 paragraphs: vec!["第一段".into(), "第二段".into()],
@@ -345,7 +346,7 @@ async fn public_contract_preserves_content_sources_and_audio_without_data_wrappe
         body["items"][0],
         json!({
             "id":"0000000000000000000000000000000000000000000000000000000000000000",
-            "team_id":77680,"team_tags":[],"heat":0,"images":[],"entries":[],"title":"隔离测试文章 0","summary":"测试摘要",
+            "team_id":77680,"team_tags":[],"heat":0,"images":[],"entries":[],"category_audio":{},"title":"隔离测试文章 0","summary":"测试摘要",
             "paragraphs":["第一段","第二段"],"published_at":"2026-10-13T08:30:00+08:00",
             "sources":[{"title":"测试来源","url":"https://example.com/original","publisher":"测试媒体","published_at":"2026-10-12T20:00:00+08:00"}],
             "audio":{"status":"ready","url":"https://example.com/audio.m4a","dialect":"sichuan","duration_seconds":60.0}

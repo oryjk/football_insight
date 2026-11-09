@@ -30,12 +30,16 @@ pub struct DailyTopic {
     /// 每日话题的快讯条目（新到旧）；旧版多篇话题为空。
     pub entries: Vec<DailyTopicEntry>,
     pub audio: DailyTopicAudio,
+    /// 每日电报按分类（domestic / world / abroad）各一段的语音；旧数据为空。
+    pub category_audio: std::collections::BTreeMap<String, DailyTopicAudio>,
     pub heat: u64,
 }
 
 #[derive(Debug, Clone)]
 pub struct DailyTopicEntry {
     pub id: String,
+    /// `domestic` 国内 / `world` 国际 / `abroad` 留洋；改版前的条目为 None。
+    pub category: Option<String>,
     pub title: String,
     pub text: String,
     pub published_at: DateTime<FixedOffset>,
@@ -66,6 +70,8 @@ pub struct DailyTopicSource {
     pub publisher: String,
     pub published_at: Option<DateTime<FixedOffset>>,
 }
+
+pub const ENTRY_CATEGORIES: [&str; 3] = ["domestic", "world", "abroad"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AudioStatus {

@@ -10,6 +10,9 @@ from urllib.parse import parse_qs, urlsplit
 from .models import SHANGHAI
 
 _ZHIBO8_LABELS = ('中超', '中甲', '中乙', '中国足球', '国足', '中国男足', '留洋', '足协杯', '亚冠')
+# `?scope=world`：五大联赛单独成一个列表，单独限量，不挤占国内新闻的下载机会。
+_ZHIBO8_WORLD_LABELS = ('英超', '西甲', '德甲', '意甲', '法甲')
+_ZHIBO8_WORLD_LIMIT = 45
 
 
 def is_article_body(attributes: dict) -> bool:
@@ -50,6 +53,9 @@ def normalize_publication_time(value: str, url: str) -> str:
 def _zhibo8_rolling_html(url: str, session, now: datetime | None = None) -> tuple[str, str]:
     reference = (now or datetime.now(SHANGHAI)).astimezone(SHANGHAI)
     dates = [(reference - timedelta(days=offset)).strftime('%Y-%m-%d') for offset in (0, 1)]
+    world = parse_qs(urlsplit(url).query).get('scope') == ['world']
+    wanted = _ZHIBO8_WORLD_LABELS if world else _ZHIBO8_LABELS
+    limit = _ZHIBO8_WORLD_LIMIT if world else 90
     links: list[str] = []
     for day in dates:
         response = session.get(f'https://news.zhibo8.com/zuqiu/json/{day}.htm',
@@ -64,15 +70,17 @@ def _zhibo8_rolling_html(url: str, session, now: datetime | None = None) -> tupl
             if not isinstance(item, dict):
                 continue
             labels = str(item.get('lable') or '')
-            if not any(tag in labels for tag in _ZHIBO8_LABELS):
+            if not any(tag in labels for tag in wanted):
                 continue
+            if world and any(tag in labels for tag in _ZHIBO8_LABELS):
+                continue  # 留洋/国足类已在国内列表里
             href = str(item.get('url') or '').strip()
             title = str(item.get('title') or item.get('indextitle') or '').strip()
             if href.startswith('/zuqiu/') and href.endswith('.htm') and title:
                 links.append(f'<a href="https://news.zhibo8.com{escape(href)}">{escape(title)}</a>')
-            if len(links) >= 90:
+            if len(links) >= limit:
                 break
-        if len(links) >= 90:
+        if len(links) >= limit:
             break
     return '<html><body>' + '\n'.join(links) + '</body></html>', url
 

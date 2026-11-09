@@ -1,6 +1,9 @@
 import type { DailyTopicItem } from '../../types/dailyTopic'
 import { containSharePhoto, roundupShareDate, roundupShareHighlights, TOPIC_SHARE_CARD, topicShareExcerpt, wrapShareCardText } from './share'
-import { isRoundupTopic } from '../../utils/dailyTopics'
+import { isRoundupTopic, TELEGRAPH_CATEGORIES, telegraphCategoryCounts, telegraphCategoryLabel } from '../../utils/dailyTopics'
+
+/** 分享图上三类的点缀色（深底上用的亮色）。 */
+const CATEGORY_COLORS = { domestic: '#ff6b6d', world: '#7fa8ff', abroad: '#ffb15c' } as const
 import type { TopicSharePhoto } from './shareCardPhoto'
 
 /** Canvas 颜色属于导出的分享图片，使用明确的绘制颜色。 */
@@ -86,15 +89,38 @@ function drawRoundupShareCard(context: UniApp.CanvasContext, item: DailyTopicIte
   font(context, 44, true)
   context.fillText(`${item.entries.length} 条快讯`, left + dateWidth + 28, 222)
 
-  roundupShareHighlights(item, 3).forEach((entry, index) => {
-    const top = 300 + index * 128
-    context.setFillStyle('#eb3f41')
-    font(context, 30, true)
-    context.fillText(entry.timeLabel, left, top)
+  // 三类条数：描边小格，数字用各自的点缀色。
+  const counts = telegraphCategoryCounts(item)
+  const cellGap = 16, cellWidth = (textWidth - cellGap * 2) / 3
+  TELEGRAPH_CATEGORIES.forEach(({ value, label }, index) => {
+    const x = left + index * (cellWidth + cellGap)
+    context.setStrokeStyle('rgba(255,255,255,0.22)')
+    context.setLineWidth(2)
+    context.strokeRect(x, 252, cellWidth, 60)
+    context.setTextAlign('center')
     context.setFillStyle('#ffffff')
-    font(context, 48, true)
-    const [line] = wrapShareCardText(entry.title, text => context.measureText(text).width, textWidth, 1)
-    context.fillText(line ?? '', left, top + 60)
+    font(context, 30, true)
+    const labelWidth = context.measureText(`${label} `).width
+    const countText = String(counts[value])
+    const total = labelWidth + context.measureText(countText).width
+    context.setTextAlign('left')
+    const start = x + (cellWidth - total) / 2
+    context.fillText(`${label} `, start, 293)
+    context.setFillStyle(CATEGORY_COLORS[value])
+    context.fillText(countText, start + labelWidth, 293)
+  })
+
+  roundupShareHighlights(item, 3).forEach((entry, index) => {
+    const baseline = 400 + index * 100
+    context.setFillStyle(CATEGORY_COLORS[entry.category])
+    font(context, 28, true)
+    const label = telegraphCategoryLabel(entry.category)
+    context.fillText(label, left, baseline)
+    const titleX = left + context.measureText(label).width + 20
+    context.setFillStyle('#ffffff')
+    font(context, 46, true)
+    const [line] = wrapShareCardText(entry.title, text => context.measureText(text).width, width - left - titleX, 1)
+    context.fillText(line ?? '', titleX, baseline)
   })
 
   context.setFillStyle('#eb3f41')

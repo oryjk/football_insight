@@ -59,12 +59,15 @@ pub(super) struct DailyTopicDto {
     /// 每日话题快讯条目，新到旧；旧版多篇话题为空数组。
     entries: Vec<DailyTopicEntryDto>,
     audio: DailyTopicAudioDto,
+    /// 每日电报分类语音：`{"domestic": {...}, "world": {...}}`；旧数据为空对象。
+    category_audio: std::collections::BTreeMap<String, DailyTopicAudioDto>,
     heat: u64,
 }
 
 #[derive(Serialize)]
 struct DailyTopicEntryDto {
     id: String,
+    category: Option<String>,
     title: String,
     text: String,
     published_at: DateTime<FixedOffset>,
@@ -76,6 +79,7 @@ impl From<DailyTopicEntry> for DailyTopicEntryDto {
     fn from(value: DailyTopicEntry) -> Self {
         Self {
             id: value.id,
+            category: value.category,
             title: value.title,
             text: value.text,
             published_at: value.published_at,
@@ -344,6 +348,11 @@ impl From<DailyTopic> for DailyTopicDto {
             images: value.images.into_iter().map(Into::into).collect(),
             entries: value.entries.into_iter().map(Into::into).collect(),
             audio: value.audio.into(),
+            category_audio: value
+                .category_audio
+                .into_iter()
+                .map(|(category, audio)| (category, audio.into()))
+                .collect(),
             heat: value.heat,
         }
     }

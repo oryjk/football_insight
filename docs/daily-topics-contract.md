@@ -42,7 +42,8 @@
 ### 每日电报条目 `entries`
 
 每日电报（2026-11-09 起）一天一个 item，`entries` 是快讯条目，按原文时间新到旧：
-`{id, title, text, published_at, sources:[同 sources 结构], team_tags:[{team_id,name}]}`。旧版多篇话题的 `entries` 为空数组。
+`{id, category, title, text, published_at, sources:[同 sources 结构], team_tags:[{team_id,name}]}`，`category` 为 `domestic`（国内）/`world`（国际）/`abroad`（留洋），改版前的条目为 null（按国内显示）。旧版多篇话题的 `entries` 为空数组。
+item 另有 `category_audio`：`{"domestic": {同 audio}, "world": {...}}`，每个分类一段语音，只含有条目的分类；旧数据为空对象。
 后端逐条校验，畸形条目跳过、不影响整篇。新版小程序有 `entries` 时按快讯流显示；旧版小程序继续读 `title`/`summary`/`paragraphs`（由条目拼出）。
 
 ### 最新汇总与按日期查汇总（Bot 与小程序共用）

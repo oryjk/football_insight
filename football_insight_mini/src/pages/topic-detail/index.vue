@@ -11,9 +11,9 @@
         <text class="topic-detail__meta">更新于 {{ item.publishedLabel }}</text>
         <view class="topic-detail__size"><FiSegmented compact :items="READING_SIZE_ITEMS" :model-value="readingSize" aria-label="文字大小" @update:model-value="setReadingSize" /></view>
       </view>
-      <FiTopicAudioPlayer v-if="audio.activeId.value" title="每日电报" :status="audio.status.value" :current-time="audio.currentTime.value" :duration="audio.duration.value" :error-message="audio.errorMessage.value" @toggle="audio.toggle(item.id)" @seek="audio.seek" @close="audio.stop" />
+      <FiTopicAudioPlayer v-if="audio.activeId.value" :title="audio.activeId.value === item.id ? '每日电报 · 全部' : audio.activeTitle.value" :status="audio.status.value" :current-time="audio.currentTime.value" :duration="audio.duration.value" :error-message="audio.errorMessage.value" @toggle="audio.toggle(audio.activeId.value)" @seek="audio.seek" @close="audio.stop" />
       <view class="topic-detail__roundup">
-        <TopicRoundup :item="item" :font-rpx="bodyFontRpx" :audio-ready="audio.availableIds.value.includes(item.id)" :audio-playing="audio.status.value === 'playing'" :audio-loading="audio.status.value === 'loading'" @play="audio.toggle(item.id)" @copy="copyEntrySource" />
+        <TopicRoundup :item="item" :font-rpx="bodyFontRpx" :active="telegraphTab" :audio-ready="audio.availableIds.value.includes(telegraphAudio)" :audio-playing="audio.activeId.value === telegraphAudio && audio.status.value === 'playing'" :audio-loading="audio.activeId.value === telegraphAudio && audio.status.value === 'loading'" @play="audio.toggle(telegraphAudio)" @select="telegraphTab = $event" @copy="copyEntrySource" />
       </view>
     </template>
     <template v-else-if="item">
@@ -72,7 +72,8 @@ import { useTopicTimeline } from './useTopicTimeline'
 import FiSegmented from '../../components/FiSegmented.vue'
 import { READING_SIZE_ITEMS, loadReadingSize, normalizeReadingSize, readingSizeRpx, saveReadingSize } from './readingSize'
 import type { DailyTopicItem } from '../../types/dailyTopic'
-import { DAILY_TOPICS_TEAM_ID, editionForTopic, isRoundupTopic, isTopicSourceUrl, mapTopicDetail, topicDetailUrl } from '../../utils/dailyTopics'
+import { DAILY_TOPICS_TEAM_ID, isRoundupTopic, isTopicSourceUrl, mapTopicDetail, telegraphAudioEdition, telegraphAudioId, topicDetailUrl } from '../../utils/dailyTopics'
+import type { TelegraphCategory } from '../../types/dailyTopic'
 import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { buildTopicTimelinePayload, buildTopicSharePayload, TOPIC_SHARE_CARD } from './share'
@@ -84,7 +85,10 @@ const item = ref<DailyTopicItem | null>(null)
 const timeline = useTopicTimeline(computed(() => item.value && !isRoundupTopic(item.value) ? item.value : null))
 const loading = ref(false)
 const errorMessage = ref('')
-const edition = computed(() => editionForTopic(item.value))
+// 每日电报的播放批次含整期和各分类语音；旧话题就是它自己。
+const edition = computed(() => telegraphAudioEdition(item.value))
+const telegraphTab = ref<TelegraphCategory | null>(null)
+const telegraphAudio = computed(() => item.value ? telegraphAudioId(item.value.id, telegraphTab.value) : '')
 const audio = useDailyTopicAudio(edition)
 const shareCard = useTopicShareCard()
 const shareArticle = computed(() => !loading.value && !errorMessage.value ? item.value : null)

@@ -331,3 +331,53 @@ def test_zhibo8_rolling_respects_explicit_at_date_and_overseas_player_scope():
     collected = collect_sources(config, now)
     assert len(collected) == 1
     assert '王钰栋' in collected[0].title
+
+
+def test_zhibo8_world_listing_takes_only_big_five_items_not_already_in_domestic_list():
+    from datetime import datetime
+    from sina_csl_scraper.topics.publishers import public_json_document
+
+    payload = ('{"video_arr":['
+               '{"lable":"足球,英超,曼联","url":"/zuqiu/2026-11-09/world1.htm","title":"曼联4-4维拉"},'
+               '{"lable":"足球,英超,留洋,中国足球","url":"/zuqiu/2026-11-09/abroad1.htm","title":"徐彬狼队U21首发"},'
+               '{"lable":"足球,中超,大连英博","url":"/zuqiu/2026-11-09/csl1.htm","title":"英博夺冠"}]}')
+
+    class Session:
+        def get(self, url, **kwargs):
+            class Resp:
+                status_code = 200
+                text = payload
+                def raise_for_status(self): pass
+            return Resp()
+
+    now = datetime.fromisoformat('2026-11-09T12:00:00+08:00')
+    world, _ = public_json_document('https://news.zhibo8.com/zuqiu/json/rolling.json?scope=world', Session(), now=now)
+    domestic, _ = public_json_document('https://news.zhibo8.com/zuqiu/json/rolling.json', Session(), now=now)
+    assert 'world1.htm' in world and 'abroad1.htm' not in world and 'csl1.htm' not in world
+    assert 'abroad1.htm' in domestic and 'csl1.htm' in domestic and 'world1.htm' not in domestic
+
+
+def test_collect_sources_accepts_watchlist_world_news_and_skips_used_urls():
+    from datetime import datetime
+    from sina_csl_scraper.topics.sources import collect_sources
+
+    now = datetime.fromisoformat('2026-11-09T12:00:00+08:00')
+    body = '英超第11轮，曼联4比4战平阿斯顿维拉，球队仍处降级区。' * 4
+    config = {
+        'team_keywords': ['蓉城'], 'team_catalog': [{'team_id': 77680, 'name': '成都蓉城'}],
+        'world_watchlist': {'clubs': [['曼联', '曼彻斯特联']], 'people': []},
+        'imports': [
+            {'title': '曼联4-4维拉', 'url': 'https://news.example/world1', 'publisher': '直播吧',
+             'published_at': '2026-11-09T10:00:00+08:00', 'body': body},
+            {'title': '水晶宫换帅', 'url': 'https://news.example/world2', 'publisher': '直播吧',
+             'published_at': '2026-11-09T10:00:00+08:00', 'body': '英超第11轮，水晶宫主帅下课，球队排名垫底。' * 4},
+        ],
+    }
+    assert [s.url for s in collect_sources(config, now)] == ['https://news.example/world1']
+
+    class NoNetwork:
+        def get(self, *args, **kwargs):
+            raise AssertionError('used URLs must not be downloaded')
+    listed = {'team_keywords': ['蓉城'], 'team_catalog': [{'team_id': 77680, 'name': '成都蓉城'}],
+              'articles': [{'url': 'https://news.example/used', 'publisher': '直播吧'}]}
+    assert collect_sources(listed, now, session=NoNetwork(), skip_urls={'https://news.example/used'}) == []

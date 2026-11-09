@@ -4,7 +4,7 @@ import { buildTopicTimelinePayload, buildTopicSharePayload, containSharePhoto, r
 
 const article: DailyTopicItem = { id: 'topic_2026-10-13', teamId: 77680, title: '蓉城争冠关键战', summary: '这是摘要',
   paragraphs: ['  正文第一段  ', '正文第二段'], publishedAt: '2026-10-13T00:00:00Z', publishedLabel: '2026/10/13 08:00',
-  sources: [], sourceLabel: '来源', heat: 0, readMinutes: 1, audio: { status: 'pending', url: null, durationSeconds: null }, entries: [] }
+  sources: [], sourceLabel: '来源', heat: 0, readMinutes: 1, audio: { status: 'pending', url: null, durationSeconds: null }, entries: [], categoryAudio: {} }
 
 describe('article sharing', () => {
   test('links to the current article with its title and generated cover', () => {
@@ -61,7 +61,7 @@ describe('article sharing', () => {
 })
 
 describe('daily roundup sharing', () => {
-  const entry = (id: string, title: string, at: string) => ({ id, title, text: '', publishedAt: at, timeLabel: at.slice(11, 16), sources: [] })
+  const entry = (id: string, title: string, at: string, category: 'domestic' | 'world' | 'abroad' = 'domestic') => ({ id, category, title, text: '', publishedAt: at, timeLabel: at.slice(11, 16), sources: [] })
   const roundup: DailyTopicItem = { ...article, id: 'r'.repeat(64), publishedAt: '2026-11-09T07:35:00Z', entries: [
     entry('a', '侯森表示享受比赛', '2026-11-09T07:30:00Z'),
     entry('b', '广东广州豹夺冠升入中超', '2026-11-09T07:20:00Z'),
@@ -73,7 +73,17 @@ describe('daily roundup sharing', () => {
     expect(buildTopicSharePayload(roundup).title).toBe('11月9日足坛4条快讯｜官宣：主帅续约一年')
   })
 
-  test('picks the weightiest entries for the card but keeps them newest first', () => {
-    expect(roundupShareHighlights(roundup, 3).map(e => e.id)).toEqual(['a', 'b', 'd'])
+  test('fills the card with the weightiest entries when only one category has news', () => {
+    expect(roundupShareHighlights(roundup, 3).map(e => e.id)).toEqual(['d', 'b', 'a'])
+  })
+
+  test('gives each category its weightiest entry first', () => {
+    const mixed: DailyTopicItem = { ...roundup, entries: [
+      entry('w1', '曼联官宣解雇主帅', '2026-11-09T07:40:00Z', 'world'),
+      entry('d1', '球队进行恢复训练', '2026-11-09T07:30:00Z'),
+      entry('d2', '广东广州豹夺冠升入中超', '2026-11-09T07:20:00Z'),
+      entry('a1', '徐彬为狼队U21首发', '2026-11-09T07:10:00Z', 'abroad'),
+    ] }
+    expect(roundupShareHighlights(mixed, 3).map(e => e.id)).toEqual(['d2', 'w1', 'a1'])
   })
 })

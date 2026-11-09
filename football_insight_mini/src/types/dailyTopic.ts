@@ -30,10 +30,17 @@ export interface DailyTopicItem {
   audio: DailyTopicAudio
   /** 每日电报的快讯条目（新到旧）；旧版多篇话题为空数组。 */
   entries: DailyTopicEntry[]
+  /** 每日电报按分类各一段的语音；旧数据为空对象。 */
+  categoryAudio: Partial<Record<TelegraphCategory, DailyTopicAudio>>
 }
+
+/** 国内 / 国际（五大联赛热门）/ 留洋。 */
+export type TelegraphCategory = 'domestic' | 'world' | 'abroad'
 
 export interface DailyTopicEntry {
   id: string
+  /** 改版前发布的条目没有分类，按国内处理。 */
+  category: TelegraphCategory
   title: string
   text: string
   publishedAt: string

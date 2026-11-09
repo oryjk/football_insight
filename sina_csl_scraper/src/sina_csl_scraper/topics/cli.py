@@ -18,7 +18,8 @@ from .models import SHANGHAI, parse_timestamp
 from .pipeline import NoTopicsError, generate_edition, refresh_edition_audio
 from .pipeline import _atomic_json
 from .repository import TopicRepository
-from .roundup import RoundupGenerator, run_roundup_update
+from .categories import Watchlist
+from .roundup import RoundupGenerator, known_source_urls, run_roundup_update
 from .sources import collect_sources
 from .storage import SshMinioTarget
 from .images import TopicImagePublisher
@@ -265,6 +266,7 @@ def roundup_update(config: Path = typer.Option(..., exists=True, dir_okay=False)
             raise ValueError('FI_DATABASE_URL is required')
         now = _now(at)
         scope = None
+        watchlist = Watchlist()
 
         def generator():
             base_url, model = os.getenv('FI_TOPIC_LLM_BASE_URL'), os.getenv('FI_TOPIC_LLM_MODEL')
@@ -272,7 +274,8 @@ def roundup_update(config: Path = typer.Option(..., exists=True, dir_okay=False)
                 raise ValueError('article LLM configuration is missing')
             return RoundupGenerator(base_url=base_url, model=model, api_key=os.getenv('FI_TOPIC_LLM_API_KEY'),
                                     team_catalog=list(scope.catalog) if scope else None,
-                                    selected_team_ids=[team.team_id for team in scope.selected] if scope else None)
+                                    selected_team_ids=[team.team_id for team in scope.selected] if scope else None,
+                                    watchlist=watchlist)
 
         with _lock(output_dir):
             try:
@@ -280,11 +283,13 @@ def roundup_update(config: Path = typer.Option(..., exists=True, dir_okay=False)
                 repository.check_schema()
                 _atomic_json(output_dir / 'daily-status.json', {'status': 'running', 'started_at': now.isoformat()})
                 source_config, scope = _collection_scope(_config(config), now)
-                sources = collect_sources(source_config, now, max_age_hours, require_available=True)
+                watchlist = Watchlist.from_config(source_config)
+                sources = collect_sources(source_config, now, max_age_hours, require_available=True,
+                                          skip_urls=known_source_urls(repository, output_dir, team_id, now))
                 result = run_roundup_update(sources, repository=repository, generator_factory=generator,
                     tts_factory=lambda: _tts(output_dir), target_factory=_target, cache_dir=output_dir,
                     now=now, team_id=team_id, max_age_hours=max_age_hours,
-                    selected_teams=list(scope.selected) if scope else None)
+                    selected_teams=list(scope.selected) if scope else None, watchlist=watchlist)
                 result['finished_at'] = datetime.now(SHANGHAI).isoformat()
                 _atomic_json(output_dir / 'daily-status.json', result)
             except Exception as error:

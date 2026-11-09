@@ -1,7 +1,15 @@
 {
   "league_selections": [
-    {"league_id": 213, "top": 16, "bottom": 0},
-    {"league_id": 214, "top": 4, "bottom": 2}
+    {
+      "league_id": 213,
+      "top": 16,
+      "bottom": 0
+    },
+    {
+      "league_id": 214,
+      "top": 4,
+      "bottom": 2
+    }
   ],
   "feeds": [
     {
@@ -14,37 +22,170 @@
     {
       "url": "https://news.zhibo8.com/zuqiu/json/rolling.json",
       "publisher": "直播吧",
-      "allowed_hosts": ["news.zhibo8.com"],
+      "allowed_hosts": [
+        "news.zhibo8.com"
+      ],
+      "path_pattern": "^/zuqiu/\\d{4}-\\d{2}-\\d{2}/[a-z0-9_]+\\.htm$",
+      "keywords": []
+    },
+    {
+      "url": "https://news.zhibo8.com/zuqiu/json/rolling.json?scope=world",
+      "publisher": "直播吧",
+      "allowed_hosts": [
+        "news.zhibo8.com"
+      ],
       "path_pattern": "^/zuqiu/\\d{4}-\\d{2}-\\d{2}/[a-z0-9_]+\\.htm$",
       "keywords": []
     },
     {
       "url": "https://api.dongqiudi.com/app/tabs/iphone/56.json",
       "publisher": "懂球帝",
-      "allowed_hosts": ["m.dongqiudi.com", "www.dongqiudi.com"],
+      "allowed_hosts": [
+        "m.dongqiudi.com",
+        "www.dongqiudi.com"
+      ],
       "path_pattern": "^/article/\\d+\\.html$",
       "keywords": []
     },
     {
       "url": "https://sports.sina.com.cn/china/",
       "publisher": "新浪体育",
-      "allowed_hosts": ["sports.sina.com.cn"],
+      "allowed_hosts": [
+        "sports.sina.com.cn"
+      ],
       "path_pattern": "^/(?:china|g)/(?:[a-z0-9_-]+/)*\\d{4}-\\d{2}-\\d{2}/doc-[a-z0-9]+\\.shtml$",
       "keywords": []
     },
     {
       "url": "https://www.ttplus.cn/innerfb.html",
       "publisher": "体坛周报／体坛+",
-      "allowed_hosts": ["www.ttplus.cn", "ttplus.cn"],
+      "allowed_hosts": [
+        "www.ttplus.cn",
+        "ttplus.cn"
+      ],
       "path_pattern": "^/publish/app/data/\\d{4}/\\d{2}/\\d{2}/\\d+/os_news\\.html$",
       "keywords": []
     },
     {
       "url": "https://www.ttplus.cn/",
       "publisher": "体坛周报／体坛+",
-      "allowed_hosts": ["www.ttplus.cn", "ttplus.cn"],
+      "allowed_hosts": [
+        "www.ttplus.cn",
+        "ttplus.cn"
+      ],
       "path_pattern": "^/publish/app/data/\\d{4}/\\d{2}/\\d{2}/\\d+/os_news\\.html$",
       "keywords": []
     }
+  ],
+  "world_watchlist": {
+    "_说明": "国际只收这些对象的消息（五大联赛热门俱乐部、球员、教练）。每组第一个是显示名，其余是别名。",
+    "clubs": [
+      [
+        "曼城",
+        "曼彻斯特城"
+      ],
+      [
+        "利物浦"
+      ],
+      [
+        "阿森纳",
+        "枪手"
+      ],
+      [
+        "曼联",
+        "曼彻斯特联"
+      ],
+      [
+        "切尔西"
+      ],
+      [
+        "热刺",
+        "托特纳姆"
+      ],
+      [
+        "皇马",
+        "皇家马德里"
+      ],
+      [
+        "巴萨",
+        "巴塞罗那"
+      ],
+      [
+        "马竞",
+        "马德里竞技"
+      ],
+      [
+        "拜仁",
+        "拜仁慕尼黑"
+      ],
+      [
+        "多特蒙德",
+        "多特"
+      ],
+      [
+        "勒沃库森",
+        "药厂"
+      ],
+      [
+        "国米",
+        "国际米兰"
+      ],
+      [
+        "AC米兰"
+      ],
+      [
+        "尤文",
+        "尤文图斯"
+      ],
+      [
+        "那不勒斯"
+      ],
+      [
+        "巴黎圣日耳曼",
+        "大巴黎"
+      ]
+    ],
+    "people": [
+      "姆巴佩",
+      "维尼修斯",
+      "贝林厄姆",
+      "哈兰德",
+      "萨拉赫",
+      "亚马尔",
+      "莱万",
+      "凯恩",
+      "登贝莱",
+      "萨卡",
+      "赖斯",
+      "帕尔默",
+      "B费",
+      "德布劳内",
+      "佩德里",
+      "罗德里",
+      "穆西亚拉",
+      "维尔茨",
+      "劳塔罗",
+      "奥斯梅恩",
+      "瓜迪奥拉",
+      "阿尔特塔",
+      "斯洛特",
+      "阿隆索",
+      "弗里克",
+      "孔帕尼",
+      "西蒙尼",
+      "恩里克",
+      "马雷斯卡"
+    ]
+  },
+  "overseas_players": [
+    "王钰栋",
+    "徐彬",
+    "魏祥鑫",
+    "刘邵子洋",
+    "何小珂",
+    "杜月徵",
+    "李嗣镕",
+    "武磊",
+    "吴少聪"
   ]
 }

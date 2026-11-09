@@ -6,9 +6,9 @@
       <text class="topic-row__date">{{ roundup ? `${roundupDayLabel(item.publishedAt)} · ${item.entries.length} 条` : item.publishedLabel }}</text>
     </view>
     <view v-if="roundup" class="topic-row__entries">
-      <view v-for="entry in item.entries.slice(0, 3)" :key="entry.id" class="topic-row__entry">
-        <text class="topic-row__entry-time">{{ entry.timeLabel }}</text>
-        <text class="topic-row__entry-title">{{ entry.title }}</text>
+      <view v-for="lead in leads" :key="lead.category" class="topic-row__entry">
+        <text class="topic-row__entry-tag" :class="`topic-row__entry-tag--${lead.category}`">{{ lead.label }} {{ lead.count }}</text>
+        <text class="topic-row__entry-title">{{ lead.entry.title }}</text>
       </view>
     </view>
     <template v-else>
@@ -28,10 +28,11 @@ import FiTopicMeta from '../../../components/topics/FiTopicMeta.vue'
 import FiTopicReadEntry from '../../../components/topics/FiTopicReadEntry.vue'
 import type { DailyTopicItem } from '../../../types/dailyTopic'
 import { topicCardPresentation } from '../presentation'
-import { isRoundupTopic, roundupDayLabel } from '../../../utils/dailyTopics'
+import { isRoundupTopic, roundupDayLabel, telegraphCategoryLeads } from '../../../utils/dailyTopics'
 const props = defineProps<{ item: DailyTopicItem; heat: number }>()
 const emit = defineEmits<{ (e: 'read', id: string): void }>()
 const roundup = computed(() => isRoundupTopic(props.item))
+const leads = computed(() => telegraphCategoryLeads(props.item))
 const presentation = computed(() => topicCardPresentation(props.item.title))
 </script>
 <style scoped>
@@ -42,9 +43,12 @@ const presentation = computed(() => topicCardPresentation(props.item.title))
 .topic-row--pressed { opacity: 0.9; transform: scale(0.99); }
 .topic-row__top, .topic-row__title, .topic-row__summary, .topic-row__entries, .topic-row__footer { position: relative; z-index: 1; }
 .topic-row__entries { margin-top: var(--fi-space-20); }
-.topic-row__entry { display: flex; align-items: baseline; gap: var(--fi-space-12); margin-top: var(--fi-space-10); }
+.topic-row__entry { display: flex; align-items: center; gap: var(--fi-space-12); margin-top: var(--fi-space-12); }
 .topic-row__entry:first-child { margin-top: 0; }
-.topic-row__entry-time { flex-shrink: 0; color: var(--fi-color-primary); font-size: var(--fi-font-24); font-weight: var(--fi-weight-bold); font-variant-numeric: tabular-nums; }
+.topic-row__entry-tag { flex-shrink: 0; min-width: 96rpx; padding: var(--fi-space-2) var(--fi-space-10); border-radius: var(--fi-radius-xs); text-align: center; font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); }
+.topic-row__entry-tag--domestic { background: #fdecec; color: #b3282a; }
+.topic-row__entry-tag--world { background: #e8f0fd; color: #1f56b8; }
+.topic-row__entry-tag--abroad { background: #fff0dc; color: #8f4700; }
 .topic-row__entry-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--fi-color-text-primary); font-size: var(--fi-font-28); line-height: var(--fi-leading-normal); font-weight: var(--fi-weight-bold); }
 .topic-row__top { display: flex; justify-content: space-between; align-items: center; gap: var(--fi-space-12); }
 .topic-row__badge { flex-shrink: 0; padding: var(--fi-space-6) var(--fi-space-14); border: var(--fi-border-width) solid currentColor; border-radius: var(--fi-radius-round); color: var(--topic-accent); background: var(--fi-color-bg); font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); }

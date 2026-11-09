@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use crate::daily_topics::domain::edition::{
     AudioStatus, DailyTopic, DailyTopicAudio, DailyTopicEntry, DailyTopicImage, DailyTopicSource,
-    DailyTopicTag,
+    DailyTopicTag, ENTRY_CATEGORIES,
 };
 
 #[derive(Deserialize)]
@@ -27,11 +27,15 @@ pub(super) struct StoredTopic {
     #[serde(default)]
     entries: serde_json::Value,
     audio: StoredAudio,
+    #[serde(default)]
+    category_audio: serde_json::Value,
 }
 
 #[derive(Deserialize)]
 struct StoredEntry {
     id: String,
+    #[serde(default)]
+    category: Option<String>,
     title: String,
     text: String,
     published_at: DateTime<FixedOffset>,
@@ -119,11 +123,44 @@ fn entries(value: &serde_json::Value) -> Vec<DailyTopicEntry> {
         .filter(|entry| !entry.title.trim().is_empty() && !entry.text.trim().is_empty())
         .map(|entry| DailyTopicEntry {
             team_tags: tags(&entry.team_tags),
+            category: entry
+                .category
+                .filter(|category| ENTRY_CATEGORIES.contains(&category.as_str())),
             id: entry.id,
             title: entry.title.trim().to_owned(),
             text: entry.text.trim().to_owned(),
             published_at: entry.published_at,
             sources: entry.sources.into_iter().map(source).collect(),
+        })
+        .collect()
+}
+
+fn audio(value: StoredAudio) -> DailyTopicAudio {
+    DailyTopicAudio {
+        status: match value.status {
+            StoredAudioStatus::Ready => AudioStatus::Ready,
+            StoredAudioStatus::Pending => AudioStatus::Pending,
+            StoredAudioStatus::Failed => AudioStatus::Failed,
+        },
+        url: value.url,
+        dialect: value.dialect,
+        duration_seconds: value.duration_seconds,
+    }
+}
+
+/// Only the three known categories; anything malformed is dropped.
+fn category_audio(
+    value: &serde_json::Value,
+) -> std::collections::BTreeMap<String, DailyTopicAudio> {
+    value
+        .as_object()
+        .into_iter()
+        .flatten()
+        .filter(|(category, _)| ENTRY_CATEGORIES.contains(&category.as_str()))
+        .filter_map(|(category, value)| {
+            serde_json::from_value::<StoredAudio>(value.clone())
+                .ok()
+                .map(|stored| (category.clone(), audio(stored)))
         })
         .collect()
 }
@@ -134,6 +171,7 @@ impl From<StoredTopic> for DailyTopic {
             heat: 0,
             team_tags: tags(&value.team_tags),
             entries: entries(&value.entries),
+            category_audio: category_audio(&value.category_audio),
             images: value
                 .images
                 .as_array()
@@ -156,16 +194,7 @@ impl From<StoredTopic> for DailyTopic {
             paragraphs: value.paragraphs,
             published_at: value.published_at,
             sources: value.sources.into_iter().map(source).collect(),
-            audio: DailyTopicAudio {
-                status: match value.audio.status {
-                    StoredAudioStatus::Ready => AudioStatus::Ready,
-                    StoredAudioStatus::Pending => AudioStatus::Pending,
-                    StoredAudioStatus::Failed => AudioStatus::Failed,
-                },
-                url: value.audio.url,
-                dialect: value.audio.dialect,
-                duration_seconds: value.audio.duration_seconds,
-            },
+            audio: audio(value.audio),
         }
     }
 }
@@ -198,8 +227,13 @@ mod tests {
     fn roundup_entries_are_read_and_malformed_ones_skipped() {
         let payload = json!({"id":"topic", "team_id":77680, "title":"title", "summary":"summary",
             "paragraphs":["【a】b"], "published_at":"2026-11-09T12:00:00+08:00", "sources":[],
+            "category_audio":{
+                "world":{"status":"ready", "url":"https://example.com/w.m4a", "dialect":"sichuan", "duration_seconds":30},
+                "gossip":{"status":"ready", "url":"https://example.com/g.m4a", "dialect":"sichuan", "duration_seconds":30},
+                "abroad":"broken"
+            },
             "entries":[
-                {"id":"e1", "title":"泰山3-2胜蓉城", "text":"山东泰山主场3-2击败成都蓉城。",
+                {"id":"e1", "category":"domestic", "title":"泰山3-2胜蓉城", "text":"山东泰山主场3-2击败成都蓉城。",
                  "published_at":"2026-11-09T10:00:00+08:00",
                  "sources":[{"title":"t", "url":"https://news.example/1", "publisher":"直播吧",
                              "published_at":"2026-11-09T10:00:00+08:00"}],
@@ -216,5 +250,10 @@ mod tests {
         assert_eq!(entry.title, "泰山3-2胜蓉城");
         assert_eq!(entry.sources[0].publisher, "直播吧");
         assert_eq!(entry.team_tags.len(), 1);
+        assert_eq!(entry.category.as_deref(), Some("domestic"));
+        assert_eq!(
+            topic.category_audio.keys().collect::<Vec<_>>(),
+            vec!["world"]
+        );
     }
 }
