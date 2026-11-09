@@ -1,4 +1,4 @@
-"""每日话题：一天一期快讯，每小时只追加新条目，已发布条目永不改写。
+"""每日电报：一天一期快讯，每小时只追加新条目，已发布条目永不改写。
 
 一期在数据库里是一行 edition、一个 item，ID 由日期决定，所以追加不会改变
 分享链接和阅读统计。item 的 `entries` 是给新版小程序的快讯流；`title`、
@@ -177,7 +177,7 @@ def build_roundup_item(*, team_id: int, edition_date: str, entries: list[dict], 
 def roundup_narration(edition_date: str, entries: list[dict]) -> str:
     """整期一段语音，从新到旧读；超出合成上限时只读最新的若干条。"""
     month, day = (int(part) for part in edition_date.split('-')[1:])
-    narration = f'{month}月{day}日每日话题。'
+    narration = f'{month}月{day}日每日电报。'
     for entry in entries:
         line = '\n' + entry['title'].rstrip('。') + '。' + entry['text']
         if len(narration) + len(line) > NARRATION_BUDGET:

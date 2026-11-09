@@ -25,9 +25,9 @@
 
 - local233 用户 crontab 每天北京时间 07:00–23:00 每个整点运行 `./update_daily_topics.sh --scheduled`，入口是 `topics roundup-update`（`topics/roundup.py`），单次最长 55 分钟。cron 直接跑工作目录代码，未提交的改动会立刻在生产生效。
 - 来源为 `config/rongcheng-news-auto.json` 的四组公开新闻源：**直播吧**（`news.zhibo8.com` 滚动 JSON）、**懂球帝**（`api.dongqiudi.com` 中超/中国足球标签）、**新浪体育**（`sports.sina.com.cn` 国内足球）、**体坛周报 + 中国新闻网体育 RSS**，必须获取完整原文与真实发布时间；每次按当前积分榜动态选中超全部 16 队、中甲前四/后二，并包含**中国留洋球员**相关动态。
-- 每日话题（2026-11-09 起）：一天一期快讯，`topics roundup-update` 每小时把新原文写成「一件事一条」的快讯追加到当天这一期，已发布条目不改写；一期是 `f_i_daily_topic_editions` 里一行、一个 item，ID 由日期决定（追加不改变分享链接和阅读统计）。
+- 每日电报（2026-11-09 起）：一天一期快讯，`topics roundup-update` 每小时把新原文写成「一件事一条」的快讯追加到当天这一期，已发布条目不改写；一期是 `f_i_daily_topic_editions` 里一行、一个 item，ID 由日期决定（追加不改变分享链接和阅读统计）。
 - 只把没用过的新原文（最近 24 小时、在关注范围内）交给大模型，并附上当天已发布标题防重复；每条的时间取引用原文里最早的发布时间。条目点名了引用原文没有的球队、或冒出原文没有的联赛名（中超/中甲/中乙/希拉谷），只丢这一条，不连累整批。
-- 交给过大模型的原文记在 `data/topics/roundup-state.json`，不论是否写成条目都不再重送；去重只看每日话题自己用过的原文，旧版多篇话题不参与。
+- 交给过大模型的原文记在 `data/topics/roundup-state.json`，不论是否写成条目都不再重送；去重只看每日电报自己用过的原文，旧版多篇话题不参与。
 - 每次追加后整期重新合成一段语音（从新到旧，超长只读最新若干条）；语音失败先发布文字、保留上一版语音，下次运行即使没有新闻也会补语音。
 - 旧版小程序仍读 `title`/`summary`/`paragraphs`：由最新三条标题、前两条正文、每条「【标题】正文」拼出。新版读 `entries`。旧的多篇话题流程 `topics daily-update`/`generate` 保留但不再定时运行。
 - 语音合成统一使用 **Edge TTS `zh-CN-YunyangNeural`（`yunyang`）**（`EdgeYunyangTts`，自带重试，生成 24kHz 单声道 WAV 校验非静音后转 AAC `.m4a` 上传 MinIO；JSONB `audio.dialect` 保持 `"sichuan"` 兼容已上线小程序播放）。

@@ -2,7 +2,7 @@
   <view class="topic-row" :class="`topic-row--${presentation.tone}`" role="button" :aria-label="`阅读${item.title}`" hover-class="topic-row--pressed" @tap="emit('read', item.id)">
     <FiTopicCrest v-if="!roundup" :item="item" variant="history" />
     <view class="topic-row__top">
-      <text class="topic-row__badge">{{ roundup ? '每日话题' : presentation.label }}</text>
+      <text class="topic-row__badge">{{ roundup ? '每日电报' : presentation.label }}</text>
       <text class="topic-row__date">{{ roundup ? `${roundupDayLabel(item.publishedAt)} · ${item.entries.length} 条` : item.publishedLabel }}</text>
     </view>
     <view v-if="roundup" class="topic-row__entries">

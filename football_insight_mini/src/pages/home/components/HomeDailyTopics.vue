@@ -3,7 +3,7 @@
     <view class="daily-topics__heading">
       <view class="daily-topics__heading-copy">
         <view class="daily-topics__title-row">
-          <text class="daily-topics__title">每日话题</text>
+          <text class="daily-topics__title">每日电报</text>
           <text class="daily-topics__date">{{ edition.dateLabel }}</text>
         </view>
       </view>

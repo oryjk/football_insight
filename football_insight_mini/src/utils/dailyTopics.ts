@@ -54,7 +54,7 @@ function beijingParts(value: string) {
   return { year: date.getUTCFullYear(), month: pad(date.getUTCMonth() + 1), day: pad(date.getUTCDate()),
     weekday: date.getUTCDay(), time: `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}` }
 }
-/** 每日话题的「那一天」：最后一次追加发生在当天 07–23 点，取发布时间的北京日期。 */
+/** 每日电报的「那一天」：最后一次追加发生在当天 07–23 点，取发布时间的北京日期。 */
 export function roundupDayLabel(publishedAt: string): string {
   const { year, month, day, weekday } = beijingParts(publishedAt)
   return `${year}年${month}月${day}日 周${'日一二三四五六'[weekday]}`
@@ -65,7 +65,7 @@ export function roundupEntryTimeLabel(entryAt: string, dayAt: string): string {
   return sameDay ? entry.time : `${entry.month}-${entry.day} ${entry.time}`
 }
 export function isRoundupTopic(item: Pick<DailyTopicItem, 'entries'>): boolean {
-  return item.entries.length > 0
+  return (item.entries?.length ?? 0) > 0
 }
 function mapEntries(value: unknown, dayAt: string): DailyTopicEntry[] {
   if (!Array.isArray(value)) return []

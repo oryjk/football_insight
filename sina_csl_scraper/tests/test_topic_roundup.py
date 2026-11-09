@@ -116,7 +116,7 @@ def test_first_run_creates_one_item_per_day_with_entries_and_legacy_fields(env, 
     assert item['title'] == '申花主帅续约一年；泽卡与中超球队商谈'
     assert item['audio']['status'] == 'ready'
     assert {tag['name'] for tag in item['team_tags']} == {'上海申花', '山东泰山'}
-    assert env[1].texts[0].startswith('11月9日每日话题。\n申花主帅续约一年。')
+    assert env[1].texts[0].startswith('11月9日每日电报。\n申花主帅续约一年。')
 
 
 def test_later_run_appends_without_rewriting_published_entries(env, tmp_path):
@@ -228,7 +228,7 @@ def test_merge_keeps_existing_entries_and_orders_newest_first():
 def test_narration_stays_within_tts_budget():
     entries = [{'title': f'标题{n}', 'text': '内容' * 60} for n in range(200)]
     text = roundup_narration('2026-11-09', entries)
-    assert len(text) <= 5500 and text.startswith('11月9日每日话题。')
+    assert len(text) <= 5500 and text.startswith('11月9日每日电报。')
 
 
 def test_legacy_fields_are_bounded_for_old_clients():

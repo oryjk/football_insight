@@ -34,7 +34,7 @@ class TopicRepository:
                       Jsonb(payload), edition['source_fingerprint'], edition['generator_version']))
 
     def roundup_for_date(self, team_id: int, edition_date: str) -> dict | None:
-        """当天这一期每日话题（一天一行，ID 由日期决定），没有则 None。"""
+        """当天这一期每日电报（一天一行，ID 由日期决定），没有则 None。"""
         from .roundup import roundup_edition_id
         edition_id = roundup_edition_id(team_id, edition_date)
         with psycopg.connect(self.database_url) as connection:
@@ -64,7 +64,7 @@ class TopicRepository:
                   Jsonb(payload), edition['source_fingerprint'], edition['generator_version']))
 
     def roundup_sources(self, team_id: int) -> set[str]:
-        """每日话题用过的原文。旧版多篇话题不参与：它们不再生成，也不该挡住当天快讯。"""
+        """每日电报用过的原文。旧版多篇话题不参与：它们不再生成，也不该挡住当天快讯。"""
         with psycopg.connect(self.database_url) as connection:
             rows = connection.execute('''
                 SELECT DISTINCT source->>'url'

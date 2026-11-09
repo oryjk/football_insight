@@ -251,7 +251,7 @@ def roundup_update(config: Path = typer.Option(..., exists=True, dir_okay=False)
                    output_dir: Path = Path('data/topics'), team_id: int = typer.Option(77680, min=1),
                    max_age_hours: int = typer.Option(24, min=1, max=72),
                    write_db: bool = False, at: str | None = None) -> None:
-    """每日话题：把新原文写成快讯追加到当天这一期，并重新合成整期语音（每小时由 cron 调用）。"""
+    """每日电报：把新原文写成快讯追加到当天这一期，并重新合成整期语音（每小时由 cron 调用）。"""
 
     def failed_result(error):
         return {'status': 'failed', 'error_type': type(error).__name__, 'previous_retained': True,

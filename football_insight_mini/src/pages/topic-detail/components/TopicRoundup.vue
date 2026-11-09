@@ -1,5 +1,5 @@
 <template>
-  <!-- 每日话题：电报式快讯流。整期一个播报，每条只有时间、标题、正文和来源，不单独统计或播报。 -->
+  <!-- 每日电报：电报式快讯流。整期一个播报，每条只有时间、标题、正文和来源，不单独统计或播报。 -->
   <view class="roundup">
     <view class="roundup__day">
       <text class="roundup__date">{{ dayLabel }}</text>

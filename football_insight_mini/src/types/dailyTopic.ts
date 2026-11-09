@@ -28,7 +28,7 @@ export interface DailyTopicItem {
   heat: number
   readMinutes: number
   audio: DailyTopicAudio
-  /** 每日话题的快讯条目（新到旧）；旧版多篇话题为空数组。 */
+  /** 每日电报的快讯条目（新到旧）；旧版多篇话题为空数组。 */
   entries: DailyTopicEntry[]
 }
 

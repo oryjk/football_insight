@@ -6,12 +6,12 @@
     <view v-if="loading" class="topic-detail__state">正在加载话题…</view>
     <view v-else-if="errorMessage" class="topic-detail__state"><text>{{ errorMessage }}</text><button @tap="load">重新加载</button></view>
     <template v-else-if="item && isRoundupTopic(item)">
-      <text class="topic-detail__title">每日话题</text>
+      <text class="topic-detail__title">每日电报</text>
       <view class="topic-detail__meta-row">
         <text class="topic-detail__meta">更新于 {{ item.publishedLabel }}</text>
         <view class="topic-detail__size"><FiSegmented compact :items="READING_SIZE_ITEMS" :model-value="readingSize" aria-label="文字大小" @update:model-value="setReadingSize" /></view>
       </view>
-      <FiTopicAudioPlayer v-if="audio.activeId.value" title="每日话题" :status="audio.status.value" :current-time="audio.currentTime.value" :duration="audio.duration.value" :error-message="audio.errorMessage.value" @toggle="audio.toggle(item.id)" @seek="audio.seek" @close="audio.stop" />
+      <FiTopicAudioPlayer v-if="audio.activeId.value" title="每日电报" :status="audio.status.value" :current-time="audio.currentTime.value" :duration="audio.duration.value" :error-message="audio.errorMessage.value" @toggle="audio.toggle(item.id)" @seek="audio.seek" @close="audio.stop" />
       <view class="topic-detail__roundup">
         <TopicRoundup :item="item" :font-rpx="bodyFontRpx" :audio-ready="audio.availableIds.value.includes(item.id)" :audio-playing="audio.status.value === 'playing'" :audio-loading="audio.status.value === 'loading'" @play="audio.toggle(item.id)" @copy="copyEntrySource" />
       </view>
@@ -80,7 +80,7 @@ import { TOPIC_SHARE_CANVAS_ID, useTopicShareCard } from './useTopicShareCard'
 
 const { navigationPageStyle } = useNavigationLayout()
 const item = ref<DailyTopicItem | null>(null)
-// 每日话题是全联赛快讯流，不做按球队的话题追踪，也不发追踪请求。
+// 每日电报是全联赛快讯流，不做按球队的话题追踪，也不发追踪请求。
 const timeline = useTopicTimeline(computed(() => item.value && !isRoundupTopic(item.value) ? item.value : null))
 const loading = ref(false)
 const errorMessage = ref('')

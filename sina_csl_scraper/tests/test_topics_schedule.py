@@ -7,7 +7,7 @@ import sys
 import pytest
 
 
-# 每日话题每小时追加一次：07–23 点每个整点都跑，单次不超过 55 分钟。
+# 每日电报每小时追加一次：07–23 点每个整点都跑，单次不超过 55 分钟。
 @pytest.mark.parametrize('hour,remaining,expected', [('06', 600, None), ('07', 57600, 3300),
                                                     ('22', 1800, 3300), ('23', 86400, 3300)])
 def test_scheduled_window_and_hourly_timeout(tmp_path, hour, remaining, expected):

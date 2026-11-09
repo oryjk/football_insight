@@ -53,9 +53,9 @@ uv run sina-csl-scraper sync-player-goals --season 2026
 
 Axum 仅批量读取本赛季最近十次已完赛实际出场，并随 overview 的 `top_scorers[].recent_goals` 和 rankings 进球分类条目的 `recent_goals` 返回；其他球员榜分类不附带逐场进球。首页与榜单复用同排列表和迷你柱，0 球灰横、有进球红柱，每个榜单共用高度刻度；单场 3 球显示「帽」，点击查看比赛详情，榜单头像继续打开能力详情。未知数据不伪造为零，少于十场不补造。当前官方日历与球队身份映射沿用 `cfl_client.py` 的 2026 配置；扩展其他赛季需先配置映射。
 
-## 每日话题与云扬语音
+## 每日电报与云扬语音
 
-每日话题（2026-11-09 起）：一天一期快讯，`topics roundup-update` 每小时把新原文写成「一件事一条」的快讯追加到当天这一期，已发布条目不改写；一期是 `f_i_daily_topic_editions` 里一行、一个 item，ID 由日期决定（追加不改变分享链接和阅读统计）。每天 07:00–23:00 每个整点由 `./update_daily_topics.sh` 调用，语音用 Edge TTS `zh-CN-YunyangNeural`。规则细节见 `AGENTS.md`「今日话题自动更新」。下面关于多篇话题、四川话语音和每半小时运行的说明是 2026-11-09 之前的旧流程，相关命令仍保留。
+每日电报（2026-11-09 起）：一天一期快讯，`topics roundup-update` 每小时把新原文写成「一件事一条」的快讯追加到当天这一期，已发布条目不改写；一期是 `f_i_daily_topic_editions` 里一行、一个 item，ID 由日期决定（追加不改变分享链接和阅读统计）。每天 07:00–23:00 每个整点由 `./update_daily_topics.sh` 调用，语音用 Edge TTS `zh-CN-YunyangNeural`。规则细节见 `AGENTS.md`「今日话题自动更新」。下面关于多篇话题、四川话语音和每半小时运行的说明是 2026-11-09 之前的旧流程，相关命令仍保留。
 
 local233 的安装路径、真实 CPU 基准、私有配置加载和手动运行命令见 [local233 今日话题运行说明](docs/topics-local233.md)。当前采集代码每次从积分榜动态选取中超前三/后三与中甲前二，读取全文后筛选；文章支持多个球队标签，供详情页话题时间线使用。代码验证与实际生产启用状态见项目 FEATURES.md。已有真实批次可用 `topics refresh-audio` 只刷新四川话音频：所有音频成功后才更新数据库，不再调用 LLM、不改原正文和来源。
 

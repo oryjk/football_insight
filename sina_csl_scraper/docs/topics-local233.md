@@ -1,4 +1,4 @@
-# local233 每日话题更新与手动运行
+# local233 每日电报更新与手动运行
 
 > **当前流程（2026-11-09 起）**：cron 每天 07:00–23:00 每个整点运行 `./update_daily_topics.sh --scheduled`，入口 `topics roundup-update`，把新原文写成快讯追加到当天这一期，规则见 `../AGENTS.md`「今日话题自动更新」。手动跑一次（会写生产库）：`./update_daily_topics.sh`。下文关于 `daily-update`、Qwen 四川话语音和每半小时运行的内容是旧流程，保留备查。
 

@@ -5,7 +5,7 @@
   <view class="topics-page">
     <view class="topics-heading">
       <text class="topics-title">全部话题</text>
-      <text class="topics-caption">每日话题 · 最新在前</text>
+      <text class="topics-caption">每日电报 · 最新在前</text>
     </view>
     <view v-if="items.length" class="topics-list">
       <TopicHistoryCard v-for="item in items" :key="item.id" :item="item" :heat="topicHeatValue(item.id, item.heat)" @read="openTopic" />
