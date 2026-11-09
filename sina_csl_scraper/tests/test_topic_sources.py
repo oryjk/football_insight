@@ -310,7 +310,7 @@ def test_zhibo8_rolling_respects_explicit_at_date_and_overseas_player_scope():
                 def raise_for_status(self): pass
             return Resp()
 
-    html, _ = public_json_document('https://news.zhibo8.com/zuqiu/json/rolling.json', RollingSession(), now=now)
+    html, _ = public_json_document('https://news.zhibo8.com/zuqiu/json/rolling.json?scope=abroad', RollingSession(), now=now)
     assert requested_urls == [
         'https://news.zhibo8.com/zuqiu/json/2026-10-20.htm',
         'https://news.zhibo8.com/zuqiu/json/2026-10-19.htm',
@@ -353,8 +353,10 @@ def test_zhibo8_world_listing_takes_only_big_five_items_not_already_in_domestic_
     now = datetime.fromisoformat('2026-11-09T12:00:00+08:00')
     world, _ = public_json_document('https://news.zhibo8.com/zuqiu/json/rolling.json?scope=world', Session(), now=now)
     domestic, _ = public_json_document('https://news.zhibo8.com/zuqiu/json/rolling.json', Session(), now=now)
+    abroad, _ = public_json_document('https://news.zhibo8.com/zuqiu/json/rolling.json?scope=abroad', Session(), now=now)
     assert 'world1.htm' in world and 'abroad1.htm' not in world and 'csl1.htm' not in world
-    assert 'abroad1.htm' in domestic and 'csl1.htm' in domestic and 'world1.htm' not in domestic
+    assert 'csl1.htm' in domestic and 'abroad1.htm' not in domestic and 'world1.htm' not in domestic
+    assert 'abroad1.htm' in abroad and 'csl1.htm' not in abroad and 'world1.htm' not in abroad
 
 
 def test_collect_sources_accepts_watchlist_world_news_and_skips_used_urls():

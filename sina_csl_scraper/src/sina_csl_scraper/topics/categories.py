@@ -14,6 +14,14 @@ DOMESTIC, WORLD, ABROAD = 'domestic', 'world', 'abroad'
 CATEGORY_LABELS = {DOMESTIC: '国内', WORLD: '国际', ABROAD: '留洋'}
 # 同时有几类证据时的默认取舍：留洋新闻常顺带提国足或前东家，国内新闻常顺带提外国球员。
 PRIORITY = (ABROAD, DOMESTIC, WORLD)
+# 国内目前只收人事变动：主教练离任/上任，球员离队/加盟（含转会、租借、解约；传闻也算，但须标明）。
+PERSONNEL = re.compile(r'离任|下课|辞职|卸任|解约|解雇|离队|告别|出走|加盟|签约|签下|引进|引入|转会|租借|回归|上任|出任|新帅|换帅|接任|执教|聘请|官宣.{0,8}(?:主帅|主教练|教练|球员|外援|内援)')
+
+
+def is_personnel_move(text: str) -> bool:
+    return bool(PERSONNEL.search(text))
+
+
 NATIONAL_TEAM = re.compile(r'中超|中甲|中乙|足协杯|中国足协|国足|中国男足|中国队|中国国家队|国奥|国青|国少|中国U\d{2}')
 
 

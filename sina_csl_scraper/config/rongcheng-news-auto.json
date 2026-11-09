@@ -38,6 +38,15 @@
       "keywords": []
     },
     {
+      "url": "https://news.zhibo8.com/zuqiu/json/rolling.json?scope=abroad",
+      "publisher": "直播吧",
+      "allowed_hosts": [
+        "news.zhibo8.com"
+      ],
+      "path_pattern": "^/zuqiu/\\d{4}-\\d{2}-\\d{2}/[a-z0-9_]+\\.htm$",
+      "keywords": []
+    },
+    {
       "url": "https://api.dongqiudi.com/app/tabs/iphone/56.json",
       "publisher": "懂球帝",
       "allowed_hosts": [

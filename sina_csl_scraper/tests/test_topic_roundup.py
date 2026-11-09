@@ -25,9 +25,9 @@ def source(number, body, published_at=None, title=None):
                          published_at or NOW - timedelta(hours=1), body)
 
 
-TAISHAN_NEWS = '山东泰山外援泽卡合同到期，正在与其他中超球队商谈。' * 3
-SHENHUA_NEWS = '上海申花主教练续约一年，球队备战新赛季。' * 3
-RONGCHENG_NEWS = '成都蓉城主帅赛后表示球队将总结经验。' * 3
+TAISHAN_NEWS = '山东泰山外援泽卡合同到期，正在与其他中超球队商谈加盟事宜。' * 3
+SHENHUA_NEWS = '上海申花官宣主教练上任，签约一年，球队备战新赛季。' * 3
+RONGCHENG_NEWS = '成都蓉城主帅赛后表示球队将总结经验，外援离队已成定局。' * 3
 CAMPUS_NEWS = '浙江省高校校园超级联赛今日开幕，比赛持续一个月。' * 3
 
 
@@ -106,15 +106,15 @@ def todays_item(repository):
 
 def test_first_run_creates_one_item_per_day_with_entries_and_legacy_fields(env, tmp_path):
     sources = [source(1, TAISHAN_NEWS, NOW - timedelta(hours=3)), source(2, SHENHUA_NEWS, NOW - timedelta(hours=1))]
-    generator = Generator([entries_for(('泽卡与中超球队商谈', '据报道，山东泰山外援泽卡合同到期，正在与其他中超球队商谈。', [1]),
-                                       ('申花主帅续约一年', '上海申花主教练续约一年。', [2]))])
+    generator = Generator([entries_for(('泽卡与中超球队商谈', '据报道，山东泰山外援泽卡合同到期，正在与其他中超球队商谈加盟。', [1]),
+                                       ('申花主帅续约一年', '上海申花新帅上任，签约一年。', [2]))])
     result = run(sources, generator, env, tmp_path)
     assert result['status'] == 'published' and result['appended'] == 2
     item = todays_item(env[0])
     assert item['id'] == roundup_item_id(77680, '2026-11-09')
     assert [entry['title'] for entry in item['entries']] == ['申花主帅续约一年', '泽卡与中超球队商谈']
     assert item['entries'][1]['published_at'] == (NOW - timedelta(hours=3)).isoformat()
-    assert item['paragraphs'][0] == '【申花主帅续约一年】上海申花主教练续约一年。'
+    assert item['paragraphs'][0] == '【申花主帅续约一年】上海申花新帅上任，签约一年。'
     assert item['title'] == '申花主帅续约一年；泽卡与中超球队商谈'
     assert item['audio']['status'] == 'ready'
     assert {tag['name'] for tag in item['team_tags']} == {'上海申花', '山东泰山'}
@@ -124,11 +124,11 @@ def test_first_run_creates_one_item_per_day_with_entries_and_legacy_fields(env, 
 
 
 def test_later_run_appends_without_rewriting_published_entries(env, tmp_path):
-    first = Generator([entries_for(('泽卡与中超球队商谈', '据报道，泽卡正在与其他中超球队商谈。', [1]))])
+    first = Generator([entries_for(('泽卡与中超球队商谈', '据报道，泽卡正在与其他中超球队商谈加盟。', [1]))])
     run([source(1, TAISHAN_NEWS)], first, env, tmp_path)
     before = copy.deepcopy(todays_item(env[0])['entries'])
 
-    second = Generator([entries_for(('申花主帅续约一年', '上海申花主教练续约一年。', [2]))])
+    second = Generator([entries_for(('申花主帅续约一年', '上海申花新帅上任，签约一年。', [2]))])
     later = NOW + timedelta(hours=1)
     result = run([source(1, TAISHAN_NEWS), source(2, SHENHUA_NEWS, later - timedelta(minutes=10))],
                  second, env, tmp_path, now=later)
@@ -145,7 +145,7 @@ def test_later_run_appends_without_rewriting_published_entries(env, tmp_path):
 def test_ungrounded_entries_are_dropped_not_the_whole_batch(env, tmp_path):
     sources = [source(1, TAISHAN_NEWS), source(3, RONGCHENG_NEWS)]
     generator = Generator([entries_for(
-        ('泽卡与中超球队商谈', '据报道，泽卡正在与其他中超球队商谈。', [1]),
+        ('泽卡与中超球队商谈', '据报道，泽卡正在与其他中超球队商谈加盟。', [1]),
         ('申花续约主帅', '上海申花主教练续约。', [1]),                    # 引用原文里没有申花
         ('蓉城希拉谷备战中乙', '成都蓉城希拉谷备战中乙。', [3]),          # 原文没有中乙
         ('泽卡加盟申花', '泽卡加盟上海申花。', [1]),                      # 点名了原文没有的球队
@@ -173,13 +173,13 @@ def test_out_of_scope_sources_never_reach_the_model(env, tmp_path):
 
 def test_audio_failure_publishes_text_and_retries_audio_next_run(env, tmp_path):
     repository, audio, _ = env
-    run([source(1, TAISHAN_NEWS)], Generator([entries_for(('泽卡与中超球队商谈', '据报道，泽卡正在商谈。', [1]))]),
+    run([source(1, TAISHAN_NEWS)], Generator([entries_for(('泽卡与中超球队商谈', '据报道，泽卡正在商谈加盟。', [1]))]),
         env, tmp_path)
     first_audio = todays_item(repository)['audio']
 
     audio.fail = True
     result = run([source(1, TAISHAN_NEWS), source(2, SHENHUA_NEWS, NOW + timedelta(minutes=30))],
-                 Generator([entries_for(('申花主帅续约一年', '上海申花主教练续约一年。', [2]))]),
+                 Generator([entries_for(('申花主帅续约一年', '上海申花新帅上任，签约一年。', [2]))]),
                  env, tmp_path, now=NOW + timedelta(hours=1))
     assert result['status'] == 'published' and result['audio_error'] == 'RuntimeError'
     item = todays_item(repository)
@@ -198,16 +198,16 @@ def test_failed_generation_is_cached_per_input_and_sources_stay_unconsumed(env, 
         raise ValueError('LLM request failed or response was not valid topic JSON')
     with pytest.raises(ValueError):
         run([source(1, TAISHAN_NEWS)], Generator([boom]), env, tmp_path)
-    retry = Generator([entries_for(('泽卡与中超球队商谈', '据报道，泽卡正在商谈。', [1]))])
+    retry = Generator([entries_for(('泽卡与中超球队商谈', '据报道，泽卡正在商谈加盟。', [1]))])
     assert run([source(1, TAISHAN_NEWS)], retry, env, tmp_path)['status'] == 'published'
 
 
 def test_new_day_starts_a_new_item(env, tmp_path):
-    run([source(1, TAISHAN_NEWS)], Generator([entries_for(('泽卡与中超球队商谈', '据报道，泽卡正在商谈。', [1]))]),
+    run([source(1, TAISHAN_NEWS)], Generator([entries_for(('泽卡与中超球队商谈', '据报道，泽卡正在商谈加盟。', [1]))]),
         env, tmp_path)
     tomorrow = NOW + timedelta(days=1)
     run([source(2, SHENHUA_NEWS, tomorrow - timedelta(hours=9))],
-        Generator([entries_for(('申花主帅续约一年', '上海申花主教练续约一年。', [2]))]), env, tmp_path, now=tomorrow)
+        Generator([entries_for(('申花主帅续约一年', '上海申花新帅上任，签约一年。', [2]))]), env, tmp_path, now=tomorrow)
     assert len(env[0].rows) == 2
     next_day = env[0].rows[roundup_edition_id(77680, '2026-11-10')]['payload']['items'][0]
     assert [entry['title'] for entry in next_day['entries']] == ['申花主帅续约一年']
@@ -215,8 +215,8 @@ def test_new_day_starts_a_new_item(env, tmp_path):
 
 def test_generator_caps_entries_and_skips_titles_already_published():
     sources = [source(1, TAISHAN_NEWS)]
-    many = [('泽卡与中超球队商谈', '据报道，泽卡正在商谈。', [1])] + [
-        (f'泽卡动态第{n}条', '据报道，泽卡正在商谈。', [1]) for n in range(MAX_NEW_ENTRIES + 3)]
+    many = [('泽卡与中超球队商谈', '据报道，泽卡正在商谈加盟。', [1])] + [
+        (f'泽卡动态第{n}条', '据报道，泽卡正在商谈加盟。', [1]) for n in range(MAX_NEW_ENTRIES + 3)]
     entries = Generator([entries_for(*many)]).generate_entries(sources, ['泽卡与中超球队商谈'], NOW)
     assert len(entries) == MAX_NEW_ENTRIES - 1
     assert '泽卡与中超球队商谈' not in [entry['title'] for entry in entries]
@@ -260,7 +260,7 @@ def entries_with_category(*specs):
 def test_entries_are_categorised_from_evidence_not_the_model_label(env, tmp_path):
     sources = [source(1, TAISHAN_NEWS), source(2, WORLD_NEWS), source(3, ABROAD_NEWS)]
     generator = Generator([entries_with_category(
-        ('world', '泽卡与中超球队商谈', '据报道，山东泰山外援泽卡正在商谈。', [1]),   # 模型标错：证据只支持国内
+        ('world', '泽卡与中超球队商谈', '据报道，山东泰山外援泽卡正在商谈加盟。', [1]),   # 模型标错：证据只支持国内
         ('world', '曼联4-4战平阿斯顿维拉', '曼联4比4战平维拉。', [2]),
         ('domestic', '徐彬为狼队U21首发', '徐彬身披10号首发。', [3]),                 # 留洋优先于国内
     )])
@@ -291,7 +291,7 @@ def test_world_entries_are_capped_per_day(env, tmp_path, monkeypatch):
 
 
 def test_entries_published_before_categories_are_treated_as_domestic(env, tmp_path):
-    run([source(1, TAISHAN_NEWS)], Generator([entries_for(('泽卡与中超球队商谈', '据报道，泽卡正在商谈。', [1]))]),
+    run([source(1, TAISHAN_NEWS)], Generator([entries_for(('泽卡与中超球队商谈', '据报道，泽卡正在商谈加盟。', [1]))]),
         env, tmp_path)
     repository = env[0]
     edition = repository.rows[roundup_edition_id(77680, '2026-11-09')]
@@ -301,3 +301,13 @@ def test_entries_published_before_categories_are_treated_as_domestic(env, tmp_pa
         Generator([entries_with_category(('abroad', '徐彬为狼队U21首发', '徐彬身披10号首发。', [3]))]),
         env, tmp_path, now=NOW + timedelta(hours=1))
     assert [e['category'] for e in todays_item(repository)['entries']] == ['abroad', 'domestic']
+
+
+def test_domestic_news_other_than_personnel_moves_is_left_out(env, tmp_path):
+    match_report = '中超第30轮，山东泰山3比2击败成都蓉城，锁定联赛第四。' * 3
+    generator = Generator([entries_for(('泽卡与中超球队商谈', '据报道，山东泰山外援泽卡正在商谈加盟。', [1]),
+                                       ('泰山3-2胜蓉城', '山东泰山3比2击败成都蓉城。', [1]))])
+    result = run([source(1, TAISHAN_NEWS), source(2, match_report)], generator, env, tmp_path)
+    decisions = {s['url'].rsplit('/', 1)[1]: s['decision'] for s in result['sources']}
+    assert decisions == {'1': 'eligible', '2': 'out_of_scope'}
+    assert [e['title'] for e in todays_item(env[0])['entries']] == ['泽卡与中超球队商谈']
