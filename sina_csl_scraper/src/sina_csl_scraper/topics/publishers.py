@@ -71,6 +71,9 @@ def _zhibo8_rolling_html(url: str, session, now: datetime | None = None) -> tupl
         for item in payload.get('video_arr', []):
             if not isinstance(item, dict):
                 continue
+            # 用 --at 补历史日期时，晚于那个时刻的条目还不存在，不能占列表名额。
+            if str(item.get('createtime') or '') > reference.strftime('%Y-%m-%d %H:%M:%S'):
+                continue
             labels = str(item.get('lable') or '')
             if not any(tag in labels for tag in wanted):
                 continue

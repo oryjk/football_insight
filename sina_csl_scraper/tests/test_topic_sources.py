@@ -383,3 +383,21 @@ def test_collect_sources_accepts_watchlist_world_news_and_skips_used_urls():
     listed = {'team_keywords': ['蓉城'], 'team_catalog': [{'team_id': 77680, 'name': '成都蓉城'}],
               'articles': [{'url': 'https://news.example/used', 'publisher': '直播吧'}]}
     assert collect_sources(listed, now, session=NoNetwork(), skip_urls={'https://news.example/used'}) == []
+
+
+def test_zhibo8_listing_ignores_items_published_after_the_run_clock():
+    from datetime import datetime
+    from sina_csl_scraper.topics.publishers import public_json_document
+    payload = ('{"video_arr":['
+               '{"lable":"中超","createtime":"2026-11-08 23:30:00","url":"/zuqiu/2026-11-08/late.htm","title":"深夜"},'
+               '{"lable":"中超","createtime":"2026-11-08 09:30:00","url":"/zuqiu/2026-11-08/early.htm","title":"上午"}]}')
+    class Session:
+        def get(self, url, **kwargs):
+            class Resp:
+                status_code = 200
+                text = payload
+                def raise_for_status(self): pass
+            return Resp()
+    html, _ = public_json_document('https://news.zhibo8.com/zuqiu/json/rolling.json', Session(),
+                                   now=datetime.fromisoformat('2026-11-08T10:00:00+08:00'))
+    assert 'early.htm' in html and 'late.htm' not in html
