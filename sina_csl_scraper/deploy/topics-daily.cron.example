@@ -1,4 +1,4 @@
 # local233 system timezone: Asia/Shanghai. Keep league/avatar jobs unchanged.
-# 07:00 through 22:30 every half hour; no automatic run continues past 23:00.
+# 每日话题：07:00–23:00 每个整点追加一次快讯（topics roundup-update），单次最长 55 分钟。
 # The wrapper serializes runs and writes data/topics/daily.log.
-0,30 7-22 * * * /bin/zsh -lc 'cd /home/betalpha/projects/football_insight/sina_csl_scraper && ./update_daily_topics.sh --scheduled'
+0 7-23 * * * /bin/zsh -lc 'cd /home/betalpha/projects/football_insight/sina_csl_scraper && ./update_daily_topics.sh --scheduled'

@@ -78,7 +78,7 @@ class _ArticleHTML(HTMLParser):
             capture = parent_capture or semantic
             if semantic:
                 self.semantic_body_found = True
-        ignored = parent_ignore or tag in self._ignored
+        ignored = parent_ignore or tag in self._ignored or 'video_box' in (attributes.get('class') or '').split()
         if capture and not ignored and tag == 'img':
             image = attributes.get('data-src') or attributes.get('data-original') or attributes.get('src')
             if image and len(self.images) < 8:
@@ -121,7 +121,8 @@ class _ArticleHTML(HTMLParser):
 
     @property
     def title(self):
-        return self.meta_title.strip() or "".join(self.title_parts).strip() or "".join(self.heading_parts).strip()
+        raw = self.meta_title.strip() or "".join(self.title_parts).strip() or "".join(self.heading_parts).strip()
+        return re.sub(r'(?:-直播吧|_新浪[^_]*_新浪网|_懂球帝|-中新网)$', '', raw).strip() or raw
 
 
 def _jsonld_dates(value):
@@ -164,9 +165,9 @@ def _extract_original(text: str, item: dict, now: datetime) -> SourceArticle:
     return SourceArticle(parser.title or item.get("title", ""), item["url"], item["publisher"], publication, parser.body, tuple(images))
 
 
-def _fetch_text(session, url: str) -> tuple[str, str]:
+def _fetch_text(session, url: str, now: datetime | None = None) -> tuple[str, str]:
     url = canonical_url(url)
-    document = public_json_document(url, session)
+    document = public_json_document(url, session, now=now)
     if document:
         return document
     response = session.get(url, timeout=30, headers={"User-Agent": "FootballInsight/1.0 public-news-reader"})
@@ -208,24 +209,31 @@ def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, ses
         raise ValueError("Collection requires aware now and positive maximum age")
     if not isinstance(config, dict):
         raise ValueError("Source configuration must be an object")
-    session = session or requests.Session()
+    if session is None:
+        session = requests.Session()
+        session.trust_env = False
     accepted: list[SourceArticle] = []
     seen_urls: set[str] = set()
     seen_bodies: set[str] = set()
     attempted_urls: set[str] = set()
+    checked_urls: set[str] = set()
     cutoff = now - timedelta(hours=max_age_hours)
 
     def accept(article):
         if not cutoff <= article.published_at <= now:
             return
-        keywords = config.get('team_keywords', ['蓉城'])
-        if not _valid_original_body(article) or not any(word in article.title + article.body for word in keywords):
+        if not _valid_original_body(article):
             return
+        combined = article.title + '\n' + article.body
+        keywords = config.get('team_keywords', ['蓉城'])
         if config.get('team_catalog'):
-            from .scope import TeamTag, tags_for_text
+            from .scope import TeamTag, is_chinese_overseas_football_news, tags_for_text
             catalog = [TeamTag(**tag) for tag in config['team_catalog']]
-            if not tags_for_text(article.title + '\n' + article.body, catalog):
+            matched_club = any(word in combined for word in keywords) and bool(tags_for_text(combined, catalog))
+            if not matched_club and not is_chinese_overseas_football_news(combined):
                 return
+        elif not any(word in combined for word in keywords):
+            return
         body_hash = hashlib.sha256(" ".join(article.body.split()).encode()).hexdigest()
         if article.url not in seen_urls and body_hash not in seen_bodies:
             seen_urls.add(article.url)
@@ -245,7 +253,7 @@ def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, ses
     available = 0
     for feed in config.get("feeds", [])[:20]:
         try:
-            text, _ = _fetch_text(session, feed["url"])
+            text, _ = _fetch_text(session, feed["url"], now=now)
             entries = list(_feed_entries(text, feed))[:MAX_DOWNLOADS]
             keywords = feed.get('keywords')
             group = [item for item in entries if not keywords or any(word in item.get('title', '') for word in keywords)]
@@ -257,7 +265,7 @@ def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, ses
 
     for listing in config.get('listings', [])[:20]:
         try:
-            text, resolved = _fetch_text(session, listing['url'])
+            text, resolved = _fetch_text(session, listing['url'], now=now)
             group = listing_entries(text, {**listing, 'url': resolved})
             candidates.extend(group)
             candidate_groups.append(group)
@@ -277,16 +285,19 @@ def collect_sources(config: dict, now: datetime, max_age_hours: int = 72, *, ses
             break
         try:
             url = canonical_url(item["url"])
-            if url in attempted_urls or url in seen_urls:
+            if url in checked_urls or url in attempted_urls or url in seen_urls:
                 continue
-            attempted_urls.add(url)
-            route_date = re.search(r'/publish/app/data/(\d{4})/(\d{2})/(\d{2})/', url)
-            if route_date and datetime.strptime('-'.join(route_date.groups()), '%Y-%m-%d').date() < cutoff.date():
-                continue
+            checked_urls.add(url)
+            route_date = re.search(r'/publish/app/data/(\d{4})/(\d{2})/(\d{2})/|/(\d{4})-(\d{2})-(\d{2})/', url)
+            if route_date:
+                parts = [p for p in route_date.groups() if p is not None]
+                if datetime.strptime('-'.join(parts), '%Y-%m-%d').date() < cutoff.date():
+                    continue
             if item.get("published_at") and parse_timestamp(item["published_at"], now) < cutoff:
                 continue
+            attempted_urls.add(url)
             original_attempts += 1
-            text, resolved_url = _fetch_text(session, url)
+            text, resolved_url = _fetch_text(session, url, now=now)
             article = _extract_original(text, {**item, "url": resolved_url}, now)
             original_successes += int(_valid_original_body(article))
             accept(article)

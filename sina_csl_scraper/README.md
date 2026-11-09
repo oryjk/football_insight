@@ -53,22 +53,21 @@ uv run sina-csl-scraper sync-player-goals --season 2026
 
 Axum 仅批量读取本赛季最近十次已完赛实际出场，并随 overview 的 `top_scorers[].recent_goals` 和 rankings 进球分类条目的 `recent_goals` 返回；其他球员榜分类不附带逐场进球。首页与榜单复用同排列表和迷你柱，0 球灰横、有进球红柱，每个榜单共用高度刻度；单场 3 球显示「帽」，点击查看比赛详情，榜单头像继续打开能力详情。未知数据不伪造为零，少于十场不补造。当前官方日历与球队身份映射沿用 `cfl_client.py` 的 2026 配置；扩展其他赛季需先配置映射。
 
-## 今日话题与本地四川话语音
+## 每日话题与云扬语音
+
+每日话题（2026-11-09 起）：一天一期快讯，`topics roundup-update` 每小时把新原文写成「一件事一条」的快讯追加到当天这一期，已发布条目不改写；一期是 `f_i_daily_topic_editions` 里一行、一个 item，ID 由日期决定（追加不改变分享链接和阅读统计）。每天 07:00–23:00 每个整点由 `./update_daily_topics.sh` 调用，语音用 Edge TTS `zh-CN-YunyangNeural`。规则细节见 `AGENTS.md`「今日话题自动更新」。下面关于多篇话题、四川话语音和每半小时运行的说明是 2026-11-09 之前的旧流程，相关命令仍保留。
 
 local233 的安装路径、真实 CPU 基准、私有配置加载和手动运行命令见 [local233 今日话题运行说明](docs/topics-local233.md)。当前采集代码每次从积分榜动态选取中超前三/后三与中甲前二，读取全文后筛选；文章支持多个球队标签，供详情页话题时间线使用。代码验证与实际生产启用状态见项目 FEATURES.md。已有真实批次可用 `topics refresh-audio` 只刷新四川话音频：所有音频成功后才更新数据库，不再调用 LLM、不改原正文和来源。
 
 local233 现已在每天北京时间 **07:00–22:30，每半小时** 检查并更新今日话题，入口为 `./update_daily_topics.sh`，使用 `config/rongcheng-news-auto.json` 持续发现体坛周报与中新网的新原文。每日命令 `topics daily-update --write-db` 只处理比已发布来源更新、且未发布过的材料；正文和每篇音频全部成功后才原子发布，无新文章或失败时保留现有内容。日志在 `data/topics/daily.log`，运行状态在 `data/topics/daily-status.json`，cron 模板在 `deploy/topics-daily.cron.example`。
 
-`topics/` 是独立的新闻生成链路，不混入赛季同步：`sources` 采集原文，`generation` 调用正文 LLM，`tts` 调用本地 Qwen，`pipeline` 负责缓存与音频发布，`repository` 原子写库，`cli` 提供入口。小程序只请求 Rust 读取接口并播放 MinIO 音频。
+`topics/` 是独立的新闻生成链路，不混入赛季同步：`sources` 采集原文，`generation` 调用正文 LLM 生成每天一条足坛动态汇总，`tts` 调用 Edge TTS `zh-CN-YunyangNeural`（`yunyang`），`pipeline` 负责缓存与音频发布，`repository` 原子写库，`cli` 提供入口。Grok Bot 与小程序共用 Rust 读取接口（`/api/v1/daily-topics/latest`、`/api/v1/daily-topics/by-date/{date}` 及 `/api/v1/daily-topics`）。
 
-准备本地 Qwen 推理程序（复用已下载的 0.6B CustomVoice 权重，Mac 使用 Metal）：
+独立合成测试语音：
 
 ```bash
-uv run python scripts/setup_qwen_native.py
 uv run sina-csl-scraper topics tts --text-file /absolute/path/to/narration.txt
 ```
-
-推理的薄原生 helper 位于 `tools/qwen-native`，仅负责模型计算，业务编排全部在 Python。构建产物与隔离后的 any-tts 0.2.0 放在被忽略的 `data/native-qwen`；安装器校验依赖归档 SHA256，并应用仓库内 0.6B 兼容补丁，不改共享 Cargo 缓存。Eric 为四川话音色，使用 `sichuan_dialect`；逐段生成24kHz单声道PCM，检查非静音与削波，再用 ffmpeg 或macOS afconvert 转AAC/m4a。Linux可用 `--device cpu` / `--device cuda` 构建并设置FI_QWEN_DEVICE；权重路径用FI_QWEN_MODEL_PATH覆盖。
 
 正文 LLM 与语音模型是两个模型。将 `.env.topics.example` 复制为本地 `.env.topics`，配置 `FI_TOPIC_LLM_BASE_URL`、`FI_TOPIC_LLM_MODEL` 和密钥；密钥不提交。本项目当前按用户指定使用 Kimi Code API `https://api.kimi.com/coding/v1`、`k3-256k`，使用low推理档位、JSON输出，最多8192输出token；接口兼容 `/chat/completions`。K3始终启用思考，不发送GLM的thinking开关和temperature参数；请求使用真实 `FootballInsight/1.0` 客户端标识。Kimi Code Key 与开放平台 Key 属于不同服务：开放平台地址是 `https://api.moonshot.cn/v1`、对应K3模型标识为 `kimi-k3`，不要混用。HTTP错误仅显示状态/数字错误码，不回显供应商原始报错或密钥。首次运行默认只生成本地文件，上传与入库通过显式开关开启：
 

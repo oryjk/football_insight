@@ -48,7 +48,7 @@ def test_unavailable_audio_setup_keeps_generated_text(tmp_path, monkeypatch, aud
         'publisher': '俱乐部', 'published_at': '2026-10-12T20:00:00+08:00', 'body': '成都蓉城今天进行训练，球员认真准备比赛。' * 15}]}))
     monkeypatch.setenv('FI_TOPIC_LLM_BASE_URL', 'http://localhost:8000/v1')
     monkeypatch.setenv('FI_TOPIC_LLM_MODEL', 'test')
-    monkeypatch.setenv('FI_QWEN_RUNNER', str(tmp_path / 'missing-runner'))
+    monkeypatch.setenv('FI_AUDIO_CONVERTER', str(tmp_path / 'missing-ffmpeg'))
     monkeypatch.delenv('FI_MINIO_ACCESS_KEY', raising=False)
     monkeypatch.delenv('FI_MINIO_SECRET_KEY', raising=False)
     class Generator:

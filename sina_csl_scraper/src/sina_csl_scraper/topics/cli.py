@@ -18,15 +18,16 @@ from .models import SHANGHAI, parse_timestamp
 from .pipeline import NoTopicsError, generate_edition, refresh_edition_audio
 from .pipeline import _atomic_json
 from .repository import TopicRepository
+from .roundup import RoundupGenerator, run_roundup_update
 from .sources import collect_sources
 from .storage import SshMinioTarget
 from .images import TopicImagePublisher
 from .sources import _fetch_text, _extract_original
 import requests
-from .tts import LocalQwenTts, discover_model
+from .tts import DEFAULT_EDGE_VOICE, EdgeYunyangTts
 from .scope import resolve_news_scope, tag_existing_items
 
-app = typer.Typer(no_args_is_help=True, help='采集成都蓉城新闻、生成今日话题和本地四川话播报。')
+app = typer.Typer(no_args_is_help=True, help='采集全联赛及留洋新闻、生成每日一条汇总与 Edge Yunyang 语音播报。')
 
 
 def _now(at: str | None) -> datetime:
@@ -56,19 +57,20 @@ def _write(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
 
 
-def _tts(cache_dir: Path) -> LocalQwenTts:
-    default_runner = Path(__file__).resolve().parents[3] / 'data/native-qwen/bin/football-qwen-tts'
-    runner = Path(os.getenv('FI_QWEN_RUNNER', str(default_runner))).expanduser().resolve()
-    if not runner.is_file():
-        raise ValueError('run uv run python scripts/setup_qwen_native.py first, or set FI_QWEN_RUNNER')
-    timeout = int(os.getenv('FI_QWEN_TIMEOUT_SECONDS', '1200'))
+def _tts(cache_dir: Path) -> EdgeYunyangTts:
+    timeout = int(os.getenv('FI_EDGE_TTS_TIMEOUT_SECONDS', '180'))
     if timeout <= 0:
-        raise ValueError('FI_QWEN_TIMEOUT_SECONDS must be positive')
-    return LocalQwenTts(model_path=discover_model(), runner=runner, cache_dir=cache_dir / 'audio',
-                        converter=os.getenv('FI_AUDIO_CONVERTER'),
-                        timeout=timeout,
-                        device=os.getenv('FI_QWEN_DEVICE', 'metal' if sys.platform == 'darwin' else 'cpu'),
-                        dtype=os.getenv('FI_QWEN_DTYPE', 'bf16'))
+        raise ValueError('FI_EDGE_TTS_TIMEOUT_SECONDS must be positive')
+    converter = os.getenv('FI_AUDIO_CONVERTER')
+    if converter and not Path(converter).expanduser().is_file():
+        raise ValueError('configured FI_AUDIO_CONVERTER does not exist')
+    return EdgeYunyangTts(
+        cache_dir=cache_dir / 'audio',
+        voice=os.getenv('FI_EDGE_TTS_VOICE', DEFAULT_EDGE_VOICE),
+        rate=os.getenv('FI_EDGE_TTS_RATE', '+0%'),
+        converter=converter,
+        timeout=timeout,
+    )
 
 
 def _target() -> MinioAssetTarget | SshMinioTarget:
@@ -123,7 +125,7 @@ def generate(config: Path = typer.Option(..., exists=True, dir_okay=False),
              limit: int = typer.Option(5, min=1, max=5), max_age_hours: int = typer.Option(72, min=1, max=168),
              generate_audio: bool = True, upload_audio: bool = False, write_db: bool = False,
              at: str | None = None) -> None:
-    """Collect -> LLM -> local Qwen -> optional MinIO -> optional atomic database upsert."""
+    """Legacy multi-topic: collect -> LLM -> Edge Yunyang TTS -> optional MinIO -> optional database upsert."""
     try:
         base_url, model = os.getenv('FI_TOPIC_LLM_BASE_URL'), os.getenv('FI_TOPIC_LLM_MODEL')
         if not base_url or not model:
@@ -178,7 +180,7 @@ def daily_update(config: Path = typer.Option(..., exists=True, dir_okay=False),
                  output_dir: Path = Path('data/topics'), team_id: int = typer.Option(77680, min=1),
                  limit: int = typer.Option(5, min=1, max=5), max_age_hours: int = typer.Option(72, min=1, max=168),
                  write_db: bool = False, at: str | None = None) -> None:
-    """Publish fresh news only after every article has verified uploaded audio."""
+    """Legacy multi-topic publication; the hourly cron uses roundup-update."""
     failure = None
 
     def failed_result(error):
@@ -244,6 +246,61 @@ def daily_update(config: Path = typer.Option(..., exists=True, dir_okay=False),
         raise typer.Exit(1) from None
 
 
+@app.command('roundup-update')
+def roundup_update(config: Path = typer.Option(..., exists=True, dir_okay=False),
+                   output_dir: Path = Path('data/topics'), team_id: int = typer.Option(77680, min=1),
+                   max_age_hours: int = typer.Option(24, min=1, max=72),
+                   write_db: bool = False, at: str | None = None) -> None:
+    """每日话题：把新原文写成快讯追加到当天这一期，并重新合成整期语音（每小时由 cron 调用）。"""
+
+    def failed_result(error):
+        return {'status': 'failed', 'error_type': type(error).__name__, 'previous_retained': True,
+                'finished_at': datetime.now(SHANGHAI).isoformat()}
+
+    try:
+        if not write_db:
+            raise ValueError('roundup-update requires explicit --write-db')
+        database_url = os.getenv('FI_DATABASE_URL') or os.getenv('DATABASE_URL')
+        if not database_url:
+            raise ValueError('FI_DATABASE_URL is required')
+        now = _now(at)
+        scope = None
+
+        def generator():
+            base_url, model = os.getenv('FI_TOPIC_LLM_BASE_URL'), os.getenv('FI_TOPIC_LLM_MODEL')
+            if not base_url or not model:
+                raise ValueError('article LLM configuration is missing')
+            return RoundupGenerator(base_url=base_url, model=model, api_key=os.getenv('FI_TOPIC_LLM_API_KEY'),
+                                    team_catalog=list(scope.catalog) if scope else None,
+                                    selected_team_ids=[team.team_id for team in scope.selected] if scope else None)
+
+        with _lock(output_dir):
+            try:
+                repository = TopicRepository(database_url)
+                repository.check_schema()
+                _atomic_json(output_dir / 'daily-status.json', {'status': 'running', 'started_at': now.isoformat()})
+                source_config, scope = _collection_scope(_config(config), now)
+                sources = collect_sources(source_config, now, max_age_hours, require_available=True)
+                result = run_roundup_update(sources, repository=repository, generator_factory=generator,
+                    tts_factory=lambda: _tts(output_dir), target_factory=_target, cache_dir=output_dir,
+                    now=now, team_id=team_id, max_age_hours=max_age_hours,
+                    selected_teams=list(scope.selected) if scope else None)
+                result['finished_at'] = datetime.now(SHANGHAI).isoformat()
+                _atomic_json(output_dir / 'daily-status.json', result)
+            except Exception as error:
+                try:
+                    _atomic_json(output_dir / 'daily-status.json', failed_result(error))
+                except OSError:
+                    pass
+                raise
+        typer.echo(json.dumps({key: value for key, value in result.items() if key != 'sources'}, ensure_ascii=False))
+    except TopicJobBusy:
+        typer.echo(json.dumps({'status': 'already_running', 'previous_retained': True}), err=True)
+    except Exception as error:
+        typer.echo(json.dumps(failed_result(error), ensure_ascii=False), err=True)
+        raise typer.Exit(1) from None
+
+
 @app.command('refresh-tags')
 def refresh_tags(config: Path = typer.Option(..., exists=True, dir_okay=False),
                  team_id: int = typer.Option(77680, min=1), write_db: bool = False) -> None:
@@ -267,12 +324,14 @@ def refresh_tags(config: Path = typer.Option(..., exists=True, dir_okay=False),
 @app.command('tts')
 def tts_command(text_file: Path = typer.Option(..., exists=True, dir_okay=False),
                 output_dir: Path = Path('data/topics')) -> None:
-    """Generate a local Sichuan AAC file without requiring an article LLM."""
+    """Generate a local AAC file without requiring an article LLM."""
     try:
         with _lock(output_dir):
-            audio = _tts(output_dir).synthesize(text_file.read_text(encoding='utf-8'))
+            tts_engine = _tts(output_dir)
+            audio = tts_engine.synthesize(text_file.read_text(encoding='utf-8'))
+        voice = getattr(tts_engine, 'voice', 'eric')
         typer.echo(json.dumps({'path': str(audio.path.resolve()), 'duration_seconds': audio.duration_seconds,
-                              'sha256': audio.sha256, 'voice': 'eric', 'dialect': 'sichuan'}, ensure_ascii=False))
+                              'sha256': audio.sha256, 'voice': voice, 'dialect': 'sichuan'}, ensure_ascii=False))
     except Exception as error:
         typer.echo(f'local TTS failed ({type(error).__name__})', err=True)
         raise typer.Exit(1) from None
@@ -341,7 +400,7 @@ def refresh_audio_command(edition_file: Path = typer.Option(..., exists=True, di
                 TopicRepository(database_url).save(refreshed)
                 database_updated = True
             _write(output_dir / 'latest.json', refreshed['payload'])
-        typer.echo(f'refreshed {len(refreshed["payload"]["items"])} independent Sichuan audio files; existing text and edition identity retained')
+        typer.echo(f'refreshed {len(refreshed["payload"]["items"])} independent audio files; existing text and edition identity retained')
     except Exception as error:
         state = 'database edition updated; local finalization failed' if database_updated else 'previous database edition retained'
         typer.echo(f'audio refresh failed ({type(error).__name__}); {state}', err=True)

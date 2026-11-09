@@ -1,16 +1,8 @@
-# local233 今日话题每日更新与手动运行
+# local233 每日话题更新与手动运行
 
-此链路使用 Kimi Code `k3-256k` 整理真实新闻全文，用本机 Qwen Eric 四川话音色生成每篇独立音频，复用头像/球队 logo 的 `MinioAssetTarget` 上传，再通过 Python 原子 upsert 发布批次。Rust 只读数据库，小程序直接播放 HTTPS MinIO URL。
+> **当前流程（2026-11-09 起）**：cron 每天 07:00–23:00 每个整点运行 `./update_daily_topics.sh --scheduled`，入口 `topics roundup-update`，把新原文写成快讯追加到当天这一期，规则见 `../AGENTS.md`「今日话题自动更新」。手动跑一次（会写生产库）：`./update_daily_topics.sh`。下文关于 `daily-update`、Qwen 四川话语音和每半小时运行的内容是旧流程，保留备查。
 
-## 已安装组件
-
-- CPU：Threadripper 3970X，32 核 / 64 线程；测量时约 233 GiB 可用内存。
-- 模型：`data/models/Qwen3-TTS-12Hz-0.6B-CustomVoice`。
-- 固定快照：`85e237c12c027371202489a0ec509ded67b5e4b5`，13 个文件共 2,498,388,392 字节，两份 safetensors 已按远端 LFS SHA256 校验。模型目录 `.football-snapshot.json` 保存安装校验信息。
-- Runner：`data/native-qwen/bin/football-qwen-tts`，从仓库 `tools/qwen-native` 构建，CPU / f32，Eric + `sichuan_dialect`。安装器校验 any-tts 0.2.0 归档及 0.6B 补丁，不修改共享 Cargo 缓存。
-- AAC：已安装 `ffmpeg` / `ffprobe`。先生成 24kHz 单声道 PCM16，检查非静音和削波，再转换 AAC/m4a。
-
-官方模型与 Eric 音色说明：[Qwen 固定模型快照](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice/blob/85e237c12c027371202489a0ec509ded67b5e4b5/README.md)。这不是拿 Mac Metal 的速度推算 CPU。
+此链路使用 Kimi Code `k3-256k` 将当天多源新闻全文（直播吧、懂球帝、新浪体育、体坛周报、中国新闻网，覆盖中超 16 队、中甲前四/后二及中国留洋球员）整理为**每天一条足坛动态汇总**，用 Edge TTS `zh-CN-YunyangNeural`（`yunyang`）生成音频，复用 `MinioAssetTarget` 上传，再通过 Python 原子更新当天批次写入 `f_i_daily_topic_editions`。Rust 只读数据库，提供 `/api/v1/daily-topics/latest` 与 `/api/v1/daily-topics/by-date/{date}` 供 Grok Bot 和小程序共用。
 
 ## 每日自动更新
 

@@ -52,6 +52,32 @@ class TopicGenerator:
         self.selected_team_ids = set(selected_team_ids or [])
         self.cache_scope = sorted(self.selected_team_ids)
 
+    def _complete(self, system: str, user: dict) -> dict:
+        """One JSON-mode chat completion; provider messages and secrets never leak into errors."""
+        headers = {"Content-Type": "application/json", "User-Agent": "FootballInsight/1.0"}
+        if self.api_key:
+            headers["Authorization"] = "Bearer " + self.api_key
+        body = {"model": self.model, "temperature": 0.2, "response_format": {"type": "json_object"},
+                "messages": [{"role": "system", "content": system},
+                             {"role": "user", "content": json.dumps(user, ensure_ascii=False)}]}
+        if self.model == 'glm-5.3':
+            body.update(thinking={'type': 'enabled'}, reasoning_effort='low', max_tokens=8192, stream=False)
+        elif self.model in {'k3', 'k3-256k', 'kimi-k3'}:
+            # K3 always reasons; it does not use GLM's thinking/sampling switch.
+            body.pop('temperature')
+            body.update(reasoning_effort='low', max_tokens=8192, stream=False)
+        try:
+            response = self.session.post(self.endpoint, headers=headers, timeout=self.timeout, json=body)
+            response.raise_for_status()
+            content = response.json()["choices"][0]["message"]["content"]
+            if not isinstance(content, str) or len(content) > 150_000:
+                raise ValueError
+            return json.loads(content)
+        except requests.HTTPError as error:
+            raise _provider_http_error(error.response) from None
+        except (requests.RequestException, ValueError, TypeError, KeyError, IndexError):
+            raise ValueError("LLM request failed or response was not valid topic JSON") from None
+
     def generate(self, sources: list[SourceArticle], team_id: int, now: datetime, limit: int = 5) -> list[dict]:
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 5:
             raise ValueError("Topic limit must be between 1 and 5")
@@ -80,29 +106,7 @@ class TopicGenerator:
             system += '每篇话题额外输出 team_ids 数组，列出该话题实质讨论的俱乐部 ID，可多选。不为仅作比较或顺带提及的球队打标签。正文使用完整球队名称，标签由程序根据正文和引用原文核验。球队字典：' + json.dumps([t.as_tag() for t in self.team_catalog], ensure_ascii=False)
             if self.selected_team_ids:
                 system += '每篇话题必须实质涉及至少一支本次关注球队：' + json.dumps([t.as_tag() for t in self.team_catalog if t.team_id in self.selected_team_ids], ensure_ascii=False)
-        headers = {"Content-Type": "application/json", "User-Agent": "FootballInsight/1.0"}
-        if self.api_key:
-            headers["Authorization"] = "Bearer " + self.api_key
-        body = {"model": self.model, "temperature": 0.2, "response_format": {"type": "json_object"},
-                "messages": [{"role": "system", "content": system},
-                             {"role": "user", "content": json.dumps({"original_sources": material}, ensure_ascii=False)}]}
-        if self.model == 'glm-5.3':
-            body.update(thinking={'type': 'enabled'}, reasoning_effort='low', max_tokens=8192, stream=False)
-        elif self.model in {'k3', 'k3-256k', 'kimi-k3'}:
-            # K3 always reasons; it does not use GLM's thinking/sampling switch.
-            body.pop('temperature')
-            body.update(reasoning_effort='low', max_tokens=8192, stream=False)
-        try:
-            response = self.session.post(self.endpoint, headers=headers, timeout=self.timeout, json=body)
-            response.raise_for_status()
-            content = response.json()["choices"][0]["message"]["content"]
-            if not isinstance(content, str) or len(content) > 150_000:
-                raise ValueError
-            payload = json.loads(content)
-        except requests.HTTPError as error:
-            raise _provider_http_error(error.response) from None
-        except (requests.RequestException, ValueError, TypeError, KeyError, IndexError):
-            raise ValueError("LLM request failed or response was not valid topic JSON") from None
+        payload = self._complete(system, {"original_sources": material})
         if not isinstance(payload, dict) or set(payload) != {"topics"} or not isinstance(payload["topics"], list) or len(payload["topics"]) > limit:
             raise ValueError("LLM topic batch has invalid structure or exceeds limit")
         articles, seen = [], set()

@@ -7,9 +7,10 @@ import sys
 import pytest
 
 
-@pytest.mark.parametrize('hour,remaining,expected', [('06', 600, None), ('07', 57600, 21600),
-                                                    ('22', 1800, 1800), ('23', 86400, None)])
-def test_scheduled_window_and_end_of_day_timeout(tmp_path, hour, remaining, expected):
+# 每日话题每小时追加一次：07–23 点每个整点都跑，单次不超过 55 分钟。
+@pytest.mark.parametrize('hour,remaining,expected', [('06', 600, None), ('07', 57600, 3300),
+                                                    ('22', 1800, 3300), ('23', 86400, 3300)])
+def test_scheduled_window_and_hourly_timeout(tmp_path, hour, remaining, expected):
     root = Path(__file__).resolve().parents[1]
     script = tmp_path / 'update_daily_topics.sh'
     script.write_bytes((root / 'update_daily_topics.sh').read_bytes()); script.chmod(0o755)
@@ -40,3 +41,4 @@ Path(os.environ['TOPIC_TEST_RESULT']).write_text(json.dumps(sys.argv[1:]))
         args = json.loads(result_path.read_text())
         assert args[1] == f'{expected}s'
         assert '--scheduled' not in args
+        assert 'roundup-update' in args and '--write-db' in args

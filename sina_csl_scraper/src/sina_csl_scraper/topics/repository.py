@@ -33,6 +33,48 @@ class TopicRepository:
                 ''', (edition['id'], payload['team_id'], payload['edition_date'], payload['updated_at'],
                       Jsonb(payload), edition['source_fingerprint'], edition['generator_version']))
 
+    def roundup_for_date(self, team_id: int, edition_date: str) -> dict | None:
+        """当天这一期每日话题（一天一行，ID 由日期决定），没有则 None。"""
+        from .roundup import roundup_edition_id
+        edition_id = roundup_edition_id(team_id, edition_date)
+        with psycopg.connect(self.database_url) as connection:
+            row = connection.execute('''SELECT id, source_fingerprint, generator_version, payload
+                FROM f_i_daily_topic_editions WHERE id = %s AND team_id = %s''', (edition_id, team_id)).fetchone()
+        if row is None:
+            return None
+        return {'id': row[0], 'source_fingerprint': row[1], 'generator_version': row[2], 'payload': row[3]}
+
+    def save_roundup(self, edition: dict) -> None:
+        """原地更新当天这一行；不删除任何其他批次，保留历史和阅读统计。"""
+        payload = edition['payload']
+        items = payload['items']
+        if len(items) != 1 or not items[0].get('entries'):
+            raise ValueError('a daily roundup edition holds exactly one item with entries')
+        with psycopg.connect(self.database_url) as connection:
+            connection.execute('''
+                INSERT INTO f_i_daily_topic_editions
+                  (id, team_id, edition_date, published_at, payload, source_fingerprint, generator_version)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET
+                  published_at = EXCLUDED.published_at,
+                  payload = EXCLUDED.payload,
+                  source_fingerprint = EXCLUDED.source_fingerprint,
+                  generator_version = EXCLUDED.generator_version
+            ''', (edition['id'], payload['team_id'], payload['edition_date'], payload['updated_at'],
+                  Jsonb(payload), edition['source_fingerprint'], edition['generator_version']))
+
+    def roundup_sources(self, team_id: int) -> set[str]:
+        """每日话题用过的原文。旧版多篇话题不参与：它们不再生成，也不该挡住当天快讯。"""
+        with psycopg.connect(self.database_url) as connection:
+            rows = connection.execute('''
+                SELECT DISTINCT source->>'url'
+                FROM f_i_daily_topic_editions
+                CROSS JOIN LATERAL jsonb_array_elements(payload->'items') AS item
+                CROSS JOIN LATERAL jsonb_array_elements(item->'sources') AS source
+                WHERE team_id = %s AND generator_version LIKE 'daily-roundup-%%'
+            ''', (team_id,)).fetchall()
+        return {canonical_url(url) for (url,) in rows if url}
+
     def published_sources(self, team_id: int) -> tuple[set[str], datetime | None]:
         """Use publication history as the durable deduplication baseline."""
         with psycopg.connect(self.database_url) as connection:

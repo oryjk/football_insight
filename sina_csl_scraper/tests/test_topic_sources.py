@@ -257,3 +257,77 @@ def test_weibo_captures_only_complete_post_with_absolute_time():
                                 datetime.fromisoformat('2026-10-13T08:00:00+08:00'))
     assert article.body == '成都蓉城希拉谷对阵青岛红狮。'
     assert article.published_at.isoformat() == '2026-10-10T15:38:38+08:00'
+
+
+def test_zhibo8_and_dongqiudi_article_extraction():
+    from sina_csl_scraper.topics.sources import _extract_original
+    from datetime import datetime
+    now = datetime.fromisoformat('2026-11-09T12:00:00+08:00')
+    zhibo8_html = (
+        '<title>鲁媒：山东泰山外援马德鲁加完成告别战-直播吧</title>'
+        '<div class="title" ms-controller="title_controller">2026-11-09 10:15:00</div>'
+        '<div id="signals"><p>山东泰山外援马德鲁加完成了本赛季最后一场比赛。</p>'
+        '<p>目前俱乐部正在评估下赛季外援配置与续约事宜。</p></div>'
+    )
+    zb_article = _extract_original(
+        zhibo8_html,
+        {'url': 'https://news.zhibo8.com/zuqiu/2026-11-09/690abc.htm', 'publisher': '直播吧'},
+        now,
+    )
+    assert zb_article.title == '鲁媒：山东泰山外援马德鲁加完成告别战'
+    assert zb_article.published_at.isoformat() == '2026-11-09T10:15:00+08:00'
+    assert '马德鲁加完成了本赛季最后一场比赛' in zb_article.body
+
+    dqd_html = (
+        '<title>浙江队与门将赵博商讨续约_懂球帝</title>'
+        '<meta property="article:published_time" content="2026-11-09 11:20:00">'
+        '<article class="dqd-article"><p>浙江队正在和门将赵博就续约问题进行商讨，双方预计达成一份一加一合同。</p></article>'
+    )
+    dqd_article = _extract_original(
+        dqd_html,
+        {'url': 'https://m.dongqiudi.com/article/5512345.html', 'publisher': '懂球帝'},
+        now,
+    )
+    assert dqd_article.title == '浙江队与门将赵博商讨续约'
+    assert dqd_article.published_at.isoformat() == '2026-11-09T11:20:00+08:00'
+    assert '双方预计达成一份一加一合同' in dqd_article.body
+
+
+def test_zhibo8_rolling_respects_explicit_at_date_and_overseas_player_scope():
+    from datetime import datetime
+    from sina_csl_scraper.topics.publishers import public_json_document
+    from sina_csl_scraper.topics.sources import collect_sources
+
+    now = datetime.fromisoformat('2026-10-20T12:00:00+08:00')
+    requested_urls = []
+
+    class RollingSession:
+        def get(self, url, **kwargs):
+            requested_urls.append(url)
+            class Resp:
+                status_code = 200
+                text = '{"video_arr":[{"lable":"留洋,中国足球","url":"/zuqiu/2026-10-20/overseas1.htm","title":"王钰栋留洋探讨合同细节"}]}'
+                def raise_for_status(self): pass
+            return Resp()
+
+    html, _ = public_json_document('https://news.zhibo8.com/zuqiu/json/rolling.json', RollingSession(), now=now)
+    assert requested_urls == [
+        'https://news.zhibo8.com/zuqiu/json/2026-10-20.htm',
+        'https://news.zhibo8.com/zuqiu/json/2026-10-19.htm',
+    ]
+    assert 'https://news.zhibo8.com/zuqiu/2026-10-20/overseas1.htm' in html
+
+    config = {
+        'team_keywords': ['蓉城'],
+        'team_catalog': [{'team_id': 77680, 'name': '成都蓉城'}],
+        'imports': [{
+            'title': '王钰栋即将开启留洋生涯',
+            'url': 'https://news.zhibo8.com/zuqiu/2026-10-20/overseas1.htm',
+            'publisher': '直播吧',
+            'published_at': '2026-10-20T10:00:00+08:00',
+            'body': '中国国脚王钰栋即将开启留洋生涯，目前正在和中日德兰队探讨合同和转会细节。' * 5,
+        }],
+    }
+    collected = collect_sources(config, now)
+    assert len(collected) == 1
+    assert '王钰栋' in collected[0].title

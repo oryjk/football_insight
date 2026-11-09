@@ -1,4 +1,3 @@
-import json
 import math
 import struct
 import wave
@@ -6,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from sina_csl_scraper.topics.tts import LocalQwenTts, split_narration, validate_wav
+from sina_csl_scraper.topics.tts import EdgeYunyangTts, split_narration, validate_wav
 
 
 def write_voice(path: Path, silent: bool = False) -> None:
@@ -33,37 +32,8 @@ def test_invalid_or_silent_wave_cannot_be_published(tmp_path):
     assert validate_wav(path) == 1.0
 
 
-def test_local_qwen_receives_eric_sichuan_and_reuses_verified_cache(tmp_path):
-    model = tmp_path / 'model'
-    model.mkdir()
-    (model / 'config.json').write_text('{}')
-    calls = []
-
-    def run(args, **kwargs):
-        calls.append(args)
-        if args[0] == 'qwen-runner':
-            request = json.loads(Path(args[2]).read_text())
-            assert request['voice'] == 'eric'
-            assert request['language'] == 'sichuan_dialect'
-            assert request['parts'] == ['蓉城雄起！']
-            write_voice(Path(args[3]))
-        else:
-            Path(args[-1]).write_bytes(b'valid-aac-container')
-
-    tts = LocalQwenTts(model_path=model, runner=Path('qwen-runner'), cache_dir=tmp_path / 'cache', converter='ffmpeg', run=run)
-    first = tts.synthesize('蓉城雄起！')
-    second = tts.synthesize('蓉城雄起！')
-    assert first == second
-    assert first.duration_seconds == 1.0
-    assert first.path.suffix == '.m4a'
-    assert len(calls) == 2
-    first.path.write_bytes(b'corrupted')
-    tts.synthesize('蓉城雄起！')
-    assert len(calls) == 4
-
-
 def test_tts_rejects_unbounded_or_blank_input_before_starting_process(tmp_path):
-    tts = LocalQwenTts(model_path=tmp_path, runner=Path('missing'), cache_dir=tmp_path)
+    tts = EdgeYunyangTts(cache_dir=tmp_path, converter='ffmpeg')
     for value in ['', ' ' * 20, '蓉' * 6001]:
         with pytest.raises(ValueError):
             tts.synthesize(value)
@@ -76,3 +46,43 @@ def test_many_paragraphs_fit_native_segment_capacity_without_losing_words():
     parts = split_narration(text)
     assert ''.join(parts) == text.replace('\n', '')
     assert len(parts) <= 60
+
+
+def test_edge_yunyang_tts_synthesizes_valid_wav_caches_m4a_and_retries_transient_failure(tmp_path):
+    calls = []
+    attempts = 0
+
+    def run(args, **kwargs):
+        calls.append(args)
+        if '-ar' in args and '24000' in args:
+            write_voice(Path(args[-1]))
+        else:
+            Path(args[-1]).write_bytes(b'valid-edge-aac')
+
+    def synthesize_mp3(text: str, voice: str, rate: str, mp3_path: Path, timeout: int) -> None:
+        nonlocal attempts
+        attempts += 1
+        calls.append(['edge_tts', text, voice, rate])
+        if attempts == 1:
+            raise RuntimeError('transient network error')
+        mp3_path.write_bytes(b'fake-mp3-audio')
+
+    tts = EdgeYunyangTts(
+        cache_dir=tmp_path / 'cache',
+        converter='ffmpeg',
+        run=run,
+        synthesize_mp3=synthesize_mp3,
+        max_retries=3,
+        retry_delay=0.0,
+    )
+    assert tts.voice == 'zh-CN-YunyangNeural'
+    first = tts.synthesize('成都蓉城今日备战动态。')
+    second = tts.synthesize('成都蓉城今日备战动态。')
+    assert first == second
+    assert first.duration_seconds == 1.0
+    assert first.path.suffix == '.m4a'
+    assert attempts == 2
+    assert len(calls) == 4  # 2 edge_tts attempts + ffmpeg wav + ffmpeg m4a; second call hits cache
+    first.path.write_bytes(b'corrupted')
+    tts.synthesize('成都蓉城今日备战动态。')
+    assert attempts == 3
