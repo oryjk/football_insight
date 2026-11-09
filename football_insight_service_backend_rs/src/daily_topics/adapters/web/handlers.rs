@@ -22,7 +22,7 @@ pub(super) async fn get_daily_topics(
     let query = parameters.try_into().map_err(|_| {
         (
             StatusCode::BAD_REQUEST,
-            "team_id must be positive and limit must be between 1 and 5",
+            "team_id must be positive and limit must be between 1 and 20",
         )
     })?;
     let result = use_case.execute(query).await.map_err(|error| {
@@ -32,6 +32,40 @@ pub(super) async fn get_daily_topics(
             "daily topics are temporarily unavailable",
         )
     })?;
+    Ok(Json(result.into()))
+}
+
+pub(super) async fn get_latest_daily_topic(
+    State(use_case): State<Arc<GetDailyTopics>>,
+    parameters: Result<Query<TopicDetailParameters>, QueryRejection>,
+) -> Result<Json<DailyTopicsResponse>, (StatusCode, &'static str)> {
+    let Query(parameters) = parameters.map_err(|_| invalid_parameters())?;
+    if parameters.team_id <= 0 {
+        return Err(invalid_parameters());
+    }
+    let result = use_case
+        .latest(parameters.team_id)
+        .await
+        .map_err(storage_failure)?;
+    Ok(Json(result.into()))
+}
+
+pub(super) async fn get_daily_topic_by_date(
+    State(use_case): State<Arc<GetDailyTopics>>,
+    Path(date_str): Path<String>,
+    parameters: Result<Query<TopicDetailParameters>, QueryRejection>,
+) -> Result<Json<DailyTopicsResponse>, (StatusCode, &'static str)> {
+    let Query(parameters) = parameters.map_err(|_| invalid_parameters())?;
+    if parameters.team_id <= 0 {
+        return Err(invalid_parameters());
+    }
+    let date = chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+        .map_err(|_| (StatusCode::BAD_REQUEST, "date must be YYYY-MM-DD"))?;
+    let result = use_case
+        .by_date(parameters.team_id, date)
+        .await
+        .map_err(storage_failure)?
+        .ok_or((StatusCode::NOT_FOUND, "daily roundup not found for date"))?;
     Ok(Json(result.into()))
 }
 

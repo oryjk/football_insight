@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use super::handlers::{
-    get_daily_topics, get_topic_detail, get_topic_history, get_topic_timeline, record_topic_visit,
+    get_daily_topic_by_date, get_daily_topics, get_latest_daily_topic, get_topic_detail,
+    get_topic_history, get_topic_timeline, record_topic_visit,
 };
 use crate::daily_topics::application::get_daily_topics::GetDailyTopics;
 use axum::{
@@ -12,6 +13,11 @@ use axum::{
 pub fn daily_topics_routes(use_case: Arc<GetDailyTopics>) -> Router {
     Router::new()
         .route("/api/v1/daily-topics", get(get_daily_topics))
+        .route("/api/v1/daily-topics/latest", get(get_latest_daily_topic))
+        .route(
+            "/api/v1/daily-topics/by-date/{date}",
+            get(get_daily_topic_by_date),
+        )
         .route("/api/v1/daily-topics/history", get(get_topic_history))
         .route("/api/v1/daily-topics/{id}", get(get_topic_detail))
         .route(

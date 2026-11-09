@@ -132,6 +132,67 @@ impl GetDailyTopics {
         })
     }
 
+    pub async fn latest(
+        &self,
+        team_id: i64,
+    ) -> Result<DailyTopicsView, DailyTopicsRepositoryError> {
+        let Some(mut edition) = self.repository.latest_for_team(team_id).await? else {
+            return Ok(DailyTopicsView {
+                team_id,
+                edition_date: None,
+                updated_at: None,
+                items: Vec::new(),
+            });
+        };
+        if edition.team_id != team_id || edition.items.iter().any(|item| item.team_id != team_id) {
+            return Err(DailyTopicsRepositoryError::InvalidEdition);
+        }
+        for item in &mut edition.items {
+            normalize_audio(&mut item.audio);
+            normalize_images(item);
+            normalize_tags(item);
+        }
+        self.attach_heat(team_id, &mut edition.items).await;
+        Ok(DailyTopicsView {
+            team_id: edition.team_id,
+            edition_date: Some(edition.edition_date),
+            updated_at: Some(edition.published_at),
+            items: edition.items,
+        })
+    }
+
+    pub async fn by_date(
+        &self,
+        team_id: i64,
+        edition_date: chrono::NaiveDate,
+    ) -> Result<Option<DailyTopicsView>, DailyTopicsRepositoryError> {
+        let Some(mut edition) = self
+            .repository
+            .edition_for_date(team_id, edition_date)
+            .await?
+        else {
+            return Ok(None);
+        };
+        if edition.team_id != team_id
+            || edition.edition_date != edition_date
+            || edition.items.iter().any(|item| item.team_id != team_id)
+        {
+            return Err(DailyTopicsRepositoryError::InvalidEdition);
+        }
+        for item in &mut edition.items {
+            normalize_audio(&mut item.audio);
+            normalize_images(item);
+            normalize_tags(item);
+        }
+        self.attach_heat(team_id, &mut edition.items).await;
+        Ok(Some(DailyTopicsView {
+            team_id: edition.team_id,
+            edition_date: Some(edition.edition_date),
+            updated_at: Some(edition.published_at),
+            items: edition.items,
+        }))
+    }
+
     pub async fn history(
         &self,
         query: TopicHistoryQuery,

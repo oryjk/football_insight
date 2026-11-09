@@ -27,8 +27,20 @@ pub struct DailyTopic {
     pub published_at: DateTime<FixedOffset>,
     pub sources: Vec<DailyTopicSource>,
     pub images: Vec<DailyTopicImage>,
+    /// 每日话题的快讯条目（新到旧）；旧版多篇话题为空。
+    pub entries: Vec<DailyTopicEntry>,
     pub audio: DailyTopicAudio,
     pub heat: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct DailyTopicEntry {
+    pub id: String,
+    pub title: String,
+    pub text: String,
+    pub published_at: DateTime<FixedOffset>,
+    pub sources: Vec<DailyTopicSource>,
+    pub team_tags: Vec<DailyTopicTag>,
 }
 
 #[derive(Debug, Clone)]

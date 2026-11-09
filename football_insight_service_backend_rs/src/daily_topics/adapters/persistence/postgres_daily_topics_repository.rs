@@ -160,6 +160,42 @@ impl DailyTopicsRepository for PostgresDailyTopicsRepository {
         }))
     }
 
+    async fn edition_for_date(
+        &self,
+        team_id: i64,
+        edition_date: NaiveDate,
+    ) -> Result<Option<DailyTopicEdition>, DailyTopicsRepositoryError> {
+        let row = sqlx::query(
+            "SELECT team_id, edition_date, published_at, payload FROM f_i_daily_topic_editions WHERE team_id = $1 AND edition_date = $2 ORDER BY published_at DESC, id DESC LIMIT 1"
+        )
+        .bind(team_id)
+        .bind(edition_date)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|error| {
+            tracing::error!(%error, team_id, %edition_date, "daily topics by-date query failed");
+            DailyTopicsRepositoryError::Unavailable
+        })?;
+        let Some(row) = row else {
+            return Ok(None);
+        };
+        let team_id: i64 = row.try_get("team_id").map_err(invalid_row)?;
+        let edition_date: NaiveDate = row.try_get("edition_date").map_err(invalid_row)?;
+        let published_at: DateTime<Utc> = row.try_get("published_at").map_err(invalid_row)?;
+        let payload: serde_json::Value = row.try_get("payload").map_err(invalid_row)?;
+        let payload: StoredPayload = serde_json::from_value(payload).map_err(|error| {
+            tracing::error!(%error, team_id, %edition_date, "invalid daily topics payload");
+            DailyTopicsRepositoryError::InvalidEdition
+        })?;
+        let shanghai = FixedOffset::east_opt(8 * 3600).expect("valid Shanghai offset");
+        Ok(Some(DailyTopicEdition {
+            team_id,
+            edition_date,
+            published_at: published_at.with_timezone(&shanghai),
+            items: payload.items.into_iter().map(Into::into).collect(),
+        }))
+    }
+
     async fn recent_for_team(
         &self,
         team_id: i64,

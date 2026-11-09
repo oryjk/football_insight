@@ -8,8 +8,8 @@ use crate::daily_topics::domain::{
         TopicPosition,
     },
     edition::{
-        AudioStatus, DailyTopic, DailyTopicAudio, DailyTopicImage, DailyTopicSource,
-        DailyTopicsView,
+        AudioStatus, DailyTopic, DailyTopicAudio, DailyTopicEntry, DailyTopicImage,
+        DailyTopicSource, DailyTopicsView,
     },
     query::{DailyTopicsQuery, InvalidDailyTopicsQuery},
 };
@@ -56,8 +56,33 @@ pub(super) struct DailyTopicDto {
     published_at: DateTime<FixedOffset>,
     sources: Vec<DailyTopicSourceDto>,
     images: Vec<DailyTopicImageDto>,
+    /// 每日话题快讯条目，新到旧；旧版多篇话题为空数组。
+    entries: Vec<DailyTopicEntryDto>,
     audio: DailyTopicAudioDto,
     heat: u64,
+}
+
+#[derive(Serialize)]
+struct DailyTopicEntryDto {
+    id: String,
+    title: String,
+    text: String,
+    published_at: DateTime<FixedOffset>,
+    sources: Vec<DailyTopicSourceDto>,
+    team_tags: Vec<TopicTagDto>,
+}
+
+impl From<DailyTopicEntry> for DailyTopicEntryDto {
+    fn from(value: DailyTopicEntry) -> Self {
+        Self {
+            id: value.id,
+            title: value.title,
+            text: value.text,
+            published_at: value.published_at,
+            sources: value.sources.into_iter().map(Into::into).collect(),
+            team_tags: value.team_tags.into_iter().map(Into::into).collect(),
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -206,7 +231,7 @@ fn history_limit() -> usize {
 #[derive(Deserialize)]
 pub(super) struct TopicDetailParameters {
     #[serde(default = "default_team")]
-    team_id: i64,
+    pub(super) team_id: i64,
 }
 
 impl TopicDetailParameters {
@@ -317,6 +342,7 @@ impl From<DailyTopic> for DailyTopicDto {
             published_at: value.published_at,
             sources: value.sources.into_iter().map(Into::into).collect(),
             images: value.images.into_iter().map(Into::into).collect(),
+            entries: value.entries.into_iter().map(Into::into).collect(),
             audio: value.audio.into(),
             heat: value.heat,
         }

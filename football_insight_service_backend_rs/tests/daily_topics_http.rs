@@ -91,6 +91,7 @@ fn edition() -> DailyTopicEdition {
                 team_id: 77680,
                 heat: 0,
                 images: Vec::new(),
+                entries: Vec::new(),
                 title: format!("隔离测试文章 {index}"),
                 summary: "测试摘要".into(),
                 paragraphs: vec!["第一段".into(), "第二段".into()],
@@ -290,7 +291,7 @@ async fn invalid_parameters_are_bad_requests_before_any_database_read() {
         "team_id=",
         "team_id=9223372036854775808",
         "limit=0",
-        "limit=6",
+        "limit=21",
         "limit=-1",
         "limit=x",
         "limit=",
@@ -302,7 +303,13 @@ async fn invalid_parameters_are_bad_requests_before_any_database_read() {
 
 #[tokio::test]
 async fn default_limit_is_five_and_requested_limit_is_respected() {
-    for (query, count) in [("", 5), ("?limit=1", 1), ("?limit=3", 3), ("?limit=5", 5)] {
+    for (query, count) in [
+        ("", 5),
+        ("?limit=1", 1),
+        ("?limit=3", 3),
+        ("?limit=5", 5),
+        ("?limit=10", 7),
+    ] {
         let (status, body) = get(
             app(Some(edition()), false),
             &format!("/api/v1/daily-topics{query}"),
@@ -338,7 +345,7 @@ async fn public_contract_preserves_content_sources_and_audio_without_data_wrappe
         body["items"][0],
         json!({
             "id":"0000000000000000000000000000000000000000000000000000000000000000",
-            "team_id":77680,"team_tags":[],"heat":0,"images":[],"title":"隔离测试文章 0","summary":"测试摘要",
+            "team_id":77680,"team_tags":[],"heat":0,"images":[],"entries":[],"title":"隔离测试文章 0","summary":"测试摘要",
             "paragraphs":["第一段","第二段"],"published_at":"2026-10-13T08:30:00+08:00",
             "sources":[{"title":"测试来源","url":"https://example.com/original","publisher":"测试媒体","published_at":"2026-10-12T20:00:00+08:00"}],
             "audio":{"status":"ready","url":"https://example.com/audio.m4a","dialect":"sichuan","duration_seconds":60.0}
@@ -537,4 +544,24 @@ async fn image_provenance_applies_to_home_history_and_detail() {
         assert_eq!(topic["images"][0]["width"], 640);
         assert_eq!(topic["audio"]["status"], "ready");
     }
+}
+
+#[tokio::test]
+async fn latest_and_by_date_endpoints_return_daily_roundup_and_validate_dates() {
+    let app = app(Some(edition()), false);
+    let (status, latest) = get(app.clone(), "/api/v1/daily-topics/latest").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(latest["edition_date"], "2026-10-13");
+    assert_eq!(latest["items"].as_array().unwrap().len(), 7);
+
+    let (status, by_date) = get(app.clone(), "/api/v1/daily-topics/by-date/2026-10-13").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(by_date["edition_date"], "2026-10-13");
+    assert_eq!(by_date["items"], latest["items"]);
+
+    let (status, _) = get(app.clone(), "/api/v1/daily-topics/by-date/2026-10-14").await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+
+    let (status, _) = get(app, "/api/v1/daily-topics/by-date/not-a-date").await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
 }

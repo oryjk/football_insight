@@ -4,7 +4,7 @@
 
 ## API
 
-`GET /api/v1/daily-topics?team_id=77680&limit=5`，沿用现有首页 API 的直接 JSON 响应（不新增 data 包装）：
+`GET /api/v1/daily-topics?team_id=77680&limit=5`（`limit` 支持 `1..20`，默认 `5`；小程序首页默认取 5 条，Grok Bot / 公众号专辑拉取可传 `limit=10` 或 `limit=15`），沿用现有首页 API 的直接 JSON 响应（不新增 data 包装）：
 
 ```json
 {
@@ -39,6 +39,17 @@
 
 图片元数据存入现有 JSONB，不新增表或迁移、不参与文章 ID/来源指纹计算。Rust 独立过滤异常可选图片记录，首页/历史/详情使用一致字段；小程序在正文前集中轮播话题配图，不自动轮播，不显示图片出处，支持左右滑动与点击预览；文末新闻来源继续保留。`refresh-images --write-db` 仅对已发布文章补图，行锁内更新图片，保留并发音频更新、发布时间、正文和独立热度统计。
 
+### 每日话题条目 `entries`
+
+每日话题（2026-11-09 起）一天一个 item，`entries` 是快讯条目，按原文时间新到旧：
+`{id, title, text, published_at, sources:[同 sources 结构], team_tags:[{team_id,name}]}`。旧版多篇话题的 `entries` 为空数组。
+后端逐条校验，畸形条目跳过、不影响整篇。新版小程序有 `entries` 时按快讯流显示；旧版小程序继续读 `title`/`summary`/`paragraphs`（由条目拼出）。
+
+### 最新汇总与按日期查汇总（Bot 与小程序共用）
+
+- `GET /api/v1/daily-topics/latest?team_id=77680`：返回最新已发布批次的每日汇总（同 `DailyTopicsResponse` 结构，每天 1 条汇总）。
+- `GET /api/v1/daily-topics/by-date/{date}?team_id=77680`（`date` 格式为 `YYYY-MM-DD`，如 `2026-11-09`）：返回指定日期的每日汇总；若该日期尚未发布则返回 404，日期格式非法返回 400。
+
 ### 历史与详情
 
 - `GET /api/v1/daily-topics/history?team_id=77680&limit=20&cursor=...`：limit 为 1..50，cursor 首次省略。返回 `{team_id, items, next_cursor, has_more}`，items 沿用原文章字段；下一页原样传回 next_cursor，无下一页则 null/false。按文章 published_at DESC、id ASC 排序，重复 ID 选择最新批次版本后再分页，游标绑定球队。
@@ -47,7 +58,9 @@
 
 ## Python 存储约定
 
-每日更新运行在 local233，由用户 crontab 每天北京时间 07:00–22:30 每半小时执行 `sina_csl_scraper/update_daily_topics.sh --scheduled`，23:00 截止自动运行，自动来源为 `config/rongcheng-news-auto.json`。每次执行读取新浪当前赛季中超/中甲积分榜，选中超前三/后三与中甲前二；参赛数量按两联赛双循环赛程的轮数校验，榜单缺行、重复或赛季异常时失败并保留原内容。球队名单不写死。
+每日更新运行在 local233，由用户 crontab 每天北京时间 07:00–23:00 每个整点执行 `sina_csl_scraper/update_daily_topics.sh --scheduled`（`topics roundup-update`），自动来源为 `config/rongcheng-news-auto.json`（覆盖直播吧、懂球帝、新浪体育、体坛周报、中国新闻网体育四组公开新闻源）。每次执行读取新浪当前赛季中超/中甲积分榜，选中超 16 队与中甲前四/后二，并包含中国留洋球员动态；每次只把没用过的新原文交给大模型写成「一件事一条」的快讯（直接说结果，传闻明确标明），追加到当天这一期；已发布条目不改写，也不删除任何其他批次。详见 `sina_csl_scraper/AGENTS.md`「今日话题自动更新」。
+
+语音合成统一使用 **Edge TTS `zh-CN-YunyangNeural`（`yunyang`）**（`EdgeYunyangTts`），合成后转为 24kHz 单声道 WAV 校验非静音，再编码为 AAC `.m4a` 上传 MinIO；`audio.dialect` 字段保持 `"sichuan"` 以兼容线上已过审小程序客户端直接播放。
 
 列表不要求标题含球队名，抓取完整原文后按俱乐部全称、常用简称与足球上下文筛选；最近 72 小时及真实原文发布时间校验保留。不同来源交错分配最多 90 次原文下载机会，避免综合体育 RSS 耗尽额度。已发布原文链接去重，不再设置全局发布时间水位，因此旧查询快照时间不会阻挡未使用过的近期新闻。无新文章、空生成或生成/语音/上传/数据库失败均保留原有批次；全部语音 ready 后才原子发布。待处理材料每次重试按当前关注球队重筛，生成缓存纳入当前关注 ID，避免排名变化后发布旧关注范围的缓存正文。
 

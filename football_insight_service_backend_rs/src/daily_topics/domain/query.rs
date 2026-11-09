@@ -8,7 +8,7 @@ pub struct DailyTopicsQuery {
 pub enum InvalidDailyTopicsQuery {
     #[error("team_id must be a positive integer")]
     TeamId,
-    #[error("limit must be between 1 and 5")]
+    #[error("limit must be between 1 and 20")]
     Limit,
 }
 
@@ -17,7 +17,7 @@ impl DailyTopicsQuery {
         if team_id <= 0 {
             return Err(InvalidDailyTopicsQuery::TeamId);
         }
-        if !(1..=5).contains(&limit) {
+        if !(1..=20).contains(&limit) {
             return Err(InvalidDailyTopicsQuery::Limit);
         }
         Ok(Self { team_id, limit })

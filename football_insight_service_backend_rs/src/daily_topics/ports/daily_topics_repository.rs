@@ -57,6 +57,17 @@ pub trait DailyTopicsRepository: Send + Sync {
         team_id: i64,
     ) -> Result<Option<DailyTopicEdition>, DailyTopicsRepositoryError>;
 
+    async fn edition_for_date(
+        &self,
+        team_id: i64,
+        edition_date: chrono::NaiveDate,
+    ) -> Result<Option<DailyTopicEdition>, DailyTopicsRepositoryError> {
+        Ok(self
+            .latest_for_team(team_id)
+            .await?
+            .filter(|edition| edition.edition_date == edition_date))
+    }
+
     async fn recent_for_team(
         &self,
         team_id: i64,
