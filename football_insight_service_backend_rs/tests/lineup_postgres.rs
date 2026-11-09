@@ -200,7 +200,7 @@ async fn concurrent_first_saves_keep_one_row_and_one_share_code() {
 
 #[tokio::test]
 #[ignore = "requires LINEUP_TEST_DATABASE_URL pointing to a disposable local *_test database"]
-async fn squad_members_include_former_players_and_exclude_other_teams() {
+async fn known_players_cover_every_team_and_former_players() {
     let db = setup().await;
     let repo = PostgresLineupRepository::new(db.pool.clone());
     sqlx::raw_sql(
@@ -209,9 +209,10 @@ async fn squad_members_include_former_players_and_exclude_other_teams() {
     .execute(&db.pool)
     .await
     .unwrap();
-    let mut found = repo.squad_members(1, &[10, 11, 12, 99]).await.unwrap();
+    // 阵容可以选其他球队的球员：任意球队名单里的现役和前队员都算，库里没有的不算。
+    let mut found = repo.known_players(&[10, 11, 12, 99]).await.unwrap();
     found.sort();
-    assert_eq!(found, vec![10, 11]);
+    assert_eq!(found, vec![10, 11, 12]);
     teardown(db).await;
 }
 

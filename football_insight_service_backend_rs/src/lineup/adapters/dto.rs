@@ -61,6 +61,37 @@ impl From<SquadPlayer> for PlayerDto {
     }
 }
 
+/// 跨队查询的球员：多带所在球队。
+#[derive(Serialize)]
+pub(super) struct ClubPlayerDto {
+    #[serde(flatten)]
+    player: PlayerDto,
+    team: Option<ClubDto>,
+}
+
+#[derive(Serialize)]
+pub(super) struct ClubDto {
+    team_id: i64,
+    team_name: String,
+}
+
+impl From<SquadPlayer> for ClubPlayerDto {
+    fn from(player: SquadPlayer) -> Self {
+        Self {
+            team: player.club.clone().map(|club| ClubDto {
+                team_id: club.team_id,
+                team_name: club.team_name,
+            }),
+            player: player.into(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub(super) struct PlayersResponse {
+    pub players: Vec<ClubPlayerDto>,
+}
+
 impl From<Squad> for SquadResponse {
     fn from(squad: Squad) -> Self {
         Self {

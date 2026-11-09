@@ -9,9 +9,12 @@ export function canShareLineup(slots: Array<{ player_id: number | null }>): bool
   return slots.length === 11 && slots.every(slot => slot.player_id !== null) && new Set(slots.map(slot => slot.player_id)).size === 11
 }
 export function publicPitch(lineup: PublicLineup) {
+  // 带 team 的是其他球队的球员，单独作为 extras 传入，球场上显示队名角标。
+  const own = lineup.players.filter(player => !player.team)
+  const outsiders = lineup.players.filter(player => player.team).map(player => ({ ...player, team: player.team! }))
   return buildPitchPlayers(lineup.slots, lineup.formation, {
-    team: lineup.team, active: lineup.players.filter(player => !player.former), former: lineup.players.filter(player => player.former),
-  })
+    team: lineup.team, active: own.filter(player => !player.former), former: own.filter(player => player.former),
+  }, outsiders)
 }
 export function lineupSharePayload(lineup: PublicLineup, imageUrl = '') {
   return { title: `${lineup.author.display_name}心中的${lineup.team.team_name} · ${lineup.formation}`, path: buildLineupViewUrl(lineup.share_code, true), ...(imageUrl ? { imageUrl } : {}) }
@@ -26,7 +29,7 @@ function clippedLabel(value: string, limit: number): string {
   const chars = Array.from(value)
   return chars.length > limit ? chars.slice(0, limit - 1).join('') + '…' : value
 }
-const palette = { paper: '#ffffff', ink: '#15161b', muted: '#6d7280', grass: '#28734f', alternate: '#2d7c56', line: '#a8c9b6', red: '#d92537' }
+const palette = { paper: '#ffffff', ink: '#15161b', muted: '#6d7280', grass: '#28734f', alternate: '#2d7c56', line: '#a8c9b6', red: '#d92537', blue: '#1f56b8' }
 export function drawLineupPoster(context: UniApp.CanvasContext, lineup: PublicLineup, images: Map<string, string>, codePath: string, card = false, sharer: LineupSharer = lineup.author): void {
   if (!card && !codePath) throw new Error('小程序码未就绪，请重试')
   const height = card ? 600 : 1200
@@ -70,6 +73,12 @@ export function drawLineupPoster(context: UniApp.CanvasContext, lineup: PublicLi
       const badge = card ? 19 : 25
       context.setFillStyle(palette.red); context.fillRect(point.x - radius - 4, point.y - radius - 4, badge, badge)
       context.setTextAlign('center'); text('前', point.x - radius - 4 + badge / 2, point.y - radius - 4 + badge - 4, card ? 13 : 17, palette.paper)
+    }
+    if (player.club) {
+      // 其他球队的球员：左上角蓝底队名简称，和编辑页的角标一致。
+      const size = card ? 12 : 16, height = card ? 18 : 24, width = Array.from(player.club).length * size + (card ? 8 : 12)
+      context.setFillStyle(palette.blue); context.fillRect(point.x - radius - 8, point.y - radius - 6, width, height)
+      context.setTextAlign('center'); text(player.club, point.x - radius - 8 + width / 2, point.y - radius - 6 + height - (card ? 4 : 6), size, palette.paper)
     }
     context.setTextAlign('center'); text(clippedLabel(player.name, 8), point.x, point.y + radius + (card ? 18 : 25), card ? 16 : 21, palette.paper)
     context.setTextAlign('left')

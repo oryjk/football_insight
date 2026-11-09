@@ -1,7 +1,7 @@
 import { computed, ref, watch } from 'vue'
-import { getMyLineupEditor, getSquad, publishMyLineup, saveMyLineupDraft } from '../../api/lineup'
+import { getLineupPlayers, getMyLineupEditor, getSquad, publishMyLineup, saveMyLineupDraft } from '../../api/lineup'
 import { useAppSession } from '../../stores/appSession'
-import type { LineupEditorResponse, SavedLineup, SavedLineupDraft, SquadResponse } from '../../types/lineup'
+import type { ClubPlayer, LineupEditorResponse, SavedLineup, SavedLineupDraft, SquadResponse } from '../../types/lineup'
 import { extractApiErrorMessage, isUnauthorizedError } from '../../utils/apiError'
 import { DEFAULT_FORMATION } from './formations'
 import { autoFillStartingEleven, emptyLineup, type LineupSlots } from './helpers'
@@ -12,6 +12,7 @@ import { useLineupEditor } from './useLineupEditor'
 interface Payload { formation: string; slots: LineupSlots }
 export interface LineupPageDeps {
   getSquad: (teamId: number) => Promise<SquadResponse>
+  getLineupPlayers: (ids: number[]) => Promise<{ players: ClubPlayer[] }>
   getMyLineupEditor: (teamId: number) => Promise<LineupEditorResponse>
   saveMyLineupDraft: (teamId: number, payload: Payload) => Promise<{ draft: SavedLineupDraft }>
   publishMyLineup: (teamId: number, payload: Payload) => Promise<{ lineup: SavedLineup; draft: SavedLineupDraft }>
@@ -30,7 +31,7 @@ export type SaveState = 'idle' | 'dirty' | 'draft' | 'published' | 'error'
 export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
   const session = overrides.isLoggedIn ? null : useAppSession()
   const deps: LineupPageDeps = {
-    getSquad, getMyLineupEditor, saveMyLineupDraft, publishMyLineup,
+    getSquad, getLineupPlayers, getMyLineupEditor, saveMyLineupDraft, publishMyLineup,
     isLoggedIn: () => Boolean(session?.hasAccessToken.value),
     userId: () => session?.currentUser.value?.id ?? null,
     storage: overrides.storage ?? uni,
@@ -42,6 +43,12 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
   const editor = useLineupEditor()
   const teamId = ref(0)
   const squad = ref<SquadResponse | null>(null)
+  /** 阵容里的其他球队球员：搜索选来的，或加载阵容时按 ID 补查到的。 */
+  const extras = ref<ClubPlayer[]>([])
+  function addExtra(player: ClubPlayer): void {
+    if (!player.team || extras.value.some(p => p.player_id === player.player_id)) return
+    extras.value = [...extras.value, player]
+  }
   const loading = ref(false)
   const errorMessage = ref('')
   const notice = ref('')
@@ -97,6 +104,7 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
     teamId.value = nextTeamId
     loading.value = true
     squad.value = null
+    extras.value = []
     savingDraft.value = false
     publishing.value = false
     editor.load(DEFAULT_FORMATION, emptyLineup(DEFAULT_FORMATION))
@@ -117,8 +125,7 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
       if (!current()) return
       savedLineup.value = mine.lineup
       cloudDraft.value = mine.draft
-      squad.value = loadedSquad
-      const known = new Set([...loadedSquad.active, ...loadedSquad.former].map(p => p.player_id))
+      const own = new Set([...loadedSquad.active, ...loadedSquad.former].map(p => p.player_id))
       let local = loadedOwner ? readDraft(nextTeamId, deps.storage, loadedOwner) : null
       const guest = options.restoreGuestDraft && deps.isLoggedIn() && ownerAtStart && ownerAtStart !== 'guest'
         ? consumeGuestDraft(nextTeamId, deps.storage) : null
@@ -132,11 +139,18 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
       const useLocal = local && (Boolean(guest) || local.savedAt > (Number.isFinite(remoteAt) ? remoteAt : 0))
       if (local && !useLocal && loadedOwner) clearDraft(nextTeamId, deps.storage, loadedOwner)
       const initial = useLocal ? local : remote
+      // 阵容里不在本队名单的球员，按 ID 补查：查得到的是其他球队的球员，照常保留。
+      const outside = [...new Set((initial?.slots ?? []).map(s => s.player_id).filter((id): id is number => id !== null && !own.has(id)))]
+      const found = outside.length ? (await deps.getLineupPlayers(outside).catch(() => ({ players: [] }))).players : []
+      if (!current()) return
+      squad.value = loadedSquad
+      extras.value = found.filter(p => p.team)
+      const known = new Set([...own, ...extras.value.map(p => p.player_id)])
       if (initial) {
         const clean = sanitizeDraftSlots(initial.slots, known)
         const removed = !sameLineup(initial, { formation: initial.formation, slots: clean })
         editor.load(initial.formation, clean, Boolean(useLocal) || removed)
-        if (removed) notice.value = '阵容里有球员已不在球队名单，已从草稿中移出，请重新选择。'
+        if (removed) notice.value = '阵容里有球员已不在中超球员库里，已从草稿中移出，请重新选择。'
       } else {
         editor.load(DEFAULT_FORMATION, autoFillStartingEleven(emptyLineup(DEFAULT_FORMATION), DEFAULT_FORMATION, loadedSquad.active))
       }
@@ -208,5 +222,5 @@ export function useLineupPage(overrides: Partial<LineupPageDeps> = {}) {
     if (!disposed && editor.dirty.value) persistDraft()
     disposed = true; loadSeq += 1; cancelDraftTimer()
   }
-  return { teamId, squad, loading, errorMessage, notice, saving, savingDraft, publishing, saveState, savedLineup, cloudDraft, hasUnpublishedChanges, editor, load, saveDraft, publish, save: saveDraft, fillStartingEleven, dispose }
+  return { teamId, squad, extras, addExtra, loading, errorMessage, notice, saving, savingDraft, publishing, saveState, savedLineup, cloudDraft, hasUnpublishedChanges, editor, load, saveDraft, publish, save: saveDraft, fillStartingEleven, dispose }
 }

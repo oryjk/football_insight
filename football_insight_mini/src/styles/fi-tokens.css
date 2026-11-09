@@ -12,6 +12,8 @@ page {
   /* ===== Primitive：颜色 ===== */
   --fi-primitive-white: #ffffff;
   --fi-primitive-red: #dc2626;
+  --fi-primitive-blue: #1f56b8;
+  --fi-primitive-blue-soft: #e8f0fd;
   --fi-primitive-red-rgb: 220, 38, 38;
   --fi-primitive-red-deep: #b91c1c;
   --fi-primitive-red-darker: #991b1b;
@@ -155,6 +157,9 @@ page {
   /* ===== Semantic：颜色 ===== */
   /* 兼容 uni.css 时代的既有语义名（值保持不变） */
   --fi-color-primary: var(--fi-primitive-red);
+  /* 阵容里其他球队的球员（队名角标、搜索结果标签）。 */
+  --fi-color-outsider: var(--fi-primitive-blue);
+  --fi-color-outsider-soft: var(--fi-primitive-blue-soft);
   --fi-color-member-card-bg: var(--fi-primitive-ink);
   --fi-color-member-card-accent: var(--fi-primitive-member-gold);
   --fi-color-member-profile-bg: var(--fi-primitive-member-profile-bg);

@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import type { SquadPlayer, SquadResponse } from '../../types/lineup'
+import type { ClubPlayer, PublicLineup, SquadPlayer, SquadResponse } from '../../types/lineup'
 import { assignPlayer, emptyLineup } from './helpers'
-import { buildPitchPlayers, buildSheetGroups, buildSheetTabs, positionIndex, resolveSheetTab } from './lineupViewModel'
+import { buildPitchPlayers, buildSearchGroups, buildSheetGroups, buildSheetTabs, positionIndex, resolveSheetTab, teamShortName } from './lineupViewModel'
+import { publicPitch } from './lineupPoster'
 
 function player(id: number, position: SquadPlayer['position'], extra: Partial<SquadPlayer> = {}): SquadPlayer {
   return { player_id: id, name: `P${id}`, shirt_number: id, position, avatar_url: null, last_season: 2026, ...extra }
@@ -115,5 +116,50 @@ describe('sheet tabs (现役 / 前队员)', () => {
 
   test('no groups at all resolves to nothing', () => {
     expect(resolveSheetTab([], 'active')).toBeNull()
+  })
+})
+
+
+describe('players from other teams', () => {
+  const zeca: ClubPlayer = { ...player(900, 'FW'), name: '泽卡', team: { team_id: 136, team_name: '山东泰山' } }
+
+  test('short team names drop the city or the trailing 队', () => {
+    expect(['山东泰山', '天津津门虎', '浙江队', '深圳新鹏城', '成都'].map(teamShortName)).toEqual(['泰山', '津门虎', '浙江', '新鹏城', '成都'])
+  })
+
+  test('outsiders on the pitch carry their club badge; own players do not', () => {
+    let slots = assignPlayer(emptyLineup('4-3-3'), 0, 1)
+    slots = assignPlayer(slots, 10, 900)
+    const pitch = buildPitchPlayers(slots, '4-3-3', squad, [zeca])
+    expect(pitch[0].player?.club).toBe(null)
+    expect(pitch[10].player).toMatchObject({ player_id: 900, name: '泽卡', club: '泰山', former: false })
+    expect(positionIndex(squad, [zeca])(900)).toBe('FW')
+  })
+
+  test('search lists own matches first, then other teams without duplicating own players', () => {
+    const local: SquadResponse = { ...squad, active: [...squad.active, { ...player(5, 'FW'), name: '王子铭' }], former: [{ ...player(20, 'DF', { last_season: 2025 }), name: '王老将' }] }
+    const remote: ClubPlayer[] = [
+      { ...player(5, 'FW'), name: '王子铭', team: { team_id: 1, team_name: '成都蓉城' } },
+      { ...player(800, 'DF'), name: '王燊超', team: { team_id: 2, team_name: '上海海港' } },
+      { ...player(801, 'FW'), name: '王钰栋', team: { team_id: 3, team_name: '浙江队' } },
+    ]
+    const groups = buildSearchGroups('王', local, emptyLineup('4-3-3'), 'FW', remote)
+    expect(groups.map(g => [g.key, g.players.map(p => p.name)])).toEqual([
+      ['team', ['王子铭', '王老将']],
+      ['others', ['王钰栋', '王燊超']],
+    ])
+    expect(groups[1].players[0].club).toBe('浙江队')
+    expect(buildSearchGroups('  ', local, emptyLineup('4-3-3'), 'FW', remote)).toEqual([])
+  })
+
+  test('shared lineups show outsiders with their badge', () => {
+    const lineup = {
+      formation: '4-3-3', team: squad.team,
+      slots: assignPlayer(assignPlayer(emptyLineup('4-3-3'), 0, 1), 10, 900),
+      players: [{ ...player(1, 'GK'), former: false }, { ...player(900, 'FW'), name: '泽卡', former: false, team: { team_id: 136, team_name: '山东泰山' } }],
+    } as unknown as PublicLineup
+    const pitch = publicPitch(lineup)
+    expect(pitch[10].player?.club).toBe('泰山')
+    expect(pitch[0].player?.club).toBe(null)
   })
 })

@@ -8,6 +8,8 @@
           {{ player.player.shirt_number }}
         </text>
         <text v-if="player.player.former" class="dot__former">前</text>
+        <!-- 其他球队的球员：左上角蓝色队名简称（外队球员不会是本队前队员，和「前」不会同时出现）。 -->
+        <text v-else-if="player.player.club" class="dot__club">{{ player.player.club }}</text>
         <text v-if="exclusive" class="dot__exclusive">独家</text>
       </template>
       <text v-else class="dot__plus">+</text>
@@ -108,6 +110,20 @@ defineProps<{
   font-size: var(--fi-font-20);
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-snug);
+}
+
+.dot__club {
+  position: absolute;
+  top: calc(-1 * var(--fi-space-6));
+  left: calc(-1 * var(--fi-space-14));
+  padding: var(--fi-space-2) var(--fi-space-8);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-outsider);
+  color: var(--fi-primitive-white);
+  font-size: var(--fi-font-18);
+  font-weight: var(--fi-weight-bold);
+  line-height: var(--fi-leading-snug);
+  white-space: nowrap;
 }
 
 .dot__exclusive {

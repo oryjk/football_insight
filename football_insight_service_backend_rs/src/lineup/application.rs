@@ -1,5 +1,8 @@
 use super::{
-    domain::{LineupReadError, Position, SquadPlayer, SquadTeam},
+    domain::{
+        LineupReadError, PLAYER_LOOKUP_LIMIT, PLAYER_SEARCH_LIMIT, Position, SquadPlayer,
+        SquadTeam, normalize_player_query,
+    },
     ports::SquadRepository,
 };
 pub mod my_lineup;
@@ -50,6 +53,24 @@ impl LineupService {
     }
 }
 
+impl LineupService {
+    /// 搜全部中超球员（选人时可以选其他球队的球员）。
+    pub async fn search_players(&self, query: &str) -> Result<Vec<SquadPlayer>, LineupReadError> {
+        let query = normalize_player_query(query).ok_or(LineupReadError::Invalid)?;
+        self.squads
+            .search_players(&query, PLAYER_SEARCH_LIMIT)
+            .await
+    }
+
+    /// 按 ID 补查球员资料：阵容里的外队球员不在本队名单，编辑页靠它显示名字和头像。
+    pub async fn find_players(&self, ids: &[i64]) -> Result<Vec<SquadPlayer>, LineupReadError> {
+        if ids.is_empty() || ids.len() > PLAYER_LOOKUP_LIMIT || ids.iter().any(|id| *id <= 0) {
+            return Err(LineupReadError::Invalid);
+        }
+        self.squads.find_players(ids).await
+    }
+}
+
 fn by_role(a: &SquadPlayer, b: &SquadPlayer) -> std::cmp::Ordering {
     Position::rank(a.position)
         .cmp(&Position::rank(b.position))
@@ -85,8 +106,47 @@ pub(crate) mod tests {
             }))
         }
         async fn list_squad(&self, _team_id: i64) -> Result<Vec<SquadPlayer>, LineupReadError> {
-            Ok(self.players.clone())
+            Ok(self
+                .players
+                .iter()
+                .filter(|p| p.club.is_none())
+                .cloned()
+                .collect())
         }
+        async fn search_players(
+            &self,
+            query: &str,
+            limit: i64,
+        ) -> Result<Vec<SquadPlayer>, LineupReadError> {
+            Ok(self
+                .players
+                .iter()
+                .filter(|p| p.name.contains(query))
+                .take(limit as usize)
+                .cloned()
+                .map(with_club)
+                .collect())
+        }
+        async fn find_players(&self, ids: &[i64]) -> Result<Vec<SquadPlayer>, LineupReadError> {
+            Ok(self
+                .players
+                .iter()
+                .filter(|p| ids.contains(&p.player_id))
+                .cloned()
+                .map(with_club)
+                .collect())
+        }
+    }
+
+    /// 跨队查询总带所在球队；测试里本队球员算成都蓉城。
+    fn with_club(mut player: SquadPlayer) -> SquadPlayer {
+        player
+            .club
+            .get_or_insert(crate::lineup::domain::PlayerClub {
+                team_id: 77680,
+                team_name: "成都蓉城".into(),
+            });
+        player
     }
 
     pub(crate) fn player(
@@ -104,6 +164,7 @@ pub(crate) mod tests {
             avatar_url: None,
             last_season: season,
             active,
+            club: None,
         }
     }
 

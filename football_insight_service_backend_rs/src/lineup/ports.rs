@@ -8,6 +8,14 @@ use uuid::Uuid;
 pub trait SquadRepository: Send + Sync {
     async fn find_team(&self, team_id: i64) -> Result<Option<SquadTeam>, LineupReadError>;
     async fn list_squad(&self, team_id: i64) -> Result<Vec<SquadPlayer>, LineupReadError>;
+    /// 全部中超球队名单（现役和前队员）里名字包含 `query` 的球员，带所在球队；完全匹配、开头匹配、现役优先。
+    async fn search_players(
+        &self,
+        query: &str,
+        limit: i64,
+    ) -> Result<Vec<SquadPlayer>, LineupReadError>;
+    /// 按 ID 查任意中超球队名单里的球员，带所在球队；查不到的 ID 不返回。
+    async fn find_players(&self, player_ids: &[i64]) -> Result<Vec<SquadPlayer>, LineupReadError>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,9 +54,8 @@ pub trait LineupRepository: Send + Sync {
         share_code: &str,
     ) -> Result<PublishedLineup, StoreError>;
     async fn find(&self, user_id: Uuid, team_id: i64) -> Result<Option<Lineup>, StoreError>;
-    /// 返回 `player_ids` 里属于该队名单（现役或前队员）的那些 id。
-    async fn squad_members(&self, team_id: i64, player_ids: &[i64])
-    -> Result<Vec<i64>, StoreError>;
+    /// 返回 `player_ids` 里出现在任意中超球队名单（现役或前队员）的那些 id。
+    async fn known_players(&self, player_ids: &[i64]) -> Result<Vec<i64>, StoreError>;
     /// Legacy save: atomically updates the public-table snapshot and private draft.
     /// Existing id, share_code, created_at and associated likes are retained.
     /// Unlike explicit publishing, the legacy application flow allows incomplete selections.

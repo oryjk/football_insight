@@ -97,13 +97,14 @@ impl MyLineupService {
             .ok_or(LineupSaveError::TeamNotFound)?;
         let ids: Vec<i64> = slots.iter().filter_map(|s| s.player_id).collect();
         if !ids.is_empty() {
-            let members = self
+            // 可以选其他球队的球员，但必须是库里真实存在的中超球员。
+            let known = self
                 .lineups
-                .squad_members(team_id, &ids)
+                .known_players(&ids)
                 .await
                 .map_err(store_error)?;
-            if members.len() != ids.len() {
-                return Err(LineupSaveError::PlayerNotInSquad);
+            if known.len() != ids.len() {
+                return Err(LineupSaveError::UnknownPlayer);
             }
         }
         Ok(())
@@ -255,7 +256,7 @@ pub(crate) mod tests {
             }
             Ok(self.stored.lock().unwrap().get(&(u, t)).cloned())
         }
-        async fn squad_members(&self, _t: i64, ids: &[i64]) -> Result<Vec<i64>, StoreError> {
+        async fn known_players(&self, ids: &[i64]) -> Result<Vec<i64>, StoreError> {
             Ok(ids
                 .iter()
                 .copied()
@@ -358,13 +359,13 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn rejects_players_that_are_not_in_the_squad() {
+    async fn rejects_players_that_are_not_in_the_player_database() {
         let (svc, _) = service(vec![1]);
         let err = svc
             .save(user(), TEAM, "4-3-3", slots(&[Some(1), Some(99)]))
             .await
             .unwrap_err();
-        assert_eq!(err, LineupSaveError::PlayerNotInSquad);
+        assert_eq!(err, LineupSaveError::UnknownPlayer);
     }
 
     #[tokio::test]
@@ -584,7 +585,7 @@ pub(crate) mod tests {
             svc.save_draft(u, TEAM, "4-3-3", slots(&[Some(9)]))
                 .await
                 .unwrap_err(),
-            LineupSaveError::PlayerNotInSquad
+            LineupSaveError::UnknownPlayer
         );
         assert!(repo.drafts.lock().unwrap().is_empty());
     }

@@ -1,8 +1,18 @@
-import type { LineupSlotDto, SavedLineupDraft, LineupEditorResponse, SavedLineup, SquadResponse, LineupSort, TeamLineups, PublicLineup, LineupLikes, LineupCodeImage, LineupConsensus } from '../types/lineup'
+import type { ClubPlayer, LineupSlotDto, SavedLineupDraft, LineupEditorResponse, SavedLineup, SquadResponse, LineupSort, TeamLineups, PublicLineup, LineupLikes, LineupCodeImage, LineupConsensus } from '../types/lineup'
 import { request } from '../utils/request'
 
 export function getSquad(teamId: number): Promise<SquadResponse> {
   return request<SquadResponse>({ url: `/lineups/squads/${teamId}` })
+}
+
+/** 搜全部中超球员（含其他球队），最多 30 人。 */
+export function searchLineupPlayers(query: string): Promise<{ players: ClubPlayer[] }> {
+  return request<{ players: ClubPlayer[] }>({ url: `/lineups/players/search?q=${encodeURIComponent(query)}`, silentNetworkError: true })
+}
+
+/** 按 ID 补查阵容里外队球员的资料（一次最多 30 人）。 */
+export function getLineupPlayers(ids: number[]): Promise<{ players: ClubPlayer[] }> {
+  return request<{ players: ClubPlayer[] }>({ url: `/lineups/players?ids=${ids.join(',')}` })
 }
 
 export function getMyLineup(teamId: number): Promise<{ lineup: SavedLineup | null }> {

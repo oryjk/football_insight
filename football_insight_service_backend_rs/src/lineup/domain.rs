@@ -45,7 +45,26 @@ pub struct SquadPlayer {
     pub avatar_url: Option<String>,
     pub last_season: i32,
     pub active: bool,
+    /// 跨队查询（搜索、外队球员）时球员所在的球队；本队名单里为 None。
+    pub club: Option<PlayerClub>,
 }
+
+/// 球员最近所在的球队：现役优先，否则取最后在队的赛季。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlayerClub {
+    pub team_id: i64,
+    pub team_name: String,
+}
+
+/// 搜索词：去掉首尾空白后 1–20 个字。
+pub fn normalize_player_query(value: &str) -> Option<String> {
+    let query = value.trim();
+    (!query.is_empty() && query.chars().count() <= 20).then(|| query.to_string())
+}
+
+/// 搜索最多返回的球员数；按 ID 查资料一次最多查的球员数。
+pub const PLAYER_SEARCH_LIMIT: i64 = 30;
+pub const PLAYER_LOOKUP_LIMIT: usize = 30;
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum LineupReadError {
@@ -219,8 +238,8 @@ pub enum LineupSaveError {
     InvalidSlots,
     #[error("发布阵容需要选满11名球员")]
     IncompleteLineup,
-    #[error("球员不属于这支球队")]
-    PlayerNotInSquad,
+    #[error("球员不在中超球员库里")]
+    UnknownPlayer,
     #[error("同一球员不能重复上场")]
     DuplicatePlayer,
     #[error("球队不存在")]

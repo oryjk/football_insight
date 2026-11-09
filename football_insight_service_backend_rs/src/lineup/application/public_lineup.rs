@@ -108,6 +108,21 @@ impl PublicLineupService {
                     .any(|slot| slot.player_id == Some(player.player_id))
             })
             .collect();
+        // 阵容里可能有其他球队的球员：不在本队名单的按 ID 补查，带上所在球队。
+        let missing: Vec<i64> = lineup
+            .slots
+            .iter()
+            .filter_map(|slot| slot.player_id)
+            .filter(|id| !lineup.players.iter().any(|p| p.player_id == *id))
+            .collect();
+        if !missing.is_empty() {
+            let external = self
+                .squads
+                .find_players(&missing)
+                .await
+                .map_err(|_| LineupPublicError::Unavailable)?;
+            lineup.players.extend(external);
+        }
         Ok(lineup)
     }
 
@@ -151,6 +166,37 @@ impl PublicLineupService {
             .await
             .map_err(|_| LineupPublicError::Unavailable)?;
         let positions = squad.iter().map(|p| (p.player_id, p.position)).collect();
+        // 共识只统计本队球员：能在其他球队名单里查到、却不在本队名单的，是外队球员，不计入。
+        // 查不到的（早已离开名单的老队员）照旧计入，显示为「未知球员」。
+        let outside_ids: Vec<i64> = lineups
+            .iter()
+            .flat_map(|(_, ids)| ids.iter().copied())
+            .filter(|id| !squad.iter().any(|p| p.player_id == *id))
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let outsiders: std::collections::HashSet<i64> = if outside_ids.is_empty() {
+            Default::default()
+        } else {
+            self.squads
+                .find_players(&outside_ids)
+                .await
+                .map_err(|_| LineupPublicError::Unavailable)?
+                .into_iter()
+                .map(|p| p.player_id)
+                .collect()
+        };
+        let lineups: Vec<(String, Vec<i64>)> = lineups
+            .into_iter()
+            .map(|(formation, ids)| {
+                (
+                    formation,
+                    ids.into_iter()
+                        .filter(|id| !outsiders.contains(id))
+                        .collect(),
+                )
+            })
+            .collect();
         let result = compute_consensus(&lineups, &positions);
         let players = result
             .players
@@ -169,6 +215,7 @@ impl PublicLineupService {
                         avatar_url: None,
                         last_season: 0,
                         active: false,
+                        club: None,
                     }),
                 group: pick.group,
                 pick_rate: percent(pick.picks, result.total),
@@ -427,6 +474,93 @@ pub(crate) mod tests {
             .find(|p| p.player.player_id == 32)
             .unwrap();
         assert_eq!(unknown.player.name, "未知球员");
+    }
+
+    fn outsider(id: i64) -> SquadPlayer {
+        use crate::lineup::{application::tests::player, domain::PlayerClub};
+        let mut p = player(id, Some(9), Some(Position::FW), 2026, true);
+        p.club = Some(PlayerClub {
+            team_id: 136,
+            team_name: "山东泰山".into(),
+        });
+        p
+    }
+
+    #[tokio::test]
+    async fn consensus_counts_only_the_teams_own_players() {
+        let mut squad = full_squad();
+        squad.push(outsider(99));
+        let with_outsider = [1, 10, 11, 12, 13, 20, 21, 22, 30, 31, 99];
+        let consensus =
+            consensus_service(vec![("4-3-3".into(), with_outsider.to_vec()); 10], squad)
+                .consensus(77680)
+                .await
+                .unwrap();
+        // 每套阵容只剩 10 名本队球员，共识里就只有这 10 人。
+        assert_eq!(consensus.players.len(), 10);
+        assert!(consensus.players.iter().all(|p| p.player.player_id != 99));
+    }
+
+    #[tokio::test]
+    async fn shared_lineups_include_players_from_other_teams_with_their_club() {
+        use crate::lineup::domain::{LineupSlot, PublicLineupItem, SquadTeam};
+        let repo = FakePublicLineups::default();
+        let slots: Vec<LineupSlot> = [1, 99]
+            .iter()
+            .enumerate()
+            .map(|(slot, id)| LineupSlot {
+                slot: slot as u8,
+                player_id: Some(*id),
+                x: 0.5,
+                y: 0.5,
+            })
+            .collect();
+        *repo.shared.lock().unwrap() = Some(SharedLineup {
+            item: PublicLineupItem {
+                share_code: "ABCD1234".into(),
+                formation: "4-3-3".into(),
+                author: crate::lineup::domain::LineupAuthor {
+                    display_name: "球迷".into(),
+                    avatar_url: None,
+                },
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+                likes: LineupLikeState {
+                    likes_count: 0,
+                    liked_by_me: false,
+                    disliked_by_me: false,
+                },
+            },
+            team: SquadTeam {
+                team_id: 77680,
+                team_name: "成都蓉城".into(),
+                avatar_url: None,
+            },
+            slots,
+            players: vec![],
+        });
+        let mut squad = full_squad();
+        squad.push(outsider(99));
+        let svc = PublicLineupService::new(
+            Arc::new(FakeSquads {
+                players: squad,
+                missing_table: false,
+            }),
+            Arc::new(repo),
+            Arc::new(FakeUserAccess {
+                active: true,
+                unavailable: false,
+            }),
+            Arc::new(FakeCodes),
+        );
+        let lineup = svc.shared("ABCD1234", None).await.unwrap();
+        let ids: Vec<i64> = lineup.players.iter().map(|p| p.player_id).collect();
+        assert_eq!(ids, vec![1, 99]);
+        assert_eq!(lineup.players[0].club, None);
+        assert_eq!(
+            lineup.players[1].club.as_ref().unwrap().team_name,
+            "山东泰山"
+        );
     }
 
     #[tokio::test]

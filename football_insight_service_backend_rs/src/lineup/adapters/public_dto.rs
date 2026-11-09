@@ -103,6 +103,15 @@ struct SharedPlayerDto {
     #[serde(flatten)]
     player: PlayerDto,
     former: bool,
+    /// 其他球队的球员才有：所在球队，前端据此显示队名角标。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    team: Option<ExternalTeamDto>,
+}
+
+#[derive(Serialize)]
+struct ExternalTeamDto {
+    team_id: i64,
+    team_name: String,
 }
 
 #[derive(Serialize)]
@@ -124,6 +133,10 @@ impl From<SharedLineup> for SharedDto {
                 .into_iter()
                 .map(|player| SharedPlayerDto {
                     former: !player.active,
+                    team: player.club.clone().map(|club| ExternalTeamDto {
+                        team_id: club.team_id,
+                        team_name: club.team_name,
+                    }),
                     player: player.into(),
                 })
                 .collect(),
@@ -255,6 +268,7 @@ mod tests {
                 avatar_url: None,
                 last_season: 2025,
                 active: false,
+                club: None,
             }],
         };
         let json = serde_json::to_value(SharedDto::from(detail)).unwrap();

@@ -79,8 +79,12 @@
       :slot-label="sheetSlotLabel"
       :occupied="sheetOccupied"
       :groups="sheetGroups"
+      :search-groups="searchGroups"
+      :search-loading="searchLoading"
+      :search-error="searchError"
       @pick="handlePick"
       @remove="handleRemove"
+      @search="searchPlayers"
     />
 
     <LineupConfirmDialog
@@ -103,7 +107,8 @@ import { onLoad, onShow, onShareAppMessage } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import LineupConfirmDialog from './components/LineupConfirmDialog.vue'
-import { getSharedLineup } from '../../api/lineup'
+import { getSharedLineup, searchLineupPlayers } from '../../api/lineup'
+import type { ClubPlayer } from '../../types/lineup'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { prepareEditorShare } from './lineupEditorShare'
 import { useLineupShare } from './useLineupShare'
@@ -113,7 +118,7 @@ import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { useAppSession } from '../../stores/appSession'
 import { buildLineupListUrl, buildLineupPageUrl, parseLineupPageQuery } from '../../utils/lineupLinks'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
-import { buildPitchPlayers, buildSheetGroups, positionIndex } from './lineupViewModel'
+import { buildPitchPlayers, buildSearchGroups, buildSheetGroups, positionIndex } from './lineupViewModel'
 import { useLineupPage } from './useLineupPage'
 import { useLineupPitchCode } from './useLineupPitchCode'
 import LineupFormationBar from './components/LineupFormationBar.vue'
@@ -125,7 +130,7 @@ import LineupActionBar from './components/LineupActionBar.vue'
 const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
 
-const { teamId, squad, loading, errorMessage, notice, saving, savingDraft, publishing, saveState, savedLineup, hasUnpublishedChanges, editor, load, saveDraft, publish, fillStartingEleven, dispose } = useLineupPage()
+const { teamId, squad, extras, addExtra, loading, errorMessage, notice, saving, savingDraft, publishing, saveState, savedLineup, hasUnpublishedChanges, editor, load, saveDraft, publish, fillStartingEleven, dispose } = useLineupPage()
 const { codeSrc: pitchCodeSrc } = useLineupPitchCode(() => savedLineup.value?.share_code)
 
 const teams = ref<Array<{ team_id: number; team_name: string; avatar_url: string | null }>>([])
@@ -165,7 +170,7 @@ watch(
   },
 )
 
-const pitchPlayers = computed(() => buildPitchPlayers(editor.slots.value, editor.formation.value, squad.value))
+const pitchPlayers = computed(() => buildPitchPlayers(editor.slots.value, editor.formation.value, squad.value, extras.value))
 
 const selectedEntry = computed(() => pitchPlayers.value.find((p) => p.slot === editor.selectedSlot.value) ?? null)
 const sheetSlotLabel = computed(() => selectedEntry.value?.label ?? '选择球员')
@@ -219,8 +224,38 @@ function openSheet(slot: number): void {
   sheetVisible.value = true
 }
 
+// 选人搜索：本队在本地名单里匹配，其他球队查后端；输入停 250ms 再查，过期的结果丢弃。
+const searchQuery = ref('')
+const searchResults = ref<ClubPlayer[]>([])
+const searchLoading = ref(false)
+const searchError = ref('')
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+let searchSeq = 0
+function searchPlayers(query: string): void {
+  searchQuery.value = query
+  searchError.value = ''
+  if (searchTimer) clearTimeout(searchTimer)
+  const seq = ++searchSeq
+  const keyword = query.trim()
+  if (!keyword) { searchResults.value = []; searchLoading.value = false; return }
+  searchLoading.value = true
+  searchTimer = setTimeout(() => {
+    searchLineupPlayers(keyword)
+      .then(({ players }) => { if (seq === searchSeq) searchResults.value = players })
+      .catch(() => { if (seq === searchSeq) { searchResults.value = []; searchError.value = '其他球队的球员暂时搜不到，本队球员仍可选' } })
+      .finally(() => { if (seq === searchSeq) searchLoading.value = false })
+  }, 250)
+}
+const searchGroups = computed(() => {
+  if (!squad.value || !selectedEntry.value || !searchQuery.value.trim()) return []
+  return buildSearchGroups(searchQuery.value, squad.value, editor.slots.value, selectedEntry.value.position, searchResults.value)
+})
+
 function handlePick(playerId: number): void {
   if (editor.selectedSlot.value === null) return
+  // 从搜索里选了其他球队的球员：记下他的资料，球场才能显示名字、头像和队名角标。
+  const outsider = searchResults.value.find(player => player.player_id === playerId)
+  if (outsider) addExtra(outsider)
   editor.pick(editor.selectedSlot.value, playerId)
   sheetVisible.value = false
 }
@@ -232,7 +267,7 @@ function handleRemove(): void {
 }
 
 function changeFormation(code: string): void {
-  editor.setFormation(code, positionIndex(squad.value))
+  editor.setFormation(code, positionIndex(squad.value, extras.value))
 }
 
 function requestConfirmation(action: 'publish' | 'reset'): void {
@@ -373,7 +408,7 @@ async function resumeRequestedAction(): Promise<void> {
   else requestConfirmation('publish')
 }
 
-onBeforeUnmount(dispose)
+onBeforeUnmount(() => { if (searchTimer) clearTimeout(searchTimer); dispose() })
 </script>
 
 <style scoped>

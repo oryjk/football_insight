@@ -1,7 +1,7 @@
 use crate::lineup::{
     domain::{
-        Lineup, LineupDraft, LineupReadError, LineupSlot, Position, PublishedLineup, SquadPlayer,
-        SquadTeam,
+        Lineup, LineupDraft, LineupReadError, LineupSlot, PlayerClub, Position, PublishedLineup,
+        SquadPlayer, SquadTeam,
     },
     ports::{LineupRepository, LineupUserAccess, SquadRepository, StoreError},
 };
@@ -76,12 +76,82 @@ impl SquadRepository for PostgresSquadRepository {
                             avatar_url,
                             last_season,
                             active,
+                            club: None,
                         }
                     },
                 )
                 .collect()
         })
         .map_err(read_error)
+    }
+
+    async fn search_players(
+        &self,
+        query: &str,
+        limit: i64,
+    ) -> Result<Vec<SquadPlayer>, LineupReadError> {
+        // strpos 而不是 LIKE：搜索词里的 % 和 _ 不会被当成通配符。
+        sqlx::query_as::<_, ClubPlayerRow>(&format!(
+            "SELECT * FROM ({CLUB_PLAYERS} WHERE strpos(s.player_name, $1) > 0 {CLUB_PLAYER_ORDER}) p
+             ORDER BY (p.player_name = $1) DESC, (strpos(p.player_name, $1) = 1) DESC,
+                      p.active DESC, p.last_season DESC, p.player_id
+             LIMIT $2"
+        ))
+        .bind(query)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map(|rows| rows.into_iter().map(Into::into).collect())
+        .map_err(read_error)
+    }
+
+    async fn find_players(&self, player_ids: &[i64]) -> Result<Vec<SquadPlayer>, LineupReadError> {
+        sqlx::query_as::<_, ClubPlayerRow>(&format!(
+            "{CLUB_PLAYERS} WHERE s.player_id = ANY($1) {CLUB_PLAYER_ORDER}"
+        ))
+        .bind(player_ids)
+        .fetch_all(&self.pool)
+        .await
+        .map(|rows| rows.into_iter().map(Into::into).collect())
+        .map_err(read_error)
+    }
+}
+
+/// 一名球员可能在多支球队的名单里（转会、前队员）：每人取一行，现役优先，其次最后在队的赛季。
+const CLUB_PLAYERS: &str = "SELECT DISTINCT ON (s.player_id)
+        s.player_id, s.player_name, s.shirt_number, s.position, s.avatar_storage_url,
+        s.last_season, s.active, s.team_id, COALESCE(t.team_name, '') AS team_name
+    FROM f_i_squad_players s LEFT JOIN f_i_teams t ON t.team_id = s.team_id";
+const CLUB_PLAYER_ORDER: &str = "ORDER BY s.player_id, s.active DESC, s.last_season DESC";
+
+#[derive(sqlx::FromRow)]
+struct ClubPlayerRow {
+    player_id: i64,
+    player_name: String,
+    shirt_number: Option<i32>,
+    position: Option<String>,
+    avatar_storage_url: Option<String>,
+    last_season: i32,
+    active: bool,
+    team_id: i64,
+    team_name: String,
+}
+
+impl From<ClubPlayerRow> for SquadPlayer {
+    fn from(row: ClubPlayerRow) -> Self {
+        Self {
+            player_id: row.player_id,
+            name: row.player_name,
+            shirt_number: row.shirt_number,
+            position: row.position.as_deref().and_then(Position::parse),
+            avatar_url: row.avatar_storage_url,
+            last_season: row.last_season,
+            active: row.active,
+            club: Some(PlayerClub {
+                team_id: row.team_id,
+                team_name: row.team_name,
+            }),
+        }
     }
 }
 
@@ -262,15 +332,10 @@ impl LineupRepository for PostgresLineupRepository {
         .map_err(store_error)
     }
 
-    async fn squad_members(
-        &self,
-        team_id: i64,
-        player_ids: &[i64],
-    ) -> Result<Vec<i64>, StoreError> {
+    async fn known_players(&self, player_ids: &[i64]) -> Result<Vec<i64>, StoreError> {
         sqlx::query_scalar::<_, i64>(
-            "SELECT player_id FROM f_i_squad_players WHERE team_id = $1 AND player_id = ANY($2)",
+            "SELECT DISTINCT player_id FROM f_i_squad_players WHERE player_id = ANY($1)",
         )
-        .bind(team_id)
         .bind(player_ids)
         .fetch_all(&self.pool)
         .await

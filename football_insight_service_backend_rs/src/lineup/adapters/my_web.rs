@@ -49,7 +49,7 @@ fn map_error(e: LineupSaveError) -> (StatusCode, String) {
         LineupSaveError::InvalidFormation
         | LineupSaveError::IncompleteLineup
         | LineupSaveError::InvalidSlots
-        | LineupSaveError::PlayerNotInSquad
+        | LineupSaveError::UnknownPlayer
         | LineupSaveError::DuplicatePlayer => StatusCode::BAD_REQUEST,
         LineupSaveError::TeamNotFound => StatusCode::NOT_FOUND,
         LineupSaveError::Unavailable => StatusCode::SERVICE_UNAVAILABLE,

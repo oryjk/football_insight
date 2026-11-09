@@ -80,6 +80,7 @@ describe('useLineupPage private drafts and publication', () => {
     const calls: string[] = []
     const page = useLineupPage({
       getSquad: async () => fullSquad,
+      getLineupPlayers: async () => ({ players: [] }),
       getMyLineupEditor: async () => ({ lineup: null, draft: null }),
       saveMyLineupDraft: async (_teamId, payload) => { calls.push('draft'); return { draft: { ...payload, updated_at: '2026-10-19T01:00:00Z' } } },
       publishMyLineup: async (_teamId, payload) => { calls.push('publish'); return { lineup: { ...publicSnapshot, ...payload }, draft: { ...payload, updated_at: '2026-10-19T01:00:00Z' } } },
@@ -292,4 +293,28 @@ describe('useLineupPage private drafts and publication', () => {
     expect(await pending).toBe('cancelled'); expect(invalidations).toBe(0); expect(revision).toBe(2)
   })
 
+})
+
+
+describe('useLineupPage players from other teams', () => {
+  const slots = emptyLineup('4-3-3').map((s, i) => ({ ...s, player_id: i === 10 ? 900 : i === 9 ? 901 : i + 1 }))
+  const ownSquad: SquadResponse = { ...squad, active: slots.slice(0, 9).map(s => ({ ...squad.active[0], player_id: s.player_id!, position: 'MF' as const })) }
+  test('keeps saved outsiders found in the player database and drops unknown ones', async () => {
+    const asked: number[][] = []
+    const page = useLineupPage({
+      getSquad: async () => ownSquad,
+      getLineupPlayers: async ids => { asked.push(ids); return { players: [{ ...squad.active[0], player_id: 900, name: '泽卡', team: { team_id: 136, team_name: '山东泰山' } }] } },
+      getMyLineupEditor: async () => ({ lineup: null, draft: { formation: '4-3-3', slots, updated_at: '2026-10-19T01:00:00Z' } }),
+      saveMyLineupDraft: async (_t, payload) => ({ draft: { ...payload, updated_at: '2026-10-19T01:00:00Z' } }),
+      publishMyLineup: async () => { throw new Error('unused') },
+      isLoggedIn: () => true, userId: () => 'A', storage: memoryStorage(),
+      now: () => Date.parse('2026-10-19T02:00:00Z'), draftDelayMs: 5,
+    })
+    await page.load(1)
+    expect(asked).toEqual([[901, 900]])
+    expect(page.extras.value.map(p => p.player_id)).toEqual([900])
+    const ids = page.editor.slots.value.map(s => s.player_id)
+    expect([ids.includes(900), ids.includes(901)]).toEqual([true, false])
+    expect(page.notice.value.includes('中超球员库')).toBe(true)
+  })
 })

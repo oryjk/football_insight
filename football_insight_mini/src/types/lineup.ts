@@ -9,6 +9,11 @@ export interface SquadPlayer {
   last_season: number
 }
 
+/** 跨队查询（选人搜索、阵容里的外队球员）返回的球员，带所在球队。 */
+export interface ClubPlayer extends SquadPlayer {
+  team: { team_id: number; team_name: string } | null
+}
+
 export interface SquadResponse {
   team: { team_id: number; team_name: string; avatar_url: string | null }
   active: SquadPlayer[]
@@ -55,7 +60,8 @@ export interface PublicLineupSummary extends LineupLikes {
 export interface PublicLineup extends PublicLineupSummary {
   team: SquadResponse['team']
   slots: LineupSlotDto[]
-  players: Array<SquadPlayer & { former: boolean }>
+  /** `team` 只有其他球队的球员才有。 */
+  players: Array<SquadPlayer & { former: boolean; team?: { team_id: number; team_name: string } }>
 }
 export interface TeamLineups {
   team: SquadResponse['team']
