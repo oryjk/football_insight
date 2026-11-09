@@ -1,13 +1,21 @@
 <template>
   <view class="topic-card">
-    <FiTopicCrest :item="item" />
+    <FiTopicCrest v-if="!roundup" :item="item" />
     <view class="topic-card__top">
-      <text class="topic-card__category">{{ homeTopicCategory(item) }}</text>
+      <text class="topic-card__category">{{ roundup ? roundupDayLabel(item.publishedAt) : homeTopicCategory(item) }}</text>
       <text class="topic-card__number">{{ indexLabel }}</text>
     </view>
     <view class="topic-card__reading" role="button" :aria-label="`阅读${item.title}`" hover-class="topic-card__reading--pressed" @tap="emit('read', item.id)">
-      <text class="topic-card__title">{{ item.title }}</text>
-      <text class="topic-card__summary">{{ item.summary }}</text>
+      <template v-if="roundup">
+        <view v-for="entry in item.entries.slice(0, 3)" :key="entry.id" class="topic-card__entry">
+          <text class="topic-card__entry-time">{{ entry.timeLabel }}</text>
+          <text class="topic-card__entry-title">{{ entry.title }}</text>
+        </view>
+      </template>
+      <template v-else>
+        <text class="topic-card__title">{{ item.title }}</text>
+        <text class="topic-card__summary">{{ item.summary }}</text>
+      </template>
     </view>
     <!-- 整张卡片的正文区已可点开阅读，底部不再单独放「查看」；只留热度/阅读时长与收听。 -->
     <view class="topic-card__footer">
@@ -22,8 +30,10 @@ import FiTopicCrest from '../../../components/topics/FiTopicCrest.vue'
 import FiTopicMeta from '../../../components/topics/FiTopicMeta.vue'
 import FiTopicAudioEntry from '../../../components/topics/FiTopicAudioEntry.vue'
 import type { DailyTopicItem } from '../../../types/dailyTopic'
-import { homeTopicCategory } from '../dailyTopics'
-defineProps<{ item: DailyTopicItem; heat: number; indexLabel: string; audioReady: boolean; audioPlaying: boolean; audioLoading: boolean }>()
+import { computed } from 'vue'
+import { homeTopicCategory, isRoundupTopic, roundupDayLabel } from '../dailyTopics'
+const props = defineProps<{ item: DailyTopicItem; heat: number; indexLabel: string; audioReady: boolean; audioPlaying: boolean; audioLoading: boolean }>()
+const roundup = computed(() => isRoundupTopic(props.item))
 const emit = defineEmits<{ (e: 'read', id: string): void; (e: 'play', id: string): void }>()
 </script>
 
@@ -37,6 +47,10 @@ const emit = defineEmits<{ (e: 'read', id: string): void; (e: 'play', id: string
 .topic-card__reading--pressed { opacity: 0.75; }
 .topic-card__title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--fi-component-topic-hero-title); font-size: var(--fi-font-36); line-height: var(--fi-leading-normal); font-weight: var(--fi-weight-extrabold); }
 .topic-card__summary { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; margin-top: var(--fi-space-12); color: var(--fi-component-topic-hero-copy); font-size: var(--fi-font-26); line-height: var(--fi-leading-normal); }
+.topic-card__entry { display: flex; align-items: baseline; gap: var(--fi-space-12); margin-top: var(--fi-space-8); }
+.topic-card__entry:first-child { margin-top: 0; }
+.topic-card__entry-time { flex-shrink: 0; color: var(--fi-component-topic-hero-caption, var(--fi-color-topic-hero-caption)); font-size: var(--fi-font-24); font-variant-numeric: tabular-nums; }
+.topic-card__entry-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--fi-component-topic-hero-title); font-size: var(--fi-font-28); line-height: var(--fi-leading-normal); font-weight: var(--fi-weight-bold); }
 .topic-card__footer { display: flex; align-items: center; gap: var(--fi-space-16); margin-top: var(--fi-space-16); }
 .topic-card__meta { flex: 1; min-width: 0; display: flex; align-items: center; overflow: hidden; }
 .topic-card__audio { flex-shrink: 0; }

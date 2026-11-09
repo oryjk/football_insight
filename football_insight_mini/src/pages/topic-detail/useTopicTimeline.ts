@@ -13,7 +13,7 @@ interface TeamTimeline {
   failedReset: boolean
 }
 
-export function useTopicTimeline(anchor: Ref<DailyTopicItem | null>) {
+export function useTopicTimeline(anchor: Readonly<Ref<DailyTopicItem | null>>) {
   const selectedTeamId = ref<number | null>(null)
   // Page-local cache: loaded pages and in-flight requests belong to their own team.
   const teams = reactive(new Map<number, TeamTimeline>())

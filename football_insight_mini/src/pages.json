@@ -89,7 +89,7 @@
 		{
 			"path": "pages/topic-detail/index",
 			"style": {
-				"navigationBarTitleText": "话题详情",
+				"navigationBarTitleText": "每日话题",
 				"navigationStyle": "custom"
 			}
 		}

@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test'
-import { mapTopicHistory, mapTopicDetail, mapTopicTimeline, mergeTopicHistory, topicDetailUrl, formatTopicHeat } from './dailyTopics'
+import { describe, expect, test } from 'bun:test'
+import { isRoundupTopic, mapDailyTopicItem, mapTopicHistory, mapTopicDetail, mapTopicTimeline, mergeTopicHistory, roundupDayLabel, topicDetailUrl, formatTopicHeat } from './dailyTopics'
 const article = (id: string, time: string) => ({ id, team_id: 77680, title: '新闻标题', summary: '摘要', paragraphs: ['正文'], published_at: time,
   sources: [{ title: '来源', publisher: '新闻', url: 'https://news.example.com/a', published_at: time }], audio: { status: 'pending' } })
 const page = (items: unknown[], next: string | null = null) => ({ team_id: 77680, items, next_cursor: next, has_more: next !== null })
@@ -73,4 +73,29 @@ test('时间线核对当前话题、球队和历史时间，拒绝串线响应',
     { ...response, items: [{ ...older, team_tags: [] }] }, { ...response, items: [{ ...older, published_at: anchor.publishedAt }] }]) {
     expect(() => mapTopicTimeline(wrong, anchor, 148)).toThrow()
   }
+})
+
+describe('daily roundup entries', () => {
+  const roundup = (entries: unknown) => mapDailyTopicItem({
+    id: 'r'.repeat(64), team_id: 77680, title: '标题', summary: '摘要', paragraphs: ['【a】b'],
+    published_at: '2026-11-09T07:00:00Z', heat: 0,
+    sources: [{ title: 't', url: 'https://news.example/1', publisher: '直播吧', published_at: '2026-11-09T02:00:00Z' }],
+    audio: { status: 'ready', url: 'https://media.example.com/r.m4a', dialect: 'sichuan', duration_seconds: 120 },
+    entries,
+  })
+  const entry = (id: string, publishedAt: string) => ({ id, title: `标题${id}`, text: `正文${id}`, published_at: publishedAt,
+    sources: [{ title: 't', url: 'https://news.example/1', publisher: '直播吧', published_at: publishedAt }] })
+
+  test('maps entries newest first with Beijing time labels and a date for the previous night', () => {
+    const item = roundup([entry('a', '2026-11-08T15:30:00Z'), entry('b', '2026-11-09T07:26:00Z')])!
+    expect(isRoundupTopic(item)).toBe(true)
+    expect(item.entries.map(e => [e.id, e.timeLabel])).toEqual([['b', '15:26'], ['a', '11-08 23:30']])
+    expect(roundupDayLabel(item.publishedAt)).toBe('2026年11月09日 周一')
+  })
+
+  test('skips malformed entries and keeps legacy topics without entries', () => {
+    const item = roundup([entry('a', '2026-11-09T07:26:00Z'), { id: 'x', title: '', text: 't', published_at: '2026-11-09T07:26:00Z' }, 'bad', entry('a', '2026-11-09T07:26:00Z')])!
+    expect(item.entries.map(e => e.id)).toEqual(['a'])
+    expect(isRoundupTopic(roundup(undefined)!)).toBe(false)
+  })
 })

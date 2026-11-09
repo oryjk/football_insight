@@ -28,6 +28,18 @@ export interface DailyTopicItem {
   heat: number
   readMinutes: number
   audio: DailyTopicAudio
+  /** 每日话题的快讯条目（新到旧）；旧版多篇话题为空数组。 */
+  entries: DailyTopicEntry[]
+}
+
+export interface DailyTopicEntry {
+  id: string
+  title: string
+  text: string
+  publishedAt: string
+  /** 当天的条目只显示「HH:mm」，前一天深夜的条目带日期「MM-DD HH:mm」。 */
+  timeLabel: string
+  sources: DailyTopicSource[]
 }
 
 export interface DailyTopicTag { teamId: number; name: string }

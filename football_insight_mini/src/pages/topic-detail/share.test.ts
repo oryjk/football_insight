@@ -4,7 +4,7 @@ import { buildTopicTimelinePayload, buildTopicSharePayload, containSharePhoto, t
 
 const article: DailyTopicItem = { id: 'topic_2026-10-13', teamId: 77680, title: '蓉城争冠关键战', summary: '这是摘要',
   paragraphs: ['  正文第一段  ', '正文第二段'], publishedAt: '2026-10-13T00:00:00Z', publishedLabel: '2026/10/13 08:00',
-  sources: [], sourceLabel: '来源', heat: 0, readMinutes: 1, audio: { status: 'pending', url: null, durationSeconds: null } }
+  sources: [], sourceLabel: '来源', heat: 0, readMinutes: 1, audio: { status: 'pending', url: null, durationSeconds: null }, entries: [] }
 
 describe('article sharing', () => {
   test('links to the current article with its title and generated cover', () => {

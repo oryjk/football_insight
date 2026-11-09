@@ -5,6 +5,17 @@
   <view class="topic-detail">
     <view v-if="loading" class="topic-detail__state">正在加载话题…</view>
     <view v-else-if="errorMessage" class="topic-detail__state"><text>{{ errorMessage }}</text><button @tap="load">重新加载</button></view>
+    <template v-else-if="item && isRoundupTopic(item)">
+      <text class="topic-detail__title">每日话题</text>
+      <view class="topic-detail__meta-row">
+        <text class="topic-detail__meta">更新于 {{ item.publishedLabel }}</text>
+        <view class="topic-detail__size"><FiSegmented compact :items="READING_SIZE_ITEMS" :model-value="readingSize" aria-label="文字大小" @update:model-value="setReadingSize" /></view>
+      </view>
+      <FiTopicAudioPlayer v-if="audio.activeId.value" title="每日话题" :status="audio.status.value" :current-time="audio.currentTime.value" :duration="audio.duration.value" :error-message="audio.errorMessage.value" @toggle="audio.toggle(item.id)" @seek="audio.seek" @close="audio.stop" />
+      <view class="topic-detail__roundup">
+        <TopicRoundup :item="item" :font-rpx="bodyFontRpx" :audio-ready="audio.availableIds.value.includes(item.id)" :audio-playing="audio.status.value === 'playing'" :audio-loading="audio.status.value === 'loading'" @play="audio.toggle(item.id)" @copy="copyEntrySource" />
+      </view>
+    </template>
     <template v-else-if="item">
       <FiTopicTeamTags v-if="timeline.tags.value.length" :tags="timeline.tags.value" :selected-team-id="timeline.selectedTeamId.value" @select="selectTimelineTeam" />
       <text class="topic-detail__title">{{ item.title }}</text>
@@ -20,8 +31,11 @@
       </view>
       <text v-for="(paragraph, index) in item.paragraphs" :key="index" class="topic-detail__paragraph" :style="{ fontSize: `${bodyFontRpx}rpx` }">{{ paragraph }}</text>
       <view class="topic-detail__sources">
-        <text class="topic-detail__sources-heading">来源</text>
-        <view v-for="(source, index) in item.sources" :key="source.url" class="topic-detail__source">
+        <view class="topic-detail__sources-toggle" role="button" :aria-expanded="sourcesOpen" hover-class="topic-detail__pressed" @tap="sourcesOpen = !sourcesOpen">
+          <text class="topic-detail__sources-heading">来源（{{ item.sources.length }}）</text>
+          <text class="topic-detail__chevron" :class="{ 'topic-detail__chevron--open': sourcesOpen }">›</text>
+        </view>
+        <view v-for="(source, index) in item.sources" v-show="sourcesOpen" :key="source.url" class="topic-detail__source">
           <text class="topic-detail__source-title">{{ index + 1 }}. {{ source.title }}</text>
           <text class="topic-detail__meta">{{ source.publisher }} · {{ source.dateLabel }}</text>
           <button class="topic-detail__copy" @tap="copySource(source.url)">复制原文链接</button>
@@ -51,13 +65,14 @@ import { useDailyTopicAudio } from '../../composables/useDailyTopicAudio'
 import FiTopicAudioEntry from '../../components/topics/FiTopicAudioEntry.vue'
 import FiTopicAudioPlayer from '../../components/topics/FiTopicAudioPlayer.vue'
 import TopicImageGallery from './components/TopicImageGallery.vue'
+import TopicRoundup from './components/TopicRoundup.vue'
 import TopicTimeline from './components/TopicTimeline.vue'
 import FiTopicTeamTags from '../../components/topics/FiTopicTeamTags.vue'
 import { useTopicTimeline } from './useTopicTimeline'
 import FiSegmented from '../../components/FiSegmented.vue'
 import { READING_SIZE_ITEMS, loadReadingSize, normalizeReadingSize, readingSizeRpx, saveReadingSize } from './readingSize'
 import type { DailyTopicItem } from '../../types/dailyTopic'
-import { DAILY_TOPICS_TEAM_ID, editionForTopic, isTopicSourceUrl, mapTopicDetail, topicDetailUrl } from '../../utils/dailyTopics'
+import { DAILY_TOPICS_TEAM_ID, editionForTopic, isRoundupTopic, isTopicSourceUrl, mapTopicDetail, topicDetailUrl } from '../../utils/dailyTopics'
 import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { buildTopicTimelinePayload, buildTopicSharePayload, TOPIC_SHARE_CARD } from './share'
@@ -65,7 +80,8 @@ import { TOPIC_SHARE_CANVAS_ID, useTopicShareCard } from './useTopicShareCard'
 
 const { navigationPageStyle } = useNavigationLayout()
 const item = ref<DailyTopicItem | null>(null)
-const timeline = useTopicTimeline(item)
+// 每日话题是全联赛快讯流，不做按球队的话题追踪，也不发追踪请求。
+const timeline = useTopicTimeline(computed(() => item.value && !isRoundupTopic(item.value) ? item.value : null))
 const loading = ref(false)
 const errorMessage = ref('')
 const edition = computed(() => editionForTopic(item.value))
@@ -104,6 +120,10 @@ function copySource(url: string) {
   if (!isTopicSourceUrl(url) || !item.value?.sources.some(source => source.url === url)) return
   uni.setClipboardData({ data: url, success: () => uni.showToast({ title: '原文链接已复制', icon: 'none' }) })
 }
+function copyEntrySource(url: string) {
+  if (!isTopicSourceUrl(url) || !item.value?.entries.some(entry => entry.sources.some(source => source.url === url))) return
+  uni.setClipboardData({ data: url, success: () => uni.showToast({ title: '原文链接已复制', icon: 'none' }) })
+}
 function selectTimelineTeam(teamId: number) {
   timeline.selectTeam(teamId)
   uni.pageScrollTo({ selector: '#topic-timeline', duration: 700 })
@@ -129,6 +149,7 @@ onShareAppMessage(() => {
 onShareTimeline(() => buildTopicTimelinePayload(shareArticle.value, shareCard.imageUrl.value))
 onScopeDispose(() => { revision += 1 })
 
+const sourcesOpen = ref(false)
 const readingSize = ref(loadReadingSize())
 const bodyFontRpx = computed(() => readingSizeRpx(readingSize.value))
 function setReadingSize(key: string) {
@@ -143,6 +164,7 @@ function setReadingSize(key: string) {
 .topic-share-canvas { position: fixed; left: -9999rpx; top: 0; pointer-events: none; }
 .topic-detail { padding: var(--fi-space-28) var(--fi-space-28) var(--fi-space-40); background: var(--fi-color-page); }
 .topic-detail__timeline { margin-top: var(--fi-space-32); }
+.topic-detail__roundup { margin-top: var(--fi-space-28); }
 .topic-detail__title { display: block; margin-top: var(--fi-space-16); color: var(--fi-color-text-primary); font-size: var(--fi-font-36); font-weight: var(--fi-weight-extrabold); line-height: var(--fi-leading-normal); }
 .topic-detail__meta-row { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-16); margin-top: var(--fi-space-18); }
 .topic-detail__meta-row .topic-detail__meta { margin-top: 0; }
@@ -153,6 +175,10 @@ function setReadingSize(key: string) {
 .topic-detail__gallery { margin-top: var(--fi-space-24); }
 .topic-detail__paragraph { display: block; margin-top: var(--fi-space-28); color: var(--fi-color-text-primary); font-size: var(--fi-font-32); line-height: var(--fi-leading-relaxed); white-space: pre-wrap; }
 .topic-detail__sources { margin-top: var(--fi-space-32); padding-top: var(--fi-space-24); border-top: var(--fi-border-divider); }
+.topic-detail__sources-toggle { display: flex; align-items: center; justify-content: space-between; }
+.topic-detail__chevron { color: var(--fi-color-text-caption); font-size: var(--fi-font-32); transform: rotate(90deg); transition: transform 0.2s; }
+.topic-detail__chevron--open { transform: rotate(-90deg); }
+.topic-detail__pressed { opacity: 0.6; }
 .topic-detail__sources-heading { display: block; color: var(--fi-color-text-primary); font-size: var(--fi-font-26); font-weight: var(--fi-weight-bold); }
 .topic-detail__source { margin-top: var(--fi-space-24); }
 .topic-detail__source-title { display: block; color: var(--fi-color-text-secondary); font-size: var(--fi-font-26); line-height: var(--fi-leading-normal); }

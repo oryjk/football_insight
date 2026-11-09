@@ -339,14 +339,14 @@ function showScorerMatch(playerName: string, match: PlayerMatchGoals) {
 onShareAppMessage(() => ({
   title: supportFavoriteTeam.value
     ? `${supportFavoriteTeam.value.team_name} 下一场先为谁站队？`
-    : '足球洞察：今日话题，关注成都蓉城',
+    : '足球洞察：每日话题，关注成都蓉城',
   path: buildSharePath('/pages/home/index', 'home'),
 }))
 
 onShareTimeline(() => ({
   title: supportFavoriteTeam.value
     ? `${supportFavoriteTeam.value.team_name} 下一场先为谁站队？`
-    : '足球洞察：今日话题，关注成都蓉城',
+    : '足球洞察：每日话题，关注成都蓉城',
   query: buildShareQuery('home'),
 }))
 

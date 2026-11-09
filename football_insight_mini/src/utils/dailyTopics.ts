@@ -1,4 +1,4 @@
-import type { DailyTopicEdition, DailyTopicImage, DailyTopicItem, DailyTopicSource, DailyTopicTag } from '../types/dailyTopic'
+import type { DailyTopicEdition, DailyTopicEntry, DailyTopicImage, DailyTopicItem, DailyTopicSource, DailyTopicTag } from '../types/dailyTopic'
 
 export const DAILY_TOPICS_TEAM_ID = 77680
 export const DAILY_TOPICS_LIMIT = 5
@@ -47,6 +47,39 @@ export function formatTopicTimestamp(value: string): string {
   const date = new Date(Date.parse(value) + 8 * 60 * 60 * 1000)
   const pad = (number: number) => String(number).padStart(2, '0')
   return `${date.getUTCFullYear()}/${pad(date.getUTCMonth() + 1)}/${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`
+}
+function beijingParts(value: string) {
+  const date = new Date(Date.parse(value) + 8 * 60 * 60 * 1000)
+  const pad = (number: number) => String(number).padStart(2, '0')
+  return { year: date.getUTCFullYear(), month: pad(date.getUTCMonth() + 1), day: pad(date.getUTCDate()),
+    weekday: date.getUTCDay(), time: `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}` }
+}
+/** 每日话题的「那一天」：最后一次追加发生在当天 07–23 点，取发布时间的北京日期。 */
+export function roundupDayLabel(publishedAt: string): string {
+  const { year, month, day, weekday } = beijingParts(publishedAt)
+  return `${year}年${month}月${day}日 周${'日一二三四五六'[weekday]}`
+}
+export function roundupEntryTimeLabel(entryAt: string, dayAt: string): string {
+  const entry = beijingParts(entryAt), day = beijingParts(dayAt)
+  const sameDay = entry.year === day.year && entry.month === day.month && entry.day === day.day
+  return sameDay ? entry.time : `${entry.month}-${entry.day} ${entry.time}`
+}
+export function isRoundupTopic(item: Pick<DailyTopicItem, 'entries'>): boolean {
+  return item.entries.length > 0
+}
+function mapEntries(value: unknown, dayAt: string): DailyTopicEntry[] {
+  if (!Array.isArray(value)) return []
+  const entries: DailyTopicEntry[] = [], seen = new Set<string>()
+  for (const candidate of value) {
+    const entry = record(candidate)
+    if (!entry) continue
+    const id = text(entry.id), title = text(entry.title), body = text(entry.text), publishedAt = timestamp(entry.published_at)
+    if (!id || !title || !body || !publishedAt || seen.has(id)) continue
+    seen.add(id)
+    const sources = Array.isArray(entry.sources) ? entry.sources.map(mapSource).filter((source): source is DailyTopicSource => source !== null) : []
+    entries.push({ id, title, text: body, publishedAt, timeLabel: roundupEntryTimeLabel(publishedAt, dayAt), sources })
+  }
+  return entries.sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))
 }
 export function emptyDailyTopicEdition(): DailyTopicEdition {
   return { teamId: DAILY_TOPICS_TEAM_ID, editionDate: null, updatedAt: null, dateLabel: '', updatedLabel: '', items: [] }
@@ -111,6 +144,7 @@ export function mapDailyTopicItem(value: unknown): DailyTopicItem | null {
       durationSeconds: ready && typeof audio?.duration_seconds === 'number' && Number.isFinite(audio.duration_seconds) && audio.duration_seconds > 0
         ? audio.duration_seconds : null,
     },
+    entries: mapEntries(item.entries, publishedAt),
   }
 }
 export function mapDailyTopicEdition(value: unknown): DailyTopicEdition {
