@@ -361,6 +361,8 @@ def run_roundup_update(sources: list[SourceArticle], *, repository, generator_fa
     previous_audio = existing_item.get('audio') if existing_item else None
     item = build_roundup_item(team_id=team_id, edition_date=edition_date, entries=entries, now=now,
                               audio=previous_audio)
+    if existing_item and existing_item.get('published_at', '') > item['published_at']:
+        item['published_at'] = existing_item['published_at']  # 补历史时段时不让发布时间倒退
     item['category_audio'] = (existing_item or {}).get('category_audio') or {}
     audio_error = None
     try:

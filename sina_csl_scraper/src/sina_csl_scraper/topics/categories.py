@@ -74,5 +74,8 @@ def choose_category(entry_text: str, reference_text: str, hint, *, focus, watchl
     if not supported:
         return None
     own = [category for category in candidate_categories(entry_text, focus=focus, watchlist=watchlist) if category in supported]
-    allowed = own or supported
+    # 国际必须条目自己点名热门对象：综述类原文常顺带提到热门球队，不能借它的证据。
+    allowed = own or [category for category in supported if category != WORLD]
+    if not allowed:
+        return None
     return hint if hint in allowed else allowed[0]

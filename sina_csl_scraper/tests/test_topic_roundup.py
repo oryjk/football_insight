@@ -311,3 +311,10 @@ def test_domestic_news_other_than_personnel_moves_is_left_out(env, tmp_path):
     decisions = {s['url'].rsplit('/', 1)[1]: s['decision'] for s in result['sources']}
     assert decisions == {'1': 'eligible', '2': 'out_of_scope'}
     assert [e['title'] for e in todays_item(env[0])['entries']] == ['泽卡与中超球队商谈']
+
+
+def test_world_needs_the_entry_itself_to_name_a_watched_target():
+    from sina_csl_scraper.topics.categories import choose_category
+    digest = '意甲第11轮：罗马3比0战胜萨索洛；国米2比0击败科莫。' * 2
+    assert choose_category('罗马3-0战胜萨索洛', digest, 'world', focus=CATALOG, watchlist=Watchlist(clubs=(('国米', '国际米兰'),))) is None
+    assert choose_category('国米2-0击败科莫', digest, 'world', focus=CATALOG, watchlist=Watchlist(clubs=(('国米', '国际米兰'),))) == 'world'

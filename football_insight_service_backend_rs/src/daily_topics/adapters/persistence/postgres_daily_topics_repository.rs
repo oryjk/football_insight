@@ -166,7 +166,7 @@ impl DailyTopicsRepository for PostgresDailyTopicsRepository {
         edition_date: NaiveDate,
     ) -> Result<Option<DailyTopicEdition>, DailyTopicsRepositoryError> {
         let row = sqlx::query(
-            "SELECT team_id, edition_date, published_at, payload FROM f_i_daily_topic_editions WHERE team_id = $1 AND edition_date = $2 ORDER BY published_at DESC, id DESC LIMIT 1"
+            "SELECT team_id, edition_date, published_at, payload FROM f_i_daily_topic_editions WHERE team_id = $1 AND edition_date = $2 ORDER BY (generator_version LIKE 'daily-roundup-%') DESC, published_at DESC, id DESC LIMIT 1"
         )
         .bind(team_id)
         .bind(edition_date)
