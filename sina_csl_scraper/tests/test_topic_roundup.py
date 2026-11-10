@@ -318,3 +318,19 @@ def test_world_needs_the_entry_itself_to_name_a_watched_target():
     digest = '意甲第11轮：罗马3比0战胜萨索洛；国米2比0击败科莫。' * 2
     assert choose_category('罗马3-0战胜萨索洛', digest, 'world', focus=CATALOG, watchlist=Watchlist(clubs=(('国米', '国际米兰'),))) is None
     assert choose_category('国米2-0击败科莫', digest, 'world', focus=CATALOG, watchlist=Watchlist(clubs=(('国米', '国际米兰'),))) == 'world'
+
+
+def test_world_entry_naming_a_watched_club_outside_football_sentences_is_world():
+    from sina_csl_scraper.topics.categories import choose_category
+    watch = Watchlist(clubs=(('曼联', '曼彻斯特联'),), people=('卡里克',))
+    entry = '据报道卡里克帅位危机，曼联讨论接任人选\n曼联高层连日开会讨论其去留，波切蒂诺是接替热门人选。'
+    refs = '记者：卡里克合同中含解约条款，中超球队也在关注。曼联主帅卡里克或下课。' * 2
+    assert choose_category(entry, refs, 'domestic', focus=CATALOG, watchlist=watch) == 'world'
+
+
+def test_entries_without_own_evidence_are_dropped_when_sources_point_both_ways():
+    from sina_csl_scraper.topics.categories import choose_category
+    watch = Watchlist(clubs=(('曼联',),))
+    refs = '中超第30轮比赛结束。曼联主帅下课。' * 2
+    assert choose_category('高层开会讨论去留', refs, 'world', focus=CATALOG, watchlist=watch) is None
+    assert choose_category('高层开会讨论去留', refs, 'domestic', focus=CATALOG, watchlist=watch) == 'domestic'

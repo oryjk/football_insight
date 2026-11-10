@@ -25,6 +25,10 @@ def is_personnel_move(text: str) -> bool:
 NATIONAL_TEAM = re.compile(r'中超|中甲|中乙|足协杯|中国足协|国足|中国男足|中国队|中国国家队|国奥|国青|国少|中国U\d{2}')
 
 
+# 同时也是普通词语的别名：只在带足球语境的句子里才算命中。
+AMBIGUOUS_ALIASES = {'巴黎', '大巴黎', '枪手', '药厂', '多特', '国际米兰'}
+
+
 @dataclass(frozen=True)
 class Watchlist:
     """国际只收这些热门俱乐部、球员、教练的消息；名单来自配置 `world_watchlist`。"""
@@ -42,13 +46,15 @@ class Watchlist:
         return cls(tuple(group for group in clubs if group), people, overseas)
 
     def world_hits(self, text: str) -> list[str]:
-        """命中的热门对象（俱乐部取主名）；只认带足球语境的句子，避免「巴黎」这类城市名误中。"""
-        hits = []
-        sentences = [s for s in re.split(r'[。！？\n；]', text) if FOOTBALL.search(s)]
-        for group in self.clubs:
-            if any(alias in sentence for sentence in sentences for alias in group):
-                hits.append(group[0])
-        hits.extend(name for name in self.people if any(name in sentence for sentence in sentences))
+        """命中的热门对象（俱乐部取主名）。「曼联」「卡里克」这类名字本身就是足球的，直接算；
+        「巴黎」「枪手」这类也是普通词的别名，要求所在句子有足球语境。"""
+        sentences = re.split(r'[。！？\n；]', text)
+        football = [s for s in sentences if FOOTBALL.search(s)]
+        def found(alias: str) -> bool:
+            pool = football if alias in AMBIGUOUS_ALIASES else sentences
+            return any(alias in sentence for sentence in pool)
+        hits = [group[0] for group in self.clubs if any(found(alias) for alias in group)]
+        hits.extend(name for name in self.people if found(name))
         return hits
 
     def is_abroad(self, text: str) -> bool:
@@ -74,8 +80,11 @@ def choose_category(entry_text: str, reference_text: str, hint, *, focus, watchl
     if not supported:
         return None
     own = [category for category in candidate_categories(entry_text, focus=focus, watchlist=watchlist) if category in supported]
-    # 国际必须条目自己点名热门对象：综述类原文常顺带提到热门球队，不能借它的证据。
-    allowed = own or [category for category in supported if category != WORLD]
-    if not allowed:
-        return None
-    return hint if hint in allowed else allowed[0]
+    if own:
+        return hint if hint in own else own[0]
+    # 条目自己没有证据（标题常省略球队名）时才借原文的：国际不借（综述类原文常顺带提热门球队），
+    # 而且只在原文的证据只指向一个分类、或大模型给的分类在其中时才借，否则宁可丢掉，也不硬归类。
+    borrowable = [category for category in supported if category != WORLD]
+    if hint in borrowable:
+        return hint
+    return borrowable[0] if len(supported) == 1 and borrowable else None
