@@ -81,9 +81,19 @@ export interface TelegraphComment {
   author: TelegraphCommentAuthor
   replyTo: TelegraphCommentReplyRef | null
   content: string
+  likesCount: number
+  likedByMe: boolean
+  repliesCount: number
   isMine: boolean
   createdAt: string
   createdLabel: string
+  relativeTimeLabel: string
+}
+
+export interface TelegraphCommentLikeSummary {
+  commentId: string
+  likesCount: number
+  likedByMe: boolean
 }
 
 export interface TelegraphCommentsPage {

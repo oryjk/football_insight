@@ -16,7 +16,13 @@
       </view>
     </view>
     <view v-if="!visible.length" class="roundup__empty">今天还没有{{ activeLabel }}消息，每小时更新一次</view>
-    <view v-for="entry in visible" :key="entry.id" class="roundup__entry">
+    <view
+      v-for="entry in visible"
+      :key="entry.id"
+      class="roundup__entry"
+      hover-class="roundup__entry--pressed"
+      @tap="emit('open-entry', entry, false)"
+    >
       <text class="roundup__line" :style="{ fontSize: `${fontRpx}rpx` }">
         <text class="roundup__time">{{ entry.timeLabel }}</text>
         <text class="roundup__title">【{{ entry.title }}】</text>
@@ -26,7 +32,7 @@
         <view class="roundup__meta-info">
           <text v-if="active === null" class="roundup__tag" :class="`roundup__tag--${entry.category}`">{{ telegraphCategoryLabel(entry.category) }}</text>
           <!-- 来源默认折叠，只露出媒体名；点开后逐条列出，可复制原文链接。 -->
-          <view v-if="entry.sources.length" class="roundup__source-toggle" role="button" :aria-expanded="expanded.has(entry.id)" hover-class="roundup__pressed" @tap="toggle(entry.id)">
+          <view v-if="entry.sources.length" class="roundup__source-toggle" role="button" :aria-expanded="expanded.has(entry.id)" hover-class="roundup__pressed" @tap.stop="toggle(entry.id)">
             <text>来源：{{ publishers(entry) }}</text>
             <text class="roundup__chevron" :class="{ 'roundup__chevron--open': expanded.has(entry.id) }">›</text>
           </view>
@@ -46,19 +52,19 @@
             v-if="commentsVisible"
             class="roundup__comment-btn"
             hover-class="roundup__pressed"
-            @tap.stop="emit('comment', entry)"
+            @tap.stop="emit('open-entry', entry, true)"
           >
             <text class="roundup__comment-label">评论</text>
             <text v-if="entry.commentsCount > 0" class="roundup__comment-count">{{ entry.commentsCount }}</text>
           </button>
         </view>
       </view>
-      <view v-if="expanded.has(entry.id)" class="roundup__sources">
+      <view v-if="expanded.has(entry.id)" class="roundup__sources" @tap.stop>
         <view v-for="source in entry.sources" :key="source.url" class="roundup__source">
           <text class="roundup__source-title">{{ source.title }}</text>
           <view class="roundup__source-meta">
             <text>{{ source.publisher }} · {{ source.dateLabel }}</text>
-            <text class="roundup__copy" role="button" hover-class="roundup__pressed" @tap="emit('copy', source.url)">复制原文链接</text>
+            <text class="roundup__copy" role="button" hover-class="roundup__pressed" @tap.stop="emit('copy', source.url)">复制原文链接</text>
           </view>
         </view>
       </view>
@@ -92,7 +98,7 @@ const emit = defineEmits<{
   (e: 'copy', url: string): void
   (e: 'like', entry: DailyTopicEntry): void
   (e: 'dislike', entry: DailyTopicEntry): void
-  (e: 'comment', entry: DailyTopicEntry): void
+  (e: 'open-entry', entry: DailyTopicEntry, focusComment: boolean): void
 }>()
 const dayLabel = computed(() => roundupDayLabel(props.item.publishedAt))
 const counts = computed(() => telegraphCategoryCounts(props.item))
@@ -126,6 +132,7 @@ function publishers(entry: DailyTopicEntry): string {
 .roundup__tab--active .roundup__tab-count { color: var(--fi-color-primary); }
 .roundup__empty { padding: var(--fi-space-40) 0; text-align: center; color: var(--fi-color-text-secondary); font-size: var(--fi-font-26); }
 .roundup__entry { padding: var(--fi-space-28) 0 var(--fi-space-20); border-bottom: var(--fi-border-divider); }
+.roundup__entry--pressed { opacity: var(--fi-opacity-pressed); }
 .roundup__line { display: block; color: var(--fi-color-text-primary); line-height: var(--fi-leading-relaxed); }
 .roundup__time { color: var(--fi-color-primary); font-weight: var(--fi-weight-bold); margin-right: var(--fi-space-8); }
 .roundup__title { font-weight: var(--fi-weight-bold); }

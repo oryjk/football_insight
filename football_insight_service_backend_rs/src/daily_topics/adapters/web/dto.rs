@@ -13,8 +13,8 @@ use crate::daily_topics::domain::{
         DailyTopicSource, DailyTopicsView,
     },
     interactions::{
-        TelegraphComment, TelegraphCommentsPage, TelegraphCommentsPosition,
-        TelegraphInteractionError, TelegraphReactionSummary,
+        TelegraphComment, TelegraphCommentLikeSummary, TelegraphCommentsPage,
+        TelegraphCommentsPosition, TelegraphInteractionError, TelegraphReactionSummary,
     },
     query::{DailyTopicsQuery, InvalidDailyTopicsQuery},
 };
@@ -501,6 +501,23 @@ pub(super) struct TelegraphCommentReplyRefDto {
 }
 
 #[derive(Serialize)]
+pub(super) struct TelegraphCommentLikeResponseDto {
+    pub comment_id: Uuid,
+    pub likes_count: u64,
+    pub liked_by_me: bool,
+}
+
+impl From<TelegraphCommentLikeSummary> for TelegraphCommentLikeResponseDto {
+    fn from(value: TelegraphCommentLikeSummary) -> Self {
+        Self {
+            comment_id: value.comment_id,
+            likes_count: value.likes_count,
+            liked_by_me: value.liked_by_me,
+        }
+    }
+}
+
+#[derive(Serialize)]
 pub(super) struct TelegraphCommentDto {
     pub id: Uuid,
     pub topic_id: String,
@@ -508,6 +525,9 @@ pub(super) struct TelegraphCommentDto {
     pub author: TelegraphCommentAuthorDto,
     pub reply_to: Option<TelegraphCommentReplyRefDto>,
     pub content: String,
+    pub likes_count: u64,
+    pub liked_by_me: bool,
+    pub replies_count: u64,
     pub is_mine: bool,
     pub created_at: DateTime<Utc>,
 }
@@ -527,6 +547,9 @@ impl From<TelegraphComment> for TelegraphCommentDto {
                 author_display_name: reply.author_display_name,
             }),
             content: value.content,
+            likes_count: value.likes_count,
+            liked_by_me: value.liked_by_me,
+            replies_count: value.replies_count,
             is_mine: value.is_mine,
             created_at: value.created_at,
         }

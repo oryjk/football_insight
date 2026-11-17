@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 
@@ -36,9 +36,9 @@ use football_insight_service_backend_rs::{
         application::telegraph_interactions::TelegraphInteractionsService,
         domain::interactions::{
             CreateTelegraphCommentInput, ReactionMutation, TelegraphComment,
-            TelegraphCommentAuthor, TelegraphCommentReplyRef, TelegraphCommentsPage,
-            TelegraphCommentsPosition, TelegraphInteractionError, TelegraphReactionKind,
-            TelegraphReactionSummary,
+            TelegraphCommentAuthor, TelegraphCommentLikeSummary, TelegraphCommentReplyRef,
+            TelegraphCommentsPage, TelegraphCommentsPosition, TelegraphInteractionError,
+            TelegraphReactionKind, TelegraphReactionSummary,
         },
         ports::daily_topics_repository::TelegraphInteractionsRepository,
     },
@@ -155,6 +155,7 @@ struct InMemoryInteractions {
     users: Arc<InMemoryUsers>,
     comments_enabled: Mutex<bool>,
     reactions: Mutex<HashMap<(String, Uuid), TelegraphReactionKind>>,
+    comment_likes: Mutex<HashSet<(Uuid, Uuid)>>,
     comments: Mutex<Vec<StoredComment>>,
     rate_limited_users: Mutex<Vec<Uuid>>,
 }
@@ -165,6 +166,7 @@ impl InMemoryInteractions {
             users,
             comments_enabled: Mutex::new(true),
             reactions: Mutex::new(HashMap::new()),
+            comment_likes: Mutex::new(HashSet::new()),
             comments: Mutex::new(Vec::new()),
             rate_limited_users: Mutex::new(Vec::new()),
         }
@@ -242,6 +244,7 @@ impl TelegraphInteractionsRepository for InMemoryInteractions {
             });
         }
         let comments = self.comments.lock().unwrap();
+        let comment_likes = self.comment_likes.lock().unwrap();
         let users = self.users.users.lock().unwrap();
         let mut visible: Vec<&StoredComment> = comments
             .iter()
@@ -272,6 +275,19 @@ impl TelegraphInteractionsRepository for InMemoryInteractions {
                             ),
                         })
                 });
+                let likes_count = comment_likes
+                    .iter()
+                    .filter(|(cid, _)| *cid == c.id)
+                    .count() as u64;
+                let liked_by_me = viewer_user_id.is_some_and(|uid| comment_likes.contains(&(c.id, uid)));
+                let replies_count = comments
+                    .iter()
+                    .filter(|child| {
+                        child.reply_to_comment_id == Some(c.id)
+                            && child.entry_id == c.entry_id
+                            && child.status == "visible"
+                    })
+                    .count() as u64;
                 TelegraphComment {
                     id: c.id,
                     topic_id: c.topic_id.clone(),
@@ -283,6 +299,9 @@ impl TelegraphInteractionsRepository for InMemoryInteractions {
                     },
                     reply_to,
                     content: c.content.clone(),
+                    likes_count,
+                    liked_by_me,
+                    replies_count,
                     is_mine: viewer_user_id == Some(c.user_id),
                     created_at: c.created_at,
                 }
@@ -419,6 +438,45 @@ impl TelegraphInteractionsRepository for InMemoryInteractions {
             .filter(|c| c.topic_id == topic_id && c.entry_id == entry_id && c.status == "visible")
             .count() as u64;
         Ok(remaining)
+    }
+
+    async fn set_comment_like(
+        &self,
+        _team_id: i64,
+        topic_id: &str,
+        entry_id: &str,
+        comment_id: Uuid,
+        user_id: Uuid,
+        active: bool,
+    ) -> Result<TelegraphCommentLikeSummary, TelegraphInteractionError> {
+        if !*self.comments_enabled.lock().unwrap() {
+            return Err(TelegraphInteractionError::CommentsDisabled);
+        }
+        let exists = self.comments.lock().unwrap().iter().any(|c| {
+            c.id == comment_id
+                && c.topic_id == topic_id
+                && c.entry_id == entry_id
+                && c.status == "visible"
+        });
+        if !exists {
+            return Err(TelegraphInteractionError::TopicOrEntryNotFound);
+        }
+        let mut comment_likes = self.comment_likes.lock().unwrap();
+        if active {
+            comment_likes.insert((comment_id, user_id));
+        } else {
+            comment_likes.remove(&(comment_id, user_id));
+        }
+        let likes_count = comment_likes
+            .iter()
+            .filter(|(cid, _)| *cid == comment_id)
+            .count() as u64;
+        let liked_by_me = comment_likes.contains(&(comment_id, user_id));
+        Ok(TelegraphCommentLikeSummary {
+            comment_id,
+            likes_count,
+            liked_by_me,
+        })
     }
 }
 
@@ -783,4 +841,80 @@ async fn comments_enforce_profile_gate_moderation_rate_limit_kill_switch_and_del
     assert_eq!(status, StatusCode::OK);
     assert_eq!(list_disabled["comments_enabled"], false);
     assert_eq!(list_disabled["items"], json!([]));
+}
+
+#[tokio::test]
+async fn comment_likes_require_login_and_replies_count_tracks_child_replies() {
+    let (app, token, _, _) = build_test_app();
+    let comments_uri = "/api/v1/daily-topics/topic-1/entries/entry-1/comments";
+
+    let (status, _) = send(
+        app.clone(),
+        "PUT",
+        "/api/v1/auth/me/profile",
+        Some(&token),
+        Some(json!({ "display_name": "成都球迷", "avatar_data_url": valid_png_data_url() })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, created) = send(
+        app.clone(),
+        "POST",
+        comments_uri,
+        Some(&token),
+        Some(json!({ "content": "主帅战术安排很明确" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let comment_id = created["comment"]["id"].as_str().unwrap().to_string();
+    let like_uri = format!("{comments_uri}/{comment_id}/like");
+
+    // Guest cannot like comment
+    assert_eq!(
+        send(app.clone(), "PUT", &like_uri, None, None).await.0,
+        StatusCode::UNAUTHORIZED
+    );
+
+    // Reply increments parent replies_count
+    let (status, _) = send(
+        app.clone(),
+        "POST",
+        comments_uri,
+        Some(&token),
+        Some(json!({ "content": "确实很清晰", "reply_to_comment_id": comment_id })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    // Like and idempotent re-like
+    let (status, liked) = send(app.clone(), "PUT", &like_uri, Some(&token), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(liked["comment_id"], comment_id);
+    assert_eq!(liked["likes_count"], 1);
+    assert_eq!(liked["liked_by_me"], true);
+
+    let (status, liked_again) = send(app.clone(), "PUT", &like_uri, Some(&token), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(liked_again["likes_count"], 1);
+    assert_eq!(liked_again["liked_by_me"], true);
+
+    // List reflects likes_count, liked_by_me, and replies_count
+    let (status, page) = send(app.clone(), "GET", comments_uri, Some(&token), None).await;
+    assert_eq!(status, StatusCode::OK);
+    let root = page["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["id"] == comment_id)
+        .unwrap();
+    assert_eq!(root["likes_count"], 1);
+    assert_eq!(root["liked_by_me"], true);
+    assert_eq!(root["replies_count"], 1);
+
+    // Unlike
+    let (status, unliked) = send(app, "DELETE", &like_uri, Some(&token), None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(unliked["likes_count"], 0);
+    assert_eq!(unliked["liked_by_me"], false);
 }

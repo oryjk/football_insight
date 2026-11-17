@@ -7,8 +7,9 @@ use crate::{
     daily_topics::{
         domain::interactions::{
             CreateTelegraphCommentInput, ReactionMutation, TelegraphComment,
-            TelegraphCommentsPage, TelegraphCommentsPosition, TelegraphInteractionError,
-            TelegraphReactionSummary, valid_telegraph_id, validate_comment_content,
+            TelegraphCommentLikeSummary, TelegraphCommentsPage, TelegraphCommentsPosition,
+            TelegraphInteractionError, TelegraphReactionSummary, valid_telegraph_id,
+            validate_comment_content,
         },
         ports::daily_topics_repository::TelegraphInteractionsRepository,
     },
@@ -108,6 +109,21 @@ impl TelegraphInteractionsService {
         validate_scope(team_id, topic_id, entry_id)?;
         self.repository
             .delete_entry_comment(team_id, topic_id, entry_id, comment_id, user_id)
+            .await
+    }
+
+    pub async fn set_comment_like(
+        &self,
+        team_id: i64,
+        topic_id: &str,
+        entry_id: &str,
+        comment_id: Uuid,
+        user_id: Uuid,
+        active: bool,
+    ) -> Result<TelegraphCommentLikeSummary, TelegraphInteractionError> {
+        validate_scope(team_id, topic_id, entry_id)?;
+        self.repository
+            .set_comment_like(team_id, topic_id, entry_id, comment_id, user_id, active)
             .await
     }
 }

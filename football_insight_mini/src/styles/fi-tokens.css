@@ -42,6 +42,8 @@ page {
   --fi-primitive-icon-md: 40rpx;
   --fi-primitive-avatar-md: 96rpx;
   --fi-primitive-grey-text: #8f9198;
+  --fi-primitive-timeline-rail: #cfd9de;
+  --fi-primitive-heart-like: #f91880;
   --fi-primitive-grey-text-deep: #6d7280;
   --fi-primitive-grey-text-soft: #7a7f8b;
   --fi-primitive-team-form-line: #a8afb9;
@@ -246,6 +248,8 @@ page {
   --fi-motion-ease-spring: var(--fi-primitive-ease-spring);
   --fi-color-divider: var(--fi-primitive-divider);
   --fi-color-divider-soft: var(--fi-primitive-divider-soft);
+  --fi-color-timeline-rail: var(--fi-primitive-timeline-rail);
+  --fi-color-heart-like: var(--fi-primitive-heart-like);
   --fi-color-border-card: var(--fi-primitive-border-card);
   --fi-color-border-chip: var(--fi-primitive-border-chip);
   --fi-color-skeleton-start: var(--fi-primitive-ticket-skeleton-line-background);

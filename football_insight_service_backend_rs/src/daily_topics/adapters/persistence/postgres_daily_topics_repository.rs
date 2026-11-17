@@ -12,9 +12,9 @@ use crate::{
             heat::{TopicHeat, TopicVisit},
             interactions::{
                 CreateTelegraphCommentInput, EntryInteractionStats, ReactionMutation,
-                TelegraphComment, TelegraphCommentAuthor, TelegraphCommentReplyRef,
-                TelegraphCommentsPage, TelegraphCommentsPosition, TelegraphInteractionError,
-                TelegraphReactionSummary,
+                TelegraphComment, TelegraphCommentAuthor, TelegraphCommentLikeSummary,
+                TelegraphCommentReplyRef, TelegraphCommentsPage, TelegraphCommentsPosition,
+                TelegraphInteractionError, TelegraphReactionSummary,
             },
         },
         ports::daily_topics_repository::{
@@ -601,7 +601,34 @@ impl TelegraphInteractionsRepository for PostgresDailyTopicsRepository {
                    c.reply_to_comment_id,
                    ru.display_name AS reply_to_author_display_name,
                    c.content,
-                   c.created_at
+                   c.created_at,
+                   (
+                     SELECT COUNT(*)::bigint
+                       FROM f_i_telegraph_comment_likes cl
+                       JOIN f_i_users lu ON lu.id = cl.user_id
+                      WHERE cl.comment_id = c.id
+                        AND lu.status = 'active'
+                   ) AS likes_count,
+                   CASE
+                     WHEN $7::uuid IS NULL THEN FALSE
+                     ELSE EXISTS(
+                       SELECT 1
+                         FROM f_i_telegraph_comment_likes cl
+                        WHERE cl.comment_id = c.id
+                          AND cl.user_id = $7
+                     )
+                   END AS liked_by_me,
+                   (
+                     SELECT COUNT(*)::bigint
+                       FROM f_i_telegraph_comments child
+                       JOIN f_i_users cu ON cu.id = child.user_id
+                      WHERE child.team_id = c.team_id
+                        AND child.topic_id = c.topic_id
+                        AND child.entry_id = c.entry_id
+                        AND child.reply_to_comment_id = c.id
+                        AND child.status = 'visible'
+                        AND cu.status = 'active'
+                   ) AS replies_count
               FROM f_i_telegraph_comments c
               JOIN f_i_users u ON u.id = c.user_id
               LEFT JOIN f_i_telegraph_comments rc
@@ -627,6 +654,7 @@ impl TelegraphInteractionsRepository for PostgresDailyTopicsRepository {
         .bind(after.map(|position| position.created_at))
         .bind(after.map(|position| position.id))
         .bind((limit + 1) as i64)
+        .bind(viewer_user_id)
         .fetch_all(&self.pool)
         .await
         .map_err(interaction_storage_error)?;
@@ -815,7 +843,10 @@ impl TelegraphInteractionsRepository for PostgresDailyTopicsRepository {
                    c.reply_to_comment_id,
                    ru.display_name AS reply_to_author_display_name,
                    c.content,
-                   c.created_at
+                   c.created_at,
+                   0::bigint AS likes_count,
+                   FALSE AS liked_by_me,
+                   0::bigint AS replies_count
               FROM f_i_telegraph_comments c
               JOIN f_i_users u ON u.id = c.user_id
               LEFT JOIN f_i_telegraph_comments rc
@@ -882,6 +913,101 @@ impl TelegraphInteractionsRepository for PostgresDailyTopicsRepository {
         self.count_visible_entry_comments(team_id, topic_id, entry_id)
             .await
     }
+
+    async fn set_comment_like(
+        &self,
+        team_id: i64,
+        topic_id: &str,
+        entry_id: &str,
+        comment_id: Uuid,
+        user_id: Uuid,
+        active: bool,
+    ) -> Result<TelegraphCommentLikeSummary, TelegraphInteractionError> {
+        self.ensure_active_user(user_id).await?;
+        self.ensure_entry_exists(team_id, topic_id, entry_id).await?;
+        let comments_enabled = self
+            .is_comments_enabled_internal()
+            .await
+            .map_err(interaction_storage_error)?;
+        if !comments_enabled {
+            return Err(TelegraphInteractionError::CommentsDisabled);
+        }
+
+        let comment_exists: bool = sqlx::query_scalar(
+            r#"
+            SELECT EXISTS(
+                SELECT 1
+                  FROM f_i_telegraph_comments c
+                  JOIN f_i_users u ON u.id = c.user_id
+                 WHERE c.id = $1
+                   AND c.team_id = $2
+                   AND c.topic_id = $3
+                   AND c.entry_id = $4
+                   AND c.status = 'visible'
+                   AND u.status = 'active'
+            )
+            "#,
+        )
+        .bind(comment_id)
+        .bind(team_id)
+        .bind(topic_id)
+        .bind(entry_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(interaction_storage_error)?;
+
+        if !comment_exists {
+            return Err(TelegraphInteractionError::TopicOrEntryNotFound);
+        }
+
+        if active {
+            sqlx::query(
+                r#"
+                INSERT INTO f_i_telegraph_comment_likes (comment_id, user_id)
+                VALUES ($1, $2)
+                ON CONFLICT (comment_id, user_id) DO NOTHING
+                "#,
+            )
+            .bind(comment_id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await
+            .map_err(interaction_storage_error)?;
+        } else {
+            sqlx::query(
+                "DELETE FROM f_i_telegraph_comment_likes WHERE comment_id = $1 AND user_id = $2",
+            )
+            .bind(comment_id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await
+            .map_err(interaction_storage_error)?;
+        }
+
+        let row = sqlx::query(
+            r#"
+            SELECT COALESCE(COUNT(*) FILTER (WHERE lu.status = 'active'), 0)::bigint AS likes_count,
+                   COALESCE(BOOL_OR(cl.user_id = $2 AND lu.status = 'active'), FALSE) AS liked_by_me
+              FROM f_i_telegraph_comment_likes cl
+              JOIN f_i_users lu ON lu.id = cl.user_id
+             WHERE cl.comment_id = $1
+            "#,
+        )
+        .bind(comment_id)
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(interaction_storage_error)?;
+
+        let likes_count: i64 = row.try_get("likes_count").map_err(interaction_storage_error)?;
+        let liked_by_me: bool = row.try_get("liked_by_me").map_err(interaction_storage_error)?;
+
+        Ok(TelegraphCommentLikeSummary {
+            comment_id,
+            likes_count: u64::try_from(likes_count).unwrap_or(0),
+            liked_by_me,
+        })
+    }
 }
 
 fn is_undefined_table(error: &sqlx::Error) -> bool {
@@ -914,6 +1040,9 @@ fn row_to_telegraph_comment(
         }),
         _ => None,
     };
+    let likes_count: i64 = row.try_get("likes_count")?;
+    let liked_by_me: bool = row.try_get("liked_by_me")?;
+    let replies_count: i64 = row.try_get("replies_count")?;
 
     Ok(TelegraphComment {
         id: row.try_get("id")?,
@@ -926,6 +1055,9 @@ fn row_to_telegraph_comment(
         },
         reply_to,
         content: row.try_get("content")?,
+        likes_count: u64::try_from(likes_count).unwrap_or(0),
+        liked_by_me,
+        replies_count: u64::try_from(replies_count).unwrap_or(0),
         is_mine: viewer_user_id == Some(user_id),
         created_at: row.try_get("created_at")?,
     })

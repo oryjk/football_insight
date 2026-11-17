@@ -79,3 +79,17 @@ export function deleteTelegraphEntryComment(
     auth: true,
   })
 }
+
+export function setTelegraphCommentLike(
+  teamId: number,
+  topicId: string,
+  entryId: string,
+  commentId: string,
+  active: boolean,
+): Promise<unknown> {
+  return request<unknown>({
+    url: `/daily-topics/${encodeURIComponent(topicId)}/entries/${encodeURIComponent(entryId)}/comments/${encodeURIComponent(commentId)}/like?team_id=${teamId}`,
+    method: active ? 'PUT' : 'DELETE',
+    auth: true,
+  })
+}

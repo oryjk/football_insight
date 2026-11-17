@@ -1,0 +1,249 @@
+<template>
+  <page-meta :page-style="pageStyle" />
+  <FiSecondaryNav :share-disabled="!entry" @back="goBack" @share="copyShareLink" />
+  <view class="entry-page-offset">
+    <view class="entry-page" :class="{ 'entry-page--with-composer': Boolean(entry && commentsVisible) }">
+      <view v-if="loading && !entry" class="entry-page__state">
+        <text>正在加载电报详情…</text>
+      </view>
+
+      <view v-else-if="errorMessage && !entry" class="entry-page__state">
+        <text class="entry-page__error">{{ errorMessage }}</text>
+        <button class="entry-page__retry" @tap="loadInitial(false)">重新加载</button>
+      </view>
+
+      <template v-else-if="entry">
+        <TelegraphEntryTimeline
+          :entry="entry"
+          :day-label="dayLabel"
+          :comments-visible="commentsVisible"
+          :reaction-pending="reactionPending"
+          :comments="comments"
+          :comments-loading="commentsLoading"
+          :loading-more="loadingMoreComments"
+          :has-more="commentsHasMore"
+          :comments-error="commentsError"
+          :pending-like-ids="pendingCommentLikeIds"
+          :deleting-comment-id="deletingCommentId"
+          @copy-source="copyEntrySource"
+          @like-entry="page.likeEntry"
+          @dislike-entry="page.dislikeEntry"
+          @focus-comment="page.startRootComment"
+          @retry-comments="page.reloadComments"
+          @load-more="page.loadMoreComments"
+          @reply-comment="page.startReply"
+          @like-comment="page.toggleCommentLike"
+          @delete-comment="page.deleteOwnComment"
+        />
+      </template>
+    </view>
+  </view>
+
+  <TelegraphEntryComposer
+    :visible="Boolean(entry && commentsVisible)"
+    :logged-in="isLoggedIn"
+    :profile-complete="profileComplete"
+    :draft="draftContent"
+    :reply-target="replyTarget"
+    :submitting="submittingComment"
+    :focus-trigger="inputFocusTrigger"
+    :keyboard-height="keyboardHeight"
+    @update:draft="draftContent = $event"
+    @login="page.requestLogin"
+    @setup-profile="page.openProfileSetup"
+    @cancel-reply="page.clearReplyTarget"
+    @submit="page.submitComment"
+  />
+
+  <FiProfileSetupSheet
+    :visible="profileSheetVisible"
+    :submitting="savingProfile"
+    :initial-nickname="editableNicknameInitialValue(session.currentUser.value)"
+    :initial-avatar-url="session.currentUser.value?.avatar_url ?? null"
+    @update:visible="profileSheetVisible = $event"
+    @submit="page.saveProfileAndContinue"
+  />
+</template>
+
+<script setup lang="ts">
+import { computed, onScopeDispose, ref } from 'vue'
+import { onLoad, onPullDownRefresh, onReachBottom, onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
+import FiProfileSetupSheet from '../../components/FiProfileSetupSheet.vue'
+import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
+import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { useAppSession } from '../../stores/appSession'
+import { useMiniReviewStatus } from '../../stores/miniReview'
+import { isTopicSourceUrl, roundupDayLabel, telegraphEntryUrl } from '../../utils/dailyTopics'
+import { editableNicknameInitialValue } from '../../utils/profileGate'
+import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
+import { buildSharePath } from '../../utils/shareSource'
+import TelegraphEntryComposer from './components/TelegraphEntryComposer.vue'
+import TelegraphEntryTimeline from './components/TelegraphEntryTimeline.vue'
+import { useTelegraphEntryPage } from './useTelegraphEntryPage'
+
+const { navigationPageStyle } = useNavigationLayout()
+const session = useAppSession()
+const miniReview = useMiniReviewStatus()
+
+let topicId = ''
+let entryId = ''
+let lastSessionRevision = session.revision.value
+
+const page = useTelegraphEntryPage({
+  topicId: () => topicId,
+  entryId: () => entryId,
+  session,
+  miniReview,
+})
+
+const {
+  topic,
+  entry,
+  loading,
+  errorMessage,
+  commentsVisible,
+  isLoggedIn,
+  profileComplete,
+  reactionPending,
+  comments,
+  commentsLoading,
+  loadingMoreComments,
+  commentsError,
+  commentsHasMore,
+  pendingCommentLikeIds,
+  draftContent,
+  replyTarget,
+  inputFocusTrigger,
+  submittingComment,
+  deletingCommentId,
+  profileSheetVisible,
+  savingProfile,
+  loadInitial,
+} = page
+
+const keyboardHeight = ref(0)
+const dayLabel = computed(() => (topic.value ? roundupDayLabel(topic.value.publishedAt) : ''))
+const pageStyle = computed(() =>
+  profileSheetVisible.value ? `${navigationPageStyle.value};overflow:hidden;` : navigationPageStyle.value,
+)
+
+const keyboardListener = (res: { height?: number }) => {
+  keyboardHeight.value = typeof res?.height === 'number' && res.height > 0 ? res.height : 0
+}
+if (typeof uni !== 'undefined' && typeof uni.onKeyboardHeightChange === 'function') {
+  uni.onKeyboardHeightChange(keyboardListener)
+}
+onScopeDispose(() => {
+  if (typeof uni !== 'undefined' && typeof uni.offKeyboardHeightChange === 'function') {
+    uni.offKeyboardHeightChange(keyboardListener)
+  }
+})
+
+function copyEntrySource(url: string): void {
+  if (!isTopicSourceUrl(url) || !entry.value?.sources.some(source => source.url === url)) {
+    return
+  }
+  uni.setClipboardData({
+    data: url,
+    success: () => uni.showToast({ title: '原文链接已复制', icon: 'none' }),
+  })
+}
+
+function goBack(): void {
+  goBackFromSecondaryPage()
+}
+
+function sharePath(): string {
+  return topicId && entryId
+    ? buildSharePath(telegraphEntryUrl(topicId, entryId), 'telegraph_entry')
+    : '/pages/home/index'
+}
+
+function copyShareLink(): void {
+  copyPageShareLink(sharePath())
+}
+
+onLoad((query) => {
+  topicId = typeof query?.topicId === 'string' ? decodeURIComponent(query.topicId) : ''
+  entryId = typeof query?.entryId === 'string' ? decodeURIComponent(query.entryId) : ''
+  const focus = query?.focus === '1'
+  lastSessionRevision = session.revision.value
+  void miniReview.ensureMiniReviewReady()
+  void session.ensureSessionReady()
+  void page.loadInitial(focus)
+})
+
+onShow(() => {
+  void miniReview.ensureMiniReviewReady()
+  void session.ensureSessionReady()
+  if (topicId && entryId && topic.value && session.revision.value !== lastSessionRevision) {
+    lastSessionRevision = session.revision.value
+    void page.refreshAll()
+  }
+})
+
+onPullDownRefresh(() => {
+  void page.refreshAll().finally(() => uni.stopPullDownRefresh())
+})
+
+onReachBottom(() => {
+  if (commentsVisible.value && commentsHasMore.value) {
+    page.loadMoreComments()
+  }
+})
+
+onShareAppMessage(() => ({
+  title: entry.value ? `【${entry.value.title}】${entry.value.text.slice(0, 26)}` : '每日电报 · 足球洞察',
+  path: sharePath(),
+}))
+
+onShareTimeline(() => ({
+  title: entry.value ? `每日电报 · ${entry.value.title}` : '每日电报 · 足球洞察',
+  query: topicId && entryId ? `topicId=${encodeURIComponent(topicId)}&entryId=${encodeURIComponent(entryId)}` : '',
+}))
+</script>
+
+<style scoped>
+.entry-page-offset {
+  padding-top: var(--fi-brand-nav-height);
+  min-height: 100vh;
+  box-sizing: border-box;
+  background: var(--fi-color-page);
+}
+
+.entry-page {
+  padding: var(--fi-space-20) var(--fi-space-20) var(--fi-space-40);
+}
+
+.entry-page--with-composer {
+  padding-bottom: calc(156rpx + env(safe-area-inset-bottom));
+}
+
+.entry-page__state {
+  padding: var(--fi-space-40) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--fi-space-20);
+  color: var(--fi-color-text-secondary);
+  font-size: var(--fi-font-26);
+  text-align: center;
+}
+
+.entry-page__error {
+  color: var(--fi-color-primary);
+}
+
+.entry-page__retry {
+  margin: 0;
+  padding: var(--fi-space-12) var(--fi-space-28);
+  border-radius: var(--fi-radius-round);
+  background: var(--fi-color-bg);
+  color: var(--fi-color-primary);
+  font-size: var(--fi-font-26);
+}
+
+.entry-page__retry::after {
+  border: 0;
+}
+</style>

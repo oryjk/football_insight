@@ -175,6 +175,20 @@
 					}
 				}
 			]
+		},
+		{
+			"root": "pages/telegraph-entry",
+			"pages": [
+				{
+					"path": "index",
+					"style": {
+						"navigationBarTitleText": "电报详情",
+						"navigationStyle": "custom",
+						"enablePullDownRefresh": true,
+						"onReachBottomDistance": 120
+					}
+				}
+			]
 		}
 	],
 	"preloadRule": {

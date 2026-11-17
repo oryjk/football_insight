@@ -7,8 +7,8 @@ use crate::daily_topics::domain::{
     heat::{TopicHeat, TopicVisit},
     interactions::{
         CreateTelegraphCommentInput, EntryInteractionStats, ReactionMutation, TelegraphComment,
-        TelegraphCommentsPage, TelegraphCommentsPosition, TelegraphInteractionError,
-        TelegraphReactionSummary,
+        TelegraphCommentLikeSummary, TelegraphCommentsPage, TelegraphCommentsPosition,
+        TelegraphInteractionError, TelegraphReactionSummary,
     },
 };
 
@@ -173,6 +173,16 @@ pub trait TelegraphInteractionsRepository: Send + Sync {
         comment_id: Uuid,
         user_id: Uuid,
     ) -> Result<u64, TelegraphInteractionError>;
+
+    async fn set_comment_like(
+        &self,
+        team_id: i64,
+        topic_id: &str,
+        entry_id: &str,
+        comment_id: Uuid,
+        user_id: Uuid,
+        active: bool,
+    ) -> Result<TelegraphCommentLikeSummary, TelegraphInteractionError>;
 }
 
 fn sort_topics(items: &mut Vec<DailyTopic>) {

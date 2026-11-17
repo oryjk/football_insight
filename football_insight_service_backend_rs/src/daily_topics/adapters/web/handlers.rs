@@ -11,9 +11,9 @@ use uuid::Uuid;
 use super::dto::{
     CreateTelegraphCommentBody, CreateTelegraphCommentResponseDto, DailyTopicDto,
     DailyTopicsParameters, DailyTopicsResponse, DeleteTelegraphCommentResponseDto,
-    EntryInteractionParameters, TelegraphCommentsPageDto, TelegraphCommentsQueryParameters,
-    TelegraphReactionResponseDto, TopicDetailParameters, TopicHistoryParameters,
-    TopicHistoryResponse,
+    EntryInteractionParameters, TelegraphCommentLikeResponseDto, TelegraphCommentsPageDto,
+    TelegraphCommentsQueryParameters, TelegraphReactionResponseDto, TopicDetailParameters,
+    TopicHistoryParameters, TopicHistoryResponse,
 };
 use crate::{
     auth::ports::token_port::TokenPort,
@@ -426,6 +426,49 @@ pub(super) async fn delete_entry_comment_handler(
         .await
         .map_err(interaction_error_response)?;
     Ok(Json(DeleteTelegraphCommentResponseDto { comments_count }))
+}
+
+async fn set_comment_like_handler(
+    State(state): State<TelegraphInteractionsWebState>,
+    headers: HeaderMap,
+    Path((topic_id, entry_id, comment_id)): Path<(String, String, Uuid)>,
+    parameters: Result<Query<EntryInteractionParameters>, QueryRejection>,
+    active: bool,
+) -> Result<Json<TelegraphCommentLikeResponseDto>, (StatusCode, Json<Value>)> {
+    let user_id = extract_required_user_id(state.token_port.as_ref(), &headers)?;
+    let Query(parameters) = parameters
+        .map_err(|_| interaction_error_response(TelegraphInteractionError::InvalidInput("参数无效")))?;
+    let summary = state
+        .service
+        .set_comment_like(
+            parameters.team_id,
+            &topic_id,
+            &entry_id,
+            comment_id,
+            user_id,
+            active,
+        )
+        .await
+        .map_err(interaction_error_response)?;
+    Ok(Json(summary.into()))
+}
+
+pub(super) async fn like_entry_comment_handler(
+    state: State<TelegraphInteractionsWebState>,
+    headers: HeaderMap,
+    path: Path<(String, String, Uuid)>,
+    parameters: Result<Query<EntryInteractionParameters>, QueryRejection>,
+) -> Result<Json<TelegraphCommentLikeResponseDto>, (StatusCode, Json<Value>)> {
+    set_comment_like_handler(state, headers, path, parameters, true).await
+}
+
+pub(super) async fn unlike_entry_comment_handler(
+    state: State<TelegraphInteractionsWebState>,
+    headers: HeaderMap,
+    path: Path<(String, String, Uuid)>,
+    parameters: Result<Query<EntryInteractionParameters>, QueryRejection>,
+) -> Result<Json<TelegraphCommentLikeResponseDto>, (StatusCode, Json<Value>)> {
+    set_comment_like_handler(state, headers, path, parameters, false).await
 }
 
 fn interaction_error_response(error: TelegraphInteractionError) -> (StatusCode, Json<Value>) {

@@ -54,6 +54,13 @@ pub struct TelegraphCommentReplyRef {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TelegraphCommentLikeSummary {
+    pub comment_id: Uuid,
+    pub likes_count: u64,
+    pub liked_by_me: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TelegraphComment {
     pub id: Uuid,
     pub topic_id: String,
@@ -61,6 +68,9 @@ pub struct TelegraphComment {
     pub author: TelegraphCommentAuthor,
     pub reply_to: Option<TelegraphCommentReplyRef>,
     pub content: String,
+    pub likes_count: u64,
+    pub liked_by_me: bool,
+    pub replies_count: u64,
     pub is_mine: bool,
     pub created_at: DateTime<Utc>,
 }

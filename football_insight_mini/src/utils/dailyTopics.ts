@@ -8,6 +8,7 @@ import type {
   DailyTopicTag,
   TelegraphCategory,
   TelegraphComment,
+  TelegraphCommentLikeSummary,
   TelegraphCommentsPage,
   TelegraphReactionSummary,
 } from '../types/dailyTopic'
@@ -293,6 +294,10 @@ export function mapTopicDetail(value: unknown): DailyTopicItem {
 export function topicDetailUrl(id: string): string {
   return `/pages/topic-detail/index?id=${encodeURIComponent(id)}`
 }
+
+export function telegraphEntryUrl(topicId: string, entryId: string, focusComment = false): string {
+  return `/pages/telegraph-entry/index?topicId=${encodeURIComponent(topicId)}&entryId=${encodeURIComponent(entryId)}${focusComment ? '&focus=1' : ''}`
+}
 export function editionForTopic(item: DailyTopicItem | null): DailyTopicEdition {
   return item ? { ...emptyDailyTopicEdition(), updatedAt: item.publishedAt, items: [item] } : emptyDailyTopicEdition()
 }
@@ -310,6 +315,18 @@ export function formatCommentTimestamp(value: string): string {
   return `${parts.month}-${parts.day} ${parts.time}`
 }
 
+export function formatXTimelineAge(value: string, nowMs = Date.now()): string {
+  if (!timestamp(value)) return ''
+  const diffSec = Math.max(0, Math.floor((nowMs - Date.parse(value)) / 1000))
+  if (diffSec < 60) return '刚刚'
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m`
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h`
+  if (diffSec < 7 * 86400) return `${Math.floor(diffSec / 86400)}d`
+  const parts = beijingParts(value)
+  const nowParts = beijingParts(new Date(nowMs).toISOString())
+  return parts.year === nowParts.year ? `${parts.month}-${parts.day}` : `${parts.year}-${parts.month}-${parts.day}`
+}
+
 export function mapTelegraphReactionSummary(value: unknown): TelegraphReactionSummary {
   const payload = record(value)
   const entryId = text(payload?.entry_id)
@@ -320,6 +337,17 @@ export function mapTelegraphReactionSummary(value: unknown): TelegraphReactionSu
     dislikesCount: nonNegativeInt(payload.dislikes_count),
     likedByMe: payload.liked_by_me === true,
     dislikedByMe: payload.disliked_by_me === true,
+  }
+}
+
+export function mapTelegraphCommentLikeSummary(value: unknown): TelegraphCommentLikeSummary {
+  const payload = record(value)
+  const commentId = text(payload?.comment_id)
+  if (!payload || !commentId) throw new Error('评论点赞状态异常，请重试')
+  return {
+    commentId,
+    likesCount: nonNegativeInt(payload.likes_count),
+    likedByMe: payload.liked_by_me === true,
   }
 }
 
@@ -347,9 +375,13 @@ export function mapTelegraphComment(value: unknown): TelegraphComment | null {
     },
     replyTo: replyId && replyAuthor ? { commentId: replyId, authorDisplayName: replyAuthor } : null,
     content,
+    likesCount: nonNegativeInt(item.likes_count),
+    likedByMe: item.liked_by_me === true,
+    repliesCount: nonNegativeInt(item.replies_count),
     isMine: item.is_mine === true,
     createdAt,
     createdLabel: formatCommentTimestamp(createdAt),
+    relativeTimeLabel: formatXTimelineAge(createdAt),
   }
 }
 

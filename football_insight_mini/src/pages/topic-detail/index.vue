@@ -1,5 +1,5 @@
 <template>
-  <page-meta :page-style="pageStyle" />
+  <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav :share-disabled="!shareArticle" @back="goBack" @share="copyArticleShareLink" />
   <view class="topic-page-offset">
   <view class="topic-detail">
@@ -27,7 +27,7 @@
           @copy="copyEntrySource"
           @like="interactions.likeEntry"
           @dislike="interactions.dislikeEntry"
-          @comment="interactions.openComments"
+          @open-entry="interactions.openEntry"
         />
       </view>
     </template>
@@ -64,51 +64,15 @@
     </template>
   </view>
   </view>
-  <TelegraphCommentSheet
-    :visible="interactions.commentSheetVisible.value"
-    :entry="interactions.activeEntry.value"
-    :comments="interactions.comments.value"
-    :loading="interactions.commentsLoading.value"
-    :loading-more="interactions.loadingMoreComments.value"
-    :has-more="interactions.commentsHasMore.value"
-    :error-message="interactions.commentsError.value"
-    :draft="interactions.draftContent.value"
-    :reply-target="interactions.replyTarget.value"
-    :submitting="interactions.submittingComment.value"
-    :deleting-id="interactions.deletingCommentId.value"
-    :logged-in="interactions.isLoggedIn.value"
-    :profile-complete="interactions.profileComplete.value"
-    @update:visible="val => { if (!val) interactions.closeComments() }"
-    @update:draft="interactions.draftContent.value = $event"
-    @retry="interactions.reloadComments"
-    @load-more="interactions.loadMoreComments"
-    @reply="interactions.setReplyTarget"
-    @cancel-reply="interactions.clearReplyTarget"
-    @submit="interactions.submitComment"
-    @delete="interactions.deleteOwnComment"
-    @login="interactions.requestLoginFromComments"
-    @setup-profile="interactions.openProfileSetup"
-  />
-  <FiProfileSetupSheet
-    :visible="interactions.profileSheetVisible.value"
-    :submitting="interactions.savingProfile.value"
-    :initial-nickname="editableNicknameInitialValue(session.currentUser.value)"
-    :initial-avatar-url="session.currentUser.value?.avatar_url ?? null"
-    @update:visible="interactions.profileSheetVisible.value = $event"
-    @submit="interactions.saveProfileAndContinue"
-  />
   <canvas :canvas-id="TOPIC_SHARE_CANVAS_ID" class="topic-share-canvas" :style="shareCanvasStyle" />
 </template>
 
 <script setup lang="ts">
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, onScopeDispose, ref } from 'vue'
-import { onLoad, onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
+import { onHide, onLoad, onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
 import { useAppSession } from '../../stores/appSession'
 import { useMiniReviewStatus } from '../../stores/miniReview'
-import { editableNicknameInitialValue } from '../../utils/profileGate'
-import FiProfileSetupSheet from '../../components/FiProfileSetupSheet.vue'
-import TelegraphCommentSheet from './components/TelegraphCommentSheet.vue'
 import { useTelegraphInteractions } from './useTelegraphInteractions'
 import { topicVisitorId } from '../../utils/topicVisitor'
 import { topicHeatValue, setTopicHeat, syncTopicHeat } from '../../stores/topicHeat'
@@ -153,17 +117,13 @@ const shareCanvasStyle = { width: `${TOPIC_SHARE_CARD.width}px`, height: `${TOPI
 let topicId = ''
 let revision = 0
 let lastLoadedSessionRevision = session.revision.value
+let hasLeftPage = false
 const interactions = useTelegraphInteractions({
   topicId: () => topicId,
   item,
   session,
   miniReview,
 })
-const pageStyle = computed(() =>
-  interactions.commentSheetVisible.value || interactions.profileSheetVisible.value
-    ? `${navigationPageStyle.value};overflow:hidden;`
-    : navigationPageStyle.value,
-)
 async function load() {
   const current = ++revision
   audio.stop()
@@ -227,10 +187,14 @@ onLoad(query => {
   void session.ensureSessionReady()
   void load()
 })
+onHide(() => {
+  hasLeftPage = true
+})
 onShow(() => {
   void miniReview.ensureMiniReviewReady()
   void session.ensureSessionReady()
-  if (topicId && item.value && session.revision.value !== lastLoadedSessionRevision) {
+  if (topicId && item.value && (hasLeftPage || session.revision.value !== lastLoadedSessionRevision)) {
+    hasLeftPage = false
     void refreshViewerState()
   }
 })

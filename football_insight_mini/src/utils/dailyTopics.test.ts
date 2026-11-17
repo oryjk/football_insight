@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import {
   formatTopicHeat,
+  formatXTimelineAge,
   isRoundupTopic,
   mapDailyTopicItem,
+  mapTelegraphCommentLikeSummary,
   mapTelegraphCommentsPage,
   mapTelegraphReactionSummary,
   mapTopicDetail,
@@ -10,6 +12,7 @@ import {
   mapTopicTimeline,
   mergeTopicHistory,
   roundupDayLabel,
+  telegraphEntryUrl,
   topicDetailUrl,
 } from './dailyTopics'
 const article = (id: string, time: string) => ({ id, team_id: 77680, title: '新闻标题', summary: '摘要', paragraphs: ['正文'], published_at: time,
@@ -157,6 +160,9 @@ describe('daily roundup entries', () => {
         author: { display_name: '凤凰山南看台', avatar_url: null },
         reply_to: { comment_id: 'c0', author_display_name: '蓉城铁粉' },
         content: '期待新援首秀',
+        likes_count: 4,
+        liked_by_me: true,
+        replies_count: 2,
         is_mine: true,
         created_at: '2026-11-17T06:30:00Z',
       }],
@@ -164,9 +170,33 @@ describe('daily roundup entries', () => {
     expect(commentsPage.totalCount).toBe(1)
     expect(commentsPage.items[0]).toMatchObject({
       id: 'c1',
+      likesCount: 4,
+      likedByMe: true,
+      repliesCount: 2,
       isMine: true,
       createdLabel: '11-17 14:30',
       replyTo: { commentId: 'c0', authorDisplayName: '蓉城铁粉' },
     })
+
+    expect(mapTelegraphCommentLikeSummary({
+      comment_id: 'c1',
+      likes_count: 9,
+      liked_by_me: true,
+    })).toEqual({
+      commentId: 'c1',
+      likesCount: 9,
+      likedByMe: true,
+    })
+
+    expect(telegraphEntryUrl('topic 1', 'entry/2')).toBe('/pages/telegraph-entry/index?topicId=topic%201&entryId=entry%2F2')
+    expect(telegraphEntryUrl('t1', 'e1', true)).toBe('/pages/telegraph-entry/index?topicId=t1&entryId=e1&focus=1')
+
+    const nowMs = Date.parse('2026-11-17T08:00:00Z')
+    expect(formatXTimelineAge('2026-11-17T07:59:30Z', nowMs)).toBe('刚刚')
+    expect(formatXTimelineAge('2026-11-17T07:45:00Z', nowMs)).toBe('15m')
+    expect(formatXTimelineAge('2026-11-17T02:00:00Z', nowMs)).toBe('6h')
+    expect(formatXTimelineAge('2026-11-15T08:00:00Z', nowMs)).toBe('2d')
+    expect(formatXTimelineAge('2026-10-01T08:00:00Z', nowMs)).toBe('10-01')
+    expect(formatXTimelineAge('2025-12-20T08:00:00Z', nowMs)).toBe('2025-12-20')
   })
 })

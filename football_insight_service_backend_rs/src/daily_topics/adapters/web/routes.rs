@@ -3,9 +3,9 @@ use std::sync::Arc;
 use super::handlers::{
     TelegraphInteractionsWebState, create_entry_comment_handler, delete_entry_comment_handler,
     dislike_entry_handler, get_daily_topic_by_date, get_daily_topics, get_latest_daily_topic,
-    get_topic_detail, get_topic_history, get_topic_timeline, like_entry_handler,
-    list_entry_comments_handler, record_topic_visit, undislike_entry_handler,
-    unlike_entry_handler,
+    get_topic_detail, get_topic_history, get_topic_timeline, like_entry_comment_handler,
+    like_entry_handler, list_entry_comments_handler, record_topic_visit,
+    undislike_entry_handler, unlike_entry_comment_handler, unlike_entry_handler,
 };
 use crate::daily_topics::application::{
     get_daily_topics::GetDailyTopics, telegraph_interactions::TelegraphInteractionsService,
@@ -57,6 +57,10 @@ pub fn telegraph_interactions_routes(
         .route(
             "/api/v1/daily-topics/{id}/entries/{entry_id}/comments/{comment_id}",
             delete(delete_entry_comment_handler),
+        )
+        .route(
+            "/api/v1/daily-topics/{id}/entries/{entry_id}/comments/{comment_id}/like",
+            put(like_entry_comment_handler).delete(unlike_entry_comment_handler),
         )
         .with_state(state)
 }
