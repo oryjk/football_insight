@@ -1,5 +1,17 @@
 import { describe, expect, test } from 'bun:test'
-import { isRoundupTopic, mapDailyTopicItem, mapTopicHistory, mapTopicDetail, mapTopicTimeline, mergeTopicHistory, roundupDayLabel, topicDetailUrl, formatTopicHeat } from './dailyTopics'
+import {
+  formatTopicHeat,
+  isRoundupTopic,
+  mapDailyTopicItem,
+  mapTelegraphCommentsPage,
+  mapTelegraphReactionSummary,
+  mapTopicDetail,
+  mapTopicHistory,
+  mapTopicTimeline,
+  mergeTopicHistory,
+  roundupDayLabel,
+  topicDetailUrl,
+} from './dailyTopics'
 const article = (id: string, time: string) => ({ id, team_id: 77680, title: '新闻标题', summary: '摘要', paragraphs: ['正文'], published_at: time,
   sources: [{ title: '来源', publisher: '新闻', url: 'https://news.example.com/a', published_at: time }], audio: { status: 'pending' } })
 const page = (items: unknown[], next: string | null = null) => ({ team_id: 77680, items, next_cursor: next, has_more: next !== null })
@@ -96,6 +108,65 @@ describe('daily roundup entries', () => {
   test('skips malformed entries and keeps legacy topics without entries', () => {
     const item = roundup([entry('a', '2026-11-09T07:26:00Z'), { id: 'x', title: '', text: 't', published_at: '2026-11-09T07:26:00Z' }, 'bad', entry('a', '2026-11-09T07:26:00Z')])!
     expect(item.entries.map(e => e.id)).toEqual(['a'])
+    expect(item.commentsEnabled).toBe(true)
+    expect(item.commentsCount).toBe(0)
+    expect(item.entries[0]).toMatchObject({ likesCount: 0, dislikesCount: 0, commentsCount: 0, likedByMe: false, dislikedByMe: false })
     expect(isRoundupTopic(roundup(undefined)!)).toBe(false)
+  })
+
+  test('maps entry interaction counts, reaction summaries, and comments page', () => {
+    const item = roundup([{
+      ...entry('a', '2026-11-09T07:26:00Z'),
+      likes_count: 5,
+      dislikes_count: 2,
+      comments_count: 3,
+      liked_by_me: true,
+      disliked_by_me: false,
+    }])!
+    expect(item.entries[0]).toMatchObject({
+      likesCount: 5,
+      dislikesCount: 2,
+      commentsCount: 3,
+      likedByMe: true,
+      dislikedByMe: false,
+    })
+
+    expect(mapTelegraphReactionSummary({
+      entry_id: 'a',
+      likes_count: 6,
+      dislikes_count: 1,
+      liked_by_me: false,
+      disliked_by_me: true,
+    })).toEqual({
+      entryId: 'a',
+      likesCount: 6,
+      dislikesCount: 1,
+      likedByMe: false,
+      dislikedByMe: true,
+    })
+
+    const commentsPage = mapTelegraphCommentsPage({
+      comments_enabled: true,
+      total_count: 1,
+      has_more: false,
+      next_cursor: null,
+      items: [{
+        id: 'c1',
+        topic_id: 't1',
+        entry_id: 'a',
+        author: { display_name: '凤凰山南看台', avatar_url: null },
+        reply_to: { comment_id: 'c0', author_display_name: '蓉城铁粉' },
+        content: '期待新援首秀',
+        is_mine: true,
+        created_at: '2026-11-17T06:30:00Z',
+      }],
+    })
+    expect(commentsPage.totalCount).toBe(1)
+    expect(commentsPage.items[0]).toMatchObject({
+      id: 'c1',
+      isMine: true,
+      createdLabel: '11-17 14:30',
+      replyTo: { commentId: 'c0', authorDisplayName: '蓉城铁粉' },
+    })
   })
 })

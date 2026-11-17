@@ -7,8 +7,9 @@ import type {
   MiniWechatBindPayload,
   MiniWechatLoginResponse,
   RegisterPayload,
+  UpdateProfilePayload,
 } from '../types/auth'
-import { extractApiErrorMessage } from '../utils/apiError'
+import { extractApiErrorMessage, isUnauthorizedError } from '../utils/apiError'
 import { readAcquisitionSource } from '../utils/acquisitionSource'
 import {
   clearManualLogout,
@@ -59,6 +60,7 @@ export interface AppSession {
    * 业务 401（invalidateSession）导致的 revision 变化不算显式操作，不取消恢复。
    */
   bootstrapSession(options: { allowSilentWechat: boolean }): Promise<CurrentUser | null>
+  updateProfile(payload: UpdateProfilePayload): Promise<CurrentUser>
   logoutSession(): Promise<void>
   invalidateSession(expectedRevision: number): void
 }
@@ -474,6 +476,38 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
     clearLocalSession()
   }
 
+  async function updateProfile(payload: UpdateProfilePayload): Promise<CurrentUser> {
+    const expectedRevision = revision.value
+    const tokenSnapshot = getAccessToken()
+    if (!tokenSnapshot) {
+      throw new Error('请先登录后再设置头像和昵称')
+    }
+
+    try {
+      const updated = await source.updateMyProfile(payload)
+      if (revision.value !== expectedRevision || getAccessToken() !== tokenSnapshot) {
+        throw new SessionSupersededError()
+      }
+      currentUser.value = updated
+      hasAccessToken.value = true
+      status.value = 'authenticated'
+      errorMessage.value = ''
+      lastEnsureSuccessAt = Date.now()
+      return updated
+    } catch (error) {
+      if (isSessionSupersededError(error)) {
+        throw error
+      }
+      if (revision.value !== expectedRevision || getAccessToken() !== tokenSnapshot) {
+        throw new SessionSupersededError()
+      }
+      if (isUnauthorizedError(error)) {
+        invalidateSession(expectedRevision)
+      }
+      throw error
+    }
+  }
+
   return {
     currentUser: readonly(currentUser),
     hasAccessToken: readonly(hasAccessToken),
@@ -487,6 +521,7 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
     loginWithMiniWechat,
     bindWechatAccount,
     bootstrapSession,
+    updateProfile,
     logoutSession,
     invalidateSession,
   }

@@ -17,6 +17,10 @@ impl GetCurrentUserUseCase {
     ) -> anyhow::Result<Option<crate::auth::domain::user::OfficialWechatAccess>> {
         self.repository.official_wechat_access(user_id).await
     }
+
+    pub async fn has_custom_profile(&self, user_id: uuid::Uuid) -> anyhow::Result<Option<bool>> {
+        self.repository.has_custom_profile(user_id).await
+    }
     pub fn new(repository: Arc<dyn AuthRepository>, token_port: Arc<dyn TokenPort>) -> Self {
         Self {
             repository,

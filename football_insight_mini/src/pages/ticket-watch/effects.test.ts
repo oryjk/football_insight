@@ -77,6 +77,9 @@ function createSessionStub(overrides: Partial<AppSession> = {}): SessionStub {
       throw new Error('unused')
     },
     bootstrapSession: async () => null,
+    updateProfile: async () => {
+      throw new Error('unused')
+    },
     bindWechatAccount: async () => {
       throw new Error('unused')
     },

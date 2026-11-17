@@ -34,8 +34,10 @@ import { getTopicHistory } from '../../api/dailyTopics'
 import type { DailyTopicItem } from '../../types/dailyTopic'
 import { DAILY_TOPICS_TEAM_ID, mapTopicHistory, mergeTopicHistory, topicDetailUrl } from '../../utils/dailyTopics'
 import { extractApiErrorMessage } from '../../utils/apiError'
+import { useMiniReviewStatus } from '../../stores/miniReview'
 
 const { navigationPageStyle } = useNavigationLayout()
+const miniReview = useMiniReviewStatus()
 const items = ref<DailyTopicItem[]>([])
 const nextCursor = ref<string | null>(null)
 const loading = ref(false)
@@ -64,7 +66,10 @@ async function load(reset: boolean) {
 }
 function retry() { void load(failedReset) }
 function openTopic(id: string) { uni.navigateTo({ url: topicDetailUrl(id) }) }
-onLoad(() => { void load(true) })
+onLoad(() => {
+  void miniReview.ensureMiniReviewReady()
+  void load(true)
+})
 onReachBottom(() => { if (!errorMessage.value) void load(false) })
 onPullDownRefresh(() => { void load(true) })
 function goBack() {

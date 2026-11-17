@@ -13,6 +13,7 @@ import type {
   NotificationEmailResponse,
   RegisterPayload,
   ResetPasswordPayload,
+  UpdateProfilePayload,
 } from '../types/auth'
 import { isUnauthorizedError } from '../utils/apiError'
 import { request } from '../utils/request'
@@ -104,5 +105,14 @@ export function updateNotificationEmail(email: string): Promise<NotificationEmai
     method: 'PUT',
     auth: true,
     data: { email },
+  })
+}
+
+export function updateMyProfile(payload: UpdateProfilePayload): Promise<CurrentUser> {
+  return request<CurrentUser>({
+    url: '/auth/me/profile',
+    method: 'PUT',
+    auth: true,
+    data: payload,
   })
 }

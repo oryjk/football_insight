@@ -17,6 +17,7 @@ use crate::{
                 postgres_admin_product_repository::PostgresAdminProductRepository,
                 postgres_admin_review_exempt_repository::PostgresAdminReviewExemptRepository,
                 postgres_admin_support_bases_repository::PostgresAdminSupportBasesRepository,
+                postgres_admin_telegraph_comments_repository::PostgresAdminTelegraphCommentsRepository,
                 postgres_admin_topic_readers_repository::PostgresAdminTopicReadersRepository,
                 postgres_admin_user_repository::PostgresAdminUserRepository,
             },
@@ -34,6 +35,7 @@ use crate::{
                 routes::{admin_audit_routes, admin_auth_routes, admin_user_routes},
                 setup_routes::admin_setup_routes,
                 support_bases_routes::admin_support_bases_routes,
+                telegraph_comments_routes::admin_telegraph_comments_routes,
                 topic_readers_routes::admin_topic_readers_routes,
             },
         },
@@ -46,6 +48,7 @@ use crate::{
             admin_review_exempt_service::AdminReviewExemptService,
             admin_setup_service::AdminSetupService,
             admin_support_bases_service::AdminSupportBasesService,
+            admin_telegraph_comments_service::AdminTelegraphCommentsService,
             admin_topic_readers_service::AdminTopicReadersService,
             admin_user_service::AdminUserService,
         },
@@ -92,6 +95,9 @@ pub fn build_admin_routes(pool: PgPool, config: &AppConfig) -> Router {
     let topic_readers_service = Arc::new(AdminTopicReadersService::new(Arc::new(
         PostgresAdminTopicReadersRepository::new(pool.clone()),
     )));
+    let telegraph_comments_service = Arc::new(AdminTelegraphCommentsService::new(Arc::new(
+        PostgresAdminTelegraphCommentsRepository::new(pool.clone()),
+    )));
 
     let support_bases_service = Arc::new(AdminSupportBasesService::new(Arc::new(
         PostgresAdminSupportBasesRepository::new(pool.clone()),
@@ -134,6 +140,10 @@ pub fn build_admin_routes(pool: PgPool, config: &AppConfig) -> Router {
         .merge(admin_brand_routes(brand_service, auth_service.clone()))
         .merge(admin_topic_readers_routes(
             topic_readers_service,
+            auth_service.clone(),
+        ))
+        .merge(admin_telegraph_comments_routes(
+            telegraph_comments_service,
             auth_service.clone(),
         ))
         .merge(admin_audit_routes(audit_service, auth_service))

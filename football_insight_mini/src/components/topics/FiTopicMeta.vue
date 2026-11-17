@@ -4,13 +4,30 @@
   <view class="topic-meta" :class="`topic-meta--${tone}`">
     <image class="topic-meta__icon" :src="fireIcon" mode="aspectFit" aria-hidden="true" />
     <text class="topic-meta__heat">热度 {{ formatTopicHeat(heat) }}</text>
+    <text v-if="showComments" class="topic-meta__comments">{{ formatTopicHeat(commentsCount) }} 评论</text>
     <text class="topic-meta__minutes">约 {{ minutes }} 分钟读完</text>
   </view>
 </template>
 <script setup lang="ts">
+import { computed } from 'vue'
 import fireIcon from '../../static/home/topic-heat-flame.svg'
+import { useMiniReviewStatus } from '../../stores/miniReview'
 import { formatTopicHeat } from '../../utils/dailyTopics'
-withDefaults(defineProps<{ heat: number; minutes: number; tone?: 'light' | 'dark' }>(), { tone: 'light' })
+const props = withDefaults(defineProps<{
+  heat: number
+  minutes: number
+  tone?: 'light' | 'dark'
+  commentsCount?: number
+  commentsEnabled?: boolean
+}>(), {
+  tone: 'light',
+  commentsCount: 0,
+  commentsEnabled: true,
+})
+const miniReview = useMiniReviewStatus()
+const showComments = computed(() =>
+  !miniReview.shouldRestrictFeatures.value && props.commentsEnabled !== false && props.commentsCount > 0,
+)
 </script>
 <style scoped>
 /* 图标、热度、阅读时长同字号同行高，在一行 flex 里居中对齐；放不下时只截断阅读时长。 */
@@ -18,6 +35,7 @@ withDefaults(defineProps<{ heat: number; minutes: number; tone?: 'light' | 'dark
 .topic-meta--light { color: var(--fi-color-text-caption); }
 .topic-meta--dark { color: var(--fi-color-topic-hero-muted); }
 .topic-meta__icon { flex-shrink: 0; width: var(--fi-space-24); height: var(--fi-space-24); margin-right: var(--fi-space-6); }
-.topic-meta__heat { flex-shrink: 0; }
-.topic-meta__minutes { min-width: 0; margin-left: var(--fi-space-16); overflow: hidden; text-overflow: ellipsis; }
+.topic-meta__heat, .topic-meta__comments { flex-shrink: 0; }
+.topic-meta__comments, .topic-meta__minutes { margin-left: var(--fi-space-16); }
+.topic-meta__minutes { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 </style>

@@ -10,6 +10,7 @@ export interface CurrentUser {
   account_identifier: string
   invite_code?: string | null
   avatar_url: string | null
+  profile_completed?: boolean
   has_wechat_binding: boolean
   official_wechat_bound?: boolean
   official_wechat_subscribed?: boolean
@@ -80,4 +81,9 @@ export interface MiniWechatBindPayload {
 
 export interface NotificationEmailResponse {
   email: string | null
+}
+
+export interface UpdateProfilePayload {
+  display_name: string
+  avatar_data_url?: string | null
 }

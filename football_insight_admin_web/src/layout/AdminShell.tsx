@@ -4,6 +4,7 @@ import {
   GraduationCap,
   LogOut,
   Menu,
+  MessageSquare,
   Package,
   Type,
   Settings,
@@ -24,6 +25,7 @@ import {
 export type AdminPage =
   | "products"
   | "topicReaders"
+  | "telegraphComments"
   | "supportBases"
   | "brand"
   | "studentConfig"
@@ -32,6 +34,7 @@ export type AdminPage =
 const PAGE_TITLES: Record<AdminPage, { title: string; subtitle: string }> = {
   products: { title: "商品管理", subtitle: "会员微信道具映射" },
   topicReaders: { title: "话题读者", subtitle: "今日话题被哪些登录用户阅读过" },
+  telegraphComments: { title: "电报评论", subtitle: "每日电报评论管理与全站评论开关" },
   supportBases: {
     title: "助力基础值",
     subtitle: "给比赛的助力数加运营基础值",
@@ -105,6 +108,19 @@ export function AdminShell({
       >
         <Eye />
         话题读者
+      </Button>
+      <Button
+        variant="ghost"
+        className="sidebar-nav-item"
+        aria-current={page === "telegraphComments" ? "page" : undefined}
+        disabled={navigationLocked}
+        onClick={() => {
+          onNavigate("telegraphComments");
+          setDrawer(false);
+        }}
+      >
+        <MessageSquare />
+        电报评论
       </Button>
       <Button
         variant="ghost"

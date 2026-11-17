@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{
     Router,
-    routing::{get, post},
+    routing::{get, post, put},
 };
 
 use crate::auth::application::{
@@ -14,6 +14,7 @@ use crate::auth::application::{
     login_with_password::LoginWithPasswordUseCase, login_with_wechat::CompleteWechatLoginUseCase,
     logout::LogoutUseCase, register_with_invite::RegisterWithInviteUseCase,
     reset_password_with_invite::ResetPasswordWithInviteUseCase,
+    update_user_profile::UpdateUserProfileUseCase,
 };
 
 use super::{
@@ -21,11 +22,13 @@ use super::{
         AuthWebConfig, get_current_user_handler, h5_test_login_handler,
         h5_test_login_users_handler, login_handler, logout_handler, mini_wechat_bind_handler,
         mini_wechat_login_handler, register_handler, reset_password_handler,
-        wechat_authorize_handler, wechat_bind_handler, wechat_callback_handler,
+        update_profile_handler, wechat_authorize_handler, wechat_bind_handler,
+        wechat_callback_handler,
     },
     wechat_handlers::{wechat_message_handler, wechat_verify_handler},
 };
 
+#[allow(clippy::too_many_arguments)]
 pub fn auth_routes(
     register_with_invite_use_case: Arc<RegisterWithInviteUseCase>,
     login_with_password_use_case: Arc<LoginWithPasswordUseCase>,
@@ -35,6 +38,7 @@ pub fn auth_routes(
     complete_mini_wechat_login_use_case: Arc<CompleteMiniWechatLoginUseCase>,
     bind_mini_wechat_account_use_case: Arc<BindWechatMiniProgramAccountUseCase>,
     get_current_user_use_case: Arc<GetCurrentUserUseCase>,
+    update_user_profile_use_case: Arc<UpdateUserProfileUseCase>,
     login_as_h5_test_user_use_case: Arc<LoginAsH5TestUserUseCase>,
     logout_use_case: Arc<LogoutUseCase>,
     wechat_webhook_use_case: Arc<HandleWechatWebhookUseCase>,
@@ -42,6 +46,7 @@ pub fn auth_routes(
 ) -> Router {
     let authorize_config = web_config.clone();
     let login_as_h5_test_user_use_case_2 = login_as_h5_test_user_use_case.clone();
+    let get_current_user_for_profile = get_current_user_use_case.clone();
 
     Router::new()
         .route(
@@ -96,6 +101,17 @@ pub fn auth_routes(
             "/api/v1/auth/me",
             get(move |headers| {
                 get_current_user_handler(headers, get_current_user_use_case.clone())
+            }),
+        )
+        .route(
+            "/api/v1/auth/me/profile",
+            put(move |headers, payload| {
+                update_profile_handler(
+                    headers,
+                    update_user_profile_use_case.clone(),
+                    get_current_user_for_profile.clone(),
+                    payload,
+                )
             }),
         )
         .route(

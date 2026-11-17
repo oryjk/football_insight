@@ -1,5 +1,5 @@
 <template>
-  <page-meta :page-style="navigationPageStyle" />
+  <page-meta :page-style="pageStyle" />
   <FiSecondaryNav :share-disabled="!shareArticle" @back="goBack" @share="copyArticleShareLink" />
   <view class="topic-page-offset">
   <view class="topic-detail">
@@ -13,7 +13,22 @@
       </view>
       <FiTopicAudioPlayer v-if="audio.activeId.value" :title="audio.activeId.value === item.id ? '每日电报 · 全部' : audio.activeTitle.value" :status="audio.status.value" :current-time="audio.currentTime.value" :duration="audio.duration.value" :error-message="audio.errorMessage.value" @toggle="audio.toggle(audio.activeId.value)" @seek="audio.seek" @close="audio.stop" />
       <view class="topic-detail__roundup">
-        <TopicRoundup :item="item" :font-rpx="bodyFontRpx" :active="telegraphTab" :audio-ready="audio.availableIds.value.includes(telegraphAudio)" :audio-playing="audio.activeId.value === telegraphAudio && audio.status.value === 'playing'" :audio-loading="audio.activeId.value === telegraphAudio && audio.status.value === 'loading'" @play="audio.toggle(telegraphAudio)" @select="telegraphTab = $event" @copy="copyEntrySource" />
+        <TopicRoundup
+          :item="item"
+          :font-rpx="bodyFontRpx"
+          :active="telegraphTab"
+          :audio-ready="audio.availableIds.value.includes(telegraphAudio)"
+          :audio-playing="audio.activeId.value === telegraphAudio && audio.status.value === 'playing'"
+          :audio-loading="audio.activeId.value === telegraphAudio && audio.status.value === 'loading'"
+          :pending-reaction-ids="interactions.pendingReactionIds.value"
+          :comments-visible="interactions.commentsVisible.value"
+          @play="audio.toggle(telegraphAudio)"
+          @select="telegraphTab = $event"
+          @copy="copyEntrySource"
+          @like="interactions.likeEntry"
+          @dislike="interactions.dislikeEntry"
+          @comment="interactions.openComments"
+        />
       </view>
     </template>
     <template v-else-if="item">
@@ -49,13 +64,52 @@
     </template>
   </view>
   </view>
+  <TelegraphCommentSheet
+    :visible="interactions.commentSheetVisible.value"
+    :entry="interactions.activeEntry.value"
+    :comments="interactions.comments.value"
+    :loading="interactions.commentsLoading.value"
+    :loading-more="interactions.loadingMoreComments.value"
+    :has-more="interactions.commentsHasMore.value"
+    :error-message="interactions.commentsError.value"
+    :draft="interactions.draftContent.value"
+    :reply-target="interactions.replyTarget.value"
+    :submitting="interactions.submittingComment.value"
+    :deleting-id="interactions.deletingCommentId.value"
+    :logged-in="interactions.isLoggedIn.value"
+    :profile-complete="interactions.profileComplete.value"
+    @update:visible="val => { if (!val) interactions.closeComments() }"
+    @update:draft="interactions.draftContent.value = $event"
+    @retry="interactions.reloadComments"
+    @load-more="interactions.loadMoreComments"
+    @reply="interactions.setReplyTarget"
+    @cancel-reply="interactions.clearReplyTarget"
+    @submit="interactions.submitComment"
+    @delete="interactions.deleteOwnComment"
+    @login="interactions.requestLoginFromComments"
+    @setup-profile="interactions.openProfileSetup"
+  />
+  <FiProfileSetupSheet
+    :visible="interactions.profileSheetVisible.value"
+    :submitting="interactions.savingProfile.value"
+    :initial-nickname="editableNicknameInitialValue(session.currentUser.value)"
+    :initial-avatar-url="session.currentUser.value?.avatar_url ?? null"
+    @update:visible="interactions.profileSheetVisible.value = $event"
+    @submit="interactions.saveProfileAndContinue"
+  />
   <canvas :canvas-id="TOPIC_SHARE_CANVAS_ID" class="topic-share-canvas" :style="shareCanvasStyle" />
 </template>
 
 <script setup lang="ts">
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, onScopeDispose, ref } from 'vue'
-import { onLoad, onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
+import { onLoad, onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
+import { useAppSession } from '../../stores/appSession'
+import { useMiniReviewStatus } from '../../stores/miniReview'
+import { editableNicknameInitialValue } from '../../utils/profileGate'
+import FiProfileSetupSheet from '../../components/FiProfileSetupSheet.vue'
+import TelegraphCommentSheet from './components/TelegraphCommentSheet.vue'
+import { useTelegraphInteractions } from './useTelegraphInteractions'
 import { topicVisitorId } from '../../utils/topicVisitor'
 import { topicHeatValue, setTopicHeat, syncTopicHeat } from '../../stores/topicHeat'
 import FiTopicMeta from '../../components/topics/FiTopicMeta.vue'
@@ -80,6 +134,8 @@ import { buildTopicTimelinePayload, buildTopicSharePayload, TOPIC_SHARE_CARD } f
 import { TOPIC_SHARE_CANVAS_ID, useTopicShareCard } from './useTopicShareCard'
 
 const { navigationPageStyle } = useNavigationLayout()
+const session = useAppSession()
+const miniReview = useMiniReviewStatus()
 const item = ref<DailyTopicItem | null>(null)
 // 每日电报是全联赛快讯流，不做按球队的话题追踪，也不发追踪请求。
 const timeline = useTopicTimeline(computed(() => item.value && !isRoundupTopic(item.value) ? item.value : null))
@@ -96,6 +152,18 @@ const shareArticle = computed(() => !loading.value && !errorMessage.value ? item
 const shareCanvasStyle = { width: `${TOPIC_SHARE_CARD.width}px`, height: `${TOPIC_SHARE_CARD.height}px` }
 let topicId = ''
 let revision = 0
+let lastLoadedSessionRevision = session.revision.value
+const interactions = useTelegraphInteractions({
+  topicId: () => topicId,
+  item,
+  session,
+  miniReview,
+})
+const pageStyle = computed(() =>
+  interactions.commentSheetVisible.value || interactions.profileSheetVisible.value
+    ? `${navigationPageStyle.value};overflow:hidden;`
+    : navigationPageStyle.value,
+)
 async function load() {
   const current = ++revision
   audio.stop()
@@ -103,6 +171,7 @@ async function load() {
   if (!/^[a-zA-Z0-9_-]{1,128}$/.test(topicId)) { errorMessage.value = '话题不存在或已下线'; return }
   loading.value = true
   errorMessage.value = ''
+  lastLoadedSessionRevision = session.revision.value
   try {
     const latest = mapTopicDetail(await getTopicDetail(DAILY_TOPICS_TEAM_ID, topicId))
     if (latest.id !== topicId) throw new Error('话题加载失败，请重试')
@@ -119,6 +188,19 @@ async function load() {
     if (current === revision) errorMessage.value = error instanceof ApiRequestError && error.statusCode === 404
       ? '话题不存在或已下线' : extractApiErrorMessage(error, '话题加载失败，请稍后重试')
   } finally { if (current === revision) loading.value = false }
+}
+async function refreshViewerState() {
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(topicId) || loading.value) return
+  const current = ++revision
+  lastLoadedSessionRevision = session.revision.value
+  try {
+    const latest = mapTopicDetail(await getTopicDetail(DAILY_TOPICS_TEAM_ID, topicId))
+    if (latest.id === topicId && current === revision) {
+      item.value = latest
+    }
+  } catch {
+    // Silent refresh on session switch never interrupts reading.
+  }
 }
 function copySource(url: string) {
   if (!isTopicSourceUrl(url) || !item.value?.sources.some(source => source.url === url)) return
@@ -139,7 +221,19 @@ function previewPhoto(url: string, urls: string[]) {
     uni.previewImage({ current: url, urls })
   }
 }
-onLoad(query => { topicId = typeof query?.id === 'string' ? query.id : ''; void load() })
+onLoad(query => {
+  topicId = typeof query?.id === 'string' ? query.id : ''
+  void miniReview.ensureMiniReviewReady()
+  void session.ensureSessionReady()
+  void load()
+})
+onShow(() => {
+  void miniReview.ensureMiniReviewReady()
+  void session.ensureSessionReady()
+  if (topicId && item.value && session.revision.value !== lastLoadedSessionRevision) {
+    void refreshViewerState()
+  }
+})
 function goBack() {
   goBackFromSecondaryPage()
 }

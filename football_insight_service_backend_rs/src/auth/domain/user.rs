@@ -54,17 +54,88 @@ pub fn validate_account_identifier(input: &str) -> anyhow::Result<String> {
     );
 }
 
+pub fn is_mainland_mobile(input: &str) -> bool {
+    let normalized = input.trim();
+    normalized.len() == 11
+        && normalized.starts_with('1')
+        && normalized.bytes().all(|byte| byte.is_ascii_digit())
+}
+
 pub fn validate_phone_number(input: &str) -> anyhow::Result<String> {
     let normalized = normalize_account_identifier(input);
-    let is_valid = normalized.len() == 11
-        && normalized.starts_with('1')
-        && normalized.chars().all(|char| char.is_ascii_digit());
-
-    if !is_valid {
+    if !is_mainland_mobile(&normalized) {
         anyhow::bail!("phone number must be a valid 11-digit mainland China mobile number");
     }
 
     Ok(normalized)
+}
+
+pub fn validate_custom_nickname(input: &str) -> anyhow::Result<String> {
+    let normalized = input.trim();
+    let char_count = normalized.chars().count();
+    if !(2..=16).contains(&char_count) {
+        anyhow::bail!("nickname must be 2 to 16 characters");
+    }
+    if normalized
+        .chars()
+        .any(|ch| ch.is_control() || matches!(ch, '<' | '>'))
+    {
+        anyhow::bail!("nickname contains unsupported characters");
+    }
+    if is_mainland_mobile(normalized) {
+        anyhow::bail!("nickname cannot be a phone number");
+    }
+    if normalized == "微信用户" || normalized.to_ascii_lowercase().starts_with("wx_") {
+        anyhow::bail!("please set a custom nickname");
+    }
+    Ok(normalized.to_string())
+}
+
+pub fn has_valid_avatar_url(avatar_url: Option<&str>) -> bool {
+    let Some(raw) = avatar_url.map(str::trim).filter(|value| !value.is_empty()) else {
+        return false;
+    };
+    let lower = raw.to_ascii_lowercase();
+    if lower.starts_with("https://") || lower.starts_with("http://") {
+        return raw.len() > 8;
+    }
+    const DATA_PREFIXES: [&str; 4] = [
+        "data:image/jpeg;base64,",
+        "data:image/jpg;base64,",
+        "data:image/png;base64,",
+        "data:image/webp;base64,",
+    ];
+    DATA_PREFIXES
+        .iter()
+        .any(|prefix| lower.starts_with(prefix) && raw.len() > prefix.len())
+}
+
+pub fn resolve_profile_completed(
+    display_name: Option<&str>,
+    account_identifier: &str,
+    avatar_url: Option<&str>,
+    custom_profile_recorded: Option<bool>,
+) -> bool {
+    if !has_valid_avatar_url(avatar_url) {
+        return false;
+    }
+    let Ok(nickname) = validate_custom_nickname(display_name.unwrap_or_default()) else {
+        return false;
+    };
+    custom_profile_recorded == Some(true) || nickname != account_identifier.trim()
+}
+
+pub fn sanitize_public_display_name(display_name: Option<&str>) -> String {
+    let Some(trimmed) = display_name.map(str::trim).filter(|value| !value.is_empty()) else {
+        return "球迷".to_string();
+    };
+    if trimmed.to_ascii_lowercase().starts_with("wx_") {
+        return "球迷".to_string();
+    }
+    if is_mainland_mobile(trimmed) {
+        return format!("{}****{}", &trimmed[..3], &trimmed[7..]);
+    }
+    trimmed.to_string()
 }
 
 pub fn resolve_membership_benefits_enabled(
@@ -222,6 +293,73 @@ mod tests {
                 now,
             ),
             "V3"
+        );
+    }
+
+    #[test]
+    fn custom_nickname_rejects_phones_defaults_control_chars_and_length() {
+        assert_eq!(
+            super::validate_custom_nickname("  蓉城老球迷  ").unwrap(),
+            "蓉城老球迷"
+        );
+        assert!(super::validate_custom_nickname("a").is_err());
+        assert!(super::validate_custom_nickname(&"迷".repeat(17)).is_err());
+        assert!(super::validate_custom_nickname("13800138000").is_err());
+        assert!(super::validate_custom_nickname("微信用户").is_err());
+        assert!(super::validate_custom_nickname("wx_abcdef").is_err());
+        assert!(super::validate_custom_nickname("球迷\n换行").is_err());
+        assert!(super::validate_custom_nickname("球迷<script>").is_err());
+    }
+
+    #[test]
+    fn resolve_profile_completed_blocks_unmodified_defaults_and_phone_numbers() {
+        let avatar = Some("https://oryjk.cn:82/minio/football-insight/u.jpg");
+        assert!(!super::resolve_profile_completed(
+            Some("13800138000"),
+            "13800138000",
+            avatar,
+            Some(false)
+        ));
+        assert!(!super::resolve_profile_completed(
+            Some("footballfan"),
+            "footballfan",
+            avatar,
+            Some(false)
+        ));
+        assert!(super::resolve_profile_completed(
+            Some("footballfan"),
+            "footballfan",
+            avatar,
+            Some(true)
+        ));
+        assert!(super::resolve_profile_completed(
+            Some("蓉城12号"),
+            "13800138000",
+            avatar,
+            None
+        ));
+        assert!(!super::resolve_profile_completed(
+            Some("蓉城12号"),
+            "13800138000",
+            None,
+            Some(true)
+        ));
+    }
+
+    #[test]
+    fn sanitize_public_display_name_masks_mobile_and_wx_identifiers() {
+        assert_eq!(
+            super::sanitize_public_display_name(Some("13800138000")),
+            "138****8000"
+        );
+        assert_eq!(
+            super::sanitize_public_display_name(Some("wx_o123456")),
+            "球迷"
+        );
+        assert_eq!(super::sanitize_public_display_name(None), "球迷");
+        assert_eq!(
+            super::sanitize_public_display_name(Some(" 凤凰山南看台 ")),
+            "凤凰山南看台"
         );
     }
 }

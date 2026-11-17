@@ -16,7 +16,7 @@
       <text class="topic-row__summary">{{ item.summary }}</text>
     </template>
     <view class="topic-row__footer">
-      <view class="topic-row__meta"><FiTopicMeta :heat="heat" :minutes="item.readMinutes" /></view>
+      <view class="topic-row__meta"><FiTopicMeta :heat="heat" :minutes="item.readMinutes" :comments-count="item.commentsCount" :comments-enabled="item.commentsEnabled" /></view>
       <view class="topic-row__read-entry"><FiTopicReadEntry @read="emit('read', item.id)" /></view>
     </view>
   </view>

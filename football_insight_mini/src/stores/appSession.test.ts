@@ -57,7 +57,7 @@ let tokenAtLogoutCall: string | null | undefined
 
 interface SourceStub {
   source: AuthSource
-  calls: Record<'getCurrentUser' | 'login' | 'register' | 'loginAsH5TestUser' | 'loginWithMiniWechat' | 'bindMiniWechatAccount' | 'logout', number>
+  calls: Record<'getCurrentUser' | 'login' | 'register' | 'loginAsH5TestUser' | 'loginWithMiniWechat' | 'bindMiniWechatAccount' | 'updateMyProfile' | 'logout', number>
   handlers: {
     getCurrentUser: () => Promise<CurrentUser | null>
     login: () => Promise<AuthResponse>
@@ -65,6 +65,7 @@ interface SourceStub {
     loginAsH5TestUser: () => Promise<AuthResponse>
     loginWithMiniWechat: () => Promise<MiniWechatLoginResponse>
     bindMiniWechatAccount: () => Promise<AuthResponse>
+    updateMyProfile: () => Promise<CurrentUser>
     logout: () => Promise<void>
   }
 }
@@ -82,6 +83,7 @@ function createSourceStub(): SourceStub {
       loginAsH5TestUser: 0,
       loginWithMiniWechat: 0,
       bindMiniWechatAccount: 0,
+      updateMyProfile: 0,
       logout: 0,
     },
     handlers: {
@@ -91,6 +93,7 @@ function createSourceStub(): SourceStub {
       loginAsH5TestUser: unexpectedCall('loginAsH5TestUser'),
       loginWithMiniWechat: unexpectedCall('loginWithMiniWechat'),
       bindMiniWechatAccount: unexpectedCall('bindMiniWechatAccount'),
+      updateMyProfile: unexpectedCall('updateMyProfile'),
       logout: unexpectedCall('logout'),
     },
     source: {} as AuthSource,
@@ -120,6 +123,10 @@ function createSourceStub(): SourceStub {
     bindMiniWechatAccount: () => {
       stub.calls.bindMiniWechatAccount += 1
       return stub.handlers.bindMiniWechatAccount()
+    },
+    updateMyProfile: () => {
+      stub.calls.updateMyProfile += 1
+      return stub.handlers.updateMyProfile()
     },
     logout: () => {
       stub.calls.logout += 1
@@ -1254,5 +1261,36 @@ describe('会话发布与工具函数', () => {
     expect(first.currentUser.value).toMatchObject({ id: 'a' })
     expect(second.currentUser.value).toBeNull()
     expect(second.status.value).toBe('guest')
+  })
+
+  test('updateProfile 更新当前用户资料并在会话被退出/切换替代时放弃过期响应', async () => {
+    const stub = createSourceStub()
+    const session = createAppSession(stub.source)
+    stub.handlers.login = () => Promise.resolve(buildAuthResponse(userA, 'token-a'))
+    await session.loginWithPassword({ account_identifier: 'a', password: 'x' })
+
+    const updatedUser: CurrentUser = {
+      ...userA,
+      display_name: '凤凰山老哥',
+      avatar_url: 'https://oryjk.cn:82/minio/football-insight/u.jpg',
+      profile_completed: true,
+    }
+    stub.handlers.updateMyProfile = () => Promise.resolve(updatedUser)
+
+    const result = await session.updateProfile({
+      display_name: '凤凰山老哥',
+      avatar_data_url: 'data:image/png;base64,abcd',
+    })
+    expect(result.profile_completed).toBe(true)
+    expect(session.currentUser.value?.display_name).toBe('凤凰山老哥')
+
+    const pending = deferred<CurrentUser>()
+    stub.handlers.updateMyProfile = () => pending.promise
+    const staleCall = session.updateProfile({ display_name: '新名字', avatar_data_url: null })
+    await session.logoutSession()
+    pending.resolve({ ...updatedUser, display_name: '新名字' })
+
+    expect(await captureError(() => staleCall)).toBeInstanceOf(SessionSupersededError)
+    expect(session.currentUser.value).toBeNull()
   })
 })

@@ -131,6 +131,11 @@ fn entries(value: &serde_json::Value) -> Vec<DailyTopicEntry> {
             text: entry.text.trim().to_owned(),
             published_at: entry.published_at,
             sources: entry.sources.into_iter().map(source).collect(),
+            likes_count: 0,
+            dislikes_count: 0,
+            comments_count: 0,
+            liked_by_me: false,
+            disliked_by_me: false,
         })
         .collect()
 }
@@ -169,6 +174,8 @@ impl From<StoredTopic> for DailyTopic {
     fn from(value: StoredTopic) -> Self {
         Self {
             heat: 0,
+            comments_enabled: true,
+            comments_count: 0,
             team_tags: tags(&value.team_tags),
             entries: entries(&value.entries),
             category_audio: category_audio(&value.category_audio),

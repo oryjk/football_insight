@@ -1,4 +1,16 @@
-import type { DailyTopicAudio, DailyTopicEdition, DailyTopicEntry, DailyTopicImage, DailyTopicItem, DailyTopicSource, DailyTopicTag, TelegraphCategory } from '../types/dailyTopic'
+import type {
+  DailyTopicAudio,
+  DailyTopicEdition,
+  DailyTopicEntry,
+  DailyTopicImage,
+  DailyTopicItem,
+  DailyTopicSource,
+  DailyTopicTag,
+  TelegraphCategory,
+  TelegraphComment,
+  TelegraphCommentsPage,
+  TelegraphReactionSummary,
+} from '../types/dailyTopic'
 
 export const DAILY_TOPICS_TEAM_ID = 77680
 export const DAILY_TOPICS_LIMIT = 5
@@ -107,6 +119,9 @@ export function telegraphCategoryLeads(item: Pick<DailyTopicItem, 'entries'>) {
 export function isRoundupTopic(item: Pick<DailyTopicItem, 'entries'>): boolean {
   return (item.entries?.length ?? 0) > 0
 }
+function nonNegativeInt(value: unknown): number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0
+}
 function mapEntries(value: unknown, dayAt: string): DailyTopicEntry[] {
   if (!Array.isArray(value)) return []
   const entries: DailyTopicEntry[] = [], seen = new Set<string>()
@@ -117,7 +132,20 @@ function mapEntries(value: unknown, dayAt: string): DailyTopicEntry[] {
     if (!id || !title || !body || !publishedAt || seen.has(id)) continue
     seen.add(id)
     const sources = Array.isArray(entry.sources) ? entry.sources.map(mapSource).filter((source): source is DailyTopicSource => source !== null) : []
-    entries.push({ id, category: telegraphCategory(entry.category), title, text: body, publishedAt, timeLabel: roundupEntryTimeLabel(publishedAt, dayAt), sources })
+    entries.push({
+      id,
+      category: telegraphCategory(entry.category),
+      title,
+      text: body,
+      publishedAt,
+      timeLabel: roundupEntryTimeLabel(publishedAt, dayAt),
+      sources,
+      likesCount: nonNegativeInt(entry.likes_count),
+      dislikesCount: nonNegativeInt(entry.dislikes_count),
+      commentsCount: nonNegativeInt(entry.comments_count),
+      likedByMe: entry.liked_by_me === true,
+      dislikedByMe: entry.disliked_by_me === true,
+    })
   }
   return entries.sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))
 }
@@ -192,7 +220,9 @@ export function mapDailyTopicItem(value: unknown): DailyTopicItem | null {
     images: mapImages(item.images, sources, paragraphs.length),
     teamTags: mapTeamTags(item.team_tags),
     sourceLabel: `${Array.from(new Set(sources.map(source => source.publisher))).join(' · ')} · ${sources.length} 个来源`,
-    heat: typeof item.heat === 'number' && Number.isSafeInteger(item.heat) && item.heat >= 0 ? item.heat : 0,
+    heat: nonNegativeInt(item.heat),
+    commentsEnabled: typeof item.comments_enabled === 'boolean' ? item.comments_enabled : true,
+    commentsCount: nonNegativeInt(item.comments_count),
     readMinutes: Math.max(1, Math.ceil(paragraphs.join('').length / 350)),
     audio: mapAudio(item.audio),
     entries: mapEntries(item.entries, publishedAt),
@@ -272,4 +302,71 @@ export function formatTopicHeat(value: number): string {
   if (heat >= 100000000) return `${Math.floor(heat / 10000000) / 10}亿`
   if (heat >= 10000) return `${Math.floor(heat / 1000) / 10}万`
   return String(heat)
+}
+
+export function formatCommentTimestamp(value: string): string {
+  if (!timestamp(value)) return ''
+  const parts = beijingParts(value)
+  return `${parts.month}-${parts.day} ${parts.time}`
+}
+
+export function mapTelegraphReactionSummary(value: unknown): TelegraphReactionSummary {
+  const payload = record(value)
+  const entryId = text(payload?.entry_id)
+  if (!payload || !entryId) throw new Error('赞踩状态异常，请重试')
+  return {
+    entryId,
+    likesCount: nonNegativeInt(payload.likes_count),
+    dislikesCount: nonNegativeInt(payload.dislikes_count),
+    likedByMe: payload.liked_by_me === true,
+    dislikedByMe: payload.disliked_by_me === true,
+  }
+}
+
+export function mapTelegraphComment(value: unknown): TelegraphComment | null {
+  const item = record(value)
+  const author = record(item?.author)
+  if (!item || !author) return null
+  const id = text(item.id)
+  const topicId = text(item.topic_id)
+  const entryId = text(item.entry_id)
+  const content = typeof item.content === 'string' ? item.content.trim() : ''
+  const createdAt = timestamp(item.created_at)
+  const displayName = text(author.display_name) || '球迷'
+  if (!id || !topicId || !entryId || !content || !createdAt) return null
+  const replyRaw = record(item.reply_to)
+  const replyId = text(replyRaw?.comment_id)
+  const replyAuthor = text(replyRaw?.author_display_name)
+  return {
+    id,
+    topicId,
+    entryId,
+    author: {
+      displayName,
+      avatarUrl: typeof author.avatar_url === 'string' && author.avatar_url.trim() ? author.avatar_url.trim() : null,
+    },
+    replyTo: replyId && replyAuthor ? { commentId: replyId, authorDisplayName: replyAuthor } : null,
+    content,
+    isMine: item.is_mine === true,
+    createdAt,
+    createdLabel: formatCommentTimestamp(createdAt),
+  }
+}
+
+export function mapTelegraphCommentsPage(value: unknown): TelegraphCommentsPage {
+  const payload = record(value)
+  if (!payload || !Array.isArray(payload.items)) {
+    throw new Error('评论加载失败，请重试')
+  }
+  const items = payload.items
+    .map(mapTelegraphComment)
+    .filter((comment): comment is TelegraphComment => comment !== null)
+  const nextCursor = typeof payload.next_cursor === 'string' && payload.next_cursor ? payload.next_cursor : null
+  return {
+    commentsEnabled: typeof payload.comments_enabled === 'boolean' ? payload.comments_enabled : true,
+    totalCount: nonNegativeInt(payload.total_count),
+    items,
+    nextCursor,
+    hasMore: payload.has_more === true && nextCursor !== null,
+  }
 }

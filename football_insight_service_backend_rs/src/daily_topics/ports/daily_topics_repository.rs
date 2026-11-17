@@ -1,9 +1,15 @@
 use async_trait::async_trait;
+use uuid::Uuid;
 
 use crate::daily_topics::domain::{
     archive::TopicPosition,
     edition::{DailyTopic, DailyTopicEdition},
     heat::{TopicHeat, TopicVisit},
+    interactions::{
+        CreateTelegraphCommentInput, EntryInteractionStats, ReactionMutation, TelegraphComment,
+        TelegraphCommentsPage, TelegraphCommentsPosition, TelegraphInteractionError,
+        TelegraphReactionSummary,
+    },
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -108,6 +114,65 @@ pub trait DailyTopicsRepository: Send + Sync {
             .await?
             .and_then(|edition| edition.items.into_iter().find(|item| item.id == id)))
     }
+
+    async fn comments_enabled(&self) -> Result<bool, DailyTopicsRepositoryError> {
+        Ok(true)
+    }
+
+    async fn entry_interactions(
+        &self,
+        _team_id: i64,
+        _topic_ids: &[String],
+        _viewer_user_id: Option<Uuid>,
+    ) -> Result<std::collections::HashMap<String, EntryInteractionStats>, DailyTopicsRepositoryError>
+    {
+        Ok(std::collections::HashMap::new())
+    }
+}
+
+#[async_trait]
+pub trait TelegraphInteractionsRepository: Send + Sync {
+    async fn set_entry_reaction(
+        &self,
+        team_id: i64,
+        topic_id: &str,
+        entry_id: &str,
+        user_id: Uuid,
+        mutation: ReactionMutation,
+    ) -> Result<TelegraphReactionSummary, TelegraphInteractionError>;
+
+    async fn list_entry_comments(
+        &self,
+        team_id: i64,
+        topic_id: &str,
+        entry_id: &str,
+        viewer_user_id: Option<Uuid>,
+        after: Option<&TelegraphCommentsPosition>,
+        limit: usize,
+    ) -> Result<TelegraphCommentsPage, TelegraphInteractionError>;
+
+    async fn check_comment_eligibility(
+        &self,
+        team_id: i64,
+        topic_id: &str,
+        entry_id: &str,
+        user_id: Uuid,
+        reply_to_comment_id: Option<Uuid>,
+    ) -> Result<Option<String>, TelegraphInteractionError>;
+
+    async fn insert_entry_comment(
+        &self,
+        input: &CreateTelegraphCommentInput,
+    ) -> Result<(TelegraphComment, u64), TelegraphInteractionError>;
+
+    async fn delete_entry_comment(
+        &self,
+        team_id: i64,
+        topic_id: &str,
+        entry_id: &str,
+        comment_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<u64, TelegraphInteractionError>;
 }
 
 fn sort_topics(items: &mut Vec<DailyTopic>) {

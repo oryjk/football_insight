@@ -20,7 +20,7 @@
     </view>
     <!-- 整张卡片的正文区已可点开阅读，底部不再单独放「查看」；只留热度/阅读时长与收听。 -->
     <view class="topic-card__footer">
-      <view class="topic-card__meta"><FiTopicMeta tone="dark" :heat="heat" :minutes="item.readMinutes" /></view>
+      <view class="topic-card__meta"><FiTopicMeta tone="dark" :heat="heat" :minutes="item.readMinutes" :comments-count="item.commentsCount" :comments-enabled="item.commentsEnabled" /></view>
       <view class="topic-card__audio"><FiTopicAudioEntry variant="hero" label="听" :ready="audioReady" :playing="audioPlaying" :loading="audioLoading" @play="emit('play', item.id)" /></view>
     </view>
   </view>

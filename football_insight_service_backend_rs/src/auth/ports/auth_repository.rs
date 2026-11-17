@@ -256,4 +256,18 @@ pub trait AuthRepository: Send + Sync {
         account_identifier: &str,
         password_hash: &str,
     ) -> anyhow::Result<()>;
+    async fn has_custom_profile(&self, _user_id: Uuid) -> anyhow::Result<Option<bool>> {
+        Ok(None)
+    }
+    async fn get_user_mini_open_id(&self, _user_id: Uuid) -> anyhow::Result<Option<String>> {
+        Ok(None)
+    }
+    async fn update_user_profile(
+        &self,
+        _user_id: Uuid,
+        _display_name: &str,
+        _avatar_url: &str,
+    ) -> anyhow::Result<AuthUser> {
+        anyhow::bail!("update user profile is not implemented")
+    }
 }

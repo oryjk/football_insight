@@ -25,6 +25,7 @@
           :invite-code="currentUserInviteCode"
           @membership-action="handleMembershipCardAction"
           @copy-invite="handleCopyInviteCode"
+          @edit-profile="openProfileSetupSheet"
         />
 
         <UserSkeleton v-if="loading" />
@@ -96,6 +97,15 @@
       @bind="handleMiniWechatBind"
     />
 
+    <FiProfileSetupSheet
+      v-model:visible="profileSheetVisible"
+      :submitting="savingProfile"
+      :initial-nickname="editableNicknameInitialValue(currentUser)"
+      :initial-avatar-url="currentUser?.avatar_url ?? null"
+      subtitle="设置你的专属头像与昵称，用于每日电报评论互动展示。"
+      @submit="handleProfileSubmit"
+    />
+
     <UserGuestChantWall v-if="showGuestChantWall" />
 
     <FiLoginFloat
@@ -122,6 +132,7 @@ import UserAccountInfoPanel from './components/UserAccountInfoPanel.vue'
 import UserPasswordLoginSheet from './components/UserPasswordLoginSheet.vue'
 import UserWechatBindSheet from './components/UserWechatBindSheet.vue'
 import UserOfficialBindSheet from '../../components/FiOfficialBindSheet.vue'
+import FiProfileSetupSheet from '../../components/FiProfileSetupSheet.vue'
 import UserH5TestLoginPanel from './components/UserH5TestLoginPanel.vue'
 import badgeCheckIcon from '../../static/user/badge-check.svg'
 import calendarDaysIcon from '../../static/user/calendar-days.svg'
@@ -150,6 +161,8 @@ import {
   type MembershipTierGuide,
 } from '../../utils/membershipRules'
 import { resolveUserLoginPresentation } from './loginHelpers'
+import { editableNicknameInitialValue } from '../../utils/profileGate'
+import { extractApiErrorMessage } from '../../utils/apiError'
 
 const { navigationPageStyle } = useNavigationLayout()
 
@@ -177,13 +190,14 @@ const {
   error: officialBindError,
   canOpen: canOpenOfficialBind,
 } = officialBind
-const pageStyle = computed(() => `${navigationPageStyle.value};${officialBindVisible.value ? 'overflow: hidden;' : ''}`)
-onHide(officialBind.handlePageHide)
-onUnmounted(officialBind.dispose)
-
 const miniWechatBindState = ref<MiniWechatBindingRequiredResponse | null>(null)
 const passwordLoginSheetVisible = ref(false)
 const passwordLoginSubmitting = ref(false)
+const profileSheetVisible = ref(false)
+const savingProfile = ref(false)
+const pageStyle = computed(() => `${navigationPageStyle.value};${officialBindVisible.value || profileSheetVisible.value ? 'overflow: hidden;' : ''}`)
+onHide(officialBind.handlePageHide)
+onUnmounted(officialBind.dispose)
 
 // 账号读取（白名单）收口到 effects：内部按 session revision 防护，
 // 旧会话的迟到响应不写状态、不弹 toast。
@@ -234,7 +248,8 @@ const isGuestPage = computed(() => !hasAccessToken.value || (!loading.value && !
 const hasOpenSheet = computed(() =>
   passwordLoginSheetVisible.value
   || Boolean(miniWechatBindState.value)
-  || officialBindVisible.value,
+  || officialBindVisible.value
+  || profileSheetVisible.value,
 )
 // H5 测试登录面板展开时，隐藏游客歌词墙和登录浮窗，避免遮挡测试账号列表。
 const h5TestUsers = ref<H5TestLoginUser[]>([])
@@ -364,6 +379,29 @@ function closeMiniWechatBindSheet(): void {
 
 async function handleMiniWechatBind(payload: MiniWechatBindForm): Promise<void> {
   await loginFlow.bindMiniWechatAccount(payload)
+}
+
+function openProfileSetupSheet(): void {
+  if (!currentUser.value) {
+    return
+  }
+  profileSheetVisible.value = true
+}
+
+async function handleProfileSubmit(payload: { display_name: string; avatar_data_url: string | null }): Promise<void> {
+  if (savingProfile.value) {
+    return
+  }
+  savingProfile.value = true
+  try {
+    await session.updateProfile(payload)
+    profileSheetVisible.value = false
+    uni.showToast({ title: '资料已保存', icon: 'success' })
+  } catch (error) {
+    uni.showToast({ title: extractApiErrorMessage(error, '保存失败，请稍后重试'), icon: 'none' })
+  } finally {
+    savingProfile.value = false
+  }
 }
 
 async function loadH5TestUsers(): Promise<void> {

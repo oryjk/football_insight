@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 use crate::auth::application::login_with_mini_wechat::MiniWechatLoginResult;
-use crate::auth::domain::user::{AuthTokenBundle, AuthUser};
+use crate::auth::domain::user::{AuthTokenBundle, AuthUser, resolve_profile_completed};
 
 #[derive(Debug, Serialize)]
 pub struct AuthResponseDto {
@@ -17,6 +17,7 @@ pub struct CurrentUserDto {
     pub account_identifier: String,
     pub invite_code: Option<String>,
     pub avatar_url: Option<String>,
+    pub profile_completed: bool,
     pub has_wechat_binding: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub official_wechat_bound: Option<bool>,
@@ -33,6 +34,12 @@ pub struct CurrentUserDto {
 
 impl From<AuthUser> for CurrentUserDto {
     fn from(value: AuthUser) -> Self {
+        let profile_completed = resolve_profile_completed(
+            value.display_name.as_deref(),
+            &value.account_identifier,
+            value.avatar_url.as_deref(),
+            None,
+        );
         Self {
             id: value.id.to_string(),
             display_name: value
@@ -41,6 +48,7 @@ impl From<AuthUser> for CurrentUserDto {
             account_identifier: value.account_identifier,
             invite_code: value.invite_code,
             avatar_url: value.avatar_url,
+            profile_completed,
             has_wechat_binding: value.has_wechat_binding,
             official_wechat_bound: None,
             official_wechat_subscribed: None,

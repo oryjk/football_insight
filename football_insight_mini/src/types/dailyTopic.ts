@@ -26,6 +26,8 @@ export interface DailyTopicItem {
   images?: DailyTopicImage[]
   sourceLabel: string
   heat: number
+  commentsEnabled: boolean
+  commentsCount: number
   readMinutes: number
   audio: DailyTopicAudio
   /** 每日电报的快讯条目（新到旧）；旧版多篇话题为空数组。 */
@@ -47,6 +49,49 @@ export interface DailyTopicEntry {
   /** 当天的条目只显示「HH:mm」，前一天深夜的条目带日期「MM-DD HH:mm」。 */
   timeLabel: string
   sources: DailyTopicSource[]
+  likesCount: number
+  dislikesCount: number
+  commentsCount: number
+  likedByMe: boolean
+  dislikedByMe: boolean
+}
+
+export interface TelegraphReactionSummary {
+  entryId: string
+  likesCount: number
+  dislikesCount: number
+  likedByMe: boolean
+  dislikedByMe: boolean
+}
+
+export interface TelegraphCommentAuthor {
+  displayName: string
+  avatarUrl: string | null
+}
+
+export interface TelegraphCommentReplyRef {
+  commentId: string
+  authorDisplayName: string
+}
+
+export interface TelegraphComment {
+  id: string
+  topicId: string
+  entryId: string
+  author: TelegraphCommentAuthor
+  replyTo: TelegraphCommentReplyRef | null
+  content: string
+  isMine: boolean
+  createdAt: string
+  createdLabel: string
+}
+
+export interface TelegraphCommentsPage {
+  commentsEnabled: boolean
+  totalCount: number
+  items: TelegraphComment[]
+  nextCursor: string | null
+  hasMore: boolean
 }
 
 export interface DailyTopicTag { teamId: number; name: string }

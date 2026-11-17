@@ -8,6 +8,9 @@ export interface PostLoginRedirectTarget {
 }
 
 export function getAccessToken(): string | null {
+  if (typeof uni === 'undefined' || typeof uni.getStorageSync !== 'function') {
+    return null
+  }
   const token = uni.getStorageSync(AUTH_TOKEN_STORAGE_KEY)
   return typeof token === 'string' && token.length > 0 ? token : null
 }

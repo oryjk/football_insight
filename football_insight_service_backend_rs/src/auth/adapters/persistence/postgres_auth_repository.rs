@@ -10,7 +10,9 @@ use crate::auth::{
             MembershipTierRule, membership_tier_rank, resolve_referrer_membership_tier_from_rules,
             resolve_ticket_watch_poll_interval_seconds,
         },
-        user::{AuthUser, StoredAuthUser, resolve_effective_membership_tier},
+        user::{
+            AuthUser, StoredAuthUser, resolve_effective_membership_tier, resolve_profile_completed,
+        },
         wechat::{IssuedInviteCode, WechatOauthProfile},
     },
     ports::auth_repository::AuthRepository,
@@ -33,6 +35,37 @@ struct ReferralMembershipUpgrade {
 impl PostgresAuthRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+
+    async fn record_custom_profile_best_effort(&self, user: &AuthUser) -> anyhow::Result<()> {
+        if !resolve_profile_completed(
+            user.display_name.as_deref(),
+            &user.account_identifier,
+            user.avatar_url.as_deref(),
+            Some(true),
+        ) {
+            return Ok(());
+        }
+        if let Err(error) = sqlx::query(
+            r#"
+            INSERT INTO f_i_user_custom_profiles (user_id, nickname_updated_at, avatar_updated_at, updated_at)
+            VALUES ($1, NOW(), NOW(), NOW())
+            ON CONFLICT (user_id) DO UPDATE
+               SET nickname_updated_at = NOW(),
+                   avatar_updated_at = NOW(),
+                   updated_at = NOW()
+            "#,
+        )
+        .bind(user.id)
+        .execute(&self.pool)
+        .await
+        {
+            match &error {
+                sqlx::Error::Database(db_err) if db_err.code().as_deref() == Some("42P01") => {}
+                _ => return Err(error.into()),
+            }
+        }
+        Ok(())
     }
 
     async fn find_user_status_by_account_identifier(
@@ -368,8 +401,10 @@ impl PostgresAuthRepository {
             }
 
             tx.commit().await?;
+            let auth_user = user.into_auth_user(&membership_tier_rules);
+            let _ = self.record_custom_profile_best_effort(&auth_user).await;
             return Ok(RegisteredUser {
-                user: user.into_auth_user(&membership_tier_rules),
+                user: auth_user,
                 newly_created: false,
             });
         }
@@ -446,8 +481,10 @@ impl PostgresAuthRepository {
         }
 
         tx.commit().await?;
+        let auth_user = user.into_auth_user(&membership_tier_rules);
+        let _ = self.record_custom_profile_best_effort(&auth_user).await;
         Ok(RegisteredUser {
-            user: user.into_auth_user(&membership_tier_rules),
+            user: auth_user,
             newly_created: true,
         })
     }
@@ -522,8 +559,10 @@ impl PostgresAuthRepository {
             }
 
             tx.commit().await?;
+            let auth_user = user.into_auth_user(&membership_tier_rules);
+            let _ = self.record_custom_profile_best_effort(&auth_user).await;
             return Ok(RegisteredUser {
-                user: user.into_auth_user(&membership_tier_rules),
+                user: auth_user,
                 newly_created: false,
             });
         }
@@ -577,8 +616,10 @@ impl PostgresAuthRepository {
         }
 
         tx.commit().await?;
+        let auth_user = user.into_auth_user(&membership_tier_rules);
+        let _ = self.record_custom_profile_best_effort(&auth_user).await;
         Ok(RegisteredUser {
-            user: user.into_auth_user(&membership_tier_rules),
+            user: auth_user,
             newly_created: true,
         })
     }
@@ -692,8 +733,10 @@ impl PostgresAuthRepository {
             }
 
             tx.commit().await?;
+            let auth_user = user.into_auth_user(&membership_tier_rules);
+            let _ = self.record_custom_profile_best_effort(&auth_user).await;
             return Ok(RegisteredUser {
-                user: user.into_auth_user(&membership_tier_rules),
+                user: auth_user,
                 newly_created: false,
             });
         }
@@ -781,8 +824,10 @@ impl PostgresAuthRepository {
         }
 
         tx.commit().await?;
+        let auth_user = user.into_auth_user(&membership_tier_rules);
+        let _ = self.record_custom_profile_best_effort(&auth_user).await;
         Ok(RegisteredUser {
-            user: user.into_auth_user(&membership_tier_rules),
+            user: auth_user,
             newly_created: true,
         })
     }
@@ -869,8 +914,10 @@ impl PostgresAuthRepository {
             }
 
             tx.commit().await?;
+            let auth_user = user.into_auth_user(&membership_tier_rules);
+            let _ = self.record_custom_profile_best_effort(&auth_user).await;
             return Ok(RegisteredUser {
-                user: user.into_auth_user(&membership_tier_rules),
+                user: auth_user,
                 newly_created: false,
             });
         }
@@ -935,8 +982,10 @@ impl PostgresAuthRepository {
         }
 
         tx.commit().await?;
+        let auth_user = user.into_auth_user(&membership_tier_rules);
+        let _ = self.record_custom_profile_best_effort(&auth_user).await;
         Ok(RegisteredUser {
-            user: user.into_auth_user(&membership_tier_rules),
+            user: auth_user,
             newly_created: true,
         })
     }
@@ -1048,8 +1097,10 @@ impl PostgresAuthRepository {
             }
 
             tx.commit().await?;
+            let auth_user = user.into_auth_user(&membership_tier_rules);
+            let _ = self.record_custom_profile_best_effort(&auth_user).await;
             return Ok(RegisteredUser {
-                user: user.into_auth_user(&membership_tier_rules),
+                user: auth_user,
                 newly_created: false,
             });
         }
@@ -1135,8 +1186,10 @@ impl PostgresAuthRepository {
         }
 
         tx.commit().await?;
+        let auth_user = user.into_auth_user(&membership_tier_rules);
+        let _ = self.record_custom_profile_best_effort(&auth_user).await;
         Ok(RegisteredUser {
-            user: user.into_auth_user(&membership_tier_rules),
+            user: auth_user,
             newly_created: true,
         })
     }
@@ -1221,8 +1274,10 @@ impl PostgresAuthRepository {
             }
 
             tx.commit().await?;
+            let auth_user = user.into_auth_user(&membership_tier_rules);
+            let _ = self.record_custom_profile_best_effort(&auth_user).await;
             return Ok(RegisteredUser {
-                user: user.into_auth_user(&membership_tier_rules),
+                user: auth_user,
                 newly_created: false,
             });
         }
@@ -1285,8 +1340,10 @@ impl PostgresAuthRepository {
         }
 
         tx.commit().await?;
+        let auth_user = user.into_auth_user(&membership_tier_rules);
+        let _ = self.record_custom_profile_best_effort(&auth_user).await;
         Ok(RegisteredUser {
-            user: user.into_auth_user(&membership_tier_rules),
+            user: auth_user,
             newly_created: true,
         })
     }
@@ -2131,6 +2188,89 @@ impl AuthRepository for PostgresAuthRepository {
         }
 
         Ok(())
+    }
+
+    async fn has_custom_profile(&self, user_id: Uuid) -> anyhow::Result<Option<bool>> {
+        match sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM f_i_user_custom_profiles WHERE user_id = $1)",
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+        {
+            Ok(exists) => Ok(Some(exists)),
+            Err(sqlx::Error::Database(db_err)) if db_err.code().as_deref() == Some("42P01") => {
+                Ok(None)
+            }
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    async fn get_user_mini_open_id(&self, user_id: Uuid) -> anyhow::Result<Option<String>> {
+        let open_id = sqlx::query_scalar::<_, Option<String>>(
+            "SELECT wx_open_id FROM f_i_users WHERE id = $1 AND status = 'active' LIMIT 1",
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?
+        .flatten()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+
+        Ok(open_id)
+    }
+
+    async fn update_user_profile(
+        &self,
+        user_id: Uuid,
+        display_name: &str,
+        avatar_url: &str,
+    ) -> anyhow::Result<AuthUser> {
+        let membership_tier_rules = self.load_membership_tier_rules().await?;
+        let user = sqlx::query_as::<_, AuthUserRow>(
+            r#"
+            UPDATE f_i_users
+               SET display_name = $2,
+                   avatar_url = $3,
+                   updated_at = NOW()
+             WHERE id = $1
+               AND status = 'active'
+            RETURNING id,
+                      account_identifier,
+                      display_name,
+                      (
+                          SELECT code
+                            FROM f_i_invite_codes AS invite_codes
+                           WHERE invite_codes.used_by_user_id = f_i_users.id
+                           LIMIT 1
+                      ) AS invite_code,
+                      avatar_url,
+                      (wx_open_id IS NOT NULL) AS has_wechat_binding,
+                      membership_tier,
+                      membership_expires_at,
+                      CASE
+                          WHEN official_wechat_open_id IS NULL THEN TRUE
+                          ELSE EXISTS (
+                              SELECT 1
+                                FROM f_i_wechat_followers AS followers
+                               WHERE followers.open_id = f_i_users.official_wechat_open_id
+                                 AND followers.unsubscribed_at IS NULL
+                          )
+                      END AS membership_benefits_enabled,
+                      created_at,
+                      updated_at
+            "#,
+        )
+        .bind(user_id)
+        .bind(display_name)
+        .bind(avatar_url)
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("user not found or inactive"))?;
+
+        let auth_user = user.into_auth_user(&membership_tier_rules);
+        self.record_custom_profile_best_effort(&auth_user).await?;
+        Ok(auth_user)
     }
 }
 

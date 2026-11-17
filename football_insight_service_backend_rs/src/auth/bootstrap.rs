@@ -10,6 +10,7 @@ use crate::{
         adapters::{
             integration::{
                 current_standard_match_port::HttpCurrentStandardMatchPort,
+                minio_avatar_storage_port::MinioOrInlineAvatarStoragePort,
                 wechat_crypto_port::OfficialWechatCryptoPort,
                 wechat_oauth_port::OfficialWechatOauthPort,
             },
@@ -39,9 +40,11 @@ use crate::{
             official_bind::{CompleteOfficialBindUseCase, CreateOfficialBindCodeUseCase},
             register_with_invite::RegisterWithInviteUseCase,
             reset_password_with_invite::ResetPasswordWithInviteUseCase,
+            update_user_profile::UpdateUserProfileUseCase,
         },
     },
     config::AppConfig,
+    content_security::ContentSecurityPort,
     system_config::ports::system_config_port::SystemConfigPort,
 };
 
@@ -57,6 +60,7 @@ pub fn build_auth(
     config: &AppConfig,
     system_config_port: Arc<dyn SystemConfigPort>,
     official_account_access_port: Arc<dyn OfficialAccountMatchIdAccessPort>,
+    content_security: Arc<dyn ContentSecurityPort>,
 ) -> AuthBootstrap {
     // Acquisition failures must not consume authentication's business connections.
     let acquisition_pool = sqlx::postgres::PgPoolOptions::new()
@@ -145,6 +149,13 @@ pub fn build_auth(
         auth_repository.clone(),
         token_port.clone(),
     ));
+    let avatar_storage = Arc::new(MinioOrInlineAvatarStoragePort::new(config.minio.clone()));
+    let update_user_profile_use_case = Arc::new(UpdateUserProfileUseCase::new(
+        auth_repository.clone(),
+        token_port.clone(),
+        avatar_storage,
+        content_security,
+    ));
     let login_as_h5_test_user_use_case = Arc::new(LoginAsH5TestUserUseCase::new(
         auth_repository.clone(),
         token_port.clone(),
@@ -183,6 +194,7 @@ pub fn build_auth(
             complete_mini_wechat_login_use_case,
             bind_mini_wechat_account_use_case,
             get_current_user_use_case.clone(),
+            update_user_profile_use_case,
             login_as_h5_test_user_use_case,
             logout_use_case,
             wechat_webhook_use_case,

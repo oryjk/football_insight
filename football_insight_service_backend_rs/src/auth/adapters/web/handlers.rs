@@ -30,6 +30,9 @@ use crate::auth::{
         logout::LogoutUseCase,
         register_with_invite::{RegisterInput, RegisterWithInviteUseCase},
         reset_password_with_invite::{ResetPasswordInput, ResetPasswordWithInviteUseCase},
+        update_user_profile::{
+            UpdateUserProfileError, UpdateUserProfileInput, UpdateUserProfileUseCase,
+        },
     },
 };
 
@@ -106,6 +109,12 @@ pub struct MiniWechatBindRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct UpdateProfileRequest {
+    pub display_name: String,
+    pub avatar_data_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct WechatCallbackQuery {
     pub code: Option<String>,
     pub state: Option<String>,
@@ -162,6 +171,42 @@ pub async fn reset_password_handler(
     Ok(StatusCode::NO_CONTENT)
 }
 
+async fn build_enriched_current_user_dto(
+    use_case: &GetCurrentUserUseCase,
+    user: crate::auth::domain::user::AuthUser,
+    custom_profile_override: Option<bool>,
+) -> CurrentUserDto {
+    let has_custom_profile = match custom_profile_override {
+        Some(value) => Some(value),
+        None => use_case
+            .has_custom_profile(user.id)
+            .await
+            .unwrap_or(None),
+    };
+    let profile_completed = crate::auth::domain::user::resolve_profile_completed(
+        user.display_name.as_deref(),
+        &user.account_identifier,
+        user.avatar_url.as_deref(),
+        has_custom_profile,
+    );
+    let official_access = use_case
+        .official_wechat_access(user.id)
+        .await
+        .unwrap_or_else(|_| {
+            tracing::warn!("failed to read official-account subscription and access status");
+            None
+        });
+    let mut dto = CurrentUserDto::from(user);
+    dto.profile_completed = profile_completed;
+    if let Some(access) = official_access {
+        dto.official_wechat_bound = Some(access.bound);
+        dto.official_wechat_subscribed = access.subscribed;
+        dto.official_wechat_binding_required = Some(access.binding_required);
+        dto.membership_benefits_enabled = access.benefits_enabled;
+    }
+    dto
+}
+
 pub async fn get_current_user_handler(
     headers: HeaderMap,
     use_case: Arc<GetCurrentUserUseCase>,
@@ -175,21 +220,45 @@ pub async fn get_current_user_handler(
         .map_err(|error| (StatusCode::UNAUTHORIZED, error.to_string()))?
         .ok_or((StatusCode::UNAUTHORIZED, "not logged in".to_string()))?;
 
-    let official_access = use_case
-        .official_wechat_access(user.id)
+    Ok(Json(
+        build_enriched_current_user_dto(&use_case, user, None).await,
+    ))
+}
+
+pub async fn update_profile_handler(
+    headers: HeaderMap,
+    use_case: Arc<UpdateUserProfileUseCase>,
+    get_current_user_use_case: Arc<GetCurrentUserUseCase>,
+    payload: Result<Json<UpdateProfileRequest>, axum::extract::rejection::JsonRejection>,
+) -> Result<Json<CurrentUserDto>, (StatusCode, String)> {
+    let token = extract_bearer_token(&headers)
+        .ok_or((StatusCode::UNAUTHORIZED, "请先登录".to_string()))?
+        .to_string();
+    let Json(request) =
+        payload.map_err(|_| (StatusCode::BAD_REQUEST, "请填写昵称并选择头像".to_string()))?;
+
+    let updated = use_case
+        .execute(UpdateUserProfileInput {
+            access_token: token,
+            display_name: request.display_name,
+            avatar_data_url: request.avatar_data_url,
+        })
         .await
-        .unwrap_or_else(|_| {
-            tracing::warn!("failed to read official-account subscription and access status");
-            None
-        });
-    let mut dto = CurrentUserDto::from(user);
-    if let Some(access) = official_access {
-        dto.official_wechat_bound = Some(access.bound);
-        dto.official_wechat_subscribed = access.subscribed;
-        dto.official_wechat_binding_required = Some(access.binding_required);
-        dto.membership_benefits_enabled = access.benefits_enabled;
-    }
-    Ok(Json(dto))
+        .map_err(|error| match error {
+            UpdateUserProfileError::Unauthorized => (StatusCode::UNAUTHORIZED, error.to_string()),
+            UpdateUserProfileError::InvalidInput(msg) => (StatusCode::BAD_REQUEST, msg),
+            UpdateUserProfileError::ContentRejected(msg) => {
+                (StatusCode::BAD_REQUEST, msg.to_string())
+            }
+            UpdateUserProfileError::ModerationUnavailable => {
+                (StatusCode::SERVICE_UNAVAILABLE, error.to_string())
+            }
+            UpdateUserProfileError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+        })?;
+
+    Ok(Json(
+        build_enriched_current_user_dto(&get_current_user_use_case, updated, Some(true)).await,
+    ))
 }
 
 pub async fn logout_handler(

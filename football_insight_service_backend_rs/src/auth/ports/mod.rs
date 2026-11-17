@@ -1,5 +1,6 @@
 pub mod acquisition_repository;
 pub mod auth_repository;
+pub mod avatar_storage_port;
 pub mod current_standard_match_port;
 pub mod h5_test_login_port;
 pub mod official_account_match_id_access_port;

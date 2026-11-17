@@ -1,6 +1,7 @@
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use chrono::{DateTime, FixedOffset, NaiveDate};
+use chrono::{DateTime, FixedOffset, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::daily_topics::domain::{
     archive::{
@@ -10,6 +11,10 @@ use crate::daily_topics::domain::{
     edition::{
         AudioStatus, DailyTopic, DailyTopicAudio, DailyTopicEntry, DailyTopicImage,
         DailyTopicSource, DailyTopicsView,
+    },
+    interactions::{
+        TelegraphComment, TelegraphCommentsPage, TelegraphCommentsPosition,
+        TelegraphInteractionError, TelegraphReactionSummary,
     },
     query::{DailyTopicsQuery, InvalidDailyTopicsQuery},
 };
@@ -62,6 +67,8 @@ pub(super) struct DailyTopicDto {
     /// 每日电报分类语音：`{"domestic": {...}, "world": {...}}`；旧数据为空对象。
     category_audio: std::collections::BTreeMap<String, DailyTopicAudioDto>,
     heat: u64,
+    comments_enabled: bool,
+    comments_count: u64,
 }
 
 #[derive(Serialize)]
@@ -73,6 +80,11 @@ struct DailyTopicEntryDto {
     published_at: DateTime<FixedOffset>,
     sources: Vec<DailyTopicSourceDto>,
     team_tags: Vec<TopicTagDto>,
+    likes_count: u64,
+    dislikes_count: u64,
+    comments_count: u64,
+    liked_by_me: bool,
+    disliked_by_me: bool,
 }
 
 impl From<DailyTopicEntry> for DailyTopicEntryDto {
@@ -85,6 +97,11 @@ impl From<DailyTopicEntry> for DailyTopicEntryDto {
             published_at: value.published_at,
             sources: value.sources.into_iter().map(Into::into).collect(),
             team_tags: value.team_tags.into_iter().map(Into::into).collect(),
+            likes_count: value.likes_count,
+            dislikes_count: value.dislikes_count,
+            comments_count: value.comments_count,
+            liked_by_me: value.liked_by_me,
+            disliked_by_me: value.disliked_by_me,
         }
     }
 }
@@ -354,6 +371,8 @@ impl From<DailyTopic> for DailyTopicDto {
                 .map(|(category, audio)| (category, audio.into()))
                 .collect(),
             heat: value.heat,
+            comments_enabled: value.comments_enabled,
+            comments_count: value.comments_count,
         }
     }
 }
@@ -392,4 +411,179 @@ pub(super) struct TopicVisitBody {
 #[derive(Serialize)]
 pub(super) struct TopicVisitResponse {
     pub heat: u64,
+}
+
+#[derive(Deserialize)]
+pub(super) struct EntryInteractionParameters {
+    #[serde(default = "default_team")]
+    pub team_id: i64,
+}
+
+#[derive(Serialize)]
+pub(super) struct TelegraphReactionResponseDto {
+    pub entry_id: String,
+    pub likes_count: u64,
+    pub dislikes_count: u64,
+    pub liked_by_me: bool,
+    pub disliked_by_me: bool,
+}
+
+impl From<TelegraphReactionSummary> for TelegraphReactionResponseDto {
+    fn from(value: TelegraphReactionSummary) -> Self {
+        Self {
+            entry_id: value.entry_id,
+            likes_count: value.likes_count,
+            dislikes_count: value.dislikes_count,
+            liked_by_me: value.liked_by_me,
+            disliked_by_me: value.disliked_by_me,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub(super) struct TelegraphCommentsQueryParameters {
+    #[serde(default = "default_team")]
+    pub team_id: i64,
+    #[serde(default = "history_limit")]
+    pub limit: usize,
+    pub cursor: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TelegraphCommentsCursorDto {
+    team_id: i64,
+    topic_id: String,
+    entry_id: String,
+    created_at: DateTime<Utc>,
+    id: Uuid,
+}
+
+impl TelegraphCommentsQueryParameters {
+    pub fn decode_cursor(
+        &self,
+        topic_id: &str,
+        entry_id: &str,
+    ) -> Result<Option<TelegraphCommentsPosition>, TelegraphInteractionError> {
+        let Some(encoded) = self.cursor.as_deref().map(str::trim).filter(|v| !v.is_empty()) else {
+            return Ok(None);
+        };
+        if encoded.len() > 1024 {
+            return Err(TelegraphInteractionError::InvalidInput("分页游标无效"));
+        }
+        let bytes = URL_SAFE_NO_PAD
+            .decode(encoded)
+            .map_err(|_| TelegraphInteractionError::InvalidInput("分页游标无效"))?;
+        let cursor: TelegraphCommentsCursorDto = serde_json::from_slice(&bytes)
+            .map_err(|_| TelegraphInteractionError::InvalidInput("分页游标无效"))?;
+        if cursor.team_id != self.team_id
+            || cursor.topic_id != topic_id
+            || cursor.entry_id != entry_id
+        {
+            return Err(TelegraphInteractionError::InvalidInput("分页游标无效"));
+        }
+        Ok(Some(TelegraphCommentsPosition {
+            created_at: cursor.created_at,
+            id: cursor.id,
+        }))
+    }
+}
+
+#[derive(Serialize)]
+pub(super) struct TelegraphCommentAuthorDto {
+    pub display_name: String,
+    pub avatar_url: Option<String>,
+}
+
+#[derive(Serialize)]
+pub(super) struct TelegraphCommentReplyRefDto {
+    pub comment_id: Uuid,
+    pub author_display_name: String,
+}
+
+#[derive(Serialize)]
+pub(super) struct TelegraphCommentDto {
+    pub id: Uuid,
+    pub topic_id: String,
+    pub entry_id: String,
+    pub author: TelegraphCommentAuthorDto,
+    pub reply_to: Option<TelegraphCommentReplyRefDto>,
+    pub content: String,
+    pub is_mine: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<TelegraphComment> for TelegraphCommentDto {
+    fn from(value: TelegraphComment) -> Self {
+        Self {
+            id: value.id,
+            topic_id: value.topic_id,
+            entry_id: value.entry_id,
+            author: TelegraphCommentAuthorDto {
+                display_name: value.author.display_name,
+                avatar_url: value.author.avatar_url,
+            },
+            reply_to: value.reply_to.map(|reply| TelegraphCommentReplyRefDto {
+                comment_id: reply.comment_id,
+                author_display_name: reply.author_display_name,
+            }),
+            content: value.content,
+            is_mine: value.is_mine,
+            created_at: value.created_at,
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub(super) struct TelegraphCommentsPageDto {
+    pub comments_enabled: bool,
+    pub total_count: u64,
+    pub items: Vec<TelegraphCommentDto>,
+    pub next_cursor: Option<String>,
+    pub has_more: bool,
+}
+
+impl TelegraphCommentsPageDto {
+    pub fn from_page(
+        page: TelegraphCommentsPage,
+        team_id: i64,
+        topic_id: &str,
+        entry_id: &str,
+    ) -> Self {
+        let next_cursor = page.next_cursor.map(|pos| {
+            URL_SAFE_NO_PAD.encode(
+                serde_json::to_vec(&TelegraphCommentsCursorDto {
+                    team_id,
+                    topic_id: topic_id.to_string(),
+                    entry_id: entry_id.to_string(),
+                    created_at: pos.created_at,
+                    id: pos.id,
+                })
+                .expect("comment cursor contains serializable values"),
+            )
+        });
+        Self {
+            comments_enabled: page.comments_enabled,
+            total_count: page.total_count,
+            items: page.items.into_iter().map(Into::into).collect(),
+            has_more: page.has_more && next_cursor.is_some(),
+            next_cursor,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub(super) struct CreateTelegraphCommentBody {
+    pub content: String,
+    pub reply_to_comment_id: Option<Uuid>,
+}
+
+#[derive(Serialize)]
+pub(super) struct CreateTelegraphCommentResponseDto {
+    pub comment: TelegraphCommentDto,
+    pub comments_count: u64,
+}
+
+#[derive(Serialize)]
+pub(super) struct DeleteTelegraphCommentResponseDto {
+    pub comments_count: u64,
 }

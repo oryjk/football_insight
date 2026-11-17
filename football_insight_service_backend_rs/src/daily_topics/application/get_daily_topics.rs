@@ -29,9 +29,17 @@ impl GetDailyTopics {
         &self,
         query: crate::daily_topics::domain::timeline::TopicTimelineQuery,
     ) -> Result<crate::daily_topics::domain::timeline::TopicTimelinePage, TopicTimelineError> {
+        self.timeline_for_viewer(query, None).await
+    }
+
+    pub async fn timeline_for_viewer(
+        &self,
+        query: crate::daily_topics::domain::timeline::TopicTimelineQuery,
+        viewer_user_id: Option<uuid::Uuid>,
+    ) -> Result<crate::daily_topics::domain::timeline::TopicTimelinePage, TopicTimelineError> {
         use crate::daily_topics::domain::timeline::TopicTimelinePage;
         let anchor = self
-            .detail(query.anchor.clone())
+            .detail_for_viewer(query.anchor.clone(), viewer_user_id)
             .await?
             .ok_or(TopicTimelineError::AnchorNotFound)?;
         let tag = anchor
@@ -73,6 +81,8 @@ impl GetDailyTopics {
             normalize_tags(item);
         }
         self.attach_heat(query.anchor.team_id(), &mut items).await;
+        self.attach_interactions(query.anchor.team_id(), viewer_user_id, &mut items)
+            .await;
         let next = if has_more {
             items.last().map(|item| TopicPosition {
                 published_at: item.published_at,
@@ -97,6 +107,14 @@ impl GetDailyTopics {
     pub async fn execute(
         &self,
         query: DailyTopicsQuery,
+    ) -> Result<DailyTopicsView, DailyTopicsRepositoryError> {
+        self.execute_for_viewer(query, None).await
+    }
+
+    pub async fn execute_for_viewer(
+        &self,
+        query: DailyTopicsQuery,
+        viewer_user_id: Option<uuid::Uuid>,
     ) -> Result<DailyTopicsView, DailyTopicsRepositoryError> {
         let Some(mut edition) = self
             .repository
@@ -126,6 +144,8 @@ impl GetDailyTopics {
             normalize_tags(item);
         }
         self.attach_heat(query.team_id(), &mut edition.items).await;
+        self.attach_interactions(query.team_id(), viewer_user_id, &mut edition.items)
+            .await;
         Ok(DailyTopicsView {
             team_id: edition.team_id,
             edition_date: Some(edition.edition_date),
@@ -137,6 +157,14 @@ impl GetDailyTopics {
     pub async fn latest(
         &self,
         team_id: i64,
+    ) -> Result<DailyTopicsView, DailyTopicsRepositoryError> {
+        self.latest_for_viewer(team_id, None).await
+    }
+
+    pub async fn latest_for_viewer(
+        &self,
+        team_id: i64,
+        viewer_user_id: Option<uuid::Uuid>,
     ) -> Result<DailyTopicsView, DailyTopicsRepositoryError> {
         let Some(mut edition) = self.repository.latest_for_team(team_id).await? else {
             return Ok(DailyTopicsView {
@@ -156,6 +184,8 @@ impl GetDailyTopics {
             normalize_tags(item);
         }
         self.attach_heat(team_id, &mut edition.items).await;
+        self.attach_interactions(team_id, viewer_user_id, &mut edition.items)
+            .await;
         Ok(DailyTopicsView {
             team_id: edition.team_id,
             edition_date: Some(edition.edition_date),
@@ -168,6 +198,15 @@ impl GetDailyTopics {
         &self,
         team_id: i64,
         edition_date: chrono::NaiveDate,
+    ) -> Result<Option<DailyTopicsView>, DailyTopicsRepositoryError> {
+        self.by_date_for_viewer(team_id, edition_date, None).await
+    }
+
+    pub async fn by_date_for_viewer(
+        &self,
+        team_id: i64,
+        edition_date: chrono::NaiveDate,
+        viewer_user_id: Option<uuid::Uuid>,
     ) -> Result<Option<DailyTopicsView>, DailyTopicsRepositoryError> {
         let Some(mut edition) = self
             .repository
@@ -189,6 +228,8 @@ impl GetDailyTopics {
             normalize_tags(item);
         }
         self.attach_heat(team_id, &mut edition.items).await;
+        self.attach_interactions(team_id, viewer_user_id, &mut edition.items)
+            .await;
         Ok(Some(DailyTopicsView {
             team_id: edition.team_id,
             edition_date: Some(edition.edition_date),
@@ -200,6 +241,14 @@ impl GetDailyTopics {
     pub async fn history(
         &self,
         query: TopicHistoryQuery,
+    ) -> Result<TopicHistoryPage, DailyTopicsRepositoryError> {
+        self.history_for_viewer(query, None).await
+    }
+
+    pub async fn history_for_viewer(
+        &self,
+        query: TopicHistoryQuery,
+        viewer_user_id: Option<uuid::Uuid>,
     ) -> Result<TopicHistoryPage, DailyTopicsRepositoryError> {
         let mut items = self
             .repository
@@ -217,6 +266,8 @@ impl GetDailyTopics {
             normalize_tags(item);
         }
         self.attach_heat(query.team_id(), &mut items).await;
+        self.attach_interactions(query.team_id(), viewer_user_id, &mut items)
+            .await;
         let next = if has_more {
             items.last().map(|item| TopicPosition {
                 published_at: item.published_at,
@@ -237,6 +288,15 @@ impl GetDailyTopics {
         query: TopicDetailQuery,
     ) -> Result<Option<crate::daily_topics::domain::edition::DailyTopic>, DailyTopicsRepositoryError>
     {
+        self.detail_for_viewer(query, None).await
+    }
+
+    pub async fn detail_for_viewer(
+        &self,
+        query: TopicDetailQuery,
+        viewer_user_id: Option<uuid::Uuid>,
+    ) -> Result<Option<crate::daily_topics::domain::edition::DailyTopic>, DailyTopicsRepositoryError>
+    {
         let mut item = self
             .repository
             .topic_for_team(query.team_id(), query.id())
@@ -251,8 +311,69 @@ impl GetDailyTopics {
             normalize_tags(item);
             self.attach_heat(query.team_id(), std::slice::from_mut(item))
                 .await;
+            self.attach_interactions(
+                query.team_id(),
+                viewer_user_id,
+                std::slice::from_mut(item),
+            )
+            .await;
         }
         Ok(item)
+    }
+
+    async fn attach_interactions(
+        &self,
+        team_id: i64,
+        viewer_user_id: Option<uuid::Uuid>,
+        items: &mut [crate::daily_topics::domain::edition::DailyTopic],
+    ) {
+        if items.is_empty() {
+            return;
+        }
+        let comments_enabled = match self.repository.comments_enabled().await {
+            Ok(enabled) => enabled,
+            Err(error) => {
+                tracing::warn!(%error, team_id, "comments config unavailable; defaulting to enabled");
+                true
+            }
+        };
+        let ids: Vec<_> = items.iter().map(|item| item.id.clone()).collect();
+        let stats = match self
+            .repository
+            .entry_interactions(team_id, &ids, viewer_user_id)
+            .await
+        {
+            Ok(stats) => stats,
+            Err(error) => {
+                tracing::warn!(%error, team_id, "telegraph entry interactions unavailable; preserving readable content");
+                Default::default()
+            }
+        };
+        for item in items {
+            item.comments_enabled = comments_enabled;
+            let mut total_comments = 0u64;
+            for entry in &mut item.entries {
+                if let Some(entry_stats) = stats.get(&entry.id) {
+                    entry.likes_count = entry_stats.likes_count;
+                    entry.dislikes_count = entry_stats.dislikes_count;
+                    entry.liked_by_me = entry_stats.liked_by_me;
+                    entry.disliked_by_me = entry_stats.disliked_by_me;
+                    entry.comments_count = if comments_enabled {
+                        entry_stats.comments_count
+                    } else {
+                        0
+                    };
+                    total_comments = total_comments.saturating_add(entry.comments_count);
+                } else {
+                    entry.likes_count = 0;
+                    entry.dislikes_count = 0;
+                    entry.liked_by_me = false;
+                    entry.disliked_by_me = false;
+                    entry.comments_count = 0;
+                }
+            }
+            item.comments_count = total_comments;
+        }
     }
 
     async fn attach_heat(

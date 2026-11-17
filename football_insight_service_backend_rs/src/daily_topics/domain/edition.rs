@@ -33,6 +33,8 @@ pub struct DailyTopic {
     /// 每日电报按分类（domestic / world / abroad）各一段的语音；旧数据为空。
     pub category_audio: std::collections::BTreeMap<String, DailyTopicAudio>,
     pub heat: u64,
+    pub comments_enabled: bool,
+    pub comments_count: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -45,6 +47,11 @@ pub struct DailyTopicEntry {
     pub published_at: DateTime<FixedOffset>,
     pub sources: Vec<DailyTopicSource>,
     pub team_tags: Vec<DailyTopicTag>,
+    pub likes_count: u64,
+    pub dislikes_count: u64,
+    pub comments_count: u64,
+    pub liked_by_me: bool,
+    pub disliked_by_me: bool,
 }
 
 #[derive(Debug, Clone)]

@@ -151,6 +151,28 @@ export interface BrandSubtitle {
   subtitle: string | null;
 }
 
+export type AdminTelegraphCommentStatusFilter = "all" | "visible" | "hidden";
+export type AdminTelegraphCommentStatus = "visible" | "hidden" | "deleted";
+
+export interface AdminTelegraphComment {
+  id: string;
+  team_id: number;
+  topic_id: string;
+  entry_id: string;
+  entry_title: string;
+  user_id: string;
+  author_display_name: string;
+  author_avatar_url: string | null;
+  content: string;
+  status: AdminTelegraphCommentStatus;
+  created_at: string;
+}
+
+export interface AdminTelegraphCommentsResponse {
+  comments_enabled: boolean;
+  items: AdminTelegraphComment[];
+}
+
 export interface SupportBaseTeam {
   team_id: number;
   team_name: string;
@@ -213,6 +235,46 @@ export function createApi(client: ApiClient) {
         `/daily-topics/${teamId}/${encodeURIComponent(topicId)}/readers`,
         token,
         { signal },
+      ),
+    telegraphComments: (
+      token: string,
+      status: AdminTelegraphCommentStatusFilter = "all",
+      limit = 50,
+      signal?: AbortSignal,
+    ) =>
+      client.request<AdminTelegraphCommentsResponse>(
+        `/telegraph-comments?status=${encodeURIComponent(status)}&limit=${limit}`,
+        token,
+        { signal },
+      ),
+    setTelegraphCommentsConfig: (
+      token: string,
+      commentsEnabled: boolean,
+      signal?: AbortSignal,
+    ) =>
+      client.request<{ comments_enabled: boolean }>(
+        "/telegraph-comments/config",
+        token,
+        {
+          method: "PUT",
+          body: JSON.stringify({ comments_enabled: commentsEnabled }),
+          signal,
+        },
+      ),
+    setTelegraphCommentStatus: (
+      token: string,
+      commentId: string,
+      status: AdminTelegraphCommentStatus,
+      signal?: AbortSignal,
+    ) =>
+      client.request<void>(
+        `/telegraph-comments/${encodeURIComponent(commentId)}/status`,
+        token,
+        {
+          method: "PUT",
+          body: JSON.stringify({ status }),
+          signal,
+        },
       ),
     supportBaseMatches: (token: string, signal?: AbortSignal) =>
       client.request<{ items: SupportBaseMatch[] }>("/support/matches", token, {

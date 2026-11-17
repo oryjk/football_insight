@@ -23,11 +23,34 @@
         <text>{{ entry.text }}</text>
       </text>
       <view class="roundup__meta">
-        <text v-if="active === null" class="roundup__tag" :class="`roundup__tag--${entry.category}`">{{ telegraphCategoryLabel(entry.category) }}</text>
-        <!-- 来源默认折叠，只露出媒体名；点开后逐条列出，可复制原文链接。 -->
-        <view v-if="entry.sources.length" class="roundup__source-toggle" role="button" :aria-expanded="expanded.has(entry.id)" hover-class="roundup__pressed" @tap="toggle(entry.id)">
-          <text>来源：{{ publishers(entry) }}</text>
-          <text class="roundup__chevron" :class="{ 'roundup__chevron--open': expanded.has(entry.id) }">›</text>
+        <view class="roundup__meta-info">
+          <text v-if="active === null" class="roundup__tag" :class="`roundup__tag--${entry.category}`">{{ telegraphCategoryLabel(entry.category) }}</text>
+          <!-- 来源默认折叠，只露出媒体名；点开后逐条列出，可复制原文链接。 -->
+          <view v-if="entry.sources.length" class="roundup__source-toggle" role="button" :aria-expanded="expanded.has(entry.id)" hover-class="roundup__pressed" @tap="toggle(entry.id)">
+            <text>来源：{{ publishers(entry) }}</text>
+            <text class="roundup__chevron" :class="{ 'roundup__chevron--open': expanded.has(entry.id) }">›</text>
+          </view>
+        </view>
+        <view class="roundup__actions">
+          <FiReactionBar
+            size="sm"
+            :count="entry.likesCount"
+            :dislike-count="entry.dislikesCount"
+            :liked="entry.likedByMe"
+            :disliked="entry.dislikedByMe"
+            :pending="pendingReactionIds.includes(entry.id)"
+            @like="emit('like', entry)"
+            @dislike="emit('dislike', entry)"
+          />
+          <button
+            v-if="commentsVisible"
+            class="roundup__comment-btn"
+            hover-class="roundup__pressed"
+            @tap.stop="emit('comment', entry)"
+          >
+            <text class="roundup__comment-label">评论</text>
+            <text v-if="entry.commentsCount > 0" class="roundup__comment-count">{{ entry.commentsCount }}</text>
+          </button>
         </view>
       </view>
       <view v-if="expanded.has(entry.id)" class="roundup__sources">
@@ -45,12 +68,32 @@
 
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
+import FiReactionBar from '../../../components/FiReactionBar.vue'
 import FiTopicAudioEntry from '../../../components/topics/FiTopicAudioEntry.vue'
 import type { DailyTopicEntry, DailyTopicItem, TelegraphCategory } from '../../../types/dailyTopic'
 import { roundupDayLabel, TELEGRAPH_CATEGORIES, telegraphCategoryCounts, telegraphCategoryLabel } from '../../../utils/dailyTopics'
 
-const props = defineProps<{ item: DailyTopicItem; fontRpx: number; active: TelegraphCategory | null; audioReady: boolean; audioPlaying: boolean; audioLoading: boolean }>()
-const emit = defineEmits<{ (e: 'play', category: TelegraphCategory | null): void; (e: 'select', category: TelegraphCategory | null): void; (e: 'copy', url: string): void }>()
+const props = withDefaults(defineProps<{
+  item: DailyTopicItem
+  fontRpx: number
+  active: TelegraphCategory | null
+  audioReady: boolean
+  audioPlaying: boolean
+  audioLoading: boolean
+  pendingReactionIds?: string[]
+  commentsVisible?: boolean
+}>(), {
+  pendingReactionIds: () => [],
+  commentsVisible: false,
+})
+const emit = defineEmits<{
+  (e: 'play', category: TelegraphCategory | null): void
+  (e: 'select', category: TelegraphCategory | null): void
+  (e: 'copy', url: string): void
+  (e: 'like', entry: DailyTopicEntry): void
+  (e: 'dislike', entry: DailyTopicEntry): void
+  (e: 'comment', entry: DailyTopicEntry): void
+}>()
 const dayLabel = computed(() => roundupDayLabel(props.item.publishedAt))
 const counts = computed(() => telegraphCategoryCounts(props.item))
 const tabs = computed(() => [
@@ -86,7 +129,13 @@ function publishers(entry: DailyTopicEntry): string {
 .roundup__line { display: block; color: var(--fi-color-text-primary); line-height: var(--fi-leading-relaxed); }
 .roundup__time { color: var(--fi-color-primary); font-weight: var(--fi-weight-bold); margin-right: var(--fi-space-8); }
 .roundup__title { font-weight: var(--fi-weight-bold); }
-.roundup__meta { display: flex; align-items: center; gap: var(--fi-space-16); margin-top: var(--fi-space-12); }
+.roundup__meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--fi-space-12) var(--fi-space-16); margin-top: var(--fi-space-12); }
+.roundup__meta-info { display: flex; flex-wrap: wrap; align-items: center; gap: var(--fi-space-12); min-width: 0; flex: 1 1 240rpx; }
+.roundup__actions { display: flex; align-items: center; flex-shrink: 0; gap: var(--fi-space-10); margin-left: auto; }
+.roundup__comment-btn { display: inline-flex; align-items: center; gap: var(--fi-space-6); height: var(--fi-component-reaction-height-sm); margin: 0; padding: 0 var(--fi-space-16); border: var(--fi-border-width) solid var(--fi-color-reaction-border); border-radius: var(--fi-radius-round); background: var(--fi-color-reaction-bg); color: var(--fi-color-reaction-text); font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); line-height: 1; box-sizing: border-box; }
+.roundup__comment-btn::after { border: 0; }
+.roundup__comment-label, .roundup__comment-count { line-height: 1; }
+.roundup__comment-count { font-variant-numeric: tabular-nums; }
 /* 三类各一个色：国内红、国际蓝、留洋橙；浅底深字保证对比度。 */
 .roundup__tag { flex-shrink: 0; padding: var(--fi-space-2) var(--fi-space-14); border-radius: var(--fi-radius-xs); font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); }
 .roundup__tag--domestic { background: #fdecec; color: #b3282a; }

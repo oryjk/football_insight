@@ -4,7 +4,7 @@
       <image class="account-hero__background" :src="memberStadiumBackgroundUrl" mode="aspectFill" aria-hidden="true" />
       <view class="account-hero__shade" aria-hidden="true" />
 
-      <view class="member-identity">
+      <view class="member-identity" hover-class="member-identity--pressed" @tap="emit('edit-profile')">
         <view class="member-identity__avatar">
           <image
             v-if="user.avatar_url"
@@ -16,7 +16,7 @@
         </view>
         <view class="member-identity__copy">
           <text class="member-identity__name">{{ displayName }}</text>
-          <text class="member-identity__caption">足球洞察 · 球迷档案</text>
+          <text class="member-identity__caption">{{ profileComplete ? '点击修改头像与昵称 ›' : '点击完善头像与昵称 ›' }}</text>
         </view>
       </view>
 
@@ -63,6 +63,7 @@ import { MEMBER_STADIUM_BG_IMAGE_URL as memberStadiumBackgroundUrl } from '../..
 import type { CurrentUser } from '../../../types/auth'
 import { formatMembershipCardExpiry } from '../helpers'
 import { MEMBERSHIP_TIER_IMAGES } from '../membershipImages'
+import { isProfileComplete } from '../../../utils/profileGate'
 
 const props = defineProps<{
   user: CurrentUser
@@ -78,9 +79,12 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'membership-action'): void
   (e: 'copy-invite'): void
+  (e: 'edit-profile'): void
 }>()
 
 const displayName = computed(() => props.user.display_name?.trim() || '会员')
+
+const profileComplete = computed(() => isProfileComplete(props.user))
 
 const avatarFallbackLabel = computed(() => displayName.value.slice(0, 1).toUpperCase())
 
@@ -177,6 +181,10 @@ const heroActionText = computed(() => (props.canRenewV9 ? '续费' : '升级'))
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-snug);
   word-break: break-all;
+}
+
+.member-identity--pressed {
+  opacity: 0.78;
 }
 
 .member-identity__caption {

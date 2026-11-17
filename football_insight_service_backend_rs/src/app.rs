@@ -9,6 +9,7 @@ use crate::{
     activity::bootstrap::build_activity_routes, admin::bootstrap::build_admin_routes,
     ai::bootstrap::build_ai_routes, auth::bootstrap::build_auth,
     auth_license::bootstrap::build_auth_license_routes, config::AppConfig,
+    content_security::{ContentSecurityPort, WechatContentSecurityAdapter},
     daily_topics::bootstrap::build_daily_topics_routes, health::bootstrap::build_health_routes,
     insight::bootstrap::build_insight, match_id_unlock::bootstrap::build_match_id_unlock_routes,
     mini_review::bootstrap::build_mini_review_routes, payment::bootstrap::build_payment,
@@ -27,11 +28,17 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
     let health_routes = build_health_routes(pool.clone());
     let system_config = build_system_config_routes(pool.clone(), insight.repository.clone());
 
+    let content_security: Arc<dyn ContentSecurityPort> =
+        Arc::new(WechatContentSecurityAdapter::new(
+            config.wechat_mini_app_id.clone(),
+            config.wechat_mini_app_secret.clone(),
+        ));
     let auth = build_auth(
         pool.clone(),
         config,
         system_config.system_config_port.clone(),
         Arc::new(PostgresOfficialAccountMatchIdAccess::new(pool.clone())),
+        content_security.clone(),
     );
     let lineup_routes = crate::lineup::bootstrap::build_lineup_routes(
         pool.clone(),
@@ -43,7 +50,8 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         auth.token_port.clone(),
         config,
     );
-    let daily_topics_routes = build_daily_topics_routes(pool.clone(), auth.token_port.clone());
+    let daily_topics_routes =
+        build_daily_topics_routes(pool.clone(), auth.token_port.clone(), content_security);
     let activity_routes = build_activity_routes(pool.clone(), auth.token_port.clone());
     let mcp_routes = crate::mcp::bootstrap::build_mcp_routes(insight.repository.clone(), config);
     let ai_routes = build_ai_routes(
