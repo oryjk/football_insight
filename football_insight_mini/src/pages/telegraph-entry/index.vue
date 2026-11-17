@@ -34,7 +34,7 @@
           @load-more="page.loadMoreComments"
           @open-comment="page.openComment"
           @like-comment="page.toggleCommentLike"
-          @delete-comment="page.deleteOwnComment"
+          @delete-comment="handleDeleteComment"
         />
       </template>
     </view>
@@ -75,6 +75,7 @@ import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { useAppSession } from '../../stores/appSession'
 import { useMiniReviewStatus } from '../../stores/miniReview'
+import type { TelegraphComment } from '../../types/dailyTopic'
 import { isTopicSourceUrl, roundupDayLabel } from '../../utils/dailyTopics'
 import { editableNicknameInitialValue } from '../../utils/profileGate'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
@@ -85,6 +86,7 @@ import {
 } from '../../utils/telegraphShareCard'
 import TelegraphEntryComposer from './components/TelegraphEntryComposer.vue'
 import TelegraphEntryTimeline from './components/TelegraphEntryTimeline.vue'
+import { confirmDeleteCommentModal } from './helpers'
 import { useTelegraphEntryPage } from './useTelegraphEntryPage'
 import { TELEGRAPH_ENTRY_SHARE_CANVAS_ID, useTelegraphEntryShareCard } from './useTelegraphEntryShareCard'
 
@@ -152,6 +154,12 @@ function copyEntrySource(url: string): void {
 
 function goBack(): void {
   goBackFromSecondaryPage()
+}
+
+function handleDeleteComment(comment: TelegraphComment): void {
+  confirmDeleteCommentModal(() => {
+    void page.deleteOwnComment(comment)
+  })
 }
 
 function copyShareLink(): void {

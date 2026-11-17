@@ -35,90 +35,18 @@
     </view>
 
     <!-- 上游节点 2：所有可见祖先评论（按从根到直接父评论顺序排列） -->
-    <view
+    <TelegraphCommentNode
       v-for="ancestor in ancestors"
       :key="ancestor.id"
-      class="x-node x-node--ancestor"
-      role="button"
-      :aria-label="`查看 ${ancestor.author.displayName} 的评论详情`"
-      hover-class="thread__pressed"
-      @tap="emit('open-comment', ancestor, false)"
-    >
-      <view class="x-node__rail">
-        <view class="x-node__avatar">
-          <image
-            v-if="ancestor.author.avatarUrl"
-            :src="ancestor.author.avatarUrl"
-            mode="aspectFill"
-            class="x-node__avatar-img"
-          />
-          <text v-else class="x-node__avatar-fallback">{{ authorInitial(ancestor.author.displayName) }}</text>
-        </view>
-        <view class="x-node__line" />
-      </view>
-
-      <view class="x-node__main">
-        <view class="x-node__header">
-          <view class="x-node__author-group">
-            <text class="x-node__author">{{ ancestor.author.displayName }}</text>
-            <text v-if="ancestor.isMine" class="x-node__mine">我</text>
-            <text class="x-node__dot">·</text>
-            <text class="x-node__time">{{ ancestor.relativeTimeLabel || ancestor.createdLabel }}</text>
-          </view>
-
-          <button
-            v-if="ancestor.isMine"
-            class="x-node__delete"
-            :disabled="deletingCommentId === ancestor.id"
-            aria-label="删除评论"
-            hover-class="thread__pressed"
-            @tap.stop="confirmDelete(ancestor)"
-          >
-            <image class="x-node__delete-icon" src="/static/topics/trash-muted.svg" mode="aspectFit" />
-          </button>
-        </view>
-
-        <text class="x-node__content">{{ ancestor.content }}</text>
-
-        <view class="x-node__actions">
-          <button
-            class="x-action"
-            aria-label="回复评论"
-            hover-class="thread__pressed"
-            @tap.stop="emit('open-comment', ancestor, true)"
-          >
-            <image class="x-action__icon" src="/static/topics/comment-bubble.svg" mode="aspectFit" />
-            <text v-if="ancestor.repliesCount > 0" class="x-action__count">
-              {{ formatCount(ancestor.repliesCount) }}
-            </text>
-          </button>
-
-          <button
-            class="x-action"
-            :class="{
-              'x-action--liked': ancestor.likedByMe,
-              'x-action--pending': pendingLikeIds.includes(ancestor.id),
-            }"
-            :aria-label="ancestor.likedByMe ? '取消评论点赞' : '点赞评论'"
-            hover-class="thread__pressed"
-            @tap.stop="emit('like-comment', ancestor)"
-          >
-            <image
-              class="x-action__icon"
-              :src="ancestor.likedByMe ? '/static/topics/heart-active.svg' : '/static/topics/heart-idle.svg'"
-              mode="aspectFit"
-            />
-            <text
-              v-if="ancestor.likesCount > 0"
-              class="x-action__count"
-              :class="{ 'x-action__count--liked': ancestor.likedByMe }"
-            >
-              {{ formatCount(ancestor.likesCount) }}
-            </text>
-          </button>
-        </view>
-      </view>
-    </view>
+      :comment="ancestor"
+      show-line
+      ancestor
+      :pending-like="pendingLikeIds.includes(ancestor.id)"
+      :deleting="deletingCommentId === ancestor.id"
+      @open="(target, focusReply) => emit('open-comment', target, focusReply)"
+      @like="emit('like-comment', $event)"
+      @delete="emit('delete-comment', $event)"
+    />
 
     <!-- 中心焦点评论主卡（X 展开态） -->
     <view class="x-focus">
@@ -150,7 +78,7 @@
           :disabled="deletingCommentId === focalComment.id"
           aria-label="删除评论"
           hover-class="thread__pressed"
-          @tap.stop="confirmDelete(focalComment)"
+          @tap.stop="deletingCommentId === focalComment.id ? undefined : emit('delete-comment', focalComment)"
         >
           <image class="x-node__delete-icon" src="/static/topics/trash-muted.svg" mode="aspectFit" />
         </button>
@@ -188,7 +116,7 @@
           class="x-focus__action"
           :class="{
             'x-focus__action--liked': focalComment.likedByMe,
-            'x-action--pending': pendingLikeIds.includes(focalComment.id),
+            'x-focus__action--pending': pendingLikeIds.includes(focalComment.id),
           }"
           :aria-label="focalComment.likedByMe ? '取消评论点赞' : '点赞评论'"
           hover-class="thread__pressed"
@@ -244,90 +172,17 @@
       </view>
 
       <template v-else>
-        <view
+        <TelegraphCommentNode
           v-for="(reply, index) in replies"
           :key="reply.id"
-          class="x-node"
-          role="button"
-          :aria-label="`查看 ${reply.author.displayName} 的评论详情`"
-          hover-class="thread__pressed"
-          @tap="emit('open-comment', reply, false)"
-        >
-          <view class="x-node__rail">
-            <view class="x-node__avatar">
-              <image
-                v-if="reply.author.avatarUrl"
-                :src="reply.author.avatarUrl"
-                mode="aspectFill"
-                class="x-node__avatar-img"
-              />
-              <text v-else class="x-node__avatar-fallback">{{ authorInitial(reply.author.displayName) }}</text>
-            </view>
-            <view v-if="index < replies.length - 1" class="x-node__line" />
-          </view>
-
-          <view class="x-node__main">
-            <view class="x-node__header">
-              <view class="x-node__author-group">
-                <text class="x-node__author">{{ reply.author.displayName }}</text>
-                <text v-if="reply.isMine" class="x-node__mine">我</text>
-                <text class="x-node__dot">·</text>
-                <text class="x-node__time">{{ reply.relativeTimeLabel || reply.createdLabel }}</text>
-              </view>
-
-              <button
-                v-if="reply.isMine"
-                class="x-node__delete"
-                :disabled="deletingCommentId === reply.id"
-                aria-label="删除评论"
-                hover-class="thread__pressed"
-                @tap.stop="confirmDelete(reply)"
-              >
-                <image class="x-node__delete-icon" src="/static/topics/trash-muted.svg" mode="aspectFit" />
-              </button>
-            </view>
-
-            <text class="x-node__content">{{ reply.content }}</text>
-
-            <view class="x-node__actions">
-              <button
-                class="x-action"
-                aria-label="回复评论"
-                hover-class="thread__pressed"
-                @tap.stop="emit('open-comment', reply, true)"
-              >
-                <image class="x-action__icon" src="/static/topics/comment-bubble.svg" mode="aspectFit" />
-                <text v-if="reply.repliesCount > 0" class="x-action__count">
-                  {{ formatCount(reply.repliesCount) }}
-                </text>
-              </button>
-
-              <button
-                class="x-action"
-                :class="{
-                  'x-action--liked': reply.likedByMe,
-                  'x-action--pending': pendingLikeIds.includes(reply.id),
-                }"
-                :aria-label="reply.likedByMe ? '取消评论点赞' : '点赞评论'"
-                hover-class="thread__pressed"
-                @tap.stop="emit('like-comment', reply)"
-              >
-                <image
-                  class="x-action__icon"
-                  :src="reply.likedByMe ? '/static/topics/heart-active.svg' : '/static/topics/heart-idle.svg'"
-                  mode="aspectFit"
-                />
-                <text
-                  v-if="reply.likesCount > 0"
-                  class="x-action__count"
-                  :class="{ 'x-action__count--liked': reply.likedByMe }"
-                >
-                  {{ formatCount(reply.likesCount) }}
-                </text>
-              </button>
-            </view>
-          </view>
-        </view>
+          :comment="reply"
+          :show-line="index < replies.length - 1"
+          :pending-like="pendingLikeIds.includes(reply.id)"
+          :deleting="deletingCommentId === reply.id"
+          @open="(target, focusReply) => emit('open-comment', target, focusReply)"
+          @like="emit('like-comment', $event)"
+          @delete="emit('delete-comment', $event)"
+        />
 
         <view class="x-timeline__footer">
           <button
@@ -349,8 +204,9 @@
 <script setup lang="ts">
 import type { DailyTopicEntry, TelegraphComment } from '../../../types/dailyTopic'
 import { formatTopicHeat, telegraphCategoryLabel } from '../../../utils/dailyTopics'
+import TelegraphCommentNode from './TelegraphCommentNode.vue'
 
-const props = defineProps<{
+defineProps<{
   entry: DailyTopicEntry
   dayLabel: string
   ancestors: TelegraphComment[]
@@ -383,22 +239,6 @@ function authorInitial(name: string): string {
 
 function formatCount(count: number): string {
   return formatTopicHeat(count)
-}
-
-function confirmDelete(comment: TelegraphComment): void {
-  if (props.deletingCommentId) {
-    return
-  }
-  uni.showModal({
-    title: '删除评论',
-    content: '确认删除这条评论吗？删除后不可恢复。',
-    showCancel: true,
-    success: (res) => {
-      if (res.confirm) {
-        emit('delete-comment', comment)
-      }
-    },
-  })
 }
 </script>
 
@@ -462,13 +302,9 @@ function confirmDelete(comment: TelegraphComment): void {
 .x-node__main {
   min-width: 0;
   flex: 1;
-  padding-bottom: var(--fi-space-24);
+  padding-bottom: var(--fi-space-22);
   display: flex;
   flex-direction: column;
-}
-
-.x-node--ancestor .x-node__main {
-  padding-bottom: var(--fi-space-22);
 }
 
 .x-node__header {
@@ -555,7 +391,6 @@ function confirmDelete(comment: TelegraphComment): void {
 }
 
 .x-node__delete::after,
-.x-action::after,
 .x-focus__action::after,
 .x-timeline__retry::after,
 .x-timeline__more::after {
@@ -581,55 +416,6 @@ function confirmDelete(comment: TelegraphComment): void {
 
 .x-node__entry-title {
   color: var(--fi-color-text-primary);
-  font-weight: var(--fi-weight-bold);
-}
-
-.x-node__content {
-  display: block;
-  margin-top: var(--fi-space-8);
-  color: var(--fi-color-text-primary);
-  font-size: var(--fi-font-28);
-  line-height: var(--fi-leading-normal);
-  word-break: break-word;
-  white-space: pre-wrap;
-}
-
-.x-node__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--fi-space-40);
-  margin-top: var(--fi-space-12);
-}
-
-.x-action {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fi-space-8);
-  margin: 0;
-  padding: var(--fi-space-6) var(--fi-space-8) var(--fi-space-6) 0;
-  border: 0;
-  background: transparent;
-  color: var(--fi-color-text-secondary);
-  line-height: 1;
-}
-
-.x-action--pending {
-  opacity: var(--fi-opacity-pressed);
-}
-
-.x-action__icon {
-  width: 30rpx;
-  height: 30rpx;
-}
-
-.x-action__count {
-  font-size: var(--fi-font-22);
-  color: var(--fi-color-text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.x-action__count--liked {
-  color: var(--fi-color-heart-like);
   font-weight: var(--fi-weight-bold);
 }
 
@@ -752,6 +538,10 @@ function confirmDelete(comment: TelegraphComment): void {
 .x-focus__action--liked {
   color: var(--fi-color-heart-like);
   font-weight: var(--fi-weight-bold);
+}
+
+.x-focus__action--pending {
+  opacity: var(--fi-opacity-pressed);
 }
 
 .x-focus__action-icon {

@@ -53,9 +53,9 @@ const presentation = computed(() => topicCardPresentation(props.item.title))
 .topic-row__entry { display: flex; align-items: center; gap: var(--fi-space-12); margin-top: var(--fi-space-12); }
 .topic-row__entry:first-child { margin-top: 0; }
 .topic-row__entry-tag { flex-shrink: 0; min-width: 96rpx; padding: var(--fi-space-2) var(--fi-space-10); border-radius: var(--fi-radius-xs); text-align: center; font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); }
-.topic-row__entry-tag--domestic { background: #fdecec; color: #b3282a; }
-.topic-row__entry-tag--world { background: #e8f0fd; color: #1f56b8; }
-.topic-row__entry-tag--abroad { background: #fff0dc; color: #8f4700; }
+.topic-row__entry-tag--domestic { background: var(--fi-color-primary-soft); color: var(--fi-color-primary-deep); }
+.topic-row__entry-tag--world { background: var(--fi-color-outsider-soft); color: var(--fi-color-outsider); }
+.topic-row__entry-tag--abroad { background: var(--fi-color-hat-trick-bg); color: var(--fi-color-hat-trick-text); }
 .topic-row__entry-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--fi-color-text-primary); font-size: var(--fi-font-28); line-height: var(--fi-leading-normal); font-weight: var(--fi-weight-bold); }
 .topic-row__top { display: flex; justify-content: space-between; align-items: center; gap: var(--fi-space-12); }
 .topic-row__badge { flex-shrink: 0; padding: var(--fi-space-6) var(--fi-space-14); border: var(--fi-border-width) solid currentColor; border-radius: var(--fi-radius-round); color: var(--topic-accent); background: var(--fi-color-bg); font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); }

@@ -1,4 +1,4 @@
-function inferMimeType(filePath: string): string {
+export function inferAvatarMimeType(filePath: string): string {
   const lowerPath = filePath.toLowerCase()
   if (lowerPath.endsWith('.jpg') || lowerPath.endsWith('.jpeg')) {
     return 'image/jpeg'
@@ -11,7 +11,7 @@ function inferMimeType(filePath: string): string {
 
 function compressOnMini(filePath: string, quality: number): Promise<string> {
   return new Promise((resolve) => {
-    if (typeof uni.compressImage !== 'function') {
+    if (typeof uni === 'undefined' || typeof uni.compressImage !== 'function') {
       resolve(filePath)
       return
     }
@@ -36,7 +36,7 @@ function readMiniFileBase64(filePath: string): Promise<string> {
           reject(new Error('头像读取失败'))
           return
         }
-        resolve(`data:${inferMimeType(filePath)};base64,${base64}`)
+        resolve(`data:${inferAvatarMimeType(filePath)};base64,${base64}`)
       },
       fail: (error) => {
         reject(new Error(error.errMsg || '头像读取失败'))
@@ -45,32 +45,33 @@ function readMiniFileBase64(filePath: string): Promise<string> {
   })
 }
 
-function readBrowserImageAsDataUrl(filePath: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      try {
-        const size = 256
-        const canvas = document.createElement('canvas')
-        const scale = Math.min(1, size / Math.max(img.width || 1, img.height || 1))
-        canvas.width = Math.max(1, Math.round(img.width * scale))
-        canvas.height = Math.max(1, Math.round(img.height * scale))
-        const ctx = canvas.getContext('2d')
-        if (!ctx) {
-          reject(new Error('浏览器不支持图片处理'))
-          return
-        }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL('image/jpeg', 0.82))
-      } catch {
-        reject(new Error('头像读取失败，请重新选择'))
-      }
+// #ifdef H5
+async function readH5BlobAsDataUrl(filePath: string): Promise<string> {
+  let blob: Blob
+  try {
+    const response = await fetch(filePath)
+    if (!response.ok) {
+      throw new Error('头像读取失败，请重新选择')
     }
-    img.onerror = () => reject(new Error('头像加载失败，请重新选择'))
-    img.src = filePath
+    blob = await response.blob()
+  } catch {
+    throw new Error('头像读取失败，请重新选择')
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string' && reader.result.startsWith('data:image/')) {
+        resolve(reader.result)
+        return
+      }
+      reject(new Error('头像格式无效，请选择 JPG 或 PNG 图片'))
+    }
+    reader.onerror = () => reject(new Error('头像读取失败，请重新选择'))
+    reader.readAsDataURL(blob)
   })
 }
+// #endif
 
 export async function readAvatarAsDataUrl(filePath: string): Promise<string> {
   const normalizedPath = filePath.trim()
@@ -81,7 +82,7 @@ export async function readAvatarAsDataUrl(filePath: string): Promise<string> {
     return normalizedPath
   }
 
-  if (typeof uni.getFileSystemManager === 'function') {
+  if (typeof uni !== 'undefined' && typeof uni.getFileSystemManager === 'function') {
     const compressed = await compressOnMini(normalizedPath, 80)
     const firstPass = await readMiniFileBase64(compressed)
     if (firstPass.length <= 240_000) {
@@ -91,5 +92,10 @@ export async function readAvatarAsDataUrl(filePath: string): Promise<string> {
     return readMiniFileBase64(tighter)
   }
 
-  return readBrowserImageAsDataUrl(normalizedPath)
+  // #ifdef H5
+  return readH5BlobAsDataUrl(normalizedPath)
+  // #endif
+  // #ifndef H5
+  throw new Error('当前环境不支持读取头像文件')
+  // #endif
 }

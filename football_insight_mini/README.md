@@ -77,7 +77,7 @@ Football Insight 的微信小程序前端，采用 `uni-app + Vue 3 + TypeScript
 - 把头像转成 `data:image/...;base64,...`
 - 作为 `avatar_data_url` 提交给后端
 
-后端会把这个值直接写入 `f_i_users.avatar_url`。
+后端在 `PUT /api/v1/auth/profile` 中完成微信内容安全检测后，已配置 MinIO 时会将头像上传至 MinIO 并把公开 URL 写入 `f_i_users.avatar_url`（未配置 MinIO 或首次微信绑定链路仍兼容直接保存 `data:image/...;base64,...`）。
 
 ## 技术栈
 

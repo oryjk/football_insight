@@ -217,6 +217,7 @@ function publishers(entry: DailyTopicEntry): string {
   .roundup__content--from-right-b,
   .roundup__content--from-left-a,
   .roundup__content--from-left-b { animation: none; }
+  .roundup__chevron { transition: none; }
 }
 .roundup__day { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-16); }
 .roundup__day-copy { display: flex; align-items: baseline; gap: var(--fi-space-16); min-width: 0; }
@@ -240,15 +241,15 @@ function publishers(entry: DailyTopicEntry): string {
 .roundup__comment-btn::after { border: 0; }
 .roundup__comment-icon { flex-shrink: 0; width: var(--fi-space-32); height: var(--fi-space-32); }
 .roundup__comment-count { line-height: var(--fi-leading-none); font-variant-numeric: tabular-nums; }
-/* 三类各一个色：国内红、国际蓝、留洋橙；浅底深字保证对比度。 */
+/* 三类各一个色：国内红、国际蓝、留洋橙；统一引用语义色 token。 */
 .roundup__tag { flex-shrink: 0; padding: var(--fi-space-2) var(--fi-space-14); border-radius: var(--fi-radius-xs); font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); }
-.roundup__tag--domestic { background: #fdecec; color: #b3282a; }
-.roundup__tag--world { background: #e8f0fd; color: #1f56b8; }
-.roundup__tag--abroad { background: #fff0dc; color: #8f4700; }
+.roundup__tag--domestic { background: var(--fi-color-primary-soft); color: var(--fi-color-primary-deep); }
+.roundup__tag--world { background: var(--fi-color-outsider-soft); color: var(--fi-color-outsider); }
+.roundup__tag--abroad { background: var(--fi-color-hat-trick-bg); color: var(--fi-color-hat-trick-text); }
 .roundup__source-toggle { display: inline-flex; align-items: center; gap: var(--fi-space-8); padding: var(--fi-space-8) 0; color: var(--fi-color-text-caption); font-size: var(--fi-font-22); line-height: var(--fi-leading-normal); }
-.roundup__chevron { display: inline-block; transform: rotate(90deg); transition: transform 0.2s; }
+.roundup__chevron { display: inline-block; transform: rotate(90deg); transition: transform var(--fi-motion-duration-base) var(--fi-motion-ease-out); }
 .roundup__chevron--open { transform: rotate(-90deg); }
-.roundup__pressed { opacity: 0.6; }
+.roundup__pressed { opacity: var(--fi-opacity-pressed); }
 .roundup__sources { margin-top: var(--fi-space-8); padding: var(--fi-space-4) var(--fi-space-20); border-radius: var(--fi-radius-md); background: var(--fi-color-bg); }
 .roundup__source { padding: var(--fi-space-16) 0; border-bottom: var(--fi-border-divider); }
 .roundup__source:last-child { border-bottom: 0; }

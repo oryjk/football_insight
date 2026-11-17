@@ -104,6 +104,7 @@
       <view class="profile-sheet__footer">
         <button
           class="profile-sheet__submit"
+          :class="{ 'profile-sheet__submit--disabled': busy }"
           :disabled="busy"
           hover-class="profile-sheet__pressed"
           @tap="handleSubmit"
@@ -225,14 +226,12 @@ async function handleSubmit(): Promise<void> {
   const hasNewAvatar = Boolean(selectedAvatarPath.value)
   if (!hasNewAvatar && !hasValidAvatarUrl(props.initialAvatarUrl)) {
     errorMessage.value = '请先上传头像'
-    uni.showToast({ title: errorMessage.value, icon: 'none' })
     return
   }
 
   const validNick = validateNicknameInput(nickname.value)
   if (!validNick) {
     errorMessage.value = '请输入 2-16 字昵称，不能使用手机号或默认名'
-    uni.showToast({ title: errorMessage.value, icon: 'none' })
     return
   }
 
@@ -243,7 +242,6 @@ async function handleSubmit(): Promise<void> {
       avatarDataUrl = await readAvatarAsDataUrl(selectedAvatarPath.value)
     } catch (error) {
       errorMessage.value = error instanceof Error ? error.message : '头像读取失败，请重新选择'
-      uni.showToast({ title: errorMessage.value, icon: 'none' })
       return
     } finally {
       readingAvatar.value = false
@@ -375,15 +373,15 @@ async function handleSubmit(): Promise<void> {
   height: 88rpx;
   margin: 0;
   border-radius: var(--fi-radius-round);
-  background: var(--fi-primitive-ink);
-  color: var(--fi-primitive-white);
+  background: var(--fi-color-text-primary);
+  color: var(--fi-color-surface);
   font-size: var(--fi-font-28);
   font-weight: var(--fi-weight-bold);
   line-height: 88rpx;
   text-align: center;
 }
 
-.profile-sheet__submit[disabled] {
+.profile-sheet__submit--disabled {
   opacity: 0.55;
 }
 

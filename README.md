@@ -243,7 +243,7 @@ bun run dev
 - 手机号
 - 密码
 
-头像当前会由小程序端转成 `data:image/...;base64,...`，再由后端写入 `f_i_users.avatar_url`。
+头像由小程序端转成 `data:image/...;base64,...` 提交给后端；更新个人资料（`PUT /api/v1/auth/profile`）时后端经过内容安全校验后优先上传至 MinIO（`avatars/users/...`）并将公开 HTTPS URL 写入 `f_i_users.avatar_url`（未配置 MinIO 时回退保存 base64 data URL）。
 
 ## 数据模型说明
 

@@ -9,6 +9,14 @@ import type {
 import { errorMessage } from "../../apiClient";
 import { Button } from "../../components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -26,9 +34,11 @@ import {
 export function TelegraphCommentsPage({
   api,
   token,
+  onBusyChange,
 }: {
   api: AdminApi;
   token: string;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [filter, setFilter] = useState<AdminTelegraphCommentStatusFilter>("all");
   const [commentsEnabled, setCommentsEnabled] = useState(true);
@@ -36,6 +46,9 @@ export function TelegraphCommentsPage({
   const [loading, setLoading] = useState(true);
   const [updatingConfig, setUpdatingConfig] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminTelegraphComment | null>(
+    null,
+  );
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
 
@@ -59,6 +72,12 @@ export function TelegraphCommentsPage({
     return () => controller.abort();
   }, [api, token, filter, revision]);
 
+  useEffect(() => {
+    onBusyChange?.(updatingConfig || busyId !== null);
+  }, [onBusyChange, updatingConfig, busyId]);
+
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
+
   async function toggleCommentsEnabled() {
     setUpdatingConfig(true);
     setError("");
@@ -80,6 +99,7 @@ export function TelegraphCommentsPage({
     setError("");
     try {
       await api.setTelegraphCommentStatus(token, commentId, nextStatus);
+      setDeleteTarget((current) => (current?.id === commentId ? null : current));
       setRevision((value) => value + 1);
     } catch (reason) {
       setError(errorMessage(reason));
@@ -107,7 +127,7 @@ export function TelegraphCommentsPage({
 
         <Button
           variant={commentsEnabled ? "secondary" : "default"}
-          disabled={loading || updatingConfig}
+          disabled={loading || updatingConfig || busyId !== null}
           onClick={toggleCommentsEnabled}
         >
           {updatingConfig
@@ -178,13 +198,13 @@ export function TelegraphCommentsPage({
                   <TableCell>{commentStatusLabel(item.status)}</TableCell>
                   <TableCell>{commentCreatedLabel(item.created_at)}</TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
+                    <div className="row-actions">
                       {item.status === "visible" ? (
                         <Button
                           variant="secondary"
                           size="sm"
-                          disabled={rowBusy}
-                          onClick={() => updateStatus(item.id, "hidden")}
+                          disabled={rowBusy || busyId !== null}
+                          onClick={() => void updateStatus(item.id, "hidden")}
                         >
                           隐藏
                         </Button>
@@ -192,8 +212,8 @@ export function TelegraphCommentsPage({
                         <Button
                           variant="secondary"
                           size="sm"
-                          disabled={rowBusy}
-                          onClick={() => updateStatus(item.id, "visible")}
+                          disabled={rowBusy || busyId !== null}
+                          onClick={() => void updateStatus(item.id, "visible")}
                         >
                           恢复展示
                         </Button>
@@ -201,8 +221,8 @@ export function TelegraphCommentsPage({
                       <Button
                         variant="destructive"
                         size="sm"
-                        disabled={rowBusy}
-                        onClick={() => updateStatus(item.id, "deleted")}
+                        disabled={rowBusy || busyId !== null}
+                        onClick={() => setDeleteTarget(item)}
                       >
                         删除
                       </Button>
@@ -214,6 +234,44 @@ export function TelegraphCommentsPage({
           </TableBody>
         </Table>
       )}
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && busyId === null) {
+            setDeleteTarget(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>确认删除评论</DialogTitle>
+            <DialogDescription>
+              确认删除「{deleteTarget?.author_display_name}」的评论吗？删除后不可恢复。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              disabled={busyId !== null}
+              onClick={() => setDeleteTarget(null)}
+            >
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!deleteTarget || busyId !== null}
+              onClick={() => {
+                if (deleteTarget) {
+                  void updateStatus(deleteTarget.id, "deleted");
+                }
+              }}
+            >
+              {busyId !== null ? "删除中…" : "确认删除"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

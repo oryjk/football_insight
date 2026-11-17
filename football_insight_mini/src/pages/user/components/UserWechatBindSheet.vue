@@ -48,6 +48,7 @@
 import { reactive, watch } from 'vue'
 import FiBottomSheet from '../../../components/FiBottomSheet.vue'
 import type { MiniWechatBindingRequiredResponse } from '../../../types/auth'
+import { readAvatarAsDataUrl } from '../../../utils/avatarDataUrl'
 
 const props = defineProps<{
   bindState: MiniWechatBindingRequiredResponse | null
@@ -98,47 +99,6 @@ function handleChooseAvatar(event: { detail?: { avatarUrl?: unknown } }): void {
   }
 
   form.avatarPreviewUrl = avatarUrl
-}
-
-function inferMimeType(filePath: string): string {
-  const lowerPath = filePath.toLowerCase()
-  if (lowerPath.endsWith('.jpg') || lowerPath.endsWith('.jpeg')) {
-    return 'image/jpeg'
-  }
-  if (lowerPath.endsWith('.webp')) {
-    return 'image/webp'
-  }
-  return 'image/png'
-}
-
-function readAvatarAsDataUrl(filePath: string): Promise<string> {
-  const normalizedPath = filePath.trim()
-  if (!normalizedPath) {
-    return Promise.reject(new Error('请先选择头像'))
-  }
-
-  if (normalizedPath.startsWith('data:image/')) {
-    return Promise.resolve(normalizedPath)
-  }
-
-  return new Promise((resolve, reject) => {
-    uni.getFileSystemManager().readFile({
-      filePath: normalizedPath,
-      encoding: 'base64',
-      success: (result) => {
-        const base64 = typeof result.data === 'string' ? result.data : ''
-        if (!base64) {
-          reject(new Error('头像读取失败'))
-          return
-        }
-
-        resolve(`data:${inferMimeType(normalizedPath)};base64,${base64}`)
-      },
-      fail: (error) => {
-        reject(new Error(error.errMsg || '头像读取失败'))
-      },
-    })
-  })
 }
 
 async function submit(): Promise<void> {

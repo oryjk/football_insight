@@ -34,7 +34,7 @@
           @open-comment="page.openComment"
           @focus-reply="page.focusReplyComposer"
           @like-comment="page.toggleCommentLike"
-          @delete-comment="page.deleteOwnComment"
+          @delete-comment="handleDeleteComment"
           @retry-replies="page.reloadReplies"
           @load-more="page.loadMoreReplies"
           @share="copyShareLink"
@@ -77,21 +77,20 @@ import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { useAppSession } from '../../stores/appSession'
 import { useMiniReviewStatus } from '../../stores/miniReview'
-import { roundupDayLabel, telegraphCommentUrl } from '../../utils/dailyTopics'
+import type { TelegraphComment } from '../../types/dailyTopic'
+import { roundupDayLabel } from '../../utils/dailyTopics'
 import { editableNicknameInitialValue } from '../../utils/profileGate'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
-import { buildSharePath, buildShareQuery } from '../../utils/shareSource'
-import {
-  buildTelegraphEntrySharePayload,
-  cleanTelegraphHeadline,
-  TELEGRAPH_SHARE_CARD,
-} from '../../utils/telegraphShareCard'
+import { TELEGRAPH_SHARE_CARD } from '../../utils/telegraphShareCard'
 import TelegraphCommentThread from './components/TelegraphCommentThread.vue'
 import TelegraphEntryComposer from './components/TelegraphEntryComposer.vue'
+import {
+  buildTelegraphCommentSharePayload,
+  buildTelegraphCommentTimelinePayload,
+  confirmDeleteCommentModal,
+} from './helpers'
 import { useTelegraphCommentPage } from './useTelegraphCommentPage'
 import { TELEGRAPH_ENTRY_SHARE_CANVAS_ID, useTelegraphEntryShareCard } from './useTelegraphEntryShareCard'
-
-const VALID_ID_RE = /^[a-zA-Z0-9_-]{1,128}$/
 
 const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
@@ -157,22 +156,21 @@ function goBack(): void {
   goBackFromSecondaryPage()
 }
 
+function handleDeleteComment(comment: TelegraphComment): void {
+  confirmDeleteCommentModal(() => {
+    void page.deleteOwnComment(comment)
+  })
+}
+
 function buildCommentSharePayload(imageUrl?: string) {
-  const valid = VALID_ID_RE.test(topicId) && VALID_ID_RE.test(entryId) && VALID_ID_RE.test(commentId)
-  if (!valid) {
-    return buildTelegraphEntrySharePayload({ topicId, entryId, entry: entry.value, imageUrl })
-  }
-  const comment = focalComment.value
-  const currentEntry = entry.value
-  const headline = currentEntry ? cleanTelegraphHeadline(currentEntry.title) || currentEntry.title : '每日电报'
-  const title = comment
-    ? `${comment.author.displayName}：${comment.content.slice(0, 26)}｜${headline}`
-    : headline
-  return {
-    title,
-    path: buildSharePath(telegraphCommentUrl(topicId, entryId, commentId), 'telegraph_comment'),
-    ...(imageUrl ? { imageUrl } : {}),
-  }
+  return buildTelegraphCommentSharePayload({
+    topicId,
+    entryId,
+    commentId,
+    entry: entry.value,
+    comment: focalComment.value,
+    imageUrl,
+  })
 }
 
 function copyShareLink(): void {
@@ -237,18 +235,14 @@ onShareAppMessage(() => {
   }
 })
 
-onShareTimeline(() => {
-  const valid = VALID_ID_RE.test(topicId) && VALID_ID_RE.test(entryId) && VALID_ID_RE.test(commentId)
-  const share = buildCommentSharePayload(shareCard.imageUrl.value)
-  const prefix = valid
-    ? `topicId=${encodeURIComponent(topicId)}&entryId=${encodeURIComponent(entryId)}&commentId=${encodeURIComponent(commentId)}&`
-    : ''
-  return {
-    title: share.title,
-    query: `${prefix}${buildShareQuery('telegraph_comment')}`,
-    ...(shareCard.imageUrl.value ? { imageUrl: shareCard.imageUrl.value } : {}),
-  }
-})
+onShareTimeline(() => buildTelegraphCommentTimelinePayload({
+  topicId,
+  entryId,
+  commentId,
+  entry: entry.value,
+  comment: focalComment.value,
+  imageUrl: shareCard.imageUrl.value,
+}))
 </script>
 
 <style scoped>

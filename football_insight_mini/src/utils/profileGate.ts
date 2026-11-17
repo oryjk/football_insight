@@ -1,4 +1,7 @@
 import type { CurrentUser } from '../types/auth'
+import { extractApiErrorCode } from './apiError'
+
+export { extractApiErrorCode }
 
 export function validateNicknameInput(raw: string): string | null {
   const trimmed = raw.trim()
@@ -56,16 +59,4 @@ export function isProfileComplete(user: CurrentUser | null): boolean {
     && validNick !== user.account_identifier.trim()
     && hasValidAvatarUrl(user.avatar_url),
   )
-}
-
-export function extractApiErrorCode(error: unknown): string | null {
-  if (!error || typeof error !== 'object' || !('body' in error)) {
-    return null
-  }
-  const body = (error as { body?: unknown }).body
-  if (!body || typeof body !== 'object' || !('code' in body)) {
-    return null
-  }
-  const code = (body as { code?: unknown }).code
-  return typeof code === 'string' && code.trim() ? code.trim() : null
 }

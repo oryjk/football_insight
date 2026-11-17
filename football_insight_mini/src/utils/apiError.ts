@@ -21,8 +21,24 @@ export function isUnauthorizedError(error: unknown): boolean {
   return error instanceof ApiRequestError && error.statusCode === 401
 }
 
+export function isNotFoundError(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.statusCode === 404
+}
+
 export function isNetworkUnavailableError(error: unknown): boolean {
   return error instanceof ApiRequestError && error.networkFailed
+}
+
+export function extractApiErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== 'object' || !('body' in error)) {
+    return null
+  }
+  const body = (error as { body?: unknown }).body
+  if (!body || typeof body !== 'object' || !('code' in body)) {
+    return null
+  }
+  const code = (body as { code?: unknown }).code
+  return typeof code === 'string' && code.trim() ? code.trim() : null
 }
 
 export function extractApiErrorMessage(error: unknown, fallback: string): string {

@@ -94,6 +94,7 @@
 ## 开发约定
 
 - 日常开发不需要新建或切换特性分支，默认直接在 `main` 分支上进行开发；若改动包含数据库迁移（`migrations/*.sql`），提交推送前必须先执行 `cd football_insight_service_backend_rs && cargo run --bin run_migrations` 完成迁移并验证；每次修改完成并通过相应验证后，默认直接在 `main` 提交并推送（`git push`），不要只停留在本地提交（用户明确要求切分支或暂不推送时除外）。每次修改小程序（`football_insight_mini`）提交推送后，默认执行 `bun run mp:release -- --robot 2 --desc "本次变更说明"` 上传体验版小程序（用户明确要求暂不上传时除外）；后端生产部署仍按用户指令执行。
+- **Git 提交必须携带 Agent 身份标识**：以后所有 AI Agent 执行 `git commit` 时，提交信息必须明确标注提交方 Agent（如 `[gemini]`、`[codex]` 或 `[kimi]`，例如 `feat(mini): ... [gemini]`），严禁不带 Agent 标识直接提交，以便追溯变更来源与责任归属。
 - 小程序（`football_insight_mini`）遵循「**轻量必要校验 → 立即 `commit + push` → 再上传体验版（及按需 `build:h5`）**」的节奏，避免重复构建卡住开发者工具通过 `dev:mp-weixin:sync` 拉取代码：
   - `git push` 前仅执行 `bun run type-check` 与 `bun run check:boundaries`（纯 UI/文案/样式微调不补测试；涉及逻辑、状态、路由或接口改动时补跑相关 `bun test`），**不在 `push` 前预先运行 `MINI_REVIEW_SKIP=1 bun run build:mp-weixin` 和 `bun run build:h5`**（仅当新增分包页面/自定义组件引用需要确认编译注册时例外先跑 `build:mp-weixin`）。
   - 通过后立即 `commit + push` 到 `origin/main`，然后再运行 `bun run mp:release -- --robot 2 --desc "本次变更说明"`（内部会自动执行边界检查、生产构建与组件注册检查并上传）；涉及跨端通用组件或 H5 时在 `push` 后验证 `bun run build:h5`。

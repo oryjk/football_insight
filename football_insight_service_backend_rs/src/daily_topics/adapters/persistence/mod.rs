@@ -1,2 +1,3 @@
 pub mod postgres_daily_topics_repository;
+mod postgres_telegraph_interactions;
 mod stored_payload;

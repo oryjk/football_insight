@@ -1,4 +1,4 @@
-import { computed, getCurrentScope, onScopeDispose, ref, type Ref } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, ref } from 'vue'
 import {
   createTelegraphEntryComment,
   deleteTelegraphEntryComment,
@@ -9,29 +9,40 @@ import {
 } from '../../api/dailyTopics'
 import { useAppSession } from '../../stores/appSession'
 import { useMiniReviewStatus } from '../../stores/miniReview'
-import type { CurrentUser } from '../../types/auth'
 import type {
   DailyTopicEntry,
   DailyTopicItem,
   TelegraphComment,
   TelegraphCommentThreadPage,
-  TelegraphCommentsPage,
 } from '../../types/dailyTopic'
-import { extractApiErrorMessage, isUnauthorizedError } from '../../utils/apiError'
+import { extractApiErrorCode, extractApiErrorMessage, isNotFoundError, isUnauthorizedError } from '../../utils/apiError'
 import {
   DAILY_TOPICS_TEAM_ID,
   mapTelegraphComment,
-  mapTelegraphCommentLikeSummary,
   mapTelegraphCommentThreadPage,
-  mapTelegraphCommentsPage,
   mapTopicDetail,
   telegraphCommentUrl,
   telegraphEntryUrl,
 } from '../../utils/dailyTopics'
-import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
-import { extractApiErrorCode, isProfileComplete } from '../../utils/profileGate'
+import { createLatestGuard, type LatestToken } from '../../utils/latestGuard'
+import { isProfileComplete } from '../../utils/profileGate'
+import {
+  buildThreadFromLegacyComments,
+  defaultNavigateBack,
+  defaultRedirectToLogin,
+  defaultToast,
+  ensureTelegraphAuthAndProfile,
+  isRouteMissing404,
+  mergeTelegraphComments,
+  patchCommentNode,
+  runSaveProfileAndContinue,
+  runToggleCommentLike,
+  syncTopicEntryCommentsCount,
+  VALID_TELEGRAPH_ID_RE,
+  type EntryMiniReviewPort,
+  type EntrySessionPort,
+} from './helpers'
 import { navigateInTelegraphStack } from './navigation'
-import type { EntryMiniReviewPort, EntrySessionPort } from './useTelegraphEntryPage'
 
 export interface TelegraphCommentPageApi {
   getTopicDetail: typeof getTopicDetail
@@ -59,63 +70,6 @@ export interface UseTelegraphCommentPageOptions {
   miniReview?: EntryMiniReviewPort
   api?: Partial<TelegraphCommentPageApi>
   ui?: Partial<TelegraphCommentPageUi>
-}
-
-const VALID_ID_RE = /^[a-zA-Z0-9_-]{1,128}$/
-const MAX_LEGACY_PAGES = 5
-
-function defaultRedirectToLogin(returnUrl: string): void {
-  rememberPostLoginRedirect({ type: 'navigateTo', url: returnUrl })
-  uni.showToast({ title: '请登录后继续', icon: 'none' })
-  // `/pages/user/index` 是 tabBar 页面，必须使用 switchTab。
-  uni.switchTab({ url: '/pages/user/index' })
-}
-
-function defaultToast(title: string, icon: 'none' | 'success' = 'none'): void {
-  uni.showToast({ title, icon })
-}
-
-function defaultNavigateBack(fallbackEntryUrl: string): void {
-  const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
-  if (pages.length >= 2) {
-    uni.navigateBack({ delta: 1 })
-    return
-  }
-  uni.redirectTo({ url: fallbackEntryUrl })
-}
-
-function mergeComments(existing: TelegraphComment[], incoming: TelegraphComment[]): TelegraphComment[] {
-  if (!existing.length) {
-    return incoming
-  }
-  const seen = new Set(existing.map(comment => comment.id))
-  const merged = [...existing]
-  for (const comment of incoming) {
-    if (!seen.has(comment.id)) {
-      seen.add(comment.id)
-      merged.push(comment)
-    }
-  }
-  return merged
-}
-
-function patchCommentNode(
-  comment: TelegraphComment,
-  targetId: string,
-  updater: (current: TelegraphComment) => TelegraphComment,
-): TelegraphComment {
-  return comment.id === targetId ? updater(comment) : comment
-}
-
-function isRouteMissing404(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null || !('statusCode' in error)) {
-    return false
-  }
-  if ((error as { statusCode?: unknown }).statusCode !== 404) {
-    return false
-  }
-  const code = extractApiErrorCode(error)
-  return code !== 'COMMENT_NOT_FOUND' && code !== 'NOT_FOUND'
 }
 
 export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions) {
@@ -161,15 +115,27 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
   const savingProfile = ref(false)
 
   let disposed = false
-  let loadGeneration = 0
-  let threadGeneration = 0
   let usingLegacyFallback = false
+  const loadGuard = createLatestGuard(() => [
+    options.topicId(),
+    options.entryId(),
+    options.commentId(),
+    session.revision.value,
+  ])
+  const threadGuard = createLatestGuard(() => [
+    options.topicId(),
+    options.entryId(),
+    options.commentId(),
+    session.revision.value,
+  ])
+  let activeThreadToken: LatestToken | null = null
 
   if (getCurrentScope()) {
     onScopeDispose(() => {
       disposed = true
-      loadGeneration += 1
-      threadGeneration += 1
+      loadGuard.invalidate()
+      threadGuard.invalidate()
+      activeThreadToken = null
     })
   }
 
@@ -195,75 +161,19 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
   }
 
   function syncEntryCommentsCount(nextCount: number): void {
-    const currentTopic = topic.value
-    const targetEntryId = options.entryId()
-    if (!currentTopic || !targetEntryId) {
-      return
-    }
-    const safeCount = Math.max(0, Math.trunc(nextCount))
-    topic.value = {
-      ...currentTopic,
-      entries: currentTopic.entries.map(item => (
-        item.id === targetEntryId ? { ...item, commentsCount: safeCount } : item
-      )),
-    }
+    syncTopicEntryCommentsCount(topic, options.entryId(), nextCount)
   }
 
-  async function buildThreadFromLegacyComments(
-    currentTopicId: string,
-    currentEntryId: string,
-    currentCommentId: string,
-  ): Promise<TelegraphCommentThreadPage | 'not_found' | 'disabled'> {
-    const allItems: TelegraphComment[] = []
-    let cursor: string | null = null
-    let lastPage: TelegraphCommentsPage | null = null
-    for (let pageIndex = 0; pageIndex < MAX_LEGACY_PAGES; pageIndex += 1) {
-      const page = mapTelegraphCommentsPage(
-        await api.getComments(teamId, currentTopicId, currentEntryId, cursor, 50),
-      )
-      lastPage = page
-      if (!page.commentsEnabled) {
-        return 'disabled'
-      }
-      for (const item of page.items) {
-        if (!allItems.some(existing => existing.id === item.id)) {
-          allItems.push(item)
-        }
-      }
-      if (!page.hasMore || !page.nextCursor || page.nextCursor === cursor) {
-        break
-      }
-      cursor = page.nextCursor
+  function resetThreadState(nextErrorMessage: string, disabled = false): void {
+    if (disabled) {
+      commentsDisabled.value = true
     }
-    const byId = new Map(allItems.map(item => [item.id, item]))
-    const focus = byId.get(currentCommentId)
-    if (!focus) {
-      return 'not_found'
-    }
-    const builtAncestors: TelegraphComment[] = []
-    const visited = new Set<string>([focus.id])
-    let parentId = focus.replyTo?.commentId ?? null
-    while (parentId && builtAncestors.length < 20 && !visited.has(parentId)) {
-      visited.add(parentId)
-      const parent = byId.get(parentId)
-      if (!parent) {
-        break
-      }
-      builtAncestors.push(parent)
-      parentId = parent.replyTo?.commentId ?? null
-    }
-    builtAncestors.reverse()
-    const directChildren = allItems.filter(item => item.replyTo?.commentId === currentCommentId)
-    return {
-      commentsEnabled: true,
-      entryCommentsCount: lastPage?.totalCount ?? allItems.length,
-      ancestors: builtAncestors,
-      comment: focus,
-      repliesTotalCount: directChildren.length,
-      items: directChildren,
-      nextCursor: null,
-      hasMore: false,
-    }
+    ancestors.value = []
+    focalComment.value = null
+    replies.value = []
+    repliesTotalCount.value = 0
+    repliesNextCursor.value = null
+    errorMessage.value = nextErrorMessage
   }
 
   async function fetchThread(reset: boolean): Promise<void> {
@@ -277,7 +187,7 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
       return
     }
 
-    const generation = reset ? ++threadGeneration : threadGeneration
+    const token = reset ? (activeThreadToken = threadGuard.begin()) : (activeThreadToken ?? threadGuard.begin())
     const cursor = reset ? null : repliesNextCursor.value
     if (reset) {
       repliesLoading.value = true
@@ -297,37 +207,32 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
           cursor,
           20,
         )
-        if (disposed || generation !== threadGeneration) {
+        if (disposed || !token.isCurrent()) {
           return
         }
         usingLegacyFallback = false
         page = mapTelegraphCommentThreadPage(raw)
       } catch (error) {
-        if (disposed || generation !== threadGeneration) {
+        if (disposed || !token.isCurrent()) {
           return
         }
         if (reset && isRouteMissing404(error)) {
-          const fallback = await buildThreadFromLegacyComments(currentTopicId, currentEntryId, currentCommentId)
-          if (disposed || generation !== threadGeneration) {
+          const fallback = await buildThreadFromLegacyComments({
+            teamId,
+            topicId: currentTopicId,
+            entryId: currentEntryId,
+            commentId: currentCommentId,
+            getComments: api.getComments,
+          })
+          if (disposed || !token.isCurrent()) {
             return
           }
           if (fallback === 'disabled') {
-            commentsDisabled.value = true
-            ancestors.value = []
-            focalComment.value = null
-            replies.value = []
-            repliesTotalCount.value = 0
-            repliesNextCursor.value = null
-            errorMessage.value = '评论功能已关闭'
+            resetThreadState('评论功能已关闭', true)
             return
           }
           if (fallback === 'not_found') {
-            ancestors.value = []
-            focalComment.value = null
-            replies.value = []
-            repliesTotalCount.value = 0
-            repliesNextCursor.value = null
-            errorMessage.value = '该评论不存在或已被删除'
+            resetThreadState('该评论不存在或已被删除')
             return
           }
           usingLegacyFallback = true
@@ -338,13 +243,7 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
       }
 
       if (!page.commentsEnabled) {
-        commentsDisabled.value = true
-        ancestors.value = []
-        focalComment.value = null
-        replies.value = []
-        repliesTotalCount.value = 0
-        repliesNextCursor.value = null
-        errorMessage.value = '评论功能已关闭'
+        resetThreadState('评论功能已关闭', true)
         return
       }
 
@@ -356,31 +255,20 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
       ancestors.value = page.ancestors
       focalComment.value = page.comment
       repliesTotalCount.value = page.repliesTotalCount
-      replies.value = reset ? page.items : mergeComments(replies.value, page.items)
+      replies.value = reset ? page.items : mergeTelegraphComments(replies.value, page.items)
       repliesNextCursor.value = page.hasMore ? page.nextCursor : null
       syncEntryCommentsCount(page.entryCommentsCount)
     } catch (error) {
-      if (disposed || generation !== threadGeneration) {
+      if (disposed || !token.isCurrent()) {
         return
       }
       const code = extractApiErrorCode(error)
       if (code === 'COMMENTS_DISABLED') {
-        commentsDisabled.value = true
-        ancestors.value = []
-        focalComment.value = null
-        replies.value = []
-        repliesTotalCount.value = 0
-        repliesNextCursor.value = null
-        errorMessage.value = '评论功能已关闭'
+        resetThreadState('评论功能已关闭', true)
         return
       }
       if (code === 'COMMENT_NOT_FOUND' || code === 'NOT_FOUND') {
-        ancestors.value = []
-        focalComment.value = null
-        replies.value = []
-        repliesTotalCount.value = 0
-        repliesNextCursor.value = null
-        errorMessage.value = '该评论不存在或已被删除'
+        resetThreadState('该评论不存在或已被删除')
         return
       }
       const msg = extractApiErrorMessage(error, '评论详情加载失败，请稍后重试')
@@ -392,7 +280,7 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
         ui.toast(msg)
       }
     } finally {
-      if (!disposed && generation === threadGeneration) {
+      if (!disposed && token.owns()) {
         repliesLoading.value = false
         loadingMoreReplies.value = false
       }
@@ -403,11 +291,11 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
     const currentTopicId = options.topicId()
     const currentEntryId = options.entryId()
     const currentCommentId = options.commentId()
-    const generation = ++loadGeneration
+    const token = loadGuard.begin()
     if (
-      !VALID_ID_RE.test(currentTopicId)
-      || !VALID_ID_RE.test(currentEntryId)
-      || !VALID_ID_RE.test(currentCommentId)
+      !VALID_TELEGRAPH_ID_RE.test(currentTopicId)
+      || !VALID_TELEGRAPH_ID_RE.test(currentEntryId)
+      || !VALID_TELEGRAPH_ID_RE.test(currentCommentId)
     ) {
       topic.value = null
       focalComment.value = null
@@ -424,7 +312,7 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
         miniReview.ensureMiniReviewReady?.(),
       ])
       const mapped = mapTopicDetail(rawTopic)
-      if (disposed || generation !== loadGeneration) {
+      if (disposed || !token.isCurrent()) {
         return
       }
       if (!mapped.entries.some(item => item.id === currentEntryId)) {
@@ -442,7 +330,7 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
       }
 
       await fetchThread(true)
-      if (disposed || generation !== loadGeneration) {
+      if (disposed || !token.isCurrent()) {
         return
       }
       if (
@@ -455,15 +343,14 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
         inputFocusTrigger.value += 1
       }
     } catch (error) {
-      if (disposed || generation !== loadGeneration) {
+      if (disposed || !token.isCurrent()) {
         return
       }
-      const isNotFound = typeof error === 'object' && error !== null && 'statusCode' in error && (error as { statusCode?: unknown }).statusCode === 404
-      errorMessage.value = isNotFound
+      errorMessage.value = isNotFoundError(error)
         ? '电报条目不存在或已下线'
         : extractApiErrorMessage(error, '评论详情加载失败，请稍后重试')
     } finally {
-      if (!disposed && generation === loadGeneration) {
+      if (!disposed && token.owns()) {
         loading.value = false
       }
     }
@@ -474,21 +361,21 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
     const currentEntryId = options.entryId()
     const currentCommentId = options.commentId()
     if (
-      !VALID_ID_RE.test(currentTopicId)
-      || !VALID_ID_RE.test(currentEntryId)
-      || !VALID_ID_RE.test(currentCommentId)
+      !VALID_TELEGRAPH_ID_RE.test(currentTopicId)
+      || !VALID_TELEGRAPH_ID_RE.test(currentEntryId)
+      || !VALID_TELEGRAPH_ID_RE.test(currentCommentId)
       || loading.value
     ) {
       return
     }
-    const generation = ++loadGeneration
+    const token = loadGuard.begin()
     try {
       const [rawTopic] = await Promise.all([
         api.getTopicDetail(teamId, currentTopicId),
         miniReview.ensureMiniReviewReady?.(),
       ])
       const mapped = mapTopicDetail(rawTopic)
-      if (disposed || generation !== loadGeneration) {
+      if (disposed || !token.isCurrent()) {
         return
       }
       if (!mapped.entries.some(item => item.id === currentEntryId)) {
@@ -513,30 +400,13 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
     }
   }
 
-  async function ensureAuthAndProfile(): Promise<boolean> {
-    if (!session.hasAccessToken.value) {
-      requestLogin()
-      return false
-    }
-    if (!session.currentUser.value) {
-      try {
-        await session.ensureSessionReady()
-      } catch {
-        // Ignore transient fetch errors and evaluate state below.
-      }
-    }
-    if (disposed) {
-      return false
-    }
-    if (!session.hasAccessToken.value || !session.currentUser.value) {
-      requestLogin()
-      return false
-    }
-    if (!isProfileComplete(session.currentUser.value)) {
-      profileSheetVisible.value = true
-      return false
-    }
-    return true
+  function ensureAuthAndProfile(): Promise<boolean> {
+    return ensureTelegraphAuthAndProfile({
+      session,
+      isDisposed: () => disposed,
+      profileSheetVisible,
+      requestLogin,
+    })
   }
 
   async function openProfileSetup(): Promise<void> {
@@ -562,47 +432,20 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
     replies.value = replies.value.map(node => patchCommentNode(node, commentId, updater))
   }
 
-  async function toggleCommentLike(comment: TelegraphComment): Promise<void> {
-    if (pendingCommentLikeIds.value.includes(comment.id)) {
-      return
-    }
-    const currentTopicId = options.topicId()
-    if (!currentTopicId) {
-      return
-    }
-    if (!session.hasAccessToken.value) {
-      ui.redirectToLogin(currentCommentUrl())
-      return
-    }
-
-    const startRevision = session.revision.value
-    pendingCommentLikeIds.value = [...pendingCommentLikeIds.value, comment.id]
-    try {
-      const raw = await api.setCommentLike(
-        teamId,
-        currentTopicId,
-        comment.entryId,
-        comment.id,
-        !comment.likedByMe,
-      )
-      if (disposed || session.revision.value !== startRevision) {
-        return
-      }
-      const summary = mapTelegraphCommentLikeSummary(raw)
-      applyLikeToVisibleNodes(summary.commentId, summary.likesCount, summary.likedByMe)
-    } catch (error) {
-      if (disposed || session.revision.value !== startRevision) {
-        return
-      }
-      if (isUnauthorizedError(error)) {
-        session.invalidateSession(startRevision)
-        ui.redirectToLogin(currentCommentUrl())
-        return
-      }
-      ui.toast(extractApiErrorMessage(error, '点赞失败，请稍后重试'))
-    } finally {
-      pendingCommentLikeIds.value = pendingCommentLikeIds.value.filter(id => id !== comment.id)
-    }
+  function toggleCommentLike(comment: TelegraphComment): Promise<void> {
+    return runToggleCommentLike({
+      comment,
+      teamId,
+      topicId: options.topicId(),
+      returnUrl: currentCommentUrl(),
+      session,
+      pendingCommentLikeIds,
+      isDisposed: () => disposed,
+      setCommentLike: api.setCommentLike,
+      applyLikeSummary: applyLikeToVisibleNodes,
+      redirectToLogin: ui.redirectToLogin,
+      toast: ui.toast,
+    })
   }
 
   async function submitReply(): Promise<void> {
@@ -675,36 +518,25 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
       }
       ui.toast(extractApiErrorMessage(error, '发表回复失败，请稍后重试'))
     } finally {
-      submittingReply.value = false
+      if (!disposed && session.revision.value === startRevision) {
+        submittingReply.value = false
+      }
     }
   }
 
-  async function saveProfileAndContinue(payload: { display_name: string; avatar_data_url: string | null }): Promise<void> {
-    if (savingProfile.value) {
-      return
-    }
-    savingProfile.value = true
-    try {
-      await session.updateProfile(payload)
-      if (disposed) {
-        return
-      }
-      profileSheetVisible.value = false
-      if (commentsVisible.value && draftContent.value.trim()) {
-        await submitReply()
-      } else {
-        ui.toast('资料已完善', 'success')
-        if (commentsVisible.value && focalComment.value) {
-          inputFocusTrigger.value += 1
-        }
-      }
-    } catch (error) {
-      if (!disposed) {
-        ui.toast(extractApiErrorMessage(error, '保存失败，请稍后重试'))
-      }
-    } finally {
-      savingProfile.value = false
-    }
+  function saveProfileAndContinue(payload: { display_name: string; avatar_data_url: string | null }): Promise<void> {
+    return runSaveProfileAndContinue({
+      payload,
+      session,
+      savingProfile,
+      profileSheetVisible,
+      isDisposed: () => disposed,
+      canContinueWithDraft: () => Boolean(commentsVisible.value && draftContent.value.trim()),
+      onContinueWithDraft: submitReply,
+      canFocusAfterSave: () => Boolean(commentsVisible.value && focalComment.value),
+      inputFocusTrigger,
+      toast: ui.toast,
+    })
   }
 
   async function deleteOwnComment(comment: TelegraphComment): Promise<void> {
@@ -753,14 +585,16 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
       }
       ui.toast(extractApiErrorMessage(error, '删除评论失败，请稍后重试'))
     } finally {
-      deletingCommentId.value = ''
+      if (!disposed && session.revision.value === startRevision) {
+        deletingCommentId.value = ''
+      }
     }
   }
 
   function openEntry(): void {
     const currentTopicId = options.topicId()
     const currentEntryId = options.entryId()
-    if (!VALID_ID_RE.test(currentTopicId) || !VALID_ID_RE.test(currentEntryId)) {
+    if (!VALID_TELEGRAPH_ID_RE.test(currentTopicId) || !VALID_TELEGRAPH_ID_RE.test(currentEntryId)) {
       return
     }
     ui.openEntry(telegraphEntryUrl(currentTopicId, currentEntryId))
@@ -769,7 +603,7 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
   function openComment(comment: TelegraphComment, focusReply = false): void {
     const currentTopicId = options.topicId()
     const currentEntryId = options.entryId()
-    if (!VALID_ID_RE.test(currentTopicId) || !VALID_ID_RE.test(currentEntryId) || !comment.id) {
+    if (!VALID_TELEGRAPH_ID_RE.test(currentTopicId) || !VALID_TELEGRAPH_ID_RE.test(currentEntryId) || !comment.id) {
       return
     }
     if (comment.id === options.commentId()) {

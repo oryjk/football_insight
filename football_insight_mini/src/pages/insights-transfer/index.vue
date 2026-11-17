@@ -23,7 +23,12 @@
             </view>
           </view>
           <text v-if="homeTeam.error.value" class="pick__error">{{ homeTeam.error.value }}</text>
-          <button class="pick__confirm" :disabled="pendingTeamId === null || homeTeam.submitting.value" @tap="confirmPick">{{ homeTeam.submitting.value ? '保存中…' : '确认主队' }}</button>
+          <button
+            class="pick__confirm"
+            :class="{ 'pick__confirm--disabled': pendingTeamId === null || homeTeam.submitting.value }"
+            :disabled="pendingTeamId === null || homeTeam.submitting.value"
+            @tap="confirmPick"
+          >{{ homeTeam.submitting.value ? '保存中…' : '确认主队' }}</button>
         </view>
         <template v-else-if="homeTeam.team.value">
           <view class="home-team">
@@ -125,7 +130,7 @@ onShow(() => {
 .pick__error { color: var(--fi-color-primary); font-size: var(--fi-font-24); }
 .pick__confirm { margin: 0; padding: var(--fi-space-20) var(--fi-space-24); border: 0; border-radius: var(--fi-radius-round); background: var(--fi-color-primary); color: var(--fi-color-surface); font-size: var(--fi-font-28); font-weight: var(--fi-weight-bold); }
 .pick__confirm::after { border: 0; }
-.pick__confirm[disabled] { background: var(--fi-color-divider); color: var(--fi-color-text-muted); }
+.pick__confirm--disabled { background: var(--fi-color-divider); color: var(--fi-color-text-muted); }
 .transfer-entry-page { min-height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--fi-space-card-gap); padding: calc(var(--fi-brand-nav-height) + var(--fi-space-24)) var(--fi-space-16) calc(var(--fi-space-64) + env(safe-area-inset-bottom)); background: var(--fi-color-page-soft); }
 .transfer-entry-heading { padding: 0 var(--fi-space-8); }
 .transfer-entry-title { display: block; color: var(--fi-color-text-primary); font-size: var(--fi-font-36); font-weight: var(--fi-weight-extrabold); }

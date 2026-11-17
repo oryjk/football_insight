@@ -139,7 +139,7 @@ import calendarDaysIcon from '../../static/user/calendar-days.svg'
 import logInIcon from '../../static/user/log-in.svg'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { listH5TestLoginUsers } from '../../api/auth'
-import { useAppSession } from '../../stores/appSession'
+import { isSessionSupersededError, useAppSession } from '../../stores/appSession'
 import type { H5TestLoginUser, MiniWechatBindingRequiredResponse } from '../../types/auth'
 import { useMiniReviewStatus } from '../../stores/miniReview'
 import { useRuntimeConfig } from '../../stores/runtimeConfig'
@@ -225,7 +225,12 @@ const loginFlow = createUserLoginFlow(
 // 但本页自己发起的认证提交（beginAuthIntent 同步递增 revision）只清展示数据，
 // 保留正在填写的认证表单（密码弹层/绑定 token），失败后可原地修改重试。
 watch(session.revision, (newRevision) => {
-  accountEffects.handleSessionRevisionChange(loginFlow.isOwnAuthSubmit(newRevision))
+  const ownAuthSubmit = loginFlow.isOwnAuthSubmit(newRevision)
+  if (!ownAuthSubmit) {
+    profileSheetVisible.value = false
+    savingProfile.value = false
+  }
+  accountEffects.handleSessionRevisionChange(ownAuthSubmit)
 })
 
 const isH5 =
@@ -392,15 +397,21 @@ async function handleProfileSubmit(payload: { display_name: string; avatar_data_
   if (savingProfile.value) {
     return
   }
+  const startRevision = session.revision.value
   savingProfile.value = true
   try {
     await session.updateProfile(payload)
     profileSheetVisible.value = false
     uni.showToast({ title: '资料已保存', icon: 'success' })
   } catch (error) {
+    if (isSessionSupersededError(error)) {
+      return
+    }
     uni.showToast({ title: extractApiErrorMessage(error, '保存失败，请稍后重试'), icon: 'none' })
   } finally {
-    savingProfile.value = false
+    if (session.revision.value === startRevision) {
+      savingProfile.value = false
+    }
   }
 }
 

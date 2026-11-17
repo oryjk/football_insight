@@ -9,7 +9,7 @@
     v-if="visible"
     class="composer"
     :class="{ 'composer--lifted': keyboardHeight > 0 }"
-    :style="{ bottom: `${keyboardHeight}px` }"
+    :style="{ transform: keyboardHeight > 0 ? `translateY(-${keyboardHeight}px)` : 'none' }"
     @touchmove.stop
     @tap.stop
   >
@@ -67,6 +67,7 @@
           <text v-if="isExpanded" class="composer__counter">{{ draftCharCount }} / 200</text>
           <button
             class="composer__send"
+            :class="{ 'composer__send--disabled': submitting || !draft.trim() }"
             :disabled="submitting || !draft.trim()"
             hover-class="composer__pressed"
             @tap="handleSendTap"
@@ -265,7 +266,7 @@ function handleSendTap(): void {
   display: flex;
   flex-direction: column;
   gap: var(--fi-space-12);
-  transition: bottom var(--fi-motion-duration-fast) var(--fi-motion-ease-out);
+  transition: transform var(--fi-motion-duration-fast) var(--fi-motion-ease-out);
 }
 
 .composer--lifted {
@@ -393,19 +394,25 @@ function handleSendTap(): void {
   height: 76rpx;
   padding: 0 var(--fi-space-28);
   border-radius: var(--fi-radius-round);
-  background: var(--fi-primitive-ink);
-  color: var(--fi-primitive-white);
+  background: var(--fi-color-text-primary);
+  color: var(--fi-color-surface);
   font-size: var(--fi-font-26);
   font-weight: var(--fi-weight-bold);
   line-height: 76rpx;
 }
 
-.composer__send[disabled] {
+.composer__send--disabled {
   opacity: 0.45;
 }
 
 .composer__pressed {
   opacity: var(--fi-opacity-pressed);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer {
+    transition: none;
+  }
 }
 </style>
 

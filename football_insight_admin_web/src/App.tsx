@@ -307,7 +307,12 @@ export function App() {
         ) : page === "topicReaders" ? (
           <TopicReadersPage key={token} api={api} token={token} />
         ) : page === "telegraphComments" ? (
-          <TelegraphCommentsPage key={token} api={api} token={token} />
+          <TelegraphCommentsPage
+            key={token}
+            api={api}
+            token={token}
+            onBusyChange={onProductBusy}
+          />
         ) : (
           <SettingsPage
             key={token}

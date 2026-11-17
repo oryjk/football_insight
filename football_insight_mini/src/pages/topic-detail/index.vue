@@ -4,7 +4,7 @@
   <view class="topic-page-offset">
   <view class="topic-detail">
     <view v-if="loading" class="topic-detail__state">正在加载话题…</view>
-    <view v-else-if="errorMessage" class="topic-detail__state"><text>{{ errorMessage }}</text><button @tap="load">重新加载</button></view>
+    <view v-else-if="errorMessage" class="topic-detail__state"><text>{{ errorMessage }}</text><button class="topic-detail__retry" @tap="load">重新加载</button></view>
     <template v-else-if="item && isRoundupTopic(item)">
       <text class="topic-detail__title">每日电报</text>
       <view class="topic-detail__meta-row">
@@ -239,14 +239,17 @@ function setReadingSize(key: string) {
 .topic-detail__paragraph { display: block; margin-top: var(--fi-space-28); color: var(--fi-color-text-primary); font-size: var(--fi-font-32); line-height: var(--fi-leading-relaxed); white-space: pre-wrap; }
 .topic-detail__sources { margin-top: var(--fi-space-32); padding-top: var(--fi-space-24); border-top: var(--fi-border-divider); }
 .topic-detail__sources-toggle { display: flex; align-items: center; justify-content: space-between; }
-.topic-detail__chevron { color: var(--fi-color-text-caption); font-size: var(--fi-font-32); transform: rotate(90deg); transition: transform 0.2s; }
+.topic-detail__chevron { color: var(--fi-color-text-caption); font-size: var(--fi-font-32); transform: rotate(90deg); transition: transform var(--fi-motion-duration-base) var(--fi-motion-ease-out); }
 .topic-detail__chevron--open { transform: rotate(-90deg); }
-.topic-detail__pressed { opacity: 0.6; }
+.topic-detail__pressed { opacity: var(--fi-opacity-pressed); }
 .topic-detail__sources-heading { display: block; color: var(--fi-color-text-primary); font-size: var(--fi-font-26); font-weight: var(--fi-weight-bold); }
 .topic-detail__source { margin-top: var(--fi-space-24); }
 .topic-detail__source-title { display: block; color: var(--fi-color-text-secondary); font-size: var(--fi-font-26); line-height: var(--fi-leading-normal); }
 .topic-detail__copy { display: inline-flex; margin: var(--fi-space-12) 0 0; padding: var(--fi-space-12) 0; background: transparent; color: var(--fi-color-primary); font-size: var(--fi-font-24); line-height: var(--fi-leading-normal); }
-.topic-detail__copy::after, .topic-detail__state button::after { border: 0; }
+.topic-detail__copy::after, .topic-detail__retry::after { border: 0; }
 .topic-detail__state { padding: var(--fi-space-40) 0; text-align: center; color: var(--fi-color-text-secondary); font-size: var(--fi-font-26); }
-.topic-detail__state button { margin-top: var(--fi-space-24); font-size: var(--fi-font-26); color: var(--fi-color-primary); background: var(--fi-color-bg); }
+.topic-detail__retry { margin-top: var(--fi-space-24); font-size: var(--fi-font-26); color: var(--fi-color-primary); background: var(--fi-color-bg); }
+@media (prefers-reduced-motion: reduce) {
+  .topic-detail__chevron { transition: none; }
+}
 </style>

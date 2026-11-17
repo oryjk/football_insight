@@ -1,7 +1,7 @@
 use crate::auth::domain::registration::{RegisteredUser, RegistrationIdentity, UserRegistration};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use sqlx::{FromRow, PgPool, Postgres, Row, Transaction};
+use sqlx::{Acquire, FromRow, PgPool, Postgres, Row, Transaction};
 use uuid::Uuid;
 
 use crate::auth::{
@@ -37,7 +37,10 @@ impl PostgresAuthRepository {
         Self { pool }
     }
 
-    async fn record_custom_profile_best_effort(&self, user: &AuthUser) -> anyhow::Result<()> {
+    async fn record_custom_profile_in_tx(
+        tx: &mut Transaction<'_, Postgres>,
+        user: &AuthUser,
+    ) -> anyhow::Result<()> {
         if !resolve_profile_completed(
             user.display_name.as_deref(),
             &user.account_identifier,
@@ -46,7 +49,8 @@ impl PostgresAuthRepository {
         ) {
             return Ok(());
         }
-        if let Err(error) = sqlx::query(
+        let mut sp = tx.begin().await?;
+        match sqlx::query(
             r#"
             INSERT INTO f_i_user_custom_profiles (user_id, nickname_updated_at, avatar_updated_at, updated_at)
             VALUES ($1, NOW(), NOW(), NOW())
@@ -57,15 +61,32 @@ impl PostgresAuthRepository {
             "#,
         )
         .bind(user.id)
-        .execute(&self.pool)
+        .execute(&mut *sp)
         .await
         {
-            match &error {
-                sqlx::Error::Database(db_err) if db_err.code().as_deref() == Some("42P01") => {}
-                _ => return Err(error.into()),
+            Ok(_) => {
+                sp.commit().await?;
             }
+            Err(sqlx::Error::Database(db_err)) if db_err.code().as_deref() == Some("42P01") => {
+                sp.rollback().await?;
+            }
+            Err(error) => return Err(error.into()),
         }
         Ok(())
+    }
+
+    async fn fetch_active_user_wx_open_id(&self, user_id: Uuid) -> anyhow::Result<Option<String>> {
+        let open_id = sqlx::query_scalar::<_, Option<String>>(
+            "SELECT wx_open_id FROM f_i_users WHERE id = $1 AND status = 'active' LIMIT 1",
+        )
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await?
+        .flatten()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+
+        Ok(open_id)
     }
 
     async fn find_user_status_by_account_identifier(
@@ -400,9 +421,9 @@ impl PostgresAuthRepository {
                 .await?;
             }
 
-            tx.commit().await?;
             let auth_user = user.into_auth_user(&membership_tier_rules);
-            let _ = self.record_custom_profile_best_effort(&auth_user).await;
+            Self::record_custom_profile_in_tx(&mut tx, &auth_user).await?;
+            tx.commit().await?;
             return Ok(RegisteredUser {
                 user: auth_user,
                 newly_created: false,
@@ -480,9 +501,9 @@ impl PostgresAuthRepository {
             .await?;
         }
 
-        tx.commit().await?;
         let auth_user = user.into_auth_user(&membership_tier_rules);
-        let _ = self.record_custom_profile_best_effort(&auth_user).await;
+        Self::record_custom_profile_in_tx(&mut tx, &auth_user).await?;
+        tx.commit().await?;
         Ok(RegisteredUser {
             user: auth_user,
             newly_created: true,
@@ -558,9 +579,9 @@ impl PostgresAuthRepository {
                 .await?;
             }
 
-            tx.commit().await?;
             let auth_user = user.into_auth_user(&membership_tier_rules);
-            let _ = self.record_custom_profile_best_effort(&auth_user).await;
+            Self::record_custom_profile_in_tx(&mut tx, &auth_user).await?;
+            tx.commit().await?;
             return Ok(RegisteredUser {
                 user: auth_user,
                 newly_created: false,
@@ -615,9 +636,9 @@ impl PostgresAuthRepository {
             .await?;
         }
 
-        tx.commit().await?;
         let auth_user = user.into_auth_user(&membership_tier_rules);
-        let _ = self.record_custom_profile_best_effort(&auth_user).await;
+        Self::record_custom_profile_in_tx(&mut tx, &auth_user).await?;
+        tx.commit().await?;
         Ok(RegisteredUser {
             user: auth_user,
             newly_created: true,
@@ -732,9 +753,9 @@ impl PostgresAuthRepository {
                 .await?;
             }
 
-            tx.commit().await?;
             let auth_user = user.into_auth_user(&membership_tier_rules);
-            let _ = self.record_custom_profile_best_effort(&auth_user).await;
+            Self::record_custom_profile_in_tx(&mut tx, &auth_user).await?;
+            tx.commit().await?;
             return Ok(RegisteredUser {
                 user: auth_user,
                 newly_created: false,
@@ -823,9 +844,9 @@ impl PostgresAuthRepository {
             .await?;
         }
 
-        tx.commit().await?;
         let auth_user = user.into_auth_user(&membership_tier_rules);
-        let _ = self.record_custom_profile_best_effort(&auth_user).await;
+        Self::record_custom_profile_in_tx(&mut tx, &auth_user).await?;
+        tx.commit().await?;
         Ok(RegisteredUser {
             user: auth_user,
             newly_created: true,
@@ -913,9 +934,9 @@ impl PostgresAuthRepository {
                 .await?;
             }
 
-            tx.commit().await?;
             let auth_user = user.into_auth_user(&membership_tier_rules);
-            let _ = self.record_custom_profile_best_effort(&auth_user).await;
+            Self::record_custom_profile_in_tx(&mut tx, &auth_user).await?;
+            tx.commit().await?;
             return Ok(RegisteredUser {
                 user: auth_user,
                 newly_created: false,
@@ -981,9 +1002,9 @@ impl PostgresAuthRepository {
             .await?;
         }
 
-        tx.commit().await?;
         let auth_user = user.into_auth_user(&membership_tier_rules);
-        let _ = self.record_custom_profile_best_effort(&auth_user).await;
+        Self::record_custom_profile_in_tx(&mut tx, &auth_user).await?;
+        tx.commit().await?;
         Ok(RegisteredUser {
             user: auth_user,
             newly_created: true,
@@ -1096,9 +1117,9 @@ impl PostgresAuthRepository {
                 .await?;
             }
 
-            tx.commit().await?;
             let auth_user = user.into_auth_user(&membership_tier_rules);
-            let _ = self.record_custom_profile_best_effort(&auth_user).await;
+            Self::record_custom_profile_in_tx(&mut tx, &auth_user).await?;
+            tx.commit().await?;
             return Ok(RegisteredUser {
                 user: auth_user,
                 newly_created: false,
@@ -1185,9 +1206,9 @@ impl PostgresAuthRepository {
             .await?;
         }
 
-        tx.commit().await?;
         let auth_user = user.into_auth_user(&membership_tier_rules);
-        let _ = self.record_custom_profile_best_effort(&auth_user).await;
+        Self::record_custom_profile_in_tx(&mut tx, &auth_user).await?;
+        tx.commit().await?;
         Ok(RegisteredUser {
             user: auth_user,
             newly_created: true,
@@ -1273,9 +1294,9 @@ impl PostgresAuthRepository {
                 .await?;
             }
 
-            tx.commit().await?;
             let auth_user = user.into_auth_user(&membership_tier_rules);
-            let _ = self.record_custom_profile_best_effort(&auth_user).await;
+            Self::record_custom_profile_in_tx(&mut tx, &auth_user).await?;
+            tx.commit().await?;
             return Ok(RegisteredUser {
                 user: auth_user,
                 newly_created: false,
@@ -1339,9 +1360,9 @@ impl PostgresAuthRepository {
             .await?;
         }
 
-        tx.commit().await?;
         let auth_user = user.into_auth_user(&membership_tier_rules);
-        let _ = self.record_custom_profile_best_effort(&auth_user).await;
+        Self::record_custom_profile_in_tx(&mut tx, &auth_user).await?;
+        tx.commit().await?;
         Ok(RegisteredUser {
             user: auth_user,
             newly_created: true,
@@ -2207,17 +2228,7 @@ impl AuthRepository for PostgresAuthRepository {
     }
 
     async fn get_user_mini_open_id(&self, user_id: Uuid) -> anyhow::Result<Option<String>> {
-        let open_id = sqlx::query_scalar::<_, Option<String>>(
-            "SELECT wx_open_id FROM f_i_users WHERE id = $1 AND status = 'active' LIMIT 1",
-        )
-        .bind(user_id)
-        .fetch_optional(&self.pool)
-        .await?
-        .flatten()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty());
-
-        Ok(open_id)
+        self.fetch_active_user_wx_open_id(user_id).await
     }
 
     async fn update_user_profile(
@@ -2226,7 +2237,8 @@ impl AuthRepository for PostgresAuthRepository {
         display_name: &str,
         avatar_url: &str,
     ) -> anyhow::Result<AuthUser> {
-        let membership_tier_rules = self.load_membership_tier_rules().await?;
+        let mut tx = self.pool.begin().await?;
+        let membership_tier_rules = Self::load_membership_tier_rules_in_tx(&mut tx).await?;
         let user = sqlx::query_as::<_, AuthUserRow>(
             r#"
             UPDATE f_i_users
@@ -2264,12 +2276,13 @@ impl AuthRepository for PostgresAuthRepository {
         .bind(user_id)
         .bind(display_name)
         .bind(avatar_url)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await?
         .ok_or_else(|| anyhow::anyhow!("user not found or inactive"))?;
 
         let auth_user = user.into_auth_user(&membership_tier_rules);
-        self.record_custom_profile_best_effort(&auth_user).await?;
+        Self::record_custom_profile_in_tx(&mut tx, &auth_user).await?;
+        tx.commit().await?;
         Ok(auth_user)
     }
 }
@@ -2277,14 +2290,7 @@ impl AuthRepository for PostgresAuthRepository {
 #[async_trait::async_trait]
 impl crate::auth::ports::user_membership_port::UserMembershipPort for PostgresAuthRepository {
     async fn get_user_open_id(&self, user_id: Uuid) -> anyhow::Result<Option<String>> {
-        let open_id: Option<String> = sqlx::query_scalar(
-            "SELECT wx_open_id FROM f_i_users WHERE id = $1 AND status = 'active' LIMIT 1",
-        )
-        .bind(user_id)
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(open_id)
+        self.fetch_active_user_wx_open_id(user_id).await
     }
 
     async fn get_user_membership_tier(&self, user_id: Uuid) -> anyhow::Result<Option<String>> {

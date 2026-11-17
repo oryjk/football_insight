@@ -530,18 +530,11 @@ cargo test --test admin_products_postgres -- --ignored
 
 ### 小程序头像存储
 
-当前小程序端不会先把头像上传到 MinIO。
+小程序端不会直传 MinIO，而是统一把头像编码为 `data:image/...;base64,...` 作为 `avatar_data_url` 传给后端：
 
-而是：
-
-- 小程序使用 `chooseAvatar` 选择头像
-- 前端将头像文件读取为 `data:image/...;base64,...`
-- 后端直接把这个 data URL 写入 `f_i_users.avatar_url`
-
-也就是说：
-
-- 当前头像以 base64 data URL 的形式落在数据库里
-- 这是为了先快速打通小程序微信首登闭环，避免额外引入上传链路
+- 小程序使用 `chooseAvatar` 选择头像并读取为 `data:image/...;base64,...`
+- 用户资料更新接口 `PUT /api/v1/auth/profile` 先调用微信 `img_sec_check` 校验图片安全，通过后由后端 `AvatarStoragePort` 上传至 MinIO（`avatars/users/{user_id}/...`）并将公开 URL 写入 `f_i_users.avatar_url`；未配置 MinIO 时回退为内联 base64 data URL
+- 首次微信绑定 `POST /api/v1/auth/mini-wechat/bind` 仍兼容直接写入 `data:image/...;base64,...`
 
 当前新增表：
 

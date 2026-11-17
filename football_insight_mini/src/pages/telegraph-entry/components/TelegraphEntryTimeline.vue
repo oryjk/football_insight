@@ -130,95 +130,18 @@
       </view>
 
       <template v-else>
-        <view
+        <TelegraphCommentNode
           v-for="(comment, index) in comments"
           :key="comment.id"
-          class="x-node"
-          role="button"
-          :aria-label="`查看 ${comment.author.displayName} 的评论详情`"
-          hover-class="timeline__pressed"
-          @tap="emit('open-comment', comment, false)"
-        >
-          <view class="x-node__rail">
-            <view class="x-node__avatar">
-              <image
-                v-if="comment.author.avatarUrl"
-                :src="comment.author.avatarUrl"
-                mode="aspectFill"
-                class="x-node__avatar-img"
-              />
-              <text v-else class="x-node__avatar-fallback">{{ authorInitial(comment.author.displayName) }}</text>
-            </view>
-            <view v-if="index < comments.length - 1" class="x-node__line" />
-          </view>
-
-          <view class="x-node__main">
-            <view class="x-node__header">
-              <view class="x-node__author-group">
-                <text class="x-node__author">{{ comment.author.displayName }}</text>
-                <text v-if="comment.isMine" class="x-node__mine">我</text>
-                <text class="x-node__dot">·</text>
-                <text class="x-node__time">{{ comment.relativeTimeLabel || comment.createdLabel }}</text>
-              </view>
-
-              <button
-                v-if="comment.isMine"
-                class="x-node__delete"
-                :disabled="deletingCommentId === comment.id"
-                aria-label="删除评论"
-                hover-class="timeline__pressed"
-                @tap.stop="confirmDelete(comment)"
-              >
-                <image class="x-node__delete-icon" src="/static/topics/trash-muted.svg" mode="aspectFit" />
-              </button>
-            </view>
-
-            <view v-if="comment.replyTo" class="x-node__replying">
-              <text class="x-node__replying-label">回复</text>
-              <text class="x-node__replying-handle">@{{ comment.replyTo.authorDisplayName }}</text>
-            </view>
-
-            <text class="x-node__content">{{ comment.content }}</text>
-
-            <view class="x-node__actions">
-              <button
-                class="x-action"
-                aria-label="回复评论"
-                hover-class="timeline__pressed"
-                @tap.stop="emit('open-comment', comment, true)"
-              >
-                <image class="x-action__icon" src="/static/topics/comment-bubble.svg" mode="aspectFit" />
-                <text v-if="comment.repliesCount > 0" class="x-action__count">
-                  {{ formatCount(comment.repliesCount) }}
-                </text>
-              </button>
-
-              <button
-                class="x-action"
-                :class="{
-                  'x-action--liked': comment.likedByMe,
-                  'x-action--pending': pendingLikeIds.includes(comment.id),
-                }"
-                :aria-label="comment.likedByMe ? '取消评论点赞' : '点赞评论'"
-                hover-class="timeline__pressed"
-                @tap.stop="emit('like-comment', comment)"
-              >
-                <image
-                  class="x-action__icon"
-                  :src="comment.likedByMe ? '/static/topics/heart-active.svg' : '/static/topics/heart-idle.svg'"
-                  mode="aspectFit"
-                />
-                <text
-                  v-if="comment.likesCount > 0"
-                  class="x-action__count"
-                  :class="{ 'x-action__count--liked': comment.likedByMe }"
-                >
-                  {{ formatCount(comment.likesCount) }}
-                </text>
-              </button>
-            </view>
-          </view>
-        </view>
+          :comment="comment"
+          :show-line="index < comments.length - 1"
+          show-reply-to
+          :pending-like="pendingLikeIds.includes(comment.id)"
+          :deleting="deletingCommentId === comment.id"
+          @open="(target, focusReply) => emit('open-comment', target, focusReply)"
+          @like="emit('like-comment', $event)"
+          @delete="emit('delete-comment', $event)"
+        />
 
         <view class="x-timeline__footer">
           <button
@@ -241,6 +164,7 @@
 import { computed, ref } from 'vue'
 import type { DailyTopicEntry, TelegraphComment } from '../../../types/dailyTopic'
 import { formatTopicHeat, telegraphCategoryLabel } from '../../../utils/dailyTopics'
+import TelegraphCommentNode from './TelegraphCommentNode.vue'
 
 const props = defineProps<{
   entry: DailyTopicEntry
@@ -274,29 +198,8 @@ const publishers = computed(() =>
   Array.from(new Set(props.entry.sources.map(source => source.publisher))).join(' · '),
 )
 
-function authorInitial(name: string): string {
-  const trimmed = name.trim()
-  return trimmed ? trimmed.slice(0, 1).toUpperCase() : '球'
-}
-
 function formatCount(count: number): string {
   return formatTopicHeat(count)
-}
-
-function confirmDelete(comment: TelegraphComment): void {
-  if (props.deletingCommentId) {
-    return
-  }
-  uni.showModal({
-    title: '删除评论',
-    content: '确认删除这条评论吗？删除后不可恢复。',
-    showCancel: true,
-    success: (res) => {
-      if (res.confirm) {
-        emit('delete-comment', comment)
-      }
-    },
-  })
 }
 </script>
 
@@ -339,12 +242,6 @@ function confirmDelete(comment: TelegraphComment): void {
 .x-node__avatar-img {
   width: 100%;
   height: 100%;
-}
-
-.x-node__avatar-fallback {
-  color: var(--fi-color-text-secondary);
-  font-size: var(--fi-font-26);
-  font-weight: var(--fi-weight-bold);
 }
 
 .x-node__line {
@@ -419,17 +316,6 @@ function confirmDelete(comment: TelegraphComment): void {
   color: var(--fi-color-hat-trick-text);
 }
 
-.x-node__mine {
-  flex-shrink: 0;
-  padding: var(--fi-space-2) var(--fi-space-8);
-  border-radius: var(--fi-radius-xs);
-  background: var(--fi-color-primary-soft);
-  color: var(--fi-color-primary);
-  font-size: var(--fi-font-18);
-  font-weight: var(--fi-weight-bold);
-  line-height: 1.2;
-}
-
 .x-node__dot,
 .x-node__time,
 .x-node__day {
@@ -439,30 +325,10 @@ function confirmDelete(comment: TelegraphComment): void {
   line-height: var(--fi-leading-snug);
 }
 
-.x-node__delete {
-  flex-shrink: 0;
-  width: 48rpx;
-  height: 48rpx;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.x-node__delete::after,
-.x-action::after,
 .x-entry-action::after,
 .x-timeline__retry::after,
 .x-timeline__more::after {
   border: 0;
-}
-
-.x-node__delete-icon {
-  width: 28rpx;
-  height: 28rpx;
 }
 
 .x-node__entry-body {
@@ -496,7 +362,7 @@ function confirmDelete(comment: TelegraphComment): void {
 .x-node__chevron {
   display: inline-block;
   transform: rotate(90deg);
-  transition: transform 0.2s;
+  transition: transform var(--fi-motion-duration-base) var(--fi-motion-ease-out);
 }
 
 .x-node__chevron--open {
@@ -591,72 +457,6 @@ function confirmDelete(comment: TelegraphComment): void {
   font-variant-numeric: tabular-nums;
 }
 
-.x-node__replying {
-  display: flex;
-  align-items: center;
-  gap: var(--fi-space-6);
-  margin-top: var(--fi-space-4);
-}
-
-.x-node__replying-label {
-  color: var(--fi-color-text-caption);
-  font-size: var(--fi-font-22);
-}
-
-.x-node__replying-handle {
-  color: var(--fi-color-outsider);
-  font-size: var(--fi-font-22);
-}
-
-.x-node__content {
-  display: block;
-  margin-top: var(--fi-space-8);
-  color: var(--fi-color-text-primary);
-  font-size: var(--fi-font-28);
-  line-height: var(--fi-leading-normal);
-  word-break: break-word;
-  white-space: pre-wrap;
-}
-
-.x-node__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--fi-space-40);
-  margin-top: var(--fi-space-12);
-}
-
-.x-action {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fi-space-8);
-  margin: 0;
-  padding: var(--fi-space-6) var(--fi-space-8) var(--fi-space-6) 0;
-  border: 0;
-  background: transparent;
-  color: var(--fi-color-text-secondary);
-  line-height: 1;
-}
-
-.x-action--pending {
-  opacity: var(--fi-opacity-pressed);
-}
-
-.x-action__icon {
-  width: 30rpx;
-  height: 30rpx;
-}
-
-.x-action__count {
-  font-size: var(--fi-font-22);
-  color: var(--fi-color-text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.x-action__count--liked {
-  color: var(--fi-color-heart-like);
-  font-weight: var(--fi-weight-bold);
-}
-
 .x-timeline__state {
   padding: var(--fi-space-32) var(--fi-space-16);
   display: flex;
@@ -696,5 +496,11 @@ function confirmDelete(comment: TelegraphComment): void {
 
 .timeline__pressed {
   opacity: var(--fi-opacity-pressed);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .x-node__chevron {
+    transition: none;
+  }
 }
 </style>

@@ -12,9 +12,9 @@
     </view>
     <view class="topics-state">
       <text v-if="loading">正在加载话题…</text>
-      <template v-else-if="errorMessage"><text>{{ errorMessage }}</text><button @tap="retry">重新加载</button></template>
+      <template v-else-if="errorMessage"><text>{{ errorMessage }}</text><button class="topics-state__action" @tap="retry">重新加载</button></template>
       <text v-else-if="!items.length">暂无已发布话题</text>
-      <button v-else-if="nextCursor" @tap="load(false)">加载更多话题</button>
+      <button v-else-if="nextCursor" class="topics-state__action" @tap="load(false)">加载更多话题</button>
       <text v-else>已显示全部话题</text>
     </view>
   </view>
@@ -87,6 +87,6 @@ onScopeDispose(() => { revision += 1 })
 .topics-title { display: block; color: var(--fi-color-text-primary); font-size: var(--fi-font-36); font-weight: var(--fi-weight-extrabold); }
 .topics-caption { display: block; margin-top: var(--fi-space-12); color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); }
 .topics-state { padding: var(--fi-space-28) 0; text-align: center; color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); }
-.topics-state button { margin-top: var(--fi-space-20); padding: var(--fi-space-16); color: var(--fi-color-primary); background: var(--fi-color-bg); border-radius: var(--fi-radius-lg); font-size: var(--fi-font-26); line-height: var(--fi-leading-normal); }
-.topics-state button::after { border: 0; }
+.topics-state__action { margin-top: var(--fi-space-20); padding: var(--fi-space-16); color: var(--fi-color-primary); background: var(--fi-color-bg); border-radius: var(--fi-radius-lg); font-size: var(--fi-font-26); line-height: var(--fi-leading-normal); }
+.topics-state__action::after { border: 0; }
 </style>
