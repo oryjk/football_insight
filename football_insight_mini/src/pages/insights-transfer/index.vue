@@ -33,7 +33,7 @@
           </view>
           <InsightsTransferPanel
             :summary="transferSummary" :loading="transferLoading" :error="transferError"
-            :hint="transferHint" :pending="transferPending"
+            :hint="transferHint" :pending="transferPending" :preferred-intent="preferredIntent"
             @retry="retryTransfer" @vote="transfer.vote" @open="openTransferCard" @more="openTransferBoard" @nominate="openTransferNominate"
           />
         </template>
@@ -44,7 +44,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { onHide, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
+import { onHide, onLoad, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import FiPanel from '../../components/FiPanel.vue'
 import InsightsTransferPanel from './components/InsightsTransferPanel.vue'
@@ -53,7 +53,7 @@ import { useInsightsTransfer } from './useInsightsTransfer'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { useAppSession } from '../../stores/appSession'
 import type { TransferIntent } from '../../types/transfer'
-import { buildTransferBoardUrl, buildTransferViewUrl, transferBoardShareTitle } from '../../utils/transferLinks'
+import { buildTransferBoardUrl, buildTransferViewUrl, parseTransferEntryQuery, transferBoardShareTitle } from '../../utils/transferLinks'
 import { buildSharePath } from '../../utils/shareSource'
 import { goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { reportPageActivity } from '../../utils/userActivity'
@@ -61,6 +61,7 @@ import { reportPageActivity } from '../../utils/userActivity'
 const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
 const pageVisible = ref(false)
+const preferredIntent = ref<TransferIntent>('out')
 const homeTeam = useTransferHomeTeam(session)
 const selectedTeamId = homeTeam.teamId
 const pendingTeamId = ref<number | null>(null)
@@ -86,14 +87,17 @@ function openTransferNominate(): void {
   // 已登录却不能投（非主队）时只提示，不跳去打开提名弹层。
   const blocked = transfer.nominateBlocked()
   if (blocked) { uni.showToast({ title: blocked, icon: 'none' }); return }
-  uni.navigateTo({ url: buildTransferBoardUrl(selectedTeamId.value, 'out', { nominate: true }) })
+  uni.navigateTo({ url: buildTransferBoardUrl(selectedTeamId.value, preferredIntent.value, { nominate: true }) })
 }
+onLoad((query) => {
+  preferredIntent.value = parseTransferEntryQuery(query as Record<string, unknown>).intent
+})
 onShareAppMessage(() => {
   const windowName = transferSummary.value?.window?.name
   if (windowName && selectedTeamId.value !== null) {
-    return { title: transferBoardShareTitle(selectedTeamName.value, windowName, 'out'), path: buildSharePath(buildTransferBoardUrl(selectedTeamId.value, 'out'), 'transfer_board') }
+    return { title: transferBoardShareTitle(selectedTeamName.value, windowName, preferredIntent.value), path: buildSharePath(buildTransferBoardUrl(selectedTeamId.value, preferredIntent.value), 'transfer_board') }
   }
-  return { title: `${selectedTeamName.value}转会表态，说说你的想法`, path: buildSharePath('/pages/insights-transfer/index', 'insights') }
+  return { title: `${selectedTeamName.value}球员表态，说说你的想法`, path: buildSharePath('/pages/insights-transfer/index', 'insights') }
 })
 onHide(() => { pageVisible.value = false })
 onUnload(() => { transfer.dispose(); homeTeam.dispose() })

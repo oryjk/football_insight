@@ -35,7 +35,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { onHide, onReachBottom, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
+import { onHide, onLoad, onReachBottom, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import FiPanel from '../../components/FiPanel.vue'
 import InsightsTeamSelector from '../../components/InsightsTeamSelector.vue'
@@ -46,7 +46,7 @@ import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { useAppSession } from '../../stores/appSession'
 import { createLineupConsensus } from '../../composables/useLineupConsensus'
 import { lineupOverlap, overlapText } from '../../utils/lineupConsensus'
-import { buildLineupPageUrl, buildLineupViewUrl } from '../../utils/lineupLinks'
+import { buildLineupPageUrl, buildLineupViewUrl, parseLineupPageQuery } from '../../utils/lineupLinks'
 import { buildSharePath } from '../../utils/shareSource'
 import { goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { reportPageActivity } from '../../utils/userActivity'
@@ -54,6 +54,7 @@ import { reportPageActivity } from '../../utils/userActivity'
 const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
 const pageVisible = ref(false)
+let pendingTeamId = 0
 const teamBrowser = useInsightsTeams(session)
 const { teams: selectableTeams, selectedTeamId, loading: teamLoading, error: teamError } = teamBrowser
 const tactics = useInsightsTactics({ session, selectedTeamId, active: pageVisible })
@@ -86,12 +87,23 @@ onShareAppMessage(() => ({
   title: `${selectedTeamName.value || '球队'}战术，看看大家怎么排`,
   path: buildSharePath('/pages/insights-tactics/index', 'insights'),
 }))
+onLoad((query) => {
+  const parsed = parseLineupPageQuery(query as Record<string, unknown>)
+  if (parsed.teamId > 0) {
+    pendingTeamId = parsed.teamId
+  }
+})
 onReachBottom(() => { void tactics.more() })
 onHide(() => { pageVisible.value = false })
 onUnload(() => { tactics.dispose(); teamBrowser.dispose() })
 onShow(() => {
   pageVisible.value = true
-  void teamBrowser.load()
+  void teamBrowser.load().then(() => {
+    if (pendingTeamId > 0) {
+      teamBrowser.selectTeam(pendingTeamId)
+      pendingTeamId = 0
+    }
+  })
   void tactics.refresh()
   reportPageActivity('insights')
 })

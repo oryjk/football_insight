@@ -214,8 +214,8 @@
 		"pages/home/index": {
 			"network": "all",
 			"packages": [
-				"pages/lineup",
-				"pages/transfer"
+				"pages/insights-tactics",
+				"pages/insights-transfer"
 			]
 		}
 	},

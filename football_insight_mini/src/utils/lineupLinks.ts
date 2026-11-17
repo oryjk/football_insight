@@ -1,4 +1,10 @@
 /** 战术板页面路径：洞察页、首页等入口共用，页面之间不互相引用。 */
+export function buildTacticsEntryUrl(teamId?: number): string {
+  return teamId && Number.isInteger(teamId) && teamId > 0
+    ? `/pages/insights-tactics/index?teamId=${teamId}`
+    : '/pages/insights-tactics/index'
+}
+
 export function buildLineupPageUrl(teamId?: number, options: { autosave?: boolean; resumeAction?: 'draft' | 'publish' } = {}): string {
   const params: string[] = []
   if (teamId && teamId > 0) params.push(`teamId=${teamId}`)

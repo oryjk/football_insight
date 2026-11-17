@@ -2,8 +2,12 @@ import type { TransferBoard, TransferCandidates, TransferCardView, TransferCodeI
 import { request } from '../utils/request'
 
 // auth: true 表示"有 token 就带上"：游客也能读，登录后多返回 my_vote / can_vote。
-export function getTransferSummary(teamId: number): Promise<TransferSummary> {
-  return request({ url: `/transfers/teams/${teamId}/summary`, auth: true })
+export function getTransferSummary(teamId: number, options?: { silentNetworkError?: boolean }): Promise<TransferSummary> {
+  return request({
+    url: `/transfers/teams/${teamId}/summary`,
+    auth: true,
+    ...(options?.silentNetworkError ? { silentNetworkError: true } : {}),
+  })
 }
 export function getTransferBoard(teamId: number, intent: TransferIntent, page = 1): Promise<TransferBoard> {
   return request({ url: `/transfers/teams/${teamId}/board?intent=${intent}&page=${page}`, auth: true })

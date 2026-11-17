@@ -35,8 +35,11 @@ export function saveMyLineup(
 export function getTeamLineups(teamId: number, sort: LineupSort, page = 1, pageSize = 20): Promise<TeamLineups> {
   return request({ url: `/lineups/teams/${teamId}?sort=${sort}&page=${page}&page_size=${pageSize}`, auth: true })
 }
-export function getLineupConsensus(teamId: number): Promise<LineupConsensus> {
-  return request({ url: `/lineups/teams/${teamId}/consensus` })
+export function getLineupConsensus(teamId: number, options?: { silentNetworkError?: boolean }): Promise<LineupConsensus> {
+  return request({
+    url: `/lineups/teams/${teamId}/consensus`,
+    ...(options?.silentNetworkError ? { silentNetworkError: true } : {}),
+  })
 }
 export function getSharedLineup(code: string): Promise<PublicLineup> {
   return request({ url: `/lineups/shared/${encodeURIComponent(code)}`, auth: true })

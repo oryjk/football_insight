@@ -1122,3 +1122,23 @@ page {
   --fi-color-match-card-overlay: var(--fi-primitive-match-card-overlay);
   --fi-shadow-match-card: var(--fi-primitive-match-card-shadow);
 }
+
+/* 首页双列互动入口：排阵容（绿茵战术）与球员点赞（热议红白） */
+:root,
+page {
+  --fi-primitive-fan-entry-lineup-border: rgba(47, 125, 79, 0.16);
+  --fi-primitive-fan-entry-like-border: rgba(220, 38, 38, 0.16);
+  --fi-primitive-fan-entry-lineup-gradient: linear-gradient(150deg, #eef8f2 0%, #ffffff 76%);
+  --fi-primitive-fan-entry-like-gradient: linear-gradient(150deg, #fff1f0 0%, #ffffff 76%);
+  --fi-primitive-fan-entry-pitch-width: 84rpx;
+  --fi-primitive-fan-entry-pitch-height: 100rpx;
+  --fi-primitive-fan-entry-avatar-overlap: -12rpx;
+
+  --fi-color-fan-entry-lineup-border: var(--fi-primitive-fan-entry-lineup-border);
+  --fi-color-fan-entry-like-border: var(--fi-primitive-fan-entry-like-border);
+  --fi-gradient-fan-entry-lineup: var(--fi-primitive-fan-entry-lineup-gradient);
+  --fi-gradient-fan-entry-like: var(--fi-primitive-fan-entry-like-gradient);
+  --fi-space-fan-entry-pitch-width: var(--fi-primitive-fan-entry-pitch-width);
+  --fi-space-fan-entry-pitch-height: var(--fi-primitive-fan-entry-pitch-height);
+  --fi-space-fan-entry-avatar-overlap: var(--fi-primitive-fan-entry-avatar-overlap);
+}

@@ -2,8 +2,8 @@
   <view class="transfer-panel">
     <!-- 表态卡：先问用户怎么看，主按钮放在最上面；不是"转会投票"这种功能名。 -->
     <view class="transfer-panel__ask">
-      <text class="transfer-panel__question">{{ summary?.window && !summary.window.open ? '本期转会表态已结束' : '这个冬窗，你想送走谁、留下谁、买回谁？' }}</text>
-      <text class="transfer-panel__lead">{{ summary?.window && !summary.window.open ? '看看大家最后的结论' : '提名一位球员，或给大家的提名点赞成 / 反对' }}</text>
+      <text class="transfer-panel__question">{{ askQuestion }}</text>
+      <text class="transfer-panel__lead">{{ askLead }}</text>
       <view class="transfer-panel__ask-foot">
         <text v-if="summary?.window" class="transfer-panel__status">{{ summary.window.name }} · {{ summary.window.open ? '表态中' : '已结束' }}</text>
         <button v-if="summary?.window?.open" class="transfer-panel__action transfer-panel__action--primary" hover-class="transfer-panel__action--pressed" @tap="emit('nominate')">我要提名</button>
@@ -19,7 +19,7 @@
     </view>
     <text v-else-if="summary && !summary.window" class="transfer-panel__state">暂无转会投票</text>
     <template v-else-if="summary">
-      <view v-for="board in summary.boards" :key="board.intent" class="transfer-panel__board">
+      <view v-for="board in orderedBoards" :key="board.intent" class="transfer-panel__board">
         <!-- 标题行只展示，不可点：原先整行可点且"查看全部"压在第一张卡的赞踩胶囊正上方，容易误点。 -->
         <view class="transfer-panel__board-head">
           <text class="transfer-panel__board-title">{{ TRANSFER_BOARD_LABELS[board.intent] }}<text v-if="board.total" class="transfer-panel__count">{{ board.total }} 张提名</text></text>
@@ -37,16 +37,33 @@
   </view>
 </template>
 <script setup lang="ts">
+import { computed } from 'vue'
 import FiTransferCard from '../../../components/FiTransferCard.vue'
 import type { TransferCard, TransferIntent, TransferSummary } from '../../../types/transfer'
-import { TRANSFER_BOARD_LABELS } from '../../../utils/transferLinks'
-defineProps<{ summary: TransferSummary | null; loading: boolean; error: string; hint: string; pending: string[] }>()
+import { TRANSFER_BOARD_LABELS, orderTransferBoards } from '../../../utils/transferLinks'
+const props = withDefaults(defineProps<{ summary: TransferSummary | null; loading: boolean; error: string; hint: string; pending: string[]; preferredIntent?: TransferIntent }>(), {
+  preferredIntent: 'out',
+})
 const emit = defineEmits<{
   (e: 'retry' | 'nominate'): void
   (e: 'vote', card: TransferCard, value: 1 | -1): void
   (e: 'open', code: string): void
   (e: 'more', intent: TransferIntent): void
 }>()
+const closed = computed(() => Boolean(props.summary?.window && !props.summary.window.open))
+const askQuestion = computed(() => {
+  if (closed.value) return '本期转会表态已结束'
+  return props.preferredIntent === 'stay'
+    ? '给喜欢的球员点个赞，也说说你想留下谁'
+    : '这个冬窗，你想送走谁、留下谁、买回谁？'
+})
+const askLead = computed(() => {
+  if (closed.value) return '看看大家最后的结论'
+  return props.preferredIntent === 'stay'
+    ? '支持你喜欢的球员，或提名球员让大家点赞 / 表态'
+    : '提名一位球员，或给大家的提名点赞成 / 反对'
+})
+const orderedBoards = computed(() => orderTransferBoards(props.summary?.boards ?? [], props.preferredIntent))
 </script>
 <style scoped>
 @import '../../../styles/fi-skeleton.css';

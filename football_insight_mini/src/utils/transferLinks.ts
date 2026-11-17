@@ -1,4 +1,4 @@
-import type { TransferCard, TransferIntent, TransferPlayer, TransferTally } from '../types/transfer'
+import type { TransferBoardSlice, TransferCard, TransferIntent, TransferPlayer, TransferTally } from '../types/transfer'
 
 /** 转会投票页面路径与文案：洞察页、首页、分包页面共用，页面之间不互相引用。 */
 export const TRANSFER_INTENTS: TransferIntent[] = ['out', 'stay', 'in']
@@ -12,6 +12,20 @@ export function validTransferCode(code: unknown): code is string {
 }
 function parseIntent(value: unknown): TransferIntent {
   return value === 'stay' || value === 'in' ? value : 'out'
+}
+
+export function buildTransferEntryUrl(intent?: TransferIntent): string {
+  return intent ? `/pages/insights-transfer/index?intent=${intent}` : '/pages/insights-transfer/index'
+}
+
+export function parseTransferEntryQuery(query: Record<string, unknown> | undefined): { intent: TransferIntent } {
+  return { intent: parseIntent(query?.intent) }
+}
+
+export function orderTransferBoards(boards: TransferBoardSlice[], preferredIntent: TransferIntent = 'out'): TransferBoardSlice[] {
+  if (preferredIntent === 'out' || boards.length <= 1) return boards
+  const order: TransferIntent[] = preferredIntent === 'stay' ? ['stay', 'in', 'out'] : ['in', 'stay', 'out']
+  return [...boards].sort((left, right) => order.indexOf(left.intent) - order.indexOf(right.intent))
 }
 
 export function buildTransferBoardUrl(teamId: number, intent: TransferIntent = 'out', options: { nominate?: boolean } = {}): string {

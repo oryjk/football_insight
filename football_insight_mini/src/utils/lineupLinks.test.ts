@@ -1,5 +1,13 @@
 import { describe, expect, test } from 'bun:test'
-import { buildLineupPageUrl, parseLineupPageQuery, buildLineupViewUrl, parseLineupShareCode, buildLineupListUrl, parseLineupListQuery } from './lineupLinks'
+import { buildLineupPageUrl, buildTacticsEntryUrl, parseLineupPageQuery, buildLineupViewUrl, parseLineupShareCode, buildLineupListUrl, parseLineupListQuery } from './lineupLinks'
+
+describe('buildTacticsEntryUrl', () => {
+  test('includes valid teamId and omits zero or invalid ids', () => {
+    expect(buildTacticsEntryUrl(77680)).toBe('/pages/insights-tactics/index?teamId=77680')
+    expect(buildTacticsEntryUrl(0)).toBe('/pages/insights-tactics/index')
+    expect(buildTacticsEntryUrl()).toBe('/pages/insights-tactics/index')
+  })
+})
 
 describe('buildLineupPageUrl', () => {
   test('adds teamId only when there is one', () => {

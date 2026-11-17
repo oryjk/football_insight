@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import type { TransferCard } from '../types/transfer'
+import type { TransferBoardSlice, TransferCard } from '../types/transfer'
 import {
-  applyTally, buildTransferBoardUrl, buildTransferViewUrl, parseTransferBoardQuery, parseTransferCode,
+  applyTally, buildTransferBoardUrl, buildTransferEntryUrl, buildTransferViewUrl, orderTransferBoards,
+  parseTransferBoardQuery, parseTransferCode, parseTransferEntryQuery,
   positionLabel, transferBoardShareTitle, transferCardShareTitle, transferStance, validTransferCode,
 } from './transferLinks'
 
@@ -83,4 +84,25 @@ test('scene_parsing_accepts_only_transfer_cards', async () => {
   expect(parseTransferCode({ scene: encodeURIComponent('s=share&c=transfer&t=bad') })).toBe('')
   expect(parseTransferCode({ scene: '%E0%A4%A' })).toBe('')
   expect(parseTransferCode({ code: 'ABCD1234', scene: 'whatever' })).toBe('ABCD1234')
+})
+
+describe('transfer entry links and board ordering', () => {
+  test('builds and parses preferred entry intent', () => {
+    expect(buildTransferEntryUrl('stay')).toBe('/pages/insights-transfer/index?intent=stay')
+    expect(buildTransferEntryUrl()).toBe('/pages/insights-transfer/index')
+    expect(parseTransferEntryQuery({ intent: 'stay' })).toEqual({ intent: 'stay' })
+    expect(parseTransferEntryQuery({ intent: 'bad' })).toEqual({ intent: 'out' })
+    expect(parseTransferEntryQuery(undefined)).toEqual({ intent: 'out' })
+  })
+
+  test('orders stay board first when entered from player likes entry', () => {
+    const boards: TransferBoardSlice[] = [
+      { intent: 'out', total: 2, items: [] },
+      { intent: 'stay', total: 3, items: [] },
+      { intent: 'in', total: 1, items: [] },
+    ]
+    expect(orderTransferBoards(boards, 'out').map(b => b.intent)).toEqual(['out', 'stay', 'in'])
+    expect(orderTransferBoards(boards, 'stay').map(b => b.intent)).toEqual(['stay', 'in', 'out'])
+    expect(orderTransferBoards(boards, 'in').map(b => b.intent)).toEqual(['in', 'stay', 'out'])
+  })
 })

@@ -51,6 +51,12 @@
           @select-team="openFavoriteTeamSheet"
           @open-match="openSupportMatch"
           @vote="handleHomeSupportVote"
+        />
+
+        <HomeFanEntries
+          :team-name="fanEntriesTeam.teamName"
+          :consensus="fanLineupConsensus"
+          :transfer-summary="fanTransferSummary"
           @open-lineup="openLineupBoard"
           @open-transfer="openTransferBoard"
         />
@@ -134,6 +140,7 @@ import FiLoginFloat from '../../components/FiLoginFloat.vue'
 import HomeDailyTopics from './components/HomeDailyTopics.vue'
 import FiTopicAudioPlayer from '../../components/topics/FiTopicAudioPlayer.vue'
 import HomeSupportPanel from './components/HomeSupportPanel.vue'
+import HomeFanEntries from './components/HomeFanEntries.vue'
 import HomeSkeleton from './components/HomeSkeleton.vue'
 import FiLaunchSplash from '../../components/FiLaunchSplash.vue'
 import { useLaunchSplash } from '../../composables/useLaunchSplash'
@@ -156,8 +163,8 @@ import type {
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
-import { buildLineupPageUrl } from '../../utils/lineupLinks'
-import { buildTransferBoardUrl } from '../../utils/transferLinks'
+import { buildTacticsEntryUrl } from '../../utils/lineupLinks'
+import { buildTransferEntryUrl } from '../../utils/transferLinks'
 import { useRuntimeConfig } from '../../stores/runtimeConfig'
 import { buildHeadlineTitleParts } from '../../utils/homeViewText'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
@@ -180,6 +187,7 @@ import { createHomeSessionSync } from './sessionEffects'
 import { useHomeMatchClock } from './useHomeMatchClock'
 import { useHomeSupportData } from './useHomeSupportData'
 import { useHomeTicketSale } from './useHomeTicketSale'
+import { useHomeFanEntries } from './useHomeFanEntries'
 import { useHomeDailyTopics } from './useHomeDailyTopics'
 import { useDailyTopicAudio } from '../../composables/useDailyTopicAudio'
 import { topicDetailUrl } from './dailyTopics'
@@ -233,6 +241,16 @@ const {
 const { saleStartAt: ticketSaleStartAt, loadTicketSaleMatches } = useHomeTicketSale(
   computed(() => supportProfile.value?.next_match ?? null),
 )
+const {
+  resolvedTeam: fanEntriesTeam,
+  consensus: fanLineupConsensus,
+  transferSummary: fanTransferSummary,
+  refresh: refreshFanEntries,
+} = useHomeFanEntries({
+  session,
+  supportProfile,
+  supportLoading,
+})
 // 比赛当天或开票当天首页显示时分秒倒计时，此时按秒刷新时钟；其余时间每分钟刷新即可。
 const homeMatchNow = useHomeMatchClock(
   (now) => resolveHomeSupportMatchCountdownClock(supportProfile.value?.next_match ?? null, now) !== null
@@ -522,17 +540,18 @@ async function handleHomeSupportVote(teamId: number) {
 }
 
 function openLineupBoard() {
-  uni.navigateTo({ url: buildLineupPageUrl(supportFavoriteTeam.value?.team_id) })
+  uni.navigateTo({ url: buildTacticsEntryUrl(fanEntriesTeam.value.teamId) })
 }
 
 function openTransferBoard() {
-  uni.navigateTo({ url: buildTransferBoardUrl(supportFavoriteTeam.value?.team_id ?? 0) })
+  uni.navigateTo({ url: buildTransferEntryUrl('stay') })
 }
 
 onShow(() => {
   reportPageActivity('home')
   const pending = [loadPage(), loadDailyTopics(), loadSupportData()]
   void loadTicketSaleMatches()
+  void refreshFanEntries()
   if (!homeInitialSettled.value) {
     void Promise.allSettled(pending).then(() => { homeInitialSettled.value = true })
   }

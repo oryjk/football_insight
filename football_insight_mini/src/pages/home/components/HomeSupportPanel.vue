@@ -143,28 +143,6 @@
         {{ favoriteTeam.team_name }} 当前还没有可展示的下一场助力比赛，等赛程刷新后这里会自动出现。
       </text>
     </template>
-
-    <!-- 排阵容同样围绕主队，收进本面板底部；加载/出错时不显示。 -->
-    <view
-      v-if="!showLoading && !errorMessage"
-      class="support-home-panel__lineup"
-      hover-class="support-home-panel__lineup--pressed"
-      @click="emit('open-lineup')"
-    >
-      <text class="support-home-panel__lineup-title">你心中的最佳 11 人</text>
-      <text class="support-home-panel__lineup-action">去排阵 ›</text>
-    </view>
-
-    <!-- 转会投票同样围绕主队，第二行入口；加载/出错时不显示。 -->
-    <view
-      v-if="!showLoading && !errorMessage"
-      class="support-home-panel__lineup support-home-panel__lineup--follow"
-      hover-class="support-home-panel__lineup--pressed"
-      @click="emit('open-transfer')"
-    >
-      <text class="support-home-panel__lineup-title">这个冬窗，送走谁？</text>
-      <text class="support-home-panel__lineup-action">去表态 ›</text>
-    </view>
   </FiPanel>
 </template>
 
@@ -205,8 +183,6 @@ const emit = defineEmits<{
   (e: 'select-team'): void
   (e: 'open-match'): void
   (e: 'vote', teamId: number): void
-  (e: 'open-lineup'): void
-  (e: 'open-transfer'): void
 }>()
 
 const favoriteTeam = computed(() => props.profile?.favorite_team ?? null)
@@ -561,39 +537,6 @@ const awayRankLabel = computed(() => {
   justify-content: space-between;
   color: var(--fi-color-text-muted);
   font-size: var(--fi-font-22);
-}
-.support-home-panel__lineup {
-  position: relative;
-  z-index: 1;
-  margin-top: var(--fi-space-22);
-  padding-top: var(--fi-space-20);
-  border-top: var(--fi-border-card);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--fi-space-16);
-}
-.support-home-panel__lineup--pressed { opacity: var(--fi-opacity-pressed); }
-/* 转会投票是第二行入口，跟在排阵容后面，不再重复分割线与上内边距。 */
-.support-home-panel__lineup--follow {
-  margin-top: var(--fi-space-16);
-  padding-top: 0;
-  border-top: 0;
-}
-.support-home-panel__lineup-title {
-  min-width: 0;
-  color: var(--fi-color-text-strong);
-  font-size: var(--fi-font-26);
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.support-home-panel__lineup-action {
-  flex-shrink: 0;
-  color: var(--fi-color-text-secondary);
-  font-size: var(--fi-font-24);
-  font-weight: 700;
 }
 .support-home-match-card__action {
   color: var(--fi-color-primary);
