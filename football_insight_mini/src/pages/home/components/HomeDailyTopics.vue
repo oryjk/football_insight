@@ -1,13 +1,11 @@
 <template>
   <view class="daily-topics">
     <view class="daily-topics__heading">
-      <view class="daily-topics__heading-copy">
-        <view class="daily-topics__title-row">
-          <text class="daily-topics__title">每日电报</text>
-          <text class="daily-topics__date">{{ edition.dateLabel }}</text>
-        </view>
-      </view>
-      <button v-if="edition.items.length" class="daily-topics__all" @tap="emit('more')">全部话题 ›</button>
+      <text class="daily-topics__title">每日电报</text>
+      <button v-if="edition.items.length" class="daily-topics__all" @tap="emit('more')">
+        <text class="daily-topics__all-text">全部话题</text>
+        <image class="daily-topics__all-icon" :src="chevronRightSecondaryIcon" mode="aspectFit" aria-hidden="true" />
+      </button>
     </view>
     <view v-if="loading && !edition.items.length" class="daily-topics__state">
       <text class="daily-topics__state-title">正在加载最新话题</text>
@@ -37,6 +35,7 @@
 <script setup lang="ts">
 import { topicHeatValue } from '../../../stores/topicHeat'
 import { computed, ref, watch } from 'vue'
+import chevronRightSecondaryIcon from '../../../static/home/chevron-right-secondary.svg'
 import HomeDailyTopicCard from './HomeDailyTopicCard.vue'
 import { lastSlideOverscroll } from '../dailyTopics'
 import type { DailyTopicEdition } from '../../../types/dailyTopic'
@@ -74,12 +73,11 @@ watch(() => props.edition.items.length, length => { if (activeIndex.value >= len
 .daily-topics { min-width: 0; padding: var(--fi-space-24) var(--fi-space-20) var(--fi-space-20); border-radius: var(--fi-radius-xl); background: var(--fi-color-page-soft); }
 .daily-topics__heading { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-12); margin-bottom: var(--fi-space-16); }
 .daily-topics__refresh-error { color: var(--fi-color-text-secondary); font-size: var(--fi-font-22); margin-bottom: var(--fi-space-16); }
-.daily-topics__heading-copy { min-width: 0; }
-.daily-topics__title-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--fi-space-16); }
 .daily-topics__title { color: var(--fi-color-text-primary); font-size: var(--fi-component-title-size); font-weight: var(--fi-component-title-weight); line-height: var(--fi-component-title-leading); }
-.daily-topics__date { color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); }
-.daily-topics__all { margin: 0; padding: var(--fi-space-8) 0 var(--fi-space-8) var(--fi-space-16); background: transparent; color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); line-height: var(--fi-leading-normal); flex-shrink: 0; }
+.daily-topics__all { display: inline-flex; align-items: center; margin: 0; padding: var(--fi-space-8) 0 var(--fi-space-8) var(--fi-space-16); background: transparent; color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); line-height: var(--fi-leading-none); flex-shrink: 0; }
 .daily-topics__all::after { border: 0; }
+.daily-topics__all-text { line-height: var(--fi-leading-none); }
+.daily-topics__all-icon { display: block; flex-shrink: 0; width: var(--fi-space-36); height: var(--fi-space-36); }
 .daily-topics__swiper--rebound { transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1); }
 .daily-topics__swiper { height: calc(var(--fi-space-topic-card-height) + var(--fi-space-12)); }
 .daily-topics__slide { box-sizing: border-box; height: 100%; padding-bottom: var(--fi-space-12); padding-right: var(--fi-space-card-gap); display: flex; flex-direction: column; align-items: stretch; }
