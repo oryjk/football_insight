@@ -57,6 +57,7 @@
           class="composer__textarea"
           :class="{ 'composer__textarea--expanded': isExpanded }"
           :placeholder="inputPlaceholder"
+          :placeholder-class="isExpanded ? 'composer__placeholder composer__placeholder--expanded' : 'composer__placeholder'"
           @input="handleInput"
           @focus="handleFocus"
           @blur="handleBlur"
@@ -401,5 +402,17 @@ function handleSendTap(): void {
 
 .composer__pressed {
   opacity: var(--fi-opacity-pressed);
+}
+</style>
+
+<style>
+.composer__placeholder {
+  font-size: var(--fi-font-26);
+  line-height: var(--fi-leading-snug);
+}
+
+.composer__placeholder--expanded {
+  font-size: var(--fi-font-28);
+  line-height: var(--fi-leading-normal);
 }
 </style>
