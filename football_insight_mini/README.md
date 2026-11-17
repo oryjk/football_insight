@@ -127,9 +127,11 @@ bun run dev:mp-weixin:sync
 微信开发者工具仍打开本机的 `football_insight_mini/dist/dev/mp-weixin`，开启「文件修改时自动编译小程序」。命令启动开发编译并立即检查远端，之后默认每 10 秒检查一次；小程序目录变化时先停编译、快进更新，再启动编译，避免拉取过程中的中间状态被编译。修改检查间隔：
 
 ```bash
-bun run dev:mp-weixin:sync --interval 5
-# 或 MINI_SYNC_INTERVAL_SECONDS=5 bun run dev:mp-weixin:sync
+bun run dev:mp-weixin:sync --interval 3
+# 或 MINI_SYNC_INTERVAL_SECONDS=3 bun run dev:mp-weixin:sync
 ```
+
+> 建议：高频小改预览可用 `--interval 3` 缩短等待；服务端/AI 侧在 `type-check`（及必要单测）通过后会先立即 `commit + push` 再执行 `mp:release`，开发者工具无需等待体验版打包上传结束即可先拉取新代码。
 
 - 跟踪本机**当前分支的远端上游**（如 `main → origin/main`），不绑定 Mac、local233 或固定仓库路径。其他电脑安装 Git、Bun 和微信开发者工具、配置好 Git 拉取认证后，同样可以运行。分支尚无上游时，先执行 `git branch --set-upstream-to=origin/main main`（按实际分支调整）。
 - 同步的是整个 monorepo；仅小程序目录变化会重启编译。`package.json` / `bun.lock` / `bun.lockb` 变化时自动执行 `bun install --frozen-lockfile`；安装失败暂停编译并重试。

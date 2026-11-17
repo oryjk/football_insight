@@ -94,6 +94,9 @@
 ## 开发约定
 
 - 日常开发不需要新建或切换特性分支，默认直接在 `main` 分支上进行开发；若改动包含数据库迁移（`migrations/*.sql`），提交推送前必须先执行 `cd football_insight_service_backend_rs && cargo run --bin run_migrations` 完成迁移并验证；每次修改完成并通过相应验证后，默认直接在 `main` 提交并推送（`git push`），不要只停留在本地提交（用户明确要求切分支或暂不推送时除外）。每次修改小程序（`football_insight_mini`）提交推送后，默认执行 `bun run mp:release -- --robot 2 --desc "本次变更说明"` 上传体验版小程序（用户明确要求暂不上传时除外）；后端生产部署仍按用户指令执行。
+- 小程序（`football_insight_mini`）遵循「**轻量必要校验 → 立即 `commit + push` → 再上传体验版（及按需 `build:h5`）**」的节奏，避免重复构建卡住开发者工具通过 `dev:mp-weixin:sync` 拉取代码：
+  - `git push` 前仅执行 `bun run type-check` 与 `bun run check:boundaries`（纯 UI/文案/样式微调不补测试；涉及逻辑、状态、路由或接口改动时补跑相关 `bun test`），**不在 `push` 前预先运行 `MINI_REVIEW_SKIP=1 bun run build:mp-weixin` 和 `bun run build:h5`**（仅当新增分包页面/自定义组件引用需要确认编译注册时例外先跑 `build:mp-weixin`）。
+  - 通过后立即 `commit + push` 到 `origin/main`，然后再运行 `bun run mp:release -- --robot 2 --desc "本次变更说明"`（内部会自动执行边界检查、生产构建与组件注册检查并上传）；涉及跨端通用组件或 H5 时在 `push` 后验证 `bun run build:h5`。
 - local233 后端统一用 `cargo run --bin football_insight_service_backend_rs`，固定端口 `18092`。常驻开发服务 `football-insight-local-backend.service` 由用户级 systemd 托管该命令；仓库根目录 `./deploy/local-test/up.sh` 先编译再重启，`down.sh` 停止后端与 Redis。前台调试先停止该用户服务；开发启动不自动执行数据库迁移。小程序、H5 和 Web 后台统一连接 `172.16.60.233:18092`，不再另建 18095 验证实例。生产 peiqian 仍按现有 Docker 约定部署。
 - 安卓管理端 `football_insight_admin_android` 暂停迭代更新。后端、Web 后台、小程序和 H5 的开发不默认同步修改、构建或发布安卓项目；保留现有安卓代码。仅在用户明确要求安卓相关改动或恢复安卓迭代时再开展对应工作。
 - 前端必须使用 `bun`

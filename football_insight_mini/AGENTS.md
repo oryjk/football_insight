@@ -129,7 +129,7 @@ src/pages/<domain>/
 
 - 不按 TDD 开发前端；页面、样式、交互、UI 调整以 `bun run type-check`、构建和模拟器/人工验证为准，**不机械新增测试**。
 - 只有涉及路由、接口调用、数据提交、权限、共享工具函数或关键业务状态变化时，才按风险补必要测试（现有 `helpers.test.ts` 模式保留）。
-- 提交前至少 `bun run type-check`；涉及页面流程或路由时补跑 `bun run build:mp-weixin`。
+- `git push` 前至少执行 `bun run type-check` 与 `bun run check:boundaries`（涉及逻辑、状态、路由或接口时补跑相关 `bun test`），通过后**立刻 `commit + push`**，不要在 `push` 前重复运行 `MINI_REVIEW_SKIP=1 bun run build:mp-weixin` 或 `bun run build:h5`，以免拖慢本机 `dev:mp-weixin:sync` 拉取预览。随后执行的 `bun run mp:release -- --robot 2` 会自行完成边界检查、生产构建与组件注册检查；涉及跨端 UI 或 H5 时在 `push` 后再跑 `bun run build:h5`。仅当新增页面/组件或调整分包结构需要提前确认编译结构时，才在 `push` 前先跑 `MINI_REVIEW_SKIP=1 bun run build:mp-weixin`。
 
 ## 小程序弹框滚动锁
 
