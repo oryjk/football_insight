@@ -64,27 +64,36 @@
     @update:visible="profileSheetVisible = $event"
     @submit="page.saveProfileAndContinue"
   />
+  <canvas :canvas-id="TELEGRAPH_ENTRY_SHARE_CANVAS_ID" class="entry-share-canvas" :style="shareCanvasStyle" />
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { onLoad, onPullDownRefresh, onReachBottom, onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
 import FiProfileSetupSheet from '../../components/FiProfileSetupSheet.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { useAppSession } from '../../stores/appSession'
 import { useMiniReviewStatus } from '../../stores/miniReview'
-import { isTopicSourceUrl, roundupDayLabel, telegraphEntryUrl } from '../../utils/dailyTopics'
+import { isTopicSourceUrl, roundupDayLabel } from '../../utils/dailyTopics'
 import { editableNicknameInitialValue } from '../../utils/profileGate'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
-import { buildSharePath } from '../../utils/shareSource'
+import {
+  buildTelegraphEntrySharePayload,
+  buildTelegraphEntryTimelinePayload,
+  TELEGRAPH_SHARE_CARD,
+} from '../../utils/telegraphShareCard'
 import TelegraphEntryComposer from './components/TelegraphEntryComposer.vue'
 import TelegraphEntryTimeline from './components/TelegraphEntryTimeline.vue'
 import { useTelegraphEntryPage } from './useTelegraphEntryPage'
+import { TELEGRAPH_ENTRY_SHARE_CANVAS_ID, useTelegraphEntryShareCard } from './useTelegraphEntryShareCard'
 
 const { navigationPageStyle } = useNavigationLayout()
 const session = useAppSession()
 const miniReview = useMiniReviewStatus()
+const shareCard = useTelegraphEntryShareCard()
+// 分享图按实际像素绘制，与页面布局的 rpx 无关。
+const shareCanvasStyle = { width: `${TELEGRAPH_SHARE_CARD.width}px`, height: `${TELEGRAPH_SHARE_CARD.height}px` }
 
 let topicId = ''
 let entryId = ''
@@ -144,19 +153,27 @@ function goBack(): void {
   goBackFromSecondaryPage()
 }
 
-function sharePath(): string {
-  return topicId && entryId
-    ? buildSharePath(telegraphEntryUrl(topicId, entryId), 'telegraph_entry')
-    : '/pages/home/index'
+function copyShareLink(): void {
+  copyPageShareLink(
+    buildTelegraphEntrySharePayload({ topicId, entryId, entry: entry.value }).path,
+  )
 }
 
-function copyShareLink(): void {
-  copyPageShareLink(sharePath())
-}
+watch(
+  [entry, () => topic.value?.publishedAt, commentsVisible],
+  ([currentEntry, publishedAt, visible]) => {
+    if (currentEntry) {
+      void shareCard.prepare(currentEntry, { publishedAt, commentsVisible: visible })
+    } else {
+      shareCard.reset()
+    }
+  },
+)
 
 onLoad((query) => {
   topicId = typeof query?.topicId === 'string' ? decodeURIComponent(query.topicId) : ''
   entryId = typeof query?.entryId === 'string' ? decodeURIComponent(query.entryId) : ''
+  shareCard.reset()
   const focus = query?.focus === '1'
   lastSessionRevision = session.revision.value
   void miniReview.ensureMiniReviewReady()
@@ -183,18 +200,45 @@ onReachBottom(() => {
   }
 })
 
-onShareAppMessage(() => ({
-  title: entry.value ? `【${entry.value.title}】${entry.value.text.slice(0, 26)}` : '每日电报 · 足球洞察',
-  path: sharePath(),
-}))
+onShareAppMessage(() => {
+  const currentEntry = entry.value
+  const options = { publishedAt: topic.value?.publishedAt, commentsVisible: commentsVisible.value }
+  const fallback = buildTelegraphEntrySharePayload({
+    topicId,
+    entryId,
+    entry: currentEntry,
+    imageUrl: shareCard.imageUrl.value,
+  })
+  if (!currentEntry || shareCard.imageUrl.value) return fallback
+  return {
+    ...fallback,
+    promise: shareCard.prepare(currentEntry, options).then(imageUrl =>
+      buildTelegraphEntrySharePayload({
+        topicId,
+        entryId,
+        entry: currentEntry,
+        imageUrl,
+      }),
+    ),
+  }
+})
 
-onShareTimeline(() => ({
-  title: entry.value ? `每日电报 · ${entry.value.title}` : '每日电报 · 足球洞察',
-  query: topicId && entryId ? `topicId=${encodeURIComponent(topicId)}&entryId=${encodeURIComponent(entryId)}` : '',
+onShareTimeline(() => buildTelegraphEntryTimelinePayload({
+  topicId,
+  entryId,
+  entry: entry.value,
+  imageUrl: shareCard.imageUrl.value,
 }))
 </script>
 
 <style scoped>
+.entry-share-canvas {
+  position: fixed;
+  left: -9999rpx;
+  top: 0;
+  pointer-events: none;
+}
+
 .entry-page-offset {
   padding-top: var(--fi-brand-nav-height);
   min-height: 100vh;

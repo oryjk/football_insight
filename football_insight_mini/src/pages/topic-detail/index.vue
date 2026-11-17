@@ -157,6 +157,7 @@ async function refreshViewerState() {
     const latest = mapTopicDetail(await getTopicDetail(DAILY_TOPICS_TEAM_ID, topicId))
     if (latest.id === topicId && current === revision) {
       item.value = latest
+      void shareCard.prepare(latest)
     }
   } catch {
     // Silent refresh on session switch never interrupts reading.
