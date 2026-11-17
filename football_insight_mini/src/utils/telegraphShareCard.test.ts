@@ -137,9 +137,11 @@ describe('telegraphShareCard drawing', () => {
     expect(joinedText.includes('大连英博外援斯坦丘已承诺加盟克卢日大学')).toBe(true)
     expect(lineText.includes('赞同 ')).toBe(true)
     expect(lineText.includes('12')).toBe(true)
-    expect(lineText.includes('评论 ')).toBe(true)
+    expect(lineText.includes(' · 评论 ')).toBe(true)
     expect(lineText.includes('6')).toBe(true)
-    expect(lineText.includes('看详情热议')).toBe(true)
+    expect(lineText.includes('看热议')).toBe(true)
+    expect(texts.some(item => item.size >= 58)).toBe(true)
+    expect(texts.some(item => item.size === 44)).toBe(true)
 
     // 明确约束：去掉底部来源，不绘制任何媒体来源信息。
     expect(joinedText.includes('来源')).toBe(false)
@@ -156,7 +158,7 @@ describe('telegraphShareCard drawing', () => {
     drawTelegraphEntryShareCard(context, sampleEntry({ commentsCount: 8, likesCount: 5 }), { commentsVisible: false })
 
     const allText = texts.map(item => item.text).join('')
-    expect(allText.includes('查看详情')).toBe(true)
+    expect(allText.includes('看详情')).toBe(true)
     expect(allText.includes('5')).toBe(true)
     expect(allText.includes('人赞同')).toBe(true)
     expect(allText.includes('评论')).toBe(false)
@@ -169,7 +171,7 @@ describe('telegraphShareCard drawing', () => {
     const { context, texts } = createRecordingCanvasContext()
     drawTelegraphEntryShareCard(context, sampleEntry({ likesCount: 0, commentsCount: 0 }), { commentsVisible: true })
     const allText = texts.map(item => item.text).join('')
-    expect(allText.includes('足坛即时快讯 · 进来聊聊你的看法')).toBe(true)
+    expect(allText.includes('进来聊聊你的看法')).toBe(true)
   })
 
   test('roundup share card draws compact header, multi-line highlights, and no sources', () => {
@@ -186,20 +188,20 @@ describe('telegraphShareCard drawing', () => {
     expect(lineText.includes('每日电报')).toBe(true)
     expect(lineText.includes('11月17日')).toBe(true)
     expect(lineText.includes('周二')).toBe(true)
-    expect(lineText.includes(' 条足坛快讯')).toBe(true)
+    expect(lineText.includes(' 条快讯')).toBe(true)
     expect(lineText.includes('看全部 3 条')).toBe(true)
     expect(joinedText.includes('官方：成都蓉城确认主教练与教练组续约')).toBe(true)
-    expect(lineText.includes('今日重点速览 · 覆盖国内/国际/留洋')).toBe(true)
+    expect(lineText.includes('今日重点 · 国内/国际/留洋')).toBe(true)
 
     // 同样严格禁止绘制来源。
     expect(joinedText.includes('来源')).toBe(false)
     expect(joinedText.includes('直播吧')).toBe(false)
     expect(joinedText.includes('懂球帝')).toBe(false)
 
-    // 子卡片正文标题底线绝不侵入底栏分割线 (638)。
-    const subCardTexts = texts.filter(t => t.size === 33)
+    // 子卡片正文标题使用 42px 大字号且底线绝不侵入底栏分割线 (650)。
+    const subCardTexts = texts.filter(t => t.size === 42)
     expect(subCardTexts.length >= 3).toBe(true)
-    expect(subCardTexts.every(t => t.y < 620)).toBe(true)
+    expect(subCardTexts.every(t => t.y < 645)).toBe(true)
   })
 })
 

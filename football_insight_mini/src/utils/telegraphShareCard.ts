@@ -26,10 +26,10 @@ const PALETTE = {
   brandRed: '#dc2626',
   white: '#ffffff',
   headline: '#f8fafc',
-  body: '#b8c0cf',
-  subHeadline: '#cbd5e1',
-  muted: '#8b93a5',
-  caption: '#7f8798',
+  body: '#cbd5e1',
+  subHeadline: '#e2e8f0',
+  muted: '#94a3b8',
+  caption: '#8b93a5',
   gold: '#e9c477',
 } as const
 
@@ -248,10 +248,10 @@ function drawChevron(
   centerX: number,
   centerY: number,
   stroke: string,
-  size = 7,
+  size = 9,
 ): void {
   context.setStrokeStyle(stroke)
-  context.setLineWidth(3)
+  context.setLineWidth(3.5)
   context.setLineCap('round')
   context.setLineJoin('round')
   context.beginPath()
@@ -268,18 +268,18 @@ function drawCardShell(context: UniApp.CanvasContext, accentBarX: number): void 
 
   let fill: string | CanvasGradient = PALETTE.cardFallback
   if (typeof context.createLinearGradient === 'function') {
-    const gradient = context.createLinearGradient(0, 28, 0, height - 28)
+    const gradient = context.createLinearGradient(0, 16, 0, height - 16)
     gradient.addColorStop(0, PALETTE.cardTop)
     gradient.addColorStop(1, PALETTE.cardBottom)
     fill = gradient
   }
-  drawRoundCard(context, 28, 28, width - 56, height - 56, 36, fill, {
+  drawRoundCard(context, 16, 16, width - 32, height - 32, 32, fill, {
     color: PALETTE.cardBorder,
     lineWidth: 2,
   })
 
   // 顶部内侧品牌红微光装饰短线。
-  drawRoundCard(context, accentBarX, 28, 128, 5, 2, PALETTE.brandRed)
+  drawRoundCard(context, accentBarX, 16, 140, 6, 3, PALETTE.brandRed)
 }
 
 function drawPillBadge(
@@ -313,10 +313,10 @@ function drawPillBadge(
 
 function drawBrandMark(context: UniApp.CanvasContext, rightX: number, baselineY: number, centerY: number): number {
   const label = '足球洞察'
-  const labelWidth = measureText(context, label, 25, true)
+  const labelWidth = measureText(context, label, 30, true)
   const textX = rightX - labelWidth
-  drawTextLeft(context, label, textX, baselineY, 25, PALETTE.caption, true)
-  const dotRadius = 5
+  drawTextLeft(context, label, textX, baselineY, 30, PALETTE.caption, true)
+  const dotRadius = 6
   const dotCx = textX - 14 - dotRadius
   context.beginPath()
   context.arc(dotCx, centerY, dotRadius, 0, Math.PI * 2)
@@ -332,10 +332,10 @@ function drawCtaPill(
   centerY: number,
   label: string,
 ): number {
-  const fontSize = 27
-  const height = 62
-  const paddingLeft = 28
-  const chevronArea = 38
+  const fontSize = 34
+  const height = 72
+  const paddingLeft = 30
+  const chevronArea = 44
   const labelWidth = measureText(context, label, fontSize, true)
   const pillWidth = Math.ceil(paddingLeft + labelWidth + chevronArea)
   const pillX = rightX - pillWidth
@@ -344,7 +344,7 @@ function drawCtaPill(
   drawRoundCard(context, pillX, pillY, pillWidth, height, Math.floor(height / 2), PALETTE.brandRed)
   const baseline = pillY + Math.round((height + fontSize * 0.72) / 2)
   drawTextLeft(context, label, pillX + paddingLeft, baseline, fontSize, PALETTE.white, true)
-  drawChevron(context, rightX - 24, centerY, PALETTE.white, 7)
+  drawChevron(context, rightX - 28, centerY, PALETTE.white, 9)
   return pillX
 }
 
@@ -352,6 +352,7 @@ interface TextSegment {
   text: string
   color: string
   bold?: boolean
+  size?: number
 }
 
 function drawFooterSegments(
@@ -364,21 +365,23 @@ function drawFooterSegments(
 ): void {
   let cursor = startX
   for (const segment of segments) {
-    const width = measureText(context, segment.text, fontSize, Boolean(segment.bold))
+    const segSize = segment.size ?? fontSize
+    const segBold = Boolean(segment.bold)
+    const width = measureText(context, segment.text, segSize, segBold)
     if (cursor + width > maxRightX) {
       const remaining = maxRightX - cursor
-      if (remaining > fontSize * 1.5) {
+      if (remaining > segSize * 1.5) {
         const [clipped] = wrapShareCardText(
           segment.text,
-          sample => measureText(context, sample, fontSize, Boolean(segment.bold)),
+          sample => measureText(context, sample, segSize, segBold),
           remaining,
           1,
         )
-        if (clipped) drawTextLeft(context, clipped, cursor, baselineY, fontSize, segment.color, Boolean(segment.bold))
+        if (clipped) drawTextLeft(context, clipped, cursor, baselineY, segSize, segment.color, segBold)
       }
       break
     }
-    drawTextLeft(context, segment.text, cursor, baselineY, fontSize, segment.color, Boolean(segment.bold))
+    drawTextLeft(context, segment.text, cursor, baselineY, segSize, segment.color, segBold)
     cursor += width
   }
 }
@@ -389,33 +392,33 @@ function buildEntryFooterSegments(entry: DailyTopicEntry, commentsVisible: boole
   if (commentsVisible) {
     if (likes > 0 && comments > 0) {
       return [
-        { text: '赞同 ', color: PALETTE.muted },
-        { text: String(likes), color: PALETTE.gold, bold: true },
-        { text: '  ·  评论 ', color: PALETTE.muted },
-        { text: String(comments), color: PALETTE.gold, bold: true },
+        { text: '赞同 ', color: PALETTE.muted, bold: true },
+        { text: String(likes), color: PALETTE.gold, bold: true, size: 38 },
+        { text: ' · 评论 ', color: PALETTE.muted, bold: true },
+        { text: String(comments), color: PALETTE.gold, bold: true, size: 38 },
       ]
     }
     if (comments > 0) {
       return [
-        { text: String(comments), color: PALETTE.gold, bold: true },
-        { text: ' 条球迷看法 · 正在热议', color: PALETTE.muted },
+        { text: String(comments), color: PALETTE.gold, bold: true, size: 38 },
+        { text: ' 条球迷看法', color: PALETTE.muted, bold: true },
       ]
     }
     if (likes > 0) {
       return [
-        { text: String(likes), color: PALETTE.gold, bold: true },
-        { text: ' 位球迷赞同 · 聊聊看法', color: PALETTE.muted },
+        { text: String(likes), color: PALETTE.gold, bold: true, size: 38 },
+        { text: ' 位球迷赞同', color: PALETTE.muted, bold: true },
       ]
     }
-    return [{ text: '足坛即时快讯 · 进来聊聊你的看法', color: PALETTE.muted }]
+    return [{ text: '进来聊聊你的看法', color: PALETTE.muted, bold: true }]
   }
   if (likes > 0) {
     return [
-      { text: String(likes), color: PALETTE.gold, bold: true },
-      { text: ' 人赞同 · 足坛即时快讯', color: PALETTE.muted },
+      { text: String(likes), color: PALETTE.gold, bold: true, size: 38 },
+      { text: ' 人赞同 · 即时快讯', color: PALETTE.muted, bold: true },
     ]
   }
-  return [{ text: '足坛即时快讯 · 每日精选速递', color: PALETTE.muted }]
+  return [{ text: '足坛即时快讯速递', color: PALETTE.muted, bold: true }]
 }
 
 /**
@@ -426,7 +429,7 @@ export function drawTelegraphEntryShareCard(
   entry: DailyTopicEntry,
   options?: { publishedAt?: string; commentsVisible?: boolean },
 ): void {
-  const left = 76
+  const left = 52
   const right = TELEGRAPH_SHARE_CARD.width - left
   const contentWidth = right - left
   const commentsVisible = options?.commentsVisible !== false
@@ -434,14 +437,14 @@ export function drawTelegraphEntryShareCard(
   drawCardShell(context, left)
 
   // 眉栏：每日电报 + 分类胶囊 + 发布时间；右侧品牌。
-  const headerY = 74
-  const pillH = 48
-  const headerBaseline = headerY + Math.round((pillH + 25 * 0.72) / 2)
+  const headerY = 48
+  const pillH = 60
+  const headerBaseline = headerY + Math.round((pillH + 34 * 0.72) / 2)
   const headerCenterY = headerY + pillH / 2
 
   let cursorX = left
-  cursorX += drawPillBadge(context, cursorX, headerY, pillH, 22, '每日电报', 25, PALETTE.white, PALETTE.brandRed)
-  cursorX += 14
+  cursorX += drawPillBadge(context, cursorX, headerY, pillH, 26, '每日电报', 34, PALETTE.white, PALETTE.brandRed)
+  cursorX += 12
 
   const badge = CATEGORY_BADGES[entry.category]
   cursorX += drawPillBadge(
@@ -449,97 +452,107 @@ export function drawTelegraphEntryShareCard(
     cursorX,
     headerY,
     pillH,
-    22,
+    24,
     telegraphCategoryLabel(entry.category),
-    25,
+    34,
     badge.text,
     badge.bg,
     badge.border,
   )
-  cursorX += 18
+  cursorX += 16
 
   const brandLeftX = drawBrandMark(context, right, headerBaseline, headerCenterY)
   const timeText = formatEntryShareTime(entry)
-  const timeMaxWidth = brandLeftX - 18 - cursorX
+  const timeMaxWidth = brandLeftX - 16 - cursorX
   if (timeText && timeMaxWidth > 60) {
     const [clippedTime] = wrapShareCardText(
       timeText,
-      sample => measureText(context, sample, 25, false),
+      sample => measureText(context, sample, 32, true),
       timeMaxWidth,
       1,
     )
-    if (clippedTime) drawTextLeft(context, clippedTime, cursorX, headerBaseline, 25, PALETTE.muted)
+    if (clippedTime) drawTextLeft(context, clippedTime, cursorX, headerBaseline, 32, PALETTE.muted, true)
   }
 
-  // 主标题区：最多 3 行 50px 粗体；无重复正文时可放宽到 4 行。
+  // 主标题区：优先 66px 粗体排 <=2 行；超过 2 行时切到 58px 粗体最多 3 行（无摘要可到 4 行）。
   const cleanTitle = cleanTelegraphHeadline(entry.title) || entry.title.trim()
   const excerpt = cleanTelegraphExcerpt(entry.text, cleanTitle)
-  const titleMaxLines = excerpt ? 3 : 4
-  const titleLines = wrapShareCardText(
+  const probe66 = wrapShareCardText(
     cleanTitle,
-    sample => measureText(context, sample, 50, true),
+    sample => measureText(context, sample, 66, true),
     contentWidth,
-    titleMaxLines,
+    3,
   )
-  const titleStartY = 204
-  const titleLineHeight = 68
+  const useLargeTitle = probe66.length <= 2
+  const titleSize = useLargeTitle ? 66 : 58
+  const titleLineHeight = useLargeTitle ? 84 : 74
+  const titleStartY = useLargeTitle ? 198 : 190
+  const titleMaxLines = useLargeTitle ? 2 : excerpt ? 3 : 4
+  const titleLines = useLargeTitle
+    ? probe66
+    : wrapShareCardText(
+        cleanTitle,
+        sample => measureText(context, sample, titleSize, true),
+        contentWidth,
+        titleMaxLines,
+      )
   titleLines.forEach((line, index) => {
-    drawTextLeft(context, line, left, titleStartY + index * titleLineHeight, 50, PALETTE.headline, true)
+    drawTextLeft(context, line, left, titleStartY + index * titleLineHeight, titleSize, PALETTE.headline, true)
   })
 
-  // 正文摘要区：竖向分类色引述条 + 多行正文。
+  // 正文摘要区：竖向分类色引述条 + 44px 大字号正文。
   if (excerpt) {
     const titleLastBaseline = titleStartY + Math.max(0, titleLines.length - 1) * titleLineHeight
-    const excerptBaseY = titleLastBaseline + 64
-    const maxLinesByTitle = titleLines.length <= 1 ? 6 : titleLines.length === 2 ? 5 : 3
-    const maxLinesByBottom = Math.max(1, Math.floor((592 - excerptBaseY) / 52) + 1)
+    const excerptBaseY = titleLastBaseline + 78
+    const maxLinesByTitle = titleLines.length <= 1 ? 5 : titleLines.length === 2 ? 4 : 3
+    const maxLinesByBottom = Math.max(1, Math.floor((596 - excerptBaseY) / 62) + 1)
     const maxExcerptLines = Math.min(maxLinesByTitle, maxLinesByBottom)
-    const excerptX = left + 26
+    const excerptX = left + 28
     const excerptLines = wrapShareCardText(
       excerpt,
-      sample => measureText(context, sample, 34, false),
+      sample => measureText(context, sample, 44, false),
       right - excerptX,
       maxExcerptLines,
     )
     if (excerptLines.length) {
-      const barTop = excerptBaseY - 30
-      const barHeight = Math.max(36, (excerptLines.length - 1) * 52 + 34)
-      drawRoundCard(context, left, barTop, 6, barHeight, 3, badge.text)
+      const barTop = excerptBaseY - 38
+      const barHeight = Math.max(46, (excerptLines.length - 1) * 62 + 44)
+      drawRoundCard(context, left, barTop, 8, barHeight, 4, badge.text)
       excerptLines.forEach((line, index) => {
-        drawTextLeft(context, line, excerptX, excerptBaseY + index * 52, 34, PALETTE.body)
+        drawTextLeft(context, line, excerptX, excerptBaseY + index * 62, 44, PALETTE.body)
       })
     }
   }
 
   // 底栏：分割线 + 左侧互动热度 + 右侧行动胶囊（不画来源）。
   context.setFillStyle(PALETTE.divider)
-  context.fillRect(left, 638, contentWidth, 1)
+  context.fillRect(left, 636, contentWidth, 1)
 
-  const footerCenterY = 704
-  const footerBaseline = footerCenterY + 10
-  const ctaLeftX = drawCtaPill(context, right, footerCenterY, commentsVisible ? '看详情热议' : '查看详情')
+  const footerCenterY = 710
+  const footerBaseline = footerCenterY + 12
+  const ctaLeftX = drawCtaPill(context, right, footerCenterY, commentsVisible ? '看热议' : '看详情')
   const segments = buildEntryFooterSegments(entry, commentsVisible)
-  drawFooterSegments(context, left, ctaLeftX - 24, footerBaseline, 27, segments)
+  drawFooterSegments(context, left, ctaLeftX - 24, footerBaseline, 34, segments)
 }
 
 /**
  * 整期《每日电报》汇总 5:4 微信分享卡（方案 A：黑金快讯风，不绘制任何来源信息）。
  */
 export function drawRoundupShareCard(context: UniApp.CanvasContext, item: DailyTopicItem): void {
-  const left = 68
+  const left = 52
   const right = TELEGRAPH_SHARE_CARD.width - left
   const contentWidth = right - left
 
   drawCardShell(context, left)
 
   // 第 1 行报头：每日电报红胶囊 + 分类计数胶囊 + 右侧品牌。
-  const row1Y = 62
-  const row1H = 44
-  const row1Baseline = row1Y + Math.round((row1H + 24 * 0.72) / 2)
+  const row1Y = 44
+  const row1H = 56
+  const row1Baseline = row1Y + Math.round((row1H + 32 * 0.72) / 2)
   const row1CenterY = row1Y + row1H / 2
 
   let cursorX = left
-  cursorX += drawPillBadge(context, cursorX, row1Y, row1H, 20, '每日电报', 24, PALETTE.white, PALETTE.brandRed)
+  cursorX += drawPillBadge(context, cursorX, row1Y, row1H, 22, '每日电报', 32, PALETTE.white, PALETTE.brandRed)
   cursorX += 12
 
   const brandLeftX = drawBrandMark(context, right, row1Baseline, row1CenterY)
@@ -550,80 +563,80 @@ export function drawRoundupShareCard(context: UniApp.CanvasContext, item: DailyT
     activeCategories.push(label)
     const badge = CATEGORY_BADGES[value]
     const pillText = `${label} ${counts[value]}`
-    const estWidth = measureText(context, pillText, 23, true) + 34
+    const estWidth = measureText(context, pillText, 30, true) + 32
     if (cursorX + estWidth > brandLeftX - 14) continue
-    cursorX += drawPillBadge(context, cursorX, row1Y + 1, 42, 17, pillText, 23, badge.text, badge.bg, badge.border)
+    cursorX += drawPillBadge(context, cursorX, row1Y + 1, 54, 16, pillText, 30, badge.text, badge.bg, badge.border)
     cursorX += 10
   }
 
   // 第 2 行报头：大号日期 + 星期；右侧金色总条数。
   const dateText = roundupShareDate(item)
-  const dateWidth = measureText(context, dateText, 54, true)
-  drawTextLeft(context, dateText, left, 172, 54, PALETTE.headline, true)
+  const dateWidth = measureText(context, dateText, 66, true)
+  drawTextLeft(context, dateText, left, 166, 66, PALETTE.headline, true)
   const weekday = roundupWeekday(item.publishedAt)
   if (weekday) {
-    drawTextLeft(context, weekday, left + dateWidth + 16, 172, 28, PALETTE.muted, true)
+    drawTextLeft(context, weekday, left + dateWidth + 16, 166, 34, PALETTE.muted, true)
   }
 
-  const suffixText = ' 条足坛快讯'
+  const suffixText = ' 条快讯'
   const countText = String(item.entries.length)
-  const suffixWidth = measureText(context, suffixText, 27, true)
-  const countWidth = measureText(context, countText, 40, true)
-  drawTextLeft(context, suffixText, right - suffixWidth, 172, 27, PALETTE.subHeadline, true)
-  drawTextLeft(context, countText, right - suffixWidth - countWidth, 172, 40, PALETTE.gold, true)
+  const suffixWidth = measureText(context, suffixText, 34, true)
+  const countWidth = measureText(context, countText, 52, true)
+  drawTextLeft(context, suffixText, right - suffixWidth, 166, 34, PALETTE.subHeadline, true)
+  drawTextLeft(context, countText, right - suffixWidth - countWidth, 166, 52, PALETTE.gold, true)
 
-  // 中部精选快讯子卡片：最多 3 条，支持双行标题不截断。
+  // 中部精选快讯子卡片：最多 3 条，42px 双行大字标题。
   const highlights = roundupShareHighlights(item, 3)
   highlights.forEach((entry, index) => {
-    const cardY = 204 + index * 140
-    const cardH = 126
-    drawRoundCard(context, left, cardY, contentWidth, cardH, 22, PALETTE.subCardBg, {
+    const cardY = 192 + index * 151
+    const cardH = 138
+    drawRoundCard(context, left, cardY, contentWidth, cardH, 24, PALETTE.subCardBg, {
       color: PALETTE.subCardBorder,
       lineWidth: 1.5,
     })
 
     const badge = CATEGORY_BADGES[entry.category]
     const catLabel = telegraphCategoryLabel(entry.category)
-    const colX = left + 22
-    const colW = 88
-    drawRoundCard(context, colX, cardY + 28, colW, 36, 10, badge.bg, { color: badge.border, lineWidth: 1 })
-    const catWidth = measureText(context, catLabel, 22, true)
-    drawTextLeft(context, catLabel, colX + (colW - catWidth) / 2, cardY + 54, 22, badge.text, true)
+    const colX = left + 20
+    const colW = 104
+    drawRoundCard(context, colX, cardY + 24, colW, 44, 12, badge.bg, { color: badge.border, lineWidth: 1 })
+    const catWidth = measureText(context, catLabel, 28, true)
+    drawTextLeft(context, catLabel, colX + (colW - catWidth) / 2, cardY + 56, 28, badge.text, true)
 
     const shortTime = entry.timeLabel.trim().slice(-5)
     if (shortTime) {
-      const timeWidth = measureText(context, shortTime, 22, false)
-      drawTextLeft(context, shortTime, colX + (colW - timeWidth) / 2, cardY + 96, 22, PALETTE.caption)
+      const timeWidth = measureText(context, shortTime, 26, true)
+      drawTextLeft(context, shortTime, colX + (colW - timeWidth) / 2, cardY + 106, 26, PALETTE.muted, true)
     }
 
-    const titleX = left + 130
-    const titleMaxWidth = right - 24 - titleX
+    const titleX = left + 144
+    const titleMaxWidth = right - 22 - titleX
     const cleanTitle = cleanTelegraphHeadline(entry.title) || entry.title.trim()
     const lines = wrapShareCardText(
       cleanTitle,
-      sample => measureText(context, sample, 33, true),
+      sample => measureText(context, sample, 42, true),
       titleMaxWidth,
       2,
     )
     if (lines.length === 1) {
-      drawTextLeft(context, lines[0]!, titleX, cardY + 75, 33, PALETTE.headline, true)
+      drawTextLeft(context, lines[0]!, titleX, cardY + 84, 42, PALETTE.headline, true)
     } else if (lines.length >= 2) {
-      drawTextLeft(context, lines[0]!, titleX, cardY + 53, 33, PALETTE.headline, true)
-      drawTextLeft(context, lines[1]!, titleX, cardY + 98, 33, PALETTE.headline, true)
+      drawTextLeft(context, lines[0]!, titleX, cardY + 58, 42, PALETTE.headline, true)
+      drawTextLeft(context, lines[1]!, titleX, cardY + 110, 42, PALETTE.headline, true)
     }
   })
 
   // 底栏：分割线 + 覆盖分类导语 + 右侧行动胶囊（不画来源）。
   context.setFillStyle(PALETTE.divider)
-  context.fillRect(left, 638, contentWidth, 1)
+  context.fillRect(left, 650, contentWidth, 1)
 
-  const footerCenterY = 704
-  const footerBaseline = footerCenterY + 10
+  const footerCenterY = 716
+  const footerBaseline = footerCenterY + 12
   const ctaLeftX = drawCtaPill(context, right, footerCenterY, `看全部 ${item.entries.length} 条`)
   const footerSummary = activeCategories.length
-    ? `今日重点速览 · 覆盖${activeCategories.join('/')}`
-    : '足坛全天重点快讯速览'
-  drawFooterSegments(context, left, ctaLeftX - 24, footerBaseline, 27, [
-    { text: footerSummary, color: PALETTE.muted },
+    ? `今日重点 · ${activeCategories.join('/')}`
+    : '今日足坛重点速览'
+  drawFooterSegments(context, left, ctaLeftX - 24, footerBaseline, 34, [
+    { text: footerSummary, color: PALETTE.muted, bold: true },
   ])
 }
