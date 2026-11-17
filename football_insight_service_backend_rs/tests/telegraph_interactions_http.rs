@@ -37,8 +37,8 @@ use football_insight_service_backend_rs::{
         domain::interactions::{
             CreateTelegraphCommentInput, ReactionMutation, TelegraphComment,
             TelegraphCommentAuthor, TelegraphCommentLikeSummary, TelegraphCommentReplyRef,
-            TelegraphCommentsPage, TelegraphCommentsPosition, TelegraphInteractionError,
-            TelegraphReactionKind, TelegraphReactionSummary,
+            TelegraphCommentThreadPage, TelegraphCommentsPage, TelegraphCommentsPosition,
+            TelegraphInteractionError, TelegraphReactionKind, TelegraphReactionSummary,
         },
         ports::daily_topics_repository::TelegraphInteractionsRepository,
     },
@@ -191,6 +191,57 @@ impl InMemoryInteractions {
             disliked_by_me: mine == Some(TelegraphReactionKind::Dislike),
         }
     }
+    fn build_comment_view(
+        &self,
+        comments: &[StoredComment],
+        comment_likes: &HashSet<(Uuid, Uuid)>,
+        users: &HashMap<Uuid, AuthUser>,
+        comment: &StoredComment,
+        viewer_user_id: Option<Uuid>,
+    ) -> TelegraphComment {
+        let author = users.get(&comment.user_id).unwrap();
+        let reply_to = comment.reply_to_comment_id.and_then(|rid| {
+            comments
+                .iter()
+                .find(|rc| rc.id == rid && rc.status == "visible")
+                .and_then(|rc| users.get(&rc.user_id))
+                .map(|ru| TelegraphCommentReplyRef {
+                    comment_id: rid,
+                    author_display_name: sanitize_public_display_name(ru.display_name.as_deref()),
+                })
+        });
+        let likes_count = comment_likes
+            .iter()
+            .filter(|(cid, _)| *cid == comment.id)
+            .count() as u64;
+        let liked_by_me =
+            viewer_user_id.is_some_and(|uid| comment_likes.contains(&(comment.id, uid)));
+        let replies_count = comments
+            .iter()
+            .filter(|child| {
+                child.reply_to_comment_id == Some(comment.id)
+                    && child.entry_id == comment.entry_id
+                    && child.status == "visible"
+            })
+            .count() as u64;
+        TelegraphComment {
+            id: comment.id,
+            topic_id: comment.topic_id.clone(),
+            entry_id: comment.entry_id.clone(),
+            author: TelegraphCommentAuthor {
+                user_id: author.id,
+                display_name: sanitize_public_display_name(author.display_name.as_deref()),
+                avatar_url: author.avatar_url.clone(),
+            },
+            reply_to,
+            content: comment.content.clone(),
+            likes_count,
+            liked_by_me,
+            replies_count,
+            is_mine: viewer_user_id == Some(comment.user_id),
+            created_at: comment.created_at,
+        }
+    }
 }
 
 #[async_trait]
@@ -230,6 +281,7 @@ impl TelegraphInteractionsRepository for InMemoryInteractions {
         viewer_user_id: Option<Uuid>,
         after: Option<&TelegraphCommentsPosition>,
         limit: usize,
+        root_only: bool,
     ) -> Result<TelegraphCommentsPage, TelegraphInteractionError> {
         if topic_id != "topic-1" || entry_id != "entry-1" {
             return Err(TelegraphInteractionError::TopicOrEntryNotFound);
@@ -254,6 +306,7 @@ impl TelegraphInteractionsRepository for InMemoryInteractions {
         let total_count = visible.len() as u64;
         let filtered: Vec<TelegraphComment> = visible
             .into_iter()
+            .filter(|c| !root_only || c.reply_to_comment_id.is_none())
             .filter(|c| {
                 after.is_none_or(|pos| {
                     c.created_at < pos.created_at
@@ -261,51 +314,7 @@ impl TelegraphInteractionsRepository for InMemoryInteractions {
                 })
             })
             .take(limit + 1)
-            .map(|c| {
-                let author = users.get(&c.user_id).unwrap();
-                let reply_to = c.reply_to_comment_id.and_then(|rid| {
-                    comments
-                        .iter()
-                        .find(|rc| rc.id == rid && rc.status == "visible")
-                        .and_then(|rc| users.get(&rc.user_id))
-                        .map(|ru| TelegraphCommentReplyRef {
-                            comment_id: rid,
-                            author_display_name: sanitize_public_display_name(
-                                ru.display_name.as_deref(),
-                            ),
-                        })
-                });
-                let likes_count = comment_likes
-                    .iter()
-                    .filter(|(cid, _)| *cid == c.id)
-                    .count() as u64;
-                let liked_by_me = viewer_user_id.is_some_and(|uid| comment_likes.contains(&(c.id, uid)));
-                let replies_count = comments
-                    .iter()
-                    .filter(|child| {
-                        child.reply_to_comment_id == Some(c.id)
-                            && child.entry_id == c.entry_id
-                            && child.status == "visible"
-                    })
-                    .count() as u64;
-                TelegraphComment {
-                    id: c.id,
-                    topic_id: c.topic_id.clone(),
-                    entry_id: c.entry_id.clone(),
-                    author: TelegraphCommentAuthor {
-                        user_id: author.id,
-                        display_name: sanitize_public_display_name(author.display_name.as_deref()),
-                        avatar_url: author.avatar_url.clone(),
-                    },
-                    reply_to,
-                    content: c.content.clone(),
-                    likes_count,
-                    liked_by_me,
-                    replies_count,
-                    is_mine: viewer_user_id == Some(c.user_id),
-                    created_at: c.created_at,
-                }
-            })
+            .map(|c| self.build_comment_view(&comments, &comment_likes, &users, c, viewer_user_id))
             .collect();
         let has_more = filtered.len() > limit;
         let mut items = filtered;
@@ -321,6 +330,114 @@ impl TelegraphInteractionsRepository for InMemoryInteractions {
         Ok(TelegraphCommentsPage {
             comments_enabled: true,
             total_count,
+            items,
+            next_cursor,
+            has_more,
+        })
+    }
+
+    async fn get_comment_thread(
+        &self,
+        _team_id: i64,
+        topic_id: &str,
+        entry_id: &str,
+        comment_id: Uuid,
+        viewer_user_id: Option<Uuid>,
+        after: Option<&TelegraphCommentsPosition>,
+        limit: usize,
+    ) -> Result<TelegraphCommentThreadPage, TelegraphInteractionError> {
+        if topic_id != "topic-1" || entry_id != "entry-1" {
+            return Err(TelegraphInteractionError::TopicOrEntryNotFound);
+        }
+        if !*self.comments_enabled.lock().unwrap() {
+            return Err(TelegraphInteractionError::CommentsDisabled);
+        }
+        let comments = self.comments.lock().unwrap();
+        let comment_likes = self.comment_likes.lock().unwrap();
+        let users = self.users.users.lock().unwrap();
+
+        let Some(focus) = comments.iter().find(|c| {
+            c.id == comment_id
+                && c.topic_id == topic_id
+                && c.entry_id == entry_id
+                && c.status == "visible"
+        }) else {
+            return Err(TelegraphInteractionError::CommentNotFound);
+        };
+        let focus_view =
+            self.build_comment_view(&comments, &comment_likes, &users, focus, viewer_user_id);
+
+        let mut ancestors = Vec::new();
+        let mut visited = HashSet::from([focus.id]);
+        let mut parent_id = focus.reply_to_comment_id;
+        while let Some(pid) = parent_id {
+            if ancestors.len() >= 20 || !visited.insert(pid) {
+                break;
+            }
+            let Some(parent) = comments.iter().find(|c| {
+                c.id == pid
+                    && c.topic_id == topic_id
+                    && c.entry_id == entry_id
+                    && c.status == "visible"
+            }) else {
+                break;
+            };
+            ancestors.push(self.build_comment_view(
+                &comments,
+                &comment_likes,
+                &users,
+                parent,
+                viewer_user_id,
+            ));
+            parent_id = parent.reply_to_comment_id;
+        }
+        ancestors.reverse();
+
+        let entry_comments_count = comments
+            .iter()
+            .filter(|c| c.topic_id == topic_id && c.entry_id == entry_id && c.status == "visible")
+            .count() as u64;
+
+        let mut children: Vec<&StoredComment> = comments
+            .iter()
+            .filter(|c| {
+                c.topic_id == topic_id
+                    && c.entry_id == entry_id
+                    && c.status == "visible"
+                    && c.reply_to_comment_id == Some(comment_id)
+            })
+            .collect();
+        children.sort_by(|a, b| b.created_at.cmp(&a.created_at).then_with(|| b.id.cmp(&a.id)));
+        let replies_total_count = children.len() as u64;
+        let filtered: Vec<TelegraphComment> = children
+            .into_iter()
+            .filter(|c| {
+                after.is_none_or(|pos| {
+                    c.created_at < pos.created_at
+                        || (c.created_at == pos.created_at && c.id < pos.id)
+                })
+            })
+            .take(limit + 1)
+            .map(|c| self.build_comment_view(&comments, &comment_likes, &users, c, viewer_user_id))
+            .collect();
+        let has_more = filtered.len() > limit;
+        let mut items = filtered;
+        items.truncate(limit);
+        let next_cursor = if has_more {
+            items.last().map(|c| TelegraphCommentsPosition {
+                created_at: c.created_at,
+                id: c.id,
+            })
+        } else {
+            None
+        };
+
+        Ok(TelegraphCommentThreadPage {
+            comments_enabled: true,
+            entry_comments_count,
+            ancestors,
+            comment: focus_view,
+            replies_total_count,
             items,
             next_cursor,
             has_more,
@@ -408,6 +525,7 @@ impl TelegraphInteractionsRepository for InMemoryInteractions {
                 Some(input.user_id),
                 None,
                 50,
+                false,
             )
             .await?;
         let created = page.items.into_iter().find(|c| c.id == id).unwrap();
@@ -917,4 +1035,141 @@ async fn comment_likes_require_login_and_replies_count_tracks_child_replies() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(unliked["likes_count"], 0);
     assert_eq!(unliked["liked_by_me"], false);
+}
+
+#[tokio::test]
+async fn root_only_and_comment_thread_isolate_nested_replies() {
+    let (app, token, _, _) = build_test_app();
+    let comments_uri = "/api/v1/daily-topics/topic-1/entries/entry-1/comments";
+
+    let (status, _) = send(
+        app.clone(),
+        "PUT",
+        "/api/v1/auth/me/profile",
+        Some(&token),
+        Some(json!({ "display_name": "成都球迷", "avatar_data_url": valid_png_data_url() })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Create C1 (root), R1 (reply to C1), and R2 (reply to R1)
+    let (status, c1_res) = send(
+        app.clone(),
+        "POST",
+        comments_uri,
+        Some(&token),
+        Some(json!({ "content": "根评论 C1" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let c1_id = c1_res["comment"]["id"].as_str().unwrap().to_string();
+
+    let (status, r1_res) = send(
+        app.clone(),
+        "POST",
+        comments_uri,
+        Some(&token),
+        Some(json!({ "content": "直接回复 R1", "reply_to_comment_id": c1_id })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let r1_id = r1_res["comment"]["id"].as_str().unwrap().to_string();
+
+    let (status, r2_res) = send(
+        app.clone(),
+        "POST",
+        comments_uri,
+        Some(&token),
+        Some(json!({ "content": "次级回复 R2", "reply_to_comment_id": r1_id })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let r2_id = r2_res["comment"]["id"].as_str().unwrap().to_string();
+
+    // root_only=true returns only C1 while total_count keeps all 3 comments
+    let (status, root_page) = send(
+        app.clone(),
+        "GET",
+        &format!("{comments_uri}?root_only=true"),
+        Some(&token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(root_page["total_count"], 3);
+    let root_items = root_page["items"].as_array().unwrap();
+    assert_eq!(root_items.len(), 1);
+    assert_eq!(root_items[0]["id"], c1_id);
+    assert_eq!(root_items[0]["replies_count"], 1);
+
+    // Thread of C1 only shows direct reply R1 (excludes R2)
+    let (status, c1_thread) = send(
+        app.clone(),
+        "GET",
+        &format!("{comments_uri}/{c1_id}/thread"),
+        Some(&token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(c1_thread["entry_comments_count"], 3);
+    assert_eq!(c1_thread["ancestors"], json!([]));
+    assert_eq!(c1_thread["comment"]["id"], c1_id);
+    assert_eq!(c1_thread["replies_total_count"], 1);
+    let c1_children = c1_thread["items"].as_array().unwrap();
+    assert_eq!(c1_children.len(), 1);
+    assert_eq!(c1_children[0]["id"], r1_id);
+
+    // Thread of R1 has C1 in ancestors and direct child R2
+    let (status, r1_thread) = send(
+        app.clone(),
+        "GET",
+        &format!("{comments_uri}/{r1_id}/thread"),
+        Some(&token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(r1_thread["ancestors"].as_array().unwrap().len(), 1);
+    assert_eq!(r1_thread["ancestors"][0]["id"], c1_id);
+    assert_eq!(r1_thread["comment"]["id"], r1_id);
+    assert_eq!(r1_thread["replies_total_count"], 1);
+    assert_eq!(r1_thread["items"][0]["id"], r2_id);
+
+    // Thread of R2 has [C1, R1] ordered root -> parent
+    let (status, r2_thread) = send(
+        app.clone(),
+        "GET",
+        &format!("{comments_uri}/{r2_id}/thread"),
+        Some(&token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(r2_thread["ancestors"].as_array().unwrap().len(), 2);
+    assert_eq!(r2_thread["ancestors"][0]["id"], c1_id);
+    assert_eq!(r2_thread["ancestors"][1]["id"], r1_id);
+    assert_eq!(r2_thread["items"], json!([]));
+
+    // Deleted comment returns 404 COMMENT_NOT_FOUND
+    let (status, _) = send(
+        app.clone(),
+        "DELETE",
+        &format!("{comments_uri}/{r2_id}"),
+        Some(&token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, deleted_thread) = send(
+        app,
+        "GET",
+        &format!("{comments_uri}/{r2_id}/thread"),
+        Some(&token),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(deleted_thread["code"], "COMMENT_NOT_FOUND");
 }

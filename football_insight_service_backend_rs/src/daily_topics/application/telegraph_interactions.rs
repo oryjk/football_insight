@@ -7,9 +7,9 @@ use crate::{
     daily_topics::{
         domain::interactions::{
             CreateTelegraphCommentInput, ReactionMutation, TelegraphComment,
-            TelegraphCommentLikeSummary, TelegraphCommentsPage, TelegraphCommentsPosition,
-            TelegraphInteractionError, TelegraphReactionSummary, valid_telegraph_id,
-            validate_comment_content,
+            TelegraphCommentLikeSummary, TelegraphCommentThreadPage, TelegraphCommentsPage,
+            TelegraphCommentsPosition, TelegraphInteractionError, TelegraphReactionSummary,
+            valid_telegraph_id, validate_comment_content,
         },
         ports::daily_topics_repository::TelegraphInteractionsRepository,
     },
@@ -53,13 +53,50 @@ impl TelegraphInteractionsService {
         viewer_user_id: Option<Uuid>,
         after: Option<&TelegraphCommentsPosition>,
         limit: usize,
+        root_only: bool,
     ) -> Result<TelegraphCommentsPage, TelegraphInteractionError> {
         validate_scope(team_id, topic_id, entry_id)?;
         if !(1..=50).contains(&limit) {
             return Err(TelegraphInteractionError::InvalidInput("分页大小无效"));
         }
         self.repository
-            .list_entry_comments(team_id, topic_id, entry_id, viewer_user_id, after, limit)
+            .list_entry_comments(
+                team_id,
+                topic_id,
+                entry_id,
+                viewer_user_id,
+                after,
+                limit,
+                root_only,
+            )
+            .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn get_comment_thread(
+        &self,
+        team_id: i64,
+        topic_id: &str,
+        entry_id: &str,
+        comment_id: Uuid,
+        viewer_user_id: Option<Uuid>,
+        after: Option<&TelegraphCommentsPosition>,
+        limit: usize,
+    ) -> Result<TelegraphCommentThreadPage, TelegraphInteractionError> {
+        validate_scope(team_id, topic_id, entry_id)?;
+        if !(1..=50).contains(&limit) {
+            return Err(TelegraphInteractionError::InvalidInput("分页大小无效"));
+        }
+        self.repository
+            .get_comment_thread(
+                team_id,
+                topic_id,
+                entry_id,
+                comment_id,
+                viewer_user_id,
+                after,
+                limit,
+            )
             .await
     }
 

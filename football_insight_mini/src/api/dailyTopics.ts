@@ -45,10 +45,27 @@ export function getTelegraphEntryComments(
   entryId: string,
   cursor: string | null = null,
   limit = 20,
+  options?: { rootOnly?: boolean },
+): Promise<unknown> {
+  const after = cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''
+  const rootOnly = options?.rootOnly ? '&root_only=true' : ''
+  return request<unknown>({
+    url: `/daily-topics/${encodeURIComponent(topicId)}/entries/${encodeURIComponent(entryId)}/comments?team_id=${teamId}&limit=${limit}${rootOnly}${after}`,
+    auth: true,
+  })
+}
+
+export function getTelegraphCommentThread(
+  teamId: number,
+  topicId: string,
+  entryId: string,
+  commentId: string,
+  cursor: string | null = null,
+  limit = 20,
 ): Promise<unknown> {
   const after = cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''
   return request<unknown>({
-    url: `/daily-topics/${encodeURIComponent(topicId)}/entries/${encodeURIComponent(entryId)}/comments?team_id=${teamId}&limit=${limit}${after}`,
+    url: `/daily-topics/${encodeURIComponent(topicId)}/entries/${encodeURIComponent(entryId)}/comments/${encodeURIComponent(commentId)}/thread?team_id=${teamId}&limit=${limit}${after}`,
     auth: true,
   })
 }

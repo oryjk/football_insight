@@ -9,6 +9,7 @@ import type {
   TelegraphCategory,
   TelegraphComment,
   TelegraphCommentLikeSummary,
+  TelegraphCommentThreadPage,
   TelegraphCommentsPage,
   TelegraphReactionSummary,
 } from '../types/dailyTopic'
@@ -298,6 +299,15 @@ export function topicDetailUrl(id: string): string {
 export function telegraphEntryUrl(topicId: string, entryId: string, focusComment = false): string {
   return `/pages/telegraph-entry/index?topicId=${encodeURIComponent(topicId)}&entryId=${encodeURIComponent(entryId)}${focusComment ? '&focus=1' : ''}`
 }
+
+export function telegraphCommentUrl(
+  topicId: string,
+  entryId: string,
+  commentId: string,
+  focusReply = false,
+): string {
+  return `/pages/telegraph-entry/comment?topicId=${encodeURIComponent(topicId)}&entryId=${encodeURIComponent(entryId)}&commentId=${encodeURIComponent(commentId)}${focusReply ? '&focus=1' : ''}`
+}
 export function editionForTopic(item: DailyTopicItem | null): DailyTopicEdition {
   return item ? { ...emptyDailyTopicEdition(), updatedAt: item.publishedAt, items: [item] } : emptyDailyTopicEdition()
 }
@@ -397,6 +407,31 @@ export function mapTelegraphCommentsPage(value: unknown): TelegraphCommentsPage 
   return {
     commentsEnabled: typeof payload.comments_enabled === 'boolean' ? payload.comments_enabled : true,
     totalCount: nonNegativeInt(payload.total_count),
+    items,
+    nextCursor,
+    hasMore: payload.has_more === true && nextCursor !== null,
+  }
+}
+
+export function mapTelegraphCommentThreadPage(value: unknown): TelegraphCommentThreadPage {
+  const payload = record(value)
+  const comment = mapTelegraphComment(payload?.comment)
+  if (!payload || !comment || !Array.isArray(payload.ancestors) || !Array.isArray(payload.items)) {
+    throw new Error('评论线程加载失败，请重试')
+  }
+  const ancestors = payload.ancestors
+    .map(mapTelegraphComment)
+    .filter((item): item is TelegraphComment => item !== null)
+  const items = payload.items
+    .map(mapTelegraphComment)
+    .filter((item): item is TelegraphComment => item !== null)
+  const nextCursor = typeof payload.next_cursor === 'string' && payload.next_cursor ? payload.next_cursor : null
+  return {
+    commentsEnabled: typeof payload.comments_enabled === 'boolean' ? payload.comments_enabled : true,
+    entryCommentsCount: nonNegativeInt(payload.entry_comments_count),
+    ancestors,
+    comment,
+    repliesTotalCount: nonNegativeInt(payload.replies_total_count),
     items,
     nextCursor,
     hasMore: payload.has_more === true && nextCursor !== null,

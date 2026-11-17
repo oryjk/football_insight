@@ -13,8 +13,9 @@ use crate::daily_topics::domain::{
         DailyTopicSource, DailyTopicsView,
     },
     interactions::{
-        TelegraphComment, TelegraphCommentLikeSummary, TelegraphCommentsPage,
-        TelegraphCommentsPosition, TelegraphInteractionError, TelegraphReactionSummary,
+        TelegraphComment, TelegraphCommentLikeSummary, TelegraphCommentThreadPage,
+        TelegraphCommentsPage, TelegraphCommentsPosition, TelegraphInteractionError,
+        TelegraphReactionSummary,
     },
     query::{DailyTopicsQuery, InvalidDailyTopicsQuery},
 };
@@ -447,6 +448,8 @@ pub(super) struct TelegraphCommentsQueryParameters {
     #[serde(default = "history_limit")]
     pub limit: usize,
     pub cursor: Option<String>,
+    #[serde(default)]
+    pub root_only: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -454,6 +457,8 @@ struct TelegraphCommentsCursorDto {
     team_id: i64,
     topic_id: String,
     entry_id: String,
+    #[serde(default)]
+    root_only: bool,
     created_at: DateTime<Utc>,
     id: Uuid,
 }
@@ -478,6 +483,58 @@ impl TelegraphCommentsQueryParameters {
         if cursor.team_id != self.team_id
             || cursor.topic_id != topic_id
             || cursor.entry_id != entry_id
+            || cursor.root_only != self.root_only
+        {
+            return Err(TelegraphInteractionError::InvalidInput("分页游标无效"));
+        }
+        Ok(Some(TelegraphCommentsPosition {
+            created_at: cursor.created_at,
+            id: cursor.id,
+        }))
+    }
+}
+
+#[derive(Deserialize)]
+pub(super) struct TelegraphCommentThreadQueryParameters {
+    #[serde(default = "default_team")]
+    pub team_id: i64,
+    #[serde(default = "history_limit")]
+    pub limit: usize,
+    pub cursor: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TelegraphCommentThreadCursorDto {
+    team_id: i64,
+    topic_id: String,
+    entry_id: String,
+    parent_comment_id: Uuid,
+    created_at: DateTime<Utc>,
+    id: Uuid,
+}
+
+impl TelegraphCommentThreadQueryParameters {
+    pub fn decode_cursor(
+        &self,
+        topic_id: &str,
+        entry_id: &str,
+        parent_comment_id: Uuid,
+    ) -> Result<Option<TelegraphCommentsPosition>, TelegraphInteractionError> {
+        let Some(encoded) = self.cursor.as_deref().map(str::trim).filter(|v| !v.is_empty()) else {
+            return Ok(None);
+        };
+        if encoded.len() > 1024 {
+            return Err(TelegraphInteractionError::InvalidInput("分页游标无效"));
+        }
+        let bytes = URL_SAFE_NO_PAD
+            .decode(encoded)
+            .map_err(|_| TelegraphInteractionError::InvalidInput("分页游标无效"))?;
+        let cursor: TelegraphCommentThreadCursorDto = serde_json::from_slice(&bytes)
+            .map_err(|_| TelegraphInteractionError::InvalidInput("分页游标无效"))?;
+        if cursor.team_id != self.team_id
+            || cursor.topic_id != topic_id
+            || cursor.entry_id != entry_id
+            || cursor.parent_comment_id != parent_comment_id
         {
             return Err(TelegraphInteractionError::InvalidInput("分页游标无效"));
         }
@@ -571,6 +628,7 @@ impl TelegraphCommentsPageDto {
         team_id: i64,
         topic_id: &str,
         entry_id: &str,
+        root_only: bool,
     ) -> Self {
         let next_cursor = page.next_cursor.map(|pos| {
             URL_SAFE_NO_PAD.encode(
@@ -578,6 +636,7 @@ impl TelegraphCommentsPageDto {
                     team_id,
                     topic_id: topic_id.to_string(),
                     entry_id: entry_id.to_string(),
+                    root_only,
                     created_at: pos.created_at,
                     id: pos.id,
                 })
@@ -587,6 +646,52 @@ impl TelegraphCommentsPageDto {
         Self {
             comments_enabled: page.comments_enabled,
             total_count: page.total_count,
+            items: page.items.into_iter().map(Into::into).collect(),
+            has_more: page.has_more && next_cursor.is_some(),
+            next_cursor,
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub(super) struct TelegraphCommentThreadDto {
+    pub comments_enabled: bool,
+    pub entry_comments_count: u64,
+    pub ancestors: Vec<TelegraphCommentDto>,
+    pub comment: TelegraphCommentDto,
+    pub replies_total_count: u64,
+    pub items: Vec<TelegraphCommentDto>,
+    pub next_cursor: Option<String>,
+    pub has_more: bool,
+}
+
+impl TelegraphCommentThreadDto {
+    pub fn from_page(
+        page: TelegraphCommentThreadPage,
+        team_id: i64,
+        topic_id: &str,
+        entry_id: &str,
+    ) -> Self {
+        let parent_comment_id = page.comment.id;
+        let next_cursor = page.next_cursor.map(|pos| {
+            URL_SAFE_NO_PAD.encode(
+                serde_json::to_vec(&TelegraphCommentThreadCursorDto {
+                    team_id,
+                    topic_id: topic_id.to_string(),
+                    entry_id: entry_id.to_string(),
+                    parent_comment_id,
+                    created_at: pos.created_at,
+                    id: pos.id,
+                })
+                .expect("comment thread cursor contains serializable values"),
+            )
+        });
+        Self {
+            comments_enabled: page.comments_enabled,
+            entry_comments_count: page.entry_comments_count,
+            ancestors: page.ancestors.into_iter().map(Into::into).collect(),
+            comment: page.comment.into(),
+            replies_total_count: page.replies_total_count,
             items: page.items.into_iter().map(Into::into).collect(),
             has_more: page.has_more && next_cursor.is_some(),
             next_cursor,

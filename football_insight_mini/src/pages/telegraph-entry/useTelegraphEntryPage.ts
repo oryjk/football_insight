@@ -20,10 +20,12 @@ import {
   mapTelegraphCommentsPage,
   mapTelegraphReactionSummary,
   mapTopicDetail,
+  telegraphCommentUrl,
   telegraphEntryUrl,
 } from '../../utils/dailyTopics'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
 import { extractApiErrorCode, isProfileComplete } from '../../utils/profileGate'
+import { navigateInTelegraphStack } from './navigation'
 
 export interface EntrySessionPort {
   currentUser: Ref<CurrentUser | null>
@@ -51,6 +53,7 @@ export interface TelegraphEntryPageApi {
 export interface TelegraphEntryPageUi {
   redirectToLogin: (returnUrl: string) => void
   toast: (title: string, icon?: 'none' | 'success') => void
+  openComment: (url: string) => void
 }
 
 export interface UseTelegraphEntryPageOptions {
@@ -108,6 +111,7 @@ export function useTelegraphEntryPage(options: UseTelegraphEntryPageOptions) {
   const ui: TelegraphEntryPageUi = {
     redirectToLogin: defaultRedirectToLogin,
     toast: defaultToast,
+    openComment: navigateInTelegraphStack,
     ...options.ui,
   }
 
@@ -194,7 +198,7 @@ export function useTelegraphEntryPage(options: UseTelegraphEntryPageOptions) {
     }
 
     try {
-      const raw = await api.getComments(teamId, currentTopicId, currentEntryId, cursor)
+      const raw = await api.getComments(teamId, currentTopicId, currentEntryId, cursor, 20, { rootOnly: true })
       if (disposed || generation !== commentsGeneration) {
         return
       }
@@ -209,7 +213,9 @@ export function useTelegraphEntryPage(options: UseTelegraphEntryPageOptions) {
         commentsNextCursor.value = null
         return
       }
-      comments.value = reset ? page.items : mergeComments(comments.value, page.items)
+      // 电报详情页时间线仅展示直接评论本电报的根评论（兼容未升级 root_only 参数的旧后端）。
+      const rootItems = page.items.filter(item => item.replyTo === null)
+      comments.value = reset ? rootItems : mergeComments(comments.value, rootItems)
       commentsNextCursor.value = page.hasMore ? page.nextCursor : null
       syncEntryCommentsCount(page.totalCount)
     } catch (error) {
@@ -440,15 +446,20 @@ export function useTelegraphEntryPage(options: UseTelegraphEntryPageOptions) {
     await ensureAuthAndProfile()
   }
 
+  function openComment(comment: TelegraphComment, focusReply = false): void {
+    const currentTopicId = options.topicId()
+    const currentEntryId = options.entryId()
+    if (!VALID_ID_RE.test(currentTopicId) || !VALID_ID_RE.test(currentEntryId) || !comment.id) {
+      return
+    }
+    ui.openComment(telegraphCommentUrl(currentTopicId, currentEntryId, comment.id, focusReply))
+  }
+
   async function startReply(comment: TelegraphComment): Promise<void> {
     if (!commentsVisible.value) {
       return
     }
-    if (!(await ensureAuthAndProfile())) {
-      return
-    }
-    replyTarget.value = comment
-    inputFocusTrigger.value += 1
+    openComment(comment, true)
   }
 
   async function startRootComment(): Promise<void> {
@@ -633,6 +644,7 @@ export function useTelegraphEntryPage(options: UseTelegraphEntryPageOptions) {
     toggleCommentLike,
     requestLogin,
     openProfileSetup,
+    openComment,
     startReply,
     startRootComment,
     clearReplyTarget,

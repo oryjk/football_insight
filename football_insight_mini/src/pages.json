@@ -187,6 +187,15 @@
 						"enablePullDownRefresh": true,
 						"onReachBottomDistance": 120
 					}
+				},
+				{
+					"path": "comment",
+					"style": {
+						"navigationBarTitleText": "评论详情",
+						"navigationStyle": "custom",
+						"enablePullDownRefresh": true,
+						"onReachBottomDistance": 120
+					}
 				}
 			]
 		}

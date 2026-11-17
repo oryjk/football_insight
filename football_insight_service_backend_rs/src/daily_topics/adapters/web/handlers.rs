@@ -11,7 +11,8 @@ use uuid::Uuid;
 use super::dto::{
     CreateTelegraphCommentBody, CreateTelegraphCommentResponseDto, DailyTopicDto,
     DailyTopicsParameters, DailyTopicsResponse, DeleteTelegraphCommentResponseDto,
-    EntryInteractionParameters, TelegraphCommentLikeResponseDto, TelegraphCommentsPageDto,
+    EntryInteractionParameters, TelegraphCommentLikeResponseDto, TelegraphCommentThreadDto,
+    TelegraphCommentThreadQueryParameters, TelegraphCommentsPageDto,
     TelegraphCommentsQueryParameters, TelegraphReactionResponseDto, TopicDetailParameters,
     TopicHistoryParameters, TopicHistoryResponse,
 };
@@ -334,6 +335,15 @@ pub(super) async fn undislike_entry_handler(
     .await
 }
 
+fn extract_optional_user_from_port(token_port: &dyn TokenPort, headers: &HeaderMap) -> Option<Uuid> {
+    let token = headers
+        .get(AUTHORIZATION)?
+        .to_str()
+        .ok()?
+        .strip_prefix("Bearer ")?;
+    token_port.verify_token(token.trim()).ok().map(|claims| claims.sub)
+}
+
 pub(super) async fn list_entry_comments_handler(
     State(state): State<TelegraphInteractionsWebState>,
     headers: HeaderMap,
@@ -345,12 +355,7 @@ pub(super) async fn list_entry_comments_handler(
     let after = parameters
         .decode_cursor(&topic_id, &entry_id)
         .map_err(interaction_error_response)?;
-    let viewer = headers
-        .get(AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "))
-        .and_then(|token| state.token_port.verify_token(token.trim()).ok())
-        .map(|claims| claims.sub);
+    let viewer = extract_optional_user_from_port(state.token_port.as_ref(), &headers);
     let page = state
         .service
         .list_comments(
@@ -360,10 +365,45 @@ pub(super) async fn list_entry_comments_handler(
             viewer,
             after.as_ref(),
             parameters.limit,
+            parameters.root_only,
         )
         .await
         .map_err(interaction_error_response)?;
     Ok(Json(TelegraphCommentsPageDto::from_page(
+        page,
+        parameters.team_id,
+        &topic_id,
+        &entry_id,
+        parameters.root_only,
+    )))
+}
+
+pub(super) async fn get_comment_thread_handler(
+    State(state): State<TelegraphInteractionsWebState>,
+    headers: HeaderMap,
+    Path((topic_id, entry_id, comment_id)): Path<(String, String, Uuid)>,
+    parameters: Result<Query<TelegraphCommentThreadQueryParameters>, QueryRejection>,
+) -> Result<Json<TelegraphCommentThreadDto>, (StatusCode, Json<Value>)> {
+    let Query(parameters) = parameters
+        .map_err(|_| interaction_error_response(TelegraphInteractionError::InvalidInput("参数无效")))?;
+    let after = parameters
+        .decode_cursor(&topic_id, &entry_id, comment_id)
+        .map_err(interaction_error_response)?;
+    let viewer = extract_optional_user_from_port(state.token_port.as_ref(), &headers);
+    let page = state
+        .service
+        .get_comment_thread(
+            parameters.team_id,
+            &topic_id,
+            &entry_id,
+            comment_id,
+            viewer,
+            after.as_ref(),
+            parameters.limit,
+        )
+        .await
+        .map_err(interaction_error_response)?;
+    Ok(Json(TelegraphCommentThreadDto::from_page(
         page,
         parameters.team_id,
         &topic_id,
@@ -474,6 +514,7 @@ pub(super) async fn unlike_entry_comment_handler(
 fn interaction_error_response(error: TelegraphInteractionError) -> (StatusCode, Json<Value>) {
     let (status, code) = match error {
         TelegraphInteractionError::TopicOrEntryNotFound => (StatusCode::NOT_FOUND, "NOT_FOUND"),
+        TelegraphInteractionError::CommentNotFound => (StatusCode::NOT_FOUND, "COMMENT_NOT_FOUND"),
         TelegraphInteractionError::Unauthorized => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED"),
         TelegraphInteractionError::ProfileIncomplete => {
             (StatusCode::FORBIDDEN, "PROFILE_INCOMPLETE")

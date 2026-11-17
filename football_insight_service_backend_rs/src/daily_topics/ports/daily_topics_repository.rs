@@ -7,8 +7,8 @@ use crate::daily_topics::domain::{
     heat::{TopicHeat, TopicVisit},
     interactions::{
         CreateTelegraphCommentInput, EntryInteractionStats, ReactionMutation, TelegraphComment,
-        TelegraphCommentLikeSummary, TelegraphCommentsPage, TelegraphCommentsPosition,
-        TelegraphInteractionError, TelegraphReactionSummary,
+        TelegraphCommentLikeSummary, TelegraphCommentThreadPage, TelegraphCommentsPage,
+        TelegraphCommentsPosition, TelegraphInteractionError, TelegraphReactionSummary,
     },
 };
 
@@ -149,7 +149,19 @@ pub trait TelegraphInteractionsRepository: Send + Sync {
         viewer_user_id: Option<Uuid>,
         after: Option<&TelegraphCommentsPosition>,
         limit: usize,
+        root_only: bool,
     ) -> Result<TelegraphCommentsPage, TelegraphInteractionError>;
+
+    async fn get_comment_thread(
+        &self,
+        team_id: i64,
+        topic_id: &str,
+        entry_id: &str,
+        comment_id: Uuid,
+        viewer_user_id: Option<Uuid>,
+        after: Option<&TelegraphCommentsPosition>,
+        limit: usize,
+    ) -> Result<TelegraphCommentThreadPage, TelegraphInteractionError>;
 
     async fn check_comment_eligibility(
         &self,

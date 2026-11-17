@@ -104,6 +104,17 @@ export interface TelegraphCommentsPage {
   hasMore: boolean
 }
 
+export interface TelegraphCommentThreadPage {
+  commentsEnabled: boolean
+  entryCommentsCount: number
+  ancestors: TelegraphComment[]
+  comment: TelegraphComment
+  repliesTotalCount: number
+  items: TelegraphComment[]
+  nextCursor: string | null
+  hasMore: boolean
+}
+
 export interface DailyTopicTag { teamId: number; name: string }
 
 export interface DailyTopicImage {

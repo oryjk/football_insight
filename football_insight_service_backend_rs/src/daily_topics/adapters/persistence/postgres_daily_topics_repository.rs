@@ -13,8 +13,8 @@ use crate::{
             interactions::{
                 CreateTelegraphCommentInput, EntryInteractionStats, ReactionMutation,
                 TelegraphComment, TelegraphCommentAuthor, TelegraphCommentLikeSummary,
-                TelegraphCommentReplyRef, TelegraphCommentsPage, TelegraphCommentsPosition,
-                TelegraphInteractionError, TelegraphReactionSummary,
+                TelegraphCommentReplyRef, TelegraphCommentThreadPage, TelegraphCommentsPage,
+                TelegraphCommentsPosition, TelegraphInteractionError, TelegraphReactionSummary,
             },
         },
         ports::daily_topics_repository::{
@@ -570,6 +570,7 @@ impl TelegraphInteractionsRepository for PostgresDailyTopicsRepository {
         viewer_user_id: Option<Uuid>,
         after: Option<&TelegraphCommentsPosition>,
         limit: usize,
+        root_only: bool,
     ) -> Result<TelegraphCommentsPage, TelegraphInteractionError> {
         self.ensure_entry_exists(team_id, topic_id, entry_id).await?;
         let comments_enabled = self
@@ -643,6 +644,7 @@ impl TelegraphInteractionsRepository for PostgresDailyTopicsRepository {
                AND c.entry_id = $3
                AND c.status = 'visible'
                AND u.status = 'active'
+               AND (NOT $8::bool OR c.reply_to_comment_id IS NULL)
                AND ($4::timestamptz IS NULL OR c.created_at < $4 OR (c.created_at = $4 AND c.id < $5))
              ORDER BY c.created_at DESC, c.id DESC
              LIMIT $6
@@ -655,6 +657,7 @@ impl TelegraphInteractionsRepository for PostgresDailyTopicsRepository {
         .bind(after.map(|position| position.id))
         .bind((limit + 1) as i64)
         .bind(viewer_user_id)
+        .bind(root_only)
         .fetch_all(&self.pool)
         .await
         .map_err(interaction_storage_error)?;
@@ -679,6 +682,340 @@ impl TelegraphInteractionsRepository for PostgresDailyTopicsRepository {
         Ok(TelegraphCommentsPage {
             comments_enabled: true,
             total_count,
+            items,
+            next_cursor,
+            has_more,
+        })
+    }
+
+    async fn get_comment_thread(
+        &self,
+        team_id: i64,
+        topic_id: &str,
+        entry_id: &str,
+        comment_id: Uuid,
+        viewer_user_id: Option<Uuid>,
+        after: Option<&TelegraphCommentsPosition>,
+        limit: usize,
+    ) -> Result<TelegraphCommentThreadPage, TelegraphInteractionError> {
+        self.ensure_entry_exists(team_id, topic_id, entry_id).await?;
+        let comments_enabled = self
+            .is_comments_enabled_internal()
+            .await
+            .map_err(interaction_storage_error)?;
+        if !comments_enabled {
+            return Err(TelegraphInteractionError::CommentsDisabled);
+        }
+
+        let focus_row = sqlx::query(
+            r#"
+            SELECT c.id,
+                   c.topic_id,
+                   c.entry_id,
+                   c.user_id,
+                   u.display_name AS author_display_name,
+                   u.avatar_url AS author_avatar_url,
+                   c.reply_to_comment_id,
+                   ru.display_name AS reply_to_author_display_name,
+                   c.content,
+                   c.created_at,
+                   (
+                     SELECT COUNT(*)::bigint
+                       FROM f_i_telegraph_comment_likes cl
+                       JOIN f_i_users lu ON lu.id = cl.user_id
+                      WHERE cl.comment_id = c.id
+                        AND lu.status = 'active'
+                   ) AS likes_count,
+                   CASE
+                     WHEN $5::uuid IS NULL THEN FALSE
+                     ELSE EXISTS(
+                       SELECT 1
+                         FROM f_i_telegraph_comment_likes cl
+                        WHERE cl.comment_id = c.id
+                          AND cl.user_id = $5
+                     )
+                   END AS liked_by_me,
+                   (
+                     SELECT COUNT(*)::bigint
+                       FROM f_i_telegraph_comments child
+                       JOIN f_i_users cu ON cu.id = child.user_id
+                      WHERE child.team_id = c.team_id
+                        AND child.topic_id = c.topic_id
+                        AND child.entry_id = c.entry_id
+                        AND child.reply_to_comment_id = c.id
+                        AND child.status = 'visible'
+                        AND cu.status = 'active'
+                   ) AS replies_count
+              FROM f_i_telegraph_comments c
+              JOIN f_i_users u ON u.id = c.user_id
+              LEFT JOIN f_i_telegraph_comments rc
+                ON rc.id = c.reply_to_comment_id
+               AND rc.entry_id = c.entry_id
+               AND rc.status = 'visible'
+              LEFT JOIN f_i_users ru
+                ON ru.id = rc.user_id
+               AND ru.status = 'active'
+             WHERE c.id = $4
+               AND c.team_id = $1
+               AND c.topic_id = $2
+               AND c.entry_id = $3
+               AND c.status = 'visible'
+               AND u.status = 'active'
+             LIMIT 1
+            "#,
+        )
+        .bind(team_id)
+        .bind(topic_id)
+        .bind(entry_id)
+        .bind(comment_id)
+        .bind(viewer_user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(interaction_storage_error)?;
+
+        let Some(focus_row) = focus_row else {
+            return Err(TelegraphInteractionError::CommentNotFound);
+        };
+        let comment = row_to_telegraph_comment(&focus_row, viewer_user_id)
+            .map_err(interaction_storage_error)?;
+
+        let ancestors = if comment.reply_to.is_some() {
+            let ancestor_rows = sqlx::query(
+                r#"
+                WITH RECURSIVE chain AS (
+                    SELECT rc.id,
+                           rc.topic_id,
+                           rc.entry_id,
+                           rc.user_id,
+                           rc.reply_to_comment_id,
+                           rc.content,
+                           rc.created_at,
+                           1 AS depth,
+                           ARRAY[c0.id, rc.id]::uuid[] AS visited
+                      FROM f_i_telegraph_comments c0
+                      JOIN f_i_telegraph_comments rc
+                        ON rc.id = c0.reply_to_comment_id
+                       AND rc.team_id = $1
+                       AND rc.topic_id = $2
+                       AND rc.entry_id = $3
+                       AND rc.status = 'visible'
+                      JOIN f_i_users rcu
+                        ON rcu.id = rc.user_id
+                       AND rcu.status = 'active'
+                     WHERE c0.id = $4
+                       AND c0.team_id = $1
+                       AND c0.topic_id = $2
+                       AND c0.entry_id = $3
+                    UNION ALL
+                    SELECT parent.id,
+                           parent.topic_id,
+                           parent.entry_id,
+                           parent.user_id,
+                           parent.reply_to_comment_id,
+                           parent.content,
+                           parent.created_at,
+                           ch.depth + 1 AS depth,
+                           ch.visited || parent.id
+                      FROM chain ch
+                      JOIN f_i_telegraph_comments parent
+                        ON parent.id = ch.reply_to_comment_id
+                       AND parent.team_id = $1
+                       AND parent.topic_id = $2
+                       AND parent.entry_id = $3
+                       AND parent.status = 'visible'
+                      JOIN f_i_users pu
+                        ON pu.id = parent.user_id
+                       AND pu.status = 'active'
+                     WHERE ch.depth < 20
+                       AND NOT (parent.id = ANY(ch.visited))
+                )
+                SELECT c.id,
+                       c.topic_id,
+                       c.entry_id,
+                       c.user_id,
+                       u.display_name AS author_display_name,
+                       u.avatar_url AS author_avatar_url,
+                       c.reply_to_comment_id,
+                       ru.display_name AS reply_to_author_display_name,
+                       c.content,
+                       c.created_at,
+                       (
+                         SELECT COUNT(*)::bigint
+                           FROM f_i_telegraph_comment_likes cl
+                           JOIN f_i_users lu ON lu.id = cl.user_id
+                          WHERE cl.comment_id = c.id
+                            AND lu.status = 'active'
+                       ) AS likes_count,
+                       CASE
+                         WHEN $5::uuid IS NULL THEN FALSE
+                         ELSE EXISTS(
+                           SELECT 1
+                             FROM f_i_telegraph_comment_likes cl
+                            WHERE cl.comment_id = c.id
+                              AND cl.user_id = $5
+                         )
+                       END AS liked_by_me,
+                       (
+                         SELECT COUNT(*)::bigint
+                           FROM f_i_telegraph_comments child
+                           JOIN f_i_users cu ON cu.id = child.user_id
+                          WHERE child.team_id = $1
+                            AND child.topic_id = $2
+                            AND child.entry_id = $3
+                            AND child.reply_to_comment_id = c.id
+                            AND child.status = 'visible'
+                            AND cu.status = 'active'
+                       ) AS replies_count
+                  FROM chain c
+                  JOIN f_i_users u ON u.id = c.user_id
+                  LEFT JOIN f_i_telegraph_comments rc
+                    ON rc.id = c.reply_to_comment_id
+                   AND rc.entry_id = c.entry_id
+                   AND rc.status = 'visible'
+                  LEFT JOIN f_i_users ru
+                    ON ru.id = rc.user_id
+                   AND ru.status = 'active'
+                 ORDER BY c.depth DESC
+                "#,
+            )
+            .bind(team_id)
+            .bind(topic_id)
+            .bind(entry_id)
+            .bind(comment_id)
+            .bind(viewer_user_id)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(interaction_storage_error)?;
+
+            ancestor_rows
+                .into_iter()
+                .map(|row| row_to_telegraph_comment(&row, viewer_user_id))
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(interaction_storage_error)?
+        } else {
+            Vec::new()
+        };
+
+        let replies_total_count_raw: i64 = sqlx::query_scalar(
+            r#"
+            SELECT COUNT(*)::bigint
+              FROM f_i_telegraph_comments c
+              JOIN f_i_users u ON u.id = c.user_id
+             WHERE c.team_id = $1
+               AND c.topic_id = $2
+               AND c.entry_id = $3
+               AND c.reply_to_comment_id = $4
+               AND c.status = 'visible'
+               AND u.status = 'active'
+            "#,
+        )
+        .bind(team_id)
+        .bind(topic_id)
+        .bind(entry_id)
+        .bind(comment_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(interaction_storage_error)?;
+        let replies_total_count = u64::try_from(replies_total_count_raw).unwrap_or(0);
+
+        let child_rows = sqlx::query(
+            r#"
+            SELECT c.id,
+                   c.topic_id,
+                   c.entry_id,
+                   c.user_id,
+                   u.display_name AS author_display_name,
+                   u.avatar_url AS author_avatar_url,
+                   c.reply_to_comment_id,
+                   ru.display_name AS reply_to_author_display_name,
+                   c.content,
+                   c.created_at,
+                   (
+                     SELECT COUNT(*)::bigint
+                       FROM f_i_telegraph_comment_likes cl
+                       JOIN f_i_users lu ON lu.id = cl.user_id
+                      WHERE cl.comment_id = c.id
+                        AND lu.status = 'active'
+                   ) AS likes_count,
+                   CASE
+                     WHEN $7::uuid IS NULL THEN FALSE
+                     ELSE EXISTS(
+                       SELECT 1
+                         FROM f_i_telegraph_comment_likes cl
+                        WHERE cl.comment_id = c.id
+                          AND cl.user_id = $7
+                     )
+                   END AS liked_by_me,
+                   (
+                     SELECT COUNT(*)::bigint
+                       FROM f_i_telegraph_comments child
+                       JOIN f_i_users cu ON cu.id = child.user_id
+                      WHERE child.team_id = c.team_id
+                        AND child.topic_id = c.topic_id
+                        AND child.entry_id = c.entry_id
+                        AND child.reply_to_comment_id = c.id
+                        AND child.status = 'visible'
+                        AND cu.status = 'active'
+                   ) AS replies_count
+              FROM f_i_telegraph_comments c
+              JOIN f_i_users u ON u.id = c.user_id
+              LEFT JOIN f_i_telegraph_comments rc
+                ON rc.id = c.reply_to_comment_id
+               AND rc.entry_id = c.entry_id
+               AND rc.status = 'visible'
+              LEFT JOIN f_i_users ru
+                ON ru.id = rc.user_id
+               AND ru.status = 'active'
+             WHERE c.team_id = $1
+               AND c.topic_id = $2
+               AND c.entry_id = $3
+               AND c.reply_to_comment_id = $8
+               AND c.status = 'visible'
+               AND u.status = 'active'
+               AND ($4::timestamptz IS NULL OR c.created_at < $4 OR (c.created_at = $4 AND c.id < $5))
+             ORDER BY c.created_at DESC, c.id DESC
+             LIMIT $6
+            "#,
+        )
+        .bind(team_id)
+        .bind(topic_id)
+        .bind(entry_id)
+        .bind(after.map(|position| position.created_at))
+        .bind(after.map(|position| position.id))
+        .bind((limit + 1) as i64)
+        .bind(viewer_user_id)
+        .bind(comment_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(interaction_storage_error)?;
+
+        let mut items = child_rows
+            .into_iter()
+            .map(|row| row_to_telegraph_comment(&row, viewer_user_id))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(interaction_storage_error)?;
+
+        let has_more = items.len() > limit;
+        items.truncate(limit);
+        let next_cursor = if has_more {
+            items.last().map(|item| TelegraphCommentsPosition {
+                created_at: item.created_at,
+                id: item.id,
+            })
+        } else {
+            None
+        };
+
+        let entry_comments_count = self
+            .count_visible_entry_comments(team_id, topic_id, entry_id)
+            .await?;
+
+        Ok(TelegraphCommentThreadPage {
+            comments_enabled: true,
+            entry_comments_count,
+            ancestors,
+            comment,
+            replies_total_count,
             items,
             next_cursor,
             has_more,

@@ -90,6 +90,18 @@ pub struct TelegraphCommentsPage {
     pub has_more: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TelegraphCommentThreadPage {
+    pub comments_enabled: bool,
+    pub entry_comments_count: u64,
+    pub ancestors: Vec<TelegraphComment>,
+    pub comment: TelegraphComment,
+    pub replies_total_count: u64,
+    pub items: Vec<TelegraphComment>,
+    pub next_cursor: Option<TelegraphCommentsPosition>,
+    pub has_more: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct CreateTelegraphCommentInput {
     pub team_id: i64,
@@ -104,6 +116,8 @@ pub struct CreateTelegraphCommentInput {
 pub enum TelegraphInteractionError {
     #[error("电报条目不存在")]
     TopicOrEntryNotFound,
+    #[error("该评论不存在或已被删除")]
+    CommentNotFound,
     #[error("请先登录")]
     Unauthorized,
     #[error("发表评论前请先上传头像并设置昵称")]

@@ -130,7 +130,15 @@
       </view>
 
       <template v-else>
-        <view v-for="(comment, index) in comments" :key="comment.id" class="x-node">
+        <view
+          v-for="(comment, index) in comments"
+          :key="comment.id"
+          class="x-node"
+          role="button"
+          :aria-label="`查看 ${comment.author.displayName} 的评论详情`"
+          hover-class="timeline__pressed"
+          @tap="emit('open-comment', comment, false)"
+        >
           <view class="x-node__rail">
             <view class="x-node__avatar">
               <image
@@ -177,7 +185,7 @@
                 class="x-action"
                 aria-label="回复评论"
                 hover-class="timeline__pressed"
-                @tap.stop="emit('reply-comment', comment)"
+                @tap.stop="emit('open-comment', comment, true)"
               >
                 <image class="x-action__icon" src="/static/topics/comment-bubble.svg" mode="aspectFit" />
                 <text v-if="comment.repliesCount > 0" class="x-action__count">
@@ -222,7 +230,7 @@
           >
             {{ loadingMore ? '正在加载更多评论…' : '加载更多评论' }}
           </button>
-          <text v-else class="x-timeline__end">已显示全部 {{ comments.length }} 条评论</text>
+          <text v-else class="x-timeline__end">已显示全部评论</text>
         </view>
       </template>
     </template>
@@ -256,7 +264,7 @@ const emit = defineEmits<{
   (e: 'focus-comment'): void
   (e: 'retry-comments'): void
   (e: 'load-more'): void
-  (e: 'reply-comment', comment: TelegraphComment): void
+  (e: 'open-comment', comment: TelegraphComment, focusReply: boolean): void
   (e: 'like-comment', comment: TelegraphComment): void
   (e: 'delete-comment', comment: TelegraphComment): void
 }>()

@@ -195,7 +195,9 @@ describe('useTelegraphEntryPage', () => {
     expect(authedPage.comments.value[0]?.likedByMe).toBe(true)
   })
 
-  test('reply creation and deletion update parent repliesCount, and profile gate preserves draft', async () => {
+  test('filters out nested replies when backend is legacy and navigates to comment detail on openComment', async () => {
+    const openedUrls: string[] = []
+    let capturedRootOnly: boolean | undefined
     const page = useTelegraphEntryPage({
       topicId: () => 'topic_1',
       entryId: () => 'entry_1',
@@ -203,35 +205,51 @@ describe('useTelegraphEntryPage', () => {
       miniReview: { shouldRestrictFeatures: ref(false) },
       api: {
         getTopicDetail: async () => makeRawTopic(),
-        getComments: async () => ({
-          comments_enabled: true,
-          total_count: 1,
-          has_more: false,
-          next_cursor: null,
-          items: [{
-            id: 'c1',
-            topic_id: 'topic_1',
-            entry_id: 'entry_1',
-            author: { display_name: '球迷甲', avatar_url: 'https://cdn.example/a.jpg' },
-            reply_to: null,
-            content: '第一条评论',
-            likes_count: 0,
-            liked_by_me: false,
-            replies_count: 0,
-            is_mine: false,
-            created_at: '2026-11-17T06:58:00Z',
-          }],
-        }),
+        getComments: async (_t, _tid, _eid, _cursor, _limit, opts) => {
+          capturedRootOnly = opts?.rootOnly
+          return {
+            comments_enabled: true,
+            total_count: 2,
+            has_more: false,
+            next_cursor: null,
+            items: [
+              {
+                id: 'r1',
+                topic_id: 'topic_1',
+                entry_id: 'entry_1',
+                author: { display_name: '楼中回复者', avatar_url: 'https://cdn.example/b.jpg' },
+                reply_to: { comment_id: 'c1', author_display_name: '球迷甲' },
+                content: '子回复不应混在一级列表',
+                likes_count: 0,
+                liked_by_me: false,
+                replies_count: 0,
+                is_mine: false,
+                created_at: '2026-11-17T06:59:00Z',
+              },
+              {
+                id: 'c1',
+                topic_id: 'topic_1',
+                entry_id: 'entry_1',
+                author: { display_name: '球迷甲', avatar_url: 'https://cdn.example/a.jpg' },
+                reply_to: null,
+                content: '第一条评论',
+                likes_count: 0,
+                liked_by_me: false,
+                replies_count: 1,
+                is_mine: false,
+                created_at: '2026-11-17T06:58:00Z',
+              },
+            ],
+          }
+        },
         createComment: async (_teamId, _topicId, _entryId, payload) => ({
-          comments_count: 2,
+          comments_count: 3,
           comment: {
             id: 'c2',
             topic_id: 'topic_1',
             entry_id: 'entry_1',
             author: { display_name: '川足铁杆', avatar_url: 'data:image/png;base64,AAAA' },
-            reply_to: payload.reply_to_comment_id
-              ? { comment_id: payload.reply_to_comment_id, author_display_name: '球迷甲' }
-              : null,
+            reply_to: null,
             content: payload.content,
             likes_count: 0,
             liked_by_me: false,
@@ -240,35 +258,40 @@ describe('useTelegraphEntryPage', () => {
             created_at: '2026-11-17T07:01:00Z',
           },
         }),
-        deleteComment: async () => ({ comments_count: 1 }),
+        deleteComment: async () => ({ comments_count: 2 }),
       },
-      ui: { redirectToLogin: () => {}, toast: () => {} },
+      ui: {
+        redirectToLogin: () => {},
+        toast: () => {},
+        openComment: url => openedUrls.push(url),
+      },
     })
 
     await page.loadInitial()
-    page.draftContent.value = '赞同楼上看法'
+    expect(capturedRootOnly).toBe(true)
+    expect(page.comments.value.map(c => c.id)).toEqual(['c1'])
+
+    page.draftContent.value = '直接评论电报'
     await page.submitComment()
     expect(page.profileSheetVisible.value).toBe(true)
-    expect(page.draftContent.value).toBe('赞同楼上看法')
+    expect(page.draftContent.value).toBe('直接评论电报')
 
     await page.saveProfileAndContinue({
       display_name: '川足铁杆',
       avatar_data_url: 'data:image/png;base64,AAAA',
     })
     expect(page.profileSheetVisible.value).toBe(false)
-    expect(page.comments.value.length).toBe(2)
+    expect(page.comments.value.map(c => c.id)).toEqual(['c2', 'c1'])
 
+    page.openComment(page.comments.value[1]!, false)
     await page.startReply(page.comments.value[1]!)
-    expect(page.replyTarget.value?.id).toBe('c1')
-    page.draftContent.value = '确实有道理'
-    await page.submitComment()
+    expect(openedUrls).toEqual([
+      '/pages/telegraph-entry/comment?topicId=topic_1&entryId=entry_1&commentId=c1',
+      '/pages/telegraph-entry/comment?topicId=topic_1&entryId=entry_1&commentId=c1&focus=1',
+    ])
 
-    const parentAfterReply = page.comments.value.find(c => c.id === 'c1')
-    expect(parentAfterReply?.repliesCount).toBe(1)
-
-    const replyItem = page.comments.value.find(c => c.replyTo?.commentId === 'c1')!
-    await page.deleteOwnComment(replyItem)
-    expect(page.comments.value.find(c => c.id === 'c1')?.repliesCount).toBe(0)
+    await page.deleteOwnComment(page.comments.value[0]!)
+    expect(page.comments.value.map(c => c.id)).toEqual(['c1'])
   })
 
   test('server 403 PROFILE_INCOMPLETE re-opens profile setup sheet and keeps draft', async () => {

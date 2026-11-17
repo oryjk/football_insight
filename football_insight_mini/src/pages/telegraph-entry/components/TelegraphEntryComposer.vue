@@ -84,15 +84,19 @@ import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
 import { useSheetKeyboard } from '../../../composables/useSheetKeyboard'
 import type { TelegraphComment } from '../../../types/dailyTopic'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   visible: boolean
   loggedIn: boolean
   profileComplete: boolean
   draft: string
-  replyTarget: TelegraphComment | null
+  replyTarget?: TelegraphComment | null
+  defaultPlaceholder?: string
   submitting: boolean
   focusTrigger: number
-}>()
+}>(), {
+  replyTarget: null,
+  defaultPlaceholder: '发布你的看法（最多 200 字）',
+})
 
 const emit = defineEmits<{
   (e: 'update:draft', value: string): void
@@ -123,7 +127,7 @@ const isExpanded = computed(() =>
   || Boolean(props.replyTarget),
 )
 const inputPlaceholder = computed(() =>
-  props.replyTarget ? `回复 @${props.replyTarget.author.displayName}…` : '发布你的看法（最多 200 字）',
+  props.replyTarget ? `回复 @${props.replyTarget.author.displayName}…` : props.defaultPlaceholder,
 )
 
 function clearCollapseTimer(): void {

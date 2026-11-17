@@ -32,7 +32,7 @@
           @focus-comment="page.startRootComment"
           @retry-comments="page.reloadComments"
           @load-more="page.loadMoreComments"
-          @reply-comment="page.startReply"
+          @open-comment="page.openComment"
           @like-comment="page.toggleCommentLike"
           @delete-comment="page.deleteOwnComment"
         />
@@ -69,7 +69,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { onLoad, onPullDownRefresh, onReachBottom, onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
+import { onHide, onLoad, onPullDownRefresh, onReachBottom, onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
 import FiProfileSetupSheet from '../../components/FiProfileSetupSheet.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
@@ -98,6 +98,7 @@ const shareCanvasStyle = { width: `${TELEGRAPH_SHARE_CARD.width}px`, height: `${
 let topicId = ''
 let entryId = ''
 let lastSessionRevision = session.revision.value
+let hasLeftPage = false
 
 const page = useTelegraphEntryPage({
   topicId: () => topicId,
@@ -181,10 +182,15 @@ onLoad((query) => {
   void page.loadInitial(focus)
 })
 
+onHide(() => {
+  hasLeftPage = true
+})
+
 onShow(() => {
   void miniReview.ensureMiniReviewReady()
   void session.ensureSessionReady()
-  if (topicId && entryId && topic.value && session.revision.value !== lastSessionRevision) {
+  if (topicId && entryId && topic.value && (hasLeftPage || session.revision.value !== lastSessionRevision)) {
+    hasLeftPage = false
     lastSessionRevision = session.revision.value
     void page.refreshAll()
   }
