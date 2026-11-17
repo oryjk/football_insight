@@ -25,7 +25,7 @@
           <view v-else class="team-chip__avatar team-chip__avatar--fallback">
             {{ team.team_name.charAt(0) }}
           </view>
-          <text>{{ team.rank_no === null ? '' : `#${team.rank_no} ` }}{{ team.team_name }}</text>
+          <text>{{ team.team_name }}</text>
         </button>
       </view>
     </scroll-view>
