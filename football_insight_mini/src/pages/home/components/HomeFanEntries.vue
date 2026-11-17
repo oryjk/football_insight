@@ -27,7 +27,7 @@
       <text class="fan-entry__subtitle">{{ lineupModel.subtitle }}</text>
       <view class="fan-entry__cta fan-entry__cta--lineup">
         <text class="fan-entry__cta-text">{{ lineupModel.ctaLabel }}</text>
-        <text class="fan-entry__cta-arrow">›</text>
+        <image class="fan-entry__cta-icon" :src="chevronRightWhiteIcon" mode="aspectFit" aria-hidden="true" />
       </view>
     </view>
 
@@ -64,7 +64,7 @@
       <text class="fan-entry__subtitle">{{ transferModel.subtitle }}</text>
       <view class="fan-entry__cta fan-entry__cta--like">
         <text class="fan-entry__cta-text">{{ transferModel.ctaLabel }}</text>
-        <text class="fan-entry__cta-arrow">›</text>
+        <image class="fan-entry__cta-icon" :src="chevronRightWhiteIcon" mode="aspectFit" aria-hidden="true" />
       </view>
     </view>
   </view>
@@ -73,6 +73,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import FiAvatar from '../../../components/FiAvatar.vue'
+import chevronRightWhiteIcon from '../../../static/home/chevron-right-white.svg'
 import likeActiveIcon from '../../../static/lineup/reaction-like-active.png'
 import type { LineupConsensus } from '../../../types/lineup'
 import type { TransferSummary } from '../../../types/transfer'
@@ -273,13 +274,10 @@ const transferModel = computed(() =>
 }
 
 .fan-entry__subtitle {
+  display: block;
   color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-22);
   line-height: var(--fi-leading-normal);
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
 }
 
 .fan-entry__cta {
@@ -287,7 +285,7 @@ const transferModel = computed(() =>
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--fi-space-12) var(--fi-space-18);
+  padding: var(--fi-space-10) var(--fi-space-16) var(--fi-space-10) var(--fi-space-18);
   border-radius: var(--fi-radius-round);
   color: var(--fi-color-surface);
 }
@@ -306,10 +304,10 @@ const transferModel = computed(() =>
   line-height: var(--fi-leading-none);
 }
 
-.fan-entry__cta-arrow {
-  font-size: var(--fi-font-26);
-  font-weight: var(--fi-weight-bold);
-  line-height: var(--fi-leading-none);
+.fan-entry__cta-icon {
+  flex-shrink: 0;
+  width: var(--fi-space-36);
+  height: var(--fi-space-36);
 }
 
 @media (prefers-reduced-motion: reduce) {

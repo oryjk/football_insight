@@ -100,11 +100,11 @@ describe('buildHomeLineupEntryViewModel', () => {
 
     const progress = buildHomeLineupEntryViewModel(createConsensus({ unlocked: false, total: 4, formation: null }), '成都蓉城')
     expect(progress.pitchDots.length).toBe(11)
-    expect(progress.subtitle).toBe('已有 4 套 · 汇聚最佳阵')
+    expect(progress.subtitle).toBe('4 套阵容 · 汇聚中')
 
     const unlocked = buildHomeLineupEntryViewModel(createConsensus(), '成都蓉城')
     expect(unlocked.pitchDots.length).toBe(11)
-    expect(unlocked.subtitle).toBe('已有 10 套 · 热门 4-2-3-1')
+    expect(unlocked.subtitle).toBe('10 套阵容 · 4-2-3-1')
   })
 })
 

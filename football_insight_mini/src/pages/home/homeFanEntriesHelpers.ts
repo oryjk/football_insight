@@ -69,9 +69,9 @@ export function buildHomeLineupEntryViewModel(
 
   let subtitle = `排一套${teamName}最佳 11 人`
   if (consensus?.unlocked && consensus.formation) {
-    subtitle = `已有 ${consensus.total} 套 · 热门 ${consensus.formation}`
+    subtitle = `${consensus.total} 套阵容 · ${consensus.formation}`
   } else if (consensus && consensus.total > 0) {
-    subtitle = `已有 ${consensus.total} 套 · 汇聚最佳阵`
+    subtitle = `${consensus.total} 套阵容 · 汇聚中`
   }
 
   return {
