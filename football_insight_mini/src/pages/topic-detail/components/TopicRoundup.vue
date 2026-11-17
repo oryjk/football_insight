@@ -15,7 +15,7 @@
         <text class="roundup__tab-count">{{ tab.count }}</text>
       </view>
     </view>
-    <view :key="activeKey" class="roundup__content" :class="contentDirection ? `roundup__content--from-${contentDirection}` : ''">
+    <view :key="activeKey" class="roundup__content" :class="contentAnimationClass">
     <view v-if="!visible.length" class="roundup__empty">今天还没有{{ activeLabel }}消息，每小时更新一次</view>
     <view
       v-for="entry in visible"
@@ -113,11 +113,16 @@ const activeKey = computed(() => props.active ?? 'all')
 const activeLabel = computed(() => props.active ? telegraphCategoryLabel(props.active) : '全部')
 const visible = computed(() => props.active ? props.item.entries.filter(entry => entry.category === props.active) : props.item.entries)
 const contentDirection = ref<'left' | 'right' | null>(null)
+const contentAnimationCycle = ref(0)
+const contentAnimationClass = computed(() => contentDirection.value
+  ? `roundup__content--from-${contentDirection.value}-${contentAnimationCycle.value % 2 === 0 ? 'a' : 'b'}`
+  : '')
 function select(category: TelegraphCategory | null, direction?: 'left' | 'right') {
   if (category === props.active) return
   const currentIndex = tabs.value.findIndex(tab => tab.value === props.active)
   const nextIndex = tabs.value.findIndex(tab => tab.value === category)
   contentDirection.value = direction ?? (nextIndex > currentIndex ? 'right' : 'left')
+  contentAnimationCycle.value += 1
   emit('select', category)
 }
 
@@ -187,19 +192,31 @@ function publishers(entry: DailyTopicEntry): string {
 .roundup { touch-action: pan-y; }
 /* #endif */
 .roundup { overflow: hidden; }
-.roundup__content--from-right { animation: roundup-content-from-right var(--fi-motion-duration-base) var(--fi-motion-ease-out) both; }
-.roundup__content--from-left { animation: roundup-content-from-left var(--fi-motion-duration-base) var(--fi-motion-ease-out) both; }
-@keyframes roundup-content-from-right {
+.roundup__content--from-right-a { animation: roundup-content-from-right-a var(--fi-motion-duration-base) var(--fi-motion-ease-out) both; }
+.roundup__content--from-right-b { animation: roundup-content-from-right-b var(--fi-motion-duration-base) var(--fi-motion-ease-out) both; }
+.roundup__content--from-left-a { animation: roundup-content-from-left-a var(--fi-motion-duration-base) var(--fi-motion-ease-out) both; }
+.roundup__content--from-left-b { animation: roundup-content-from-left-b var(--fi-motion-duration-base) var(--fi-motion-ease-out) both; }
+@keyframes roundup-content-from-right-a {
   from { opacity: 0; transform: translateX(96rpx); }
   to { opacity: 1; transform: translateX(0); }
 }
-@keyframes roundup-content-from-left {
+@keyframes roundup-content-from-right-b {
+  from { opacity: 0; transform: translateX(96rpx); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes roundup-content-from-left-a {
+  from { opacity: 0; transform: translateX(-96rpx); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes roundup-content-from-left-b {
   from { opacity: 0; transform: translateX(-96rpx); }
   to { opacity: 1; transform: translateX(0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .roundup__content--from-right,
-  .roundup__content--from-left { animation: none; }
+  .roundup__content--from-right-a,
+  .roundup__content--from-right-b,
+  .roundup__content--from-left-a,
+  .roundup__content--from-left-b { animation: none; }
 }
 .roundup__day { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-16); }
 .roundup__day-copy { display: flex; align-items: baseline; gap: var(--fi-space-16); min-width: 0; }
