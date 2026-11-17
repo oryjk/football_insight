@@ -186,7 +186,7 @@ function publishers(entry: DailyTopicEntry): string {
 .roundup__tab--active { border-bottom-color: var(--fi-color-primary); color: var(--fi-color-text-primary); font-weight: var(--fi-weight-extrabold); }
 .roundup__tab-count { font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); color: var(--fi-color-text-caption); }
 .roundup__tab--active .roundup__tab-count { color: var(--fi-color-primary); }
-.roundup__empty { padding: var(--fi-space-40) 0; text-align: center; color: var(--fi-color-text-secondary); font-size: var(--fi-font-26); }
+.roundup__empty { box-sizing: border-box; min-height: calc(100vh - 420rpx); padding: var(--fi-space-40) 0; text-align: center; color: var(--fi-color-text-secondary); font-size: var(--fi-font-26); }
 .roundup__entry { padding: var(--fi-space-28) 0 var(--fi-space-20); border-bottom: var(--fi-border-divider); }
 .roundup__entry--pressed { opacity: var(--fi-opacity-pressed); }
 .roundup__line { display: block; color: var(--fi-color-text-primary); line-height: var(--fi-leading-relaxed); }
