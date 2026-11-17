@@ -51,11 +51,12 @@
           <button
             v-if="commentsVisible"
             class="roundup__comment-btn"
+            :aria-label="`查看评论，${entry.commentsCount} 条`"
             hover-class="roundup__pressed"
             @tap.stop="emit('open-entry', entry, true)"
           >
-            <text class="roundup__comment-label">评论</text>
-            <text v-if="entry.commentsCount > 0" class="roundup__comment-count">{{ entry.commentsCount }}</text>
+            <image class="roundup__comment-icon" src="/static/topics/comment-bubble.svg" mode="aspectFit" aria-hidden="true" />
+            <text class="roundup__comment-count">{{ entry.commentsCount }}</text>
           </button>
         </view>
       </view>
@@ -194,10 +195,10 @@ function publishers(entry: DailyTopicEntry): string {
 .roundup__meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--fi-space-12) var(--fi-space-16); margin-top: var(--fi-space-12); }
 .roundup__meta-info { display: flex; flex-wrap: wrap; align-items: center; gap: var(--fi-space-12); min-width: 0; flex: 1 1 240rpx; }
 .roundup__actions { display: flex; align-items: center; flex-shrink: 0; gap: var(--fi-space-10); margin-left: auto; }
-.roundup__comment-btn { display: inline-flex; align-items: center; gap: var(--fi-space-6); height: var(--fi-component-reaction-height-sm); margin: 0; padding: 0 var(--fi-space-16); border: var(--fi-border-width) solid var(--fi-color-reaction-border); border-radius: var(--fi-radius-round); background: var(--fi-color-reaction-bg); color: var(--fi-color-reaction-text); font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); line-height: 1; box-sizing: border-box; }
+.roundup__comment-btn { display: inline-flex; align-items: center; gap: var(--fi-space-8); height: var(--fi-component-reaction-height-sm); margin: 0; padding: 0 var(--fi-space-8); border: 0; border-radius: 0; background: transparent; color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); line-height: var(--fi-leading-none); box-sizing: border-box; }
 .roundup__comment-btn::after { border: 0; }
-.roundup__comment-label, .roundup__comment-count { line-height: 1; }
-.roundup__comment-count { font-variant-numeric: tabular-nums; }
+.roundup__comment-icon { flex-shrink: 0; width: var(--fi-space-32); height: var(--fi-space-32); }
+.roundup__comment-count { line-height: var(--fi-leading-none); font-variant-numeric: tabular-nums; }
 /* 三类各一个色：国内红、国际蓝、留洋橙；浅底深字保证对比度。 */
 .roundup__tag { flex-shrink: 0; padding: var(--fi-space-2) var(--fi-space-14); border-radius: var(--fi-radius-xs); font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); }
 .roundup__tag--domestic { background: #fdecec; color: #b3282a; }

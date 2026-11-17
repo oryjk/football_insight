@@ -54,26 +54,39 @@
         </view>
 
         <view class="x-node__entry-controls">
-          <FiReactionBar
-            size="md"
-            :count="entry.likesCount"
-            :dislike-count="entry.dislikesCount"
-            :liked="entry.likedByMe"
-            :disliked="entry.dislikedByMe"
-            :pending="reactionPending"
-            @like="emit('like-entry')"
-            @dislike="emit('dislike-entry')"
-          />
           <button
             v-if="commentsVisible"
-            class="x-entry-comment-pill"
+            class="x-entry-action"
+            :aria-label="`发表评论，现有 ${entry.commentsCount} 条评论`"
             hover-class="timeline__pressed"
             @tap="emit('focus-comment')"
           >
-            <image class="x-entry-comment-pill__icon" src="/static/topics/comment-bubble.svg" mode="aspectFit" />
-            <text class="x-entry-comment-pill__label">
-              {{ entry.commentsCount > 0 ? `评论 ${formatCount(entry.commentsCount)}` : '写评论' }}
-            </text>
+            <image class="x-entry-action__icon" src="/static/topics/comment-bubble.svg" mode="aspectFit" aria-hidden="true" />
+            <text class="x-entry-action__count">{{ formatCount(entry.commentsCount) }}</text>
+          </button>
+          <button
+            class="x-entry-action"
+            :class="{ 'x-entry-action--liked': entry.likedByMe, 'x-entry-action--pending': reactionPending }"
+            :aria-label="entry.likedByMe ? '取消点赞' : '点赞'"
+            :aria-pressed="entry.likedByMe"
+            :aria-disabled="reactionPending"
+            hover-class="timeline__pressed"
+            @tap="reactionPending ? undefined : emit('like-entry')"
+          >
+            <image class="x-entry-action__icon" :src="entry.likedByMe ? '/static/lineup/reaction-like-active.png' : '/static/lineup/reaction-like-idle.png'" mode="aspectFit" aria-hidden="true" />
+            <text class="x-entry-action__count">{{ formatCount(entry.likesCount) }}</text>
+          </button>
+          <button
+            class="x-entry-action"
+            :class="{ 'x-entry-action--disliked': entry.dislikedByMe, 'x-entry-action--pending': reactionPending }"
+            :aria-label="entry.dislikedByMe ? '取消点踩' : '点踩'"
+            :aria-pressed="entry.dislikedByMe"
+            :aria-disabled="reactionPending"
+            hover-class="timeline__pressed"
+            @tap="reactionPending ? undefined : emit('dislike-entry')"
+          >
+            <image class="x-entry-action__icon" :src="entry.dislikedByMe ? '/static/lineup/reaction-dislike-active.png' : '/static/lineup/reaction-dislike-idle.png'" mode="aspectFit" aria-hidden="true" />
+            <text class="x-entry-action__count">{{ formatCount(entry.dislikesCount) }}</text>
           </button>
         </view>
       </view>
@@ -198,7 +211,6 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import FiReactionBar from '../../../components/FiReactionBar.vue'
 import type { DailyTopicEntry, TelegraphComment } from '../../../types/dailyTopic'
 import { formatTopicHeat, telegraphCategoryLabel } from '../../../utils/dailyTopics'
 
@@ -261,10 +273,7 @@ function confirmDelete(comment: TelegraphComment): void {
 
 <style scoped>
 .x-timeline {
-  background: var(--fi-color-surface);
-  border-radius: var(--fi-radius-lg);
-  padding: var(--fi-space-24) var(--fi-space-24) var(--fi-space-20);
-  border: var(--fi-border-card);
+  padding: var(--fi-space-4) var(--fi-space-4) var(--fi-space-20);
 }
 
 .x-node {
@@ -416,7 +425,7 @@ function confirmDelete(comment: TelegraphComment): void {
 
 .x-node__delete::after,
 .x-action::after,
-.x-entry-comment-pill::after,
+.x-entry-action::after,
 .x-timeline__retry::after,
 .x-timeline__more::after {
   border: 0;
@@ -507,34 +516,50 @@ function confirmDelete(comment: TelegraphComment): void {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: var(--fi-space-16);
   margin-top: var(--fi-space-18);
+  padding-top: var(--fi-space-12);
+  border-top: var(--fi-border-divider);
 }
 
-.x-entry-comment-pill {
+.x-entry-action {
   display: inline-flex;
   align-items: center;
   gap: var(--fi-space-8);
-  height: var(--fi-component-reaction-height-md);
+  min-height: var(--fi-space-48);
   margin: 0;
-  padding: 0 var(--fi-space-24);
-  border: var(--fi-border-width) solid var(--fi-color-reaction-border);
-  border-radius: var(--fi-radius-round);
-  background: var(--fi-color-reaction-bg);
-  color: var(--fi-color-reaction-text);
+  padding: 0 var(--fi-space-8);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-26);
-  font-weight: var(--fi-weight-bold);
-  line-height: 1;
+  line-height: var(--fi-leading-none);
   box-sizing: border-box;
 }
 
-.x-entry-comment-pill__icon {
-  width: 28rpx;
-  height: 28rpx;
+.x-entry-action--liked {
+  color: var(--fi-color-reaction-like);
 }
 
-.x-entry-comment-pill__label {
-  line-height: 1;
+.x-entry-action--disliked {
+  color: var(--fi-color-reaction-dislike);
+}
+
+.x-entry-action--pending {
+  opacity: var(--fi-opacity-pressed);
+}
+
+.x-entry-action__icon {
+  flex-shrink: 0;
+  width: var(--fi-space-32);
+  height: var(--fi-space-32);
+}
+
+.x-entry-action__count {
+  line-height: var(--fi-leading-none);
+  font-variant-numeric: tabular-nums;
 }
 
 .x-node__replying {
