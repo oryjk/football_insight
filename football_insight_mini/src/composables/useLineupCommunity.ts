@@ -85,7 +85,7 @@ export function createLineupList(overrides: Partial<CommunityDeps> = {}) {
   const deps = communityDeps(overrides)
   const teamId = ref(0), sort = ref<LineupSort>('latest'), page = ref(0), total = ref(0)
   const team = ref<TeamLineups['team'] | null>(null), items = ref<PublicLineupSummary[]>([])
-  const loading = ref(false), error = ref('')
+  const loading = ref(false), stale = ref(false), error = ref('')
   const likes = createLineupLikes(deps)
   let generation = 0, disposed = false
   async function fetchPage(next: number): Promise<void> {
@@ -96,18 +96,34 @@ export function createLineupList(overrides: Partial<CommunityDeps> = {}) {
     try {
       const result = await publicRead(deps, () => deps.list(id, order, next, 20), current)
       if (!result || !current()) return
+      stale.value = false
       team.value = result.team; total.value = result.total; page.value = result.page
       const codes = new Set(items.value.map(item => item.share_code))
       items.value = next === 1 ? result.items : [...items.value, ...result.items.filter(item => !codes.has(item.share_code))]
-    } catch (cause) { if (current()) error.value = extractApiErrorMessage(cause, '球队战术板加载失败') }
+    } catch (cause) {
+      if (current()) {
+        error.value = extractApiErrorMessage(cause, '球队战术板加载失败')
+        // 切换排序失败时清空旧排序缓存，避免旧榜继续冒充当前排序结果。
+        if (stale.value) { items.value = []; stale.value = false }
+      }
+    }
     finally { if (current()) loading.value = false }
   }
   function load(id: number, order: LineupSort = sort.value): Promise<void> {
+    const sameTeam = id > 0 && id === teamId.value && items.value.length > 0
+    const switchingSort = sameTeam && order !== sort.value
     generation++; disposed = false; likes.reset(); loading.value = false
-    teamId.value = id; sort.value = order; page.value = 0; total.value = 0; items.value = []; team.value = null
+    teamId.value = id; sort.value = order; page.value = 0
+    if (sameTeam) {
+      // 同队切换排序或刷新时保留现有列表与总数，直到新数据回来再替换，避免列表先塌缩后撑开引起页面抖动。
+      stale.value = switchingSort
+    } else {
+      total.value = 0; items.value = []; team.value = null; stale.value = false
+    }
     return fetchPage(1)
   }
   function more(): Promise<void> {
+    if (loading.value || stale.value) return Promise.resolve()
     return page.value === 0 || items.value.length < total.value ? fetchPage(page.value + 1) : Promise.resolve()
   }
   async function like(item: PublicLineupSummary, returnUrl: string, kind: LineupReaction = 'like'): Promise<void> {
@@ -124,10 +140,13 @@ export function createLineupList(overrides: Partial<CommunityDeps> = {}) {
     else if (updated && sort.value === 'likes') await load(teamId.value, 'likes')
   }
   /** Pause an embedded list without discarding its last successfully loaded page. */
-  function invalidatePending(): void { generation++; likes.reset(); loading.value = false }
+  function invalidatePending(): void {
+    generation++; likes.reset(); loading.value = false
+    if (stale.value) { items.value = []; total.value = 0; stale.value = false }
+  }
   function dispose(): void { disposed = true; invalidatePending() }
   const dislike = (item: PublicLineupSummary, returnUrl: string) => like(item, returnUrl, 'dislike')
-  return { teamId, sort, page, total, team, items, loading, error, pendingLikes: likes.pending, load, more, like, dislike, invalidatePending, dispose }
+  return { teamId, sort, page, total, team, items, loading, stale, error, pendingLikes: likes.pending, load, more, like, dislike, invalidatePending, dispose }
 }
 
 export function createLineupDetail(overrides: Partial<CommunityDeps> = {}) {

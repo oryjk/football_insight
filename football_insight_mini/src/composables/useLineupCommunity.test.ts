@@ -67,6 +67,84 @@ describe('public list ownership', () => {
     await list.more()
     expect(list.page.value).toBe(2); expect(list.items.value.length).toBe(2)
   })
+  test('switching sort on the same team keeps cached items while stale and skips stale on same-sort reload', async () => {
+    const sortGate = deferred<TeamLineups>(), reloadGate = deferred<TeamLineups>()
+    let calls = 0
+    const list = createLineupList({
+      ...deps(),
+      list: async (id) => {
+        calls++
+        if (calls === 2) return sortGate.promise
+        if (calls === 3) return reloadGate.promise
+        return response(id)
+      },
+    })
+    await list.load(1, 'latest')
+    const sorting = list.load(1, 'likes')
+    expect(list.stale.value).toBe(true)
+    expect(list.loading.value).toBe(true)
+    expect(list.items.value.length).toBe(1)
+    expect(list.total.value).toBe(3)
+    await list.more()
+    expect(calls).toBe(2)
+    expect(list.page.value).toBe(0)
+    sortGate.resolve(response(1)); await sorting
+    expect(list.stale.value).toBe(false)
+    expect(list.loading.value).toBe(false)
+    expect(list.sort.value).toBe('likes')
+    expect(list.page.value).toBe(1)
+    expect(list.items.value.length).toBe(1)
+    const reloading = list.load(1, 'likes')
+    expect(list.stale.value).toBe(false)
+    expect(list.items.value.length).toBe(1)
+    reloadGate.resolve(response(1)); await reloading
+    expect(list.stale.value).toBe(false)
+  })
+  test('switching teams immediately clears previous team items without stale', async () => {
+    const next = deferred<TeamLineups>(); let calls = 0
+    const list = createLineupList({ ...deps(), list: async (id) => ++calls === 2 ? next.promise : response(id) })
+    await list.load(1, 'latest')
+    const switchTeam = list.load(2, 'latest')
+    expect(list.stale.value).toBe(false)
+    expect(list.items.value).toEqual([])
+    expect(list.total.value).toBe(0)
+    expect(list.team.value).toBe(null)
+    next.resolve(response(2)); await switchTeam
+    expect(list.team.value?.team_id).toBe(2)
+    expect(list.items.value.length).toBe(1)
+  })
+  test('failed sort switch and mid-switch invalidatePending clear stale items', async () => {
+    let rejectSort: (reason?: unknown) => void = () => {}
+    let calls = 0
+    const list = createLineupList({
+      ...deps(),
+      list: (id, order) => ++calls === 2 && order === 'likes'
+        ? new Promise<TeamLineups>((_resolve, reject) => { rejectSort = reject })
+        : Promise.resolve(response(id)),
+    })
+    await list.load(1, 'latest')
+    const failed = list.load(1, 'likes')
+    expect(list.stale.value).toBe(true); expect(list.items.value.length).toBe(1)
+    rejectSort(new Error('sort failed')); await failed
+    expect(list.stale.value).toBe(false)
+    expect(list.items.value).toEqual([])
+    expect(list.error.value === '').toBe(false)
+
+    const gate = deferred<TeamLineups>()
+    const paused = createLineupList({
+      ...deps(),
+      list: async (id, order) => order === 'likes' ? gate.promise : response(id),
+    })
+    await paused.load(1, 'latest')
+    const pending = paused.load(1, 'likes')
+    expect(paused.stale.value).toBe(true); expect(paused.items.value.length).toBe(1)
+    paused.invalidatePending()
+    expect(paused.stale.value).toBe(false)
+    expect(paused.items.value).toEqual([])
+    expect(paused.total.value).toBe(0)
+    gate.resolve(response(1)); await pending
+    expect(paused.items.value).toEqual([])
+  })
 })
 
 describe('login return navigation', () => {

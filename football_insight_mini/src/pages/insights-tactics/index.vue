@@ -23,7 +23,7 @@
           :authenticated="tacticsAuthenticated"
           :mine-loading="mineLoading" :mine-error="mineError" :draft="mineDraft" :published="minePublished"
           :items="communityItems" :total="communityTotal" :sort="communitySort"
-          :loading="communityLoading || teamLoading" :error="teamError || communityError" :pending-likes="communityPendingLikes"
+          :loading="communityLoading || teamLoading" :stale="communityStale" :error="teamError || communityError" :pending-likes="communityPendingLikes"
           :consensus="consensus" :my-overlap="myOverlap" :my-player-ids="myPlayerIds" @explain="showHint"
           @edit="goToTeamBoard" @retry-mine="tactics.retryMine()" @retry-list="retryTacticsList"
           @sort="tactics.changeSort" @like="tactics.like" @dislike="tactics.dislike" @open="openPublicTactics" @more="tactics.more()"
@@ -59,7 +59,7 @@ const teamBrowser = useInsightsTeams(session)
 const { teams: selectableTeams, selectedTeamId, loading: teamLoading, error: teamError } = teamBrowser
 const tactics = useInsightsTactics({ session, selectedTeamId, active: pageVisible })
 const { mineLoading, mineError, mineDraft, minePublished, authenticated: tacticsAuthenticated } = tactics
-const { items: communityItems, total: communityTotal, sort: communitySort, loading: communityLoading, error: communityError, pendingLikes: communityPendingLikes } = tactics.community
+const { items: communityItems, total: communityTotal, sort: communitySort, loading: communityLoading, stale: communityStale, error: communityError, pendingLikes: communityPendingLikes } = tactics.community
 const lineupConsensus = createLineupConsensus()
 const consensus = lineupConsensus.consensus
 // 球队变化或页面重新可见（含 onShow）时刷新共识
