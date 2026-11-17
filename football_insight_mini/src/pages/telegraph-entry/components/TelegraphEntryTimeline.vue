@@ -88,6 +88,26 @@
             <image class="x-entry-action__icon" :src="entry.dislikedByMe ? '/static/lineup/reaction-dislike-active.png' : '/static/lineup/reaction-dislike-idle.png'" mode="aspectFit" aria-hidden="true" />
             <text class="x-entry-action__count">{{ formatCount(entry.dislikesCount) }}</text>
           </button>
+          <!-- #ifdef MP-WEIXIN -->
+          <button
+            class="x-entry-action"
+            aria-label="分享电报"
+            open-type="share"
+            hover-class="timeline__pressed"
+          >
+            <image class="x-entry-action__icon" src="/static/lineup/share.png" mode="aspectFit" aria-hidden="true" />
+          </button>
+          <!-- #endif -->
+          <!-- #ifndef MP-WEIXIN -->
+          <button
+            class="x-entry-action"
+            aria-label="分享电报"
+            hover-class="timeline__pressed"
+            @tap="emit('share')"
+          >
+            <image class="x-entry-action__icon" src="/static/lineup/share.png" mode="aspectFit" aria-hidden="true" />
+          </button>
+          <!-- #endif -->
         </view>
       </view>
     </view>
@@ -230,6 +250,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'copy-source', url: string): void
+  (e: 'share'): void
   (e: 'like-entry'): void
   (e: 'dislike-entry'): void
   (e: 'focus-comment'): void

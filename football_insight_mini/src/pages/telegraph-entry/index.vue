@@ -26,6 +26,7 @@
           :pending-like-ids="pendingCommentLikeIds"
           :deleting-comment-id="deletingCommentId"
           @copy-source="copyEntrySource"
+          @share="copyShareLink"
           @like-entry="page.likeEntry"
           @dislike-entry="page.dislikeEntry"
           @focus-comment="page.startRootComment"
