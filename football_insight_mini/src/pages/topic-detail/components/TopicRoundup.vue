@@ -1,6 +1,6 @@
 <template>
   <!-- 每日电报：顶部「全部 / 国内 / 国际 / 留洋」切换。全部按时间混排并标分类；切到某类只看这一类，播报也只播这一类。 -->
-  <view class="roundup">
+  <view class="roundup" @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd" @touchcancel="cancelSwipe">
     <view class="roundup__day">
       <view class="roundup__day-copy">
         <text class="roundup__date">{{ dayLabel }}</text>
@@ -110,6 +110,57 @@ const activeKey = computed(() => props.active ?? 'all')
 const activeLabel = computed(() => props.active ? telegraphCategoryLabel(props.active) : '全部')
 const visible = computed(() => props.active ? props.item.entries.filter(entry => entry.category === props.active) : props.item.entries)
 function select(category: TelegraphCategory | null) { if (category !== props.active) emit('select', category) }
+
+// 只在单指横向滑动结束后切换；纵向起手后不再识别为切分类。
+let swipe: {
+  x: number
+  y: number
+  identifier: number
+  category: TelegraphCategory | null
+  topicId: string
+  axis: 'pending' | 'horizontal' | 'vertical'
+} | null = null
+function cancelSwipe() { swipe = null }
+function onTouchStart(event: TouchEvent) {
+  cancelSwipe()
+  if (event.touches.length !== 1) return
+  const touch = event.touches[0]
+  swipe = {
+    x: touch.clientX,
+    y: touch.clientY,
+    identifier: touch.identifier,
+    category: props.active,
+    topicId: props.item.id,
+    axis: 'pending',
+  }
+}
+function onTouchMove(event: TouchEvent) {
+  if (!swipe) return
+  const touch = event.touches[0]
+  if (event.touches.length !== 1 || touch.identifier !== swipe.identifier) {
+    cancelSwipe()
+    return
+  }
+  const dx = Math.abs(touch.clientX - swipe.x)
+  const dy = Math.abs(touch.clientY - swipe.y)
+  if (swipe.axis === 'pending' && Math.max(dx, dy) >= 10) {
+    swipe.axis = dx > dy * 1.25 ? 'horizontal' : 'vertical'
+  }
+}
+function onTouchEnd(event: TouchEvent) {
+  const start = swipe
+  cancelSwipe()
+  if (!start || start.axis === 'vertical' || event.touches.length || event.changedTouches.length !== 1) return
+  const touch = event.changedTouches[0]
+  if (touch.identifier !== start.identifier || props.active !== start.category || props.item.id !== start.topicId) return
+  const dx = touch.clientX - start.x
+  const dy = touch.clientY - start.y
+  if (Math.abs(dx) < 48 || Math.abs(dx) <= Math.abs(dy) * 1.25) return
+  const index = tabs.value.findIndex(tab => tab.value === start.category)
+  const next = tabs.value[index + (dx < 0 ? 1 : -1)]
+  if (next) select(next.value)
+}
+
 const expanded = reactive(new Set<string>())
 function toggle(entryId: string) {
   if (expanded.has(entryId)) expanded.delete(entryId)
@@ -121,6 +172,10 @@ function publishers(entry: DailyTopicEntry): string {
 </script>
 
 <style scoped>
+/* #ifdef H5 */
+/* 横滑由分类切换处理，纵向仍使用浏览器原生滚动。 */
+.roundup { touch-action: pan-y; }
+/* #endif */
 .roundup__day { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-16); }
 .roundup__day-copy { display: flex; align-items: baseline; gap: var(--fi-space-16); min-width: 0; }
 .roundup__date { color: var(--fi-color-text-primary); font-size: var(--fi-font-30); font-weight: var(--fi-weight-extrabold); }
