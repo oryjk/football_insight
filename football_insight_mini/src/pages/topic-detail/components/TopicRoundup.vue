@@ -15,6 +15,7 @@
         <text class="roundup__tab-count">{{ tab.count }}</text>
       </view>
     </view>
+    <view :key="activeKey" class="roundup__content" :class="contentDirection ? `roundup__content--from-${contentDirection}` : ''">
     <view v-if="!visible.length" class="roundup__empty">今天还没有{{ activeLabel }}消息，每小时更新一次</view>
     <view
       v-for="entry in visible"
@@ -70,11 +71,12 @@
         </view>
       </view>
     </view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import FiReactionBar from '../../../components/FiReactionBar.vue'
 import FiTopicAudioEntry from '../../../components/topics/FiTopicAudioEntry.vue'
 import type { DailyTopicEntry, DailyTopicItem, TelegraphCategory } from '../../../types/dailyTopic'
@@ -110,7 +112,14 @@ const tabs = computed(() => [
 const activeKey = computed(() => props.active ?? 'all')
 const activeLabel = computed(() => props.active ? telegraphCategoryLabel(props.active) : '全部')
 const visible = computed(() => props.active ? props.item.entries.filter(entry => entry.category === props.active) : props.item.entries)
-function select(category: TelegraphCategory | null) { if (category !== props.active) emit('select', category) }
+const contentDirection = ref<'left' | 'right' | null>(null)
+function select(category: TelegraphCategory | null, direction?: 'left' | 'right') {
+  if (category === props.active) return
+  const currentIndex = tabs.value.findIndex(tab => tab.value === props.active)
+  const nextIndex = tabs.value.findIndex(tab => tab.value === category)
+  contentDirection.value = direction ?? (nextIndex > currentIndex ? 'right' : 'left')
+  emit('select', category)
+}
 
 // 只在单指横向滑动结束后切换；纵向起手后不再识别为切分类。
 let swipe: {
@@ -159,7 +168,7 @@ function onTouchEnd(event: TouchEvent) {
   if (Math.abs(dx) < 48 || Math.abs(dx) <= Math.abs(dy) * 1.25) return
   const index = tabs.value.findIndex(tab => tab.value === start.category)
   const next = tabs.value[index + (dx < 0 ? 1 : -1)]
-  if (next) select(next.value)
+  if (next) select(next.value, dx < 0 ? 'right' : 'left')
 }
 
 const expanded = reactive(new Set<string>())
@@ -177,6 +186,21 @@ function publishers(entry: DailyTopicEntry): string {
 /* 横滑由分类切换处理，纵向仍使用浏览器原生滚动。 */
 .roundup { touch-action: pan-y; }
 /* #endif */
+.roundup { overflow: hidden; }
+.roundup__content--from-right { animation: roundup-content-from-right var(--fi-motion-duration-base) var(--fi-motion-ease-out) both; }
+.roundup__content--from-left { animation: roundup-content-from-left var(--fi-motion-duration-base) var(--fi-motion-ease-out) both; }
+@keyframes roundup-content-from-right {
+  from { opacity: 0; transform: translateX(96rpx); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes roundup-content-from-left {
+  from { opacity: 0; transform: translateX(-96rpx); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .roundup__content--from-right,
+  .roundup__content--from-left { animation: none; }
+}
 .roundup__day { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-16); }
 .roundup__day-copy { display: flex; align-items: baseline; gap: var(--fi-space-16); min-width: 0; }
 .roundup__date { color: var(--fi-color-text-primary); font-size: var(--fi-font-30); font-weight: var(--fi-weight-extrabold); }
