@@ -1,9 +1,16 @@
 <template>
   <view
+    v-if="visible && isFocused"
+    class="composer-backdrop"
+    @touchmove.stop.prevent
+    @tap="dismissKeyboard"
+  />
+  <view
     v-if="visible"
     class="composer"
     :class="{ 'composer--lifted': keyboardHeight > 0 }"
     :style="{ bottom: `${keyboardHeight}px` }"
+    @touchmove.stop
     @tap.stop
   >
     <button
@@ -36,35 +43,44 @@
         </button>
       </view>
 
-      <view class="composer__row">
-        <input
+      <view class="composer__editor" :class="{ 'composer__editor--expanded': isExpanded }">
+        <textarea
           :value="draft"
-          :focus="inputFocused"
-          class="composer__input"
-          maxlength="200"
-          :disabled="submitting"
+          :focus="programmaticFocus"
+          fixed
           :adjust-position="false"
-          confirm-type="send"
+          :show-confirm-bar="false"
+          :disable-default-padding="true"
+          :cursor-spacing="0"
+          :maxlength="200"
+          :disabled="submitting"
+          class="composer__textarea"
+          :class="{ 'composer__textarea--expanded': isExpanded }"
           :placeholder="inputPlaceholder"
           @input="handleInput"
-          @blur="inputFocused = false"
-          @confirm="emit('submit')"
+          @focus="handleFocus"
+          @blur="handleBlur"
+          @keyboardheightchange="handleKeyboardHeightChange"
         />
-        <button
-          class="composer__send"
-          :disabled="submitting || !draft.trim()"
-          hover-class="composer__pressed"
-          @tap="emit('submit')"
-        >
-          {{ submitting ? '发送中' : '发送' }}
-        </button>
+        <view class="composer__toolbar" :class="{ 'composer__toolbar--expanded': isExpanded }">
+          <text v-if="isExpanded" class="composer__counter">{{ draftCharCount }} / 200</text>
+          <button
+            class="composer__send"
+            :disabled="submitting || !draft.trim()"
+            hover-class="composer__pressed"
+            @tap="handleSendTap"
+          >
+            {{ submitting ? '发送中' : '发送' }}
+          </button>
+        </view>
       </view>
     </template>
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
+import { useSheetKeyboard } from '../../../composables/useSheetKeyboard'
 import type { TelegraphComment } from '../../../types/dailyTopic'
 
 const props = defineProps<{
@@ -75,7 +91,6 @@ const props = defineProps<{
   replyTarget: TelegraphComment | null
   submitting: boolean
   focusTrigger: number
-  keyboardHeight: number
 }>()
 
 const emit = defineEmits<{
@@ -84,24 +99,89 @@ const emit = defineEmits<{
   (e: 'setup-profile'): void
   (e: 'cancel-reply'): void
   (e: 'submit'): void
+  (e: 'focus-change', focused: boolean): void
 }>()
 
-const inputFocused = ref(false)
+const {
+  keyboardHeight,
+  onInputFocus,
+  onInputBlur,
+  onKeyboardHeightChange,
+  resetKeyboard,
+} = useSheetKeyboard()
+
+const isFocused = ref(false)
+const programmaticFocus = ref(false)
+let collapseTimer: ReturnType<typeof setTimeout> | null = null
+
+const draftCharCount = computed(() => Array.from(props.draft).length)
+const isExpanded = computed(() =>
+  isFocused.value
+  || props.submitting
+  || draftCharCount.value > 0
+  || Boolean(props.replyTarget),
+)
 const inputPlaceholder = computed(() =>
   props.replyTarget ? `回复 @${props.replyTarget.author.displayName}…` : '发布你的看法（最多 200 字）',
+)
+
+function clearCollapseTimer(): void {
+  if (collapseTimer) {
+    clearTimeout(collapseTimer)
+    collapseTimer = null
+  }
+}
+
+watch(isFocused, (focused) => {
+  emit('focus-change', focused)
+})
+
+watch(
+  () => props.visible,
+  (open) => {
+    if (!open) {
+      clearCollapseTimer()
+      programmaticFocus.value = false
+      isFocused.value = false
+      resetKeyboard()
+    }
+  },
 )
 
 watch(
   () => props.focusTrigger,
   async (trigger) => {
-    if (!trigger) {
+    if (!trigger || !props.visible) {
       return
     }
-    inputFocused.value = false
+    clearCollapseTimer()
+    isFocused.value = true
+    programmaticFocus.value = false
     await nextTick()
-    inputFocused.value = true
+    programmaticFocus.value = true
   },
 )
+
+const globalKeyboardListener = (res: { height?: number }) => {
+  if (!props.visible || !isFocused.value) {
+    return
+  }
+  const height = typeof res?.height === 'number' && res.height > 0 ? res.height : 0
+  onKeyboardHeightChange({ detail: { height } })
+  if (height === 0 && !props.draft.trim()) {
+    isFocused.value = false
+  }
+}
+if (typeof uni !== 'undefined' && typeof uni.onKeyboardHeightChange === 'function') {
+  uni.onKeyboardHeightChange(globalKeyboardListener)
+}
+
+onScopeDispose(() => {
+  clearCollapseTimer()
+  if (typeof uni !== 'undefined' && typeof uni.offKeyboardHeightChange === 'function') {
+    uni.offKeyboardHeightChange(globalKeyboardListener)
+  }
+})
 
 function handleInput(event: unknown): void {
   const detail = (event as { detail?: { value?: unknown } } | null)?.detail
@@ -114,9 +194,59 @@ function handleInput(event: unknown): void {
     emit('update:draft', target.value)
   }
 }
+
+function handleFocus(event: unknown): void {
+  clearCollapseTimer()
+  isFocused.value = true
+  onInputFocus(event)
+}
+
+function handleKeyboardHeightChange(event: unknown): void {
+  const hadHeight = keyboardHeight.value > 0
+  onKeyboardHeightChange(event)
+  if (hadHeight && keyboardHeight.value === 0 && !props.draft.trim()) {
+    isFocused.value = false
+  }
+}
+
+function handleBlur(): void {
+  programmaticFocus.value = false
+  onInputBlur()
+  clearCollapseTimer()
+  // 延迟收起高度，避免点「发送」或「取消」时按钮位置先于 @tap 跳变。
+  collapseTimer = setTimeout(() => {
+    collapseTimer = null
+    if (!programmaticFocus.value) {
+      isFocused.value = false
+    }
+  }, 90)
+}
+
+function dismissKeyboard(): void {
+  clearCollapseTimer()
+  programmaticFocus.value = false
+  isFocused.value = false
+  resetKeyboard()
+  if (typeof uni !== 'undefined' && typeof uni.hideKeyboard === 'function') {
+    uni.hideKeyboard()
+  }
+}
+
+function handleSendTap(): void {
+  clearCollapseTimer()
+  emit('submit')
+}
 </script>
 
 <style scoped>
+.composer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 29;
+  background: var(--fi-color-overlay);
+  opacity: 0.35;
+}
+
 .composer {
   position: fixed;
   left: 0;
@@ -126,9 +256,11 @@ function handleInput(event: unknown): void {
   padding: var(--fi-space-14) var(--fi-space-24) calc(var(--fi-space-18) + env(safe-area-inset-bottom));
   background: var(--fi-color-surface);
   border-top: var(--fi-border-divider);
+  box-shadow: var(--fi-shadow-floating);
   display: flex;
   flex-direction: column;
   gap: var(--fi-space-12);
+  transition: bottom var(--fi-motion-duration-fast) var(--fi-motion-ease-out);
 }
 
 .composer--lifted {
@@ -194,23 +326,61 @@ function handleInput(event: unknown): void {
   line-height: 1.4;
 }
 
-.composer__row {
+.composer__editor {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--fi-space-12);
 }
 
-.composer__input {
+.composer__editor--expanded {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--fi-space-12);
+}
+
+.composer__textarea {
   flex: 1;
   min-width: 0;
+  width: auto;
   height: 76rpx;
-  padding: 0 var(--fi-space-24);
+  min-height: 76rpx;
+  padding: var(--fi-space-16) var(--fi-space-24);
   box-sizing: border-box;
   border-radius: var(--fi-radius-round);
   background: var(--fi-color-page-soft);
   border: var(--fi-border-card);
   color: var(--fi-color-text-primary);
   font-size: var(--fi-font-26);
+  line-height: var(--fi-leading-snug);
+}
+
+.composer__textarea--expanded {
+  flex: none;
+  width: 100%;
+  height: 184rpx;
+  min-height: 184rpx;
+  padding: var(--fi-space-18) var(--fi-space-20);
+  border-radius: var(--fi-radius-md);
+  font-size: var(--fi-font-28);
+  line-height: var(--fi-leading-normal);
+}
+
+.composer__toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.composer__toolbar--expanded {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.composer__counter {
+  color: var(--fi-color-text-caption);
+  font-size: var(--fi-font-22);
+  font-variant-numeric: tabular-nums;
 }
 
 .composer__send {

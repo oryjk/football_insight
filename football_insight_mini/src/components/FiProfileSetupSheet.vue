@@ -75,7 +75,9 @@
           :adjust-position="false"
           placeholder="请输入 2-16 字昵称（不可用手机号）"
           @input="clearError"
+          @focus="onInputFocus"
           @blur="handleNicknameBlur"
+          @keyboardheightchange="onKeyboardHeightChange"
         />
         <!-- #endif -->
         <!-- #ifndef MP-WEIXIN -->
@@ -84,8 +86,12 @@
           class="profile-sheet__input"
           maxlength="16"
           :disabled="busy"
+          :adjust-position="false"
           placeholder="请输入 2-16 字昵称（不可用手机号）"
           @input="clearError"
+          @focus="onInputFocus"
+          @blur="onInputBlur"
+          @keyboardheightchange="onKeyboardHeightChange"
         />
         <!-- #endif -->
         <text class="profile-sheet__hint">支持中文、英文或数字，长度 2-16 个字符，将通过微信内容安全审核。</text>
@@ -110,8 +116,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onScopeDispose, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import FiBottomSheet from './FiBottomSheet.vue'
+import { useSheetKeyboard } from '../composables/useSheetKeyboard'
 import { readAvatarAsDataUrl } from '../utils/avatarDataUrl'
 import { hasValidAvatarUrl, validateNicknameInput } from '../utils/profileGate'
 
@@ -134,7 +141,13 @@ const nickname = ref('')
 const selectedAvatarPath = ref('')
 const errorMessage = ref('')
 const readingAvatar = ref(false)
-const keyboardHeight = ref(0)
+const {
+  keyboardHeight,
+  onInputFocus,
+  onInputBlur,
+  onKeyboardHeightChange,
+  resetKeyboard,
+} = useSheetKeyboard()
 
 const busy = computed(() => props.submitting || readingAvatar.value)
 const previewAvatar = computed(() =>
@@ -151,22 +164,10 @@ watch(
       errorMessage.value = ''
       return
     }
-    keyboardHeight.value = 0
+    resetKeyboard()
   },
   { immediate: true },
 )
-
-const keyboardListener = (res: { height?: number }) => {
-  keyboardHeight.value = props.visible && typeof res?.height === 'number' && res.height > 0 ? res.height : 0
-}
-if (typeof uni !== 'undefined' && typeof uni.onKeyboardHeightChange === 'function') {
-  uni.onKeyboardHeightChange(keyboardListener)
-}
-onScopeDispose(() => {
-  if (typeof uni !== 'undefined' && typeof uni.offKeyboardHeightChange === 'function') {
-    uni.offKeyboardHeightChange(keyboardListener)
-  }
-})
 
 function clearError(): void {
   errorMessage.value = ''
@@ -177,7 +178,7 @@ function handleVisibleChange(nextVisible: boolean): void {
 }
 
 function handleClose(): void {
-  keyboardHeight.value = 0
+  resetKeyboard()
 }
 
 function handleChooseMiniAvatar(event: unknown): void {
@@ -209,6 +210,7 @@ function handleChooseH5Avatar(): void {
 }
 
 function handleNicknameBlur(event: unknown): void {
+  onInputBlur()
   const detail = (event as { detail?: { value?: unknown } } | null)?.detail
   if (typeof detail?.value === 'string') {
     nickname.value = detail.value

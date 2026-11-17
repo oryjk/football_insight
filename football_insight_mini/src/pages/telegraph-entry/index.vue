@@ -47,8 +47,8 @@
     :reply-target="replyTarget"
     :submitting="submittingComment"
     :focus-trigger="inputFocusTrigger"
-    :keyboard-height="keyboardHeight"
     @update:draft="draftContent = $event"
+    @focus-change="composerFocused = $event"
     @login="page.requestLogin"
     @setup-profile="page.openProfileSetup"
     @cancel-reply="page.clearReplyTarget"
@@ -66,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onScopeDispose, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { onLoad, onPullDownRefresh, onReachBottom, onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
 import FiProfileSetupSheet from '../../components/FiProfileSetupSheet.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
@@ -121,23 +121,13 @@ const {
   loadInitial,
 } = page
 
-const keyboardHeight = ref(0)
+const composerFocused = ref(false)
 const dayLabel = computed(() => (topic.value ? roundupDayLabel(topic.value.publishedAt) : ''))
 const pageStyle = computed(() =>
-  profileSheetVisible.value ? `${navigationPageStyle.value};overflow:hidden;` : navigationPageStyle.value,
+  profileSheetVisible.value || composerFocused.value
+    ? `${navigationPageStyle.value};overflow:hidden;`
+    : navigationPageStyle.value,
 )
-
-const keyboardListener = (res: { height?: number }) => {
-  keyboardHeight.value = typeof res?.height === 'number' && res.height > 0 ? res.height : 0
-}
-if (typeof uni !== 'undefined' && typeof uni.onKeyboardHeightChange === 'function') {
-  uni.onKeyboardHeightChange(keyboardListener)
-}
-onScopeDispose(() => {
-  if (typeof uni !== 'undefined' && typeof uni.offKeyboardHeightChange === 'function') {
-    uni.offKeyboardHeightChange(keyboardListener)
-  }
-})
 
 function copyEntrySource(url: string): void {
   if (!isTopicSourceUrl(url) || !entry.value?.sources.some(source => source.url === url)) {
