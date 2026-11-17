@@ -2,8 +2,12 @@
   <view class="topic-row" :class="`topic-row--${presentation.tone}`" role="button" :aria-label="`阅读${item.title}`" hover-class="topic-row--pressed" @tap="emit('read', item.id)">
     <FiTopicCrest v-if="!roundup" :item="item" variant="history" />
     <view class="topic-row__top">
-      <text class="topic-row__badge">{{ roundup ? '每日电报' : presentation.label }}</text>
-      <text class="topic-row__date">{{ roundup ? `${roundupDayLabel(item.publishedAt)} · ${item.entries.length} 条` : item.publishedLabel }}</text>
+      <view v-if="roundup" class="topic-row__calendar" :class="{ 'topic-row__calendar--today': calendar.isToday }">
+        <image class="topic-row__calendar-icon" :src="calendarIcon" mode="aspectFit" aria-hidden="true" />
+        <text class="topic-row__calendar-label">{{ calendar.label }}</text>
+      </view>
+      <text v-else class="topic-row__badge">{{ presentation.label }}</text>
+      <text class="topic-row__date">{{ roundup ? `${item.entries.length} 条` : item.publishedLabel }}</text>
     </view>
     <view v-if="roundup" class="topic-row__entries">
       <view v-for="lead in leads" :key="lead.category" class="topic-row__entry">
@@ -26,13 +30,16 @@ import { computed } from 'vue'
 import FiTopicCrest from '../../../components/topics/FiTopicCrest.vue'
 import FiTopicMeta from '../../../components/topics/FiTopicMeta.vue'
 import FiTopicReadEntry from '../../../components/topics/FiTopicReadEntry.vue'
+import calendarIcon from '../../../static/user/calendar-days.svg'
 import type { DailyTopicItem } from '../../../types/dailyTopic'
+import { isRoundupTopic, telegraphCategoryLeads } from '../../../utils/dailyTopics'
 import { topicCardPresentation } from '../presentation'
-import { isRoundupTopic, roundupDayLabel, telegraphCategoryLeads } from '../../../utils/dailyTopics'
+import { telegraphCalendarLabel } from '../telegraphCalendar'
 const props = defineProps<{ item: DailyTopicItem; heat: number }>()
 const emit = defineEmits<{ (e: 'read', id: string): void }>()
 const roundup = computed(() => isRoundupTopic(props.item))
 const leads = computed(() => telegraphCategoryLeads(props.item))
+const calendar = computed(() => telegraphCalendarLabel(props.item.publishedAt))
 const presentation = computed(() => topicCardPresentation(props.item.title))
 </script>
 <style scoped>
@@ -52,6 +59,10 @@ const presentation = computed(() => topicCardPresentation(props.item.title))
 .topic-row__entry-title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--fi-color-text-primary); font-size: var(--fi-font-28); line-height: var(--fi-leading-normal); font-weight: var(--fi-weight-bold); }
 .topic-row__top { display: flex; justify-content: space-between; align-items: center; gap: var(--fi-space-12); }
 .topic-row__badge { flex-shrink: 0; padding: var(--fi-space-6) var(--fi-space-14); border: var(--fi-border-width) solid currentColor; border-radius: var(--fi-radius-round); color: var(--topic-accent); background: var(--fi-color-bg); font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); }
+.topic-row__calendar { flex-shrink: 0; display: inline-flex; align-items: center; gap: var(--fi-space-8); color: var(--fi-color-text-primary); }
+.topic-row__calendar--today { color: var(--fi-color-primary); }
+.topic-row__calendar-icon { width: var(--fi-space-28); height: var(--fi-space-28); }
+.topic-row__calendar-label { font-size: var(--fi-font-28); font-weight: var(--fi-weight-bold); line-height: var(--fi-leading-normal); }
 .topic-row__date { min-width: 0; color: var(--fi-color-text-caption); font-size: var(--fi-font-20); text-align: right; }
 .topic-row__title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: var(--fi-space-20); color: var(--fi-color-text-primary); font-size: var(--fi-font-32); font-weight: var(--fi-weight-bold); line-height: var(--fi-leading-normal); }
 .topic-row__summary { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: var(--fi-space-16); color: var(--fi-color-text-secondary); font-size: var(--fi-font-26); line-height: var(--fi-leading-relaxed); }

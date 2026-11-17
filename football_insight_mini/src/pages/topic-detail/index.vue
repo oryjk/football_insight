@@ -9,7 +9,7 @@
       <text class="topic-detail__title">每日电报</text>
       <view class="topic-detail__meta-row">
         <text class="topic-detail__meta">更新于 {{ item.publishedLabel }}</text>
-        <view class="topic-detail__size"><FiSegmented compact :items="READING_SIZE_ITEMS" :model-value="readingSize" aria-label="文字大小" @update:model-value="setReadingSize" /></view>
+        <view class="topic-detail__size"><FiSegmented compact frameless :items="READING_SIZE_ITEMS" :model-value="readingSize" aria-label="文字大小" @update:model-value="setReadingSize" /></view>
       </view>
       <FiTopicAudioPlayer v-if="audio.activeId.value" :title="audio.activeId.value === item.id ? '每日电报 · 全部' : audio.activeTitle.value" :status="audio.status.value" :current-time="audio.currentTime.value" :duration="audio.duration.value" :error-message="audio.errorMessage.value" @toggle="audio.toggle(audio.activeId.value)" @seek="audio.seek" @close="audio.stop" />
       <view class="topic-detail__roundup">
@@ -36,7 +36,7 @@
       <text class="topic-detail__title">{{ item.title }}</text>
       <view class="topic-detail__meta-row">
         <text class="topic-detail__meta">{{ item.publishedLabel }}</text>
-        <view class="topic-detail__size"><FiSegmented compact :items="READING_SIZE_ITEMS" :model-value="readingSize" aria-label="文字大小" @update:model-value="setReadingSize" /></view>
+        <view class="topic-detail__size"><FiSegmented compact frameless :items="READING_SIZE_ITEMS" :model-value="readingSize" aria-label="文字大小" @update:model-value="setReadingSize" /></view>
       </view>
       <view class="topic-detail__heat"><FiTopicMeta :heat="topicHeatValue(item.id, item.heat)" :minutes="item.readMinutes" /></view>
       <view class="topic-detail__audio"><FiTopicAudioEntry :ready="audio.availableIds.value.includes(item.id)" :playing="audio.status.value === 'playing'" :loading="audio.status.value === 'loading'" @play="audio.toggle(item.id)" /></view>

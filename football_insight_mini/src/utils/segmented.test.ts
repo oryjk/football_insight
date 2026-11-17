@@ -19,6 +19,11 @@ describe('segmentedThumbStyle', () => {
     expect(segmentedThumbStyle(5, 4).includes('* 6) / 5)')).toBe(true)
   })
 
+  test('frameless tracks divide the full width without outer padding or gaps', () => {
+    expect(segmentedThumbStyle(3, 0, null)).toBe('width: calc(100% / 3); transform: translateX(0%);')
+    expect(segmentedThumbStyle(3, 2, null)).toBe('width: calc(100% / 3); transform: translateX(200%);')
+  })
+
   test('an unknown selection hides the thumb instead of pointing at a wrong segment', () => {
     expect(segmentedThumbStyle(3, -1).includes('opacity: 0')).toBe(true)
     expect(segmentedThumbStyle(3, 3).includes('opacity: 0')).toBe(true)

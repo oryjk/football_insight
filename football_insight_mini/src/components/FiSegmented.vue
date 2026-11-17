@@ -1,5 +1,5 @@
 <template>
-  <view class="fi-segmented" :class="{ 'fi-segmented--compact': compact }" role="group" :aria-label="ariaLabel">
+  <view class="fi-segmented" :class="{ 'fi-segmented--compact': compact, 'fi-segmented--frameless': frameless }" role="group" :aria-label="ariaLabel">
     <view class="fi-segmented__thumb" :style="thumbStyle" />
     <view
       v-for="item in items"
@@ -30,8 +30,8 @@ import type { FiSegmentedItem } from '../types/segmented'
 import { segmentedThumbStyle } from '../utils/segmented'
 
 /**
- * 通用分段切换：带描边的圆角轨道 + 随选中项滑动的实心墨色滑块，任意段数、可选图标。
- * 榜赛页（球队榜/球员榜）与洞察页（进球/助攻/失球）共用，样式只在这里维护一份。
+ * 通用分段切换：默认使用带描边的圆角轨道，frameless 时去掉轨道与间距。
+ * 榜赛、洞察和电报字号等页面共用，样式只在这里维护一份。
  */
 const props = defineProps<{
   items: FiSegmentedItem[]
@@ -39,6 +39,7 @@ const props = defineProps<{
   ariaLabel?: string
   /** 行内小尺寸：用于放在文字行旁边，不撑高所在行。 */
   compact?: boolean
+  frameless?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -49,6 +50,7 @@ const thumbStyle = computed(() =>
   segmentedThumbStyle(
     props.items.length,
     props.items.findIndex(item => item.key === props.modelValue),
+    props.frameless ? null : 'var(--fi-space-6)',
   ),
 )
 
@@ -111,6 +113,8 @@ function select(key: string): void {
 .fi-segmented--compact { padding: var(--fi-space-4); gap: var(--fi-space-4); }
 .fi-segmented--compact .fi-segmented__thumb { top: var(--fi-space-4); bottom: var(--fi-space-4); left: var(--fi-space-4); }
 .fi-segmented--compact .fi-segmented__button { min-height: var(--fi-space-44); padding: 0 var(--fi-space-8); font-size: var(--fi-font-22); }
+.fi-segmented--frameless { padding: 0; gap: 0; border: 0; border-radius: 0; background: transparent; }
+.fi-segmented--frameless .fi-segmented__thumb { top: 0; bottom: 0; left: 0; box-shadow: none; }
 
 .fi-segmented__button--pressed {
   opacity: var(--fi-opacity-pressed);
