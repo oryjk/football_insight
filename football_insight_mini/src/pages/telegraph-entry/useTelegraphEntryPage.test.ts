@@ -322,4 +322,62 @@ describe('useTelegraphEntryPage', () => {
     expect(page.profileSheetVisible.value).toBe(true)
     expect(page.draftContent.value).toBe('保留草稿')
   })
+
+  test('waits for the review result before loading comments', async () => {
+    const restricted = ref(true)
+    let finishReview!: () => void
+    let commentRequests = 0
+    const page = useTelegraphEntryPage({
+      topicId: () => 'topic_1',
+      entryId: () => 'entry_1',
+      session: makeSession(null, false),
+      miniReview: {
+        shouldRestrictFeatures: restricted,
+        ensureMiniReviewReady: () => new Promise(resolve => {
+          finishReview = () => {
+            restricted.value = false
+            resolve(null)
+          }
+        }),
+      },
+      api: {
+        getTopicDetail: async () => makeRawTopic(),
+        getComments: async () => {
+          commentRequests += 1
+          return { comments_enabled: true, total_count: 0, has_more: false, next_cursor: null, items: [] }
+        },
+      },
+      ui: { redirectToLogin: () => {}, toast: () => {} },
+    })
+
+    const loading = page.loadInitial()
+    await Promise.resolve()
+    expect(commentRequests).toBe(0)
+    finishReview()
+    await loading
+    expect(commentRequests).toBe(1)
+    expect(page.commentsVisible.value).toBe(true)
+  })
+
+  test('keeps comments hidden and does not request them while reviewing', async () => {
+    let commentRequests = 0
+    const page = useTelegraphEntryPage({
+      topicId: () => 'topic_1',
+      entryId: () => 'entry_1',
+      session: makeSession(null, false),
+      miniReview: { shouldRestrictFeatures: ref(true), ensureMiniReviewReady: async () => null },
+      api: {
+        getTopicDetail: async () => makeRawTopic(),
+        getComments: async () => {
+          commentRequests += 1
+          return { comments_enabled: true, total_count: 0, has_more: false, next_cursor: null, items: [] }
+        },
+      },
+      ui: { redirectToLogin: () => {}, toast: () => {} },
+    })
+
+    await page.loadInitial()
+    expect(commentRequests).toBe(0)
+    expect(page.commentsVisible.value).toBe(false)
+  })
 })

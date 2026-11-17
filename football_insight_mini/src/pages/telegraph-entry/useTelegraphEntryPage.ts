@@ -38,6 +38,7 @@ export interface EntrySessionPort {
 
 export interface EntryMiniReviewPort {
   shouldRestrictFeatures: Ref<boolean>
+  ensureMiniReviewReady?: () => Promise<unknown>
 }
 
 export interface TelegraphEntryPageApi {
@@ -249,7 +250,11 @@ export function useTelegraphEntryPage(options: UseTelegraphEntryPageOptions) {
     loading.value = true
     errorMessage.value = ''
     try {
-      const mapped = mapTopicDetail(await api.getTopicDetail(teamId, currentTopicId))
+      const [rawTopic] = await Promise.all([
+        api.getTopicDetail(teamId, currentTopicId),
+        miniReview.ensureMiniReviewReady?.(),
+      ])
+      const mapped = mapTopicDetail(rawTopic)
       if (disposed || generation !== loadGeneration) {
         return
       }
@@ -292,7 +297,11 @@ export function useTelegraphEntryPage(options: UseTelegraphEntryPageOptions) {
     }
     const generation = ++loadGeneration
     try {
-      const mapped = mapTopicDetail(await api.getTopicDetail(teamId, currentTopicId))
+      const [rawTopic] = await Promise.all([
+        api.getTopicDetail(teamId, currentTopicId),
+        miniReview.ensureMiniReviewReady?.(),
+      ])
+      const mapped = mapTopicDetail(rawTopic)
       if (disposed || generation !== loadGeneration) {
         return
       }

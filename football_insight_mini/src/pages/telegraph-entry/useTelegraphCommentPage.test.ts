@@ -237,4 +237,76 @@ describe('useTelegraphCommentPage', () => {
     await page.deleteOwnComment(page.focalComment.value!)
     expect(backedTo).toEqual(['/pages/telegraph-entry/index?topicId=topic_1&entryId=entry_1'])
   })
+
+  test('waits for the review result before opening a comment thread', async () => {
+    const restricted = ref(true)
+    let finishReview!: () => void
+    let threadRequests = 0
+    const page = useTelegraphCommentPage({
+      topicId: () => 'topic_1',
+      entryId: () => 'entry_1',
+      commentId: () => 'c1',
+      session: makeSession(null, false),
+      miniReview: {
+        shouldRestrictFeatures: restricted,
+        ensureMiniReviewReady: () => new Promise(resolve => {
+          finishReview = () => {
+            restricted.value = false
+            resolve(null)
+          }
+        }),
+      },
+      api: {
+        getTopicDetail: async () => makeRawTopic(),
+        getCommentThread: async () => {
+          threadRequests += 1
+          return {
+            comments_enabled: true,
+            entry_comments_count: 1,
+            ancestors: [],
+            comment: rawComment('c1', '根评论'),
+            replies_total_count: 0,
+            items: [],
+            next_cursor: null,
+            has_more: false,
+          }
+        },
+      },
+      ui: { redirectToLogin: () => {}, toast: () => {} },
+    })
+
+    const loading = page.loadInitial()
+    await Promise.resolve()
+    expect(threadRequests).toBe(0)
+    finishReview()
+    await loading
+    expect(threadRequests).toBe(1)
+    expect(page.focalComment.value?.id).toBe('c1')
+    expect(page.commentsVisible.value).toBe(true)
+  })
+
+  test('closes a directly opened comment thread while reviewing', async () => {
+    let threadRequests = 0
+    const page = useTelegraphCommentPage({
+      topicId: () => 'topic_1',
+      entryId: () => 'entry_1',
+      commentId: () => 'c1',
+      session: makeSession(null, false),
+      miniReview: { shouldRestrictFeatures: ref(true), ensureMiniReviewReady: async () => null },
+      api: {
+        getTopicDetail: async () => makeRawTopic(),
+        getCommentThread: async () => {
+          threadRequests += 1
+          throw new Error('should not request comments')
+        },
+      },
+      ui: { redirectToLogin: () => {}, toast: () => {} },
+    })
+
+    await page.loadInitial()
+    expect(threadRequests).toBe(0)
+    expect(page.focalComment.value).toBeNull()
+    expect(page.commentsVisible.value).toBe(false)
+    expect(page.errorMessage.value).toBe('评论功能已关闭')
+  })
 })

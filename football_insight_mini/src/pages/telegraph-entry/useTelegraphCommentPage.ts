@@ -419,7 +419,11 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
     errorMessage.value = ''
     commentsDisabled.value = false
     try {
-      const mapped = mapTopicDetail(await api.getTopicDetail(teamId, currentTopicId))
+      const [rawTopic] = await Promise.all([
+        api.getTopicDetail(teamId, currentTopicId),
+        miniReview.ensureMiniReviewReady?.(),
+      ])
+      const mapped = mapTopicDetail(rawTopic)
       if (disposed || generation !== loadGeneration) {
         return
       }
@@ -479,7 +483,11 @@ export function useTelegraphCommentPage(options: UseTelegraphCommentPageOptions)
     }
     const generation = ++loadGeneration
     try {
-      const mapped = mapTopicDetail(await api.getTopicDetail(teamId, currentTopicId))
+      const [rawTopic] = await Promise.all([
+        api.getTopicDetail(teamId, currentTopicId),
+        miniReview.ensureMiniReviewReady?.(),
+      ])
+      const mapped = mapTopicDetail(rawTopic)
       if (disposed || generation !== loadGeneration) {
         return
       }

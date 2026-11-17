@@ -12,6 +12,10 @@
         <button class="comment-page__retry" @tap="loadInitial(false)">重新加载</button>
       </view>
 
+      <view v-else-if="!commentsVisible" class="comment-page__state">
+        <text>评论功能已关闭</text>
+      </view>
+
       <template v-else-if="entry && focalComment">
         <TelegraphCommentThread
           :entry="entry"
