@@ -364,8 +364,8 @@ export function useTelegraphInteractions(options: UseTelegraphInteractionsOption
       ui.toast('请输入评论内容')
       return
     }
-    if (Array.from(content).length > 280) {
-      ui.toast('评论内容最多 280 字')
+    if (Array.from(content).length > 200) {
+      ui.toast('评论内容最多 200 字')
       return
     }
 

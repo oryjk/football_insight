@@ -131,7 +131,7 @@
             <input
               :value="draft"
               class="comment-sheet__input"
-              maxlength="280"
+              maxlength="200"
               :disabled="submitting"
               :adjust-position="false"
               confirm-type="send"
@@ -194,7 +194,7 @@ const sheetTitle = computed(() =>
 )
 const sheetHeight = computed(() => (keyboardHeight.value > 0 ? '48vh' : '76vh'))
 const inputPlaceholder = computed(() =>
-  props.replyTarget ? `回复 @${props.replyTarget.author.displayName}…` : '说说你的看法（最多 280 字）',
+  props.replyTarget ? `回复 @${props.replyTarget.author.displayName}…` : '说说你的看法（最多 200 字）',
 )
 
 watch(
