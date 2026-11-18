@@ -215,20 +215,7 @@ tick() {
         return 0
     fi
 
-    local dirty
-    dirty=$(git -C "$REPO_ROOT" status --porcelain --untracked-files=normal)
-    if [[ -n "$dirty" ]]; then
-        notice "Working tree has uncommitted changes; pausing auto-sync until clean."
-        return 0
-    fi
-
     git -C "$REPO_ROOT" fetch --quiet origin "$DEPLOY_BRANCH:refs/remotes/origin/$DEPLOY_BRANCH"
-
-    dirty=$(git -C "$REPO_ROOT" status --porcelain --untracked-files=normal)
-    if [[ -n "$dirty" ]]; then
-        notice "Working tree changed during fetch; pausing auto-sync."
-        return 0
-    fi
 
     local before target
     before=$(git -C "$REPO_ROOT" rev-parse HEAD)
@@ -239,11 +226,20 @@ tick() {
         return 0
     fi
 
+    local dirty
+    dirty=$(git -C "$REPO_ROOT" status --porcelain --untracked-files=normal)
+    if [[ -n "$dirty" ]]; then
+        notice "Working tree has uncommitted changes; pausing auto-sync until clean."
+        report_status "$target" "local233/sync" "pending" "Paused: local233 has uncommitted/untracked files"
+        return 0
+    fi
+
     local counts left_count
     counts=$(git -C "$REPO_ROOT" rev-list --left-right --count "${before}...${target}")
     left_count=${counts%%[[:space:]]*}
     if [[ "$left_count" != "0" ]]; then
         notice "Local branch has unpushed or diverged commits; pausing auto-sync."
+        report_status "$target" "local233/sync" "pending" "Paused: local233 has unpushed local commits"
         return 0
     fi
 
