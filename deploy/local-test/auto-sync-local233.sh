@@ -63,7 +63,7 @@ fi
 
 DEPLOY_BRANCH=${DEPLOY_BRANCH:-main}
 AUTO_SYNC_BACKEND=${AUTO_SYNC_BACKEND:-1}
-AUTO_SYNC_MP_RELEASE=${AUTO_SYNC_MP_RELEASE:-1}
+AUTO_SYNC_MP_RELEASE=${AUTO_SYNC_MP_RELEASE:-0}
 AUTO_SYNC_MP_ROBOT=${AUTO_SYNC_MP_ROBOT:-2}
 GH_REPO=${GH_REPO:-oryjk/football_insight}
 
@@ -268,9 +268,17 @@ tick() {
     counts=$(git -C "$REPO_ROOT" rev-list --left-right --count "${before}...${target}")
     left_count=${counts%%[[:space:]]*}
     if [[ "$left_count" != "0" ]]; then
-        notice "Local branch has unpushed or diverged commits; pausing auto-sync."
-        report_status "$target" "local233/sync" "pending" "Paused: local233 has unpushed local commits"
-        return 0
+        local non_auto_commits
+        non_auto_commits=$(git -C "$REPO_ROOT" log --format=%s "${target}..${before}" | grep -v '^chore(mini): sync allocated review version' || true)
+        if [[ -z "$non_auto_commits" ]]; then
+            log "Discarding diverged local version-sync commit(s) to realign with origin/$DEPLOY_BRANCH..."
+            git -C "$REPO_ROOT" reset --hard "$target"
+            before=$target
+        else
+            notice "Local branch has unpushed or diverged commits; pausing auto-sync."
+            report_status "$target" "local233/sync" "pending" "Paused: local233 has unpushed local commits"
+            return 0
+        fi
     fi
 
     local changed_files

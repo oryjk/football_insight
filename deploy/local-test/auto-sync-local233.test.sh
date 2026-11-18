@@ -111,7 +111,7 @@ git -C "$WORK_REPO" commit -m "feat: full-stack change [gemini]" >/dev/null
 git -C "$WORK_REPO" push origin main >/dev/null
 PUSHED_SHA=$(git -C "$WORK_REPO" rev-parse HEAD)
 
-FAKE_ALLOCATE_NEW_VERSION=1 "$LOCAL_REPO/deploy/local-test/auto-sync-local233.sh" --once
+FAKE_ALLOCATE_NEW_VERSION=1 AUTO_SYNC_MP_RELEASE=1 "$LOCAL_REPO/deploy/local-test/auto-sync-local233.sh" --once
 
 grep -q "cargo run --bin run_migrations" "$COMMAND_LOG"
 grep -q "up.sh executed" "$COMMAND_LOG"
