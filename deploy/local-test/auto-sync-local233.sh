@@ -245,7 +245,7 @@ tick() {
         return 0
     fi
 
-    git -C "$REPO_ROOT" fetch --quiet origin "$DEPLOY_BRANCH:refs/remotes/origin/$DEPLOY_BRANCH"
+    git -C "$REPO_ROOT" fetch --quiet --no-write-fetch-head origin "$DEPLOY_BRANCH:refs/remotes/origin/$DEPLOY_BRANCH"
 
     local before target
     before=$(git -C "$REPO_ROOT" rev-parse HEAD)
