@@ -346,17 +346,14 @@ function formatCount(count: number): string {
   background: var(--fi-color-primary-soft);
   color: var(--fi-color-primary-deep);
 }
-
 .x-node__tag--world {
   background: var(--fi-color-outsider-soft);
   color: var(--fi-color-outsider);
 }
-
 .x-node__tag--abroad {
   background: var(--fi-color-hat-trick-bg);
   color: var(--fi-color-hat-trick-text);
 }
-
 .x-node__mine {
   flex-shrink: 0;
   padding: var(--fi-space-2) var(--fi-space-8);
@@ -367,7 +364,6 @@ function formatCount(count: number): string {
   font-weight: var(--fi-weight-bold);
   line-height: 1.2;
 }
-
 .x-node__dot,
 .x-node__time,
 .x-node__day {
@@ -376,7 +372,6 @@ function formatCount(count: number): string {
   font-size: var(--fi-font-22);
   line-height: var(--fi-leading-snug);
 }
-
 .x-node__delete {
   flex-shrink: 0;
   width: 48rpx;
@@ -389,19 +384,16 @@ function formatCount(count: number): string {
   align-items: center;
   justify-content: center;
 }
-
 .x-node__delete::after,
 .x-focus__action::after,
 .x-timeline__retry::after,
 .x-timeline__more::after {
   border: 0;
 }
-
 .x-node__delete-icon {
   width: 28rpx;
   height: 28rpx;
 }
-
 .x-node__entry-snippet {
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -413,17 +405,14 @@ function formatCount(count: number): string {
   line-height: var(--fi-leading-normal);
   word-break: break-word;
 }
-
 .x-node__entry-title {
   color: var(--fi-color-text-primary);
   font-weight: var(--fi-weight-bold);
 }
-
 .x-node__replying-label {
   color: var(--fi-color-text-caption);
   font-size: var(--fi-font-22);
 }
-
 .x-node__replying-handle {
   color: var(--fi-color-outsider);
   font-size: var(--fi-font-22);
