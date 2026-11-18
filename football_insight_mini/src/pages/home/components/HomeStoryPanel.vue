@@ -2,7 +2,6 @@
   <FiPanel>
     <FiSectionHeading>
       <template #heading>
-        <text class="section-kicker">{{ kicker }}</text>
         <view class="story-headline">
           <text>{{ headlineParts.leading }}</text>
           <text v-if="headlineParts.highlighted" class="inline-highlight">{{ headlineParts.highlighted }}</text>
@@ -58,28 +57,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import FiPanel from '../../../components/FiPanel.vue'
 import FiSectionHeading from '../../../components/FiSectionHeading.vue'
 import pulseMatchCornerImage from '../../../static/home/pulse-match-corner.png'
 import { resolveHomePulseTechStats, type HomePulseLeadMatch } from '../helpers'
 
-const props = defineProps<{
+defineProps<{
   headlineParts: { leading: string; highlighted: string; trailing: string }
   body: string
   updatedAtLabel: string
   pulseMatches: HomePulseLeadMatch[]
   watchPoints: string[]
 }>()
-
-// 进行中 → 实时脉冲；仅有完赛 → 最近赛果（带轮次）；24 小时后无赛果 → 联赛速览。
-const kicker = computed(() => {
-  const first = props.pulseMatches[0]
-  if (!first) return '联赛速览'
-  return props.pulseMatches.some((match) => match.status === 'live')
-    ? '实时脉冲'
-    : `最近赛果 · 第 ${first.round_number} 轮`
-})
 
 const emit = defineEmits<{
   (e: 'open-tech-stats', match: HomePulseLeadMatch): void
@@ -95,15 +84,6 @@ function openTechStats(match: HomePulseLeadMatch): void {
 </script>
 
 <style scoped lang="css">
-.section-kicker {
-  display: block;
-  margin: 0;
-  color: var(--fi-color-text-muted);
-  font-size: var(--fi-font-22);
-  font-weight: 700;
-  letter-spacing: 3rpx;
-}
-
 .story-headline {
   display: block;
   color: var(--fi-color-text-strong);
