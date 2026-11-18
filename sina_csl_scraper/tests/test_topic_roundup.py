@@ -334,3 +334,124 @@ def test_entries_without_own_evidence_are_dropped_when_sources_point_both_ways()
     refs = '中超第30轮比赛结束。曼联主帅下课。' * 2
     assert choose_category('高层开会讨论去留', refs, 'world', focus=CATALOG, watchlist=watch) is None
     assert choose_category('高层开会讨论去留', refs, 'domestic', focus=CATALOG, watchlist=watch) == 'domestic'
+
+
+def test_non_personnel_headline_mentioning_old_sacking_in_body_is_rejected(env, tmp_path):
+    brazil_media = source(
+        1,
+        '巴西媒体撰文回顾成都蓉城痛失中超冠军，文末提到赛季结束后主帅阿洛伊西下课，董事长王磊和总经理吴博同时辞职。' * 2,
+        title='传到南美了！巴媒关注蓉城丢冠：史上最惨掉链子？夺冠横幅都挂了',
+    )
+    generator = Generator([])
+    result = run([brazil_media], generator, env, tmp_path)
+    assert result['status'] == 'no_new'
+    assert result['sources'][0]['decision'] == 'out_of_scope'
+    assert generator.requests == []
+
+
+def test_cross_day_deduplication_blocks_repeated_sacking_and_allows_rumor_to_official_upgrade(env, tmp_path):
+    day1_sacking = source(
+        1,
+        '成都蓉城官方宣布主教练约翰·阿洛伊西下课，团队一并离任。' * 3,
+        published_at=NOW - timedelta(hours=2),
+        title='官方：成都蓉城主帅约翰·阿洛伊西下课',
+    )
+    day1_rumor = source(
+        2,
+        '据足球报报道，前广州富力主帅斯托伊科维奇将执教山东泰山，预计下周官宣。' * 3,
+        published_at=NOW - timedelta(hours=1),
+        title='足球报：前广州富力主帅斯托伊科维奇将执教泰山，据悉下周官宣',
+    )
+    run(
+        [day1_sacking, day1_rumor],
+        Generator([entries_for(
+            ('成都蓉城官宣主帅约翰·阿洛伊西下课', '成都蓉城官方宣布约翰·阿洛伊西离任。', [1]),
+            ('据报道山东泰山基本敲定斯托伊科维奇', '据报道，斯托伊科维奇将执教山东泰山，预计下周官宣。', [2]),
+        )]),
+        env,
+        tmp_path,
+        now=NOW,
+    )
+
+    day2 = NOW + timedelta(days=2)
+    day2_repeat_sacking = source(
+        3,
+        '成都蓉城官方宣布约翰·阿洛伊西下课，斯托伊科维奇正式出任山东泰山一线队主教练。' * 3,
+        published_at=day2 - timedelta(hours=1),
+        title='官方：斯托伊科维奇出任山东泰山新任主帅',
+    )
+    gen_day2 = Generator([entries_for(
+        ('成都蓉城主帅阿洛伊西下课', '成都蓉城主帅阿洛伊西下课。', [3]),
+        ('据报道斯托伊科维奇接近执教山东泰山', '据报道，斯托伊科维奇接近执教山东泰山。', [3]),
+        ('斯托伊科维奇出任山东泰山主教练', '山东泰山官方宣布斯托伊科维奇出任一线队主教练。', [3]),
+    )])
+    result = run([day2_repeat_sacking], gen_day2, env, tmp_path, now=day2)
+    assert '成都蓉城官宣主帅约翰·阿洛伊西下课' in gen_day2.requests[0]['published_titles']
+    assert result['appended'] == 1
+    day2_entries = env[0].rows[roundup_edition_id(77680, '2026-11-11')]['payload']['items'][0]['entries']
+    assert [e['title'] for e in day2_entries] == ['斯托伊科维奇出任山东泰山主教练']
+
+
+def test_prune_roundup_editions_removes_unanchored_and_duplicate_entries_and_refreshes_audio(env, tmp_path):
+    from sina_csl_scraper.topics.roundup import prune_roundup_editions
+    repository, audio, target = env
+    run(
+        [source(1, '成都蓉城官方宣布主帅约翰·阿洛伊西下课。' * 3, title='官方：蓉城主帅约翰·阿洛伊西下课')],
+        Generator([entries_for(('成都蓉城官宣主帅约翰·阿洛伊西下课', '成都蓉城官方宣布阿洛伊西下课。', [1]))]),
+        env,
+        tmp_path,
+        now=NOW,
+    )
+    later_day = NOW + timedelta(days=9)
+    edition_date = '2026-11-18'
+    bad_entry = {
+        'id': 'd20bb964ea',
+        'category': 'domestic',
+        'title': '成都蓉城主帅阿洛伊西下课',
+        'text': '痛失中超冠军后，成都蓉城主帅阿洛伊西下课。',
+        'published_at': later_day.isoformat(),
+        'sources': [{
+            'title': '传到南美了！巴媒关注蓉城丢冠：史上最惨掉链子？夺冠横幅都挂了',
+            'url': 'https://news.example/bad',
+            'publisher': '直播吧',
+            'published_at': later_day.isoformat(),
+        }],
+        'team_tags': [RONGCHENG.as_tag()],
+    }
+    good_entry = {
+        'id': 'c88fae8d7f',
+        'category': 'domestic',
+        'title': '据报道李源一有望加盟云南玉昆',
+        'text': '据报道山东泰山中场李源一有望加盟云南玉昆。',
+        'published_at': later_day.isoformat(),
+        'sources': [{
+            'title': '博主晒玉昆队徽：李源一不会留在山东，要“孔雀西南飞”',
+            'url': 'https://news.example/good',
+            'publisher': '懂球帝',
+            'published_at': later_day.isoformat(),
+        }],
+        'team_tags': [TAISHAN.as_tag()],
+    }
+    item = build_roundup_item(team_id=77680, edition_date=edition_date, entries=[bad_entry, good_entry],
+                              now=later_day, audio={'status': 'ready', 'url': 'https://assets.example/old.m4a',
+                                                    'dialect': 'sichuan', 'duration_seconds': 20})
+    repository.save_roundup({
+        'id': roundup_edition_id(77680, edition_date),
+        'source_fingerprint': 'fp',
+        'generator_version': 'daily-roundup-v1:test',
+        'payload': {'team_id': 77680, 'edition_date': edition_date, 'updated_at': later_day.isoformat(), 'items': [item]},
+    })
+
+    summary = prune_roundup_editions(repository=repository, tts_factory=lambda: audio, target_factory=lambda: target,
+                                     cache_dir=tmp_path, now=later_day, team_id=77680)
+    assert summary['modified_editions'] == 1 and summary['removed_entries'] == 1
+    cleaned_item = repository.rows[roundup_edition_id(77680, edition_date)]['payload']['items'][0]
+    assert [e['id'] for e in cleaned_item['entries']] == ['c88fae8d7f']
+    assert '阿洛伊西' not in cleaned_item['title']
+    assert cleaned_item['audio']['url'] != 'https://assets.example/old.m4a'
+
+    # Second run is a no-op
+    second = prune_roundup_editions(repository=repository, tts_factory=lambda: audio, target_factory=lambda: target,
+                                    cache_dir=tmp_path, now=later_day, team_id=77680)
+    assert second['modified_editions'] == 0 and second['removed_entries'] == 0
+

@@ -207,6 +207,36 @@ run_mini_release_sync() {
     fi
 }
 
+run_scraper_topics_sync() {
+    local before_sha=$1
+    local target_sha=$2
+
+    log "Scraper topic changes detected (${before_sha:0:7} -> ${target_sha:0:7}); pruning roundup editions & refreshing audio on local233..."
+    report_status "$target_sha" "local233/topics-prune" "pending" "Pruning roundup editions & refreshing audio..."
+
+    local output_file
+    output_file=$(mktemp "${TMPDIR:-/tmp}/local233-topics-sync.XXXXXX")
+    if (
+        set -euo pipefail
+        cd "$REPO_ROOT/sina_csl_scraper"
+        uv run --no-sync python scripts/run_topics_local.py prune-roundup --write-db
+    ) >"$output_file" 2>&1; then
+        cat "$output_file"
+        rm -f "$output_file"
+        log "Roundup editions pruned and audio refreshed at ${target_sha:0:7}."
+        report_status "$target_sha" "local233/topics-prune" "success" "Roundup editions pruned & audio refreshed (${target_sha:0:7})"
+        return 0
+    else
+        cat "$output_file" >&2
+        local tail_err
+        tail_err=$(tail -n 1 "$output_file" | tr '\r\n' ' ')
+        rm -f "$output_file"
+        log "ERROR: Roundup prune failed at ${target_sha:0:7}."
+        report_status "$target_sha" "local233/topics-prune" "failure" "Failed: ${tail_err:-topics prune error}"
+        return 1
+    fi
+}
+
 tick() {
     local current_branch
     current_branch=$(git -C "$REPO_ROOT" branch --show-current)
@@ -227,10 +257,10 @@ tick() {
     fi
 
     local dirty
-    dirty=$(git -C "$REPO_ROOT" status --porcelain --untracked-files=normal)
+    dirty=$(git -C "$REPO_ROOT" status --porcelain --untracked-files=no)
     if [[ -n "$dirty" ]]; then
-        notice "Working tree has uncommitted changes; pausing auto-sync until clean."
-        report_status "$target" "local233/sync" "pending" "Paused: local233 has uncommitted/untracked files"
+        notice "Working tree has uncommitted tracked changes; pausing auto-sync until clean."
+        report_status "$target" "local233/sync" "pending" "Paused: local233 has uncommitted tracked changes"
         return 0
     fi
 
@@ -250,6 +280,7 @@ tick() {
     local migrations_changed=false
     local mini_changed=false
     local mini_deps_changed=false
+    local scraper_topics_changed=false
 
     while IFS= read -r file; do
         [[ -z "$file" ]] && continue
@@ -268,6 +299,9 @@ tick() {
             football_insight_mini/*)
                 mini_changed=true
                 ;;
+            sina_csl_scraper/src/sina_csl_scraper/topics/*|sina_csl_scraper/scripts/run_topics_local.py)
+                scraper_topics_changed=true
+                ;;
         esac
     done <<<"$changed_files"
 
@@ -281,12 +315,16 @@ tick() {
         run_backend_sync "$before" "$target" "$migrations_changed" || sync_failed=1
     fi
 
+    if [[ "$scraper_topics_changed" == "true" ]]; then
+        run_scraper_topics_sync "$before" "$target" || sync_failed=1
+    fi
+
     if [[ "$mini_changed" == "true" && "$AUTO_SYNC_MP_RELEASE" == "1" ]]; then
         run_mini_release_sync "$before" "$target" "$mini_deps_changed" || sync_failed=1
     fi
 
-    if [[ "$backend_changed" == "false" && "$mini_changed" == "false" ]]; then
-        log "Fast-forwarded to ${target:0:7} (no backend or mini changes)."
+    if [[ "$backend_changed" == "false" && "$mini_changed" == "false" && "$scraper_topics_changed" == "false" ]]; then
+        log "Fast-forwarded to ${target:0:7} (no backend, mini, or topics changes)."
         report_status "$target" "local233/sync" "success" "Synced ${target:0:7} on local233"
     fi
 

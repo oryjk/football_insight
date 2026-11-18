@@ -16,18 +16,19 @@ from urllib.parse import urlparse
 from .generation import TopicGenerator, _plain
 from .models import SHANGHAI, SourceArticle, parse_timestamp, source_fingerprint
 from .pipeline import _atomic_json
-from .categories import (ABROAD, CATEGORY_LABELS, DOMESTIC, WORLD, Watchlist, candidate_categories, choose_category,
-                         is_personnel_move)
+from .categories import (ABROAD, CATEGORY_LABELS, DOMESTIC, WORLD, EventDeduplicator, Watchlist, candidate_categories,
+                         choose_category, is_personnel_move, is_personnel_source)
 from .scope import tags_for_text
 
 logger = logging.getLogger(__name__)
 
-ROUNDUP_VERSION = 'daily-roundup-v1'
+ROUNDUP_VERSION = 'daily-roundup-v2'
 MAX_NEW_ENTRIES = 15
 MAX_ENTRIES_PER_DAY = 80
 MAX_SOURCES_PER_RUN = 30
 NARRATION_BUDGET = 5500
 CONSUMED_RETENTION_DAYS = 7
+RECENT_TITLE_DAYS = 14
 WORLD_DAILY_LIMIT = 10          # 国际每天最多 10 条，不让五大联赛淹没国内
 WORLD_SOURCES_PER_RUN = 12      # 每次最多送 12 篇国际原文给大模型，其余额度留给国内和留洋
 CATEGORY_ORDER = (DOMESTIC, WORLD, ABROAD)
@@ -70,16 +71,18 @@ class RoundupGenerator(TopicGenerator):
             '不得添加原文没有的事实、比分、日期、网址或猜测。'
             '快讯分三类，每条给出 category：'
             'domestic（国内：中超、中甲、中乙、足协杯俱乐部，以及国足和各级国家队；国内只写人事变动——主教练离任或上任、球员离队或加盟，'
-            '包括转会、租借、解约，赛果、排名、伤病、表态、纪录等其他国内消息一律不写）；'
+            '包括转会、租借、解约，赛果、排名、伤病、表态、纪录、股改等其他国内消息一律不写）；'
             'abroad（留洋：中国球员在海外俱乐部的转会、出场、进球、伤病）；'
             'world（国际：五大联赛，只写 world_watchlist 里的热门俱乐部、球员、教练）。'
             f'world 这次最多 {world_limit} 条，只挑转会官宣、换帅、重要赛果、重大伤病这类结果，不写赛前分析和花边。'
             '球迷趣闻、商业活动、校园或业余比赛、纯评论都不写。'
+            '每条快讯必须概括所引用原文标题与导语的核心新事件；如果一篇原文的主题是评论、复盘、外媒反响、专访或股改，'
+            '严禁从正文末尾抠取数日前已发生的人事背景（如旧的主帅下课、高层辞职）当成新快讯。'
             '一件事写一条：title 是 8 到 24 字的结果式标题；text 用 1 到 2 句话直接说结果，最多 120 字，不写空话套话，不提问。'
             '凡是传闻、接触、有意、商讨等尚未官宣的消息，必须在 title 或 text 里写明「传闻」「据报道」「有意」「正在接触」或「正在商讨」，'
             '绝不能写成已经官宣。严格区分成都蓉城一线队（中超）和成都蓉城希拉谷（中乙）。'
             '提到球队时用完整名称（如「山东泰山」）。多篇原文报道同一件事时合并成一条，source_ids 列出支撑这一条的全部原文。'
-            'published_titles 是今天已经发布过的快讯标题：这些事不要再写；只有出现新的实质进展'
+            'published_titles 是近期及今天已经发布过的快讯标题：这些事不要再写；只有出现新的实质进展'
             '（例如传闻变成官宣、比赛有了结果）时，才写一条新的，标题要体现进展。'
             f'最多输出 {limit} 条，没有值得写的就输出空数组。'
             '只输出 JSON 对象：{"entries":[{"category":"domestic|world|abroad","title":"纯文本","text":"纯文本","source_ids":["输入的source_id"]}]}。'
@@ -89,19 +92,19 @@ class RoundupGenerator(TopicGenerator):
                                           'original_sources': material})
         if not isinstance(payload, dict) or not isinstance(payload.get('entries'), list):
             raise ValueError('LLM roundup response has invalid structure')
-        entries, seen = [], {title for title in existing_titles}
+        entries, deduplicator = [], EventDeduplicator(existing_titles)
         for raw in payload['entries'][:limit]:
-            entry = self._entry(raw, by_id, seen)
+            entry = self._entry(raw, by_id, deduplicator)
             if entry is None or (entry['category'] == WORLD and sum(e['category'] == WORLD for e in entries) >= world_limit):
                 continue
-            seen.add(entry['title'])
+            deduplicator.record(entry['title'])
             entries.append(entry)
         dropped = len(payload['entries'][:limit]) - len(entries)
         if dropped:
             logger.warning('dropped %d ungrounded or duplicate roundup entries', dropped)
         return entries
 
-    def _entry(self, raw, by_id: dict[str, SourceArticle], seen: set[str]) -> dict | None:
+    def _entry(self, raw, by_id: dict[str, SourceArticle], deduplicator: EventDeduplicator) -> dict | None:
         try:
             if not isinstance(raw, dict):
                 return None
@@ -111,7 +114,7 @@ class RoundupGenerator(TopicGenerator):
                 return None
         except ValueError:
             return None
-        if title in seen:
+        if deduplicator.is_duplicate(title):
             return None
         refs = sorted(set(refs))
         cited = [by_id[ref] for ref in refs]
@@ -128,7 +131,12 @@ class RoundupGenerator(TopicGenerator):
                 return None
         category = choose_category(generated_text, reference_text, raw.get('category'),
                                    focus=self._focus(), watchlist=self.watchlist)
-        if category is None or (category == DOMESTIC and not is_personnel_move(generated_text)):
+        if category is None:
+            return None
+        if category == DOMESTIC and (
+            not is_personnel_move(generated_text)
+            or not any(is_personnel_source(source.title, source.body) for source in cited)
+        ):
             return None
         published_at = min(source.published_at for source in cited)
         identity = json.dumps([title, text, refs, ROUNDUP_VERSION], ensure_ascii=False)
@@ -282,6 +290,120 @@ def known_source_urls(repository, cache_dir: Path, team_id: int, now: datetime) 
     return repository.roundup_sources(team_id) | set(consumed)
 
 
+def _recent_roundup_titles(repository, team_id: int, edition_date: str, days: int = RECENT_TITLE_DAYS) -> list[str]:
+    recent_fn = getattr(repository, 'recent_roundup_titles', None)
+    if callable(recent_fn):
+        return list(recent_fn(team_id, edition_date, days=days))
+    base = datetime.fromisoformat(edition_date).date()
+    titles: list[str] = []
+    for offset in range(days, 0, -1):
+        day = (base - timedelta(days=offset)).isoformat()
+        stored = repository.roundup_for_date(team_id, day)
+        if not stored:
+            continue
+        for item in stored.get('payload', {}).get('items') or []:
+            for entry in reversed(item.get('entries') or []):
+                if entry.get('title'):
+                    titles.append(entry['title'])
+    return titles
+
+
+def prune_roundup_editions(*, repository, tts_factory=None, target_factory=None, cache_dir: Path | None = None,
+                           now: datetime, team_id: int = 77680, refresh_audio: bool = True) -> dict:
+    """按最新规则清洗全部每日电报批次：先立即落库删掉不合格/重复条目，再从最新一期倒序重做语音。"""
+    editions_fn = getattr(repository, 'roundup_editions', None)
+    if callable(editions_fn):
+        editions = list(editions_fn(team_id))
+    else:
+        rows = getattr(repository, 'rows', {})
+        editions = sorted(
+            [json.loads(json.dumps(ed)) for ed in rows.values() if ed.get('payload', {}).get('team_id') == team_id],
+            key=lambda ed: ed['payload']['edition_date'],
+        )
+    deduplicator = EventDeduplicator()
+    modified: list[tuple[dict, list[str]]] = []
+    latest_date = max((ed['payload']['edition_date'] for ed in editions), default=None)
+
+    for stored in editions:
+        edition = json.loads(json.dumps(stored))
+        payload = edition['payload']
+        edition_date = payload['edition_date']
+        old_item = payload['items'][0]
+        original_entries = old_item.get('entries') or []
+        kept_chronological: list[dict] = []
+        removed_titles: list[str] = []
+        for entry in reversed(original_entries):
+            cat = entry_category(entry)
+            text = f"{entry.get('title', '')}\n{entry.get('text', '')}"
+            sources = entry.get('sources') or []
+            if cat == DOMESTIC and (
+                not is_personnel_move(text)
+                or not any(is_personnel_source(src.get('title', ''), '') for src in sources)
+            ):
+                removed_titles.append(entry.get('title', ''))
+                continue
+            if not deduplicator.accept(entry.get('title', '')):
+                removed_titles.append(entry.get('title', ''))
+                continue
+            kept_chronological.append({**entry, 'category': cat})
+
+        kept = list(reversed(kept_chronological))
+        if not removed_titles or not kept:
+            continue
+
+        published_at = parse_timestamp(old_item.get('published_at', now.isoformat()), now)
+        item = build_roundup_item(team_id=team_id, edition_date=edition_date, entries=kept,
+                                  now=published_at, audio=old_item.get('audio'))
+        item['published_at'] = old_item.get('published_at', item['published_at'])
+        present_categories = {entry_category(e) for e in kept}
+        item['category_audio'] = {
+            c: audio for c, audio in ((old_item.get('category_audio') or {}).items()) if c in present_categories
+        }
+        payload['items'] = [item]
+        payload['updated_at'] = now.isoformat()
+        edition['source_fingerprint'] = hashlib.sha256(
+            json.dumps(sorted(s['url'] for s in item['sources'])).encode()
+        ).hexdigest()
+        repository.save_roundup(edition)
+        if cache_dir is not None and edition_date == latest_date:
+            _atomic_json(cache_dir / 'roundup-latest.json', edition['payload'])
+        modified.append((edition, removed_titles))
+
+    audio_refreshed = 0
+    audio_errors: dict[str, str] = {}
+    if refresh_audio and tts_factory is not None and target_factory is not None and modified:
+        for edition, _ in reversed(modified):
+            edition_date = edition['payload']['edition_date']
+            item = edition['payload']['items'][0]
+            try:
+                item['audio'], item['category_audio'] = _publish_audio(
+                    item, tts=tts_factory(), target=target_factory(), team_id=team_id, edition_date=edition_date
+                )
+                repository.save_roundup(edition)
+                if cache_dir is not None and edition_date == latest_date:
+                    _atomic_json(cache_dir / 'roundup-latest.json', edition['payload'])
+                audio_refreshed += 1
+            except Exception as error:
+                audio_errors[edition_date] = type(error).__name__
+                logger.warning('roundup prune audio refresh failed for %s (%s)', edition_date, type(error).__name__)
+
+    return {
+        'checked_editions': len(editions),
+        'modified_editions': len(modified),
+        'removed_entries': sum(len(titles) for _, titles in modified),
+        'audio_refreshed': audio_refreshed,
+        'audio_errors': audio_errors,
+        'details': [
+            {
+                'edition_date': ed['payload']['edition_date'],
+                'remaining': len(ed['payload']['items'][0]['entries']),
+                'removed_titles': list(reversed(titles)),
+            }
+            for ed, titles in modified
+        ],
+    }
+
+
 def run_roundup_update(sources: list[SourceArticle], *, repository, generator_factory, tts_factory,
                        target_factory, cache_dir: Path, now: datetime, team_id: int = 77680,
                        max_age_hours: int = 24, selected_teams=None, watchlist: Watchlist | None = None) -> dict:
@@ -299,13 +421,15 @@ def run_roundup_update(sources: list[SourceArticle], *, repository, generator_fa
     def category_of(item: SourceArticle) -> str | None:
         text = item.title + '\n' + item.body
         found = candidate_categories(text, focus=selected_teams, watchlist=watchlist)
-        # 国内只收人事变动：原文里连人事字眼都没有，就不占大模型的名额。
-        found = [c for c in found if c != DOMESTIC or is_personnel_move(text)]
+        # 国内只收人事变动：原文标题（或测试桩导语）必须直接报道人事变动，不从非人事文章里抠旧背景。
+        found = [c for c in found if c != DOMESTIC or is_personnel_source(item.title, item.body)]
         return found[0] if found else None
 
     stored = repository.roundup_for_date(team_id, edition_date)
     existing_item = stored['payload']['items'][0] if stored else None
     existing = [{**entry, 'category': entry_category(entry)} for entry in (existing_item.get('entries') or [])] if existing_item else []
+    recent_titles = _recent_roundup_titles(repository, team_id, edition_date)
+    prior_titles = recent_titles + [entry['title'] for entry in existing]
     world_quota = max(0, WORLD_DAILY_LIMIT - sum(entry['category'] == WORLD for entry in existing))
 
     diagnostics, eligible = [], []
@@ -338,19 +462,20 @@ def run_roundup_update(sources: list[SourceArticle], *, repository, generator_fa
     # 生成结果按输入缓存，语音或上传失败后重跑不会再次调用大模型。
     generator = generator_factory()
     key = hashlib.sha256(json.dumps([ROUNDUP_VERSION, edition_date, source_fingerprint(fresh),
-                                     sorted(entry['title'] for entry in existing), generator.model,
+                                     sorted(set(prior_titles)), generator.model,
                                      getattr(generator, 'cache_scope', [])], ensure_ascii=False).encode()).hexdigest()
     cache_path = cache_dir / 'roundup' / f'{key}.json'
     if cache_path.exists():
         new_entries = json.loads(cache_path.read_text(encoding='utf-8'))['entries']
     else:
-        new_entries = generator.generate_entries(fresh, [entry['title'] for entry in existing], now,
+        new_entries = generator.generate_entries(fresh, prior_titles, now,
                                                  world_limit=max(world_quota, 0))
         _atomic_json(cache_path, {'entries': new_entries})
 
     consumed.update({item.url: now.isoformat() for item in fresh})
     known_ids = {entry['id'] for entry in existing}
-    new_entries = [entry for entry in new_entries if entry['id'] not in known_ids]
+    deduplicator = EventDeduplicator(prior_titles)
+    new_entries = [entry for entry in new_entries if entry['id'] not in known_ids and deduplicator.accept(entry['title'])]
     if world_quota == 0:
         new_entries = [entry for entry in new_entries if entry.get('category') != WORLD]
     if not new_entries:

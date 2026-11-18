@@ -19,7 +19,7 @@ from .pipeline import NoTopicsError, generate_edition, refresh_edition_audio
 from .pipeline import _atomic_json
 from .repository import TopicRepository
 from .categories import Watchlist
-from .roundup import RoundupGenerator, known_source_urls, run_roundup_update
+from .roundup import RoundupGenerator, known_source_urls, prune_roundup_editions, run_roundup_update
 from .sources import collect_sources
 from .storage import SshMinioTarget
 from .images import TopicImagePublisher
@@ -282,6 +282,15 @@ def roundup_update(config: Path = typer.Option(..., exists=True, dir_okay=False)
                 repository = TopicRepository(database_url)
                 repository.check_schema()
                 _atomic_json(output_dir / 'daily-status.json', {'status': 'running', 'started_at': now.isoformat()})
+                pruned = prune_roundup_editions(
+                    repository=repository,
+                    tts_factory=lambda: _tts(output_dir),
+                    target_factory=_target,
+                    cache_dir=output_dir,
+                    now=now,
+                    team_id=team_id,
+                    refresh_audio=True,
+                )
                 source_config, scope = _collection_scope(_config(config), now)
                 watchlist = Watchlist.from_config(source_config)
                 sources = collect_sources(source_config, now, max_age_hours, require_available=True,
@@ -290,6 +299,8 @@ def roundup_update(config: Path = typer.Option(..., exists=True, dir_okay=False)
                     tts_factory=lambda: _tts(output_dir), target_factory=_target, cache_dir=output_dir,
                     now=now, team_id=team_id, max_age_hours=max_age_hours,
                     selected_teams=list(scope.selected) if scope else None, watchlist=watchlist)
+                if pruned['removed_entries']:
+                    result['pruned'] = pruned
                 result['finished_at'] = datetime.now(SHANGHAI).isoformat()
                 _atomic_json(output_dir / 'daily-status.json', result)
             except Exception as error:
@@ -303,6 +314,37 @@ def roundup_update(config: Path = typer.Option(..., exists=True, dir_okay=False)
         typer.echo(json.dumps({'status': 'already_running', 'previous_retained': True}), err=True)
     except Exception as error:
         typer.echo(json.dumps(failed_result(error), ensure_ascii=False), err=True)
+        raise typer.Exit(1) from None
+
+
+@app.command('prune-roundup')
+def prune_roundup_command(output_dir: Path = Path('data/topics'), team_id: int = typer.Option(77680, min=1),
+                          refresh_audio: bool = True, write_db: bool = False, at: str | None = None) -> None:
+    """按最新电报规则清理无标题人事锚点或跨日重复的旧条目，并按需重做语音。"""
+    try:
+        if not write_db:
+            raise ValueError('prune-roundup requires explicit --write-db')
+        database_url = os.getenv('FI_DATABASE_URL') or os.getenv('DATABASE_URL')
+        if not database_url:
+            raise ValueError('FI_DATABASE_URL is required')
+        now = _now(at)
+        with _lock(output_dir):
+            repository = TopicRepository(database_url)
+            repository.check_schema()
+            result = prune_roundup_editions(
+                repository=repository,
+                tts_factory=(lambda: _tts(output_dir)) if refresh_audio else None,
+                target_factory=_target if refresh_audio else None,
+                cache_dir=output_dir,
+                now=now,
+                team_id=team_id,
+                refresh_audio=refresh_audio,
+            )
+        typer.echo(json.dumps(result, ensure_ascii=False))
+    except TopicJobBusy:
+        typer.echo(json.dumps({'status': 'already_running', 'previous_retained': True}), err=True)
+    except Exception as error:
+        typer.echo(json.dumps({'status': 'failed', 'error_type': type(error).__name__}, ensure_ascii=False), err=True)
         raise typer.Exit(1) from None
 
 

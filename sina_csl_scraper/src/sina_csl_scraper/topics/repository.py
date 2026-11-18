@@ -1,7 +1,7 @@
 """Only writes the table provisioned by the Rust migration, never creates tables."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import psycopg
 from psycopg.types.json import Jsonb
@@ -43,6 +43,36 @@ class TopicRepository:
         if row is None:
             return None
         return {'id': row[0], 'source_fingerprint': row[1], 'generator_version': row[2], 'payload': row[3]}
+
+    def roundup_editions(self, team_id: int) -> list[dict]:
+        """按日期从旧到新读取全部每日电报批次，用于跨日去重与历史清洗。"""
+        with psycopg.connect(self.database_url) as connection:
+            rows = connection.execute('''
+                SELECT id, source_fingerprint, generator_version, payload
+                FROM f_i_daily_topic_editions
+                WHERE team_id = %s AND generator_version LIKE 'daily-roundup-%%'
+                ORDER BY edition_date ASC, id ASC
+            ''', (team_id,)).fetchall()
+        return [{'id': row[0], 'source_fingerprint': row[1], 'generator_version': row[2], 'payload': row[3]}
+                for row in rows]
+
+    def recent_roundup_titles(self, team_id: int, before_date: str, days: int = 14) -> list[str]:
+        """最近 N 天（不含当天）已发布的快讯标题，按从旧到新顺序返回，用于跨日去重。"""
+        start_date = (datetime.fromisoformat(before_date).date() - timedelta(days=days)).isoformat()
+        with psycopg.connect(self.database_url) as connection:
+            rows = connection.execute('''
+                SELECT payload FROM f_i_daily_topic_editions
+                WHERE team_id = %s AND generator_version LIKE 'daily-roundup-%%'
+                  AND edition_date >= %s AND edition_date < %s
+                ORDER BY edition_date ASC, id ASC
+            ''', (team_id, start_date, before_date)).fetchall()
+        titles: list[str] = []
+        for (payload,) in rows:
+            for item in payload.get('items') or []:
+                for entry in reversed(item.get('entries') or []):
+                    if entry.get('title'):
+                        titles.append(entry['title'])
+        return titles
 
     def save_roundup(self, edition: dict) -> None:
         """原地更新当天这一行；不删除任何其他批次，保留历史和阅读统计。"""
