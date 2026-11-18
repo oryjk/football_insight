@@ -1,6 +1,6 @@
 <template>
   <FiPanel>
-    <FiSectionHeading kicker="积分榜头部" title="先看联赛头部格局" />
+    <FiSectionHeading title="积分榜头部" />
     <FiStandingsTable :teams="teams" @select="emit('select', $event)" />
   </FiPanel>
 </template>

@@ -12,7 +12,7 @@ import FiPlayerGoalsTable from '../../../components/FiPlayerGoalsTable.vue'
 import type { PlayerGoalEntry } from '../../../utils/playerGoals'
 import type { PlayerMatchGoals } from '../../../types/insight'
 
-defineProps<{ kicker: string; title: string; players: PlayerGoalEntry[] }>()
+defineProps<{ kicker?: string; title: string; players: PlayerGoalEntry[] }>()
 const emit = defineEmits<{
   (event: 'select-match', playerName: string, match: PlayerMatchGoals): void
 }>()

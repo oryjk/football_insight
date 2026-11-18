@@ -84,8 +84,7 @@
           />
 
           <HomeRankingPanel
-            kicker="射手榜"
-            title="当前赛季累计射手榜"
+            title="射手榜"
             :players="scorers"
             @select-match="showScorerMatch"
           />
