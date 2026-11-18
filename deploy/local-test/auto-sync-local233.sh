@@ -219,7 +219,7 @@ run_scraper_topics_sync() {
     if (
         set -euo pipefail
         cd "$REPO_ROOT/sina_csl_scraper"
-        uv run --no-sync python scripts/run_topics_local.py prune-roundup --write-db
+        timeout --kill-after=10s 180s uv run --no-sync python scripts/run_topics_local.py prune-roundup --write-db
     ) >"$output_file" 2>&1; then
         cat "$output_file"
         rm -f "$output_file"

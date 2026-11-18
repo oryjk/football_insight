@@ -372,7 +372,9 @@ def prune_roundup_editions(*, repository, tts_factory=None, target_factory=None,
     audio_refreshed = 0
     audio_errors: dict[str, str] = {}
     if refresh_audio and tts_factory is not None and target_factory is not None and modified:
-        for edition, _ in reversed(modified):
+        # 仅重做最新一期（当天）的语音，避免一次性连续请求数十次 Edge TTS 触发限流卡死。
+        latest_modified = [ed for ed, _ in modified if ed['payload']['edition_date'] == latest_date]
+        for edition in latest_modified:
             edition_date = edition['payload']['edition_date']
             item = edition['payload']['items'][0]
             try:
