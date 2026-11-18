@@ -60,3 +60,57 @@ cargo run --bin football_insight_service_backend_rs
 ```
 
 该脚本要求本地和远端工作区干净，当前业务提交已 push；在 local233 本机执行时直接拉取当前分支。可设置 `DEPLOY_HOST`、`DEPLOY_REPO_DIR`、`DEPLOY_BRANCH`。更新后调用上述 Cargo 启动脚本，并核对用户服务和 API；端口固定为 18092。
+
+## 云端开发自动同步与上传守护服务（local233）
+
+当在远程云主机修改代码并 `git push` 到 `origin/main` 时，可在 `local233` 启用常驻守护服务 `football-insight-auto-sync.service`，自动完成拉取、`18092` 后端重启与微信小程序体验版（`robot 2`）上传，并通过 `gh api` 将执行状态回传至 GitHub Commit Status：
+
+### 1. 在 local233 首次启用（只需执行一次）
+
+```bash
+cd /home/betalpha/projects/football_insight
+git pull --ff-only
+
+# 确保已安装并登录 GitHub CLI（用于向云端回传构建/上传状态）
+gh auth status || gh auth login
+
+# 安装并启动用户级 systemd 自动同步服务
+./deploy/local-test/install-auto-sync-service.sh
+```
+
+常用运维命令（在 `local233` 执行）：
+
+```bash
+# 查看实时同步、后端重启与小程序上传日志
+journalctl --user -u football-insight-auto-sync.service -f
+
+# 单次手动触发检查
+./deploy/local-test/auto-sync-local233.sh --once
+```
+
+### 2. 自动触发与状态回传规则
+
+- **后端变更**（`football_insight_service_backend_rs/**`）：
+  - 若包含 `migrations/*.sql` 变更，先自动执行 `cargo run --bin run_migrations`
+  - 自动调用 `./deploy/local-test/up.sh` 编译并重启 `18092` 后端，校验 `/api/health` 等接口
+  - 通过 `gh api` 回传状态上下文 `local233/backend-18092`（`pending` → `success` / `failure`）
+- **小程序变更**（`football_insight_mini/**`）：
+  - 若依赖文件变化，先执行 `bun install --frozen-lockfile`
+  - 先同步审核版本号（若分配了新版本号，自动提交推送 `chore(mini): sync allocated review version [local233]`），再执行 `bun run mp:release -- --robot 2 --desc "<commit 标题>"`
+  - 通过 `gh api` 回传状态上下文 `local233/mp-release-robot2`（`pending` → `success` / `failure`）
+
+### 3. 云端 Agent 监控与 GitHub Actions 备用上传
+
+- 云端 Agent 在 `git push` 后可执行：
+  ```bash
+  ./deploy/local-test/wait-local233-sync.sh
+  ```
+  实时轮询 `local233` 回传的 Commit Status，确认 `18092` 后端重启和体验版上传完成后再通知用户。
+- 若需要将微信上传密钥托管到 GitHub Actions 云端作为备用通道（在 `local233` 执行一次即可注入仓库 Secrets）：
+  ```bash
+  cd /home/betalpha/projects/football_insight/football_insight_mini
+  gh secret set MINI_CI_PRIVATE_KEY < private.wxc61da17a97f6eb1b.key
+  grep '^MINI_REVIEW_API_KEY=' .env.ci.local | cut -d= -f2- | gh secret set MINI_REVIEW_API_KEY
+  ```
+  配置后可通过 `gh workflow run mp-release.yml -f desc="变更说明"` 直接在 GitHub 云端触发体验版上传。
+

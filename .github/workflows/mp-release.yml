@@ -1,0 +1,73 @@
+name: mini release upload
+
+on:
+  workflow_dispatch:
+    inputs:
+      desc:
+        description: "本次体验版变更说明"
+        required: true
+        type: string
+      robot:
+        description: "微信 CI 机器人编号（2 为体验版，1 为开发版）"
+        required: false
+        default: "2"
+        type: choice
+        options:
+          - "2"
+          - "1"
+
+permissions:
+  contents: write
+
+jobs:
+  mp-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        working-directory: football_insight_mini
+        run: bun install --frozen-lockfile
+
+      - name: Prepare WeChat CI credentials
+        working-directory: football_insight_mini
+        env:
+          MINI_REVIEW_API_KEY: ${{ secrets.MINI_REVIEW_API_KEY }}
+          MINI_CI_PRIVATE_KEY: ${{ secrets.MINI_CI_PRIVATE_KEY }}
+        run: |
+          if [ -z "$MINI_REVIEW_API_KEY" ] || [ -z "$MINI_CI_PRIVATE_KEY" ]; then
+            echo "Missing GitHub Secrets: MINI_REVIEW_API_KEY and/or MINI_CI_PRIVATE_KEY" >&2
+            exit 1
+          fi
+          printf 'MINI_REVIEW_API_KEY=%s\nMINI_REVIEW_API_URL=https://match.oryjk.cn/api/v1\n' "$MINI_REVIEW_API_KEY" > .env.ci.local
+          printf '%s\n' "$MINI_CI_PRIVATE_KEY" > private.wxc61da17a97f6eb1b.key
+          chmod 600 .env.ci.local private.wxc61da17a97f6eb1b.key
+
+      - name: Sync allocated review version (auto-commit if incremented)
+        working-directory: football_insight_mini
+        run: |
+          MINI_REVIEW_SKIP=0 bun --no-env-file --bun scripts/sync-manifest-version.mjs
+          if [ -n "$(git status --porcelain -- src/manifest.json src/config/generatedMiniProgramVersion.ts)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/manifest.json src/config/generatedMiniProgramVersion.ts
+            git commit -m "chore(mini): sync allocated review version [ci]"
+            git push origin HEAD:main
+          fi
+
+      - name: Build and upload Mini Program
+        working-directory: football_insight_mini
+        run: bun run mp:release -- --robot "${{ inputs.robot }}" --desc "${{ inputs.desc }}"
+
+      - name: Clean up credentials
+        if: always()
+        working-directory: football_insight_mini
+        run: rm -f .env.ci.local private.wxc61da17a97f6eb1b.key
