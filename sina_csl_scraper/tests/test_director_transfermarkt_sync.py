@@ -739,11 +739,11 @@ def test_parse_local_html_dir_and_sync_with_sina_english_names(tmp_path) -> None
     # Bridge English Transfermarkt dataset names to Chinese f_i_squad_players via Sina English names
     store = FakeTransfermarktStore(
         squad_players=[
-            SquadPlayerRecord(77680, "成都蓉城", 101, "韦世豪", 7, True),
-            SquadPlayerRecord(77680, "成都蓉城", 102, "费利佩", 9, True),
+            SquadPlayerRecord(team_id=77680, player_id=101, player_name="韦世豪", team_name="成都蓉城", shirt_number=7, active=True),
+            SquadPlayerRecord(team_id=77680, player_id=102, player_name="费利佩", team_name="成都蓉城", shirt_number=9, active=True),
         ],
         director_candidates=[
-            DirectorCandidateRecord(201, "罗慕洛", "成都蓉城", "CSL", True),
+            DirectorCandidateRecord(id=201, player_name="罗慕洛", current_club="成都蓉城", league_tag="CSL", active=True),
         ],
     )
     players = [
