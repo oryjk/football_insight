@@ -23,6 +23,7 @@ from .catalog import build_player_profiles, build_team_profiles
 from .cfl_client import CflCslClient
 from .client import SinaCslClient, serialize_datasets
 from .constants import DEFAULT_LEAGUE_ID
+from .director_avatars import PostgresDirectorAvatarStore, sync_director_avatars
 from .leisu import LeisuBrowserClient, LeisuCornerEnricher, load_leisu_match_map
 from .models import MatchResult
 from .postgres_repository import PostgresInsightSyncRepository
@@ -349,6 +350,55 @@ def sync_avatar_thumbs_command(
     summary = sync_avatar_thumbs(
         urls, public_base, minio_prefix, HttpAssetFetcher(), target, dry_run=dry_run, limit=limit,
     )
+    typer.echo(json.dumps(summary, ensure_ascii=False))
+    if summary["failed"]:
+        raise typer.Exit(1)
+
+
+@app.command("sync-director-avatars")
+def sync_director_avatars_command(
+    force: bool = typer.Option(False, "--force", help="Refresh candidates that already have an avatar_url."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Discover avatars without uploading or writing to DB."),
+    limit: int | None = typer.Option(None, help="Process at most N candidates."),
+    interval: float = typer.Option(0.5, min=0.0, help="Seconds to wait between external API requests."),
+    database_url: str | None = typer.Option(None, envvar=["FI_DATABASE_URL", "DATABASE_URL"]),
+    minio_endpoint: str = typer.Option(_env_default("FI_MINIO_ENDPOINT", "https://oryjk.cn:82/minio")),
+    minio_access_key: str = typer.Option(_env_default("FI_MINIO_ACCESS_KEY", "") or ""),
+    minio_secret_key: str = typer.Option(_env_default("FI_MINIO_SECRET_KEY", "") or ""),
+    minio_bucket: str = typer.Option(_env_default("FI_MINIO_BUCKET", "football-insight") or "football-insight"),
+    minio_region: str = typer.Option(_env_default("FI_MINIO_REGION", "us-east-1") or "us-east-1"),
+    minio_prefix: str = typer.Option(_env_default("FI_MINIO_PREFIX", "summary") or "summary"),
+    minio_public_base_url: str | None = typer.Option(_env_default("FI_MINIO_PUBLIC_BASE_URL")),
+) -> None:
+    """Backfill real player avatars for f_i_director_candidates into MinIO."""
+    if not database_url:
+        raise typer.BadParameter("PostgreSQL database_url is required")
+    if not dry_run and (not minio_access_key or not minio_secret_key):
+        raise typer.BadParameter("MinIO credentials are required unless --dry-run")
+
+    target = (
+        None
+        if dry_run
+        else MinioAssetTarget.from_credentials(
+            endpoint=minio_endpoint,
+            access_key=minio_access_key,
+            secret_key=minio_secret_key,
+            bucket=minio_bucket,
+            region=minio_region,
+            public_base_url=minio_public_base_url,
+        )
+    )
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        summary = sync_director_avatars(
+            store=PostgresDirectorAvatarStore(connection),
+            prefix=minio_prefix,
+            fetcher=HttpAssetFetcher(),
+            target=target,
+            force=force,
+            dry_run=dry_run,
+            limit=limit,
+            interval=interval,
+        )
     typer.echo(json.dumps(summary, ensure_ascii=False))
     if summary["failed"]:
         raise typer.Exit(1)

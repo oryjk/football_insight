@@ -75,6 +75,30 @@ LEFT JOIN LATERAL (
     WHERE c.plan_id = p.id
 ) cm ON TRUE";
 
+const SQUAD_PLAYER_AVATAR_EXPR: &str =
+    "COALESCE(NULLIF(BTRIM(sp.avatar_storage_url), ''), NULLIF(BTRIM(sp.avatar_source_url), '')) AS avatar_url";
+
+const POOL_CANDIDATE_SELECT: &str = "SELECT c.code, c.player_name, c.position, c.country, c.is_foreign,
+       c.league_tag, c.current_club, c.tags,
+       COALESCE(NULLIF(BTRIM(c.avatar_url), ''), sp_avatar.avatar_url) AS avatar_url
+FROM f_i_director_candidates c
+LEFT JOIN LATERAL (
+    SELECT COALESCE(
+               NULLIF(BTRIM(sp.avatar_storage_url), ''),
+               NULLIF(BTRIM(sp.avatar_source_url), '')
+           ) AS avatar_url
+    FROM f_i_squad_players sp
+    WHERE sp.player_name = c.player_name
+      AND COALESCE(
+              NULLIF(BTRIM(sp.avatar_storage_url), ''),
+              NULLIF(BTRIM(sp.avatar_source_url), '')
+          ) IS NOT NULL
+    ORDER BY sp.active DESC,
+             sp.last_season DESC,
+             (NULLIF(BTRIM(sp.avatar_storage_url), '') IS NOT NULL) DESC
+    LIMIT 1
+) sp_avatar ON TRUE";
+
 #[derive(FromRow)]
 struct WindowRow {
     id: i64,
@@ -105,7 +129,7 @@ struct SquadPlayerRow {
     shirt_number: Option<i32>,
     position: Option<String>,
     country: Option<String>,
-    avatar_storage_url: Option<String>,
+    avatar_url: Option<String>,
 }
 
 impl From<SquadPlayerRow> for SquadPlayer {
@@ -118,7 +142,7 @@ impl From<SquadPlayerRow> for SquadPlayer {
             shirt_number: r.shirt_number,
             position: r.position,
             country: r.country,
-            avatar_url: r.avatar_storage_url,
+            avatar_url: r.avatar_url,
         }
     }
 }
@@ -289,7 +313,7 @@ impl DirectorRepository for PostgresDirectorRepository {
     async fn team_active_squad(&self, team_id: i64) -> Result<Vec<SquadPlayer>, DirectorError> {
         sqlx::query_as::<_, SquadPlayerRow>(&format!(
             "SELECT sp.player_id, sp.team_id, t.team_name, sp.player_name,
-                    sp.shirt_number, sp.position, sp.country, sp.avatar_storage_url
+                    sp.shirt_number, sp.position, sp.country, {SQUAD_PLAYER_AVATAR_EXPR}
              FROM f_i_squad_players sp
              JOIN f_i_teams t ON t.team_id = sp.team_id
              WHERE sp.team_id = $1 AND sp.active = TRUE
@@ -311,7 +335,7 @@ impl DirectorRepository for PostgresDirectorRepository {
         let pattern = keyword.map(|kw| format!("%{kw}%"));
         sqlx::query_as::<_, SquadPlayerRow>(&format!(
             "SELECT sp.player_id, sp.team_id, t.team_name, sp.player_name,
-                    sp.shirt_number, sp.position, sp.country, sp.avatar_storage_url
+                    sp.shirt_number, sp.position, sp.country, {SQUAD_PLAYER_AVATAR_EXPR}
              FROM f_i_squad_players sp
              JOIN f_i_teams t ON t.team_id = sp.team_id
              WHERE sp.active = TRUE
@@ -338,9 +362,9 @@ impl DirectorRepository for PostgresDirectorRepository {
         player_id: i64,
         exclude_team_id: i64,
     ) -> Result<Option<SquadPlayer>, DirectorError> {
-        sqlx::query_as::<_, SquadPlayerRow>(
+        sqlx::query_as::<_, SquadPlayerRow>(&format!(
             "SELECT sp.player_id, sp.team_id, t.team_name, sp.player_name,
-                    sp.shirt_number, sp.position, sp.country, sp.avatar_storage_url
+                    sp.shirt_number, sp.position, sp.country, {SQUAD_PLAYER_AVATAR_EXPR}
              FROM f_i_squad_players sp
              JOIN f_i_teams t ON t.team_id = sp.team_id
              WHERE sp.player_id = $1
@@ -351,8 +375,8 @@ impl DirectorRepository for PostgresDirectorRepository {
                    WHERE own.team_id = $2 AND own.player_id = sp.player_id AND own.active = TRUE
                )
              ORDER BY sp.last_season DESC
-             LIMIT 1",
-        )
+             LIMIT 1"
+        ))
         .bind(player_id)
         .bind(exclude_team_id)
         .fetch_optional(&self.pool)
@@ -370,22 +394,20 @@ impl DirectorRepository for PostgresDirectorRepository {
         limit: i64,
     ) -> Result<Vec<PoolCandidate>, DirectorError> {
         let pattern = keyword.map(|kw| format!("%{kw}%"));
-        sqlx::query_as::<_, PoolCandidateRow>(
-            "SELECT code, player_name, position, country, is_foreign,
-                    league_tag, current_club, tags, avatar_url
-             FROM f_i_director_candidates
-             WHERE active = TRUE
-               AND is_foreign = $2
+        sqlx::query_as::<_, PoolCandidateRow>(&format!(
+            "{POOL_CANDIDATE_SELECT}
+             WHERE c.active = TRUE
+               AND c.is_foreign = $2
                AND (
                    $3 = 'ALL'
-                   OR ($3 = 'K' AND UPPER(league_tag) IN ('K1', 'K2'))
-                   OR ($3 = 'OTHER' AND UPPER(league_tag) NOT IN ('K1', 'K2', 'J1', 'CSL', 'FREE'))
-                   OR UPPER(league_tag) = $3
+                   OR ($3 = 'K' AND UPPER(c.league_tag) IN ('K1', 'K2'))
+                   OR ($3 = 'OTHER' AND UPPER(c.league_tag) NOT IN ('K1', 'K2', 'J1', 'CSL', 'FREE'))
+                   OR UPPER(c.league_tag) = $3
                )
-               AND ($4::TEXT IS NULL OR player_name ILIKE $4 OR current_club ILIKE $4)
-             ORDER BY (target_team_id = $1) DESC NULLS LAST, sort_order ASC, id ASC
-             LIMIT $5",
-        )
+               AND ($4::TEXT IS NULL OR c.player_name ILIKE $4 OR c.current_club ILIKE $4)
+             ORDER BY (c.target_team_id = $1) DESC NULLS LAST, c.sort_order ASC, c.id ASC
+             LIMIT $5"
+        ))
         .bind(team_id)
         .bind(is_foreign)
         .bind(league)
@@ -401,13 +423,11 @@ impl DirectorRepository for PostgresDirectorRepository {
         &self,
         code: &str,
     ) -> Result<Option<PoolCandidate>, DirectorError> {
-        sqlx::query_as::<_, PoolCandidateRow>(
-            "SELECT code, player_name, position, country, is_foreign,
-                    league_tag, current_club, tags, avatar_url
-             FROM f_i_director_candidates
-             WHERE code = $1 AND active = TRUE
-             LIMIT 1",
-        )
+        sqlx::query_as::<_, PoolCandidateRow>(&format!(
+            "{POOL_CANDIDATE_SELECT}
+             WHERE c.code = $1 AND c.active = TRUE
+             LIMIT 1"
+        ))
         .bind(code)
         .fetch_optional(&self.pool)
         .await
