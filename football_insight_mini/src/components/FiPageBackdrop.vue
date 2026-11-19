@@ -1,5 +1,5 @@
 <template>
-  <view v-if="resolvedImageUrl" class="fi-page-backdrop" :class="{ 'fi-page-backdrop--full': fullPage }" aria-hidden="true">
+  <view v-if="resolvedImageUrl" class="fi-page-backdrop" :class="{ 'fi-page-backdrop--full': fullPage || isCustomImage }" aria-hidden="true">
     <view class="fi-page-backdrop__image" :style="imageStyle"></view>
     <view class="fi-page-backdrop__fade" :class="{ 'fi-page-backdrop__fade--custom': isCustomImage }"></view>
   </view>
@@ -64,7 +64,7 @@ const imageStyle = computed(() =>
   bottom: 0;
   background-repeat: no-repeat;
   background-size: cover;
-  background-position: center top;
+  background-position: center center;
 }
 
 .fi-page-backdrop__fade {
