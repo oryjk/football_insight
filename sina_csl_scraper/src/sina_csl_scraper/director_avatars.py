@@ -444,6 +444,7 @@ class AvatarDiscoverer:
             self.session.headers["User-Agent"] = DEFAULT_USER_AGENT
         self.timeout = timeout
         self.hints = DIRECTOR_SEARCH_HINTS if hints is None else hints
+        self._thesportsdb_blocked = False
 
     def search_thesportsdb(self, name: str) -> str | None:
         response = self.session.get(
@@ -518,21 +519,33 @@ class AvatarDiscoverer:
     def discover(self, candidate: DirectorCandidate) -> str | None:
         hint = self.hints.get(candidate.code) or _fallback_hint(candidate)
 
-        for name in hint.search_names:
-            try:
-                found = self.search_thesportsdb(name)
-            except Exception:  # noqa: BLE001 - 单个查询失败继续尝试其他名字或兜底源
-                logger.warning("TheSportsDB lookup failed for %s (%s)", candidate.code, name, exc_info=True)
-                continue
-            if found:
-                return found
+        if not self._thesportsdb_blocked:
+            for name in hint.search_names:
+                try:
+                    found = self.search_thesportsdb(name)
+                except requests.HTTPError as exc:
+                    status = exc.response.status_code if exc.response is not None else None
+                    if status in (401, 403):
+                        self._thesportsdb_blocked = True
+                        logger.warning(
+                            "TheSportsDB returned HTTP %s; disabling TheSportsDB for remaining candidates and using Wikipedia.",
+                            status,
+                        )
+                        break
+                    logger.warning("TheSportsDB HTTP %s for %s (%s)", status, candidate.code, name)
+                    continue
+                except Exception as exc:  # noqa: BLE001 - 单个查询失败继续尝试其他名字或兜底源
+                    logger.warning("TheSportsDB lookup failed for %s (%s): %s", candidate.code, name, exc)
+                    continue
+                if found:
+                    return found
 
         wiki_titles = hint.wiki_titles or hint.search_names[:1]
         for title in wiki_titles:
             try:
                 found = self.search_wikipedia(title)
-            except Exception:  # noqa: BLE001 - Wikipedia 失败不阻塞
-                logger.warning("Wikipedia lookup failed for %s (%s)", candidate.code, title, exc_info=True)
+            except Exception as exc:  # noqa: BLE001 - Wikipedia 失败不阻塞
+                logger.warning("Wikipedia lookup failed for %s (%s): %s", candidate.code, title, exc)
                 continue
             if found:
                 return found
