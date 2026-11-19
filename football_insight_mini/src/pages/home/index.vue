@@ -59,6 +59,7 @@
           :transfer-summary="fanTransferSummary"
           @open-lineup="openLineupBoard"
           @open-transfer="openTransferBoard"
+          @open-director="openDirector"
         />
 
         <!-- 回到页面的后台刷新沿用已有内容，只有还没有总览数据时才显示骨架 -->
@@ -538,12 +539,11 @@ async function handleHomeSupportVote(teamId: number) {
   }
 }
 
-function openLineupBoard() {
-  uni.navigateTo({ url: buildTacticsEntryUrl(fanEntriesTeam.value.teamId) })
-}
-
-function openTransferBoard() {
-  uni.navigateTo({ url: buildTransferEntryUrl('stay') })
+function openLineupBoard() { uni.navigateTo({ url: buildTacticsEntryUrl(fanEntriesTeam.value.teamId) }) }
+function openTransferBoard() { uni.navigateTo({ url: buildTransferEntryUrl('stay') }) }
+function openDirector() {
+  const teamId = fanEntriesTeam.value.teamId
+  uni.navigateTo({ url: teamId ? `/pages/director/index?team_id=${teamId}` : '/pages/director/index' })
 }
 
 onShow(() => {

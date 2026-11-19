@@ -67,6 +67,24 @@
         <image class="fan-entry__cta-icon" :src="chevronRightWhiteIcon" mode="aspectFit" aria-hidden="true" />
       </view>
     </view>
+    <view
+      class="fan-entry fan-entry--director"
+      role="button"
+      aria-label="我来当总监：休赛期建队模拟，定 5 外援拉微信群 PK"
+      hover-class="fan-entry--pressed"
+      :hover-stay-time="80"
+      @tap="emit('open-director')"
+    >
+      <view class="fan-entry__director-left">
+        <text class="fan-entry__kicker fan-entry__kicker--director">休赛期建队</text>
+        <text class="fan-entry__title">我来当总监</text>
+        <text class="fan-entry__subtitle">给{{ teamName }}定 5 外援阵容，发微信群看 1v1 分歧报告</text>
+      </view>
+      <view class="fan-entry__cta fan-entry__cta--director">
+        <text class="fan-entry__cta-text">去建队</text>
+        <image class="fan-entry__cta-icon" :src="chevronRightWhiteIcon" mode="aspectFit" aria-hidden="true" />
+      </view>
+    </view>
   </view>
 </template>
 
@@ -91,6 +109,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'open-lineup'): void
   (e: 'open-transfer'): void
+  (e: 'open-director'): void
 }>()
 
 const lineupModel = computed(() =>
@@ -129,6 +148,35 @@ const transferModel = computed(() =>
 .fan-entry--like {
   background: var(--fi-gradient-fan-entry-like);
   border: var(--fi-border-width) solid var(--fi-color-fan-entry-like-border);
+}
+
+.fan-entry--director {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #eef3ff 0%, #ffffff 72%);
+  border: var(--fi-border-card);
+}
+
+.fan-entry__director-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--fi-space-8);
+}
+
+.fan-entry__kicker--director {
+  background: var(--fi-color-outsider-soft);
+  color: var(--fi-color-outsider);
+}
+
+.fan-entry__cta--director {
+  flex-shrink: 0;
+  margin-top: 0;
+  background: var(--fi-color-text-primary);
 }
 
 .fan-entry--pressed {

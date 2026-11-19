@@ -175,6 +175,7 @@ fn matches_excluded_prefix(path: &str) -> bool {
         || path.starts_with("/api/v1/mini-review/")
         || path == "/api/v1/daily-topics"
         || path.starts_with("/api/v1/daily-topics/")
+        || path.starts_with("/api/v1/director/")
         || path == "/football/wechat/webhook"
         || path == "/api/health"
 }

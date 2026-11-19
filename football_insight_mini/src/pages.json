@@ -198,6 +198,25 @@
 					}
 				}
 			]
+		},
+		{
+			"root": "pages/director",
+			"pages": [
+				{
+					"path": "index",
+					"style": {
+						"navigationBarTitleText": "我来当总监",
+						"navigationStyle": "custom"
+					}
+				},
+				{
+					"path": "view",
+					"style": {
+						"navigationBarTitleText": "总监建队方案",
+						"navigationStyle": "custom"
+					}
+				}
+			]
 		}
 	],
 	"preloadRule": {
@@ -208,14 +227,16 @@
 				"pages/insights-tactics",
 				"pages/insights-transfer",
 				"pages/lineup",
-				"pages/transfer"
+				"pages/transfer",
+				"pages/director"
 			]
 		},
 		"pages/home/index": {
 			"network": "all",
 			"packages": [
 				"pages/insights-tactics",
-				"pages/insights-transfer"
+				"pages/insights-transfer",
+				"pages/director"
 			]
 		}
 	},

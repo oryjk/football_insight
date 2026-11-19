@@ -138,7 +138,12 @@ const currentUser = session.currentUser
 const pageVisible = ref(false)
 const teamBrowser = useInsightsTeams(session)
 const { teams: selectableTeams, selectedTeamId, loading: teamLoading, error: teamError } = teamBrowser
-function openSecondary(target: 'tactics' | 'transfer'): void {
+function openSecondary(target: 'tactics' | 'transfer' | 'director'): void {
+  if (target === 'director') {
+    const teamId = selectedTeamId.value
+    uni.navigateTo({ url: teamId ? `/pages/director/index?team_id=${teamId}` : '/pages/director/index' })
+    return
+  }
   uni.navigateTo({ url: target === 'tactics' ? '/pages/insights-tactics/index' : '/pages/insights-transfer/index' })
 }
 const ticketWatchNavigating = ref(false)

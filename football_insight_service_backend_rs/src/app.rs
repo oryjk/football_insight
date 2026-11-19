@@ -50,8 +50,16 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         auth.token_port.clone(),
         config,
     );
-    let daily_topics_routes =
-        build_daily_topics_routes(pool.clone(), auth.token_port.clone(), content_security);
+    let daily_topics_routes = build_daily_topics_routes(
+        pool.clone(),
+        auth.token_port.clone(),
+        content_security.clone(),
+    );
+    let director_routes = crate::director::bootstrap::build_director_routes(
+        pool.clone(),
+        auth.token_port.clone(),
+        content_security,
+    );
     let activity_routes = build_activity_routes(pool.clone(), auth.token_port.clone());
     let mcp_routes = crate::mcp::bootstrap::build_mcp_routes(insight.repository.clone(), config);
     let ai_routes = build_ai_routes(
@@ -138,6 +146,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         .merge(lineup_routes)
         .merge(transfer_routes)
         .merge(daily_topics_routes)
+        .merge(director_routes)
         .merge(mini_review_routes)
         .merge(admin_routes)
         .merge(system_config.routes)
