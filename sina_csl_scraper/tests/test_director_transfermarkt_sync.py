@@ -742,7 +742,7 @@ def test_parse_local_html_dir_and_sync_with_sina_english_names(tmp_path) -> None
             SquadPlayerRecord(77680, "成都蓉城", 101, "韦世豪", 7, True),
             SquadPlayerRecord(77680, "成都蓉城", 102, "费利佩", 9, True),
         ],
-        candidates=[
+        director_candidates=[
             DirectorCandidateRecord(201, "罗慕洛", "成都蓉城", "CSL", True),
         ],
     )
