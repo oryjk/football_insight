@@ -1,6 +1,6 @@
 <template>
   <page-meta :page-style="navigationPageStyle + pageLockStyle" />
-  <view class="page-root" :class="{ 'page-root--locked': pageScrollLocked }">
+  <view class="rankings-shell" :class="{ 'rankings-shell--locked': pageScrollLocked }">
     <FiBrandNav />
     <FiPageBackdrop :image-url="pageBackgroundImageUrl" />
 
@@ -86,7 +86,7 @@ onShareAppMessage(() => {
 </script>
 
 <style scoped lang="css">
-.page-root {
+.rankings-shell {
   position: relative;
   min-height: 100vh;
   background: var(--fi-color-page-soft);
@@ -97,7 +97,7 @@ onShareAppMessage(() => {
   position: relative;
   z-index: 1;
 }
-.page-root--locked {
+.rankings-shell--locked {
   height: 100vh;
   overflow: hidden;
 }
