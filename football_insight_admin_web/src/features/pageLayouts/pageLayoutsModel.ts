@@ -223,9 +223,14 @@ export function filterAndGroupPages(
 export function defaultPreviewBaseUrl(
   configuredUrl?: string,
   currentOrigin?: string,
+  basePath?: string,
 ): string {
   const explicit = configuredUrl?.trim();
   if (explicit) return explicit.replace(/\/+$/, "");
+  const normalizedBase = basePath?.trim().replace(/\/+$/, "") ?? "";
+  if (currentOrigin && normalizedBase && normalizedBase !== "/") {
+    return `${currentOrigin.replace(/\/+$/, "")}${normalizedBase}/preview`;
+  }
   if (currentOrigin && /match\.oryjk\.cn/i.test(currentOrigin)) {
     return `${currentOrigin.replace(/\/+$/, "")}/football`;
   }

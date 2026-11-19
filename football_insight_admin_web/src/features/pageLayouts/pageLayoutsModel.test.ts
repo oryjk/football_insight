@@ -175,6 +175,9 @@ describe("pageLayoutsModel", () => {
       "https://match.oryjk.cn/football",
     );
     expect(
+      defaultPreviewBaseUrl("", "http://172.16.60.233", "/football-admin/"),
+    ).toBe("http://172.16.60.233/football-admin/preview");
+    expect(
       buildPreviewIframeUrl(
         "https://match.oryjk.cn/football/",
         "/pages/home/index",

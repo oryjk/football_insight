@@ -23,20 +23,28 @@ import {
 
 type PreviewMode = "h5" | "schematic";
 
-function readSavedPreviewBaseUrl(): string {
+function resolveDefaultBaseUrl(): string {
   const configured =
     typeof import.meta.env.VITE_H5_PREVIEW_URL === "string"
       ? import.meta.env.VITE_H5_PREVIEW_URL
       : "";
   const origin =
     typeof window !== "undefined" ? window.location.origin : undefined;
+  const basePath =
+    typeof import.meta.env.BASE_URL === "string"
+      ? import.meta.env.BASE_URL
+      : undefined;
+  return defaultPreviewBaseUrl(configured, origin, basePath);
+}
+
+function readSavedPreviewBaseUrl(): string {
   try {
     const stored = window.localStorage.getItem(PREVIEW_BASE_URL_STORAGE_KEY);
     if (stored && stored.trim()) return stored.trim();
   } catch {
     // Ignore storage restriction errors.
   }
-  return defaultPreviewBaseUrl(configured, origin);
+  return resolveDefaultBaseUrl();
 }
 
 export function PageLayoutPreview({ draft }: { draft: AdminPageLayout }) {
@@ -132,6 +140,20 @@ export function PageLayoutPreview({ draft }: { draft: AdminPageLayout }) {
     setShowUrlConfig(false);
   }
 
+  function resetPreviewBaseUrl() {
+    const fallback = resolveDefaultBaseUrl();
+    setPreviewBaseUrl(fallback);
+    setUrlInput(fallback);
+    setBridgeReady(false);
+    setReloadNonce((n) => n + 1);
+    try {
+      window.localStorage.removeItem(PREVIEW_BASE_URL_STORAGE_KEY);
+    } catch {
+      // Ignore storage failures.
+    }
+    setShowUrlConfig(false);
+  }
+
   return (
     <aside className="page-layouts-preview-panel" aria-label="实时预览">
       <div className="page-layouts-preview-toolbar">
@@ -207,11 +229,19 @@ export function PageLayoutPreview({ draft }: { draft: AdminPageLayout }) {
           <Input
             value={urlInput}
             onChange={(e) => setUrlInput(e.target.value)}
-            placeholder="例如 https://match.oryjk.cn/football 或 http://localhost:5173"
+            placeholder="例如 http://172.16.60.233/football-admin/preview 或 http://localhost:5173"
             aria-label="H5 预览基地址"
           />
           <Button type="button" size="sm" onClick={applyPreviewBaseUrl}>
             应用
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={resetPreviewBaseUrl}
+          >
+            默认
           </Button>
         </div>
       )}

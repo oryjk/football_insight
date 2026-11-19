@@ -190,6 +190,9 @@ export function createPageLayoutStore(source: typeof pageLayoutApi = pageLayoutA
         if (typeof msg.pageKey === 'string' && VALID_PAGE_KEYS.has(msg.pageKey)) {
           applyPreviewDraft(msg.pageKey, msg.layout)
         }
+        if (host.parent && host.parent !== (globalThis as unknown) && typeof host.parent.postMessage === 'function') {
+          host.parent.postMessage({ type: 'fi-layout-preview:ready' }, '*')
+        }
         return
       }
 
