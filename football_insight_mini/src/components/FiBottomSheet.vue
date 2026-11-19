@@ -43,11 +43,13 @@
         <slot name="footer"></slot>
       </view>
     </view>
+    <FiBackIntercept :active="visible" @leave="handleClose" />
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, useSlots, watch } from 'vue'
+import FiBackIntercept from './FiBackIntercept.vue'
 
 interface Props {
   visible: boolean

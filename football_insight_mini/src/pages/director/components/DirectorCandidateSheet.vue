@@ -8,20 +8,18 @@
     @update:visible="emit('update:visible', $event)"
   >
     <view class="sheet-content">
-      <scroll-view scroll-x class="league-tabs">
-        <view class="league-tabs__list">
-          <button
-            v-for="tab in tabs"
-            :key="tab.value"
-            class="league-tab"
-            :class="{ 'league-tab--active': leagueFilter === tab.value }"
-            hover-class="sheet-pressed"
-            @tap="emit('update:leagueFilter', tab.value)"
-          >
-            {{ tab.label }}
-          </button>
-        </view>
-      </scroll-view>
+      <view class="league-tabs__list">
+        <button
+          v-for="tab in tabs"
+          :key="tab.value"
+          class="league-tab"
+          :class="{ 'league-tab--active': leagueFilter === tab.value }"
+          hover-class="sheet-pressed"
+          @tap="emit('update:leagueFilter', tab.value)"
+        >
+          {{ tab.label }}
+        </button>
+      </view>
 
       <view v-if="leagueFilter === 'CUSTOM'" class="custom-form">
         <text class="custom-form__hint">候选池没有你想签的球员？直接自由提名，提交后自动计入风格标签</text>
@@ -243,13 +241,9 @@ function handleCustomSubmit(): void {
   padding-bottom: var(--fi-space-24);
 }
 
-.league-tabs {
-  width: 100%;
-  white-space: nowrap;
-}
-
 .league-tabs__list {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--fi-space-10);
 }
 

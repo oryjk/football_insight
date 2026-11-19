@@ -47,11 +47,13 @@
           </view>
 
         </view>
+        <FiBackIntercept @leave="emit('close')" />
       </view>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import FiBackIntercept from '../../../components/FiBackIntercept.vue'
 import type { MatchCard } from '../../../types/insight'
 import { resolveMatchTechStats } from '../helpers'
 

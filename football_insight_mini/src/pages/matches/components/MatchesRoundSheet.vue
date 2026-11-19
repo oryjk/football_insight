@@ -16,11 +16,13 @@
       </view>
     </view>
   </view>
+  <FiBackIntercept @leave="emit('close')" />
 </view>
 </template>
 
 <script setup lang="ts">
 import type { MatchCard } from '../../../types/insight'
+import FiBackIntercept from '../../../components/FiBackIntercept.vue'
 import FiLoading from '../../../components/FiLoading.vue'
 import MatchesMatchCard from './MatchesMatchCard.vue'
 

@@ -39,11 +39,13 @@
         </view>
       </view>
     </view>
+    <FiBackIntercept @leave="emit('close')" />
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import FiBackIntercept from './FiBackIntercept.vue'
 import type { PlayerMatchGoals } from '../types/insight'
 import { buildGoalMatchDetail } from '../utils/playerGoals'
 

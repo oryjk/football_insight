@@ -62,10 +62,12 @@
 
     <canvas canvas-id="standingsPosterCanvas" class="standings-poster-canvas" />
     <canvas canvas-id="standingsShareCoverCanvas" class="standings-share-cover-canvas" />
+    <FiBackIntercept @leave="emit('close')" />
   </view>
 </template>
 
 <script setup lang="ts">
+import FiBackIntercept from '../../../components/FiBackIntercept.vue'
 import FiCrestProgress from '../../../components/FiCrestProgress.vue'
 import { resolveAclQualification } from '../../../utils/aclQualification'
 import { getCurrentInstance, ref, watch } from 'vue'

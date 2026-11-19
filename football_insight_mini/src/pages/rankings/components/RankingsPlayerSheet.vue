@@ -41,10 +41,12 @@
         </view>
       </view>
     </view>
+    <FiBackIntercept @leave="emit('close')" />
   </view>
 </template>
 
 <script setup lang="ts">
+import FiBackIntercept from '../../../components/FiBackIntercept.vue'
 import TeamAbilityHexagon from './TeamAbilityHexagon.vue'
 import type { PlayerRankingEntry } from '../../../types/insight'
 import { TEAM_ABILITY_AXES } from '../ability'

@@ -21,10 +21,12 @@
       </view>
       <slot />
     </view>
+    <FiBackIntercept @leave="emit('close')" />
   </view>
 </template>
 
 <script setup lang="ts">
+import FiBackIntercept from '../../../components/FiBackIntercept.vue'
 import closeIcon from '../../../static/home/sheet-close.svg'
 
 withDefaults(

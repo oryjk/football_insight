@@ -58,10 +58,12 @@
         {{ submitting ? '处理中...' : '微信支付并开通' }}
       </button>
     </view>
+    <FiBackIntercept @leave="emit('close')" />
   </view>
 </template>
 
 <script setup lang="ts">
+import FiBackIntercept from '../../../components/FiBackIntercept.vue'
 import type {
   TicketWatchMatchSummary,
   RefluxSubscriptionPlan,

@@ -8,10 +8,12 @@
         <button class="confirm-card__button confirm-card__button--confirm" hover-class="confirm-card__button--pressed" @tap="emit('confirm')">确认</button>
       </view>
     </view>
+    <FiBackIntercept :active="visible" @leave="emit('cancel')" />
   </view>
 </template>
 
 <script setup lang="ts">
+import FiBackIntercept from '../../../components/FiBackIntercept.vue'
 defineProps<{ visible: boolean; title: string; message: string }>()
 const emit = defineEmits<{
   (event: 'confirm'): void

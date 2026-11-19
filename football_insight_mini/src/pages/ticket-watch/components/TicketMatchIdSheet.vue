@@ -52,11 +52,13 @@
         <text v-for="n in WATERMARK_TILE_COUNT" :key="n" class="match-id-watermark__tile">{{ watermark }}</text>
       </view>
     </view>
+    <FiBackIntercept @leave="close" />
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, watch } from 'vue'
+import FiBackIntercept from '../../../components/FiBackIntercept.vue'
 import { buildMatchIdSourceLabel } from '../helpers'
 
 const props = defineProps<{

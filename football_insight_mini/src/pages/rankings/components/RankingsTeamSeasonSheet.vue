@@ -123,11 +123,12 @@
         <text>这支球队当前还没有可展示的赛季比赛记录。</text>
       </view>
     </view>
+    <FiBackIntercept @leave="emit('close')" />
   </view>
 </template>
-
 <script setup lang="ts">
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import FiBackIntercept from '../../../components/FiBackIntercept.vue'
 import FiLoading from '../../../components/FiLoading.vue'
 import FiResultDots from '../../../components/FiResultDots.vue'
 import TeamAbilityHexagon from './TeamAbilityHexagon.vue'
@@ -135,7 +136,6 @@ import type { TeamRankingEntry } from '../../../types/insight'
 import { TEAM_ABILITY_AXES } from '../ability'
 import { padUpcomingDots, type ResultDotItem } from '../../../utils/resultDots'
 import { buildTeamSeasonMatchRowId, formatTeamSeasonRecord, type TeamSeasonMatch } from '../../../utils/teamSeasonMatches'
-
 const props = defineProps<{
   team: TeamRankingEntry
   avatar: string
@@ -147,16 +147,11 @@ const props = defineProps<{
   loading: boolean
   errorMessage: string
 }>()
-
 const abilityAxes = TEAM_ABILITY_AXES
-
 function formatAbilityScore(value: number | undefined): string {
   return `${Math.round((value ?? 0) * 100)}`
 }
-
-const emit = defineEmits<{
-  (e: 'close'): void
-}>()
+const emit = defineEmits<{ (e: 'close'): void }>()
 
 const instance = getCurrentInstance()
 const scrollTop = ref(0)
