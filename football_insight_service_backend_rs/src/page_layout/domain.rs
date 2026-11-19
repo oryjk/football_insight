@@ -8,6 +8,8 @@ use url::Url;
 
 pub const MAX_IMAGE_URL_CHARS: usize = 2048;
 pub const MAX_UPLOAD_IMAGE_BYTES: usize = 4 * 1024 * 1024;
+pub const DEFAULT_PHOENIX_STADIUM_BG_URL: &str =
+    "https://oryjk.cn:82/minio/football-insight/static/user/phoenix-stadium-bg.webp";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -30,6 +32,7 @@ pub struct PageDefinition {
     pub title: &'static str,
     pub route_path: &'static str,
     pub group: PageGroup,
+    pub default_background_image_url: Option<&'static str>,
     pub blocks: &'static [BlockDefinition],
 }
 
@@ -734,6 +737,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "首页",
         route_path: "/pages/home/index",
         group: PageGroup::PrimaryTab,
+        default_background_image_url: Some(DEFAULT_PHOENIX_STADIUM_BG_URL),
         blocks: HOME_BLOCKS,
     },
     PageDefinition {
@@ -741,6 +745,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "榜单赛程",
         route_path: "/pages/rankings/index",
         group: PageGroup::PrimaryTab,
+        default_background_image_url: Some(DEFAULT_PHOENIX_STADIUM_BG_URL),
         blocks: RANKINGS_BLOCKS,
     },
     PageDefinition {
@@ -748,6 +753,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "洞察",
         route_path: "/pages/insights/index",
         group: PageGroup::PrimaryTab,
+        default_background_image_url: Some(DEFAULT_PHOENIX_STADIUM_BG_URL),
         blocks: INSIGHTS_BLOCKS,
     },
     PageDefinition {
@@ -755,6 +761,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "换座",
         route_path: "/pages/seat-swap/index",
         group: PageGroup::PrimaryTab,
+        default_background_image_url: Some(DEFAULT_PHOENIX_STADIUM_BG_URL),
         blocks: SEAT_SWAP_BLOCKS,
     },
     PageDefinition {
@@ -762,6 +769,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "我的",
         route_path: "/pages/user/index",
         group: PageGroup::PrimaryTab,
+        default_background_image_url: Some(DEFAULT_PHOENIX_STADIUM_BG_URL),
         blocks: USER_BLOCKS,
     },
     PageDefinition {
@@ -769,6 +777,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "余票看板",
         route_path: "/pages/ticket-watch/index",
         group: PageGroup::Feature,
+        default_background_image_url: Some(DEFAULT_PHOENIX_STADIUM_BG_URL),
         blocks: TICKET_WATCH_BLOCKS,
     },
     PageDefinition {
@@ -776,6 +785,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "赛季总结",
         route_path: "/pages/season-recap/index",
         group: PageGroup::Feature,
+        default_background_image_url: None,
         blocks: SEASON_RECAP_BLOCKS,
     },
     PageDefinition {
@@ -783,6 +793,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "开通会员",
         route_path: "/pages/membership-purchase/index",
         group: PageGroup::Feature,
+        default_background_image_url: Some(DEFAULT_PHOENIX_STADIUM_BG_URL),
         blocks: MEMBERSHIP_PURCHASE_BLOCKS,
     },
     PageDefinition {
@@ -790,6 +801,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "赛前助力",
         route_path: "/pages/support/index",
         group: PageGroup::Feature,
+        default_background_image_url: Some(DEFAULT_PHOENIX_STADIUM_BG_URL),
         blocks: SUPPORT_BLOCKS,
     },
     PageDefinition {
@@ -797,6 +809,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "全部话题",
         route_path: "/pages/topics/index",
         group: PageGroup::Feature,
+        default_background_image_url: None,
         blocks: TOPICS_BLOCKS,
     },
     PageDefinition {
@@ -804,6 +817,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "学员功能",
         route_path: "/pages/student/index",
         group: PageGroup::Feature,
+        default_background_image_url: None,
         blocks: STUDENT_BLOCKS,
     },
     PageDefinition {
@@ -811,6 +825,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "设置",
         route_path: "/pages/user/settings/index",
         group: PageGroup::Feature,
+        default_background_image_url: None,
         blocks: USER_SETTINGS_BLOCKS,
     },
     PageDefinition {
@@ -818,6 +833,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "球队战术板",
         route_path: "/pages/team-board/index",
         group: PageGroup::Feature,
+        default_background_image_url: Some(DEFAULT_PHOENIX_STADIUM_BG_URL),
         blocks: TEAM_BOARD_BLOCKS,
     },
     PageDefinition {
@@ -825,6 +841,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "排阵容",
         route_path: "/pages/insights-tactics/index",
         group: PageGroup::Feature,
+        default_background_image_url: None,
         blocks: INSIGHTS_TACTICS_BLOCKS,
     },
     PageDefinition {
@@ -832,6 +849,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "转会表态",
         route_path: "/pages/insights-transfer/index",
         group: PageGroup::Feature,
+        default_background_image_url: None,
         blocks: INSIGHTS_TRANSFER_BLOCKS,
     },
     PageDefinition {
@@ -839,6 +857,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "战术板编辑",
         route_path: "/pages/lineup/index",
         group: PageGroup::Feature,
+        default_background_image_url: None,
         blocks: LINEUP_BLOCKS,
     },
     PageDefinition {
@@ -846,6 +865,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "球队战术板列表",
         route_path: "/pages/lineup/list",
         group: PageGroup::Feature,
+        default_background_image_url: None,
         blocks: LINEUP_LIST_BLOCKS,
     },
     PageDefinition {
@@ -853,6 +873,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "转会榜",
         route_path: "/pages/transfer/board",
         group: PageGroup::Feature,
+        default_background_image_url: None,
         blocks: TRANSFER_BOARD_BLOCKS,
     },
     PageDefinition {
@@ -860,6 +881,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "我来当总监",
         route_path: "/pages/director/index",
         group: PageGroup::Feature,
+        default_background_image_url: None,
         blocks: DIRECTOR_BLOCKS,
     },
     PageDefinition {
@@ -867,6 +889,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "每日电报详情",
         route_path: "/pages/topic-detail/index",
         group: PageGroup::Detail,
+        default_background_image_url: None,
         blocks: TOPIC_DETAIL_BLOCKS,
     },
     PageDefinition {
@@ -874,6 +897,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "球迷阵容详情",
         route_path: "/pages/lineup/view",
         group: PageGroup::Detail,
+        default_background_image_url: None,
         blocks: LINEUP_VIEW_BLOCKS,
     },
     PageDefinition {
@@ -881,6 +905,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "转会提名详情",
         route_path: "/pages/transfer/view",
         group: PageGroup::Detail,
+        default_background_image_url: None,
         blocks: TRANSFER_VIEW_BLOCKS,
     },
     PageDefinition {
@@ -888,6 +913,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "电报条目详情",
         route_path: "/pages/telegraph-entry/index",
         group: PageGroup::Detail,
+        default_background_image_url: None,
         blocks: TELEGRAPH_ENTRY_BLOCKS,
     },
     PageDefinition {
@@ -895,6 +921,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "评论详情",
         route_path: "/pages/telegraph-entry/comment",
         group: PageGroup::Detail,
+        default_background_image_url: None,
         blocks: TELEGRAPH_COMMENT_BLOCKS,
     },
     PageDefinition {
@@ -902,6 +929,7 @@ pub const PAGE_LAYOUT_CATALOG: &[PageDefinition] = &[
         title: "总监建队方案",
         route_path: "/pages/director/view",
         group: PageGroup::Detail,
+        default_background_image_url: None,
         blocks: DIRECTOR_VIEW_BLOCKS,
     },
 ];
@@ -1041,10 +1069,14 @@ pub fn resolve_page_layout(
         }
     }
 
-    let safe_page_bg = stored
-        .and_then(|s| s.background_image_url.as_deref())
-        .and_then(|url| normalize_optional_image_url(Some(url), "background_image_url").ok())
-        .flatten();
+    let safe_page_bg = match stored {
+        Some(record) => record
+            .background_image_url
+            .as_deref()
+            .and_then(|url| normalize_optional_image_url(Some(url), "background_image_url").ok())
+            .flatten(),
+        None => def.default_background_image_url.map(str::to_string),
+    };
 
     ResolvedPageLayout {
         page_key: def.page_key.to_string(),
@@ -1338,5 +1370,31 @@ mod tests {
             parse_layout_image_data_url(&spoofed),
             Err(PageLayoutError::InvalidInput(_))
         ));
+    }
+
+    #[test]
+    fn resolve_page_layout_defaults_to_builtin_bg_and_respects_explicit_clear() {
+        let home_def = find_page_definition("home").expect("home");
+        let default_home = resolve_page_layout(home_def, None);
+        assert_eq!(
+            default_home.background_image_url.as_deref(),
+            Some(DEFAULT_PHOENIX_STADIUM_BG_URL)
+        );
+        assert!(!default_home.is_customized);
+
+        let cleared_stored = StoredPageLayout {
+            page_key: "home".into(),
+            background_image_url: None,
+            blocks: vec![],
+            version: 1,
+            updated_at: Utc::now(),
+        };
+        let cleared_home = resolve_page_layout(home_def, Some(&cleared_stored));
+        assert_eq!(cleared_home.background_image_url, None);
+        assert!(cleared_home.is_customized);
+
+        let topics_def = find_page_definition("topics").expect("topics");
+        let default_topics = resolve_page_layout(topics_def, None);
+        assert_eq!(default_topics.background_image_url, None);
     }
 }

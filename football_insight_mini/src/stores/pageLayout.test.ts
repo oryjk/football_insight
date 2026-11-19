@@ -94,6 +94,21 @@ describe('pageLayoutDefaults', () => {
     const normalized = normalizePageLayout('seat_swap', { blocks: allHidden })
     expect(normalized.blocks.every((b) => !b.visible)).toBe(true)
   })
+
+  test('defaults built-in stadium MinIO background and honors explicit null clear', () => {
+    const defaultHome = createDefaultPageLayout('home')
+    expect(defaultHome.background_image_url).toBe(
+      'https://oryjk.cn:82/minio/football-insight/static/user/phoenix-stadium-bg.webp',
+    )
+    const defaultTopics = createDefaultPageLayout('topics')
+    expect(defaultTopics.background_image_url).toBeNull()
+
+    const clearedHome = normalizePageLayout('home', {
+      background_image_url: null,
+      blocks: defaultHome.blocks,
+    })
+    expect(clearedHome.background_image_url).toBeNull()
+  })
 })
 
 describe('createPageLayoutStore', () => {

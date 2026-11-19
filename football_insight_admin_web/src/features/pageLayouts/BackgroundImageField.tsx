@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Image as ImageIcon, Upload, X } from "lucide-react";
 import type { AdminApi } from "../../api";
 import { errorMessage, isAborted } from "../../apiClient";
@@ -52,6 +52,10 @@ export function BackgroundImageField({
   const normalized = normalizeImageUrlInput(value);
   const urlError = validateImageUrlInput(value);
   const hasValidUrl = Boolean(normalized && !urlError);
+
+  useEffect(() => {
+    setPreviewFailed(false);
+  }, [normalized]);
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];

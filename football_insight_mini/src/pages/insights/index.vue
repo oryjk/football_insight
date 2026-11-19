@@ -2,7 +2,7 @@
   <page-meta :page-style="navigationPageStyle" />
   <view class="page-root">
     <FiBrandNav />
-    <FiPageBackdrop :image-url="pageBackgroundImageUrl" :fallback-image-url="bgImage" />
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" />
     <view class="page-scroll">
       <view class="page">
         <template v-for="block in visibleBlocks" :key="block.key">
@@ -130,7 +130,6 @@ import InsightsTeamPanel from './components/InsightsTeamPanel.vue'
 import FiTeamSelector from '../../components/FiTeamSelector.vue'
 import InsightsContributionSurface from './components/InsightsContributionSurface.vue'
 import type { TeamInsight } from '../../types/insight'
-import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { usePageLayout } from '../../composables/usePageLayout'
 import { useAppSession } from '../../stores/appSession'
 import { isMembershipTierAtLeast } from '../../utils/membershipRules'

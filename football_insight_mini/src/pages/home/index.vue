@@ -4,7 +4,7 @@
     <FiLaunchSplash :phase="splash.phase.value" />
     <!-- 冷启动宽限期内（启动幕尚未决定是否出现）背景图和导航都不显示，免得先于启动幕闪现 -->
     <FiBrandNav v-show="!launchPending" />
-    <FiPageBackdrop v-if="!launchPending" :image-url="pageBackgroundImageUrl" :fallback-image-url="bgImage" />
+    <FiPageBackdrop v-if="!launchPending" :image-url="pageBackgroundImageUrl" />
     <view class="page-scroll">
       <view class="page">
         <HomeSkeleton v-if="showInitialSkeleton" />
@@ -144,7 +144,6 @@ import type {
   RoundReference,
 } from '../../types/insight'
 import { extractApiErrorMessage } from '../../utils/apiError'
-import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
 import { buildTacticsEntryUrl } from '../../utils/lineupLinks'
 import { buildTransferEntryUrl } from '../../utils/transferLinks'

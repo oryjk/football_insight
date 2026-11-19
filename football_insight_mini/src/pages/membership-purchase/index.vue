@@ -2,7 +2,7 @@
   <page-meta :page-style="navigationPageStyle + pageLockStyle" />
   <FiSecondaryNav :shareable="false" @back="goBackFromSecondaryPage('/pages/user/index')" />
   <view v-show="!reviewRestricted" class="page-root">
-    <FiPageBackdrop :image-url="pageBackgroundImageUrl" :fallback-image-url="phoenixStadiumBgImage" full-page />
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
     <view class="page">
       <template v-for="block in visibleBlocks" :key="block.key">
         <FiLayoutBlock
@@ -140,7 +140,6 @@ import { waitForPaidOrder } from '../../composables/confirmPaidOrder'
 import { canUseVirtualPayment, requestDigitalPayment } from '../../utils/virtualPayment'
 import { useRuntimeConfig } from '../../stores/runtimeConfig'
 import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
-import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
 import { reportPageActivity } from '../../utils/userActivity'
 import { useMiniReviewStatus } from '../../stores/miniReview'

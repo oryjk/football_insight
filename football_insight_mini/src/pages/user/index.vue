@@ -2,7 +2,7 @@
   <page-meta :page-style="pageStyle" />
   <view class="page-root" :class="{ 'page-root--guest': isGuestPage }">
     <FiBrandNav :transparent="isGuestPage" />
-    <FiPageBackdrop :image-url="pageBackgroundImageUrl" :fallback-image-url="phoenixStadiumBgImage" full-page />
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
     <view v-if="isGuestPage && !pageBackgroundImageUrl" class="page-bg-fade"></view>
     <view class="page-scroll">
       <view class="page">
@@ -161,7 +161,6 @@ import UserH5TestLoginPanel from './components/UserH5TestLoginPanel.vue'
 import badgeCheckIcon from '../../static/user/badge-check.svg'
 import calendarDaysIcon from '../../static/user/calendar-days.svg'
 import logInIcon from '../../static/user/log-in.svg'
-import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { listH5TestLoginUsers } from '../../api/auth'
 import { usePageLayout } from '../../composables/usePageLayout'
 import { isSessionSupersededError, useAppSession } from '../../stores/appSession'

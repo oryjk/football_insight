@@ -451,7 +451,7 @@ export function PageLayoutsPage({
               <BackgroundImageField
                 id={`page-bg-${draft.page_key}`}
                 label="页面背景图（可选）"
-                hint="设置后将作为整个页面的背景层（自动叠加可读性遮罩），留空则使用默认背景。"
+                hint="默认展示页面当前内置背景图地址；修改或上传后作为整页背景层，清空后不显示背景图，点击「恢复默认」可还原。"
                 value={draft.background_image_url}
                 disabled={busy}
                 api={api}

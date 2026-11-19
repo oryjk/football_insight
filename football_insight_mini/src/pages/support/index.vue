@@ -2,7 +2,7 @@
   <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav @back="goBackFromSecondaryPage()" @share="copyPageShareLink(detail ? `/pages/support/index?matchId=${detail.match_id}` : '/pages/home/index')" />
   <view class="page-root">
-    <FiPageBackdrop :image-url="pageBackgroundImageUrl" :fallback-image-url="phoenixStadiumBgImage" full-page />
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
     <scroll-view scroll-y class="page-scroll">
       <view class="page">
         <FiLoading
@@ -143,7 +143,6 @@ import FiPanel from '../../components/FiPanel.vue'
 import FiSectionHeading from '../../components/FiSectionHeading.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
-import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import type { SupportMatchTeam } from '../../types/support'
 import { setPostLoginRedirectTarget } from '../../utils/authStorage'
 import { savePosterToAlbum } from '../../utils/canvasPoster'

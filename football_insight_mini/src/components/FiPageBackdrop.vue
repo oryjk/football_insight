@@ -7,6 +7,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { PHOENIX_STADIUM_BG_IMAGE_URL } from '../config/assets'
 
 const props = withDefaults(
   defineProps<{
@@ -21,13 +22,16 @@ const props = withDefaults(
   },
 )
 
-const isCustomImage = computed(() => Boolean(props.imageUrl && props.imageUrl.trim()))
 const resolvedImageUrl = computed(() => {
   const custom = props.imageUrl?.trim()
   if (custom) return custom
   const fallback = props.fallbackImageUrl?.trim()
   return fallback || ''
 })
+
+const isCustomImage = computed(
+  () => Boolean(resolvedImageUrl.value) && resolvedImageUrl.value !== PHOENIX_STADIUM_BG_IMAGE_URL,
+)
 
 const imageStyle = computed(() =>
   resolvedImageUrl.value ? { backgroundImage: `url(${resolvedImageUrl.value})` } : {},

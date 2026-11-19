@@ -2,7 +2,7 @@
   <page-meta :page-style="pageStyle" />
   <FiSecondaryNav @back="goBackFromSecondaryPage('/pages/insights/index')" @share="copyPageShareLink('/pages/ticket-watch/index')" />
   <view v-if="pageEntered" class="page-root">
-    <FiPageBackdrop :image-url="pageBackgroundImageUrl" :fallback-image-url="phoenixStadiumBgImage" full-page />
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
     <view class="page" :class="{ 'board-content--history-stats': activeTab === 'history-stats' }">
       <template v-for="block in visibleBlocks" :key="block.key">
         <FiLayoutBlock v-if="block.key === 'header'" :background-image-url="block.background_image_url">
@@ -274,7 +274,6 @@ import {
   onShow,
   onUnload,
 } from '@dcloudio/uni-app'
-import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { loadSystemConfigUnderReview } from '../../utils/systemConfig'
 import { reportPageActivity } from '../../utils/userActivity'
 import { formatInviteUpgradeHint } from '../../utils/membershipRules'

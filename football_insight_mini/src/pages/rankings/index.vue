@@ -2,7 +2,7 @@
   <page-meta :page-style="navigationPageStyle + pageLockStyle" />
   <view class="page-root" :class="{ 'page-root--locked': pageScrollLocked }">
     <FiBrandNav />
-    <FiPageBackdrop :image-url="pageBackgroundImageUrl" :fallback-image-url="bgImage" />
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" />
 
     <template v-for="section in visibleSections" :key="section">
       <view v-if="section === 'rankings'" class="page-section-slot">
@@ -27,7 +27,6 @@ import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import { usePageLayout } from '../../composables/usePageLayout'
-import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import RankingsContent from './RankingsContent.vue'
 import MatchesContent from '../matches/MatchesContent.vue'
 

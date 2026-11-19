@@ -2,7 +2,7 @@
   <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav @back="goBackToInsights" @share="copyPageShareLink(teamId ? `/pages/team-board/index?teamId=${teamId}` : '/pages/insights/index')" />
   <view class="page-root">
-    <FiPageBackdrop :image-url="pageBackgroundImageUrl" :fallback-image-url="phoenixStadiumBgImage" full-page />
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
     <scroll-view scroll-y class="page-scroll">
       <view class="page">
         <view class="page-content">
@@ -74,7 +74,6 @@ import FiLoading from '../../components/FiLoading.vue'
 import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { copyPageShareLink } from '../../utils/secondaryNavigation'
-import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import TeamBoardHero from './components/TeamBoardHero.vue'
 import TeamBoardLauncher from './components/TeamBoardLauncher.vue'
 import TeamBoardPostCard from './components/TeamBoardPostCard.vue'

@@ -2,7 +2,7 @@
   <page-meta :page-style="navigationPageStyle + pageLockStyle" />
   <view class="page-root">
     <FiBrandNav />
-    <FiPageBackdrop :image-url="pageBackgroundImageUrl" :fallback-image-url="phoenixStadiumBgImage" />
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" />
     <view class="page">
       <SeatSwapSkeleton v-if="loading" />
 
@@ -173,7 +173,6 @@ import SeatSwapMapSheet from './components/SeatSwapMapSheet.vue'
 import SeatSwapSeatSheet from './components/SeatSwapSeatSheet.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { usePageLayout } from '../../composables/usePageLayout'
-import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
 import type { SeatSwapCandidate } from '../../types/seatSwap'
 import { buildSharePath } from '../../utils/shareSource'

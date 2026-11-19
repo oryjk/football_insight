@@ -1,6 +1,6 @@
 <template>
   <view class="page-root" :class="{ 'page-root--embedded': embedded }">
-    <FiPageBackdrop v-if="!embedded" :image-url="pageBackgroundImageUrl" :fallback-image-url="bgImage" />
+    <FiPageBackdrop v-if="!embedded" :image-url="pageBackgroundImageUrl" />
     <view class="page-scroll">
       <view class="page">
       <MatchesSkeleton v-if="loading" />
@@ -43,7 +43,6 @@ import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
 import { usePageLayout } from '../../composables/usePageLayout'
 import MatchesSkeleton from './components/MatchesSkeleton.vue'
-import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import MatchesSeasonProgress from './components/MatchesSeasonProgress.vue'
 import MatchesUpcomingPanel from './components/MatchesUpcomingPanel.vue'
 import MatchesRecentResults from './components/MatchesRecentResults.vue'

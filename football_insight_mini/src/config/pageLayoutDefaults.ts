@@ -1,4 +1,17 @@
 import type { PageLayoutBlock, PageLayoutKey, PublicPageLayout } from '../types/pageLayout'
+import { PHOENIX_STADIUM_BG_IMAGE_URL } from './assets'
+
+export const DEFAULT_PAGE_BACKGROUND_URLS: Partial<Record<PageLayoutKey, string>> = {
+  home: PHOENIX_STADIUM_BG_IMAGE_URL,
+  rankings: PHOENIX_STADIUM_BG_IMAGE_URL,
+  insights: PHOENIX_STADIUM_BG_IMAGE_URL,
+  seat_swap: PHOENIX_STADIUM_BG_IMAGE_URL,
+  user: PHOENIX_STADIUM_BG_IMAGE_URL,
+  ticket_watch: PHOENIX_STADIUM_BG_IMAGE_URL,
+  membership_purchase: PHOENIX_STADIUM_BG_IMAGE_URL,
+  support: PHOENIX_STADIUM_BG_IMAGE_URL,
+  team_board: PHOENIX_STADIUM_BG_IMAGE_URL,
+}
 
 export const DEFAULT_PAGE_BLOCK_KEYS: Record<PageLayoutKey, readonly string[]> = {
   home: ['daily_topics', 'my_team_support', 'fan_entries', 'story_pulse', 'standings', 'top_scorers'],
@@ -52,7 +65,7 @@ export function sanitizeImageUrl(url: unknown): string | null {
 export function createDefaultPageLayout(pageKey: PageLayoutKey): PublicPageLayout {
   return {
     page_key: pageKey,
-    background_image_url: null,
+    background_image_url: DEFAULT_PAGE_BACKGROUND_URLS[pageKey] ?? null,
     blocks: DEFAULT_PAGE_BLOCK_KEYS[pageKey].map((key) => ({
       key,
       visible: true,
@@ -96,9 +109,14 @@ export function normalizePageLayout(
     }
   }
 
+  const backgroundImageUrl =
+    raw && Object.prototype.hasOwnProperty.call(raw, 'background_image_url')
+      ? sanitizeImageUrl(raw.background_image_url)
+      : (DEFAULT_PAGE_BACKGROUND_URLS[pageKey] ?? null)
+
   return {
     page_key: pageKey,
-    background_image_url: sanitizeImageUrl(raw?.background_image_url),
+    background_image_url: backgroundImageUrl,
     blocks,
     version: typeof raw?.version === 'number' && Number.isFinite(raw.version) ? raw.version : 0,
     updated_at: typeof raw?.updated_at === 'string' ? raw.updated_at : null,

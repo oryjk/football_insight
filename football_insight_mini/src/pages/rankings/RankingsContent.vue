@@ -1,6 +1,6 @@
 <template>
   <view class="page-root" :class="{ 'page-root--embedded': embedded }">
-    <FiPageBackdrop v-if="!embedded" :image-url="pageBackgroundImageUrl" :fallback-image-url="bgImage" />
+    <FiPageBackdrop v-if="!embedded" :image-url="pageBackgroundImageUrl" />
     <view class="page-scroll" :class="{ 'page-scroll--locked': selectedRankingTeam || selectedRankingPlayer || selectedStandingsTable || selectedGoalMatch }">
       <view class="page">
       <RankingsSkeleton v-if="loading" />
@@ -107,7 +107,6 @@ import type {
 } from '../../types/insight'
 import { extractApiErrorMessage } from '../../utils/apiError'
 import { resolveTeamSeasonMatches, type TeamSeasonMatch } from '../../utils/teamSeasonMatches'
-import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import { sortStandingsPreviewTables } from './helpers'
 import { buildPlayerAbilityDetail, buildTeamAbilityValues, TEAM_ABILITY_FALLBACK } from './ability'
 import { buildStandingsPosterSharePath, buildStandingsPosterShareTitle, type StandingsRankingMode } from './poster'
