@@ -1,7 +1,7 @@
 <template>
   <button class="audio-entry" :class="{ 'audio-entry--ready': ready, 'audio-entry--hero': variant === 'hero', 'audio-entry--disabled': !ready }" :disabled="!ready" :aria-label="!ready ? '语音准备中' : loading ? '正在加载语音' : playing ? '暂停播报' : variant === 'hero' ? '播放话题语音' : label" @tap.stop="emit('play')">
     <view v-if="variant === 'hero'" class="audio-entry__control" aria-hidden="true">
-      <view v-if="!ready || loading" class="audio-entry__waiting"><view class="audio-entry__waiting-dot" /><view class="audio-entry__waiting-dot" /><view class="audio-entry__waiting-dot" /></view>
+      <view v-if="!ready || loading" class="audio-entry__waiting" :class="{ 'audio-entry__waiting--animating': loading }"><view class="audio-entry__waiting-dot audio-entry__waiting-dot--1" /><view class="audio-entry__waiting-dot audio-entry__waiting-dot--2" /><view class="audio-entry__waiting-dot audio-entry__waiting-dot--3" /></view>
       <view v-else-if="playing" class="audio-entry__pause"><view class="audio-entry__pause-bar" /><view class="audio-entry__pause-bar" /></view>
       <view v-else class="audio-entry__play" />
     </view>
@@ -39,6 +39,17 @@ const emit = defineEmits<{ (e: 'play'): void }>()
 .audio-entry__play { width: 0; height: 0; border-top: var(--fi-space-8) solid transparent; border-bottom: var(--fi-space-8) solid transparent; border-left: var(--fi-space-14) solid currentColor; }
 .audio-entry__pause { display: flex; justify-content: space-between; width: var(--fi-space-16); height: var(--fi-space-24); }
 .audio-entry__pause-bar { width: var(--fi-space-6); height: 100%; border-radius: var(--fi-space-1); background: currentColor; }
-.audio-entry__waiting { display: flex; align-items: center; gap: var(--fi-space-4); }
+.audio-entry__waiting { display: flex; align-items: center; gap: var(--fi-space-4); height: var(--fi-space-24); }
 .audio-entry__waiting-dot { width: var(--fi-space-4); height: var(--fi-space-4); border-radius: var(--fi-radius-round); background: currentColor; }
+.audio-entry__waiting--animating .audio-entry__waiting-dot { animation: fi-audio-dot-bounce 900ms ease-in-out infinite; }
+.audio-entry__waiting--animating .audio-entry__waiting-dot--1 { animation-delay: 0ms; }
+.audio-entry__waiting--animating .audio-entry__waiting-dot--2 { animation-delay: 150ms; }
+.audio-entry__waiting--animating .audio-entry__waiting-dot--3 { animation-delay: 300ms; }
+@keyframes fi-audio-dot-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.55; }
+  40% { transform: translateY(calc(var(--fi-space-6) * -1)); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .audio-entry__waiting--animating .audio-entry__waiting-dot { animation: none; }
+}
 </style>

@@ -26,18 +26,6 @@
           @more="openMoreTopics"
         />
 
-        <FiTopicAudioPlayer
-          v-if="topicAudio.activeId.value"
-          :title="topicAudio.activeTitle.value"
-          :status="topicAudio.status.value"
-          :current-time="topicAudio.currentTime.value"
-          :duration="topicAudio.duration.value"
-          :error-message="topicAudio.errorMessage.value"
-          @toggle="toggleCurrentTopicAudio"
-          @seek="topicAudio.seek"
-          @close="topicAudio.stop"
-        />
-
         <HomeSupportPanel
           :now="homeMatchNow"
           :has-auth-token="hasAuthToken"
@@ -138,7 +126,6 @@ import { onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
 import HomeDailyTopics from './components/HomeDailyTopics.vue'
-import FiTopicAudioPlayer from '../../components/topics/FiTopicAudioPlayer.vue'
 import HomeSupportPanel from './components/HomeSupportPanel.vue'
 import HomeFanEntries from './components/HomeFanEntries.vue'
 import HomeSkeleton from './components/HomeSkeleton.vue'
@@ -304,10 +291,6 @@ const topicAudio = useDailyTopicAudio(topicEdition)
 
 function openDailyTopic(id: string) { uni.navigateTo({ url: topicDetailUrl(id) }) }
 function openMoreTopics() { uni.navigateTo({ url: '/pages/topics/index' }) }
-
-function toggleCurrentTopicAudio() {
-  if (topicAudio.activeId.value) topicAudio.toggle(topicAudio.activeId.value)
-}
 
 const updatedAtLabel = computed(() => {
   if (!overview.value?.latest_scrape_finished_at) {
