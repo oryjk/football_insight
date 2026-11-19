@@ -32,8 +32,13 @@
         </view>
         <view class="player-row__info">
           <view class="player-row__top">
+            <text
+              class="pes-pos"
+              :class="`pes-pos--${resolvePesPositionBadge(player.position).zone}`"
+            >
+              {{ resolvePesPositionBadge(player.position).code }}
+            </text>
             <text class="player-row__name">{{ player.player_name }}</text>
-            <text class="player-row__pos">{{ directorPositionLabel(player.position) }}</text>
           </view>
           <text class="player-row__meta">
             {{ player.country }}{{ player.shirt_number ? ` · ${player.shirt_number}号` : '' }}
@@ -71,9 +76,14 @@
         <view v-for="item in foreignIns" :key="item.key" class="signing-chip">
           <view class="signing-chip__main">
             <view class="signing-chip__top">
+              <text
+                class="pes-pos"
+                :class="`pes-pos--${resolvePesPositionBadge(item.position).zone}`"
+              >
+                {{ resolvePesPositionBadge(item.position).code }}
+              </text>
               <text class="signing-chip__name">{{ item.player_name }}</text>
               <text class="signing-chip__tag">{{ directorLeagueLabel(item.league_tag) }}</text>
-              <text class="signing-chip__pos">{{ directorPositionLabel(item.position) }}</text>
             </view>
             <text class="signing-chip__club">{{ item.current_club }}</text>
           </view>
@@ -102,7 +112,8 @@
 <script setup lang="ts">
 import FiAvatar from '../../../components/FiAvatar.vue'
 import type { DirectorSquadPlayerDto, PlanPlayerItem } from '../../../types/director'
-import { directorLeagueLabel, directorPositionLabel } from '../../../utils/directorLinks'
+import { directorLeagueLabel } from '../../../utils/directorLinks'
+import { resolvePesPositionBadge } from '../badges'
 import type { ForeignQuotaCheck } from '../helpers'
 
 const props = defineProps<{
@@ -216,17 +227,20 @@ function isLeave(playerId: number): boolean {
 .squad-list {
   display: flex;
   flex-direction: column;
-  gap: var(--fi-space-12);
+  border-top: 1rpx solid var(--fi-color-divider-soft);
 }
 
 .player-row {
   display: flex;
   align-items: center;
   gap: var(--fi-space-14);
-  padding: var(--fi-space-14) var(--fi-space-16);
-  border-radius: var(--fi-radius-md);
-  background: var(--fi-color-page-soft);
-  border: var(--fi-border-width) solid var(--fi-color-divider-soft);
+  padding: var(--fi-space-16) 0;
+  border-bottom: 1rpx solid var(--fi-color-divider-soft);
+}
+
+.player-row:last-child {
+  border-bottom: none;
+  padding-bottom: var(--fi-space-4);
 }
 
 .player-row__avatar {
@@ -235,7 +249,7 @@ function isLeave(playerId: number): boolean {
   height: var(--fi-space-64);
   border-radius: var(--fi-radius-round);
   overflow: hidden;
-  background: var(--fi-color-surface);
+  background: var(--fi-color-page-soft);
   font-size: var(--fi-font-24);
 }
 
@@ -253,20 +267,29 @@ function isLeave(playerId: number): boolean {
   gap: var(--fi-space-8);
 }
 
+.pes-pos {
+  flex-shrink: 0;
+  min-width: 66rpx;
+  padding: var(--fi-space-4) var(--fi-space-8);
+  border-radius: var(--fi-radius-xs);
+  background: #1c232d;
+  font-size: var(--fi-font-20);
+  font-weight: var(--fi-weight-extrabold);
+  line-height: var(--fi-leading-none);
+  text-align: center;
+  letter-spacing: 1rpx;
+}
+
+.pes-pos--gk { color: #f2c94c; }
+.pes-pos--df { color: #38b6ff; }
+.pes-pos--mf { color: #4cd964; }
+.pes-pos--fw { color: #ff477e; }
+
 .player-row__name {
   color: var(--fi-color-text-strong);
   font-size: var(--fi-font-28);
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-tight);
-}
-
-.player-row__pos {
-  padding: var(--fi-space-4) var(--fi-space-8);
-  border-radius: var(--fi-radius-xs);
-  background: var(--fi-color-surface);
-  color: var(--fi-color-text-secondary);
-  font-size: var(--fi-font-20);
-  line-height: var(--fi-leading-none);
 }
 
 .player-row__meta {
@@ -349,7 +372,7 @@ function isLeave(playerId: number): boolean {
 .signing-list {
   display: flex;
   flex-direction: column;
-  gap: var(--fi-space-10);
+  border-top: 1rpx solid var(--fi-color-divider-soft);
 }
 
 .signing-chip {
@@ -357,10 +380,12 @@ function isLeave(playerId: number): boolean {
   align-items: center;
   justify-content: space-between;
   gap: var(--fi-space-12);
-  padding: var(--fi-space-14) var(--fi-space-16);
-  border-radius: var(--fi-radius-md);
-  background: var(--fi-color-primary-soft);
-  border: var(--fi-border-width) solid var(--fi-color-border-chip);
+  padding: var(--fi-space-14) 0;
+  border-bottom: 1rpx solid var(--fi-color-divider-soft);
+}
+
+.signing-chip:last-child {
+  border-bottom: none;
 }
 
 .signing-chip__main {
@@ -387,20 +412,15 @@ function isLeave(playerId: number): boolean {
 .signing-chip__tag {
   padding: var(--fi-space-4) var(--fi-space-10);
   border-radius: var(--fi-radius-round);
-  background: var(--fi-color-primary);
-  color: var(--fi-color-surface);
+  background: var(--fi-color-primary-soft);
+  color: var(--fi-color-primary);
   font-size: var(--fi-font-20);
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-none);
 }
 
-.signing-chip__pos {
-  color: var(--fi-color-text-secondary);
-  font-size: var(--fi-font-20);
-}
-
 .signing-chip__club {
-  color: var(--fi-color-text-secondary);
+  color: var(--fi-color-text-muted);
   font-size: var(--fi-font-22);
 }
 

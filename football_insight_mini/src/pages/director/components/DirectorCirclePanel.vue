@@ -181,16 +181,19 @@ const emit = defineEmits<{
 .member-list {
   display: flex;
   flex-direction: column;
-  gap: var(--fi-space-10);
+  border-top: 1rpx solid var(--fi-color-divider-soft);
 }
 
 .rank-row {
   display: flex;
   align-items: center;
   gap: var(--fi-space-12);
-  padding: var(--fi-space-12) var(--fi-space-16);
-  border-radius: var(--fi-radius-md);
-  background: var(--fi-color-page-soft);
+  padding: var(--fi-space-14) 0;
+  border-bottom: 1rpx solid var(--fi-color-divider-soft);
+}
+
+.rank-row:last-child {
+  border-bottom: none;
 }
 
 .rank-idx {
@@ -235,15 +238,17 @@ const emit = defineEmits<{
   display: flex;
   align-items: center;
   gap: var(--fi-space-12);
-  padding: var(--fi-space-14) var(--fi-space-16);
-  border-radius: var(--fi-radius-md);
-  background: var(--fi-color-page-soft);
-  border: var(--fi-border-width) solid var(--fi-color-divider-soft);
+  padding: var(--fi-space-14) var(--fi-space-8);
+  border-bottom: 1rpx solid var(--fi-color-divider-soft);
+}
+
+.member-row:last-child {
+  border-bottom: none;
 }
 
 .member-row--active {
   background: var(--fi-color-primary-soft);
-  border-color: var(--fi-color-primary);
+  box-shadow: inset 6rpx 0 0 var(--fi-color-primary);
 }
 
 .member-avatar {

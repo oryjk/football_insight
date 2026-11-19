@@ -20,7 +20,15 @@
       <view class="roster-grid">
         <view v-for="item in finalForeignList" :key="item.key" class="roster-chip">
           <view class="roster-chip__top">
-            <text class="roster-chip__name">{{ item.player_name }}</text>
+            <view class="roster-chip__title">
+              <text
+                class="pes-pos"
+                :class="`pes-pos--${resolvePesPositionBadge(item.position).zone}`"
+              >
+                {{ resolvePesPositionBadge(item.position).code }}
+              </text>
+              <text class="roster-chip__name">{{ item.player_name }}</text>
+            </view>
             <text
               class="roster-chip__badge"
               :class="item.isNew ? 'roster-chip__badge--new' : 'roster-chip__badge--stay'"
@@ -29,7 +37,7 @@
             </text>
           </view>
           <text class="roster-chip__meta">
-            {{ directorPositionLabel(item.position) }} · {{ directorLeagueLabel(item.league_tag) }} · {{ item.current_club }}
+            {{ directorLeagueLabel(item.league_tag) }} · {{ item.current_club }}
           </text>
         </view>
       </view>
@@ -67,6 +75,7 @@ import { computed } from 'vue'
 import FiAvatar from '../../../components/FiAvatar.vue'
 import type { DirectorPlanDto } from '../../../types/director'
 import { directorLeagueLabel, directorPositionLabel } from '../../../utils/directorLinks'
+import { resolvePesPositionBadge } from '../badges'
 
 const props = defineProps<{
   plan: DirectorPlanDto
@@ -166,17 +175,20 @@ const finalForeignList = computed(() => [
 .roster-grid {
   display: flex;
   flex-direction: column;
-  gap: var(--fi-space-10);
+  border-top: 1rpx solid var(--fi-color-divider-soft);
 }
 
 .roster-chip {
   display: flex;
   flex-direction: column;
   gap: var(--fi-space-6);
-  padding: var(--fi-space-14) var(--fi-space-16);
-  border-radius: var(--fi-radius-md);
-  background: var(--fi-color-page-soft);
-  border: var(--fi-border-width) solid var(--fi-color-divider-soft);
+  padding: var(--fi-space-14) 0;
+  border-bottom: 1rpx solid var(--fi-color-divider-soft);
+}
+
+.roster-chip:last-child {
+  border-bottom: none;
+  padding-bottom: var(--fi-space-4);
 }
 
 .roster-chip__top {
@@ -185,6 +197,31 @@ const finalForeignList = computed(() => [
   justify-content: space-between;
   gap: var(--fi-space-10);
 }
+
+.roster-chip__title {
+  display: flex;
+  align-items: center;
+  gap: var(--fi-space-8);
+  min-width: 0;
+}
+
+.pes-pos {
+  flex-shrink: 0;
+  min-width: 66rpx;
+  padding: var(--fi-space-4) var(--fi-space-8);
+  border-radius: var(--fi-radius-xs);
+  background: #1c232d;
+  font-size: var(--fi-font-20);
+  font-weight: var(--fi-weight-extrabold);
+  line-height: var(--fi-leading-none);
+  text-align: center;
+  letter-spacing: 1rpx;
+}
+
+.pes-pos--gk { color: #f2c94c; }
+.pes-pos--df { color: #38b6ff; }
+.pes-pos--mf { color: #4cd964; }
+.pes-pos--fw { color: #ff477e; }
 
 .roster-chip__name {
   color: var(--fi-color-text-strong);

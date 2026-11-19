@@ -176,7 +176,7 @@ defineProps<{
 .diff-list {
   display: flex;
   flex-direction: column;
-  gap: var(--fi-space-8);
+  border-top: 1rpx solid var(--fi-color-divider-soft);
 }
 
 .diff-row {
@@ -184,9 +184,12 @@ defineProps<{
   align-items: center;
   justify-content: space-between;
   gap: var(--fi-space-10);
-  padding: var(--fi-space-10) var(--fi-space-14);
-  border-radius: var(--fi-radius-sm);
-  background: var(--fi-color-page-soft);
+  padding: var(--fi-space-12) 0;
+  border-bottom: 1rpx solid var(--fi-color-divider-soft);
+}
+
+.diff-row:last-child {
+  border-bottom: none;
 }
 
 .diff-row__name {

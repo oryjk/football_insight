@@ -116,33 +116,45 @@
             :key="item.key"
             class="candidate-row"
             :class="{ 'candidate-row--selected': selectedKeys.has(item.key) }"
+            hover-class="sheet-pressed"
+            @tap="emit('pick', item)"
           >
             <view
               class="candidate-row__avatar"
               :hover-class="item.avatar_url ? 'sheet-pressed' : 'none'"
-              @tap="previewAvatar(item)"
+              @tap.stop="previewAvatar(item)"
             >
               <FiAvatar :src="item.avatar_url" :size="96" :name="item.player_name" />
             </view>
             <view class="candidate-row__body">
               <view class="candidate-row__top">
+                <text
+                  class="pes-pos"
+                  :class="`pes-pos--${positionBadge(item).zone}`"
+                >
+                  {{ positionBadge(item).code }}
+                </text>
                 <text class="candidate-row__name">{{ item.player_name }}</text>
                 <text class="candidate-row__league">{{ directorLeagueLabel(item.league_tag) }}</text>
-                <text class="candidate-row__pos">{{ directorPositionLabel(item.position) }}</text>
               </view>
               <text class="candidate-row__meta">{{ item.current_club }} · {{ item.country }}</text>
               <view v-if="item.tags.length" class="candidate-row__tags">
-                <text v-for="tag in item.tags" :key="tag" class="candidate-tag">{{ tag }}</text>
+                <text
+                  v-for="tag in item.tags"
+                  :key="tag"
+                  class="candidate-tag"
+                  :class="`candidate-tag--${resolveCandidateTagTone(tag)}`"
+                >
+                  {{ tag }}
+                </text>
               </view>
             </view>
-            <button
-              class="candidate-row__action"
-              :class="{ 'candidate-row__action--picked': selectedKeys.has(item.key) }"
-              hover-class="sheet-pressed"
-              @tap="emit('pick', item)"
+            <view
+              class="candidate-row__check"
+              :class="{ 'candidate-row__check--picked': selectedKeys.has(item.key) }"
             >
-              {{ selectedKeys.has(item.key) ? '已选' : '签下' }}
-            </button>
+              <text v-if="selectedKeys.has(item.key)" class="candidate-row__check-mark">✓</text>
+            </view>
           </view>
         </view>
       </template>
@@ -159,7 +171,8 @@ import type {
   DirectorLeagueFilter,
   DirectorPosition,
 } from '../../../types/director'
-import { directorLeagueLabel, directorPositionLabel } from '../../../utils/directorLinks'
+import { directorLeagueLabel } from '../../../utils/directorLinks'
+import { resolveCandidateTagTone, resolvePesPositionBadge, type PesPositionBadge } from '../badges'
 import {
   DIRECTOR_DOMESTIC_LEAGUE_TABS,
   DIRECTOR_FOREIGN_LEAGUE_TABS,
@@ -208,6 +221,10 @@ watch(
     customLeagueTag.value = props.mode === 'foreign' ? 'K1' : 'CSL'
   },
 )
+
+function positionBadge(item: DirectorCandidateDto): PesPositionBadge {
+  return resolvePesPositionBadge(item.position, item.tags)
+}
 
 function onSearchInput(event: unknown): void {
   const value = (event as { detail?: { value?: string } } | null)?.detail?.value
@@ -307,22 +324,22 @@ function handleCustomSubmit(): void {
 .candidate-list {
   display: flex;
   flex-direction: column;
-  gap: var(--fi-space-12);
+  border-top: 1rpx solid var(--fi-color-divider-soft);
 }
 
 .candidate-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--fi-space-14);
-  padding: var(--fi-space-16);
-  border-radius: var(--fi-radius-md);
-  background: var(--fi-color-page-soft);
-  border: var(--fi-border-width) solid var(--fi-color-divider-soft);
+  padding: var(--fi-space-16) var(--fi-space-8);
+  border-bottom: 1rpx solid var(--fi-color-divider-soft);
+  background: var(--fi-color-surface);
 }
 
 .candidate-row--selected {
   background: var(--fi-color-primary-soft);
-  border-color: var(--fi-color-primary);
+  box-shadow: inset 6rpx 0 0 var(--fi-color-primary);
 }
 
 .candidate-row__avatar {
@@ -331,7 +348,7 @@ function handleCustomSubmit(): void {
   height: var(--fi-space-64);
   border-radius: var(--fi-radius-round);
   overflow: hidden;
-  background: var(--fi-color-surface);
+  background: var(--fi-color-page-soft);
   font-size: var(--fi-font-24);
 }
 
@@ -350,6 +367,24 @@ function handleCustomSubmit(): void {
   gap: var(--fi-space-8);
 }
 
+.pes-pos {
+  flex-shrink: 0;
+  min-width: 66rpx;
+  padding: var(--fi-space-4) var(--fi-space-8);
+  border-radius: var(--fi-radius-xs);
+  background: #1c232d;
+  font-size: var(--fi-font-20);
+  font-weight: var(--fi-weight-extrabold);
+  line-height: var(--fi-leading-none);
+  text-align: center;
+  letter-spacing: 1rpx;
+}
+
+.pes-pos--gk { color: #f2c94c; }
+.pes-pos--df { color: #38b6ff; }
+.pes-pos--mf { color: #4cd964; }
+.pes-pos--fw { color: #ff477e; }
+
 .candidate-row__name {
   color: var(--fi-color-text-strong);
   font-size: var(--fi-font-28);
@@ -358,17 +393,12 @@ function handleCustomSubmit(): void {
 
 .candidate-row__league {
   padding: var(--fi-space-4) var(--fi-space-10);
-  border-radius: var(--fi-radius-round);
-  background: var(--fi-color-outsider-soft);
-  color: var(--fi-color-outsider);
+  border-radius: var(--fi-radius-xs);
+  background: var(--fi-color-page-soft);
+  color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-20);
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-none);
-}
-
-.candidate-row__pos {
-  color: var(--fi-color-text-secondary);
-  font-size: var(--fi-font-20);
 }
 
 .candidate-row__meta {
@@ -385,32 +415,44 @@ function handleCustomSubmit(): void {
 .candidate-tag {
   padding: var(--fi-space-4) var(--fi-space-8);
   border-radius: var(--fi-radius-xs);
-  background: var(--fi-color-surface);
-  color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-20);
-  line-height: var(--fi-leading-none);
-}
-
-.candidate-row__action {
-  flex-shrink: 0;
-  margin: 0;
-  padding: var(--fi-space-10) var(--fi-space-18);
-  border-radius: var(--fi-radius-round);
-  background: var(--fi-color-surface);
-  color: var(--fi-color-primary);
-  border: var(--fi-border-width) solid var(--fi-color-primary);
-  font-size: var(--fi-font-22);
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-none);
 }
 
-.candidate-row__action::after {
-  border: 0;
+.candidate-tag--gold { background: #fff6db; color: #9a5b00; }
+.candidate-tag--crimson { background: #ffeef2; color: #c21e4f; }
+.candidate-tag--orange { background: #fff1e6; color: #c44d00; }
+.candidate-tag--emerald { background: #e8f8ef; color: #147a47; }
+.candidate-tag--cyan { background: #e6f6fe; color: #0b6b99; }
+.candidate-tag--indigo { background: #eef0ff; color: #3c48b8; }
+.candidate-tag--blue { background: #e9f2ff; color: #1a56b8; }
+.candidate-tag--rose { background: #fdecec; color: #b42318; }
+.candidate-tag--teal { background: #e6f7f5; color: #0f766e; }
+.candidate-tag--purple { background: #f3ecff; color: #6d28d9; }
+
+.candidate-row__check {
+  flex-shrink: 0;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  border: var(--fi-border-width) solid var(--fi-color-divider);
+  background: var(--fi-color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.candidate-row__action--picked {
+.candidate-row__check--picked {
+  border-color: var(--fi-color-primary);
   background: var(--fi-color-primary);
+}
+
+.candidate-row__check-mark {
   color: var(--fi-color-surface);
+  font-size: var(--fi-font-22);
+  font-weight: var(--fi-weight-extrabold);
+  line-height: var(--fi-leading-none);
 }
 
 .state-box {
