@@ -21,12 +21,12 @@
         <view v-for="item in finalForeignList" :key="item.key" class="roster-chip">
           <view class="roster-chip__top">
             <view class="roster-chip__title">
-              <text
+              <view
                 class="pes-pos"
                 :class="`pes-pos--${resolvePesPositionBadge(item.position).zone}`"
               >
                 {{ resolvePesPositionBadge(item.position).code }}
-              </text>
+              </view>
               <text class="roster-chip__name">{{ item.player_name }}</text>
             </view>
             <text

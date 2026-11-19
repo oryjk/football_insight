@@ -135,14 +135,14 @@
             </view>
             <view class="candidate-row__body">
               <view class="candidate-row__top">
-                <text
+                <view
                   class="pes-pos"
                   :class="`pes-pos--${positionBadge(item).zone}`"
                 >
                   {{ positionBadge(item).code }}
-                </text>
+                </view>
                 <text class="candidate-row__name">{{ item.player_name }}</text>
-                <text class="candidate-row__league">{{ directorLeagueLabel(item.league_tag) }}</text>
+                <view class="candidate-row__league">{{ directorLeagueLabel(item.league_tag) }}</view>
               </view>
               <text class="candidate-row__meta">{{ item.current_club }} · {{ item.country }}</text>
               <view v-if="item.tags.length" class="candidate-row__tags">

@@ -32,12 +32,12 @@
         </view>
         <view class="player-row__info">
           <view class="player-row__top">
-            <text
+            <view
               class="pes-pos"
               :class="`pes-pos--${resolvePesPositionBadge(player.position).zone}`"
             >
               {{ resolvePesPositionBadge(player.position).code }}
-            </text>
+            </view>
             <text class="player-row__name">{{ player.player_name }}</text>
           </view>
           <text class="player-row__meta">
@@ -76,12 +76,12 @@
         <view v-for="item in foreignIns" :key="item.key" class="signing-chip">
           <view class="signing-chip__main">
             <view class="signing-chip__top">
-              <text
+              <view
                 class="pes-pos"
                 :class="`pes-pos--${resolvePesPositionBadge(item.position).zone}`"
               >
                 {{ resolvePesPositionBadge(item.position).code }}
-              </text>
+              </view>
               <text class="signing-chip__name">{{ item.player_name }}</text>
               <text class="signing-chip__tag">{{ directorLeagueLabel(item.league_tag) }}</text>
             </view>
