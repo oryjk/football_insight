@@ -144,6 +144,18 @@ cd football_insight_service_backend_rs
 
 ### Docker 发布（local233 构建，生产默认）
 
+推荐使用仓库根目录一键脚本（在 `local233` 执行，自动校验干净 main → 本机 `docker build` → `gzip` 流式传到 `peiqian` → 可选跑迁移 → 切容器并验证本机与公网健康检查，同时输出上一版本回滚命令）：
+
+```bash
+# 常规发版（无新迁移，或迁移已在共享库执行过）
+./deploy_peiqian_from_local233.sh
+
+# 含新迁移时（会在切容器前自动用新镜像执行 run_migrations）
+./deploy_peiqian_from_local233.sh --migrate
+```
+
+如需手工分步执行，等价命令如下：
+
 ```bash
 cd football_insight_service_backend_rs
 TAG=$(git rev-parse --short HEAD)
