@@ -81,7 +81,7 @@
   display: grid;
   gap: var(--fi-space-12);
   padding: var(--fi-space-32) var(--fi-space-28, var(--fi-space-28));
-  border-radius: var(--fi-radius-topic-hero);
+  border-radius: var(--fi-component-topic-hero-radius);
   background: var(--fi-gradient-topic-hero);
 }
 
@@ -130,7 +130,7 @@
 
 .skeleton-hero-card {
   padding: 26rpx var(--fi-space-24) var(--fi-space-20);
-  border-radius: var(--fi-radius-xl);
+  border-radius: var(--fi-component-panel-radius);
   background: rgba(255, 255, 255, 0.96);
   border: 2rpx solid rgba(229, 231, 236, 0.98);
   box-shadow: 0 18rpx 46rpx rgba(26, 28, 36, 0.07);
@@ -150,7 +150,7 @@
 
 .skeleton-briefing-card {
   padding: var(--fi-space-20);
-  border-radius: var(--fi-radius-xl);
+  border-radius: var(--fi-component-panel-radius);
   background: rgba(255, 255, 255, 0.96);
   border: 2rpx solid rgba(229, 231, 236, 0.98);
   box-shadow: 0 18rpx 46rpx rgba(26, 28, 36, 0.07);
@@ -170,7 +170,7 @@
 
 .skeleton-panel-card {
   padding: var(--fi-space-20);
-  border-radius: var(--fi-radius-xl);
+  border-radius: var(--fi-component-panel-radius);
   background: rgba(255, 255, 255, 0.94);
   border: 2rpx solid rgba(236, 236, 241, 0.95);
   box-shadow: 0 20rpx 48rpx rgba(26, 28, 36, 0.06);

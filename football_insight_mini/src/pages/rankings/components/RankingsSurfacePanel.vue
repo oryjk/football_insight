@@ -183,7 +183,7 @@ async function centerActiveCategory(): Promise<void> {
 <style scoped lang="css">
 .panel {
   background: rgba(255, 255, 255, 0.94);
-  border-radius: var(--fi-radius-xl);
+  border-radius: var(--fi-component-panel-radius);
   padding: var(--fi-space-20);
   border: var(--fi-border-card);
   box-shadow: var(--fi-shadow-card);

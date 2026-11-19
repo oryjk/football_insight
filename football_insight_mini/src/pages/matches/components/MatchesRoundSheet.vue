@@ -38,7 +38,7 @@ const emit = defineEmits<{
 
 .schedule-dialog__sheet {
   background: var(--fi-color-schedule-dialog-sheet-background);
-  border-radius: var(--fi-radius-xl);
+  border-radius: var(--fi-component-panel-radius);
   padding: var(--fi-space-28);
   /* H5 底部栏占用窗口空间；小程序没有该变量时保留原始留白。 */
   padding-bottom: calc(var(--fi-space-28) + var(--window-bottom, 0rpx));

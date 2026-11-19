@@ -56,7 +56,7 @@ const emit = defineEmits<{
   position: relative;
   z-index: 1;
   background: var(--fi-color-surface-frosted);
-  border-radius: var(--fi-radius-xl);
+  border-radius: var(--fi-component-panel-radius);
   padding: var(--fi-space-20);
   border: var(--fi-border-card);
   box-shadow: var(--fi-shadow-card);

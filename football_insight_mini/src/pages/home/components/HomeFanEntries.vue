@@ -132,7 +132,7 @@ const transferModel = computed(() =>
   gap: var(--fi-space-14);
   box-sizing: border-box;
   padding: var(--fi-space-20);
-  border-radius: var(--fi-radius-xl);
+  border-radius: var(--fi-component-panel-radius);
   box-shadow: var(--fi-shadow-card);
   transition: opacity var(--fi-motion-duration-fast) var(--fi-motion-ease-out);
 }

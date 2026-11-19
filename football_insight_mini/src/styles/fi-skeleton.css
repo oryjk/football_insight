@@ -10,7 +10,7 @@
   overflow: hidden;
   min-width: 0;
   padding: var(--fi-space-20);
-  border-radius: var(--fi-radius-xl);
+  border-radius: var(--fi-component-panel-radius);
   border: var(--fi-border-card);
   background: var(--fi-color-surface-panel);
   box-shadow: var(--fi-shadow-card);

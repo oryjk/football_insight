@@ -106,7 +106,7 @@ onShareAppMessage(() => ({
 }
 
 .hero-card {
-  position: relative; z-index: 1; background: var(--fi-color-ticket-recent-reflux-bucket-lock-body-background-2); border-radius: var(--fi-radius-xl);
+  position: relative; z-index: 1; background: var(--fi-color-ticket-recent-reflux-bucket-lock-body-background-2); border-radius: var(--fi-component-panel-radius);
   padding: var(--fi-space-20); border: var(--fi-component-matches-match-card-border); box-shadow: var(--fi-shadow-card);
   backdrop-filter: blur(var(--fi-space-18)); -webkit-backdrop-filter: blur(var(--fi-space-18));
 }

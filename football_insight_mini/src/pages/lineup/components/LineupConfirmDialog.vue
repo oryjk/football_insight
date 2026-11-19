@@ -40,7 +40,7 @@ const emit = defineEmits<{
   max-width: calc(var(--fi-space-64) * 10);
   padding: var(--fi-space-32);
   border: var(--fi-border-card);
-  border-radius: var(--fi-radius-xl);
+  border-radius: var(--fi-component-panel-radius);
   background: var(--fi-color-surface);
   box-shadow: var(--fi-shadow-floating);
 }

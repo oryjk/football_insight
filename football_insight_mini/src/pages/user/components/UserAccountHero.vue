@@ -103,7 +103,7 @@ const heroActionText = computed(() => (props.canRenewV9 ? '续费' : '升级'))
   position: relative;
   z-index: 1;
   overflow: hidden;
-  border-radius: var(--fi-radius-xl);
+  border-radius: var(--fi-component-panel-radius);
   background: var(--fi-color-surface);
   box-shadow: var(--fi-shadow-card);
 }

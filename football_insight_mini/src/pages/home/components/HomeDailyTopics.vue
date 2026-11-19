@@ -70,7 +70,7 @@ watch(() => props.edition.items.length, length => { if (activeIndex.value >= len
 </script>
 
 <style scoped>
-.daily-topics { min-width: 0; padding: var(--fi-space-24) var(--fi-space-20) var(--fi-space-20); border-radius: var(--fi-radius-xl); background: var(--fi-color-page-soft); }
+.daily-topics { min-width: 0; padding: var(--fi-space-24) var(--fi-space-20) var(--fi-space-20); border-radius: var(--fi-component-panel-radius); background: var(--fi-color-page-soft); }
 .daily-topics__heading { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-12); margin-bottom: var(--fi-space-16); }
 .daily-topics__refresh-error { color: var(--fi-color-text-secondary); font-size: var(--fi-font-22); margin-bottom: var(--fi-space-16); }
 .daily-topics__title { color: var(--fi-color-text-primary); font-size: var(--fi-component-title-size); font-weight: var(--fi-component-title-weight); line-height: var(--fi-component-title-leading); }

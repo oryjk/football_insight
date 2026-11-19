@@ -579,7 +579,7 @@ onShow(() => {
 
 .state-card {
   background: var(--fi-color-surface-frosted);
-  border-radius: var(--fi-radius-xl);
+  border-radius: var(--fi-component-panel-radius);
   border: var(--fi-border-card);
   box-shadow: var(--fi-shadow-card);
   padding: var(--fi-space-20);

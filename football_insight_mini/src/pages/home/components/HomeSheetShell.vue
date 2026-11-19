@@ -62,7 +62,7 @@ const emit = defineEmits<{
 .sheet-card {
   width: 100%;
   max-height: 78vh;
-  border-radius: var(--fi-radius-xl) var(--fi-radius-xl) 0 0;
+  border-radius: var(--fi-radius-md) var(--fi-radius-md) 0 0;
   background: rgba(255, 255, 255, 0.98);
   padding: var(--fi-space-28) var(--fi-space-24) var(--fi-space-40);
   box-shadow: 0 -24rpx 56rpx rgba(12, 14, 20, 0.12);

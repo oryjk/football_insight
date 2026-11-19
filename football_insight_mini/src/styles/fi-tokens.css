@@ -1051,7 +1051,7 @@ page {
   --fi-gradient-topic-hero: radial-gradient(ellipse at top right, var(--fi-color-topic-hero-glow), transparent 62%), linear-gradient(150deg, var(--fi-color-topic-hero-top), var(--fi-color-topic-hero-bg) 65%);
 
   --fi-component-topic-hero-bg: var(--fi-gradient-topic-hero);
-  --fi-component-topic-hero-radius: var(--fi-radius-topic-hero);
+  --fi-component-topic-hero-radius: var(--fi-radius-md);
   --fi-component-topic-hero-title: var(--fi-color-topic-hero-text);
   --fi-component-topic-hero-copy: var(--fi-color-topic-hero-muted);
   --fi-component-topic-hero-action-height: 60rpx;

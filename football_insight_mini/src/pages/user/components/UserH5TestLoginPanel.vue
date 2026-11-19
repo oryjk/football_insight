@@ -86,7 +86,7 @@ function handleSelect(user: H5TestLoginUser): void {
   position: relative;
   z-index: 1;
   background: rgba(255,255,255,0.72);
-  border-radius: var(--fi-radius-xl);
+  border-radius: var(--fi-component-panel-radius);
   padding: var(--fi-space-20);
   border: 2rpx solid rgba(255,255,255,0.55);
   box-shadow: 0 20rpx 48rpx rgba(26,28,36,0.06);

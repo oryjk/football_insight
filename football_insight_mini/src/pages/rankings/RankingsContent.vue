@@ -393,7 +393,7 @@ defineExpose({
 .page { padding: var(--fi-space-24) var(--fi-space-16) var(--fi-space-card-gap); display: flex; flex-direction: column; gap: var(--fi-space-card-gap); }
 .state-card {
   background: rgba(255, 255, 255, 0.94);
-  border-radius: var(--fi-radius-xl);
+  border-radius: var(--fi-component-panel-radius);
   padding: var(--fi-space-20);
   border: var(--fi-border-card);
   box-shadow: var(--fi-shadow-card);

@@ -83,7 +83,7 @@ function getTechStatRowStyle(index: number) {
 .sheet-card {
   width: 100%;
   max-height: 78vh;
-  border-radius: var(--fi-radius-xl) var(--fi-radius-xl) 0 0;
+  border-radius: var(--fi-radius-md) var(--fi-radius-md) 0 0;
   background: var(--fi-color-ticket-history-trend-summary-item-background-2);
   padding: var(--fi-space-28) var(--fi-space-24) var(--fi-space-40);
   box-shadow: var(--fi-shadow-sheet-card-box-shadow);
