@@ -628,7 +628,7 @@ def test_cli_sync_director_transfermarkt(monkeypatch: pytest.MonkeyPatch) -> Non
     )
     ok_res = runner.invoke(
         app,
-        ["sync-director-transfermarkt", "--leagues", "csl", "--delay", "0", "--limit-clubs", "1"],
+        ["sync-director-transfermarkt", "--live", "--leagues", "csl", "--delay", "0", "--limit-clubs", "1"],
     )
     assert ok_res.exit_code == 0, ok_res.output
     payload = json.loads(ok_res.output)
@@ -681,4 +681,113 @@ def test_match_squad_player_falls_back_to_english_club_and_shirt_number() -> Non
     )
     matched = match_squad_player(tm_player, squad_by_name, squad_by_club_shirt)
     assert matched is active_felipe
+
+
+def test_parse_players_csv_supports_dataset_gz_and_custom_zh_csv(tmp_path) -> None:
+    import gzip
+    from sina_csl_scraper.director_transfermarkt_sync import parse_players_csv
+
+    # 1) dcaribou/transfermarkt-datasets gzipped CSV format
+    gz_path = tmp_path / "players.csv.gz"
+    gz_content = (
+        "player_id,first_name,last_name,name,current_club_name,current_club_domestic_competition_id,"
+        "date_of_birth,contract_expiration_date,market_value_in_eur\n"
+        "12345,Shihao,Wei,Shihao Wei,Chengdu Rongcheng,CSL,1995-04-08 00:00:00,2026-12-31 00:00:00,750000.0\n"
+        "67890,,Felipe,Felipe,Chengdu Rongcheng,CSL,1992-04-10,2026-12-31,350000\n"
+    )
+    with gzip.open(gz_path, "wt", encoding="utf-8") as handle:
+        handle.write(gz_content)
+
+    ds_players = parse_players_csv(gz_path)
+    assert len(ds_players) == 2
+    assert ds_players[0].player_name == "Shihao Wei"
+    assert ds_players[0].league_key == "csl"
+    assert ds_players[0].birth_date == date(1995, 4, 8)
+    assert ds_players[0].contract_until == date(2026, 12, 31)
+    assert ds_players[0].market_value_eur == 750_000
+
+    # 2) Simple hand-crafted Chinese CSV
+    zh_path = tmp_path / "custom.csv"
+    zh_path.write_text(
+        "player_name,club_name,market_value_eur,birth_date,contract_until\n"
+        "罗慕洛,成都蓉城,180万欧,1995-10-27,2027-12-31\n",
+        encoding="utf-8",
+    )
+    zh_players = parse_players_csv(zh_path)
+    assert len(zh_players) == 1
+    assert zh_players[0].player_name == "罗慕洛"
+    assert zh_players[0].market_value_eur == 1_800_000
+    assert zh_players[0].birth_date == date(1995, 10, 27)
+
+
+def test_parse_local_html_dir_and_sync_with_sina_english_names(tmp_path) -> None:
+    from sina_csl_scraper.director_transfermarkt_sync import (
+        parse_local_html_dir,
+        sync_transfermarkt_from_players,
+    )
+
+    html_file = tmp_path / "chengdu_rongcheng.html"
+    html_file.write_text(
+        "<html><head><title>Chengdu Rongcheng - Detailed squad 2026 | Transfermarkt</title></head>"
+        "<body><h1>Chengdu Rongcheng</h1>" + SAMPLE_EN_DE_SQUAD_HTML + "</body></html>",
+        encoding="utf-8",
+    )
+    html_players = parse_local_html_dir(tmp_path)
+    assert len(html_players) == 2
+    assert html_players[0].club_name == "Chengdu Rongcheng"
+
+    # Bridge English Transfermarkt dataset names to Chinese f_i_squad_players via Sina English names
+    store = FakeTransfermarktStore(
+        squad_players=[
+            SquadPlayerRecord(77680, "成都蓉城", 101, "韦世豪", 7, True),
+            SquadPlayerRecord(77680, "成都蓉城", 102, "费利佩", 9, True),
+        ],
+        candidates=[
+            DirectorCandidateRecord(201, "罗慕洛", "成都蓉城", "CSL", True),
+        ],
+    )
+    players = [
+        # Reversed Chinese name order: Wei Shihao (Sina) <-> Shihao Wei (TM)
+        TransfermarktPlayer("Shihao Wei", "Chengdu Rongcheng", "csl", None, date(1995, 4, 8), date(2026, 12, 31), 750_000),
+        # Wrong random club single-word "Felipe" should be ignored
+        TransfermarktPlayer("Felipe", "Some Random Club", "bra1", None, date(1999, 1, 1), date(2027, 1, 1), 99_000_000),
+        # Correct Chengdu Rongcheng "Felipe" should match
+        TransfermarktPlayer("Felipe", "Chengdu Rongcheng", "csl", None, date(1992, 4, 10), date(2026, 12, 31), 350_000),
+        # Direct Chinese custom CSV row for candidate
+        TransfermarktPlayer("罗慕洛", "成都蓉城", "csv", None, date(1995, 10, 27), date(2027, 12, 31), 1_800_000),
+    ]
+    summary = sync_transfermarkt_from_players(
+        players=players,
+        store=store,
+        dry_run=False,
+        source_label="test",
+        sina_english_names={101: "Wei Shihao", 102: "Felipe"},
+    )
+    assert summary["squad_matches"] == 2
+    assert summary["squad_updated"] == 2
+    assert summary["candidate_matches"] == 1
+    assert summary["candidate_updated"] == 1
+    by_pid = {row["player_id"]: row for row in store.updated_squad_rows}
+    assert by_pid[101]["market_value_eur"] == 750_000
+    assert by_pid[102]["market_value_eur"] == 350_000
+
+
+def test_cli_sync_director_transfermarkt_from_csv(tmp_path) -> None:
+    csv_path = tmp_path / "manual.csv"
+    csv_path.write_text(
+        "player_name,club_name,market_value_eur,birth_date,contract_until\n"
+        "费利佩,成都蓉城,35万欧,1992-04-10,2026-12-31\n",
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        ["sync-director-transfermarkt", "--from-csv", str(csv_path), "--no-sina-names"],
+    )
+    assert res.exit_code == 0, res.output
+    payload = json.loads(res.output)
+    assert payload["dry_run"] is True
+    assert payload["players_loaded"] == 1
+    assert payload["source"] == f"csv:{csv_path}"
+
 

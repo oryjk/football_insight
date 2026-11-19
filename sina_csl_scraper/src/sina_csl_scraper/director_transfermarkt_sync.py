@@ -7,6 +7,9 @@ into ``f_i_squad_players`` (for CSL) and ``f_i_director_candidates`` (for all le
 """
 from __future__ import annotations
 
+import csv
+import gzip
+import io
 import logging
 import re
 import time
@@ -16,6 +19,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
+from pathlib import Path
 from typing import Any, Protocol
 
 import requests
@@ -23,6 +27,8 @@ import requests
 logger = logging.getLogger(__name__)
 
 DEFAULT_BASE_URL = "https://www.transfermarkt.com"
+DEFAULT_DATASET_URL = "https://pub-e682421888d945d684bcae8890b0ec20.r2.dev/data/players.csv.gz"
+DEFAULT_DATASET_CACHE_PATH = Path("data/transfermarkt-players.csv.gz")
 DEFAULT_DELAY_SECONDS = 1.2
 
 # Mapping from CLI league key -> Transfermarkt competition code
@@ -410,6 +416,8 @@ def parse_tm_date(raw: str) -> date | None:
     text = _AGE_SUFFIX_RE.sub("", text).strip().rstrip("†").strip()
     if not text or text in {"-", "—", "–", "?", "N/A", "n/a", "未知"}:
         return None
+    if len(text) >= 11 and text[10] in {" ", "T"} and _DATE_ISO_RE.match(text[:10]):
+        text = text[:10]
 
     m = _DATE_ISO_RE.match(text)
     if m:
@@ -1193,3 +1201,325 @@ def sync_transfermarkt_valuations(
         "candidate_matches": len(candidate_rows),
         "candidate_updated": candidate_updated,
     }
+
+
+TM_CODE_TO_LEAGUE_KEY: dict[str, str] = {code: key for key, code in TRANSFERMARKT_LEAGUE_CODES.items()}
+
+
+def _name_match_keys(name: str) -> list[str]:
+    """Generate normalized full-name and reversed-order variants (e.g. Wei Shihao <-> Shihao Wei)."""
+    cleaned = _collapse_ws(name)
+    if not cleaned:
+        return []
+    keys: list[str] = []
+    full = normalize_player_name(cleaned)
+    if full:
+        keys.append(full)
+    parts = [p for p in re.split(r"[\s\-]+", cleaned) if p]
+    if len(parts) == 2 and all(part.isascii() for part in parts):
+        reversed_key = normalize_player_name(f"{parts[1]} {parts[0]}")
+        if reversed_key and reversed_key not in keys:
+            keys.append(reversed_key)
+    return keys
+
+
+def _first_nonempty(row: dict[str, str], keys: Sequence[str]) -> str:
+    for key in keys:
+        val = row.get(key)
+        if val is not None and val.strip():
+            return val.strip()
+    return ""
+
+
+def _parse_csv_market_value(raw: str) -> int | None:
+    text = raw.strip()
+    if not text:
+        return None
+    # Plain numeric EUR values from transfermarkt-datasets (e.g. "1500000" or "1500000.0")
+    try:
+        dec = Decimal(text)
+        val = int(dec.quantize(Decimal("1")))
+        return val if val > 0 else None
+    except InvalidOperation:
+        return parse_market_value_eur(text)
+
+
+def parse_players_csv(path: Path) -> list[TransfermarktPlayer]:
+    """Load players from a local `.csv` or `.csv.gz` file.
+
+    Supports both ``dcaribou/transfermarkt-datasets`` ``players.csv(.gz)`` and simple
+    user-maintained CSVs (``player_name,club_name,market_value_eur,birth_date,contract_until``).
+    """
+    is_gz = path.suffix.lower() == ".gz" or path.name.lower().endswith(".csv.gz")
+    opener = (lambda p: gzip.open(p, "rt", encoding="utf-8-sig", newline="")) if is_gz else (
+        lambda p: open(p, "r", encoding="utf-8-sig", newline="")
+    )
+    players: list[TransfermarktPlayer] = []
+    with opener(path) as handle:
+        reader = csv.DictReader(handle)
+        if not reader.fieldnames:
+            return players
+        for raw_row in reader:
+            row = {str(k).strip().lower(): (v or "") for k, v in raw_row.items() if k is not None}
+            name = _first_nonempty(row, ("player_name", "name", "full_name"))
+            if not name:
+                first = _first_nonempty(row, ("first_name",))
+                last = _first_nonempty(row, ("last_name",))
+                name = _collapse_ws(f"{first} {last}")
+            if not name:
+                continue
+
+            club_name = _first_nonempty(row, ("club_name", "current_club_name", "club", "team_name"))
+            comp_raw = _first_nonempty(
+                row,
+                ("league", "league_key", "current_club_domestic_competition_id", "competition_id"),
+            )
+            league_key = TM_CODE_TO_LEAGUE_KEY.get(comp_raw.upper(), comp_raw.lower() or "csv")
+
+            shirt_raw = _first_nonempty(row, ("shirt_number", "number"))
+            shirt_number = _parse_shirt_number(shirt_raw) if shirt_raw else None
+
+            mv_raw = _first_nonempty(
+                row,
+                ("market_value_eur", "market_value_in_eur", "market_value", "value_eur", "highest_market_value_in_eur"),
+            )
+            market_value_eur = _parse_csv_market_value(mv_raw)
+            birth_date = parse_tm_date(_first_nonempty(row, ("birth_date", "date_of_birth", "dob")))
+            contract_until = parse_tm_date(
+                _first_nonempty(row, ("contract_until", "contract_expiration_date", "contract_end"))
+            )
+            tm_id_raw = _first_nonempty(row, ("tm_player_id", "player_id"))
+            tm_player_id = int(tm_id_raw) if tm_id_raw.isdigit() else None
+
+            player = TransfermarktPlayer(
+                player_name=name,
+                club_name=club_name,
+                league_key=league_key,
+                shirt_number=shirt_number,
+                birth_date=birth_date,
+                contract_until=contract_until,
+                market_value_eur=market_value_eur,
+                tm_player_id=tm_player_id,
+            )
+            if _has_any_valuation_field(player):
+                players.append(player)
+    return players
+
+
+def _infer_club_name_from_html(html: str, fallback_stem: str) -> str:
+    h1_match = re.search(r"<h1[^>]*>(.*?)</h1>", html, re.IGNORECASE | re.DOTALL)
+    if h1_match:
+        h1_text = _collapse_ws(re.sub(r"<[^>]+>", " ", h1_match.group(1)))
+        if h1_text:
+            return h1_text
+    title_match = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
+    if title_match:
+        title_text = _collapse_ws(title_match.group(1))
+        if " - " in title_text:
+            return title_text.split(" - ", 1)[0].strip()
+        if " | " in title_text:
+            return title_text.split(" | ", 1)[0].strip()
+    return fallback_stem.replace("_", " ").replace("-", " ").strip()
+
+
+def parse_local_html_dir(html_dir: Path) -> list[TransfermarktPlayer]:
+    """Parse browser-saved Transfermarkt club squad HTML files from a local directory."""
+    players: list[TransfermarktPlayer] = []
+    for path in sorted(html_dir.iterdir()):
+        if not path.is_file() or path.suffix.lower() not in {".html", ".htm"}:
+            continue
+        html = path.read_text(encoding="utf-8", errors="replace")
+        club_name = _infer_club_name_from_html(html, path.stem)
+        parsed = parse_club_squad(html, club_name=club_name, league_key="csl")
+        players.extend(p for p in parsed if _has_any_valuation_field(p))
+    return players
+
+
+def download_transfermarkt_dataset(
+    *,
+    dataset_url: str = DEFAULT_DATASET_URL,
+    cache_path: Path = DEFAULT_DATASET_CACHE_PATH,
+    refresh: bool = False,
+    timeout: float = 60.0,
+) -> Path:
+    """Download and cache the open ``dcaribou/transfermarkt-datasets`` ``players.csv.gz``."""
+    if cache_path.is_file() and not refresh:
+        return cache_path
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    response = requests.get(dataset_url, timeout=timeout, stream=True)
+    response.raise_for_status()
+    tmp_path = cache_path.with_suffix(cache_path.suffix + ".tmp")
+    with open(tmp_path, "wb") as handle:
+        for chunk in response.iter_content(chunk_size=65536):
+            if chunk:
+                handle.write(chunk)
+    tmp_path.replace(cache_path)
+    return cache_path
+
+
+def fetch_sina_english_names(team_ids: Sequence[int]) -> dict[int, str]:
+    """Fetch ``player_id -> english_name`` from Sina's squad API for CSL teams."""
+    from .client import SinaCslClient
+
+    client = SinaCslClient()
+    mapping: dict[int, str] = {}
+    for team_id in sorted(set(team_ids)):
+        try:
+            data = client._request("/op/api/team/player", {"tid": team_id})
+            items = data.get("players") if isinstance(data, dict) else None
+            for item in items or []:
+                if not isinstance(item, dict):
+                    continue
+                pid_raw = str(item.get("pid") or "").strip()
+                eng_name = str(item.get("name") or "").strip()
+                if pid_raw.isdigit() and eng_name:
+                    mapping[int(pid_raw)] = eng_name
+        except Exception as error:  # noqa: BLE001
+            logger.warning("Failed to fetch Sina English squad names for team_id=%s: %s", team_id, error)
+    return mapping
+
+
+def sync_transfermarkt_from_players(
+    *,
+    players: Sequence[TransfermarktPlayer],
+    store: TransfermarktStore | None = None,
+    dry_run: bool = True,
+    source_label: str = "dataset",
+    sina_english_names: dict[int, str] | None = None,
+) -> dict[str, Any]:
+    """Match pre-loaded Transfermarkt players (dataset/CSV/local HTML) against DB tables."""
+    squad_by_name: dict[str, list[SquadPlayerRecord]] = {}
+    squad_by_club_shirt: dict[tuple[str, int], list[SquadPlayerRecord]] = {}
+    candidates_by_name: dict[str, list[DirectorCandidateRecord]] = {}
+    english_by_player_id = sina_english_names or {}
+
+    if store is not None:
+        for record in store.load_squad_players():
+            for key in _name_match_keys(record.player_name):
+                squad_by_name.setdefault(key, []).append(record)
+            eng_name = english_by_player_id.get(record.player_id)
+            if eng_name:
+                for key in _name_match_keys(eng_name):
+                    squad_by_name.setdefault(key, []).append(record)
+            club_key = canonicalize_csl_club(record.team_name)
+            if club_key and record.shirt_number is not None:
+                squad_by_club_shirt.setdefault((club_key, record.shirt_number), []).append(record)
+
+        for record in store.load_director_candidates():
+            for key in _name_match_keys(record.player_name):
+                candidates_by_name.setdefault(key, []).append(record)
+
+    squad_best: dict[tuple[int, int], tuple[tuple[int, int, int, int], dict[str, Any], str]] = {}
+    candidate_best: dict[int, tuple[tuple[int, int, int], dict[str, Any], str]] = {}
+
+    for player in players:
+        if not _has_any_valuation_field(player):
+            continue
+
+        # 1) Match f_i_squad_players
+        matched_squad: SquadPlayerRecord | None = None
+        match_via_shirt = False
+        for key in _name_match_keys(player.player_name):
+            records = squad_by_name.get(key)
+            if records:
+                # Prefer records matching club, shirt number, active
+                matched_squad = max(
+                    records,
+                    key=lambda rec: (
+                        _club_similarity_score(player.club_name, rec.team_name),
+                        1 if (player.shirt_number is not None and rec.shirt_number == player.shirt_number) else 0,
+                        1 if rec.active else 0,
+                    ),
+                )
+                break
+
+        if matched_squad is None and player.shirt_number is not None:
+            matched_squad = match_squad_player(player, {}, squad_by_club_shirt)
+            match_via_shirt = matched_squad is not None
+
+        if matched_squad is not None:
+            club_score = _club_similarity_score(player.club_name, matched_squad.team_name)
+            is_single_latin_word = (
+                player.player_name.isascii() and len(player.player_name.strip().split()) == 1
+            )
+            # Guard against false positives on single-word global names (e.g. "Felipe", "Oscar")
+            if is_single_latin_word and not match_via_shirt and club_score == 0 and player.league_key != "csl":
+                matched_squad = None
+
+        if matched_squad is not None:
+            pk = (matched_squad.team_id, matched_squad.player_id)
+            score = (
+                _club_similarity_score(player.club_name, matched_squad.team_name),
+                1 if player.league_key == "csl" else 0,
+                1 if player.market_value_eur is not None else 0,
+                1 if player.contract_until is not None else 0,
+            )
+            row = {
+                "team_id": matched_squad.team_id,
+                "player_id": matched_squad.player_id,
+                "market_value_eur": player.market_value_eur,
+                "birth_date": player.birth_date,
+                "contract_until": player.contract_until,
+            }
+            existing = squad_best.get(pk)
+            if existing is None or score > existing[0]:
+                label = f"{matched_squad.team_name} {matched_squad.player_name} <- {player.player_name} ({player.market_value_eur})"
+                squad_best[pk] = (score, row, label)
+
+        # 2) Match f_i_director_candidates
+        matched_cand: DirectorCandidateRecord | None = None
+        for key in _name_match_keys(player.player_name):
+            records = candidates_by_name.get(key)
+            if records:
+                expected_tag = LEAGUE_KEY_TO_CANDIDATE_TAG.get(player.league_key, "")
+                matched_cand = max(
+                    records,
+                    key=lambda rec: (
+                        _club_similarity_score(player.club_name, rec.current_club),
+                        1 if expected_tag and rec.league_tag == expected_tag else 0,
+                        1 if rec.active else 0,
+                    ),
+                )
+                break
+
+        if matched_cand is not None:
+            score_c = (
+                _club_similarity_score(player.club_name, matched_cand.current_club),
+                1 if player.market_value_eur is not None else 0,
+                1 if player.contract_until is not None else 0,
+            )
+            row_c = {
+                "id": matched_cand.id,
+                "market_value_eur": player.market_value_eur,
+                "birth_date": player.birth_date,
+                "contract_until": player.contract_until,
+            }
+            existing_c = candidate_best.get(matched_cand.id)
+            if existing_c is None or score_c > existing_c[0]:
+                label_c = f"[cand] {matched_cand.player_name} <- {player.player_name} ({player.market_value_eur})"
+                candidate_best[matched_cand.id] = (score_c, row_c, label_c)
+
+    squad_rows = [item[1] for item in squad_best.values()]
+    candidate_rows = [item[1] for item in candidate_best.values()]
+    squad_updated = 0
+    candidate_updated = 0
+
+    if not dry_run and store is not None:
+        squad_updated = store.update_squad_players(squad_rows)
+        candidate_updated = store.update_director_candidates(candidate_rows)
+
+    sample_matches = [item[2] for item in list(squad_best.values())[:5]] + [
+        item[2] for item in list(candidate_best.values())[:3]
+    ]
+    return {
+        "dry_run": dry_run,
+        "source": source_label,
+        "players_loaded": len(players),
+        "sina_names_loaded": len(english_by_player_id),
+        "squad_matches": len(squad_rows),
+        "squad_updated": squad_updated,
+        "candidate_matches": len(candidate_rows),
+        "candidate_updated": candidate_updated,
+        "sample_matches": sample_matches,
+    }
+

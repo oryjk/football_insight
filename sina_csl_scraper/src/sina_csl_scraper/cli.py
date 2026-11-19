@@ -33,11 +33,18 @@ from .director_sina_sync import (
 )
 from .director_transfermarkt_sync import (
     DEFAULT_BASE_URL as DEFAULT_TM_BASE_URL,
+    DEFAULT_DATASET_CACHE_PATH,
+    DEFAULT_DATASET_URL,
     DEFAULT_DELAY_SECONDS as DEFAULT_TM_DELAY_SECONDS,
     DEFAULT_TM_LEAGUES_STR,
     HttpTransfermarktClient,
     PostgresTransfermarktStore,
+    download_transfermarkt_dataset,
+    fetch_sina_english_names,
+    parse_local_html_dir,
+    parse_players_csv,
     parse_tm_leagues_arg,
+    sync_transfermarkt_from_players,
     sync_transfermarkt_valuations,
 )
 from .leisu import LeisuBrowserClient, LeisuCornerEnricher, load_leisu_match_map
@@ -560,27 +567,62 @@ def _read_database_url_from_dotenv_files() -> str | None:
 
 @app.command("sync-director-transfermarkt")
 def sync_director_transfermarkt_command(
+    from_csv: Path | None = typer.Option(
+        None,
+        "--from-csv",
+        help="Import from a local .csv or .csv.gz file (transfermarkt-datasets or custom CSV).",
+    ),
+    from_html_dir: Path | None = typer.Option(
+        None,
+        "--from-html-dir",
+        help="Import from a local directory of browser-saved Transfermarkt club squad HTML files.",
+    ),
+    dataset_url: str = typer.Option(
+        DEFAULT_DATASET_URL,
+        "--dataset-url",
+        help="Open transfermarkt-datasets players.csv.gz URL (used by default when no local file or --live is given).",
+    ),
+    dataset_cache: Path = typer.Option(
+        DEFAULT_DATASET_CACHE_PATH,
+        "--dataset-cache",
+        help="Local cache path for downloaded players.csv.gz.",
+    ),
+    refresh_dataset: bool = typer.Option(
+        False,
+        "--refresh-dataset",
+        help="Re-download players.csv.gz even if the cache file already exists.",
+    ),
+    sina_names: bool = typer.Option(
+        True,
+        "--sina-names/--no-sina-names",
+        help="Fetch Sina English squad names to bridge Chinese f_i_squad_players with English Transfermarkt names.",
+    ),
+    live: bool = typer.Option(
+        False,
+        "--live",
+        help="Attempt direct HTTP scraping of Transfermarkt web pages (may be blocked by AWS WAF).",
+    ),
     leagues: str = typer.Option(
         DEFAULT_TM_LEAGUES_STR,
         "--leagues",
-        help="Comma-separated league keys (csl,k1,j1,epl,laliga,seriea,bundesliga,ligue1).",
+        help="Comma-separated league keys for --live mode (csl,k1,j1,epl,laliga,seriea,bundesliga,ligue1).",
     ),
     base_url: str = typer.Option(
         DEFAULT_TM_BASE_URL,
         "--base-url",
-        help="Transfermarkt base URL (default: https://www.transfermarkt.com).",
+        help="Transfermarkt base URL for --live mode (default: https://www.transfermarkt.com).",
     ),
     delay: float = typer.Option(
         DEFAULT_TM_DELAY_SECONDS,
         "--delay",
         min=0.0,
-        help="Polite delay in seconds between Transfermarkt HTTP requests.",
+        help="Polite delay in seconds between HTTP requests in --live mode.",
     ),
     limit_clubs: int | None = typer.Option(
         None,
         "--limit-clubs",
         min=1,
-        help="Process at most N clubs across all selected leagues.",
+        help="Process at most N clubs in --live mode.",
     ),
     write_db: bool = typer.Option(
         False,
@@ -598,7 +640,7 @@ def sync_director_transfermarkt_command(
         help="PostgreSQL connection string (auto-loads from .env.sync or backend .env if omitted).",
     ),
 ) -> None:
-    """Backfill market_value_eur, birth_date, and contract_until from Transfermarkt."""
+    """Backfill market_value_eur, birth_date, and contract_until into director tables."""
     try:
         league_keys = parse_tm_leagues_arg(leagues)
     except ValueError as error:
@@ -612,25 +654,70 @@ def sync_director_transfermarkt_command(
             "(pass --database-url, set DATABASE_URL, or ensure ../football_insight_service_backend_rs/.env exists)"
         )
 
-    client = HttpTransfermarktClient(base_url=base_url)
-    if resolved_database_url:
-        with psycopg.connect(resolved_database_url, autocommit=True) as connection:
+    if live:
+        client = HttpTransfermarktClient(base_url=base_url)
+        if resolved_database_url:
+            with psycopg.connect(resolved_database_url, autocommit=True) as connection:
+                summary = sync_transfermarkt_valuations(
+                    client=client,
+                    store=PostgresTransfermarktStore(connection),
+                    leagues=league_keys,
+                    dry_run=effective_dry_run,
+                    delay=delay,
+                    limit_clubs=limit_clubs,
+                )
+        else:
             summary = sync_transfermarkt_valuations(
                 client=client,
-                store=PostgresTransfermarktStore(connection),
+                store=None,
                 leagues=league_keys,
-                dry_run=effective_dry_run,
+                dry_run=True,
                 delay=delay,
                 limit_clubs=limit_clubs,
             )
+        typer.echo(json.dumps(summary, ensure_ascii=False))
+        return
+
+    if from_csv is not None:
+        if not from_csv.is_file():
+            raise typer.BadParameter(f"CSV file not found: {from_csv}")
+        players = parse_players_csv(from_csv)
+        source_label = f"csv:{from_csv}"
+    elif from_html_dir is not None:
+        if not from_html_dir.is_dir():
+            raise typer.BadParameter(f"HTML directory not found: {from_html_dir}")
+        players = parse_local_html_dir(from_html_dir)
+        source_label = f"html-dir:{from_html_dir}"
     else:
-        summary = sync_transfermarkt_valuations(
-            client=client,
+        cached = download_transfermarkt_dataset(
+            dataset_url=dataset_url,
+            cache_path=dataset_cache,
+            refresh=refresh_dataset,
+        )
+        players = parse_players_csv(cached)
+        source_label = f"dataset:{cached}"
+
+    if resolved_database_url:
+        with psycopg.connect(resolved_database_url, autocommit=True) as connection:
+            store = PostgresTransfermarktStore(connection)
+            eng_names: dict[int, str] = {}
+            if sina_names:
+                team_ids = [rec.team_id for rec in store.load_squad_players() if rec.active]
+                if team_ids:
+                    eng_names = fetch_sina_english_names(team_ids)
+            summary = sync_transfermarkt_from_players(
+                players=players,
+                store=store,
+                dry_run=effective_dry_run,
+                source_label=source_label,
+                sina_english_names=eng_names,
+            )
+    else:
+        summary = sync_transfermarkt_from_players(
+            players=players,
             store=None,
-            leagues=league_keys,
             dry_run=True,
-            delay=delay,
-            limit_clubs=limit_clubs,
+            source_label=source_label,
         )
     typer.echo(json.dumps(summary, ensure_ascii=False))
 
