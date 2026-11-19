@@ -22,7 +22,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_BASE_URL = "https://www.transfermarkt.cn"
+DEFAULT_BASE_URL = "https://www.transfermarkt.com"
 DEFAULT_DELAY_SECONDS = 1.2
 
 # Mapping from CLI league key -> Transfermarkt competition code
@@ -57,7 +57,7 @@ DEFAULT_HEADERS: dict[str, str] = {
         "Chrome/131.0.0.0 Safari/537.36"
     ),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
     "Cache-Control": "no-cache",
     "Pragma": "no-cache",
     "Upgrade-Insecure-Requests": "1",
@@ -883,7 +883,56 @@ def parse_club_squad(
     return players
 
 
+_CSL_CLUB_ALIAS_GROUPS: dict[str, tuple[str, ...]] = {
+    "chengdu_rongcheng": ("成都蓉城", "chengdu rongcheng", "cd rongcheng", "chengdu better city"),
+    "shanghai_port": ("上海海港", "上海上港", "shanghai port", "sh port", "shanghai sipg"),
+    "shanghai_shenhua": ("上海申花", "shanghai shenhua", "sh shenhua"),
+    "beijing_guoan": ("北京国安", "beijing guoan", "bj guoan"),
+    "shandong_taishan": ("山东泰山", "山东鲁能", "shandong taishan", "sd taishan"),
+    "zhejiang": ("浙江", "浙江队", "浙江绿城", "zhejiang fc", "zhejiang professional", "zj fc", "zhejiang"),
+    "tianjin_jinmen_tiger": ("天津津门虎", "津门虎", "tianjin jinmen tiger", "tj jinmen tiger"),
+    "henan": ("河南", "河南队", "河南嵩山龙门", "henan fc", "henan songshan longmen", "hn fc", "henan"),
+    "wuhan_three_towns": ("武汉三镇", "wuhan three towns", "wh three towns"),
+    "qingdao_west_coast": ("青岛西海岸", "qingdao west coast", "qd west coast"),
+    "qingdao_hainiu": ("青岛海牛", "qingdao hainiu", "qd hainiu"),
+    "shenzhen_peng_city": ("深圳新鹏城", "shenzhen peng city", "sz peng city"),
+    "yunnan_yukun": ("云南玉昆", "yunnan yukun", "yn yukun"),
+    "dalian_yingbo": ("大连英博", "dalian yingbo", "dl yingbo"),
+    "liaoning_tieren": ("辽宁铁人", "liaoning tieren", "ln tieren"),
+    "chongqing_tonglianglong": ("重庆铜梁龙", "chongqing tonglianglong", "cq tonglianglong"),
+    "changchun_yatai": ("长春亚泰", "changchun yatai", "cc yatai"),
+    "meizhou_hakka": ("梅州客家", "meizhou hakka", "mz hakka"),
+    "cangzhou_mighty_lions": ("沧州雄狮", "cangzhou mighty lions", "cz mighty lions"),
+    "nantong_zhiyun": ("南通支云", "nantong zhiyun", "nt zhiyun"),
+}
+
+_CSL_CLUB_CANONICAL_LOOKUP: dict[str, str] = {
+    normalize_club_name(alias): canonical
+    for canonical, aliases in _CSL_CLUB_ALIAS_GROUPS.items()
+    for alias in aliases
+    if normalize_club_name(alias)
+}
+
+
+def canonicalize_csl_club(name: str) -> str:
+    """Resolve Chinese or English CSL club names to a shared canonical club key."""
+    norm = normalize_club_name(name)
+    if not norm:
+        return ""
+    direct = _CSL_CLUB_CANONICAL_LOOKUP.get(norm)
+    if direct:
+        return direct
+    for alias_norm, canonical in _CSL_CLUB_CANONICAL_LOOKUP.items():
+        if len(alias_norm) >= 4 and (alias_norm in norm or norm in alias_norm):
+            return canonical
+    return norm
+
+
 def _club_similarity_score(tm_club: str, db_club: str) -> int:
+    canon_tm = canonicalize_csl_club(tm_club)
+    canon_db = canonicalize_csl_club(db_club)
+    if canon_tm and canon_db and canon_tm == canon_db:
+        return 2
     norm_tm = normalize_club_name(tm_club)
     norm_db = normalize_club_name(db_club)
     if not norm_tm or not norm_db:
@@ -898,32 +947,51 @@ def _club_similarity_score(tm_club: str, db_club: str) -> int:
 def match_squad_player(
     tm_player: TransfermarktPlayer,
     squad_by_name: dict[str, list[SquadPlayerRecord]],
+    squad_by_club_shirt: dict[tuple[str, int], list[SquadPlayerRecord]] | None = None,
 ) -> SquadPlayerRecord | None:
-    """Match a parsed Transfermarkt player against ``f_i_squad_players`` rows."""
+    """Match a parsed Transfermarkt player against ``f_i_squad_players`` rows.
+
+    First matches by normalized player name (handles same-script names), then falls back
+    to ``(canonical_csl_club, shirt_number)`` so English Transfermarkt pages reliably
+    match Chinese ``f_i_squad_players`` rosters.
+    """
     key = normalize_player_name(tm_player.player_name)
-    if not key:
-        return None
-    candidates = squad_by_name.get(key)
-    if not candidates:
-        return None
-    if len(candidates) == 1:
-        return candidates[0]
+    candidates = squad_by_name.get(key) if key else None
+    if candidates:
+        if len(candidates) == 1:
+            return candidates[0]
 
-    def _rank(record: SquadPlayerRecord) -> tuple[int, int, int]:
-        club_score = _club_similarity_score(tm_player.club_name, record.team_name)
-        shirt_score = (
-            1
-            if (
-                tm_player.shirt_number is not None
-                and record.shirt_number is not None
-                and tm_player.shirt_number == record.shirt_number
+        def _rank(record: SquadPlayerRecord) -> tuple[int, int, int]:
+            club_score = _club_similarity_score(tm_player.club_name, record.team_name)
+            shirt_score = (
+                1
+                if (
+                    tm_player.shirt_number is not None
+                    and record.shirt_number is not None
+                    and tm_player.shirt_number == record.shirt_number
+                )
+                else 0
             )
-            else 0
-        )
-        active_score = 1 if record.active else 0
-        return (club_score, shirt_score, active_score)
+            active_score = 1 if record.active else 0
+            return (club_score, shirt_score, active_score)
 
-    return max(candidates, key=_rank)
+        return max(candidates, key=_rank)
+
+    if squad_by_club_shirt and tm_player.shirt_number is not None:
+        club_key = canonicalize_csl_club(tm_player.club_name)
+        if club_key:
+            shirt_candidates = squad_by_club_shirt.get((club_key, tm_player.shirt_number))
+            if shirt_candidates:
+                active_candidates = [rec for rec in shirt_candidates if rec.active]
+                if len(active_candidates) == 1:
+                    return active_candidates[0]
+                if not active_candidates and len(shirt_candidates) == 1:
+                    return shirt_candidates[0]
+                if active_candidates:
+                    return active_candidates[0]
+                return shirt_candidates[0]
+
+    return None
 
 
 def match_director_candidate(
@@ -971,6 +1039,7 @@ def sync_transfermarkt_valuations(
 ) -> dict[str, Any]:
     """Fetch Transfermarkt squads and backfill valuation/bio fields into PostgreSQL."""
     squad_by_name: dict[str, list[SquadPlayerRecord]] = {}
+    squad_by_club_shirt: dict[tuple[str, int], list[SquadPlayerRecord]] = {}
     candidates_by_name: dict[str, list[DirectorCandidateRecord]] = {}
 
     if store is not None:
@@ -978,6 +1047,9 @@ def sync_transfermarkt_valuations(
             key = normalize_player_name(record.player_name)
             if key:
                 squad_by_name.setdefault(key, []).append(record)
+            club_key = canonicalize_csl_club(record.team_name)
+            if club_key and record.shirt_number is not None:
+                squad_by_club_shirt.setdefault((club_key, record.shirt_number), []).append(record)
         for record in store.load_director_candidates():
             key = normalize_player_name(record.player_name)
             if key:
@@ -1052,8 +1124,8 @@ def sync_transfermarkt_valuations(
                 if not _has_any_valuation_field(player):
                     continue
 
-                if league_key == "csl" and squad_by_name:
-                    matched_squad = match_squad_player(player, squad_by_name)
+                if league_key == "csl" and (squad_by_name or squad_by_club_shirt):
+                    matched_squad = match_squad_player(player, squad_by_name, squad_by_club_shirt)
                     if matched_squad is not None:
                         squad_updates_by_pk[(matched_squad.team_id, matched_squad.player_id)] = {
                             "team_id": matched_squad.team_id,

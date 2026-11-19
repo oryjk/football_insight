@@ -637,3 +637,48 @@ def test_cli_sync_director_transfermarkt(monkeypatch: pytest.MonkeyPatch) -> Non
     assert payload["players_parsed"] == 3
     assert payload["squad_matches"] == 0
     assert payload["candidate_matches"] == 0
+
+
+def test_match_squad_player_falls_back_to_english_club_and_shirt_number() -> None:
+    from sina_csl_scraper.director_transfermarkt_sync import canonicalize_csl_club
+
+    assert canonicalize_csl_club("Chengdu Rongcheng") == "chengdu_rongcheng"
+    assert canonicalize_csl_club("成都蓉城") == "chengdu_rongcheng"
+    assert canonicalize_csl_club("Shanghai Port") == "shanghai_port"
+    assert canonicalize_csl_club("上海海港") == "shanghai_port"
+
+    inactive_old_no9 = SquadPlayerRecord(
+        team_id=77680,
+        team_name="成都蓉城",
+        player_id=9001,
+        player_name="旧九号",
+        shirt_number=9,
+        active=False,
+    )
+    active_felipe = SquadPlayerRecord(
+        team_id=77680,
+        team_name="成都蓉城",
+        player_id=9002,
+        player_name="费利佩",
+        shirt_number=9,
+        active=True,
+    )
+    squad_by_name = {
+        normalize_player_name(inactive_old_no9.player_name): [inactive_old_no9],
+        normalize_player_name(active_felipe.player_name): [active_felipe],
+    }
+    squad_by_club_shirt = {
+        ("chengdu_rongcheng", 9): [inactive_old_no9, active_felipe],
+    }
+    tm_player = TransfermarktPlayer(
+        player_name="Felipe Silva",
+        club_name="Chengdu Rongcheng",
+        league_key="csl",
+        shirt_number=9,
+        birth_date=date(1992, 4, 10),
+        contract_until=date(2026, 12, 31),
+        market_value_eur=350_000,
+    )
+    matched = match_squad_player(tm_player, squad_by_name, squad_by_club_shirt)
+    assert matched is active_felipe
+

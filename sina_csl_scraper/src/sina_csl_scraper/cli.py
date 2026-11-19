@@ -518,6 +518,46 @@ def sync_director_sina_command(
     typer.echo(json.dumps(summary, ensure_ascii=False))
 
 
+def _read_database_url_from_dotenv_files() -> str | None:
+    """Fallback to reading FI_DATABASE_URL / DATABASE_URL from repo .env files."""
+    cwd = Path.cwd()
+    candidates = (
+        cwd / ".env.sync",
+        cwd / ".env",
+        cwd.parent / "football_insight_service_backend_rs" / ".env",
+        Path(__file__).resolve().parents[2] / ".env.sync",
+        Path(__file__).resolve().parents[3] / "football_insight_service_backend_rs" / ".env",
+    )
+    seen: set[Path] = set()
+    for env_path in candidates:
+        resolved = env_path.resolve()
+        if resolved in seen or not resolved.is_file():
+            continue
+        seen.add(resolved)
+        found: dict[str, str] = {}
+        try:
+            for raw_line in resolved.read_text(encoding="utf-8").splitlines():
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                if line.startswith("export "):
+                    line = line[len("export "):].strip()
+                key, value = line.split("=", 1)
+                key = key.strip()
+                if key not in {"FI_DATABASE_URL", "DATABASE_URL"}:
+                    continue
+                value = value.strip().strip('"').strip("'")
+                if value:
+                    found[key] = value
+        except OSError:
+            continue
+        if found.get("FI_DATABASE_URL"):
+            return found["FI_DATABASE_URL"]
+        if found.get("DATABASE_URL"):
+            return found["DATABASE_URL"]
+    return None
+
+
 @app.command("sync-director-transfermarkt")
 def sync_director_transfermarkt_command(
     leagues: str = typer.Option(
@@ -528,7 +568,7 @@ def sync_director_transfermarkt_command(
     base_url: str = typer.Option(
         DEFAULT_TM_BASE_URL,
         "--base-url",
-        help="Transfermarkt base URL (default: https://www.transfermarkt.cn).",
+        help="Transfermarkt base URL (default: https://www.transfermarkt.com).",
     ),
     delay: float = typer.Option(
         DEFAULT_TM_DELAY_SECONDS,
@@ -555,7 +595,7 @@ def sync_director_transfermarkt_command(
     database_url: str | None = typer.Option(
         None,
         envvar=["FI_DATABASE_URL", "DATABASE_URL"],
-        help="PostgreSQL connection string (required when --write-db is enabled).",
+        help="PostgreSQL connection string (auto-loads from .env.sync or backend .env if omitted).",
     ),
 ) -> None:
     """Backfill market_value_eur, birth_date, and contract_until from Transfermarkt."""
@@ -565,12 +605,16 @@ def sync_director_transfermarkt_command(
         raise typer.BadParameter(str(error)) from error
 
     effective_dry_run = dry_run or not write_db
-    if not effective_dry_run and not database_url:
-        raise typer.BadParameter("PostgreSQL database_url is required when --write-db is enabled")
+    resolved_database_url = database_url or _read_database_url_from_dotenv_files()
+    if not effective_dry_run and not resolved_database_url:
+        raise typer.BadParameter(
+            "PostgreSQL database_url is required when --write-db is enabled "
+            "(pass --database-url, set DATABASE_URL, or ensure ../football_insight_service_backend_rs/.env exists)"
+        )
 
     client = HttpTransfermarktClient(base_url=base_url)
-    if database_url:
-        with psycopg.connect(database_url, autocommit=True) as connection:
+    if resolved_database_url:
+        with psycopg.connect(resolved_database_url, autocommit=True) as connection:
             summary = sync_transfermarkt_valuations(
                 client=client,
                 store=PostgresTransfermarktStore(connection),
