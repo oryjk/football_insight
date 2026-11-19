@@ -182,6 +182,18 @@ class TransfermarktStore(Protocol):
     def update_director_candidates(self, rows: list[dict[str, Any]]) -> int: ...
 
 
+TRANSFERMARKT_LEAGUE_SLUGS: dict[str, str] = {
+    "CSL": "chinese-super-league",
+    "RSK1": "k-league-1",
+    "JAP1": "j1-league",
+    "GB1": "premier-league",
+    "ES1": "laliga",
+    "IT1": "serie-a",
+    "L1": "bundesliga",
+    "FR1": "ligue-1",
+}
+
+
 class HttpTransfermarktClient:
     """HTTP client for fetching Transfermarkt league and squad HTML pages."""
 
@@ -206,10 +218,11 @@ class HttpTransfermarktClient:
         return response.text
 
     def fetch_league_html(self, tm_code: str) -> str:
-        return self._get(f"/startseite/wettbewerb/{tm_code}")
+        slug = TRANSFERMARKT_LEAGUE_SLUGS.get(tm_code, "jumplist")
+        return self._get(f"/{slug}/startseite/wettbewerb/{tm_code}")
 
     def fetch_club_squad_html(self, club_id: int) -> str:
-        return self._get(f"/kader/verein/{club_id}/plus/1")
+        return self._get(f"/jumplist/kader/verein/{club_id}/plus/1")
 
 
 class PostgresTransfermarktStore:
@@ -1147,15 +1160,18 @@ def sync_transfermarkt_valuations(
 
             _pause()
 
-        league_summaries.append(
-            {
-                "league": league_key,
-                "tm_code": tm_code,
-                "clubs_fetched": league_clubs_fetched,
-                "clubs_failed": league_clubs_failed,
-                "players_parsed": league_players_parsed,
-            }
-        )
+        league_summary: dict[str, Any] = {
+            "league": league_key,
+            "tm_code": tm_code,
+            "clubs_fetched": league_clubs_fetched,
+            "clubs_failed": league_clubs_failed,
+            "players_parsed": league_players_parsed,
+        }
+        if not clubs:
+            title_match = re.search(r"<title[^>]*>(.*?)</title>", league_html, re.IGNORECASE | re.DOTALL)
+            league_summary["html_len"] = len(league_html)
+            league_summary["page_title"] = _collapse_ws(title_match.group(1)) if title_match else ""
+        league_summaries.append(league_summary)
 
     squad_rows = list(squad_updates_by_pk.values())
     candidate_rows = list(candidate_updates_by_id.values())
