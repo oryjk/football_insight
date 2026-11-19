@@ -46,7 +46,7 @@ const emit = defineEmits<{ (e: 'open', target: 'tactics' | 'transfer' | 'directo
   gap: var(--fi-space-16);
   box-sizing: border-box;
   padding: var(--fi-space-24) var(--fi-space-16);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-component-panel-radius);
   position: relative;
   overflow: hidden;
   border: var(--fi-border-card);

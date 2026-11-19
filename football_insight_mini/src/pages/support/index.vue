@@ -426,7 +426,7 @@ function formatSupportCount(value: number): string {
 }
 .support-team-card {
   padding: var(--fi-space-20);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-component-panel-radius);
   border: 2rpx solid #ececf1;
   background: #ffffff;
   display: grid;
@@ -528,7 +528,7 @@ function formatSupportCount(value: number): string {
 .poster-panel__image {
   margin-top: var(--fi-space-18);
   width: 100%;
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-component-panel-radius);
 }
 .poster-panel__save {
   margin-top: var(--fi-space-18);

@@ -81,7 +81,7 @@ const techStats = computed(() => resolveHomePulseTechStats(props.match))
   z-index: 3;
   margin-top: var(--fi-space-20);
   overflow: hidden;
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-component-panel-radius);
   background: var(--fi-gradient-topic-hero);
   border: 1rpx solid var(--fi-color-match-card-hairline);
   box-shadow: var(--fi-shadow-match-card);

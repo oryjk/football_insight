@@ -107,7 +107,7 @@ const emit = defineEmits<{
 .privilege-panel,
 .upgrade-panel {
   padding: var(--fi-space-22);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-radius-xs);
 }
 
 .info-panel,

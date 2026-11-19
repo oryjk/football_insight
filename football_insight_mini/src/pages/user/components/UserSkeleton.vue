@@ -207,7 +207,7 @@
   justify-content: space-between;
   gap: var(--fi-space-18);
   padding: var(--fi-space-18) var(--fi-space-20);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-component-panel-radius);
   border: 2rpx solid rgba(232, 212, 166, 0.82);
   background: rgba(255, 252, 244, 0.74);
 }
@@ -222,7 +222,7 @@
   margin-top: var(--fi-space-24);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-component-panel-radius);
   overflow: hidden;
   border: 2rpx solid rgba(234, 226, 209, 0.92);
 }

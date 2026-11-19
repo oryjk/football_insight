@@ -87,6 +87,6 @@ onScopeDispose(() => { revision += 1 })
 .topics-title { display: block; color: var(--fi-color-text-primary); font-size: var(--fi-font-36); font-weight: var(--fi-weight-extrabold); }
 .topics-caption { display: block; margin-top: var(--fi-space-12); color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); }
 .topics-state { padding: var(--fi-space-28) 0; text-align: center; color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); }
-.topics-state__action { margin-top: var(--fi-space-20); padding: var(--fi-space-16); color: var(--fi-color-primary); background: var(--fi-color-bg); border-radius: var(--fi-radius-lg); font-size: var(--fi-font-26); line-height: var(--fi-leading-normal); }
+.topics-state__action { margin-top: var(--fi-space-20); padding: var(--fi-space-16); color: var(--fi-color-primary); background: var(--fi-color-bg); border-radius: var(--fi-radius-xs); font-size: var(--fi-font-26); line-height: var(--fi-leading-normal); }
 .topics-state__action::after { border: 0; }
 </style>

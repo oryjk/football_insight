@@ -29,7 +29,7 @@ const stage = computed(() => percent.value < 25 ? props.stages[0] : percent.valu
 <style scoped>
 .progress-mask {position:fixed;left:0;right:0;top:0;bottom:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:0 var(--fi-space-48);background:rgba(0,0,0,0.45);}
 .progress-inline .progress-card { box-shadow: none; border: var(--fi-border-card); }
-.progress-card {width:100%;box-sizing:border-box;padding:var(--fi-space-32) var(--fi-space-28);background:var(--fi-color-surface);border-radius:var(--fi-radius-lg);box-shadow:var(--fi-shadow-floating);}
+.progress-card {width:100%;box-sizing:border-box;padding:var(--fi-space-32) var(--fi-space-28);background:var(--fi-color-surface);border-radius:var(--fi-component-panel-radius);box-shadow:var(--fi-shadow-floating);}
 .progress-card__title {display:block;margin-bottom:var(--fi-space-28);font-size:var(--fi-font-30);font-weight:var(--fi-weight-bold);color:var(--fi-color-text-primary);text-align:center;}
 .progress-track {position:relative;height:var(--fi-space-16);margin:0 var(--fi-space-24);background:var(--fi-color-divider);border-radius:var(--fi-radius-round);}
 .progress-fill {position:relative;height:100%;min-width:var(--fi-space-16);background:linear-gradient(90deg,#ffda79,#ff963d,#e90016);border-radius:var(--fi-radius-round);transition:width 240ms linear;}

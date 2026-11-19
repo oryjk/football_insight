@@ -122,7 +122,7 @@ onUnmounted(student.dispose)
 <style scoped>
 .student-page { min-height: 100vh; box-sizing: border-box; padding: calc(var(--fi-brand-nav-height) + var(--fi-space-24)) var(--fi-space-24) calc(var(--fi-space-40) + env(safe-area-inset-bottom)); background: var(--fi-color-page-soft); display: flex; flex-direction: column; gap: var(--fi-space-20); }
 .intro, .panel { display: flex; flex-direction: column; gap: var(--fi-space-16); }
-.panel { padding: var(--fi-space-24); background: var(--fi-color-surface); border: var(--fi-border-card); border-radius: var(--fi-radius-lg); box-shadow: var(--fi-shadow-soft); }
+.panel { padding: var(--fi-space-24); background: var(--fi-color-surface); border: var(--fi-border-card); border-radius: var(--fi-component-panel-radius); box-shadow: var(--fi-shadow-soft); }
 .eyebrow { color: var(--fi-color-primary); font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); }
 .page-title { color: var(--fi-color-text-primary); font-size: var(--fi-font-44); font-weight: var(--fi-weight-extrabold); line-height: var(--fi-leading-heading); }
 .section-title { color: var(--fi-color-text-primary); font-size: var(--fi-font-30); font-weight: var(--fi-weight-bold); }

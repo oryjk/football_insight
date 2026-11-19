@@ -81,7 +81,7 @@ watch(() => props.edition.items.length, length => { if (activeIndex.value >= len
 .daily-topics__swiper--rebound { transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1); }
 .daily-topics__swiper { height: calc(var(--fi-space-topic-card-height) + var(--fi-space-12)); }
 .daily-topics__slide { box-sizing: border-box; height: 100%; padding-bottom: var(--fi-space-12); padding-right: var(--fi-space-card-gap); display: flex; flex-direction: column; align-items: stretch; }
-.daily-topics__state { padding: var(--fi-space-40) var(--fi-space-28); border-radius: var(--fi-radius-lg); background: var(--fi-color-bg); border: var(--fi-border-card); }
+.daily-topics__state { padding: var(--fi-space-40) var(--fi-space-28); border-radius: var(--fi-component-panel-radius); background: var(--fi-color-bg); border: var(--fi-border-card); }
 .daily-topics__state-title { display: block; color: var(--fi-color-text-primary); font-size: var(--fi-font-30); font-weight: var(--fi-weight-bold); }
 .daily-topics__state-copy { display: block; margin-top: var(--fi-space-16); color: var(--fi-color-text-secondary); font-size: var(--fi-font-26); line-height: var(--fi-leading-relaxed); }
 .daily-topics__retry { display: inline-flex; margin: var(--fi-space-24) 0 0; padding: var(--fi-space-12) var(--fi-space-24); color: var(--fi-color-primary); background: var(--fi-color-topic-audio-surface); font-size: var(--fi-font-24); line-height: var(--fi-leading-normal); border-radius: var(--fi-radius-round); }

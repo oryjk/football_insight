@@ -26,7 +26,7 @@ const emit = defineEmits<{ (event: 'open'): void }>()
   box-sizing: border-box;
   text-align: left;
   border: var(--fi-border-card);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-component-panel-radius);
   background: var(--fi-color-surface);
   box-shadow: var(--fi-shadow-card);
   line-height: var(--fi-leading-normal);

@@ -45,7 +45,7 @@
 .matches-skeleton__round { display: grid; justify-items: center; gap: var(--fi-space-8); }
 .matches-skeleton__dot { width: var(--fi-space-28); height: var(--fi-space-28); }
 .matches-skeleton__number { width: var(--fi-space-16); height: var(--fi-space-18); }
-.matches-skeleton__match { display: grid; gap: var(--fi-space-20); margin-top: var(--fi-space-card-gap); padding: var(--fi-space-24) var(--fi-space-20); border: var(--fi-border-divider); border-radius: var(--fi-radius-lg); background: var(--fi-color-page); }
+.matches-skeleton__match { display: grid; gap: var(--fi-space-20); margin-top: var(--fi-space-card-gap); padding: var(--fi-space-24) var(--fi-space-20); border: var(--fi-border-divider); border-radius: var(--fi-component-panel-radius); background: var(--fi-color-page); }
 .matches-skeleton__meta { width: 48%; }
 .matches-skeleton__teams { display: grid; grid-template-columns: var(--fi-space-44) minmax(0, 1fr) var(--fi-space-64) minmax(0, 1fr) var(--fi-space-44); gap: var(--fi-space-8); align-items: center; }
 .matches-skeleton__name { height: var(--fi-space-28); }

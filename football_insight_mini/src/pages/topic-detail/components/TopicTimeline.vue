@@ -79,6 +79,6 @@ onScopeDispose(() => { disposed = true; selection += 1 })
 .topic-timeline__title { display: block; color: var(--fi-color-text-primary); font-size: var(--fi-font-26); line-height: var(--fi-leading-normal); }
 .topic-timeline__current { display: block; margin-bottom: var(--fi-space-8); color: var(--fi-color-primary); font-size: var(--fi-font-20); }
 .topic-timeline__state { color: var(--fi-color-text-caption); font-size: var(--fi-font-22); line-height: var(--fi-leading-normal); padding-top: var(--fi-space-12); }
-.topic-timeline__state button { margin: var(--fi-space-16) 0 0; padding: var(--fi-space-12) var(--fi-space-20); background: var(--fi-color-bg); color: var(--fi-color-primary); font-size: var(--fi-font-24); line-height: var(--fi-leading-normal); border-radius: var(--fi-radius-lg); }
+.topic-timeline__state button { margin: var(--fi-space-16) 0 0; padding: var(--fi-space-12) var(--fi-space-20); background: var(--fi-color-bg); color: var(--fi-color-primary); font-size: var(--fi-font-24); line-height: var(--fi-leading-normal); border-radius: var(--fi-radius-xs); }
 .topic-timeline__state button::after { border: 0; }
 </style>

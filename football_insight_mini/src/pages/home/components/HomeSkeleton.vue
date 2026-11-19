@@ -277,7 +277,7 @@
   padding: var(--fi-space-24) var(--fi-space-22);
   display: grid;
   gap: var(--fi-space-14);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-component-panel-radius);
   border: 2rpx solid #ececf1;
   background: linear-gradient(180deg, rgba(249, 249, 252, 0.9), rgba(255, 255, 255, 1));
   margin-top: var(--fi-space-16);

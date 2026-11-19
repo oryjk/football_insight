@@ -149,7 +149,7 @@ function openTechStats(match: HomePulseLeadMatch): void {
   padding: var(--fi-space-18) var(--fi-space-16);
   display: grid;
   gap: var(--fi-space-10);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-component-panel-radius);
   border: 2rpx solid #ececf1;
   background-color: var(--fi-primitive-white);
 }

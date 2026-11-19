@@ -27,7 +27,7 @@ watch(() => props.title, () => { dragTime.value = null })
 </script>
 
 <style scoped>
-.topic-player { padding: var(--fi-space-20) var(--fi-space-24); background: var(--fi-color-bg); border: var(--fi-border-card); border-radius: var(--fi-radius-lg); }
+.topic-player { padding: var(--fi-space-20) var(--fi-space-24); background: var(--fi-color-bg); border: var(--fi-border-card); border-radius: var(--fi-component-panel-radius); }
 .topic-player__heading { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-12); }
 .topic-player__title { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--fi-color-text-primary); font-size: var(--fi-font-26); font-weight: var(--fi-weight-bold); }
 .topic-player__close { flex-shrink: 0; margin: 0; padding: var(--fi-space-12); background: transparent; color: var(--fi-color-text-secondary); font-size: var(--fi-font-22); line-height: var(--fi-leading-normal); }

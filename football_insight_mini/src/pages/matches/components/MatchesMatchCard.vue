@@ -52,7 +52,7 @@ const hasTechStats = computed(() => hasMatchTechStats(props.match))
 .match-card {
   position: relative;
   padding: var(--fi-space-18) var(--fi-space-18) var(--fi-space-18) var(--fi-space-22);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-component-panel-radius);
   border: var(--fi-component-matches-match-card-border);
   background: var(--fi-color-ticket-recent-reflux-bucket-lock-body-background-2);
   backdrop-filter: blur(var(--fi-space-14));

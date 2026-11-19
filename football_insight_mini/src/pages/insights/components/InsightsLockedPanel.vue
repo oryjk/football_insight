@@ -127,7 +127,7 @@ const previewSections = computed(() => [
   display: grid;
   gap: var(--fi-space-10);
   padding: var(--fi-space-22);
-  border-radius: var(--fi-radius-md);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-insights-preview-metric);
   color: var(--fi-color-text-caption);
   font-size: var(--fi-font-22);
@@ -149,7 +149,7 @@ const previewSections = computed(() => [
   display: grid;
   gap: var(--fi-space-12);
   padding: var(--fi-space-22);
-  border-radius: var(--fi-radius-md);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-insights-preview-surface);
 }
 

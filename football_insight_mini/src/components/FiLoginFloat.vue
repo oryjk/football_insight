@@ -55,7 +55,7 @@ function handleAction(): void {
   align-items: center;
   gap: var(--fi-space-20);
   padding: var(--fi-space-22) var(--fi-space-24);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-component-panel-radius);
   background: rgba(21, 23, 29, 0.96);
   box-shadow: 0 20rpx 46rpx rgba(16, 18, 24, 0.24);
 }

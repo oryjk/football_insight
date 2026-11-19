@@ -573,7 +573,7 @@ onShow(() => {
 }
 
 .account-actions {
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-component-panel-radius);
   padding: var(--fi-space-22) var(--fi-space-24);
   border: 1rpx solid rgba(229, 232, 238, 0.96);
   background: rgba(255, 255, 255, 0.94);
@@ -679,7 +679,7 @@ onShow(() => {
 }
 
 .account-actions {
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-component-panel-radius);
   padding: var(--fi-space-18) var(--fi-space-20);
   animation: fi-fade-in-up 520ms cubic-bezier(0.22, 1, 0.36, 1) 320ms both;
 }

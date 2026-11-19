@@ -53,7 +53,7 @@ defineProps<{ snapshot: TeamBoardSnapshot; composer?: boolean }>()
 .team-board-snapshot {
   margin-top: var(--fi-space-18);
   padding: var(--fi-space-22);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-component-panel-radius);
   background: #f7f8fb;
 }
 .team-board-snapshot__summary-value {

@@ -202,7 +202,7 @@ function copy(): void {
   width: 100%;
   max-width: calc(var(--fi-space-64) * 10);
   box-sizing: border-box;
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-component-panel-radius);
   background: var(--fi-color-ticket-history-trend-summary-item-background-2);
   padding: var(--fi-space-28) var(--fi-space-24) var(--fi-space-32);
   box-shadow: var(--fi-shadow-card-strong);

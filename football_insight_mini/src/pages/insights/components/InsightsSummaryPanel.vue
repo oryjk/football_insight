@@ -65,7 +65,7 @@ defineProps<{ insight: TeamInsight }>()
   display: grid;
   gap: var(--fi-space-20);
   padding: var(--fi-space-18) var(--fi-space-20);
-  border-radius: var(--fi-radius-md);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-page);
 }
 .briefing-card__label { color: var(--fi-color-text-muted); font-size: var(--fi-font-24); line-height: var(--fi-leading-normal); }

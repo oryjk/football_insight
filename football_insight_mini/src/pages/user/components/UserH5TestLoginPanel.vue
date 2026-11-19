@@ -96,7 +96,7 @@ function handleSelect(user: H5TestLoginUser): void {
 
 .h5-test-login-panel {
   padding: var(--fi-space-22);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-radius-xs);
   border: 1rpx dashed rgba(214, 158, 46, 0.72);
   background: rgba(255, 250, 235, 0.9);
 }
