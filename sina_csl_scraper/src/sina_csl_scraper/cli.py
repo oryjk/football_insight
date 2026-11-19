@@ -24,6 +24,7 @@ from .cfl_client import CflCslClient
 from .client import SinaCslClient, serialize_datasets
 from .constants import DEFAULT_LEAGUE_ID
 from .director_avatars import PostgresDirectorAvatarStore, sync_director_avatars
+from .director_sina_age_sync import PostgresSinaAgeStore, sync_director_sina_ages
 from .director_sina_sync import (
     DEFAULT_LEAGUES_STR,
     DefaultSinaDirectorClient,
@@ -732,6 +733,80 @@ def sync_director_transfermarkt_command(
             store=None,
             dry_run=True,
             source_label=source_label,
+        )
+    typer.echo(json.dumps(summary, ensure_ascii=False))
+
+
+@app.command("sync-director-sina-ages")
+def sync_director_sina_ages_cmd(
+    write_db: bool = typer.Option(
+        False,
+        "--write-db",
+        help="Write approximate Jan-1 birth_date into PostgreSQL where birth_date IS NULL (defaults to dry-run).",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Force dry-run without writing to PostgreSQL (default when --write-db is not passed).",
+    ),
+    only_squad: bool = typer.Option(
+        False,
+        "--only-squad",
+        help="Only backfill f_i_squad_players.",
+    ),
+    only_candidates: bool = typer.Option(
+        False,
+        "--only-candidates",
+        help="Only backfill f_i_director_candidates.",
+    ),
+    limit: int | None = typer.Option(
+        None,
+        "--limit",
+        min=1,
+        help="Fetch at most N unique Sina player IDs (useful for smoke tests).",
+    ),
+    concurrency: int = typer.Option(
+        8,
+        "--concurrency",
+        min=1,
+        max=16,
+        help="Number of concurrent /op/api/player requests.",
+    ),
+    timeout: int = typer.Option(
+        15,
+        "--timeout",
+        min=3,
+        max=60,
+        help="Per-request HTTP timeout in seconds.",
+    ),
+    database_url: str | None = typer.Option(
+        None,
+        envvar=["FI_DATABASE_URL", "DATABASE_URL"],
+        help="PostgreSQL connection string (auto-loads from .env.sync or backend .env if omitted).",
+    ),
+) -> None:
+    """Backfill missing player ages (birth_date IS NULL) from Sina /op/api/player."""
+    if only_squad and only_candidates:
+        raise typer.BadParameter("Cannot pass both --only-squad and --only-candidates")
+
+    effective_dry_run = dry_run or not write_db
+    resolved_database_url = database_url or _read_database_url_from_dotenv_files()
+    if not resolved_database_url:
+        raise typer.BadParameter(
+            "PostgreSQL database_url is required to load missing player IDs "
+            "(pass --database-url, set DATABASE_URL, or ensure ../football_insight_service_backend_rs/.env exists)"
+        )
+
+    with psycopg.connect(resolved_database_url, autocommit=True) as connection:
+        store = PostgresSinaAgeStore(connection)
+        summary = sync_director_sina_ages(
+            store=store,
+            dry_run=effective_dry_run,
+            only_squad=only_squad,
+            only_candidates=only_candidates,
+            limit=limit,
+            concurrency=concurrency,
+            timeout=timeout,
         )
     typer.echo(json.dumps(summary, ensure_ascii=False))
 

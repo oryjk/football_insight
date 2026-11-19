@@ -116,6 +116,10 @@ class SinaCslClient:
         players = [parse_squad_player(team_id, item) for item in items or [] if isinstance(item, dict)]
         return [player for player in players if player is not None]
 
+    def fetch_player_profile(self, player_id: int) -> dict[str, Any] | None:
+        data = self._request("/op/api/player", {"pid": player_id})
+        return data if isinstance(data, dict) else None
+
     def fetch_team_coach(self, team_id: int) -> TeamCoach | None:
         data = self._request("/op/api/team", {"tid": team_id})
         return parse_team_coach(team_id, data if isinstance(data, dict) else {})
