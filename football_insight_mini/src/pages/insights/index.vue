@@ -14,11 +14,11 @@
         <InsightsSecondaryEntries @open="openSecondary" />
         <FiPanel>
           <view class="insights-workspace">
-            <InsightsTeamSelector
+            <FiTeamSelector
               v-if="selectableTeams.length"
               :teams="selectableTeams"
-              :selected-team-id="selectedTeamId"
-              @update:selected-team-id="teamBrowser.selectTeam"
+              :model-value="selectedTeamId"
+              @update:model-value="teamBrowser.selectTeam"
             />
             <view v-else class="state-card team-loading">
               <text>{{ teamError || '正在加载球队…' }}</text>
@@ -112,7 +112,7 @@ import InsightsLockedPanel from './components/InsightsLockedPanel.vue'
 import InsightsMatchOutlook from './components/InsightsMatchOutlook.vue'
 import { createOutlookLoader } from './useMatchOutlook'
 import InsightsTeamPanel from './components/InsightsTeamPanel.vue'
-import InsightsTeamSelector from '../../components/InsightsTeamSelector.vue'
+import FiTeamSelector from '../../components/FiTeamSelector.vue'
 import InsightsContributionSurface from './components/InsightsContributionSurface.vue'
 import type { TeamInsight } from '../../types/insight'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'

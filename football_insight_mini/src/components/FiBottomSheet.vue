@@ -159,7 +159,7 @@ function handleMaskTap() {
   max-height: var(--fi-sheet-height);
   display: flex;
   flex-direction: column;
-  border-radius: var(--fi-radius-xl) var(--fi-radius-xl) 0 0;
+  border-radius: var(--fi-radius-md) var(--fi-radius-md) 0 0;
   background: #ffffff;
   border-top: 1rpx solid rgba(232, 233, 238, 0.95);
   box-shadow: 0 -24rpx 56rpx rgba(12, 14, 20, 0.12);

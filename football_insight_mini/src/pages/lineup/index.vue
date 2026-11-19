@@ -13,7 +13,7 @@
     <!-- #ifndef H5 -->
     <view class="page">
       <view v-if="teams.length" class="team-picker">
-        <LineupTeamPicker :teams="teams" :model-value="teamId" @update:model-value="switchTeam" />
+        <FiTeamSelector :teams="teams" :model-value="teamId" @update:model-value="switchTeam" />
       </view>
       <FiLoading
         v-if="loading"
@@ -124,7 +124,7 @@ import { useLineupPitchCode } from './useLineupPitchCode'
 import LineupFormationBar from './components/LineupFormationBar.vue'
 import LineupPitch from './components/LineupPitch.vue'
 import LineupPlayerSheet from './components/LineupPlayerSheet.vue'
-import LineupTeamPicker from './components/LineupTeamPicker.vue'
+import FiTeamSelector from '../../components/FiTeamSelector.vue'
 import LineupActionBar from './components/LineupActionBar.vue'
 
 const { navigationPageStyle } = useNavigationLayout()

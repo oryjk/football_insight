@@ -8,11 +8,11 @@
     </view>
     <FiPanel>
       <view class="tactics-workspace">
-        <InsightsTeamSelector
+        <FiTeamSelector
           v-if="selectableTeams.length"
           :teams="selectableTeams"
-          :selected-team-id="selectedTeamId"
-          @update:selected-team-id="teamBrowser.selectTeam"
+          :model-value="selectedTeamId"
+          @update:model-value="teamBrowser.selectTeam"
         />
         <view v-else class="state-card">
           <text>{{ teamError || '正在加载球队…' }}</text>
@@ -38,7 +38,7 @@ import { computed, ref, watch } from 'vue'
 import { onHide, onLoad, onReachBottom, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import FiPanel from '../../components/FiPanel.vue'
-import InsightsTeamSelector from '../../components/InsightsTeamSelector.vue'
+import FiTeamSelector from '../../components/FiTeamSelector.vue'
 import InsightsTacticsPanel from './components/InsightsTacticsPanel.vue'
 import { useInsightsTeams } from '../../composables/useInsightsTeams'
 import { useInsightsTactics } from './useInsightsTactics'

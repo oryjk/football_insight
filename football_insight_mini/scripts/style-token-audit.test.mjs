@@ -56,7 +56,6 @@ const LEGACY_PRIMITIVE_REFS = {
   'pages/lineup/components/LineupPitch.vue': 1,
   'pages/lineup/components/LineupPlayerDot.vue': 10,
   'pages/lineup/components/LineupPlayerSheet.vue': 4,
-  'pages/lineup/components/LineupTeamPicker.vue': 1,
   'pages/lineup/index.vue': 1,
   'pages/membership-purchase/components/MembershipInviteSheet.vue': 1,
   'pages/membership-purchase/components/MembershipLevelsSheet.vue': 1,

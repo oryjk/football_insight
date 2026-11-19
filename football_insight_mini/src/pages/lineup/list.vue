@@ -7,7 +7,7 @@
     <text class="community-caption">请在微信小程序中查看球队战术板。</text>
     <!-- #endif -->
     <!-- #ifndef H5 -->
-    <LineupTeamPicker :teams="teams" :model-value="teamId" @update:model-value="switchTeam" />
+    <FiTeamSelector :teams="teams" :model-value="teamId" @update:model-value="switchTeam" />
     <view class="community-row">
       <button class="community-action" :class="{ 'community-action--active': sort === 'latest' }" @tap="changeSort('latest')">最新发布</button>
       <button class="community-action" :class="{ 'community-action--active': sort === 'likes' }" @tap="changeSort('likes')">点赞榜</button>
@@ -27,7 +27,7 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import { onLoad, onReachBottom, onShow } from '@dcloudio/uni-app'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import FiLoading from '../../components/FiLoading.vue'
-import LineupTeamPicker from './components/LineupTeamPicker.vue'
+import FiTeamSelector from '../../components/FiTeamSelector.vue'
 import FiLineupCommunityCard from '../../components/FiLineupCommunityCard.vue'
 import { listSupportTeams } from '../../api/support'
 import type { LineupSort, SquadResponse } from '../../types/lineup'

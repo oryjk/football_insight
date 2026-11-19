@@ -330,7 +330,7 @@ page {
   --fi-component-btn-bg-deep: var(--fi-color-primary-deep);
   --fi-component-card-bg: var(--fi-primitive-white);
   --fi-component-card-text: var(--fi-color-text-primary);
-  --fi-component-card-radius: var(--fi-radius-xl);
+  --fi-component-card-radius: var(--fi-radius-sm);
   --fi-component-card-border: var(--fi-border-card);
   --fi-component-card-shadow: var(--fi-shadow-card);
   --fi-component-topic-gallery-height: var(--fi-space-topic-gallery-height);
@@ -344,7 +344,7 @@ page {
   --fi-component-close-size: var(--fi-font-24);
   /* FiPanel / FiSectionHeading 卡片与标题区契约（统一自洞察/首页面板的主流写法） */
   --fi-component-panel-bg: var(--fi-color-surface-panel);
-  --fi-component-panel-radius: var(--fi-radius-xl);
+  --fi-component-panel-radius: var(--fi-radius-sm);
   --fi-component-panel-border: var(--fi-border-card);
   --fi-component-panel-shadow: var(--fi-shadow-card);
   --fi-component-panel-padding: var(--fi-space-20);
@@ -358,7 +358,7 @@ page {
   --fi-component-title-size-xl: var(--fi-font-56);
   /* FiLoading 加载卡契约（值提取自组件原实现，视觉不变） */
   --fi-component-loading-bg: var(--fi-color-surface-frosted);
-  --fi-component-loading-radius: var(--fi-radius-lg);
+  --fi-component-loading-radius: var(--fi-radius-sm);
   --fi-component-loading-shadow: var(--fi-shadow-floating);
   /* 换座页：Dock 与浮窗共用高度，确保浮窗定位在 Dock 之上 */
   --fi-component-seat-swap-dock-height: 80rpx;

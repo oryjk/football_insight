@@ -16,11 +16,11 @@
       <text class="director-banner__text">正与好友同局 PK，选完立看 1v1 分歧报告</text>
     </view>
 
-    <InsightsTeamSelector
+    <FiTeamSelector
       v-if="teams.length"
       :teams="teams"
-      :selected-team-id="activeTeamId"
-      @update:selected-team-id="handleSelectTeam"
+      :model-value="activeTeamId"
+      @update:model-value="handleSelectTeam"
     />
 
     <FiLoading v-if="loading && !context" title="正在加载球队阵容" caption="准备现役外援与引援候选名单…" />
@@ -98,7 +98,7 @@ import { computed, onBeforeUnmount, watch } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiLoading from '../../components/FiLoading.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
-import InsightsTeamSelector from '../../components/InsightsTeamSelector.vue'
+import FiTeamSelector from '../../components/FiTeamSelector.vue'
 import { useInsightsTeams } from '../../composables/useInsightsTeams'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { useAppSession } from '../../stores/appSession'

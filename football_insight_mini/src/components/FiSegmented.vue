@@ -67,7 +67,7 @@ function select(key: string): void {
   gap: var(--fi-space-6);
   padding: var(--fi-space-6);
   border: var(--fi-border-width) solid var(--fi-color-border-chip);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-segmented-track);
   box-sizing: border-box;
 }
@@ -77,7 +77,7 @@ function select(key: string): void {
   top: var(--fi-space-6);
   bottom: var(--fi-space-6);
   left: var(--fi-space-6);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-2xs);
   background: var(--fi-color-text-primary);
   box-shadow: var(--fi-shadow-segmented-thumb);
   transition: transform 300ms cubic-bezier(0.3, 0.9, 0.3, 1);
@@ -95,7 +95,7 @@ function select(key: string): void {
   justify-content: center;
   gap: var(--fi-space-10);
   padding: 0 var(--fi-space-20);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-2xs);
   color: var(--fi-color-segmented-idle);
   font-size: var(--fi-font-26);
   font-weight: var(--fi-weight-bold);
