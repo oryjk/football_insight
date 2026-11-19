@@ -10,7 +10,7 @@
         :key="row.player_id"
         class="ranking-row"
       >
-        <text class="ranking-row__rank" :class="`ranking-row__rank--${row.rank_no}`">#{{ row.rank_no }}</text>
+        <text class="ranking-row__rank" :class="`ranking-row__rank--${row.rank_no}`">{{ row.rank_no }}</text>
         <image
           :src="row.avatar_storage_url || ''"
           mode="aspectFill"

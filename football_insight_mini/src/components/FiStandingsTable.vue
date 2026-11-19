@@ -16,7 +16,7 @@
         hover-stay-time="100"
         @click="emit('select', { key: team.team_id })"
       >
-        <text class="standings__rank" :class="{ 'standings__rank--first': team.rank_no === 1 }">#{{ team.rank_no }}</text>
+        <text class="standings__rank" :class="{ 'standings__rank--first': team.rank_no === 1 }">{{ team.rank_no }}</text>
         <image class="standings__avatar" :src="team.avatar_storage_url || ''" mode="aspectFit" />
         <view class="standings__identity">
           <text class="standings__name">{{ team.team_name }}</text>
