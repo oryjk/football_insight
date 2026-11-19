@@ -15,11 +15,14 @@ const LEAGUE_LABELS: Record<string, string> = {
   K2: 'K2联赛',
   K: 'K联赛',
   J1: 'J1联赛',
+  EUR: '五大联赛',
+  ACL: '亚冠',
   CSL: '中超',
   CL1: '中甲',
+  SPL: '沙特联',
+  MLS: '美职联',
   FREE: '自由身',
   BRA: '巴西',
-  EUR: '欧洲',
   OTHER: '海外',
 }
 

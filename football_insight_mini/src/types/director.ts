@@ -2,7 +2,18 @@ export type DirectorPosition = 'GK' | 'DF' | 'MF' | 'FW'
 
 export type DirectorPlayerSource = 'squad' | 'pool' | 'custom'
 
-export type DirectorLeagueFilter = 'all' | 'K' | 'J1' | 'CSL' | 'FREE' | 'CUSTOM'
+export type DirectorLeagueFilter =
+  | 'all'
+  | 'K'
+  | 'J1'
+  | 'EUR'
+  | 'ACL'
+  | 'CL1'
+  | 'SPL'
+  | 'MLS'
+  | 'CSL'
+  | 'FREE'
+  | 'CUSTOM'
 
 export interface PlanPlayerItem {
   key: string

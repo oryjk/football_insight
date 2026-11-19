@@ -159,7 +159,20 @@ impl DirectorService {
 
         if !matches!(
             normalized_league.as_str(),
-            "ALL" | "K" | "K1" | "K2" | "J1" | "CSL" | "FREE" | "OTHER"
+            "ALL"
+                | "K"
+                | "K1"
+                | "K2"
+                | "J1"
+                | "EUR"
+                | "ACL"
+                | "CL1"
+                | "SPL"
+                | "MLS"
+                | "BRA"
+                | "CSL"
+                | "FREE"
+                | "OTHER"
         ) {
             return Err(DirectorError::InvalidInput("联赛筛选参数无效".into()));
         }
@@ -173,7 +186,7 @@ impl DirectorService {
                 is_foreign,
                 &normalized_league,
                 trimmed_kw,
-                60,
+                100,
             )
             .await?;
 

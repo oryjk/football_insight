@@ -268,11 +268,10 @@ export function useDirectorDraft(session: AppSession) {
     candidatesLoading.value = true
     candidatesError.value = ''
     try {
-      const apiLeague = leagueFilter.value === 'K' ? 'all' : leagueFilter.value
       const res = await getDirectorCandidates({
         teamId: activeTeamId.value,
         isForeign: sheetMode.value === 'foreign',
-        league: apiLeague,
+        league: leagueFilter.value,
         q: searchQuery.value,
       })
       if (!token.isCurrent()) return

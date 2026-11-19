@@ -22,6 +22,11 @@ export const DIRECTOR_FOREIGN_LEAGUE_TABS: ReadonlyArray<{ value: DirectorLeague
   { value: 'all', label: '全部' },
   { value: 'K', label: 'K联赛' },
   { value: 'J1', label: 'J联赛' },
+  { value: 'EUR', label: '五大联赛' },
+  { value: 'ACL', label: '亚冠' },
+  { value: 'CL1', label: '中甲' },
+  { value: 'SPL', label: '沙特联' },
+  { value: 'MLS', label: '美职联' },
   { value: 'CSL', label: '中超' },
   { value: 'FREE', label: '自由身' },
   { value: 'CUSTOM', label: '自由提名' },
@@ -30,6 +35,7 @@ export const DIRECTOR_FOREIGN_LEAGUE_TABS: ReadonlyArray<{ value: DirectorLeague
 export const DIRECTOR_DOMESTIC_LEAGUE_TABS: ReadonlyArray<{ value: DirectorLeagueFilter; label: string }> = [
   { value: 'all', label: '全部' },
   { value: 'CSL', label: '中超' },
+  { value: 'CL1', label: '中甲' },
   { value: 'FREE', label: '自由身' },
   { value: 'CUSTOM', label: '自由提名' },
 ]

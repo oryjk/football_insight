@@ -10,7 +10,6 @@
     >
       <view class="fan-entry__top">
         <view class="fan-entry__head">
-          <text class="fan-entry__kicker fan-entry__kicker--lineup">{{ lineupModel.kicker }}</text>
           <text class="fan-entry__title">{{ lineupModel.title }}</text>
         </view>
         <view class="fan-entry__pitch" aria-hidden="true">
@@ -41,7 +40,6 @@
     >
       <view class="fan-entry__top">
         <view class="fan-entry__head">
-          <text class="fan-entry__kicker fan-entry__kicker--like">{{ transferModel.kicker }}</text>
           <text class="fan-entry__title">{{ transferModel.title }}</text>
         </view>
         <view class="fan-entry__visual" aria-hidden="true">
@@ -76,7 +74,6 @@
       @tap="emit('open-director')"
     >
       <view class="fan-entry__director-left">
-        <text class="fan-entry__kicker fan-entry__kicker--director">休赛期建队</text>
         <text class="fan-entry__title">我来当总监</text>
         <text class="fan-entry__subtitle">给{{ teamName }}定 5 外援阵容，发微信群看 1v1 分歧报告</text>
       </view>

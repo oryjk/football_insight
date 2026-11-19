@@ -118,10 +118,12 @@
             :key="item.key"
             class="candidate-row"
             :class="{ 'candidate-row--selected': selectedKeys.has(item.key) }"
-            hover-class="sheet-pressed"
-            @tap="emit('pick', item)"
           >
-            <view class="candidate-row__avatar">
+            <view
+              class="candidate-row__avatar"
+              :hover-class="item.avatar_url ? 'sheet-pressed' : 'none'"
+              @tap="previewAvatar(item)"
+            >
               <FiAvatar :src="item.avatar_url" :size="96" :name="item.player_name" />
             </view>
             <view class="candidate-row__body">
@@ -135,12 +137,14 @@
                 <text v-for="tag in item.tags" :key="tag" class="candidate-tag">{{ tag }}</text>
               </view>
             </view>
-            <text
+            <button
               class="candidate-row__action"
               :class="{ 'candidate-row__action--picked': selectedKeys.has(item.key) }"
+              hover-class="sheet-pressed"
+              @tap="emit('pick', item)"
             >
               {{ selectedKeys.has(item.key) ? '已选' : '签下' }}
-            </text>
+            </button>
           </view>
         </view>
       </template>
@@ -189,7 +193,7 @@ const tabs = computed(() =>
 )
 
 const customLeaguePresets = computed(() =>
-  props.mode === 'foreign' ? ['K1', 'K2', 'J1', 'CSL', 'FREE', 'OTHER'] : ['CSL', 'CL1', 'FREE'],
+  props.mode === 'foreign' ? ['K1', 'K2', 'J1', 'EUR', 'ACL', 'SPL', 'MLS', 'CSL', 'FREE', 'OTHER'] : ['CSL', 'CL1', 'FREE'],
 )
 
 const customName = ref('')
@@ -210,6 +214,15 @@ watch(
 function onSearchInput(event: unknown): void {
   const value = (event as { detail?: { value?: string } } | null)?.detail?.value
   emit('update:searchQuery', typeof value === 'string' ? value : '')
+}
+
+function previewAvatar(item: DirectorCandidateDto): void {
+  const url = item.avatar_url?.trim()
+  if (!url) return
+  uni.previewImage({
+    urls: [url],
+    current: url,
+  })
 }
 
 function handleCustomSubmit(): void {
@@ -386,6 +399,7 @@ function handleCustomSubmit(): void {
 
 .candidate-row__action {
   flex-shrink: 0;
+  margin: 0;
   padding: var(--fi-space-10) var(--fi-space-18);
   border-radius: var(--fi-radius-round);
   background: var(--fi-color-surface);
@@ -394,6 +408,10 @@ function handleCustomSubmit(): void {
   font-size: var(--fi-font-22);
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-none);
+}
+
+.candidate-row__action::after {
+  border: 0;
 }
 
 .candidate-row__action--picked {
