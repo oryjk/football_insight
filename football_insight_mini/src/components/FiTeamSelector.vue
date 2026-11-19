@@ -111,7 +111,7 @@ watch(
   min-width: 0;
   padding: var(--fi-space-6);
   border: var(--fi-border-width) solid var(--fi-color-border-chip);
-  border-radius: var(--fi-radius-xs);
+  border-radius: var(--fi-radius-sm);
   background: var(--fi-color-segmented-track);
   overflow: hidden;
   box-sizing: border-box;
@@ -134,7 +134,7 @@ watch(
   gap: var(--fi-space-12);
   min-height: var(--fi-space-64);
   padding: 0 var(--fi-space-20);
-  border-radius: var(--fi-radius-2xs);
+  border-radius: var(--fi-radius-xs);
   background: transparent;
   color: var(--fi-color-segmented-idle);
   font-size: var(--fi-font-24);
