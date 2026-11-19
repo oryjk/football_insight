@@ -27,13 +27,13 @@
       <view v-else-if="squad" class="page-content">
         <view v-if="notice" class="notice"><text>{{ notice }}</text></view>
         <template v-for="block in visibleBlocks" :key="block.key">
-          <FiLayoutBlock v-if="block.key === 'team_picker' && teams.length" :background-image-url="block.background_image_url">
+          <FiLayoutBlock v-if="block.key === 'team_picker' && teams.length" class="lineup-block" :background-image-url="block.background_image_url">
             <view class="team-picker">
               <FiTeamSelector :teams="teams" :model-value="teamId" @update:model-value="switchTeam" />
             </view>
           </FiLayoutBlock>
 
-          <FiLayoutBlock v-else-if="block.key === 'status_bar'" :background-image-url="block.background_image_url">
+          <FiLayoutBlock v-else-if="block.key === 'status_bar'" class="lineup-block" :background-image-url="block.background_image_url">
             <view class="status-row">
               <view class="status-row__heading">
                 <text class="status-row__title">我的最佳阵容</text>
@@ -43,7 +43,7 @@
             </view>
           </FiLayoutBlock>
 
-          <FiLayoutBlock v-else-if="block.key === 'formation_bar'" :background-image-url="block.background_image_url">
+          <FiLayoutBlock v-else-if="block.key === 'formation_bar'" class="lineup-block" :background-image-url="block.background_image_url">
             <LineupFormationBar :model-value="editor.formation.value" @update:model-value="changeFormation" />
           </FiLayoutBlock>
 
@@ -53,7 +53,7 @@
             </FiLayoutBlock>
           </view>
 
-          <FiLayoutBlock v-else-if="block.key === 'hint'" :background-image-url="block.background_image_url">
+          <FiLayoutBlock v-else-if="block.key === 'hint'" class="lineup-block" :background-image-url="block.background_image_url">
             <view class="hint-group">
               <view class="hint-row">
                 <text class="hint">点选球员 · 按住拖动 · 已排 {{ editor.filled.value }}/11</text>
@@ -63,7 +63,7 @@
             </view>
           </FiLayoutBlock>
 
-          <FiLayoutBlock v-else-if="block.key === 'action_bar'" :background-image-url="block.background_image_url">
+          <FiLayoutBlock v-else-if="block.key === 'action_bar'" class="lineup-block" :background-image-url="block.background_image_url">
             <view class="action-slot">
               <LineupActionBar :busy="saving" :saving-draft="savingDraft" :publishing="publishing" :share-preparing="sharePreparing" :complete="editor.filled.value === 11" :published="Boolean(savedLineup)" @reset="requestConfirmation('reset')" @share="handleShare" @draft="handleDraft" @publish="requestConfirmation('publish')" />
             </view>
@@ -439,7 +439,9 @@ onBeforeUnmount(() => { if (searchTimer) clearTimeout(searchTimer); dispose() })
   gap: var(--fi-space-12);
 }
 
-.page-content > :not(.pitch-slot) {
+.page-content > view:not(.pitch-slot),
+.page-content > text,
+.lineup-block {
   flex-shrink: 0;
 }
 
