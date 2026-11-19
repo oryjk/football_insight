@@ -74,7 +74,7 @@ defineProps<{
   flex-direction: column;
   gap: var(--fi-space-16);
   padding: var(--fi-space-24);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-radius-sm);
   background: var(--fi-color-surface);
   border: var(--fi-border-width) solid var(--fi-color-primary);
   box-shadow: var(--fi-shadow-card);
@@ -127,7 +127,7 @@ defineProps<{
 
 .compare-summary {
   padding: var(--fi-space-14) var(--fi-space-16);
-  border-radius: var(--fi-radius-md);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-primary-soft);
   color: var(--fi-color-primary-deep);
   font-size: var(--fi-font-24);
@@ -154,8 +154,8 @@ defineProps<{
 }
 
 .compare-tag {
-  padding: var(--fi-space-6) var(--fi-space-14);
-  border-radius: var(--fi-radius-round);
+  padding: var(--fi-space-6) var(--fi-space-12);
+  border-radius: var(--fi-radius-2xs);
   background: var(--fi-color-page-soft);
   color: var(--fi-color-text-primary);
   font-size: var(--fi-font-22);

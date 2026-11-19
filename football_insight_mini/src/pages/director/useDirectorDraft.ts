@@ -314,6 +314,21 @@ export function useDirectorDraft(session: AppSession) {
     void fetchCandidates()
   }
 
+  const sheetQuotaReached = computed(() => {
+    if (sheetMode.value === 'foreign') {
+      return foreignStayIds.value.length + foreignIns.value.length >= foreignQuota.value
+    }
+    return domesticIns.value.length >= maxDomesticIns.value
+  })
+
+  const sheetQuotaHint = computed(() => {
+    if (!sheetQuotaReached.value) return ''
+    if (sheetMode.value === 'foreign') {
+      return `外援名额已满（${foreignQuota.value}/${foreignQuota.value}），其余球员暂不可选；点击已选球员可取消，或先让现役外援离队`
+    }
+    return `国内重点补强已满（${maxDomesticIns.value}/${maxDomesticIns.value}），其余球员暂不可选；点击已选球员可取消`
+  })
+
   function pickCandidate(candidate: DirectorCandidateDto): void {
     const item = candidateToPlanPlayer(candidate)
     if (sheetMode.value === 'foreign') {
@@ -322,26 +337,26 @@ export function useDirectorDraft(session: AppSession) {
         return
       }
       if (foreignStayIds.value.length + foreignIns.value.length >= foreignQuota.value) {
-        uni.showToast({ title: `外援名额已满（${foreignQuota.value}/${foreignQuota.value}）`, icon: 'none' })
+        uni.showToast({
+          title: `外援名额已满（${foreignQuota.value}/${foreignQuota.value}），请先取消已选球员`,
+          icon: 'none',
+        })
         return
       }
       foreignIns.value = [...foreignIns.value, item]
-      if (foreignStayIds.value.length + foreignIns.value.length >= foreignQuota.value) {
-        sheetVisible.value = false
-      }
     } else {
       if (selectedDomesticKeys.value.has(item.key)) {
         removeDomesticIn(item.key)
         return
       }
       if (domesticIns.value.length >= maxDomesticIns.value) {
-        uni.showToast({ title: `国内补强最多选 ${maxDomesticIns.value} 人`, icon: 'none' })
+        uni.showToast({
+          title: `国内补强已满（${maxDomesticIns.value}/${maxDomesticIns.value}），请先取消已选球员`,
+          icon: 'none',
+        })
         return
       }
       domesticIns.value = [...domesticIns.value, item]
-      if (domesticIns.value.length >= maxDomesticIns.value) {
-        sheetVisible.value = false
-      }
     }
   }
 
@@ -471,6 +486,8 @@ export function useDirectorDraft(session: AppSession) {
     candidatesError,
     selectedForeignKeys,
     selectedDomesticKeys,
+    sheetQuotaReached,
+    sheetQuotaHint,
     setRouteContext,
     loadContext,
     setForeignAction,

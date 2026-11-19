@@ -93,7 +93,7 @@ const finalForeignList = computed(() => [
   flex-direction: column;
   gap: var(--fi-space-18);
   padding: var(--fi-space-24);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-radius-sm);
   background: var(--fi-color-surface);
   border: var(--fi-border-card);
   box-shadow: var(--fi-shadow-card);
@@ -138,8 +138,8 @@ const finalForeignList = computed(() => [
 
 .style-badge {
   flex-shrink: 0;
-  padding: var(--fi-space-8) var(--fi-space-16);
-  border-radius: var(--fi-radius-round);
+  padding: var(--fi-space-8) var(--fi-space-14);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-primary);
   color: var(--fi-color-surface);
   font-size: var(--fi-font-22);
@@ -149,7 +149,7 @@ const finalForeignList = computed(() => [
 
 .manifesto-box {
   padding: var(--fi-space-16) var(--fi-space-20);
-  border-radius: var(--fi-radius-md);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-primary-soft);
 }
 
@@ -207,9 +207,14 @@ const finalForeignList = computed(() => [
 
 .pes-pos {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   min-width: 66rpx;
-  padding: var(--fi-space-4) var(--fi-space-8);
-  border-radius: var(--fi-radius-xs);
+  height: var(--fi-space-32);
+  padding: 0 var(--fi-space-8);
+  border-radius: var(--fi-radius-2xs);
   background: #1c232d;
   font-size: var(--fi-font-20);
   font-weight: var(--fi-weight-extrabold);
@@ -230,8 +235,10 @@ const finalForeignList = computed(() => [
 }
 
 .roster-chip__badge {
-  padding: var(--fi-space-4) var(--fi-space-12);
-  border-radius: var(--fi-radius-round);
+  display: inline-flex;
+  align-items: center;
+  padding: var(--fi-space-4) var(--fi-space-10);
+  border-radius: var(--fi-radius-2xs);
   font-size: var(--fi-font-20);
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-none);
@@ -266,8 +273,8 @@ const finalForeignList = computed(() => [
 }
 
 .leave-tag {
-  padding: var(--fi-space-6) var(--fi-space-14);
-  border-radius: var(--fi-radius-round);
+  padding: var(--fi-space-6) var(--fi-space-12);
+  border-radius: var(--fi-radius-2xs);
   background: var(--fi-color-page-soft);
   color: var(--fi-color-text-secondary);
   border: var(--fi-border-width) solid var(--fi-color-divider);
@@ -276,8 +283,8 @@ const finalForeignList = computed(() => [
 }
 
 .in-tag {
-  padding: var(--fi-space-6) var(--fi-space-14);
-  border-radius: var(--fi-radius-round);
+  padding: var(--fi-space-6) var(--fi-space-12);
+  border-radius: var(--fi-radius-2xs);
   background: var(--fi-color-seat-desired-bg);
   color: var(--fi-color-seat-desired);
   font-size: var(--fi-font-22);

@@ -94,6 +94,10 @@
           <button class="search-btn" hover-class="sheet-pressed" @tap="emit('search')">搜索</button>
         </view>
 
+        <view v-if="quotaReached && quotaHint" class="quota-banner">
+          <text class="quota-banner__text">{{ quotaHint }}</text>
+        </view>
+
         <view v-if="loading" class="state-box">
           <text class="state-text">正在加载候选球员…</text>
         </view>
@@ -115,8 +119,11 @@
             v-for="item in candidates"
             :key="item.key"
             class="candidate-row"
-            :class="{ 'candidate-row--selected': selectedKeys.has(item.key) }"
-            hover-class="sheet-pressed"
+            :class="{
+              'candidate-row--selected': selectedKeys.has(item.key),
+              'candidate-row--disabled': quotaReached && !selectedKeys.has(item.key),
+            }"
+            :hover-class="quotaReached && !selectedKeys.has(item.key) ? 'none' : 'sheet-pressed'"
             @tap="emit('pick', item)"
           >
             <view
@@ -188,6 +195,8 @@ const props = defineProps<{
   loading: boolean
   error: string
   selectedKeys: Set<string>
+  quotaReached: boolean
+  quotaHint: string
 }>()
 
 const emit = defineEmits<{
@@ -268,7 +277,7 @@ function handleCustomSubmit(): void {
   flex-shrink: 0;
   margin: 0;
   padding: var(--fi-space-10) var(--fi-space-20);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-page-soft);
   color: var(--fi-color-text-secondary);
   border: var(--fi-border-width) solid var(--fi-color-divider);
@@ -277,9 +286,11 @@ function handleCustomSubmit(): void {
   line-height: var(--fi-leading-none);
 }
 
-.league-tab::after {
-  border: 0;
-}
+.league-tab::after,
+.search-btn::after,
+.retry-btn::after,
+.pos-chip::after,
+.custom-submit::after { border: 0; }
 
 .league-tab--active {
   background: var(--fi-color-text-primary);
@@ -298,7 +309,7 @@ function handleCustomSubmit(): void {
   min-width: 0;
   height: var(--fi-space-68);
   padding: 0 var(--fi-space-18);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-page-soft);
   border: var(--fi-border-width) solid var(--fi-color-divider);
   color: var(--fi-color-text-primary);
@@ -309,7 +320,7 @@ function handleCustomSubmit(): void {
   flex-shrink: 0;
   margin: 0;
   padding: var(--fi-space-16) var(--fi-space-24);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-primary);
   color: var(--fi-color-surface);
   font-size: var(--fi-font-24);
@@ -317,8 +328,18 @@ function handleCustomSubmit(): void {
   line-height: var(--fi-leading-none);
 }
 
-.search-btn::after {
-  border: 0;
+.quota-banner {
+  padding: var(--fi-space-12) var(--fi-space-16);
+  border-radius: var(--fi-radius-xs);
+  background: var(--fi-color-primary-soft);
+  border: var(--fi-border-width) solid var(--fi-color-primary);
+}
+
+.quota-banner__text {
+  color: var(--fi-color-primary-deep);
+  font-size: var(--fi-font-22);
+  font-weight: var(--fi-weight-bold);
+  line-height: var(--fi-leading-normal);
 }
 
 .candidate-list {
@@ -341,6 +362,8 @@ function handleCustomSubmit(): void {
   background: var(--fi-color-primary-soft);
   box-shadow: inset 6rpx 0 0 var(--fi-color-primary);
 }
+
+.candidate-row--disabled { opacity: 0.42; }
 
 .candidate-row__avatar {
   flex-shrink: 0;
@@ -369,9 +392,14 @@ function handleCustomSubmit(): void {
 
 .pes-pos {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   min-width: 66rpx;
-  padding: var(--fi-space-4) var(--fi-space-8);
-  border-radius: var(--fi-radius-xs);
+  height: var(--fi-space-32);
+  padding: 0 var(--fi-space-8);
+  border-radius: var(--fi-radius-2xs);
   background: #1c232d;
   font-size: var(--fi-font-20);
   font-weight: var(--fi-weight-extrabold);
@@ -392,8 +420,11 @@ function handleCustomSubmit(): void {
 }
 
 .candidate-row__league {
-  padding: var(--fi-space-4) var(--fi-space-10);
-  border-radius: var(--fi-radius-xs);
+  display: inline-flex;
+  align-items: center;
+  height: var(--fi-space-32);
+  padding: 0 var(--fi-space-10);
+  border-radius: var(--fi-radius-2xs);
   background: var(--fi-color-page-soft);
   color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-20);
@@ -413,8 +444,10 @@ function handleCustomSubmit(): void {
 }
 
 .candidate-tag {
+  display: inline-flex;
+  align-items: center;
   padding: var(--fi-space-4) var(--fi-space-8);
-  border-radius: var(--fi-radius-xs);
+  border-radius: var(--fi-radius-2xs);
   font-size: var(--fi-font-20);
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-none);
@@ -470,23 +503,17 @@ function handleCustomSubmit(): void {
   line-height: var(--fi-leading-normal);
 }
 
-.state-text--error {
-  color: var(--fi-color-primary-deep);
-}
+.state-text--error { color: var(--fi-color-primary-deep); }
 
 .retry-btn {
   margin: 0;
   padding: var(--fi-space-12) var(--fi-space-28);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-text-primary);
   color: var(--fi-color-surface);
   font-size: var(--fi-font-24);
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-none);
-}
-
-.retry-btn::after {
-  border: 0;
 }
 
 .custom-form {
@@ -516,7 +543,7 @@ function handleCustomSubmit(): void {
 .custom-field__input {
   height: var(--fi-space-72);
   padding: 0 var(--fi-space-18);
-  border-radius: var(--fi-radius-md);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-page-soft);
   border: var(--fi-border-width) solid var(--fi-color-divider);
   color: var(--fi-color-text-primary);
@@ -532,17 +559,13 @@ function handleCustomSubmit(): void {
 .pos-chip {
   margin: 0;
   padding: var(--fi-space-10) var(--fi-space-20);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-page-soft);
   color: var(--fi-color-text-secondary);
   border: var(--fi-border-width) solid var(--fi-color-divider);
   font-size: var(--fi-font-22);
   font-weight: var(--fi-weight-bold);
   line-height: var(--fi-leading-none);
-}
-
-.pos-chip::after {
-  border: 0;
 }
 
 .pos-chip--active {
@@ -554,7 +577,7 @@ function handleCustomSubmit(): void {
 .custom-submit {
   margin: 0;
   padding: var(--fi-space-20);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-primary);
   color: var(--fi-color-surface);
   font-size: var(--fi-font-28);
@@ -562,11 +585,5 @@ function handleCustomSubmit(): void {
   line-height: var(--fi-leading-none);
 }
 
-.custom-submit::after {
-  border: 0;
-}
-
-.sheet-pressed {
-  opacity: var(--fi-opacity-pressed);
-}
+.sheet-pressed { opacity: var(--fi-opacity-pressed); }
 </style>

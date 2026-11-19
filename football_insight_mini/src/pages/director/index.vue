@@ -67,6 +67,8 @@
       :loading="candidatesLoading"
       :error="candidatesError"
       :selected-keys="sheetMode === 'foreign' ? selectedForeignKeys : selectedDomesticKeys"
+      :quota-reached="sheetQuotaReached"
+      :quota-hint="sheetQuotaHint"
       @update:league-filter="draft.setLeagueFilter"
       @update:search-query="searchQuery = $event"
       @search="draft.fetchCandidates"
@@ -144,6 +146,8 @@ const {
   candidatesError,
   selectedForeignKeys,
   selectedDomesticKeys,
+  sheetQuotaReached,
+  sheetQuotaHint,
 } = draft
 
 const pageStyle = computed(() =>

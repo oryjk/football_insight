@@ -95,7 +95,7 @@ function handleSubmit(): void {
   flex-direction: column;
   gap: var(--fi-space-18);
   padding: var(--fi-space-24);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-radius-sm);
   background: var(--fi-color-surface);
   border: var(--fi-border-card);
   box-shadow: var(--fi-shadow-card);
@@ -138,7 +138,7 @@ function handleSubmit(): void {
   min-width: 0;
   height: var(--fi-space-68);
   padding: 0 var(--fi-space-18);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-page-soft);
   border: var(--fi-border-width) solid var(--fi-color-divider);
   color: var(--fi-color-text-primary);
@@ -149,7 +149,7 @@ function handleSubmit(): void {
   flex-shrink: 0;
   margin: 0;
   padding: var(--fi-space-16) var(--fi-space-24);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-text-primary);
   color: var(--fi-color-surface);
   font-size: var(--fi-font-24);

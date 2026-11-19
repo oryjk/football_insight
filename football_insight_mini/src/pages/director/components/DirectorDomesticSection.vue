@@ -141,7 +141,7 @@ function onManifestoInput(event: unknown): void {
   flex-direction: column;
   gap: var(--fi-space-14);
   padding: var(--fi-space-24);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-radius-sm);
   background: var(--fi-color-surface);
   border: var(--fi-border-card);
   box-shadow: var(--fi-shadow-card);
@@ -162,7 +162,7 @@ function onManifestoInput(event: unknown): void {
 
 .section-step {
   padding: var(--fi-space-4) var(--fi-space-10);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-2xs);
   background: var(--fi-color-page-soft);
   color: var(--fi-color-text-secondary);
   font-size: var(--fi-font-18);
@@ -212,7 +212,7 @@ function onManifestoInput(event: unknown): void {
 .mini-btn {
   margin: 0;
   padding: var(--fi-space-8) var(--fi-space-18);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-text-primary);
   color: var(--fi-color-surface);
   font-size: var(--fi-font-22);
@@ -244,7 +244,7 @@ function onManifestoInput(event: unknown): void {
   align-items: center;
   gap: var(--fi-space-8);
   padding: var(--fi-space-8) var(--fi-space-14);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-2xs);
   background: var(--fi-color-seat-desired-bg);
   color: var(--fi-color-seat-desired);
   font-size: var(--fi-font-22);
@@ -269,7 +269,7 @@ function onManifestoInput(event: unknown): void {
 .domestic-pill {
   margin: 0;
   padding: var(--fi-space-10) var(--fi-space-16);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-page-soft);
   color: var(--fi-color-text-secondary);
   border: var(--fi-border-width) solid var(--fi-color-divider);
@@ -299,7 +299,7 @@ function onManifestoInput(event: unknown): void {
   height: calc(var(--fi-space-64) * 2);
   box-sizing: border-box;
   padding: var(--fi-space-16);
-  border-radius: var(--fi-radius-md);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-page-soft);
   border: var(--fi-border-width) solid var(--fi-color-divider);
   color: var(--fi-color-text-primary);
@@ -316,7 +316,7 @@ function onManifestoInput(event: unknown): void {
 .preset-chip {
   margin: 0;
   padding: var(--fi-space-8) var(--fi-space-14);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-page-soft);
   color: var(--fi-color-text-secondary);
   border: var(--fi-border-width) solid var(--fi-color-divider);

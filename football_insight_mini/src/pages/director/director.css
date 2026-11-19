@@ -35,7 +35,7 @@
   display: inline-flex;
   align-items: center;
   padding: var(--fi-space-6) var(--fi-space-14);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-2xs);
   background: var(--fi-color-primary-soft);
   color: var(--fi-color-primary);
   font-size: var(--fi-font-22);
@@ -55,7 +55,7 @@
   justify-content: space-between;
   gap: var(--fi-space-12);
   padding: var(--fi-space-16) var(--fi-space-20);
-  border-radius: var(--fi-radius-md);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-primary-soft);
   border: var(--fi-border-width) solid var(--fi-color-primary);
 }
@@ -72,7 +72,7 @@
   flex-direction: column;
   gap: var(--fi-space-16);
   padding: var(--fi-space-24);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-radius-sm);
   background: var(--fi-color-surface);
   border: var(--fi-border-card);
   box-shadow: var(--fi-shadow-card);
@@ -80,7 +80,7 @@
 
 .director-error {
   padding: var(--fi-space-24);
-  border-radius: var(--fi-radius-lg);
+  border-radius: var(--fi-radius-sm);
   background: var(--fi-color-surface);
   border: var(--fi-border-card);
   display: flex;
@@ -103,7 +103,7 @@
   gap: var(--fi-space-8);
   margin: 0;
   padding: var(--fi-space-18) var(--fi-space-24);
-  border-radius: var(--fi-radius-round);
+  border-radius: var(--fi-radius-xs);
   background: var(--fi-color-surface);
   color: var(--fi-color-text-primary);
   border: var(--fi-border-card);
