@@ -2,17 +2,20 @@
   <page-meta :page-style="navigationPageStyle + pageLockStyle" />
   <view class="page-root" :class="{ 'page-root--locked': pageScrollLocked }">
     <FiBrandNav />
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" :fallback-image-url="bgImage" />
 
-    <view>
-      <RankingsContent
-        ref="rankingsContentRef"
-        @page-scroll-lock-change="handlePageScrollLockChange"
-      />
-    </view>
-    <view>
-      <MatchesContent embedded />
-    </view>
-
+    <template v-for="section in visibleSections" :key="section">
+      <view v-if="section === 'rankings'" class="page-section-slot">
+        <RankingsContent
+          ref="rankingsContentRef"
+          :embedded="true"
+          @page-scroll-lock-change="handlePageScrollLockChange"
+        />
+      </view>
+      <view v-else class="page-section-slot">
+        <MatchesContent embedded />
+      </view>
+    </template>
   </view>
 </template>
 
@@ -20,12 +23,25 @@
 import { buildSharePath } from '../../utils/shareSource'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, nextTick, ref } from 'vue'
-import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
+import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
+import { usePageLayout } from '../../composables/usePageLayout'
+import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import RankingsContent from './RankingsContent.vue'
 import MatchesContent from '../matches/MatchesContent.vue'
 
 const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('rankings')
+
+const visibleSections = computed<Array<'rankings' | 'matches'>>(() => {
+  const rankingsIndex = visibleBlocks.value.findIndex((b) => b.key.startsWith('rankings_'))
+  const matchesIndex = visibleBlocks.value.findIndex((b) => b.key.startsWith('matches_'))
+  const entries: Array<{ id: 'rankings' | 'matches'; index: number }> = []
+  if (rankingsIndex >= 0) entries.push({ id: 'rankings', index: rankingsIndex })
+  if (matchesIndex >= 0) entries.push({ id: 'matches', index: matchesIndex })
+  return entries.sort((a, b) => a.index - b.index).map((e) => e.id)
+})
 
 const rankingsContentRef = ref<InstanceType<typeof RankingsContent> | null>(null)
 const pendingSharedPosterSlug = ref<string | null>(null)
@@ -52,6 +68,10 @@ onLoad((query) => {
   }
 })
 
+onShow(() => {
+  void refreshLayout()
+})
+
 onShareAppMessage(() => {
   const standingsPosterPayload = rankingsContentRef.value?.getStandingsPosterSharePayload()
 
@@ -70,7 +90,13 @@ onShareAppMessage(() => {
 .page-root {
   position: relative;
   min-height: 100vh;
-  background: #f7f8fa;
+  background: var(--fi-color-page-soft);
+  padding-top: var(--fi-brand-nav-height);
+  box-sizing: border-box;
+}
+.page-section-slot {
+  position: relative;
+  z-index: 1;
 }
 .page-root--locked {
   height: 100vh;

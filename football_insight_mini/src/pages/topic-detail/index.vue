@@ -2,73 +2,106 @@
   <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav :share-disabled="!shareArticle" @back="goBack" @share="copyArticleShareLink" />
   <view class="topic-page-offset">
-  <view class="topic-detail">
-    <view v-if="loading" class="topic-detail__state">正在加载话题…</view>
-    <view v-else-if="errorMessage" class="topic-detail__state"><text>{{ errorMessage }}</text><button class="topic-detail__retry" @tap="load">重新加载</button></view>
-    <template v-else-if="item && isRoundupTopic(item)">
-      <text class="topic-detail__title">每日电报</text>
-      <view class="topic-detail__meta-row">
-        <text class="topic-detail__meta">更新于 {{ item.publishedLabel }}</text>
-        <view class="topic-detail__size"><FiSegmented compact frameless :items="READING_SIZE_ITEMS" :model-value="readingSize" aria-label="文字大小" @update:model-value="setReadingSize" /></view>
-      </view>
-      <FiTopicAudioPlayer v-if="audio.activeId.value" :title="audio.activeId.value === item.id ? '每日电报 · 全部' : audio.activeTitle.value" :status="audio.status.value" :current-time="audio.currentTime.value" :duration="audio.duration.value" :error-message="audio.errorMessage.value" @toggle="audio.toggle(audio.activeId.value)" @seek="audio.seek" @close="audio.stop" />
-      <view class="topic-detail__roundup">
-        <TopicRoundup
-          :item="item"
-          :font-rpx="bodyFontRpx"
-          :active="telegraphTab"
-          :audio-ready="audio.availableIds.value.includes(telegraphAudio)"
-          :audio-playing="audio.activeId.value === telegraphAudio && audio.status.value === 'playing'"
-          :audio-loading="audio.activeId.value === telegraphAudio && audio.status.value === 'loading'"
-          :pending-reaction-ids="interactions.pendingReactionIds.value"
-          :comments-visible="interactions.commentsVisible.value"
-          @play="audio.toggle(telegraphAudio)"
-          @select="telegraphTab = $event"
-          @copy="copyEntrySource"
-          @like="interactions.likeEntry"
-          @dislike="interactions.dislikeEntry"
-          @open-entry="interactions.openEntry"
-        />
-      </view>
-    </template>
-    <template v-else-if="item">
-      <FiTopicTeamTags v-if="timeline.tags.value.length" :tags="timeline.tags.value" :selected-team-id="timeline.selectedTeamId.value" @select="selectTimelineTeam" />
-      <text class="topic-detail__title">{{ item.title }}</text>
-      <view class="topic-detail__meta-row">
-        <text class="topic-detail__meta">{{ item.publishedLabel }}</text>
-        <view class="topic-detail__size"><FiSegmented compact frameless :items="READING_SIZE_ITEMS" :model-value="readingSize" aria-label="文字大小" @update:model-value="setReadingSize" /></view>
-      </view>
-      <view class="topic-detail__heat"><FiTopicMeta :heat="topicHeatValue(item.id, item.heat)" :minutes="item.readMinutes" /></view>
-      <view class="topic-detail__audio"><FiTopicAudioEntry :ready="audio.availableIds.value.includes(item.id)" :playing="audio.status.value === 'playing'" :loading="audio.status.value === 'loading'" @play="audio.toggle(item.id)" /></view>
-      <FiTopicAudioPlayer v-if="audio.activeId.value" :title="item.title" :status="audio.status.value" :current-time="audio.currentTime.value" :duration="audio.duration.value" :error-message="audio.errorMessage.value" @toggle="audio.toggle(item.id)" @seek="audio.seek" @close="audio.stop" />
-      <view v-if="item.images?.length" class="topic-detail__gallery">
-        <TopicImageGallery :key="item.id" :images="item.images" @preview="previewPhoto" />
-      </view>
-      <text v-for="(paragraph, index) in item.paragraphs" :key="index" class="topic-detail__paragraph" :style="{ fontSize: `${bodyFontRpx}rpx` }">{{ paragraph }}</text>
-      <view class="topic-detail__sources">
-        <view class="topic-detail__sources-toggle" role="button" :aria-expanded="sourcesOpen" hover-class="topic-detail__pressed" @tap="sourcesOpen = !sourcesOpen">
-          <text class="topic-detail__sources-heading">来源（{{ item.sources.length }}）</text>
-          <text class="topic-detail__chevron" :class="{ 'topic-detail__chevron--open': sourcesOpen }">›</text>
-        </view>
-        <view v-for="(source, index) in item.sources" v-show="sourcesOpen" :key="source.url" class="topic-detail__source">
-          <text class="topic-detail__source-title">{{ index + 1 }}. {{ source.title }}</text>
-          <text class="topic-detail__meta">{{ source.publisher }} · {{ source.dateLabel }}</text>
-          <button class="topic-detail__copy" @tap="copySource(source.url)">复制原文链接</button>
-        </view>
-      </view>
-      <view v-if="timeline.tags.value.length" id="topic-timeline" class="topic-detail__timeline">
-        <TopicTimeline :anchor="item" :tags="timeline.tags.value" :selected-team-id="timeline.selectedTeamId.value" :items="timeline.items.value"
-          :loading="timeline.loading.value" :error-message="timeline.errorMessage.value" :has-more="!!timeline.nextCursor.value"
-          @select="timeline.selectTeam" @read="openTimelineTopic" @more="timeline.loadMore" @retry="timeline.retry" />
-      </view>
-    </template>
-  </view>
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
+    <view class="topic-detail">
+      <view v-if="loading" class="topic-detail__state">正在加载话题…</view>
+      <view v-else-if="errorMessage" class="topic-detail__state"><text>{{ errorMessage }}</text><button class="topic-detail__retry" @tap="load">重新加载</button></view>
+      <template v-else-if="item">
+        <template v-for="block in visibleBlocks" :key="block.key">
+          <FiLayoutBlock v-if="block.key === 'header'" :background-image-url="block.background_image_url">
+            <template v-if="isRoundupTopic(item)">
+              <text class="topic-detail__title">每日电报</text>
+              <view class="topic-detail__meta-row">
+                <text class="topic-detail__meta">更新于 {{ item.publishedLabel }}</text>
+                <view class="topic-detail__size"><FiSegmented compact frameless :items="READING_SIZE_ITEMS" :model-value="readingSize" aria-label="文字大小" @update:model-value="setReadingSize" /></view>
+              </view>
+            </template>
+            <template v-else>
+              <FiTopicTeamTags v-if="timeline.tags.value.length" :tags="timeline.tags.value" :selected-team-id="timeline.selectedTeamId.value" @select="selectTimelineTeam" />
+              <text class="topic-detail__title">{{ item.title }}</text>
+              <view class="topic-detail__meta-row">
+                <text class="topic-detail__meta">{{ item.publishedLabel }}</text>
+                <view class="topic-detail__size"><FiSegmented compact frameless :items="READING_SIZE_ITEMS" :model-value="readingSize" aria-label="文字大小" @update:model-value="setReadingSize" /></view>
+              </view>
+              <view class="topic-detail__heat"><FiTopicMeta :heat="topicHeatValue(item.id, item.heat)" :minutes="item.readMinutes" /></view>
+              <view class="topic-detail__audio"><FiTopicAudioEntry :ready="audio.availableIds.value.includes(item.id)" :playing="audio.status.value === 'playing'" :loading="audio.status.value === 'loading'" @play="audio.toggle(item.id)" /></view>
+            </template>
+          </FiLayoutBlock>
+
+          <FiLayoutBlock v-else-if="block.key === 'audio_player' && audio.activeId.value" :background-image-url="block.background_image_url">
+            <FiTopicAudioPlayer
+              :title="isRoundupTopic(item) ? (audio.activeId.value === item.id ? '每日电报 · 全部' : audio.activeTitle.value) : item.title"
+              :status="audio.status.value"
+              :current-time="audio.currentTime.value"
+              :duration="audio.duration.value"
+              :error-message="audio.errorMessage.value"
+              @toggle="audio.toggle(isRoundupTopic(item) ? audio.activeId.value : item.id)"
+              @seek="audio.seek"
+              @close="audio.stop"
+            />
+          </FiLayoutBlock>
+
+          <FiLayoutBlock v-else-if="block.key === 'roundup_content' && isRoundupTopic(item)" :background-image-url="block.background_image_url">
+            <view class="topic-detail__roundup">
+              <TopicRoundup
+                :item="item"
+                :font-rpx="bodyFontRpx"
+                :active="telegraphTab"
+                :audio-ready="audio.availableIds.value.includes(telegraphAudio)"
+                :audio-playing="audio.activeId.value === telegraphAudio && audio.status.value === 'playing'"
+                :audio-loading="audio.activeId.value === telegraphAudio && audio.status.value === 'loading'"
+                :pending-reaction-ids="interactions.pendingReactionIds.value"
+                :comments-visible="interactions.commentsVisible.value"
+                @play="audio.toggle(telegraphAudio)"
+                @select="telegraphTab = $event"
+                @copy="copyEntrySource"
+                @like="interactions.likeEntry"
+                @dislike="interactions.dislikeEntry"
+                @open-entry="interactions.openEntry"
+              />
+            </view>
+          </FiLayoutBlock>
+
+          <FiLayoutBlock v-else-if="block.key === 'article_gallery' && !isRoundupTopic(item) && item.images?.length" :background-image-url="block.background_image_url">
+            <view class="topic-detail__gallery">
+              <TopicImageGallery :key="item.id" :images="item.images" @preview="previewPhoto" />
+            </view>
+          </FiLayoutBlock>
+
+          <FiLayoutBlock v-else-if="block.key === 'article_body' && !isRoundupTopic(item)" :background-image-url="block.background_image_url">
+            <view>
+              <text v-for="(paragraph, index) in item.paragraphs" :key="index" class="topic-detail__paragraph" :style="{ fontSize: `${bodyFontRpx}rpx` }">{{ paragraph }}</text>
+              <view class="topic-detail__sources">
+                <view class="topic-detail__sources-toggle" role="button" :aria-expanded="sourcesOpen" hover-class="topic-detail__pressed" @tap="sourcesOpen = !sourcesOpen">
+                  <text class="topic-detail__sources-heading">来源（{{ item.sources.length }}）</text>
+                  <text class="topic-detail__chevron" :class="{ 'topic-detail__chevron--open': sourcesOpen }">›</text>
+                </view>
+                <view v-for="(source, index) in item.sources" v-show="sourcesOpen" :key="source.url" class="topic-detail__source">
+                  <text class="topic-detail__source-title">{{ index + 1 }}. {{ source.title }}</text>
+                  <text class="topic-detail__meta">{{ source.publisher }} · {{ source.dateLabel }}</text>
+                  <button class="topic-detail__copy" @tap="copySource(source.url)">复制原文链接</button>
+                </view>
+              </view>
+            </view>
+          </FiLayoutBlock>
+
+          <FiLayoutBlock v-else-if="block.key === 'article_timeline' && !isRoundupTopic(item) && timeline.tags.value.length" :background-image-url="block.background_image_url">
+            <view id="topic-timeline" class="topic-detail__timeline">
+              <TopicTimeline :anchor="item" :tags="timeline.tags.value" :selected-team-id="timeline.selectedTeamId.value" :items="timeline.items.value"
+                :loading="timeline.loading.value" :error-message="timeline.errorMessage.value" :has-more="!!timeline.nextCursor.value"
+                @select="timeline.selectTeam" @read="openTimelineTopic" @more="timeline.loadMore" @retry="timeline.retry" />
+            </view>
+          </FiLayoutBlock>
+        </template>
+      </template>
+    </view>
   </view>
   <canvas :canvas-id="TOPIC_SHARE_CANVAS_ID" class="topic-share-canvas" :style="shareCanvasStyle" />
 </template>
 
 <script setup lang="ts">
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { computed, onScopeDispose, ref } from 'vue'
 import { onHide, onLoad, onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
 import { useAppSession } from '../../stores/appSession'
@@ -76,6 +109,8 @@ import { useMiniReviewStatus } from '../../stores/miniReview'
 import { useTelegraphInteractions } from './useTelegraphInteractions'
 import { topicVisitorId } from '../../utils/topicVisitor'
 import { topicHeatValue, setTopicHeat, syncTopicHeat } from '../../stores/topicHeat'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiTopicMeta from '../../components/topics/FiTopicMeta.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { getTopicDetail, recordTopicVisit } from '../../api/dailyTopics'
@@ -98,6 +133,7 @@ import { buildTopicTimelinePayload, buildTopicSharePayload, TOPIC_SHARE_CARD } f
 import { TOPIC_SHARE_CANVAS_ID, useTopicShareCard } from './useTopicShareCard'
 
 const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('topic_detail')
 const session = useAppSession()
 const miniReview = useMiniReviewStatus()
 const item = ref<DailyTopicItem | null>(null)
@@ -192,6 +228,7 @@ onHide(() => {
   hasLeftPage = true
 })
 onShow(() => {
+  void refreshLayout()
   void miniReview.ensureMiniReviewReady()
   void session.ensureSessionReady()
   if (topicId && item.value && (hasLeftPage || session.revision.value !== lastLoadedSessionRevision)) {
@@ -223,9 +260,9 @@ function setReadingSize(key: string) {
 </script>
 
 <style scoped>
-.topic-page-offset { padding-top: var(--fi-brand-nav-height); }
+.topic-page-offset { position: relative; min-height: 100vh; padding-top: var(--fi-brand-nav-height); background: var(--fi-color-page); box-sizing: border-box; }
 .topic-share-canvas { position: fixed; left: -9999rpx; top: 0; pointer-events: none; }
-.topic-detail { padding: var(--fi-space-28) var(--fi-space-28) var(--fi-space-40); background: var(--fi-color-page); }
+.topic-detail { position: relative; z-index: 1; padding: var(--fi-space-28) var(--fi-space-28) var(--fi-space-40); }
 .topic-detail__timeline { margin-top: var(--fi-space-32); }
 .topic-detail__roundup { margin-top: var(--fi-space-28); }
 .topic-detail__title { display: block; margin-top: var(--fi-space-16); color: var(--fi-color-text-primary); font-size: var(--fi-font-36); font-weight: var(--fi-weight-extrabold); line-height: var(--fi-leading-normal); }

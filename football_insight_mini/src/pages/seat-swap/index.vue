@@ -2,8 +2,7 @@
   <page-meta :page-style="navigationPageStyle + pageLockStyle" />
   <view class="page-root">
     <FiBrandNav />
-    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
-    <view class="page-bg-fade"></view>
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" :fallback-image-url="phoenixStadiumBgImage" />
     <view class="page">
       <SeatSwapSkeleton v-if="loading" />
 
@@ -13,50 +12,67 @@
       </view>
 
       <view v-else class="page-content">
-        <SeatSwapNotice v-if="!currentView?.available" text="换座撮合只在成都蓉城当前比赛开放。" />
-        <SeatSwapNotice
-          v-else-if="!isLoggedIn"
-          text="未登录可浏览脱敏意向;发布、确认和查看联系方式需要登录。"
-          action-label="去登录"
-          @action="goToUserPage"
-        />
+        <template v-for="block in visibleBlocks" :key="block.key">
+          <FiLayoutBlock
+            v-if="block.key === 'notice' && (!currentView?.available || !isLoggedIn)"
+            :background-image-url="block.background_image_url"
+          >
+            <SeatSwapNotice v-if="!currentView?.available" text="换座撮合只在成都蓉城当前比赛开放。" />
+            <SeatSwapNotice
+              v-else-if="!isLoggedIn"
+              text="未登录可浏览脱敏意向;发布、确认和查看联系方式需要登录。"
+              action-label="去登录"
+              @action="goToUserPage"
+            />
+          </FiLayoutBlock>
 
-        <view id="seat-swap-map-anchor" class="seat-map-section">
-          <SeatSwapRegionPanel
-            :mode="mainMapMode"
-            :regions="regions"
-            :badges="regionBadgeCounts"
-            :filter-key="browsingFilterKey"
-            :current-key="currentView?.my_request?.current_region_key || ''"
-            :desired-keys="myDesiredKeys"
-            :has-my-request="!!currentView?.my_request"
-            :headline="matchTitle"
-            :headline-meta="matchSummary"
-            :badge="`${candidatesCount} 条意向`"
-            @region-tap="handleMainMapTap"
-          />
-        </view>
+          <FiLayoutBlock
+            v-else-if="block.key === 'region_map'"
+            :background-image-url="block.background_image_url"
+          >
+            <view id="seat-swap-map-anchor" class="seat-map-section">
+              <SeatSwapRegionPanel
+                :mode="mainMapMode"
+                :regions="regions"
+                :badges="regionBadgeCounts"
+                :filter-key="browsingFilterKey"
+                :current-key="currentView?.my_request?.current_region_key || ''"
+                :desired-keys="myDesiredKeys"
+                :has-my-request="!!currentView?.my_request"
+                :headline="matchTitle"
+                :headline-meta="matchSummary"
+                :badge="`${candidatesCount} 条意向`"
+                @region-tap="handleMainMapTap"
+              />
+            </view>
+          </FiLayoutBlock>
 
-        <view :id="SEAT_SWAP_POOL_ANCHOR_ID">
-          <SeatSwapPoolList
-            :groups="seatSwapRegionGroups"
-            :expanded-keys="expandedRegionKeys"
-            :filter-key="browsingFilterKey"
-            :filter-name="browsingFilterName"
-            :filtered-candidates="filteredCandidates"
-            :total-count="candidatesCount"
-            :my-desired-keys="myDesiredKeys"
-            :is-logged-in="isLoggedIn"
-            :my-request-id="currentView?.my_request?.request_id ?? null"
-            :my-request="currentView?.my_request ?? null"
-            @toggle-group="toggleRegionGroup"
-            @clear-filter="clearFilter"
-            @confirm="confirmCandidate"
-            @view="openCandidateView"
-            @cancel-confirmation="cancelCandidateConfirmation"
-            @preview-seat="openSeatPreview"
-          />
-        </view>
+          <FiLayoutBlock
+            v-else-if="block.key === 'pool_list'"
+            :background-image-url="block.background_image_url"
+          >
+            <view :id="SEAT_SWAP_POOL_ANCHOR_ID">
+              <SeatSwapPoolList
+                :groups="seatSwapRegionGroups"
+                :expanded-keys="expandedRegionKeys"
+                :filter-key="browsingFilterKey"
+                :filter-name="browsingFilterName"
+                :filtered-candidates="filteredCandidates"
+                :total-count="candidatesCount"
+                :my-desired-keys="myDesiredKeys"
+                :is-logged-in="isLoggedIn"
+                :my-request-id="currentView?.my_request?.request_id ?? null"
+                :my-request="currentView?.my_request ?? null"
+                @toggle-group="toggleRegionGroup"
+                @clear-filter="clearFilter"
+                @confirm="confirmCandidate"
+                @view="openCandidateView"
+                @cancel-confirmation="cancelCandidateConfirmation"
+                @preview-seat="openSeatPreview"
+              />
+            </view>
+          </FiLayoutBlock>
+        </template>
       </view>
     </view>
 
@@ -141,6 +157,8 @@
 import { computed, getCurrentInstance, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { onHide, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import SeatSwapApplicantSheet from './components/SeatSwapApplicantSheet.vue'
 import SeatSwapMatchedSheet from './components/SeatSwapMatchedSheet.vue'
 import SeatSwapManageSheet from './components/SeatSwapManageSheet.vue'
@@ -154,6 +172,7 @@ import SeatSwapMapFab from './components/SeatSwapMapFab.vue'
 import SeatSwapMapSheet from './components/SeatSwapMapSheet.vue'
 import SeatSwapSeatSheet from './components/SeatSwapSeatSheet.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { useAppSession } from '../../stores/appSession'
 import type { SeatSwapCandidate } from '../../types/seatSwap'
@@ -169,6 +188,7 @@ onShareAppMessage(() => ({
 }))
 
 const { navigationPageStyle, navigationHeightPx } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('seat_swap')
 
 const USE_SEAT_SWAP_MOCK_LARGE_DATA =
   import.meta.env.DEV && String(import.meta.env.VITE_SEAT_SWAP_MOCK_LARGE_DATA || '').trim() === '1'
@@ -450,6 +470,7 @@ function goToUserPage(): void {
 }
 
 onShow(() => {
+  void refreshLayout()
   void loadPage()
 })
 </script>
@@ -461,28 +482,6 @@ onShow(() => {
   position: relative;
   min-height: 100vh;
   background: var(--fi-color-page-soft);
-}
-
-/* 背景与首页同一手法：顶部 600rpx 球场图随页面滚动，渐变从透明过渡到页面底色，不再有硬边。 */
-.page-bg-img {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: var(--fi-space-600);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.page-bg-fade {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: var(--fi-space-600);
-  background: var(--fi-color-page-backdrop-fade);
-  pointer-events: none;
-  z-index: 0;
 }
 
 .page {

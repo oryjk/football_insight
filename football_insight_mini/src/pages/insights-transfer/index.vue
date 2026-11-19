@@ -2,12 +2,9 @@
   <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav @back="goBackFromSecondaryPage('/pages/insights/index')" />
   <view class="transfer-entry-page">
-    <view class="transfer-entry-heading">
-      <text class="transfer-entry-title">转会表态</text>
-      <text class="transfer-entry-caption">送走谁、留下谁、买回谁，说出你的想法</text>
-    </view>
-    <FiPanel>
-      <view class="transfer-entry-workspace">
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
+    <view class="transfer-entry-content">
+      <FiPanel v-if="(homeTeam.loading.value && !homeTeam.teams.value.length) || (homeTeam.error.value && !homeTeam.needsPick.value && !homeTeam.teamId.value) || homeTeam.needsPick.value">
         <view v-if="homeTeam.loading.value && !homeTeam.teams.value.length" class="state-card"><text>正在加载…</text></view>
         <view v-else-if="homeTeam.error.value && !homeTeam.needsPick.value && !homeTeam.teamId.value" class="state-card">
           <text>{{ homeTeam.error.value }}</text>
@@ -30,32 +27,52 @@
             @tap="confirmPick"
           >{{ homeTeam.submitting.value ? '保存中…' : '确认主队' }}</button>
         </view>
-        <template v-else-if="homeTeam.team.value">
-          <view class="home-team">
-            <image v-if="homeTeam.team.value.avatar_storage_url" :src="homeTeam.team.value.avatar_storage_url" class="home-team__avatar" mode="aspectFit" />
-            <text class="home-team__name">{{ homeTeam.team.value.team_name }}</text>
-            <text class="home-team__tag">{{ homeTeam.loggedIn.value ? '我的主队' : '登录后为主队表态' }}</text>
+      </FiPanel>
+
+      <template v-for="block in visibleBlocks" :key="block.key">
+        <FiLayoutBlock v-if="block.key === 'heading'" :background-image-url="block.background_image_url">
+          <view class="transfer-entry-heading">
+            <text class="transfer-entry-title">转会表态</text>
+            <text class="transfer-entry-caption">送走谁、留下谁、买回谁，说出你的想法</text>
           </view>
-          <InsightsTransferPanel
-            :summary="transferSummary" :loading="transferLoading" :error="transferError"
-            :hint="transferHint" :pending="transferPending" :preferred-intent="preferredIntent"
-            @retry="retryTransfer" @vote="transfer.vote" @open="openTransferCard" @more="openTransferBoard" @nominate="openTransferNominate"
-          />
-        </template>
-      </view>
-    </FiPanel>
+        </FiLayoutBlock>
+
+        <FiLayoutBlock v-else-if="block.key === 'home_team_bar' && homeTeam.team.value && !homeTeam.needsPick.value" :background-image-url="block.background_image_url">
+          <FiPanel>
+            <view class="home-team">
+              <image v-if="homeTeam.team.value.avatar_storage_url" :src="homeTeam.team.value.avatar_storage_url" class="home-team__avatar" mode="aspectFit" />
+              <text class="home-team__name">{{ homeTeam.team.value.team_name }}</text>
+              <text class="home-team__tag">{{ homeTeam.loggedIn.value ? '我的主队' : '登录后为主队表态' }}</text>
+            </view>
+          </FiPanel>
+        </FiLayoutBlock>
+
+        <FiLayoutBlock v-else-if="block.key === 'transfer_panel' && homeTeam.team.value && !homeTeam.needsPick.value" :background-image-url="block.background_image_url">
+          <FiPanel>
+            <InsightsTransferPanel
+              :summary="transferSummary" :loading="transferLoading" :error="transferError"
+              :hint="transferHint" :pending="transferPending" :preferred-intent="preferredIntent"
+              @retry="retryTransfer" @vote="transfer.vote" @open="openTransferCard" @more="openTransferBoard" @nominate="openTransferNominate"
+            />
+          </FiPanel>
+        </FiLayoutBlock>
+      </template>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { onHide, onLoad, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import FiPanel from '../../components/FiPanel.vue'
 import InsightsTransferPanel from './components/InsightsTransferPanel.vue'
 import { useTransferHomeTeam } from './useTransferHomeTeam'
 import { useInsightsTransfer } from './useInsightsTransfer'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { useAppSession } from '../../stores/appSession'
 import type { TransferIntent } from '../../types/transfer'
 import { buildTransferBoardUrl, buildTransferViewUrl, parseTransferEntryQuery, transferBoardShareTitle } from '../../utils/transferLinks'
@@ -64,6 +81,7 @@ import { goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { reportPageActivity } from '../../utils/userActivity'
 
 const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('insights_transfer')
 const session = useAppSession()
 const pageVisible = ref(false)
 const preferredIntent = ref<TransferIntent>('out')
@@ -108,6 +126,7 @@ onHide(() => { pageVisible.value = false })
 onUnload(() => { transfer.dispose(); homeTeam.dispose() })
 onShow(() => {
   pageVisible.value = true
+  void refreshLayout()
   void homeTeam.load().then(() => transfer.refresh())
   reportPageActivity('insights')
 })
@@ -131,10 +150,10 @@ onShow(() => {
 .pick__confirm { margin: 0; padding: var(--fi-space-20) var(--fi-space-24); border: 0; border-radius: var(--fi-radius-round); background: var(--fi-color-primary); color: var(--fi-color-surface); font-size: var(--fi-font-28); font-weight: var(--fi-weight-bold); }
 .pick__confirm::after { border: 0; }
 .pick__confirm--disabled { background: var(--fi-color-divider); color: var(--fi-color-text-muted); }
-.transfer-entry-page { min-height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--fi-space-card-gap); padding: calc(var(--fi-brand-nav-height) + var(--fi-space-24)) var(--fi-space-16) calc(var(--fi-space-64) + env(safe-area-inset-bottom)); background: var(--fi-color-page-soft); }
+.transfer-entry-page { position: relative; min-height: 100vh; box-sizing: border-box; padding: calc(var(--fi-brand-nav-height) + var(--fi-space-24)) var(--fi-space-16) calc(var(--fi-space-64) + env(safe-area-inset-bottom)); background: var(--fi-color-page-soft); }
+.transfer-entry-content { position: relative; z-index: 1; display: flex; flex-direction: column; gap: var(--fi-space-card-gap); }
 .transfer-entry-heading { padding: 0 var(--fi-space-8); }
 .transfer-entry-title { display: block; color: var(--fi-color-text-primary); font-size: var(--fi-font-36); font-weight: var(--fi-weight-extrabold); }
 .transfer-entry-caption { display: block; margin-top: var(--fi-space-12); color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); }
-.transfer-entry-workspace { display: flex; flex-direction: column; gap: var(--fi-space-24); min-width: 0; }
 .state-card { padding: var(--fi-space-16) 0; color: var(--fi-color-text-caption); font-size: var(--fi-font-24); }
 </style>

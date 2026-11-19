@@ -15,6 +15,7 @@ pub mod logging;
 pub mod match_id_unlock;
 pub mod mcp;
 pub mod mini_review;
+pub mod page_layout;
 pub mod payment;
 pub mod push_notification;
 pub mod reflux_subscription;

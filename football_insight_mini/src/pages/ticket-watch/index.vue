@@ -2,34 +2,17 @@
   <page-meta :page-style="pageStyle" />
   <FiSecondaryNav @back="goBackFromSecondaryPage('/pages/insights/index')" @share="copyPageShareLink('/pages/ticket-watch/index')" />
   <view v-if="pageEntered" class="page-root">
-    <image
-      class="page-bg-img"
-      :src="phoenixStadiumBgImage"
-      mode="aspectFill"
-      :webp="true"
-    />
-    <view class="page-bg-fade" />
-    <view class="page">
-      <TicketWatchHeader
-        :active-tab="activeTab"
-        @tab="activeTab = $event"
-      />
-      <view v-if="systemConfigUnderReview" class="state-card"
-        ><text>当前版本展示基础内容。</text></view
-      >
-      <TicketMembershipLock
-        :binding-required="officialBindingRequired"
-        v-else-if="membershipBenefitsLocked"
-        @login="officialBindingRequired ? officialBind.open() : goToUserPage()"
-      />
-      <view v-else-if="activeTab === 'current'" class="board-content">
-        <TicketBoardSkeleton v-if="currentLoading" mode="current" :show-tabs="false" />
-        <view
-          v-else-if="currentErrorMessage"
-          class="state-card state-card--error"
-          ><text>{{ currentErrorMessage }}</text></view
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" :fallback-image-url="phoenixStadiumBgImage" full-page />
+    <view class="page" :class="{ 'board-content--history-stats': activeTab === 'history-stats' }">
+      <template v-for="block in visibleBlocks" :key="block.key">
+        <FiLayoutBlock v-if="block.key === 'header'" :background-image-url="block.background_image_url">
+          <TicketWatchHeader :active-tab="activeTab" @tab="activeTab = $event" />
+        </FiLayoutBlock>
+
+        <FiLayoutBlock
+          v-else-if="block.key === 'current_match' && !systemConfigUnderReview && !membershipBenefitsLocked && activeTab === 'current' && !currentLoading && !currentErrorMessage"
+          :background-image-url="block.background_image_url"
         >
-        <template v-else>
           <TicketCurrentMatchCard
             v-if="currentMatch"
             :match="currentMatch"
@@ -47,101 +30,39 @@
             @subscribe="openRefluxSubscriptionSheet"
             @match-id="openMatchIdSheet"
           />
-          <view v-else class="state-card state-card--empty"
-            ><text>{{ currentMessage }}</text></view
-          >
+          <view v-else class="state-card state-card--empty"><text>{{ currentMessage }}</text></view>
+        </FiLayoutBlock>
+
+        <FiLayoutBlock
+          v-else-if="block.key === 'history_selector' && !systemConfigUnderReview && !membershipBenefitsLocked && activeTab === 'history' && !historyLoading && !historyErrorMessage"
+          :background-image-url="block.background_image_url"
+        >
+          <view v-if="!visibleHistoryMatches.length" class="state-card">
+            <text>{{ historyTrendLoading ? '正在加载历史回流数据…' : '暂无有回流数据的历史比赛。' }}</text>
+          </view>
+          <TicketHistorySelector v-else :matches="visibleHistoryMatches" :selected-match-id="selectedHistoryMatchId" @select="handleHistoryMatchSelect" />
+        </FiLayoutBlock>
+
+        <FiLayoutBlock
+          v-else-if="block.key === 'history_match' && !systemConfigUnderReview && !membershipBenefitsLocked && activeTab === 'history' && !historyLoading && !historyErrorMessage && displayedHistoryMatch"
+          :background-image-url="block.background_image_url"
+        >
+          <TicketHistoryMatchCard :match="displayedHistoryMatch" :switching="historySelectionLoading" :total-occurrences="historyTotalOccurrences" />
+        </FiLayoutBlock>
+
+        <FiLayoutBlock
+          v-else-if="block.key === 'focus_panel' && !systemConfigUnderReview && !membershipBenefitsLocked && ((activeTab === 'current' && !currentLoading && !currentErrorMessage && currentMatch && (currentFocusBlocks.length || currentInterestFocusBlocks.length)) || (activeTab === 'history' && !historyLoading && !historyErrorMessage && displayedHistoryMatch && (historyFocusBlocks.length || historyInterestFocusBlocks.length)))"
+          :background-image-url="block.background_image_url"
+        >
           <TicketFocusPanel
-            v-if="
-              currentMatch &&
-              (currentFocusBlocks.length || currentInterestFocusBlocks.length)
-            "
+            v-if="activeTab === 'current'"
             :focus-blocks="currentFocusBlocks"
             :interest-blocks="currentInterestFocusBlocks"
             :collapsed="isCurrentSectionCollapsed('focus')"
             @toggle="toggleCurrentSectionCollapsed('focus')"
           />
-          <TicketTrackedInterests
-            v-if="currentMatch && currentUser"
-            :interests="currentTrackedInterests"
-            :summary="currentTrackedInterestSummary"
-            :collapsed="isCurrentSectionCollapsed('tracked-interests')"
-            @toggle="toggleCurrentSectionCollapsed('tracked-interests')"
-          />
-          <TicketRecentRefluxPanel
-            v-if="currentMatch && currentRecentRefluxPanelMode !== 'hidden'"
-            :mode="currentRecentRefluxPanelMode"
-            :buckets="currentRecentRefluxBuckets"
-            :membership-tier="viewerMembershipTier"
-            :invite-hint="inviteUpgradeHint"
-            @upgrade="handleRecentRefluxUpgrade"
-            @invite="handleInviteUpgrade"
-          />
-          <TicketBestWindowsPanel
-            v-if="bestWindowsLoading || bestWindowsData"
-            :data="bestWindowsData"
-            :loading="bestWindowsLoading"
-            :visible="bestWindowsVisible"
-            :invite-hint="inviteUpgradeHint"
-            @upgrade="handleBestWindowsUpgrade"
-            @invite="handleInviteUpgrade"
-          />
-          <view
-            v-if="currentMatch && prioritizedCurrentSections.length"
-            class="inventory-stack"
-          >
-            <TicketInventoryPanel
-              v-for="section in prioritizedCurrentSections"
-              :key="section.price"
-              :section="section"
-              :match-id="currentMatch.match_id"
-              :busy-blocks="interestToggleLoading"
-              :collapsed="
-                isCurrentSectionCollapsed(`inventory:${section.price}`)
-              "
-              @toggle="
-                toggleCurrentSectionCollapsed(`inventory:${section.price}`)
-              "
-              @interest="handleCurrentInterest"
-            />
-          </view>
-          <TicketSupplyInsights
-            v-if="currentMatch"
-            :stats="currentBoardStats"
-            :decision-lines="currentDecisionLines"
-            :insight-collapsed="isCurrentSectionCollapsed('insight')"
-            :decision-collapsed="isCurrentSectionCollapsed('decision')"
-            @toggle="toggleCurrentSectionCollapsed"
-          />
-        </template>
-      </view>
-      <view v-else-if="activeTab === 'history'" class="board-content">
-        <TicketBoardSkeleton v-if="historyLoading" mode="history" />
-        <view
-          v-else-if="historyErrorMessage"
-          class="state-card state-card--error"
-          ><text>{{ historyErrorMessage }}</text></view
-        >
-        <template v-else>
-          <view v-if="!visibleHistoryMatches.length" class="state-card">
-            <text>{{ historyTrendLoading ? '正在加载历史回流数据…' : '暂无有回流数据的历史比赛。' }}</text>
-          </view>
-          <TicketHistorySelector
-            v-else
-            :matches="visibleHistoryMatches"
-            :selected-match-id="selectedHistoryMatchId"
-            @select="handleHistoryMatchSelect"
-          />
-          <TicketHistoryMatchCard
-            v-if="displayedHistoryMatch"
-            :match="displayedHistoryMatch"
-            :switching="historySelectionLoading"
-            :total-occurrences="historyTotalOccurrences"
-          />
           <TicketFocusPanel
-            v-if="
-              displayedHistoryMatch &&
-              (historyFocusBlocks.length || historyInterestFocusBlocks.length)
-            "
+            v-else
             :focus-blocks="historyFocusBlocks"
             :interest-blocks="historyInterestFocusBlocks"
             :collapsed="isHistorySectionCollapsed('focus')"
@@ -149,26 +70,91 @@
             :switching="historySelectionLoading"
             @toggle="toggleHistorySectionCollapsed('focus')"
           />
-          <view
-            v-if="displayedHistoryMatch && prioritizedHistorySections.length"
-            class="inventory-stack"
-          >
+        </FiLayoutBlock>
+
+        <FiLayoutBlock
+          v-else-if="block.key === 'tracked_interests' && !systemConfigUnderReview && !membershipBenefitsLocked && activeTab === 'current' && !currentLoading && !currentErrorMessage && currentMatch && currentUser"
+          :background-image-url="block.background_image_url"
+        >
+          <TicketTrackedInterests
+            :interests="currentTrackedInterests"
+            :summary="currentTrackedInterestSummary"
+            :collapsed="isCurrentSectionCollapsed('tracked-interests')"
+            @toggle="toggleCurrentSectionCollapsed('tracked-interests')"
+          />
+        </FiLayoutBlock>
+
+        <FiLayoutBlock
+          v-else-if="block.key === 'recent_reflux' && !systemConfigUnderReview && !membershipBenefitsLocked && activeTab === 'current' && !currentLoading && !currentErrorMessage && currentMatch && currentRecentRefluxPanelMode !== 'hidden'"
+          :background-image-url="block.background_image_url"
+        >
+          <TicketRecentRefluxPanel
+            :mode="currentRecentRefluxPanelMode"
+            :buckets="currentRecentRefluxBuckets"
+            :membership-tier="viewerMembershipTier"
+            :invite-hint="inviteUpgradeHint"
+            @upgrade="handleRecentRefluxUpgrade"
+            @invite="handleInviteUpgrade"
+          />
+        </FiLayoutBlock>
+
+        <FiLayoutBlock
+          v-else-if="block.key === 'best_windows' && !systemConfigUnderReview && !membershipBenefitsLocked && activeTab === 'current' && !currentLoading && !currentErrorMessage && (bestWindowsLoading || bestWindowsData)"
+          :background-image-url="block.background_image_url"
+        >
+          <TicketBestWindowsPanel
+            :data="bestWindowsData"
+            :loading="bestWindowsLoading"
+            :visible="bestWindowsVisible"
+            :invite-hint="inviteUpgradeHint"
+            @upgrade="handleBestWindowsUpgrade"
+            @invite="handleInviteUpgrade"
+          />
+        </FiLayoutBlock>
+
+        <FiLayoutBlock
+          v-else-if="block.key === 'inventory_stack' && !systemConfigUnderReview && !membershipBenefitsLocked && ((activeTab === 'current' && !currentLoading && !currentErrorMessage && currentMatch && prioritizedCurrentSections.length) || (activeTab === 'history' && !historyLoading && !historyErrorMessage && displayedHistoryMatch && prioritizedHistorySections.length))"
+          :background-image-url="block.background_image_url"
+        >
+          <view v-if="activeTab === 'current' && currentMatch" class="inventory-stack">
+            <TicketInventoryPanel
+              v-for="section in prioritizedCurrentSections"
+              :key="section.price"
+              :section="section"
+              :match-id="currentMatch.match_id"
+              :busy-blocks="interestToggleLoading"
+              :collapsed="isCurrentSectionCollapsed(`inventory:${section.price}`)"
+              @toggle="toggleCurrentSectionCollapsed(`inventory:${section.price}`)"
+              @interest="handleCurrentInterest"
+            />
+          </view>
+          <view v-else-if="displayedHistoryMatch" class="inventory-stack">
             <TicketInventoryPanel
               v-for="section in prioritizedHistorySections"
               :key="section.price"
               :section="section"
               :match-id="displayedHistoryMatch.match_id"
               readonly
-              :collapsed="
-                isHistorySectionCollapsed(`inventory:${section.price}`)
-              "
-              @toggle="
-                toggleHistorySectionCollapsed(`inventory:${section.price}`)
-              "
+              :collapsed="isHistorySectionCollapsed(`inventory:${section.price}`)"
+              @toggle="toggleHistorySectionCollapsed(`inventory:${section.price}`)"
             />
           </view>
+        </FiLayoutBlock>
+
+        <FiLayoutBlock
+          v-else-if="block.key === 'supply_insights' && !systemConfigUnderReview && !membershipBenefitsLocked && ((activeTab === 'current' && !currentLoading && !currentErrorMessage && currentMatch) || (activeTab === 'history' && !historyLoading && !historyErrorMessage && displayedHistoryMatch))"
+          :background-image-url="block.background_image_url"
+        >
           <TicketSupplyInsights
-            v-if="displayedHistoryMatch"
+            v-if="activeTab === 'current'"
+            :stats="currentBoardStats"
+            :decision-lines="currentDecisionLines"
+            :insight-collapsed="isCurrentSectionCollapsed('insight')"
+            :decision-collapsed="isCurrentSectionCollapsed('decision')"
+            @toggle="toggleCurrentSectionCollapsed"
+          />
+          <TicketSupplyInsights
+            v-else
             :stats="historyBoardStats"
             :decision-lines="historyDecisionLines"
             history
@@ -176,35 +162,50 @@
             :decision-collapsed="isHistorySectionCollapsed('decision')"
             @toggle="toggleHistorySectionCollapsed"
           />
-        </template>
-      </view>
-      <view v-else-if="activeTab === 'history-stats'" class="board-content board-content--history-stats">
-        <TicketBoardSkeleton v-if="historyLoading" mode="history-stats" />
-        <view
-          v-else-if="historyErrorMessage"
-          class="state-card state-card--error"
-          ><text>{{ historyErrorMessage }}</text></view
+        </FiLayoutBlock>
+
+        <FiLayoutBlock
+          v-else-if="block.key === 'history_trend' && !systemConfigUnderReview && !membershipBenefitsLocked && activeTab === 'history-stats' && !historyLoading && !historyErrorMessage"
+          :background-image-url="block.background_image_url"
         >
-        <view v-else-if="!historyMatches.length" class="state-card"
-          ><text>当前没有历史比赛。</text></view
+          <view v-if="!historyMatches.length" class="state-card"><text>当前没有历史比赛。</text></view>
+          <TicketHistoryTrend v-else :loading="historyTrendLoading" :trend="historyRefluxTrend" @select="handleHistoryMatchSelect" />
+        </FiLayoutBlock>
+
+        <FiLayoutBlock
+          v-else-if="block.key === 'share_poster' && posterVisible"
+          :background-image-url="block.background_image_url"
         >
-        <TicketHistoryTrend
-          v-else
-          :loading="historyTrendLoading"
-          :trend="historyRefluxTrend"
-          @select="handleHistoryMatchSelect"
-        />
-      </view>
-      <TicketSharePosterPanel
-        v-if="posterVisible"
-        :image-path="posterImagePath"
-        :generating="posterGenerating"
-        :loading="posterLoading"
-        :error="posterError"
-        @generate="generatePoster"
-        @preview="previewPoster"
-        @save="savePoster"
+          <TicketSharePosterPanel
+            :image-path="posterImagePath"
+            :generating="posterGenerating"
+            :loading="posterLoading"
+            :error="posterError"
+            @generate="generatePoster"
+            @preview="previewPoster"
+            @save="savePoster"
+          />
+        </FiLayoutBlock>
+      </template>
+
+      <view v-if="systemConfigUnderReview" class="state-card"><text>当前版本展示基础内容。</text></view>
+      <TicketMembershipLock
+        v-else-if="membershipBenefitsLocked"
+        :binding-required="officialBindingRequired"
+        @login="officialBindingRequired ? officialBind.open() : goToUserPage()"
       />
+      <template v-else-if="activeTab === 'current'">
+        <TicketBoardSkeleton v-if="currentLoading" mode="current" :show-tabs="false" />
+        <view v-else-if="currentErrorMessage" class="state-card state-card--error"><text>{{ currentErrorMessage }}</text></view>
+      </template>
+      <template v-else-if="activeTab === 'history'">
+        <TicketBoardSkeleton v-if="historyLoading" mode="history" />
+        <view v-else-if="historyErrorMessage" class="state-card state-card--error"><text>{{ historyErrorMessage }}</text></view>
+      </template>
+      <template v-else-if="activeTab === 'history-stats'">
+        <TicketBoardSkeleton v-if="historyLoading" mode="history-stats" />
+        <view v-else-if="historyErrorMessage" class="state-card state-card--error"><text>{{ historyErrorMessage }}</text></view>
+      </template>
     </view>
     <canvas canvas-id="ticketWatchSharePoster" class="share-poster-canvas" :style="posterCanvasStyle" />
     <TicketInterestConfirm
@@ -259,7 +260,10 @@ import { openUserOfficialAccount } from '../../utils/officialAccountNavigation'
 
 import { buildSharePath, buildShareQuery } from '../../utils/shareSource'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { computed, nextTick, ref, watch } from 'vue'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import {
@@ -309,6 +313,7 @@ import { createTicketWatchSessionSync } from './sessionSync'
 import { syncVisibleHistorySelection } from './ticketWatchHistorySelection'
 
 const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('ticket_watch')
 
 const state = useTicketWatchState()
 const {
@@ -582,6 +587,7 @@ onShow(() => {
   bindingStateReady.value = false
   void officialBind.handlePageShow()
   reportPageActivity('ticket_watch')
+  void refreshLayout()
   beginPaywallVisit()
   reportRecentRefluxLockImpression()
   pageVisible = true
@@ -658,27 +664,6 @@ onUnload(() => {
   position: relative;
   min-height: 100vh;
   background: var(--fi-color-page-soft);
-}
-
-.page-bg-img {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.page-bg-fade {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  background: var(--fi-color-ticket-page-bg-fade-background-2);
-  pointer-events: none;
-  z-index: 0;
 }
 
 .page {

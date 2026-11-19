@@ -136,6 +136,8 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         auth.token_port.clone(),
         config.mini_review_control_user_ids.clone(),
     );
+    let page_layout_routes =
+        crate::page_layout::bootstrap::build_page_layout_routes(pool.clone(), config);
     let push_notification_routes = build_push_notification_routes(pool, auth.token_port.clone());
 
     Router::new()
@@ -149,6 +151,7 @@ pub fn build_router(pool: PgPool, config: &AppConfig) -> Router {
         .merge(director_routes)
         .merge(mini_review_routes)
         .merge(admin_routes)
+        .merge(page_layout_routes)
         .merge(system_config.routes)
         .merge(auth.routes)
         .merge(activity_routes)

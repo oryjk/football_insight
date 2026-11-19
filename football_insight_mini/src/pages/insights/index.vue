@@ -2,93 +2,106 @@
   <page-meta :page-style="navigationPageStyle" />
   <view class="page-root">
     <FiBrandNav />
-    <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
-    <view class="page-bg-fade"></view>
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" :fallback-image-url="bgImage" />
     <view class="page-scroll">
       <view class="page">
-        <InsightsTicketWatchEntry
-          v-if="!systemConfigUnderReview"
-          :locked="shouldLockTicketWatchEntry"
-          @open="openTicketWatch"
-        />
-        <InsightsSecondaryEntries @open="openSecondary" />
-        <FiPanel>
-          <view class="insights-workspace">
-            <FiTeamSelector
-              v-if="selectableTeams.length"
-              :teams="selectableTeams"
-              :model-value="selectedTeamId"
-              @update:model-value="teamBrowser.selectTeam"
+        <template v-for="block in visibleBlocks" :key="block.key">
+          <FiLayoutBlock
+            v-if="block.key === 'ticket_watch_entry' && !systemConfigUnderReview"
+            :background-image-url="block.background_image_url"
+          >
+            <InsightsTicketWatchEntry
+              :locked="shouldLockTicketWatchEntry"
+              @open="openTicketWatch"
             />
-            <view v-else class="state-card team-loading">
-              <text>{{ teamError || '正在加载球队…' }}</text>
-              <button v-if="teamError" @tap="teamBrowser.load()">重试</button>
-            </view>
-            <view class="insights-content">
-                <view v-if="outlookReviewReady && !systemConfigUnderReview && currentUser" class="workspace-section">
-                  <InsightsMatchOutlook
-                    :matches="outlookMatches"
-                    :selected-match-id="outlookSelectedMatchId"
-                    :outlook="matchOutlook"
-                    :loading="outlookLoading"
-                    :error="outlookError"
-                    @select-match="outlookLoader.selectMatch"
-                  />
+          </FiLayoutBlock>
+
+          <FiLayoutBlock
+            v-else-if="block.key === 'secondary_entries'"
+            :background-image-url="block.background_image_url"
+          >
+            <InsightsSecondaryEntries @open="openSecondary" />
+          </FiLayoutBlock>
+
+          <FiLayoutBlock
+            v-else-if="block.key === 'team_selector'"
+            :background-image-url="block.background_image_url"
+          >
+            <FiPanel>
+              <FiTeamSelector
+                v-if="selectableTeams.length"
+                :teams="selectableTeams"
+                :model-value="selectedTeamId"
+                @update:model-value="teamBrowser.selectTeam"
+              />
+              <view v-else class="state-card team-loading">
+                <text>{{ teamError || '正在加载球队…' }}</text>
+                <button v-if="teamError" @tap="teamBrowser.load()">重试</button>
+              </view>
+            </FiPanel>
+          </FiLayoutBlock>
+
+          <FiLayoutBlock
+            v-else-if="block.key === 'match_outlook' && outlookReviewReady && !systemConfigUnderReview && currentUser"
+            :background-image-url="block.background_image_url"
+          >
+            <FiPanel>
+              <InsightsMatchOutlook
+                :matches="outlookMatches"
+                :selected-match-id="outlookSelectedMatchId"
+                :outlook="matchOutlook"
+                :loading="outlookLoading"
+                :error="outlookError"
+                @select-match="outlookLoader.selectMatch"
+              />
+            </FiPanel>
+          </FiLayoutBlock>
+
+          <FiLayoutBlock
+            v-else-if="block.key === 'team_insight'"
+            :background-image-url="block.background_image_url"
+          >
+            <FiPanel>
+              <view class="insights-content">
+                <InsightsSkeleton v-if="userLoading" />
+                <InsightsLockedPanel v-else-if="!currentUser" mode="guest" />
+                <InsightsLockedPanel v-else-if="membershipBenefitsLocked" mode="membership" @action="goToUserPage()" />
+                <InsightsSkeleton v-else-if="loading" />
+                <view v-else-if="errorMessage" class="state-card state-card--error">
+                  <text>{{ errorMessage }}</text>
                 </view>
-
-                <view class="workspace-section">
-                  <InsightsSkeleton
-                    v-if="userLoading"
-                  />
-
-                  <InsightsLockedPanel v-else-if="!currentUser" mode="guest" />
-
-                  <InsightsLockedPanel v-else-if="membershipBenefitsLocked" mode="membership" @action="goToUserPage()" />
-
-                  <InsightsSkeleton
-                    v-else-if="loading"
-                  />
-
-                  <view v-else-if="errorMessage" class="state-card state-card--error">
-                    <text>{{ errorMessage }}</text>
-                  </view>
-
-                  <template v-else-if="selectedInsight">
-                    <InsightsTeamPanel
-                      :insight="selectedInsight"
+                <template v-else-if="selectedInsight">
+                  <InsightsTeamPanel :insight="selectedInsight" />
+                  <view class="contribution-section">
+                    <InsightsContributionSurface
+                      :rows="{
+                        'goals-for-opponent': goalsForByOpponentRows,
+                        'goals-for-player': goalsForByPlayerRows,
+                        'assists-player': assistsByPlayerRows,
+                        'goals-against-opponent': goalsAgainstByOpponentRows,
+                      }"
+                      :expanded="{
+                        'goals-for-opponent': goalsForOpponentExpanded,
+                        'goals-for-player': goalsForPlayerExpanded,
+                        'assists-player': assistsForPlayerExpanded,
+                        'goals-against-opponent': goalsAgainstOpponentExpanded,
+                      }"
+                      @toggle="key => {
+                        if (key === 'goals-for-opponent') goalsForOpponentExpanded = !goalsForOpponentExpanded
+                        else if (key === 'goals-for-player') goalsForPlayerExpanded = !goalsForPlayerExpanded
+                        else if (key === 'assists-player') assistsForPlayerExpanded = !assistsForPlayerExpanded
+                        else if (key === 'goals-against-opponent') goalsAgainstOpponentExpanded = !goalsAgainstOpponentExpanded
+                      }"
                     />
-
-                    <view class="contribution-section">
-                      <InsightsContributionSurface
-                        :rows="{
-                          'goals-for-opponent': goalsForByOpponentRows,
-                          'goals-for-player': goalsForByPlayerRows,
-                          'assists-player': assistsByPlayerRows,
-                          'goals-against-opponent': goalsAgainstByOpponentRows,
-                        }"
-                        :expanded="{
-                          'goals-for-opponent': goalsForOpponentExpanded,
-                          'goals-for-player': goalsForPlayerExpanded,
-                          'assists-player': assistsForPlayerExpanded,
-                          'goals-against-opponent': goalsAgainstOpponentExpanded,
-                        }"
-                        @toggle="key => {
-                          if (key === 'goals-for-opponent') goalsForOpponentExpanded = !goalsForOpponentExpanded
-                          else if (key === 'goals-for-player') goalsForPlayerExpanded = !goalsForPlayerExpanded
-                          else if (key === 'assists-player') assistsForPlayerExpanded = !assistsForPlayerExpanded
-                          else if (key === 'goals-against-opponent') goalsAgainstOpponentExpanded = !goalsAgainstOpponentExpanded
-                        }"
-                      />
-                    </view>
-                  </template>
-
-                  <view v-else class="state-card">
-                    <text>当前还没有可展示的球队洞察数据。</text>
                   </view>
+                </template>
+                <view v-else class="state-card">
+                  <text>当前还没有可展示的球队洞察数据。</text>
                 </view>
-            </view>
-          </view>
-        </FiPanel>
+              </view>
+            </FiPanel>
+          </FiLayoutBlock>
+        </template>
       </view>
     </view>
 
@@ -102,7 +115,9 @@ import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, ref, watch } from 'vue'
 import { onHide, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiPanel from '../../components/FiPanel.vue'
 import InsightsSecondaryEntries from './components/InsightsSecondaryEntries.vue'
 import { useInsightsTeams } from '../../composables/useInsightsTeams'
@@ -116,6 +131,7 @@ import FiTeamSelector from '../../components/FiTeamSelector.vue'
 import InsightsContributionSurface from './components/InsightsContributionSurface.vue'
 import type { TeamInsight } from '../../types/insight'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { useAppSession } from '../../stores/appSession'
 import { isMembershipTierAtLeast } from '../../utils/membershipRules'
 import { beginPaywallVisit, reportPaywallImpression, reportPaywallTap } from '../../composables/usePaywallTelemetry'
@@ -131,6 +147,7 @@ import { createInsightsSessionSync, runInsightsShow } from './sessionEffects'
 import { useInsightsData } from './useInsightsData'
 
 const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('insights')
 
 // 登录用户共享自 appSession：读取走会话缓存，401 清理由 session 统一处理。
 const session = useAppSession()
@@ -323,6 +340,7 @@ function goToLogin(): void {
 
 onShow(async () => {
   pageVisible.value = true
+  void refreshLayout()
   void teamBrowser.load()
   outlookReviewReady.value = false
   reportPageActivity('insights')
@@ -346,22 +364,12 @@ onShow(async () => {
 <style scoped lang="css">
 .team-loading { color:var(--fi-color-text-caption); font-size:var(--fi-font-24); }
 .page-root { position: relative; min-height: 100vh; background: var(--fi-color-page-soft); }
-.insights-workspace { display: flex; flex-direction: column; gap: var(--fi-space-24); min-width: 0; }
 .insights-content {
-  /* 至少一屏高：切到较短的胶囊内容时页面不往回缩，配合切换时的滚动定位消除抖动。 */
-  min-height: calc(100vh - var(--fi-brand-nav-height, 0px));
-  /* FiPanel 的组件 token 可继承穿过小程序宿主节点，内层作为同一底板的内容区。 */
-  --fi-component-panel-bg: transparent;
-  --fi-component-panel-radius: 0;
-  --fi-component-panel-border: 0;
-  --fi-component-panel-shadow: none;
-  --fi-component-panel-padding: 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--fi-space-28);
 }
-.workspace-section { min-width: 0; padding-top: var(--fi-space-24); border-top: var(--fi-border-width) solid var(--fi-color-divider); }
 .contribution-section { margin-top: var(--fi-space-28); padding-top: var(--fi-space-24); border-top: var(--fi-border-width) solid var(--fi-color-divider); }
 .page-scroll {
   padding-top: var(--fi-brand-nav-height);
@@ -374,25 +382,6 @@ onShow(async () => {
   display: flex;
   flex-direction: column;
   gap: var(--fi-space-card-gap);
-}
-.page-bg-img {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: var(--fi-space-insights-backdrop-height);
-  pointer-events: none;
-  z-index: 0;
-}
-.page-bg-fade {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: var(--fi-space-insights-backdrop-height);
-  background: var(--fi-color-page-backdrop-fade);
-  pointer-events: none;
-  z-index: 0;
 }
 .state-card {
   position: relative;

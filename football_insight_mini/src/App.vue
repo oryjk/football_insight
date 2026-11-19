@@ -4,6 +4,7 @@ import { watch } from "vue";
 import { useAppSession } from "./stores/appSession";
 import { useRuntimeConfig } from "./stores/runtimeConfig";
 import { useMiniReviewStatus } from "./stores/miniReview";
+import { usePageLayoutStore } from "./stores/pageLayout";
 import { captureAcquisitionSource } from "./utils/acquisitionSource";
 import { getDevBuildInfo } from "./utils/devBuildInfo";
 // #ifdef MP-WEIXIN
@@ -45,11 +46,15 @@ onLaunch(() => {
   void useMiniReviewStatus().ensureMiniReviewReady();
   // 公共配置与审核状态后台预加载；失败不阻断首页，页面 onShow 会复用缓存或重试。
   void useRuntimeConfig().ensureRuntimeConfig();
+  const pageLayoutStore = usePageLayoutStore();
+  pageLayoutStore.initPreviewBridge();
+  void pageLayoutStore.ensurePageLayouts();
 });
 onShow((options) => {
   console.log("Football Insight mini show");
   // A warm scan/share can be the first attributed entry after an organic cold launch.
   captureAcquisitionSource(options);
+  void usePageLayoutStore().ensurePageLayouts();
 });
 onHide(() => {
   console.log("Football Insight mini hide");

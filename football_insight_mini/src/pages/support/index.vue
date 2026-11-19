@@ -2,120 +2,129 @@
   <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav @back="goBackFromSecondaryPage()" @share="copyPageShareLink(detail ? `/pages/support/index?matchId=${detail.match_id}` : '/pages/home/index')" />
   <view class="page-root">
-    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
-    <view class="page-bg-fade"></view>
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" :fallback-image-url="phoenixStadiumBgImage" full-page />
     <scroll-view scroll-y class="page-scroll">
       <view class="page">
-      <FiPanel>
-        <FiSectionHeading kicker="赛前助力" :title="heroTitle" size="xl">
-          <template #meta>
-            <text class="meta-pill">{{ heroBadge }}</text>
-          </template>
-        </FiSectionHeading>
+        <FiLoading
+          v-if="loading"
+          title="助力页加载中"
+          caption="正在整理这场比赛的双方热度对抗。"
+        />
 
-        <text class="hero-summary">{{ heroSummary }}</text>
-      </FiPanel>
-
-      <FiLoading
-        v-if="loading"
-        title="助力页加载中"
-        caption="正在整理这场比赛的双方热度对抗。"
-      />
-
-      <FiPanel v-else-if="errorMessage">
-        <text class="state-error">{{ errorMessage }}</text>
-      </FiPanel>
-
-      <template v-else-if="detail">
-        <FiPanel>
-          <view class="support-scoreboard__meta">
-            <text>第 {{ detail.round_number }} 轮</text>
-            <text>{{ detail.match_date }} {{ detail.match_time }}</text>
-          </view>
-
-          <view class="support-scoreboard__teams">
-            <view class="support-team-card" :class="{ 'support-team-card--favorite': favoriteTeamId === detail.home_team.team_id }">
-              <image :src="detail.home_team.avatar_storage_url || ''" mode="aspectFit" class="support-team-card__avatar" />
-              <text class="support-team-card__name">{{ detail.home_team.team_name }}</text>
-              <text class="support-team-card__count">{{ formatSupportCount(detail.home_team.support_count) }}</text>
-              <text class="support-team-card__share">{{ detail.home_team.support_share_pct }}%</text>
-            </view>
-
-            <view class="support-scoreboard__vs">
-              <text class="support-scoreboard__vs-mark">VS</text>
-              <text class="support-scoreboard__vs-state">{{ supportWindowLabel }}</text>
-            </view>
-
-            <view class="support-team-card support-team-card--away" :class="{ 'support-team-card--favorite': favoriteTeamId === detail.away_team.team_id }">
-              <image :src="detail.away_team.avatar_storage_url || ''" mode="aspectFit" class="support-team-card__avatar" />
-              <text class="support-team-card__name">{{ detail.away_team.team_name }}</text>
-              <text class="support-team-card__count">{{ formatSupportCount(detail.away_team.support_count) }}</text>
-              <text class="support-team-card__share">{{ detail.away_team.support_share_pct }}%</text>
-            </view>
-          </view>
-
-          <view class="support-bar">
-            <view
-              class="support-bar__home"
-              :style="{ width: `${detail.home_team.support_share_pct}%` }"
-            />
-            <view
-              class="support-bar__away"
-              :style="{ width: `${detail.away_team.support_share_pct}%` }"
-            />
-          </view>
-
-          <view class="support-scoreboard__footer">
-            <text>总助力值 {{ formatSupportCount(detail.total_support_count) }}</text>
-            <text>{{ countdownLabel }}</text>
-          </view>
+        <FiPanel v-else-if="errorMessage">
+          <text class="state-error">{{ errorMessage }}</text>
         </FiPanel>
 
-        <FiPanel>
-          <FiSectionHeading kicker="站队状态" :title="stanceTitle">
-            <template #meta>
-              <text class="meta-pill">{{ stanceBadge }}</text>
-            </template>
-          </FiSectionHeading>
+        <template v-for="block in visibleBlocks" :key="block.key">
+          <FiLayoutBlock
+            v-if="block.key === 'hero'"
+            :background-image-url="block.background_image_url"
+          >
+            <FiPanel>
+              <FiSectionHeading kicker="赛前助力" :title="heroTitle" size="xl">
+                <template #meta>
+                  <text class="meta-pill">{{ heroBadge }}</text>
+                </template>
+              </FiSectionHeading>
+              <text class="hero-summary">{{ heroSummary }}</text>
+            </FiPanel>
+          </FiLayoutBlock>
 
-          <view class="support-state-card__notes">
-            <text>{{ stanceDescription }}</text>
-            <text>{{ rankingNote }}</text>
-          </view>
+          <FiLayoutBlock
+            v-else-if="block.key === 'scoreboard' && !loading && !errorMessage && detail"
+            :background-image-url="block.background_image_url"
+          >
+            <FiPanel>
+              <view class="support-scoreboard__meta">
+                <text>第 {{ detail.round_number }} 轮</text>
+                <text>{{ detail.match_date }} {{ detail.match_time }}</text>
+              </view>
 
-          <view class="support-actions">
-            <button
-              v-for="team in matchTeams"
-              :key="team.team_id"
-              class="primary-action support-actions__primary"
-              :class="{ 'primary-action--disabled': !canTakeVoteAction(team.team_id) }"
-              :disabled="!canTakeVoteAction(team.team_id)"
-              @click="handleVote(team.team_id)"
-            >
-              {{ voteButtonLabel(team) }}
-            </button>
-            <button class="secondary-action" open-type="share">
-              转发拉票
-            </button>
-            <button class="secondary-action" :disabled="posterGenerating" @click="generatePoster">
-              {{ posterGenerating ? '生成中' : '生成拉票海报' }}
-            </button>
-          </view>
+              <view class="support-scoreboard__teams">
+                <view class="support-team-card" :class="{ 'support-team-card--favorite': favoriteTeamId === detail.home_team.team_id }">
+                  <image :src="detail.home_team.avatar_storage_url || ''" mode="aspectFit" class="support-team-card__avatar" />
+                  <text class="support-team-card__name">{{ detail.home_team.team_name }}</text>
+                  <text class="support-team-card__count">{{ formatSupportCount(detail.home_team.support_count) }}</text>
+                  <text class="support-team-card__share">{{ detail.home_team.support_share_pct }}%</text>
+                </view>
 
-          <text class="support-state-card__rule">
-            规则：主客队任选，开球前可点击已助力取消并重新选择；同一时间只能保留一队的助力，比赛开始后自动截止。
-          </text>
-        </FiPanel>
+                <view class="support-scoreboard__vs">
+                  <text class="support-scoreboard__vs-mark">VS</text>
+                  <text class="support-scoreboard__vs-state">{{ supportWindowLabel }}</text>
+                </view>
 
-        <FiPanel v-if="posterImagePath">
-          <FiSectionHeading kicker="拉票海报" title="已生成本地海报" />
+                <view class="support-team-card support-team-card--away" :class="{ 'support-team-card--favorite': favoriteTeamId === detail.away_team.team_id }">
+                  <image :src="detail.away_team.avatar_storage_url || ''" mode="aspectFit" class="support-team-card__avatar" />
+                  <text class="support-team-card__name">{{ detail.away_team.team_name }}</text>
+                  <text class="support-team-card__count">{{ formatSupportCount(detail.away_team.support_count) }}</text>
+                  <text class="support-team-card__share">{{ detail.away_team.support_share_pct }}%</text>
+                </view>
+              </view>
 
-          <image :src="posterImagePath" mode="widthFix" class="poster-panel__image" />
-          <button class="primary-action poster-panel__save" @click="savePosterImage">保存到相册</button>
-        </FiPanel>
-      </template>
+              <view class="support-bar">
+                <view class="support-bar__home" :style="{ width: `${detail.home_team.support_share_pct}%` }" />
+                <view class="support-bar__away" :style="{ width: `${detail.away_team.support_share_pct}%` }" />
+              </view>
 
-      <canvas canvas-id="supportPosterCanvas" class="support-poster-canvas" />
+              <view class="support-scoreboard__footer">
+                <text>总助力值 {{ formatSupportCount(detail.total_support_count) }}</text>
+                <text>{{ countdownLabel }}</text>
+              </view>
+            </FiPanel>
+          </FiLayoutBlock>
+
+          <FiLayoutBlock
+            v-else-if="block.key === 'stance_actions' && !loading && !errorMessage && detail"
+            :background-image-url="block.background_image_url"
+          >
+            <FiPanel>
+              <FiSectionHeading kicker="站队状态" :title="stanceTitle">
+                <template #meta>
+                  <text class="meta-pill">{{ stanceBadge }}</text>
+                </template>
+              </FiSectionHeading>
+
+              <view class="support-state-card__notes">
+                <text>{{ stanceDescription }}</text>
+                <text>{{ rankingNote }}</text>
+              </view>
+
+              <view class="support-actions">
+                <button
+                  v-for="team in matchTeams"
+                  :key="team.team_id"
+                  class="primary-action support-actions__primary"
+                  :class="{ 'primary-action--disabled': !canTakeVoteAction(team.team_id) }"
+                  :disabled="!canTakeVoteAction(team.team_id)"
+                  @click="handleVote(team.team_id)"
+                >
+                  {{ voteButtonLabel(team) }}
+                </button>
+                <button class="secondary-action" open-type="share">转发拉票</button>
+                <button class="secondary-action" :disabled="posterGenerating" @click="generatePoster">
+                  {{ posterGenerating ? '生成中' : '生成拉票海报' }}
+                </button>
+              </view>
+
+              <text class="support-state-card__rule">
+                规则：主客队任选，开球前可点击已助力取消并重新选择；同一时间只能保留一队的助力，比赛开始后自动截止。
+              </text>
+            </FiPanel>
+          </FiLayoutBlock>
+
+          <FiLayoutBlock
+            v-else-if="block.key === 'poster' && !loading && !errorMessage && detail && posterImagePath"
+            :background-image-url="block.background_image_url"
+          >
+            <FiPanel>
+              <FiSectionHeading kicker="拉票海报" title="已生成本地海报" />
+              <image :src="posterImagePath" mode="widthFix" class="poster-panel__image" />
+              <button class="primary-action poster-panel__save" @click="savePosterImage">保存到相册</button>
+            </FiPanel>
+          </FiLayoutBlock>
+        </template>
+
+        <canvas canvas-id="supportPosterCanvas" class="support-poster-canvas" />
       </view>
     </scroll-view>
   </view>
@@ -124,9 +133,12 @@
 <script setup lang="ts">
 import { buildSharePath } from '../../utils/shareSource'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { computed, ref } from 'vue'
 import { onHide, onLoad, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
 import FiLoading from '../../components/FiLoading.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiPanel from '../../components/FiPanel.vue'
 import FiSectionHeading from '../../components/FiSectionHeading.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
@@ -147,6 +159,7 @@ import { useSupportPage } from './useSupportPage'
 import { useSupportPoster } from './useSupportPoster'
 
 const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('support')
 
 // 登录标记共享自 appSession，退出/换号后自动更新。
 const session = useAppSession()
@@ -272,6 +285,7 @@ onLoad((options) => {
 })
 
 onShow(() => {
+  void refreshLayout()
   void loadPage()
 })
 
@@ -356,26 +370,7 @@ function formatSupportCount(value: number): string {
   min-height: 100vh;
   background: #f7f8fa;
 }
-.page-bg-img {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  pointer-events: none;
-  z-index: 0;
-}
-.page-bg-fade {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  background: linear-gradient(180deg, rgba(246, 247, 244, 0.24) 0%, rgba(247, 248, 250, 0.74) 32%, #f7f8fa 58%, #f7f8fa 100%);
-  pointer-events: none;
-  z-index: 0;
-}
-.page-scroll { height: 100vh; padding-top: var(--fi-brand-nav-height); }
+.page-scroll { position: relative; z-index: 1; height: 100vh; padding-top: var(--fi-brand-nav-height); }
 .page {
   position: relative;
   z-index: 1;

@@ -2,61 +2,80 @@
   <page-meta :page-style="pageStyle" />
   <FiSecondaryNav @back="goBack" @share="handleH5Share" />
   <view class="director-page">
-    <view class="director-header">
-      <view class="director-header__row">
-        <text class="director-header__title">我来当总监</text>
-        <text v-if="context" class="director-header__window">{{ context.window.name }}</text>
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
+    <view class="director-content">
+      <view v-if="isPkMode" class="director-banner">
+        <text class="director-banner__text">正与好友同局 PK，选完立看 1v1 分歧报告</text>
       </view>
-      <text class="director-header__sub">
-        {{ context ? `${context.team.team_name}已有 ${context.team_plan_count} 份建队方案，1 分钟定出你的 5 外援` : '休赛期建队模拟 · 定出你的 5 外援并拉微信群友 PK' }}
-      </text>
+
+      <FiLoading v-if="loading && !context" title="正在加载球队阵容" caption="准备现役外援与引援候选名单…" />
+
+      <view v-else-if="error && !context" class="director-error">
+        <text class="director-error__text">{{ error }}</text>
+        <button class="director-btn director-btn--primary" hover-class="director-btn--pressed" @tap="draft.loadContext()">
+          重新加载
+        </button>
+      </view>
+
+      <template v-for="block in visibleBlocks" :key="block.key">
+        <FiLayoutBlock v-if="block.key === 'header'" :background-image-url="block.background_image_url">
+          <view class="director-header">
+            <view class="director-header__row">
+              <text class="director-header__title">我来当总监</text>
+              <text v-if="context" class="director-header__window">{{ context.window.name }}</text>
+            </view>
+            <text class="director-header__sub">
+              {{ context ? `${context.team.team_name}已有 ${context.team_plan_count} 份建队方案，1 分钟定出你的 5 外援` : '休赛期建队模拟 · 定出你的 5 外援并拉微信群友 PK' }}
+            </text>
+          </view>
+        </FiLayoutBlock>
+
+        <FiLayoutBlock
+          v-else-if="block.key === 'team_selector' && teams.length"
+          :background-image-url="block.background_image_url"
+        >
+          <FiTeamSelector
+            :teams="teams"
+            :model-value="activeTeamId"
+            @update:model-value="handleSelectTeam"
+          />
+        </FiLayoutBlock>
+
+        <FiLayoutBlock
+          v-else-if="block.key === 'foreign_section' && context"
+          :background-image-url="block.background_image_url"
+        >
+          <DirectorForeignSection
+            :squad-foreign="context.squad_foreign"
+            :foreign-stay-ids="foreignStayIds"
+            :foreign-leave-ids="foreignLeaveIds"
+            :foreign-ins="foreignIns"
+            :quota-check="quotaCheck"
+            @set-action="draft.setForeignAction"
+            @remove-in="draft.removeForeignIn"
+            @open-picker="draft.openCandidateSheet('foreign')"
+          />
+        </FiLayoutBlock>
+
+        <FiLayoutBlock
+          v-else-if="block.key === 'domestic_section' && context"
+          :background-image-url="block.background_image_url"
+        >
+          <DirectorDomesticSection
+            :squad-domestic="context.squad_domestic"
+            :domestic-ins="domesticIns"
+            :domestic-outs="domesticOuts"
+            :max-domestic-ins="maxDomesticIns"
+            :max-domestic-outs="maxDomesticOuts"
+            :manifesto="manifesto"
+            @open-domestic-picker="draft.openCandidateSheet('domestic')"
+            @remove-domestic-in="draft.removeDomesticIn"
+            @toggle-domestic-out="draft.toggleDomesticOut"
+            @update:manifesto="manifesto = $event"
+          />
+        </FiLayoutBlock>
+      </template>
     </view>
-
-    <view v-if="isPkMode" class="director-banner">
-      <text class="director-banner__text">正与好友同局 PK，选完立看 1v1 分歧报告</text>
-    </view>
-
-    <FiTeamSelector
-      v-if="teams.length"
-      :teams="teams"
-      :model-value="activeTeamId"
-      @update:model-value="handleSelectTeam"
-    />
-
-    <FiLoading v-if="loading && !context" title="正在加载球队阵容" caption="准备现役外援与引援候选名单…" />
-
-    <view v-else-if="error && !context" class="director-error">
-      <text class="director-error__text">{{ error }}</text>
-      <button class="director-btn director-btn--primary" hover-class="director-btn--pressed" @tap="draft.loadContext()">
-        重新加载
-      </button>
-    </view>
-
-    <template v-else-if="context">
-      <DirectorForeignSection
-        :squad-foreign="context.squad_foreign"
-        :foreign-stay-ids="foreignStayIds"
-        :foreign-leave-ids="foreignLeaveIds"
-        :foreign-ins="foreignIns"
-        :quota-check="quotaCheck"
-        @set-action="draft.setForeignAction"
-        @remove-in="draft.removeForeignIn"
-        @open-picker="draft.openCandidateSheet('foreign')"
-      />
-
-      <DirectorDomesticSection
-        :squad-domestic="context.squad_domestic"
-        :domestic-ins="domesticIns"
-        :domestic-outs="domesticOuts"
-        :max-domestic-ins="maxDomesticIns"
-        :max-domestic-outs="maxDomesticOuts"
-        :manifesto="manifesto"
-        @open-domestic-picker="draft.openCandidateSheet('domestic')"
-        @remove-domestic-in="draft.removeDomesticIn"
-        @toggle-domestic-out="draft.toggleDomesticOut"
-        @update:manifesto="manifesto = $event"
-      />
-    </template>
 
     <DirectorCandidateSheet
       v-model:visible="sheetVisible"
@@ -96,11 +115,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, watch } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
 import FiLoading from '../../components/FiLoading.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import FiTeamSelector from '../../components/FiTeamSelector.vue'
 import { useInsightsTeams } from '../../composables/useInsightsTeams'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { useAppSession } from '../../stores/appSession'
 import {
   buildDirectorEditUrl,
@@ -115,6 +137,11 @@ import DirectorForeignSection from './components/DirectorForeignSection.vue'
 import { useDirectorDraft } from './useDirectorDraft'
 
 const { navigationPageStyle } = useNavigationLayout()
+const {
+  pageBackgroundImageUrl,
+  visibleBlocks,
+  refreshLayout,
+} = usePageLayout('director')
 const session = useAppSession()
 const teamBrowser = useInsightsTeams(session)
 const { teams } = teamBrowser
@@ -175,6 +202,7 @@ onLoad((query) => {
 })
 
 onShow(() => {
+  void refreshLayout()
   if (initialLoaded && loadedRevision !== session.revision.value) {
     loadedRevision = session.revision.value
     void draft.loadContext(activeTeamId.value)

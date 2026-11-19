@@ -189,6 +189,39 @@ export interface SupportBaseMatch {
   home_team: SupportBaseTeam;
   away_team: SupportBaseTeam;
 }
+export type PageLayoutGroup = "primary_tab" | "feature" | "detail";
+export interface AdminPageLayoutBlock {
+  key: string;
+  label: string;
+  description: string;
+  visible: boolean;
+  background_image_url: string | null;
+}
+export interface AdminPageLayout {
+  page_key: string;
+  title: string;
+  route_path: string;
+  group: PageLayoutGroup;
+  description: string;
+  background_image_url: string | null;
+  blocks: AdminPageLayoutBlock[];
+  customized: boolean;
+  version: number;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+export interface SavePageLayoutBlockPayload {
+  key: string;
+  visible: boolean;
+  background_image_url: string | null;
+}
+export interface SavePageLayoutPayload {
+  background_image_url: string | null;
+  blocks: SavePageLayoutBlockPayload[];
+}
+export interface UploadLayoutImageResult {
+  url: string;
+}
 export function createApi(client: ApiClient) {
   return {
     setupStatus: async (signal?: AbortSignal): Promise<AdminSetupStatus> => {
@@ -431,6 +464,52 @@ export function createApi(client: ApiClient) {
         method: "DELETE",
         signal,
       }),
+    pageLayouts: (token: string, signal?: AbortSignal) =>
+      client.request<{ items: AdminPageLayout[] }>("/page-layouts", token, {
+        signal,
+      }),
+    savePageLayout: (
+      token: string,
+      pageKey: string,
+      payload: SavePageLayoutPayload,
+      signal?: AbortSignal,
+    ) =>
+      client.request<AdminPageLayout>(
+        `/page-layouts/${encodeURIComponent(pageKey)}`,
+        token,
+        {
+          method: "PUT",
+          body: JSON.stringify(payload),
+          signal,
+        },
+      ),
+    resetPageLayout: (
+      token: string,
+      pageKey: string,
+      signal?: AbortSignal,
+    ) =>
+      client.request<AdminPageLayout>(
+        `/page-layouts/${encodeURIComponent(pageKey)}`,
+        token,
+        {
+          method: "DELETE",
+          signal,
+        },
+      ),
+    uploadLayoutImage: (
+      token: string,
+      dataUrl: string,
+      signal?: AbortSignal,
+    ) =>
+      client.request<UploadLayoutImageResult>(
+        "/page-layouts/upload-image",
+        token,
+        {
+          method: "POST",
+          body: JSON.stringify({ data_url: dataUrl }),
+          signal,
+        },
+      ),
   };
 }
 export type AdminApi = ReturnType<typeof createApi>;

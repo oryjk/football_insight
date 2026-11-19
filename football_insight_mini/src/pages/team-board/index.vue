@@ -2,8 +2,7 @@
   <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav @back="goBackToInsights" @share="copyPageShareLink(teamId ? `/pages/team-board/index?teamId=${teamId}` : '/pages/insights/index')" />
   <view class="page-root">
-    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
-    <view class="page-bg-fade"></view>
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" :fallback-image-url="phoenixStadiumBgImage" full-page />
     <scroll-view scroll-y class="page-scroll">
       <view class="page">
         <view class="page-content">
@@ -18,25 +17,36 @@
           </view>
 
           <template v-else-if="board">
-            <TeamBoardHero :team="board.team" @back="goBackToInsights" />
-            <TeamBoardLauncher
-              :presets="composerPresets"
-              :post-count="posts.length"
-              @open-composer="openComposer"
-            />
+            <template v-for="block in visibleBlocks" :key="block.key">
+              <FiLayoutBlock v-if="block.key === 'hero'" :background-image-url="block.background_image_url">
+                <TeamBoardHero :team="board.team" @back="goBackToInsights" />
+              </FiLayoutBlock>
 
-            <view v-if="!posts.length" class="panel state-card state-card--empty">
-              <text>这个球队还没有观点帖。先从一张洞察卡开始，发布第一条数据观点。</text>
-            </view>
+              <FiLayoutBlock v-else-if="block.key === 'launcher'" :background-image-url="block.background_image_url">
+                <TeamBoardLauncher
+                  :presets="composerPresets"
+                  :post-count="posts.length"
+                  @open-composer="openComposer"
+                />
+              </FiLayoutBlock>
 
-            <TeamBoardPostCard
-              v-for="post in posts"
-              :key="post.post_id"
-              :post="post"
-              v-model:comment-draft="commentDrafts[post.post_id]"
-              @toggle-like="toggleLike"
-              @submit-comment="submitComment"
-            />
+              <FiLayoutBlock v-else-if="block.key === 'posts'" :background-image-url="block.background_image_url">
+                <view class="posts-stack">
+                  <view v-if="!posts.length" class="panel state-card state-card--empty">
+                    <text>这个球队还没有观点帖。先从一张洞察卡开始，发布第一条数据观点。</text>
+                  </view>
+
+                  <TeamBoardPostCard
+                    v-for="post in posts"
+                    :key="post.post_id"
+                    :post="post"
+                    v-model:comment-draft="commentDrafts[post.post_id]"
+                    @toggle-like="toggleLike"
+                    @submit-comment="submitComment"
+                  />
+                </view>
+              </FiLayoutBlock>
+            </template>
           </template>
         </view>
 
@@ -58,7 +68,10 @@
 import { buildSharePath } from '../../utils/shareSource'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
 import FiLoading from '../../components/FiLoading.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { copyPageShareLink } from '../../utils/secondaryNavigation'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
@@ -69,6 +82,7 @@ import TeamBoardComposer from './components/TeamBoardComposer.vue'
 import { useTeamBoardPage } from './useTeamBoardPage'
 
 const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('team_board')
 const {
   teamId, loading, errorMessage, board, posts, composerPresets,
   composerOpen, selectedPreset, postTitle, postCommentary, composerErrorMessage, commentDrafts,
@@ -87,7 +101,6 @@ onLoad((query) => {
   teamId.value = typeof raw === 'string' ? Number(raw) : null
 })
 
-
 function goBackToInsights(): void {
   uni.navigateBack({
     fail: () => {
@@ -97,6 +110,7 @@ function goBackToInsights(): void {
 }
 
 onShow(() => {
+  void refreshLayout()
   void loadBoard()
 })
 </script>
@@ -109,28 +123,9 @@ onShow(() => {
   min-height: 100vh;
   background: #f7f8fa;
 }
-.page-bg-img {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  pointer-events: none;
-  z-index: 0;
-}
-.page-bg-fade {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  background: linear-gradient(180deg, rgba(246, 247, 244, 0.24) 0%, rgba(247, 248, 250, 0.74) 32%, #f7f8fa 58%, #f7f8fa 100%);
-  pointer-events: none;
-  z-index: 0;
-}
-.page-scroll { height: 100vh; padding-top: var(--fi-brand-nav-height); }
+.page-scroll { position: relative; z-index: 1; height: 100vh; padding-top: var(--fi-brand-nav-height); }
 .page { position: relative; z-index: 1; padding: var(--fi-space-28) var(--fi-space-24) var(--fi-space-40); }
 .state-card--error text { font-size: var(--fi-font-28); color: #c03a2b; }
 .state-card--empty text { color: #767a84; font-size: var(--fi-font-26); }
-.page-content { display: flex; flex-direction: column; gap: var(--fi-space-card-gap); }
+.page-content, .posts-stack { display: flex; flex-direction: column; gap: var(--fi-space-card-gap); }
 </style>

@@ -1,7 +1,6 @@
 <template>
-  <view class="page-root">
-    <image class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
-    <view class="page-bg-fade"></view>
+  <view class="page-root" :class="{ 'page-root--embedded': embedded }">
+    <FiPageBackdrop v-if="!embedded" :image-url="pageBackgroundImageUrl" :fallback-image-url="bgImage" />
     <view class="page-scroll" :class="{ 'page-scroll--locked': selectedRankingTeam || selectedRankingPlayer || selectedStandingsTable || selectedGoalMatch }">
       <view class="page">
       <RankingsSkeleton v-if="loading" />
@@ -11,22 +10,32 @@
       </view>
 
       <template v-else-if="rankings">
-        <RankingsStandingsLauncher
-          v-if="previewStandingsTables.length"
-          :tables="previewStandingsTables"
-          @open="openStandingsSheet"
-        />
+        <template v-for="block in rankingsBlocks" :key="block.key">
+          <FiLayoutBlock
+            v-if="block.key === 'rankings_standings' && previewStandingsTables.length"
+            :background-image-url="block.background_image_url"
+          >
+            <RankingsStandingsLauncher
+              :tables="previewStandingsTables"
+              @open="openStandingsSheet"
+            />
+          </FiLayoutBlock>
 
-        <RankingsSurfacePanel
-          v-if="(scope === 'team' && hasTeamCategories) || (scope === 'player' && hasPlayerCategories)"
-          v-model:scope="scope"
-          v-model:standings-ranking-mode="standingsRankingMode"
-          v-model:active-category-slug="activeCategorySlug"
-          :rankings="rankings"
-          @open-team="openRankingTeamSheet"
-          @open-player="openRankingPlayerSheet"
-          @select-match="showGoalMatchDetail"
-        />
+          <FiLayoutBlock
+            v-else-if="block.key === 'rankings_surface' && ((scope === 'team' && hasTeamCategories) || (scope === 'player' && hasPlayerCategories))"
+            :background-image-url="block.background_image_url"
+          >
+            <RankingsSurfacePanel
+              v-model:scope="scope"
+              v-model:standings-ranking-mode="standingsRankingMode"
+              v-model:active-category-slug="activeCategorySlug"
+              :rankings="rankings"
+              @open-team="openRankingTeamSheet"
+              @open-player="openRankingPlayerSheet"
+              @select-match="showGoalMatchDetail"
+            />
+          </FiLayoutBlock>
+        </template>
       </template>
       </view>
     </view>
@@ -77,6 +86,9 @@ import { computed, ref, watch } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import RankingsSkeleton from './components/RankingsSkeleton.vue'
 import FiGoalMatchDialog from '../../components/FiGoalMatchDialog.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
+import { usePageLayout } from '../../composables/usePageLayout'
 import RankingsStandingsLauncher from './components/RankingsStandingsLauncher.vue'
 import RankingsSurfacePanel from './components/RankingsSurfacePanel.vue'
 import RankingsTeamSeasonSheet from './components/RankingsTeamSeasonSheet.vue'
@@ -367,6 +379,10 @@ async function loadPage(): Promise<void> {
   }
 }
 
+defineProps<{ embedded?: boolean }>()
+const { visibleBlocks, pageBackgroundImageUrl } = usePageLayout('rankings')
+const rankingsBlocks = computed(() => visibleBlocks.value.filter((b) => b.key.startsWith('rankings_')))
+
 onShow(() => {
   reportPageActivity('rankings')
   void loadPage()
@@ -386,6 +402,9 @@ defineExpose({
   z-index: 1;
   box-sizing: border-box;
 }
+.page-root--embedded .page-scroll {
+  padding-top: 0;
+}
 .page-scroll--locked {
   height: 100vh;
   overflow: hidden;
@@ -399,23 +418,4 @@ defineExpose({
   box-shadow: var(--fi-shadow-card);
 }
 .state-card--error text { font-size: var(--fi-font-28); color: #c03a2b; }
-.page-bg-img {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 600rpx;
-  pointer-events: none;
-  z-index: 0;
-}
-.page-bg-fade {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 600rpx;
-  background: linear-gradient(180deg, transparent 45%, rgba(247, 248, 250, 0.55) 78%, var(--fi-color-page-soft) 100%);
-  pointer-events: none;
-  z-index: 0;
-}
 </style>

@@ -2,6 +2,7 @@
   <page-meta :page-style="pageStyle" />
   <FiSecondaryNav :share-disabled="!focalComment || !entry" @back="goBack" @share="copyShareLink" />
   <view class="comment-page-offset">
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
     <view class="comment-page" :class="{ 'comment-page--with-composer': Boolean(entry && focalComment && commentsVisible) }">
       <view v-if="loading && !focalComment" class="comment-page__state">
         <text>正在加载评论详情…</text>
@@ -17,28 +18,32 @@
       </view>
 
       <template v-else-if="entry && focalComment">
-        <TelegraphCommentThread
-          :entry="entry"
-          :day-label="dayLabel"
-          :ancestors="ancestors"
-          :focal-comment="focalComment"
-          :replies="replies"
-          :replies-total-count="repliesTotalCount"
-          :replies-loading="repliesLoading"
-          :loading-more="loadingMoreReplies"
-          :has-more="repliesHasMore"
-          :replies-error="repliesError"
-          :pending-like-ids="pendingCommentLikeIds"
-          :deleting-comment-id="deletingCommentId"
-          @open-entry="page.openEntry"
-          @open-comment="page.openComment"
-          @focus-reply="page.focusReplyComposer"
-          @like-comment="page.toggleCommentLike"
-          @delete-comment="handleDeleteComment"
-          @retry-replies="page.reloadReplies"
-          @load-more="page.loadMoreReplies"
-          @share="copyShareLink"
-        />
+        <template v-for="block in visibleBlocks" :key="block.key">
+          <FiLayoutBlock v-if="block.key === 'thread'" :background-image-url="block.background_image_url">
+            <TelegraphCommentThread
+              :entry="entry"
+              :day-label="dayLabel"
+              :ancestors="ancestors"
+              :focal-comment="focalComment"
+              :replies="replies"
+              :replies-total-count="repliesTotalCount"
+              :replies-loading="repliesLoading"
+              :loading-more="loadingMoreReplies"
+              :has-more="repliesHasMore"
+              :replies-error="repliesError"
+              :pending-like-ids="pendingCommentLikeIds"
+              :deleting-comment-id="deletingCommentId"
+              @open-entry="page.openEntry"
+              @open-comment="page.openComment"
+              @focus-reply="page.focusReplyComposer"
+              @like-comment="page.toggleCommentLike"
+              @delete-comment="handleDeleteComment"
+              @retry-replies="page.reloadReplies"
+              @load-more="page.loadMoreReplies"
+              @share="copyShareLink"
+            />
+          </FiLayoutBlock>
+        </template>
       </template>
     </view>
   </view>
@@ -72,9 +77,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { onHide, onLoad, onPullDownRefresh, onReachBottom, onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiProfileSetupSheet from '../../components/FiProfileSetupSheet.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { useAppSession } from '../../stores/appSession'
 import { useMiniReviewStatus } from '../../stores/miniReview'
 import type { TelegraphComment } from '../../types/dailyTopic'
@@ -93,6 +101,7 @@ import { useTelegraphCommentPage } from './useTelegraphCommentPage'
 import { TELEGRAPH_ENTRY_SHARE_CANVAS_ID, useTelegraphEntryShareCard } from './useTelegraphEntryShareCard'
 
 const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('telegraph_comment')
 const session = useAppSession()
 const miniReview = useMiniReviewStatus()
 const shareCard = useTelegraphEntryShareCard()
@@ -205,6 +214,7 @@ onHide(() => {
 })
 
 onShow(() => {
+  void refreshLayout()
   void miniReview.ensureMiniReviewReady()
   void session.ensureSessionReady()
   if (topicId && entryId && commentId && topic.value && (hasLeftPage || session.revision.value !== lastSessionRevision)) {
@@ -254,6 +264,7 @@ onShareTimeline(() => buildTelegraphCommentTimelinePayload({
 }
 
 .comment-page-offset {
+  position: relative;
   padding-top: var(--fi-brand-nav-height);
   min-height: 100vh;
   box-sizing: border-box;
@@ -261,6 +272,8 @@ onShareTimeline(() => buildTelegraphCommentTimelinePayload({
 }
 
 .comment-page {
+  position: relative;
+  z-index: 1;
   padding: var(--fi-space-20) var(--fi-space-20) var(--fi-space-40);
 }
 

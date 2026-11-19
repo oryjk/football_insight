@@ -2,131 +2,161 @@
   <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav @back="goBack" @share="handleH5Share" />
   <view class="director-page">
-    <view class="director-header">
-      <view class="director-header__row">
-        <text class="director-header__title">总监建队方案</text>
-        <text v-if="detail" class="director-header__window">{{ detail.plan.window_name }}</text>
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
+    <view class="director-content">
+      <FiLoading v-if="loading && !detail" title="正在加载建队方案" caption="读取 5 外援名单与好友圈共识…" />
+
+      <view v-else-if="error && !detail" class="director-error">
+        <text class="director-error__text">{{ error }}</text>
+        <button class="director-btn director-btn--primary" hover-class="director-btn--pressed" @tap="viewModel.loadDetail()">
+          重试
+        </button>
       </view>
-    </view>
 
-    <FiLoading v-if="loading && !detail" title="正在加载建队方案" caption="读取 5 外援名单与好友圈共识…" />
+      <template v-for="block in visibleBlocks" :key="block.key">
+        <FiLayoutBlock v-if="block.key === 'header'" :background-image-url="block.background_image_url">
+          <view class="director-header">
+            <view class="director-header__row">
+              <text class="director-header__title">总监建队方案</text>
+              <text v-if="detail" class="director-header__window">{{ detail.plan.window_name }}</text>
+            </view>
+          </view>
+        </FiLayoutBlock>
 
-    <view v-else-if="error && !detail" class="director-error">
-      <text class="director-error__text">{{ error }}</text>
-      <button class="director-btn director-btn--primary" hover-class="director-btn--pressed" @tap="viewModel.loadDetail()">
-        重试
-      </button>
-    </view>
+        <FiLayoutBlock
+          v-else-if="block.key === 'comparison' && detail?.comparison"
+          :background-image-url="block.background_image_url"
+        >
+          <DirectorComparisonCard
+            :comparison="detail.comparison"
+            :target-author-name="detail.plan.author.nickname"
+          />
+        </FiLayoutBlock>
 
-    <template v-else-if="detail">
-      <DirectorComparisonCard
-        v-if="detail.comparison"
-        :comparison="detail.comparison"
-        :target-author-name="detail.plan.author.nickname"
-      />
+        <FiLayoutBlock
+          v-else-if="block.key === 'view_tabs' && detail"
+          :background-image-url="block.background_image_url"
+        >
+          <FiSegmented
+            v-model="activeTab"
+            :items="tabItems"
+            aria-label="方案视图切换"
+          />
+        </FiLayoutBlock>
 
-      <FiSegmented
-        v-model="activeTab"
-        :items="tabItems"
-        aria-label="方案视图切换"
-      />
+        <FiLayoutBlock
+          v-else-if="block.key === 'plan_overview' && detail && activeTab === 'plan'"
+          :background-image-url="block.background_image_url"
+        >
+          <DirectorPlanOverview :plan="detail.plan" />
+        </FiLayoutBlock>
 
-      <template v-if="activeTab === 'plan'">
-        <DirectorPlanOverview :plan="detail.plan" />
-        <DirectorCommentsSection
-          :likes-count="detail.plan.likes_count"
-          :dislikes-count="detail.plan.dislikes_count"
-          :my-reaction="detail.plan.my_reaction"
-          :reaction-pending="reactionPending"
-          :comments-count="detail.plan.comments_count"
-          :comments="detail.comments"
-          :submitting="commentSubmitting"
-          @react="viewModel.toggleReaction"
-          @submit-comment="handleCommentSubmit"
-        />
+        <FiLayoutBlock
+          v-else-if="block.key === 'comments' && detail && activeTab === 'plan'"
+          :background-image-url="block.background_image_url"
+        >
+          <DirectorCommentsSection
+            :likes-count="detail.plan.likes_count"
+            :dislikes-count="detail.plan.dislikes_count"
+            :my-reaction="detail.plan.my_reaction"
+            :reaction-pending="reactionPending"
+            :comments-count="detail.plan.comments_count"
+            :comments="detail.comments"
+            :submitting="commentSubmitting"
+            @react="viewModel.toggleReaction"
+            @submit-comment="handleCommentSubmit"
+          />
+        </FiLayoutBlock>
+
+        <FiLayoutBlock
+          v-else-if="block.key === 'circle_panel' && detail && activeTab === 'circle'"
+          :background-image-url="block.background_image_url"
+        >
+          <DirectorCirclePanel
+            :circle="circle"
+            :loading="circleLoading"
+            :error="circleError"
+            :current-share-code="detail.plan.share_code"
+            @retry="viewModel.loadCircle(detail.plan.circle_code)"
+            @share="handleH5Share"
+            @open-plan="openOtherPlan"
+          />
+        </FiLayoutBlock>
       </template>
+    </view>
 
-      <DirectorCirclePanel
-        v-else
-        :circle="circle"
-        :loading="circleLoading"
-        :error="circleError"
-        :current-share-code="detail.plan.share_code"
-        @retry="viewModel.loadCircle(detail.plan.circle_code)"
-        @share="handleH5Share"
-        @open-plan="openOtherPlan"
-      />
+    <view v-if="detail" class="director-dock">
+      <view class="director-dock__actions">
+        <template v-if="detail.plan.is_mine">
+          <button
+            class="director-btn director-dock__btn"
+            hover-class="director-btn--pressed"
+            @tap="openEditOwn"
+          >
+            修改方案
+          </button>
+          <!-- #ifdef MP-WEIXIN -->
+          <button
+            class="director-btn director-btn--primary director-dock__btn"
+            open-type="share"
+            hover-class="director-btn--pressed"
+          >
+            发微信群 PK
+          </button>
+          <!-- #endif -->
+          <!-- #ifndef MP-WEIXIN -->
+          <button
+            class="director-btn director-btn--primary director-dock__btn"
+            hover-class="director-btn--pressed"
+            @tap="handleH5Share"
+          >
+            发微信群 PK
+          </button>
+          <!-- #endif -->
+        </template>
 
-      <view class="director-dock">
-        <view class="director-dock__actions">
-          <template v-if="detail.plan.is_mine">
-            <button
-              class="director-btn director-dock__btn"
-              hover-class="director-btn--pressed"
-              @tap="openEditOwn"
-            >
-              修改方案
-            </button>
-            <!-- #ifdef MP-WEIXIN -->
-            <button
-              class="director-btn director-btn--primary director-dock__btn"
-              open-type="share"
-              hover-class="director-btn--pressed"
-            >
-              发微信群 PK
-            </button>
-            <!-- #endif -->
-            <!-- #ifndef MP-WEIXIN -->
-            <button
-              class="director-btn director-btn--primary director-dock__btn"
-              hover-class="director-btn--pressed"
-              @tap="handleH5Share"
-            >
-              发微信群 PK
-            </button>
-            <!-- #endif -->
-          </template>
-
-          <template v-else>
-            <button
-              class="director-btn director-btn--primary director-dock__btn"
-              hover-class="director-btn--pressed"
-              @tap="openJoinPk"
-            >
-              我也来当总监
-            </button>
-            <!-- #ifdef MP-WEIXIN -->
-            <button
-              class="director-btn director-btn--dark director-dock__btn"
-              open-type="share"
-              hover-class="director-btn--pressed"
-            >
-              转发给群友
-            </button>
-            <!-- #endif -->
-            <!-- #ifndef MP-WEIXIN -->
-            <button
-              class="director-btn director-btn--dark director-dock__btn"
-              hover-class="director-btn--pressed"
-              @tap="handleH5Share"
-            >
-              转发给群友
-            </button>
-            <!-- #endif -->
-          </template>
-        </view>
+        <template v-else>
+          <button
+            class="director-btn director-btn--primary director-dock__btn"
+            hover-class="director-btn--pressed"
+            @tap="openJoinPk"
+          >
+            我也来当总监
+          </button>
+          <!-- #ifdef MP-WEIXIN -->
+          <button
+            class="director-btn director-btn--dark director-dock__btn"
+            open-type="share"
+            hover-class="director-btn--pressed"
+          >
+            转发给群友
+          </button>
+          <!-- #endif -->
+          <!-- #ifndef MP-WEIXIN -->
+          <button
+            class="director-btn director-btn--dark director-dock__btn"
+            hover-class="director-btn--pressed"
+            @tap="handleH5Share"
+          >
+            转发给群友
+          </button>
+          <!-- #endif -->
+        </template>
       </view>
-    </template>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
 import FiLoading from '../../components/FiLoading.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import FiSegmented from '../../components/FiSegmented.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { useAppSession } from '../../stores/appSession'
 import type { FiSegmentedItem } from '../../types/segmented'
 import {
@@ -144,6 +174,11 @@ import { buildDirectorShareText } from './helpers'
 import { useDirectorView } from './useDirectorView'
 
 const { navigationPageStyle } = useNavigationLayout()
+const {
+  pageBackgroundImageUrl,
+  visibleBlocks,
+  refreshLayout,
+} = usePageLayout('director_view')
 const session = useAppSession()
 const viewModel = useDirectorView(session)
 const {
@@ -176,6 +211,7 @@ onLoad((query) => {
 })
 
 onShow(() => {
+  void refreshLayout()
   if (loadedRevision !== session.revision.value) {
     loadedRevision = session.revision.value
     void viewModel.loadDetail(shareCode.value)

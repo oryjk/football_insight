@@ -2,29 +2,53 @@
   <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav :shareable="false" @back="goBack" />
   <view class="community-page">
-    <text class="community-title">大家排的阵容</text>
-    <!-- #ifdef H5 -->
-    <text class="community-caption">请在微信小程序中查看球队战术板。</text>
-    <!-- #endif -->
-    <!-- #ifndef H5 -->
-    <FiTeamSelector :teams="teams" :model-value="teamId" @update:model-value="switchTeam" />
-    <view class="community-row">
-      <button class="community-action" :class="{ 'community-action--active': sort === 'latest' }" @tap="changeSort('latest')">最新发布</button>
-      <button class="community-action" :class="{ 'community-action--active': sort === 'likes' }" @tap="changeSort('likes')">点赞榜</button>
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
+    <view class="community-content">
+      <!-- #ifdef H5 -->
+      <FiLayoutBlock v-if="isBlockVisible('title')" :background-image-url="blockBackground('title')">
+        <text class="community-title">大家排的阵容</text>
+      </FiLayoutBlock>
+      <text class="community-caption">请在微信小程序中查看球队战术板。</text>
+      <!-- #endif -->
+      <!-- #ifndef H5 -->
+      <template v-for="block in visibleBlocks" :key="block.key">
+        <FiLayoutBlock v-if="block.key === 'title'" :background-image-url="block.background_image_url">
+          <text class="community-title">大家排的阵容</text>
+        </FiLayoutBlock>
+        <FiLayoutBlock v-else-if="block.key === 'team_picker'" :background-image-url="block.background_image_url">
+          <FiTeamSelector :teams="teams" :model-value="teamId" @update:model-value="switchTeam" />
+        </FiLayoutBlock>
+        <FiLayoutBlock v-else-if="block.key === 'sort_bar'" :background-image-url="block.background_image_url">
+          <view class="community-content">
+            <view class="community-row">
+              <button class="community-action" :class="{ 'community-action--active': sort === 'latest' }" @tap="changeSort('latest')">最新发布</button>
+              <button class="community-action" :class="{ 'community-action--active': sort === 'likes' }" @tap="changeSort('likes')">点赞榜</button>
+            </view>
+            <text class="community-caption">{{ total }} 套完整阵容 · {{ sort === 'likes' ? '按点赞数排序，同赞按发布时间排序' : '按首次发布时间排序' }}</text>
+          </view>
+        </FiLayoutBlock>
+        <FiLayoutBlock v-else-if="block.key === 'list'" :background-image-url="block.background_image_url">
+          <view class="community-content">
+            <text v-if="error" class="community-error">{{ error }}</text>
+            <FiLoading v-if="loading && !items.length" title="战术板加载中" caption="正在读取球队的球迷阵容。" />
+            <FiLineupCommunityCard v-for="(item, index) in items" :key="item.share_code" :item="item" :rank="sort === 'likes' ? index + 1 : undefined" :pending="pendingLikes.includes(item.share_code)" @open="open(item.share_code)" @like="like(item, returnUrl)" @dislike="dislike(item, returnUrl)" />
+            <text v-if="!loading && !error && !items.length" class="community-caption">还没有完整阵容，来排出第一套吧。</text>
+            <button v-if="error || items.length < total" class="community-action" :disabled="loading" @tap="retry">{{ loading ? '加载中…' : error ? '重试加载' : '加载更多' }}</button>
+          </view>
+        </FiLayoutBlock>
+        <FiLayoutBlock v-else-if="block.key === 'cta'" :background-image-url="block.background_image_url">
+          <button class="community-action community-action--active" @tap="edit">我也排一套</button>
+        </FiLayoutBlock>
+      </template>
+      <!-- #endif -->
     </view>
-    <text class="community-caption">{{ total }} 套完整阵容 · {{ sort === 'likes' ? '按点赞数排序，同赞按发布时间排序' : '按首次发布时间排序' }}</text>
-    <text v-if="error" class="community-error">{{ error }}</text>
-    <FiLoading v-if="loading && !items.length" title="战术板加载中" caption="正在读取球队的球迷阵容。" />
-    <FiLineupCommunityCard v-for="(item, index) in items" :key="item.share_code" :item="item" :rank="sort === 'likes' ? index + 1 : undefined" :pending="pendingLikes.includes(item.share_code)" @open="open(item.share_code)" @like="like(item, returnUrl)" @dislike="dislike(item, returnUrl)" />
-    <text v-if="!loading && !error && !items.length" class="community-caption">还没有完整阵容，来排出第一套吧。</text>
-    <button v-if="error || items.length < total" class="community-action" :disabled="loading" @tap="retry">{{ loading ? '加载中…' : error ? '重试加载' : '加载更多' }}</button>
-    <button class="community-action community-action--active" @tap="edit">我也排一套</button>
-    <!-- #endif -->
   </view>
 </template>
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { onLoad, onReachBottom, onShow } from '@dcloudio/uni-app'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import FiLoading from '../../components/FiLoading.vue'
 import FiTeamSelector from '../../components/FiTeamSelector.vue'
@@ -32,9 +56,11 @@ import FiLineupCommunityCard from '../../components/FiLineupCommunityCard.vue'
 import { listSupportTeams } from '../../api/support'
 import type { LineupSort, SquadResponse } from '../../types/lineup'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { buildLineupListUrl, buildLineupPageUrl, buildLineupViewUrl, parseLineupListQuery } from '../../utils/lineupLinks'
 import { createLineupList } from '../../composables/useLineupCommunity'
 const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, isBlockVisible, blockBackground, refreshLayout } = usePageLayout('lineup_list')
 const state = createLineupList()
 const { teamId, sort, items, total, loading, error, pendingLikes, more, like, dislike } = state
 const teams = ref<Array<SquadResponse['team']>>([])
@@ -67,6 +93,7 @@ onLoad(query => {
   requested = parsed.teamId; requestedSort = parsed.sort
 })
 onShow(() => {
+  void refreshLayout()
   // Re-read after detail returns so ranks and viewer-specific likes are authoritative.
   if (!started) { started = true; void start() }
   else if (teamId.value) void state.load(teamId.value)

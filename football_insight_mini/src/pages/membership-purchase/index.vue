@@ -2,48 +2,68 @@
   <page-meta :page-style="navigationPageStyle + pageLockStyle" />
   <FiSecondaryNav :shareable="false" @back="goBackFromSecondaryPage('/pages/user/index')" />
   <view v-show="!reviewRestricted" class="page-root">
-    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
-    <view class="page-bg-fade"></view>
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" :fallback-image-url="phoenixStadiumBgImage" full-page />
     <view class="page">
-      <FiPanel v-if="paymentChecked && !paymentAvailable">
-        <text class="notice-title">会员购买暂未开放</text>
-        <text class="notice-body">{{ paymentUnavailableMessage }}</text>
-      </FiPanel>
+      <template v-for="block in visibleBlocks" :key="block.key">
+        <FiLayoutBlock
+          v-if="block.key === 'availability_notice' && paymentChecked && !paymentAvailable"
+          :background-image-url="block.background_image_url"
+        >
+          <FiPanel>
+            <text class="notice-title">会员购买暂未开放</text>
+            <text class="notice-body">{{ paymentUnavailableMessage }}</text>
+          </FiPanel>
+        </FiLayoutBlock>
 
-      <FiPanel>
-        <FiSectionHeading kicker="选择回流看板会员档位" />
-        <MembershipTierList
-          v-if="productOptions.length"
-          :options="productOptions"
-          :selected-tier="selectedProduct?.target_tier ?? ''"
-          :summaries="tierSummaries"
-          @select="selectTier"
-        />
-        <view v-else class="tier-empty">
-          <text class="notice-title">{{ emptyProductTitle }}</text>
-          <text class="notice-body">{{ emptyProductBody }}</text>
-        </view>
-      </FiPanel>
+        <FiLayoutBlock
+          v-else-if="block.key === 'tier_list'"
+          :background-image-url="block.background_image_url"
+        >
+          <FiPanel>
+            <FiSectionHeading kicker="选择回流看板会员档位" />
+            <MembershipTierList
+              v-if="productOptions.length"
+              :options="productOptions"
+              :selected-tier="selectedProduct?.target_tier ?? ''"
+              :summaries="tierSummaries"
+              @select="selectTier"
+            />
+            <view v-else class="tier-empty">
+              <text class="notice-title">{{ emptyProductTitle }}</text>
+              <text class="notice-body">{{ emptyProductBody }}</text>
+            </view>
+          </FiPanel>
+        </FiLayoutBlock>
 
-      <MembershipBenefitsPanel
-        v-if="selectedBenefits"
-        :code="formatMembershipTierLabel(selectedBenefits.code)"
-        :benefit-items="selectedBenefits.items"
-      />
+        <FiLayoutBlock
+          v-else-if="block.key === 'benefits' && selectedBenefits"
+          :background-image-url="block.background_image_url"
+        >
+          <MembershipBenefitsPanel
+            :code="formatMembershipTierLabel(selectedBenefits.code)"
+            :benefit-items="selectedBenefits.items"
+          />
+        </FiLayoutBlock>
 
-      <FiPanel flush>
-        <view class="link-row" @tap="levelsSheetVisible = true">
-          <text class="link-row__label">会员等级说明</text>
-          <text class="link-row__arrow">›</text>
-        </view>
-        <view class="link-row link-row--divided" @tap="openInviteSheet">
-          <view class="link-row__main">
-            <text class="link-row__label">邀请好友免费升级</text>
-            <text v-if="inviteLinkCaption" class="link-row__caption">{{ inviteLinkCaption }}</text>
-          </view>
-          <text class="link-row__arrow">›</text>
-        </view>
-      </FiPanel>
+        <FiLayoutBlock
+          v-else-if="block.key === 'extra_links'"
+          :background-image-url="block.background_image_url"
+        >
+          <FiPanel flush>
+            <view class="link-row" @tap="levelsSheetVisible = true">
+              <text class="link-row__label">会员等级说明</text>
+              <text class="link-row__arrow">›</text>
+            </view>
+            <view class="link-row link-row--divided" @tap="openInviteSheet">
+              <view class="link-row__main">
+                <text class="link-row__label">邀请好友免费升级</text>
+                <text v-if="inviteLinkCaption" class="link-row__caption">{{ inviteLinkCaption }}</text>
+              </view>
+              <text class="link-row__arrow">›</text>
+            </view>
+          </FiPanel>
+        </FiLayoutBlock>
+      </template>
     </view>
 
     <view class="purchase-bar">
@@ -98,8 +118,11 @@
 
 <script setup lang="ts">
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { onShow } from '@dcloudio/uni-app'
 import { ref, computed, watch } from 'vue'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import FiPanel from '../../components/FiPanel.vue'
 import FiSectionHeading from '../../components/FiSectionHeading.vue'
@@ -136,6 +159,7 @@ import {
 } from './helpers'
 
 const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('membership_purchase')
 
 const product = ref<Awaited<ReturnType<typeof getMembershipProduct>> | null>(null)
 // 公共配置共享自 runtimeConfig store（60 秒缓存，失败保留上次成功值）。
@@ -233,6 +257,7 @@ async function enterPurchasePage() {
 }
 
 onShow(() => {
+  void refreshLayout()
   void enterPurchasePage()
 })
 
@@ -375,27 +400,6 @@ async function handlePurchase() {
   min-height: 100vh;
   background: #f7f8fa;
   box-sizing: border-box;
-}
-
-.page-bg-img {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.page-bg-fade {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  background: linear-gradient(180deg, rgba(246, 247, 244, 0.24) 0%, rgba(247, 248, 250, 0.74) 32%, #f7f8fa 58%, #f7f8fa 100%);
-  pointer-events: none;
-  z-index: 0;
 }
 
 .page {

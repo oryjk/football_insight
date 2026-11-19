@@ -2,21 +2,36 @@
   <page-meta :page-style="navigationPageStyle + (shareVisible ? 'overflow: hidden;' : '')" />
   <FiSecondaryNav @back="goBack" />
   <view class="transfer-page">
-    <FiLoading v-if="loading && !view" title="提名加载中" caption="正在读取这张提名。" />
-    <text v-else-if="error && !view" class="transfer-error">{{ error }}</text>
-    <template v-else-if="view">
-      <text class="transfer-title">{{ view.team.team_name }}球迷希望 {{ view.card.player.name }} {{ transferStance(view.card) }}</text>
-      <text class="transfer-caption">{{ view.window.name }} · {{ TRANSFER_BOARD_LABELS[view.card.intent] }}{{ view.card.rank ? `第 ${view.card.rank} 名` : '' }}{{ view.window.open ? ' · 你同意吗？' : ' · 本期已结束' }}</text>
-      <view class="transfer-panel">
-        <FiTransferCard size="md" :card="view.card" :show-rank="false" :pending="pending.includes(view.card.share_code)" @vote="vote" />
-      </view>
-      <text v-if="hint" class="transfer-caption">{{ hint }}</text>
-      <view class="transfer-row">
-        <button class="transfer-action transfer-action--active" @tap="openShare">分享拉票</button>
-        <button class="transfer-action" @tap="openBoard">看大家怎么投</button>
-      </view>
-      <button v-if="view.window.open" class="transfer-action" @tap="openNominate">我也来提名</button>
-    </template>
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
+    <view class="transfer-content">
+      <FiLoading v-if="loading && !view" title="提名加载中" caption="正在读取这张提名。" />
+      <text v-else-if="error && !view" class="transfer-error">{{ error }}</text>
+      <template v-else-if="view">
+        <template v-for="block in visibleBlocks" :key="block.key">
+          <FiLayoutBlock v-if="block.key === 'header'" :background-image-url="block.background_image_url">
+            <view class="transfer-content">
+              <text class="transfer-title">{{ view.team.team_name }}球迷希望 {{ view.card.player.name }} {{ transferStance(view.card) }}</text>
+              <text class="transfer-caption">{{ view.window.name }} · {{ TRANSFER_BOARD_LABELS[view.card.intent] }}{{ view.card.rank ? `第 ${view.card.rank} 名` : '' }}{{ view.window.open ? ' · 你同意吗？' : ' · 本期已结束' }}</text>
+            </view>
+          </FiLayoutBlock>
+          <FiLayoutBlock v-else-if="block.key === 'card'" :background-image-url="block.background_image_url">
+            <view class="transfer-panel">
+              <FiTransferCard size="md" :card="view.card" :show-rank="false" :pending="pending.includes(view.card.share_code)" @vote="vote" />
+            </view>
+          </FiLayoutBlock>
+          <FiLayoutBlock v-else-if="block.key === 'actions'" :background-image-url="block.background_image_url">
+            <view class="transfer-content">
+              <text v-if="hint" class="transfer-caption">{{ hint }}</text>
+              <view class="transfer-row">
+                <button class="transfer-action transfer-action--active" @tap="openShare">分享拉票</button>
+                <button class="transfer-action" @tap="openBoard">看大家怎么投</button>
+              </view>
+              <button v-if="view.window.open" class="transfer-action" @tap="openNominate">我也来提名</button>
+            </view>
+          </FiLayoutBlock>
+        </template>
+      </template>
+    </view>
     <TransferShareSheet v-model:visible="shareVisible" :busy="shareBusy" :image-path="shareImage" :error="shareError" @generate="share.generate" @preview="share.preview" @save="share.save" />
     <canvas canvas-id="transfer-share-canvas" class="transfer-canvas" :style="{ width: '750px', height: '1200px' }" />
   </view>
@@ -24,12 +39,15 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import FiLoading from '../../components/FiLoading.vue'
 import FiTransferCard from '../../components/FiTransferCard.vue'
 import { getTransferCard } from '../../api/transfer'
 import { createTransferVotes, transferVoteDeps } from '../../composables/useTransferVotes'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { useAppSession } from '../../stores/appSession'
 import type { TransferCardView, TransferVoteValue } from '../../types/transfer'
 import { extractApiErrorMessage } from '../../utils/apiError'
@@ -39,6 +57,7 @@ import TransferShareSheet from './components/TransferShareSheet.vue'
 import { useTransferShare } from './useTransferShare'
 
 const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('transfer_view')
 const session = useAppSession()
 const voteDeps = transferVoteDeps()
 const votes = createTransferVotes(voteDeps)
@@ -93,6 +112,7 @@ async function vote(value: TransferVoteValue): Promise<void> {
 
 onLoad(query => { code.value = parseTransferCode(query as Record<string, unknown>) })
 onShow(() => {
+  void refreshLayout()
   if (loadedRevision !== session.revision.value) { loadedRevision = session.revision.value; void load() }
 })
 onShareAppMessage(() => ({

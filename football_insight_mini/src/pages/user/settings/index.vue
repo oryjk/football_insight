@@ -2,69 +2,82 @@
   <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav :shareable="false" @back="goBackFromSecondaryPage('/pages/user/index')" />
   <view class="settings-page">
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
     <view class="settings-section">
-      <view class="settings-item">
-        <text class="settings-item__label">当前版本</text>
-        <text class="settings-item__value">{{ MINI_PROGRAM_VERSION }}</text>
-      </view>
-
-      <view class="settings-item">
-        <text class="settings-item__label">审核状态</text>
-        <text class="settings-item__value" :class="{ 'settings-item__value--reviewing': isReviewing }">{{ statusText }}</text>
-      </view>
-
-      <view v-if="canControl" class="settings-item settings-item--stacked">
-        <view class="settings-item__row">
-          <text class="settings-item__label">切换审核状态</text>
-          <text class="settings-item__caption">切换后全量用户的会员/支付等入口显隐会立即变化；仅管理员账号可切换。</text>
-        </view>
-
-        <view class="settings-options">
-          <view
-            class="settings-option"
-            :class="{ 'settings-option--active': isReviewing }"
-            @click="!isReviewing && handleToggle(true)"
-          >
-            <text>审核中</text>
+      <template v-for="block in visibleBlocks" :key="block.key">
+        <FiLayoutBlock v-if="block.key === 'version_info'" :background-image-url="block.background_image_url">
+          <view class="settings-item">
+            <text class="settings-item__label">当前版本</text>
+            <text class="settings-item__value">{{ MINI_PROGRAM_VERSION }}</text>
           </view>
-          <view
-            class="settings-option"
-            :class="{ 'settings-option--active': !isReviewing }"
-            @click="isReviewing && handleToggle(false)"
-          >
-            <text>已过审</text>
-          </view>
-        </view>
-      </view>
+        </FiLayoutBlock>
 
-    <!-- #ifdef H5 -->
-    <view class="settings-section">
-      <view class="settings-item settings-item--stacked" v-if="h5TestUsers.length">
-        <view class="settings-item__row">
-          <text class="settings-item__label">H5 测试登录</text>
-          <text class="settings-item__caption">一键以测试身份登录，用于在 H5 上验证需要登录的场景。</text>
-        </view>
-
-        <view class="settings-options settings-options--stacked">
-          <view
-            v-for="user in h5TestUsers"
-            :key="user.id"
-            class="settings-option"
-            @click="handleH5TestLogin(user)"
-          >
-            <text>{{ h5TestUserLabel(user) }}</text>
+        <FiLayoutBlock v-else-if="block.key === 'review_status'" :background-image-url="block.background_image_url">
+          <view class="settings-item">
+            <text class="settings-item__label">审核状态</text>
+            <text class="settings-item__value" :class="{ 'settings-item__value--reviewing': isReviewing }">{{ statusText }}</text>
           </view>
-        </view>
-      </view>
-    </view>
-    <!-- #endif -->
+        </FiLayoutBlock>
+
+        <FiLayoutBlock v-else-if="block.key === 'review_control' && canControl" :background-image-url="block.background_image_url">
+          <view class="settings-item settings-item--stacked">
+            <view class="settings-item__row">
+              <text class="settings-item__label">切换审核状态</text>
+              <text class="settings-item__caption">切换后全量用户的会员/支付等入口显隐会立即变化；仅管理员账号可切换。</text>
+            </view>
+
+            <view class="settings-options">
+              <view
+                class="settings-option"
+                :class="{ 'settings-option--active': isReviewing }"
+                @click="!isReviewing && handleToggle(true)"
+              >
+                <text>审核中</text>
+              </view>
+              <view
+                class="settings-option"
+                :class="{ 'settings-option--active': !isReviewing }"
+                @click="isReviewing && handleToggle(false)"
+              >
+                <text>已过审</text>
+              </view>
+            </view>
+          </view>
+        </FiLayoutBlock>
+
+        <!-- #ifdef H5 -->
+        <FiLayoutBlock v-else-if="block.key === 'h5_test_login' && h5TestUsers.length" :background-image-url="block.background_image_url">
+          <view class="settings-item settings-item--stacked">
+            <view class="settings-item__row">
+              <text class="settings-item__label">H5 测试登录</text>
+              <text class="settings-item__caption">一键以测试身份登录，用于在 H5 上验证需要登录的场景。</text>
+            </view>
+
+            <view class="settings-options settings-options--stacked">
+              <view
+                v-for="user in h5TestUsers"
+                :key="user.id"
+                class="settings-option"
+                @click="handleH5TestLogin(user)"
+              >
+                <text>{{ h5TestUserLabel(user) }}</text>
+              </view>
+            </view>
+          </view>
+        </FiLayoutBlock>
+        <!-- #endif -->
+      </template>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { useNavigationLayout } from '../../../composables/useNavigationLayout'
+import { usePageLayout } from '../../../composables/usePageLayout'
 import { ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
+import FiLayoutBlock from '../../../components/FiLayoutBlock.vue'
+import FiPageBackdrop from '../../../components/FiPageBackdrop.vue'
 import FiSecondaryNav from '../../../components/FiSecondaryNav.vue'
 import { goBackFromSecondaryPage } from '../../../utils/secondaryNavigation'
 import { canControlMiniReview, putMiniReviewReviewStatus } from '../../../api/miniReview'
@@ -75,11 +88,13 @@ import type { MiniReviewStatus } from '../../../types/system'
 import { resolveReviewStatusView } from './reviewStatusView'
 import type { H5TestLoginUser } from '../../../types/auth'
 
+const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('user_settings')
+onShow(() => { void refreshLayout() })
+
 // #ifdef H5
 import { listH5TestLoginUsers } from '../../../api/auth'
 import { isSessionSupersededError, useAppSession } from '../../../stores/appSession'
-
-const { navigationPageStyle } = useNavigationLayout()
 
 const h5TestUsers = ref<H5TestLoginUser[]>([])
 
@@ -184,12 +199,15 @@ loadStatus()
 
 <style scoped lang="css">
 .settings-page {
+  position: relative;
   min-height: 100vh;
   background: var(--fi-color-page);
   padding: calc(var(--fi-brand-nav-height) + var(--fi-space-24)) var(--fi-space-24) var(--fi-space-40);
 }
 
 .settings-section {
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: var(--fi-space-card-gap);
 }

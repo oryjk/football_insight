@@ -2,6 +2,7 @@
   <page-meta :page-style="pageStyle" />
   <FiSecondaryNav :share-disabled="!entry" @back="goBack" @share="copyShareLink" />
   <view class="entry-page-offset">
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
     <view class="entry-page" :class="{ 'entry-page--with-composer': Boolean(entry && commentsVisible) }">
       <view v-if="loading && !entry" class="entry-page__state">
         <text>正在加载电报详情…</text>
@@ -13,29 +14,33 @@
       </view>
 
       <template v-else-if="entry">
-        <TelegraphEntryTimeline
-          :entry="entry"
-          :day-label="dayLabel"
-          :comments-visible="commentsVisible"
-          :reaction-pending="reactionPending"
-          :comments="comments"
-          :comments-loading="commentsLoading"
-          :loading-more="loadingMoreComments"
-          :has-more="commentsHasMore"
-          :comments-error="commentsError"
-          :pending-like-ids="pendingCommentLikeIds"
-          :deleting-comment-id="deletingCommentId"
-          @copy-source="copyEntrySource"
-          @share="copyShareLink"
-          @like-entry="page.likeEntry"
-          @dislike-entry="page.dislikeEntry"
-          @focus-comment="page.startRootComment"
-          @retry-comments="page.reloadComments"
-          @load-more="page.loadMoreComments"
-          @open-comment="page.openComment"
-          @like-comment="page.toggleCommentLike"
-          @delete-comment="handleDeleteComment"
-        />
+        <template v-for="block in visibleBlocks" :key="block.key">
+          <FiLayoutBlock v-if="block.key === 'timeline'" :background-image-url="block.background_image_url">
+            <TelegraphEntryTimeline
+              :entry="entry"
+              :day-label="dayLabel"
+              :comments-visible="commentsVisible"
+              :reaction-pending="reactionPending"
+              :comments="comments"
+              :comments-loading="commentsLoading"
+              :loading-more="loadingMoreComments"
+              :has-more="commentsHasMore"
+              :comments-error="commentsError"
+              :pending-like-ids="pendingCommentLikeIds"
+              :deleting-comment-id="deletingCommentId"
+              @copy-source="copyEntrySource"
+              @share="copyShareLink"
+              @like-entry="page.likeEntry"
+              @dislike-entry="page.dislikeEntry"
+              @focus-comment="page.startRootComment"
+              @retry-comments="page.reloadComments"
+              @load-more="page.loadMoreComments"
+              @open-comment="page.openComment"
+              @like-comment="page.toggleCommentLike"
+              @delete-comment="handleDeleteComment"
+            />
+          </FiLayoutBlock>
+        </template>
       </template>
     </view>
   </view>
@@ -70,9 +75,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { onHide, onLoad, onPullDownRefresh, onReachBottom, onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiProfileSetupSheet from '../../components/FiProfileSetupSheet.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { useAppSession } from '../../stores/appSession'
 import { useMiniReviewStatus } from '../../stores/miniReview'
 import type { TelegraphComment } from '../../types/dailyTopic'
@@ -91,6 +99,7 @@ import { useTelegraphEntryPage } from './useTelegraphEntryPage'
 import { TELEGRAPH_ENTRY_SHARE_CANVAS_ID, useTelegraphEntryShareCard } from './useTelegraphEntryShareCard'
 
 const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('telegraph_entry')
 const session = useAppSession()
 const miniReview = useMiniReviewStatus()
 const shareCard = useTelegraphEntryShareCard()
@@ -195,6 +204,7 @@ onHide(() => {
 })
 
 onShow(() => {
+  void refreshLayout()
   void miniReview.ensureMiniReviewReady()
   void session.ensureSessionReady()
   if (topicId && entryId && topic.value && (hasLeftPage || session.revision.value !== lastSessionRevision)) {
@@ -254,6 +264,7 @@ onShareTimeline(() => buildTelegraphEntryTimelinePayload({
 }
 
 .entry-page-offset {
+  position: relative;
   padding-top: var(--fi-brand-nav-height);
   min-height: 100vh;
   box-sizing: border-box;
@@ -261,6 +272,8 @@ onShareTimeline(() => buildTelegraphEntryTimelinePayload({
 }
 
 .entry-page {
+  position: relative;
+  z-index: 1;
   padding: var(--fi-space-20) var(--fi-space-20) var(--fi-space-40);
 }
 

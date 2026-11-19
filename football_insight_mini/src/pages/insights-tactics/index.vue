@@ -2,40 +2,55 @@
   <page-meta :page-style="navigationPageStyle" />
   <FiSecondaryNav @back="goBackFromSecondaryPage('/pages/insights/index')" />
   <view class="tactics-page">
-    <view class="tactics-heading">
-      <text class="tactics-title">排阵容</text>
-      <text class="tactics-caption">看看大家怎么排，也排一套你的阵容</text>
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
+    <view class="tactics-content">
+      <template v-for="block in visibleBlocks" :key="block.key">
+        <FiLayoutBlock v-if="block.key === 'heading'" :background-image-url="block.background_image_url">
+          <view class="tactics-heading">
+            <text class="tactics-title">排阵容</text>
+            <text class="tactics-caption">看看大家怎么排，也排一套你的阵容</text>
+          </view>
+        </FiLayoutBlock>
+
+        <FiLayoutBlock v-else-if="block.key === 'team_selector'" :background-image-url="block.background_image_url">
+          <FiPanel>
+            <FiTeamSelector
+              v-if="selectableTeams.length"
+              :teams="selectableTeams"
+              :model-value="selectedTeamId"
+              @update:model-value="teamBrowser.selectTeam"
+            />
+            <view v-else class="state-card">
+              <text>{{ teamError || '正在加载球队…' }}</text>
+              <button v-if="teamError" @tap="teamBrowser.load()">重试</button>
+            </view>
+          </FiPanel>
+        </FiLayoutBlock>
+
+        <FiLayoutBlock v-else-if="block.key === 'tactics_panel'" :background-image-url="block.background_image_url">
+          <FiPanel>
+            <InsightsTacticsPanel
+              :team-name="selectedTeamName"
+              :authenticated="tacticsAuthenticated"
+              :mine-loading="mineLoading" :mine-error="mineError" :draft="mineDraft" :published="minePublished"
+              :items="communityItems" :total="communityTotal" :sort="communitySort"
+              :loading="communityLoading || teamLoading" :stale="communityStale" :error="teamError || communityError" :pending-likes="communityPendingLikes"
+              :consensus="consensus" :my-overlap="myOverlap" :my-player-ids="myPlayerIds" @explain="showHint"
+              @edit="goToTeamBoard" @retry-mine="tactics.retryMine()" @retry-list="retryTacticsList"
+              @sort="tactics.changeSort" @like="tactics.like" @dislike="tactics.dislike" @open="openPublicTactics" @more="tactics.more()"
+            />
+          </FiPanel>
+        </FiLayoutBlock>
+      </template>
     </view>
-    <FiPanel>
-      <view class="tactics-workspace">
-        <FiTeamSelector
-          v-if="selectableTeams.length"
-          :teams="selectableTeams"
-          :model-value="selectedTeamId"
-          @update:model-value="teamBrowser.selectTeam"
-        />
-        <view v-else class="state-card">
-          <text>{{ teamError || '正在加载球队…' }}</text>
-          <button v-if="teamError" @tap="teamBrowser.load()">重试</button>
-        </view>
-        <InsightsTacticsPanel
-          :team-name="selectedTeamName"
-          :authenticated="tacticsAuthenticated"
-          :mine-loading="mineLoading" :mine-error="mineError" :draft="mineDraft" :published="minePublished"
-          :items="communityItems" :total="communityTotal" :sort="communitySort"
-          :loading="communityLoading || teamLoading" :stale="communityStale" :error="teamError || communityError" :pending-likes="communityPendingLikes"
-          :consensus="consensus" :my-overlap="myOverlap" :my-player-ids="myPlayerIds" @explain="showHint"
-          @edit="goToTeamBoard" @retry-mine="tactics.retryMine()" @retry-list="retryTacticsList"
-          @sort="tactics.changeSort" @like="tactics.like" @dislike="tactics.dislike" @open="openPublicTactics" @more="tactics.more()"
-        />
-      </view>
-    </FiPanel>
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { onHide, onLoad, onReachBottom, onShareAppMessage, onShow, onUnload } from '@dcloudio/uni-app'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import FiPanel from '../../components/FiPanel.vue'
 import FiTeamSelector from '../../components/FiTeamSelector.vue'
@@ -43,6 +58,7 @@ import InsightsTacticsPanel from './components/InsightsTacticsPanel.vue'
 import { useInsightsTeams } from '../../composables/useInsightsTeams'
 import { useInsightsTactics } from './useInsightsTactics'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { useAppSession } from '../../stores/appSession'
 import { createLineupConsensus } from '../../composables/useLineupConsensus'
 import { lineupOverlap, overlapText } from '../../utils/lineupConsensus'
@@ -52,6 +68,7 @@ import { goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import { reportPageActivity } from '../../utils/userActivity'
 
 const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('insights_tactics')
 const session = useAppSession()
 const pageVisible = ref(false)
 let pendingTeamId = 0
@@ -98,6 +115,7 @@ onHide(() => { pageVisible.value = false })
 onUnload(() => { tactics.dispose(); teamBrowser.dispose() })
 onShow(() => {
   pageVisible.value = true
+  void refreshLayout()
   void teamBrowser.load().then(() => {
     if (pendingTeamId > 0) {
       teamBrowser.selectTeam(pendingTeamId)
@@ -110,10 +128,10 @@ onShow(() => {
 </script>
 
 <style scoped lang="css">
-.tactics-page { min-height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--fi-space-card-gap); padding: calc(var(--fi-brand-nav-height) + var(--fi-space-24)) var(--fi-space-16) calc(var(--fi-space-64) + env(safe-area-inset-bottom)); background: var(--fi-color-page-soft); }
+.tactics-page { position: relative; min-height: 100vh; box-sizing: border-box; padding: calc(var(--fi-brand-nav-height) + var(--fi-space-24)) var(--fi-space-16) calc(var(--fi-space-64) + env(safe-area-inset-bottom)); background: var(--fi-color-page-soft); }
+.tactics-content { position: relative; z-index: 1; display: flex; flex-direction: column; gap: var(--fi-space-card-gap); }
 .tactics-heading { padding: 0 var(--fi-space-8); }
 .tactics-title { display: block; color: var(--fi-color-text-primary); font-size: var(--fi-font-36); font-weight: var(--fi-weight-extrabold); }
 .tactics-caption { display: block; margin-top: var(--fi-space-12); color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); }
-.tactics-workspace { display: flex; flex-direction: column; gap: var(--fi-space-24); min-width: 0; }
 .state-card { padding: var(--fi-space-16) 0; color: var(--fi-color-text-caption); font-size: var(--fi-font-24); }
 </style>

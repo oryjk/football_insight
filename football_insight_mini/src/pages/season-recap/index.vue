@@ -2,48 +2,61 @@
  <page-meta :page-style="navigationPageStyle + pageLockStyle" />
  <FiSecondaryNav @back="goBackFromSecondaryPage('/pages/user/index')" @share="copyPageShareLink(sharePath)" />
  <view class="recap-page">
-  <view class="recap-heading">
-   <text class="recap-title">{{season}} 我的赛季足迹</text>
-   <text class="recap-caption">勾选去过的蓉城比赛，生成你的里程海报</text>
-  </view>
-  <view v-if="error && session.hasAccessToken.value" class="recap-error">
-   <text class="recap-error__text">{{error}}</text>
-   <button v-if="!view" class="recap-error__retry" hover-class="pressed" @tap="load">重新加载</button>
-  </view>
-  <FiPanel v-if="!session.hasAccessToken.value">
-   <text class="caption">登录后记录观赛足迹，换设备也能继续查看。</text>
-   <button class="action" hover-class="pressed" @tap="login">登录并制作</button>
-  </FiPanel>
-  <FiLoading v-else-if="loading" title="正在整理赛季比赛" caption="只展示成都蓉城一线队已结束的比赛" />
-  <template v-if="view">
-   <FiPanel>
-    <SeasonRecapSummary :summary="summaryPreview" :season="season" :dirty="dirty" />
-   </FiPanel>
-   <FiPanel>
-    <SeasonRecapThemePicker :model-value="theme" :disabled="generating" @update:model-value="setTheme" />
-   </FiPanel>
-   <FiPanel>
-    <SeasonRecapMatches v-model:filter="filter" :matches="view.matches" :selected="selected" :disabled="generating" @toggle="toggle" @select="setSelected" />
-    <view v-if="showHomeDistance" class="distance">
-     <view class="distance__field">
-      <text class="distance__label">去主场单边距离</text>
-      <input class="distance__input" type="digit" :value="distance" :disabled="generating" maxlength="6" placeholder="0–500" placeholder-class="distance__placeholder" aria-label="去主场的单边距离，公里" @input="handleDistanceInput" />
-      <text class="distance__unit">公里</text>
-     </view>
-     <text class="distance__hint">填一次即可，会记住</text>
-    </view>
-   </FiPanel>
-   <view class="formula">
-    <button class="formula__toggle" hover-class="pressed" :aria-expanded="formulaOpen" @tap="formulaOpen=!formulaOpen">
-     <text class="formula__label">里程怎么算</text>
-     <text class="formula__arrow" :class="{'formula__arrow--open':formulaOpen}">›</text>
-    </button>
-    <FiCollapse :open="formulaOpen">
-     <text class="formula__body">客场：成都至对手主场城市的大圆直线距离 × 2，每场取整后相加；主场：单边距离 × 2 × 场次，合计取整；取消或未结束的比赛不计入。</text>
-    </FiCollapse>
+  <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
+  <view class="recap-content">
+   <view v-if="error && session.hasAccessToken.value" class="recap-error">
+    <text class="recap-error__text">{{error}}</text>
+    <button v-if="!view" class="recap-error__retry" hover-class="pressed" @tap="load">重新加载</button>
    </view>
-  </template>
-  <SeasonRecapPoster v-if="generated" :key="generated.key" :payload="generated" @ready="handlePosterReady" @failed="handlePosterFailed" />
+   <FiPanel v-if="!session.hasAccessToken.value">
+    <text class="caption">登录后记录观赛足迹，换设备也能继续查看。</text>
+    <button class="action" hover-class="pressed" @tap="login">登录并制作</button>
+   </FiPanel>
+   <FiLoading v-else-if="loading" title="正在整理赛季比赛" caption="只展示成都蓉城一线队已结束的比赛" />
+   <template v-for="block in visibleBlocks" :key="block.key">
+    <FiLayoutBlock v-if="block.key === 'heading'" :background-image-url="block.background_image_url">
+     <view class="recap-heading">
+      <text class="recap-title">{{season}} 我的赛季足迹</text>
+      <text class="recap-caption">勾选去过的蓉城比赛，生成你的里程海报</text>
+     </view>
+    </FiLayoutBlock>
+    <FiLayoutBlock v-else-if="block.key === 'summary' && view" :background-image-url="block.background_image_url">
+     <FiPanel>
+      <SeasonRecapSummary :summary="summaryPreview" :season="season" :dirty="dirty" />
+     </FiPanel>
+    </FiLayoutBlock>
+    <FiLayoutBlock v-else-if="block.key === 'theme_picker' && view" :background-image-url="block.background_image_url">
+     <FiPanel>
+      <SeasonRecapThemePicker :model-value="theme" :disabled="generating" @update:model-value="setTheme" />
+     </FiPanel>
+    </FiLayoutBlock>
+    <FiLayoutBlock v-else-if="block.key === 'matches' && view" :background-image-url="block.background_image_url">
+     <FiPanel>
+      <SeasonRecapMatches v-model:filter="filter" :matches="view.matches" :selected="selected" :disabled="generating" @toggle="toggle" @select="setSelected" />
+      <view v-if="showHomeDistance" class="distance">
+       <view class="distance__field">
+        <text class="distance__label">去主场单边距离</text>
+        <input class="distance__input" type="digit" :value="distance" :disabled="generating" maxlength="6" placeholder="0–500" placeholder-class="distance__placeholder" aria-label="去主场的单边距离，公里" @input="handleDistanceInput" />
+        <text class="distance__unit">公里</text>
+       </view>
+       <text class="distance__hint">填一次即可，会记住</text>
+      </view>
+     </FiPanel>
+    </FiLayoutBlock>
+    <FiLayoutBlock v-else-if="block.key === 'formula' && view" :background-image-url="block.background_image_url">
+     <view class="formula">
+      <button class="formula__toggle" hover-class="pressed" :aria-expanded="formulaOpen" @tap="formulaOpen=!formulaOpen">
+       <text class="formula__label">里程怎么算</text>
+       <text class="formula__arrow" :class="{'formula__arrow--open':formulaOpen}">›</text>
+      </button>
+      <FiCollapse :open="formulaOpen">
+       <text class="formula__body">客场：成都至对手主场城市的大圆直线距离 × 2，每场取整后相加；主场：单边距离 × 2 × 场次，合计取整；取消或未结束的比赛不计入。</text>
+      </FiCollapse>
+     </view>
+    </FiLayoutBlock>
+   </template>
+   <SeasonRecapPoster v-if="generated" :key="generated.key" :payload="generated" @ready="handlePosterReady" @failed="handlePosterFailed" />
+  </view>
  </view>
  <SeasonRecapDock v-if="showDock" :stats="selectionStats" :generating="generating" :has-poster="!!posterPath" @generate="handleGenerate" @open="posterSheetVisible=true" />
  <FiCrestProgress v-if="generating" overlay title="正在生成赛季海报" :stages="['保存你的勾选…','准备二维码与队徽…','绘制海报…','导出高清图片…']" />
@@ -53,6 +66,8 @@
 import { computed, ref } from 'vue'
 import { onLoad,onShow,onUnload,onShareAppMessage,onShareTimeline } from '@dcloudio/uni-app'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiPanel from '../../components/FiPanel.vue'
 import FiLoading from '../../components/FiLoading.vue'
 import FiCollapse from '../../components/FiCollapse.vue'
@@ -64,6 +79,7 @@ import FiCrestProgress from '../../components/FiCrestProgress.vue'
 import SeasonRecapPoster from './components/SeasonRecapPoster.vue'
 import SeasonRecapThemePicker from './components/SeasonRecapThemePicker.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { useAppSession } from '../../stores/appSession'
 import { getSeasonRecap,saveSeasonRecap,getSeasonRecapCode } from '../../api/seasonRecap'
 import { setPostLoginRedirectTarget } from '../../utils/authStorage'
@@ -75,6 +91,7 @@ import { createRecapFlow } from './flow'
 import { saveRecapPoster } from './poster'
 const session=useAppSession()
 const {navigationPageStyle}=useNavigationLayout()
+const {visibleBlocks,pageBackgroundImageUrl,refreshLayout}=usePageLayout('season_recap')
 const flow=createRecapFlow(session,{load:getSeasonRecap,save:saveSeasonRecap,code:getSeasonRecapCode})
 const {theme,setTheme,season,view,selected,distance,loading,generating,error,posterPath,generated,dirty,load,toggle,setSelected,editDistance,generate,posterReady,posterFailed}=flow
 const sharePath=computed(()=>recapSharePath(season.value))
@@ -95,7 +112,7 @@ const summaryPreview=computed<RecapSummary>(()=>{
  return previewRecapSummary(current.matches,selected.value,distance.value)??current.summary
 })
 onLoad(query=>{season.value=resolveRecapSeason(query??{})})
-onShow(()=>{if(!view.value)void load()})
+onShow(()=>{void refreshLayout();if(!view.value)void load()})
 onUnload(flow.dispose)
 // vue-tsc resolves <input> to the H5 InputEvent; uni-app supplies the same detail.value payload on both runtimes.
 function handleDistanceInput(event: InputEvent) {
@@ -114,7 +131,8 @@ onShareAppMessage(()=>({title:`我的 ${season.value} 蓉城赛季足迹`,path:s
 onShareTimeline(()=>({title:`我的 ${season.value} 蓉城赛季足迹`,query:`season=${season.value}&src=share&cid=recap${season.value}`,...(posterPath.value?{imageUrl:posterPath.value}:{})}))
 </script>
 <style scoped>
-.recap-page {min-height:100vh;box-sizing:border-box;display:flex;flex-direction:column;gap:var(--fi-space-card-gap);padding:calc(var(--fi-brand-nav-height) + var(--fi-space-24)) var(--fi-space-24) calc(var(--fi-space-64) + var(--fi-space-64) + var(--fi-space-40) + env(safe-area-inset-bottom));background:var(--fi-color-page);color:var(--fi-color-text-primary);}
+.recap-page {position:relative;min-height:100vh;box-sizing:border-box;padding:calc(var(--fi-brand-nav-height) + var(--fi-space-24)) var(--fi-space-24) calc(var(--fi-space-64) + var(--fi-space-64) + var(--fi-space-40) + env(safe-area-inset-bottom));background:var(--fi-color-page);color:var(--fi-color-text-primary);}
+.recap-content {position:relative;z-index:1;display:flex;flex-direction:column;gap:var(--fi-space-card-gap);}
 .recap-heading {margin-bottom:var(--fi-space-12);}
 .recap-title {display:block;color:var(--fi-color-text-primary);font-size:var(--fi-font-36);font-weight:var(--fi-weight-extrabold);}
 .recap-caption {display:block;margin-top:var(--fi-space-12);color:var(--fi-color-text-secondary);font-size:var(--fi-font-24);}

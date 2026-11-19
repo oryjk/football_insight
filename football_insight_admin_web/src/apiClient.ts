@@ -65,7 +65,16 @@ export class ApiClient {
         404: "学员功能配置暂不可用，请重新加载",
         409: "学员功能配置冲突，请检查微信商品 ID 后重试",
       };
+      const pageLayoutMessages: Record<number, string> = {
+        400: "页面装修配置或背景图格式无效，请检查后重试",
+        404: "目标页面不存在，请刷新列表后重试",
+        413: "背景图文件过大，请控制在 5MB 以内",
+        503: "对象存储暂不可用，可直接粘贴图片 URL",
+      };
       const message =
+        (path.startsWith("/page-layouts")
+          ? pageLayoutMessages[response.status]
+          : undefined) ||
         (path === "/student/config"
           ? studentConfigMessages[response.status]
           : undefined) ||

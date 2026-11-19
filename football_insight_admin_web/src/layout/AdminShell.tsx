@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import {
   Eye,
   GraduationCap,
+  LayoutTemplate,
   LogOut,
   Menu,
   MessageSquare,
@@ -24,6 +25,7 @@ import {
 } from "../components/ui/sheet";
 export type AdminPage =
   | "products"
+  | "pageLayouts"
   | "topicReaders"
   | "telegraphComments"
   | "supportBases"
@@ -33,6 +35,10 @@ export type AdminPage =
   | "settings";
 const PAGE_TITLES: Record<AdminPage, { title: string; subtitle: string }> = {
   products: { title: "商品管理", subtitle: "会员微信道具映射" },
+  pageLayouts: {
+    title: "页面装修",
+    subtitle: "配置小程序全部页面卡片顺序、显隐与背景图，支持 H5 实时预览",
+  },
   topicReaders: { title: "话题读者", subtitle: "今日话题被哪些登录用户阅读过" },
   telegraphComments: { title: "电报评论", subtitle: "每日电报评论管理与全站评论开关" },
   supportBases: {
@@ -82,6 +88,19 @@ export function AdminShell({
       >
         <Package />
         商品管理
+      </Button>
+      <Button
+        variant="ghost"
+        className="sidebar-nav-item"
+        aria-current={page === "pageLayouts" ? "page" : undefined}
+        disabled={navigationLocked}
+        onClick={() => {
+          onNavigate("pageLayouts");
+          setDrawer(false);
+        }}
+      >
+        <LayoutTemplate />
+        页面装修
       </Button>
       <Button
         variant="ghost"

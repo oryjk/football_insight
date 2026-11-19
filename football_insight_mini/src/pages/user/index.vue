@@ -2,72 +2,94 @@
   <page-meta :page-style="pageStyle" />
   <view class="page-root" :class="{ 'page-root--guest': isGuestPage }">
     <FiBrandNav :transparent="isGuestPage" />
-    <image class="page-bg-img" :src="phoenixStadiumBgImage" mode="aspectFill" :webp="true" />
-    <view class="page-bg-fade"></view>
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" :fallback-image-url="phoenixStadiumBgImage" full-page />
+    <view v-if="isGuestPage && !pageBackgroundImageUrl" class="page-bg-fade"></view>
     <view class="page-scroll">
       <view class="page">
-      <UserBasicAccountPanel
-        v-if="systemConfigUnderReview && currentUser"
-        :user="currentUser"
-        @logout="handleLogout"
-      />
+        <UserSkeleton v-if="!systemConfigUnderReview && loading" />
 
-      <template v-else>
-        <UserAccountHero
-          v-if="currentUser"
-          :user="currentUser"
-          :hero-class="currentMembershipMeta.heroClass"
-          :tone-class="currentMembershipGuide.toneClass"
-          :code="currentMembershipMeta.code"
-          :badge-label="currentMembershipMeta.badgeLabel"
-          :can-purchase="canPurchaseMembership"
-          :can-renew-v9="canRenewCurrentV9Membership"
-          :invite-code="currentUserInviteCode"
-          @membership-action="handleMembershipCardAction"
-          @copy-invite="handleCopyInviteCode"
-          @edit-profile="openProfileSetupSheet"
-        />
+        <template v-for="block in visibleBlocks" :key="block.key">
+          <FiLayoutBlock
+            v-if="block.key === 'account_hero' && currentUser"
+            :background-image-url="block.background_image_url"
+          >
+            <UserBasicAccountPanel
+              v-if="systemConfigUnderReview"
+              :user="currentUser"
+              @logout="handleLogout"
+            />
+            <UserAccountHero
+              v-else
+              :user="currentUser"
+              :hero-class="currentMembershipMeta.heroClass"
+              :tone-class="currentMembershipGuide.toneClass"
+              :code="currentMembershipMeta.code"
+              :badge-label="currentMembershipMeta.badgeLabel"
+              :can-purchase="canPurchaseMembership"
+              :can-renew-v9="canRenewCurrentV9Membership"
+              :invite-code="currentUserInviteCode"
+              @membership-action="handleMembershipCardAction"
+              @copy-invite="handleCopyInviteCode"
+              @edit-profile="openProfileSetupSheet"
+            />
+          </FiLayoutBlock>
 
-        <UserSkeleton v-if="loading" />
+          <FiLayoutBlock
+            v-else-if="block.key === 'account_info' && !systemConfigUnderReview && !loading && currentUser"
+            :background-image-url="block.background_image_url"
+          >
+            <UserAccountInfoPanel
+              :items="accountInfoItems"
+              :icon-map="accountInfoIconMap"
+              :show-official-bind="canOpenOfficialBind"
+              @open-student="openStudentPage"
+              @bind-official="officialBind.open"
+            />
+          </FiLayoutBlock>
 
-        <template v-else-if="currentUser">
-          <UserAccountInfoPanel
-            :items="accountInfoItems"
-            :icon-map="accountInfoIconMap"
-            :show-official-bind="canOpenOfficialBind"
-            @open-student="openStudentPage"
-            @bind-official="officialBind.open"
-          />
+          <FiLayoutBlock
+            v-else-if="block.key === 'season_recap_entry' && !systemConfigUnderReview && !loading && currentUser"
+            :background-image-url="block.background_image_url"
+          >
+            <UserSeasonRecapEntry @open="openSeasonRecap" />
+          </FiLayoutBlock>
 
-          <UserSeasonRecapEntry @open="openSeasonRecap" />
-
-          <view class="account-actions">
-            <view class="account-actions__body">
-              <text class="account-actions__label">账号管理</text>
-              <text class="account-actions__caption">{{ loginPresentation.switchAccountCaption }}</text>
+          <FiLayoutBlock
+            v-else-if="block.key === 'account_actions' && !systemConfigUnderReview && !loading && currentUser"
+            :background-image-url="block.background_image_url"
+          >
+            <view class="account-actions">
+              <view class="account-actions__body">
+                <text class="account-actions__label">账号管理</text>
+                <text class="account-actions__caption">{{ loginPresentation.switchAccountCaption }}</text>
+              </view>
+              <button class="logout-action" @click="handleLogout">退出登录</button>
             </view>
-            <button class="logout-action" @click="handleLogout">退出登录</button>
-          </view>
-        </template>
-      </template>
-      <!-- H5 测试登录入口：仅当后端配置 H5_TEST_LOGIN_USER_IDS 白名单时展示，不受审核模式影响。 -->
-      <!-- #ifdef H5 -->
-      <UserH5TestLoginPanel
-        v-if="h5TestUsers.length"
-        :users="h5TestUsers"
-        :current-user-id="currentUser?.id"
-        @select="handleH5TestLoginSelect"
-      />
-      <!-- #endif -->
+          </FiLayoutBlock>
 
-      <!-- 设置入口仅管理员（后端白名单判定）可见；不受审核模式影响。 -->
-      <view v-if="isReviewController" class="panel settings-entry-panel" hover-class="settings-entry-panel--pressed" hover-stay-time="100" @click="openSettingsPage">
-        <view class="settings-entry-panel__body">
-          <text class="settings-entry-panel__title">设置</text>
-          <text class="settings-entry-panel__caption">查看当前版本审核状态</text>
-        </view>
-        <text class="settings-entry-panel__arrow">›</text>
-      </view>
+          <FiLayoutBlock
+            v-else-if="block.key === 'settings_entry' && isReviewController"
+            :background-image-url="block.background_image_url"
+          >
+            <view class="panel settings-entry-panel" hover-class="settings-entry-panel--pressed" hover-stay-time="100" @click="openSettingsPage">
+              <view class="settings-entry-panel__body">
+                <text class="settings-entry-panel__title">设置</text>
+                <text class="settings-entry-panel__caption">查看当前版本审核状态</text>
+              </view>
+              <text class="settings-entry-panel__arrow">›</text>
+            </view>
+          </FiLayoutBlock>
+        </template>
+
+        <!-- H5 测试登录入口：仅当后端配置 H5_TEST_LOGIN_USER_IDS 白名单时展示，不受审核模式影响。 -->
+        <!-- #ifdef H5 -->
+        <UserH5TestLoginPanel
+          v-if="h5TestUsers.length"
+          :users="h5TestUsers"
+          :current-user-id="currentUser?.id"
+          @select="handleH5TestLoginSelect"
+        />
+        <!-- #endif -->
       </view>
     </view>
 
@@ -123,7 +145,9 @@ import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { onHide, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import UserGuestChantWall from './components/UserGuestChantWall.vue'
 import UserBasicAccountPanel from './components/UserBasicAccountPanel.vue'
 import UserSkeleton from './components/UserSkeleton.vue'
@@ -139,6 +163,7 @@ import calendarDaysIcon from '../../static/user/calendar-days.svg'
 import logInIcon from '../../static/user/log-in.svg'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as phoenixStadiumBgImage } from '../../config/assets'
 import { listH5TestLoginUsers } from '../../api/auth'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { isSessionSupersededError, useAppSession } from '../../stores/appSession'
 import type { H5TestLoginUser, MiniWechatBindingRequiredResponse } from '../../types/auth'
 import { useMiniReviewStatus } from '../../stores/miniReview'
@@ -165,6 +190,7 @@ import { editableNicknameInitialValue } from '../../utils/profileGate'
 import { extractApiErrorMessage } from '../../utils/apiError'
 
 const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('user')
 
 function openSeasonRecap() { uni.navigateTo({ url: '/pages/season-recap/index' }) }
 
@@ -434,6 +460,7 @@ async function handleH5TestLoginSelect(user: H5TestLoginUser): Promise<void> {
 }
 
 onShow(() => {
+  void refreshLayout()
   void officialBind.handlePageShow()
   reportPageActivity('user')
   beginPaywallVisit()
@@ -482,16 +509,6 @@ onShow(() => {
   box-sizing: border-box;
 }
 
-.page-bg-img {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  pointer-events: none;
-  z-index: 0;
-}
-
 .page-bg-fade {
   position: fixed;
   top: 0;
@@ -499,15 +516,10 @@ onShow(() => {
   width: 100%;
   height: 100vh;
   background:
-    linear-gradient(180deg, rgba(246, 247, 244, 0.24) 0%, rgba(247, 248, 250, 0.74) 32%, var(--fi-color-page-soft) 58%, var(--fi-color-page-soft) 100%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.page-root--guest .page-bg-fade {
-  background:
     linear-gradient(180deg, rgba(0, 0, 0, 0.18) 0%, rgba(247, 248, 250, 0.58) 22%, rgba(20, 20, 18, 0.12) 48%, rgba(0, 0, 0, 0.34) 100%),
     linear-gradient(0deg, rgba(0, 0, 0, 0.08), rgba(255, 255, 255, 0.04));
+  pointer-events: none;
+  z-index: 0;
 }
 
 .page-root--guest .page {
@@ -515,61 +527,16 @@ onShow(() => {
   padding: var(--fi-space-24) var(--fi-space-28) calc(var(--fi-space-32) + env(safe-area-inset-bottom) + var(--fi-space-100));
 }
 
-.hero-card, .panel {
+.panel {
   position: relative;
   z-index: 1;
-  background: rgba(255,255,255,0.72);
+  background: var(--fi-color-surface-frosted);
   border-radius: var(--fi-component-panel-radius);
   padding: var(--fi-space-20);
   border: 2rpx solid rgba(255,255,255,0.55);
   box-shadow: 0 20rpx 48rpx rgba(26,28,36,0.06);
   backdrop-filter: blur(18rpx);
   -webkit-backdrop-filter: blur(18rpx);
-}
-
-.page-root--guest .account-hero {
-  animation-delay: 90ms;
-}
-
-.hero-card__top, .section-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.hero-card__top, .section-heading { align-items: flex-start; gap: var(--fi-space-12); }
-
-.hero-card__title, .section-title {
-  display: block;
-  margin-top: var(--fi-space-10);
-  color: #2a2c31;
-  font-size: var(--fi-font-48);
-  line-height: 1.08;
-  font-weight: 800;
-}
-
-.hero-card__summary, .account-form-panel__summary, .user-panel__summary {
-  display: block;
-  margin-top: var(--fi-space-18);
-  color: #6b707b;
-  font-size: var(--fi-font-28);
-  line-height: 1.7;
-}
-
-.hero-card__badge, .meta-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  white-space: nowrap;
-  line-height: 1;
-  box-sizing: border-box;
-  padding: var(--fi-space-14) var(--fi-space-24);
-  border-radius: var(--fi-radius-round);
-  border: 2rpx solid var(--page-border);
-  background: var(--fi-color-page);
-  color: var(--fi-color-text-secondary);
-  font-size: var(--fi-font-24);
 }
 
 .account-actions {

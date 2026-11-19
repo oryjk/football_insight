@@ -1,15 +1,22 @@
 <template>
   <view class="page-root" :class="{ 'page-root--embedded': embedded }">
-    <image v-if="!embedded" class="page-bg-img" :src="bgImage" mode="aspectFill" :webp="true" />
-    <view v-if="!embedded" class="page-bg-fade"></view>
+    <FiPageBackdrop v-if="!embedded" :image-url="pageBackgroundImageUrl" :fallback-image-url="bgImage" />
     <view class="page-scroll">
       <view class="page">
       <MatchesSkeleton v-if="loading" />
       <view v-else-if="errorMessage" class="state-card state-card--error"><text>{{ errorMessage }}</text></view>
       <template v-else>
-        <MatchesSeasonProgress :rounds="rounds" :selected-round-number="selectedRoundNumber" @open-round="openRoundDialog" />
-        <MatchesUpcomingPanel :sections="upcomingSections" :now-iso="pageNowIso" @open-round="openRoundDialog" @open-tech-stats="openMatchTechStats" />
-        <MatchesRecentResults v-if="groupedMatches.length" :groups="groupedMatches" :now-iso="pageNowIso" @open-tech-stats="openMatchTechStats" />
+        <template v-for="block in matchesBlocks" :key="block.key">
+          <FiLayoutBlock v-if="block.key === 'matches_progress'" :background-image-url="block.background_image_url">
+            <MatchesSeasonProgress :rounds="rounds" :selected-round-number="selectedRoundNumber" @open-round="openRoundDialog" />
+          </FiLayoutBlock>
+          <FiLayoutBlock v-else-if="block.key === 'matches_upcoming'" :background-image-url="block.background_image_url">
+            <MatchesUpcomingPanel :sections="upcomingSections" :now-iso="pageNowIso" @open-round="openRoundDialog" @open-tech-stats="openMatchTechStats" />
+          </FiLayoutBlock>
+          <FiLayoutBlock v-else-if="block.key === 'matches_results' && groupedMatches.length" :background-image-url="block.background_image_url">
+            <MatchesRecentResults :groups="groupedMatches" :now-iso="pageNowIso" @open-tech-stats="openMatchTechStats" />
+          </FiLayoutBlock>
+        </template>
       </template>
       </view>
     </view>
@@ -30,7 +37,11 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
+import { usePageLayout } from '../../composables/usePageLayout'
 import MatchesSkeleton from './components/MatchesSkeleton.vue'
 import { PHOENIX_STADIUM_BG_IMAGE_URL as bgImage } from '../../config/assets'
 import MatchesSeasonProgress from './components/MatchesSeasonProgress.vue'
@@ -41,6 +52,9 @@ import MatchesTechStatsSheet from './components/MatchesTechStatsSheet.vue'
 import { useMatchesPage } from './useMatchesPage'
 
 defineProps<{ embedded?: boolean }>()
+
+const { visibleBlocks, pageBackgroundImageUrl } = usePageLayout('rankings')
+const matchesBlocks = computed(() => visibleBlocks.value.filter((b) => b.key.startsWith('matches_')))
 
 const {
   loading, errorMessage, rounds, pageNowIso, groupedMatches, upcomingSections,

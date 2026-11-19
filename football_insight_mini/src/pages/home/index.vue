@@ -4,80 +4,73 @@
     <FiLaunchSplash :phase="splash.phase.value" />
     <!-- 冷启动宽限期内（启动幕尚未决定是否出现）背景图和导航都不显示，免得先于启动幕闪现 -->
     <FiBrandNav v-show="!launchPending" />
-    <view v-if="!launchPending" class="page-bg-img" :style="{ backgroundImage: `url(${bgImage})` }"></view>
-    <view v-if="!launchPending" class="page-bg-fade"></view>
+    <FiPageBackdrop v-if="!launchPending" :image-url="pageBackgroundImageUrl" :fallback-image-url="bgImage" />
     <view class="page-scroll">
       <view class="page">
-        <!-- 首屏三路数据（话题/助力/总览）全部落定前只显示一个统一骨架，避免部分已出内容、部分仍是骨架 -->
-        <!-- 冷启动时，启动幕宽限期与展示期内不渲染骨架屏；启动幕收起后数据仍未落定才显示骨架 -->
         <HomeSkeleton v-if="showInitialSkeleton" />
-
         <template v-else-if="homeInitialSettled">
-        <HomeDailyTopics
-          :edition="topicEdition"
-          :loading="topicsLoading"
-          :error-message="topicsErrorMessage"
-          :available-audio-ids="topicAudio.availableIds.value"
-          :active-audio-id="topicAudio.activeId.value"
-          :audio-status="topicAudio.status.value"
-          @read="openDailyTopic"
-          @play="topicAudio.toggle"
-          @retry="loadDailyTopics"
-          @more="openMoreTopics"
-        />
-
-        <HomeSupportPanel
-          :now="homeMatchNow"
-          :has-auth-token="hasAuthToken"
-          :loading="supportLoading"
-          :profile="supportProfile"
-          :error-message="supportErrorMessage"
-          :teams="supportTeams"
-          :vote-submitting-team-id="voteSubmittingTeamId"
-          :favorite-submitting="favoriteSubmitting"
-          :sale-start-at="ticketSaleStartAt"
-          @select-team="openFavoriteTeamSheet"
-          @open-match="openSupportMatch"
-          @vote="handleHomeSupportVote"
-        />
-
-        <HomeFanEntries
-          :team-name="fanEntriesTeam.teamName"
-          :consensus="fanLineupConsensus"
-          :transfer-summary="fanTransferSummary"
-          @open-lineup="openLineupBoard"
-          @open-transfer="openTransferBoard"
-          @open-director="openDirector"
-        />
-
-        <!-- 回到页面的后台刷新沿用已有内容，只有还没有总览数据时才显示骨架 -->
-        <HomeSkeleton v-if="loading && !overview" />
-
-        <view v-else-if="errorMessage" class="state-card state-card--error">
-          <text>{{ errorMessage }}</text>
-        </view>
-
-        <template v-else-if="overview">
-          <HomeStoryPanel
-            :headline-parts="headlineTitleParts"
-            :body="headlineBody"
-            :updated-at-label="updatedAtLabel"
-            :pulse-matches="pulseMatches"
-            :watch-points="watchPoints"
-            @open-tech-stats="openPulseMatchTechStats"
-          />
-
-          <HomeStandingsPanel
-            :teams="standings"
-            @select="openStandingsRowSheet"
-          />
-
-          <HomeRankingPanel
-            title="射手榜"
-            :players="scorers"
-            @select-match="showScorerMatch"
-          />
-        </template>
+          <HomeSkeleton v-if="loading && !overview && hasVisibleOverviewBlock" />
+          <view v-else-if="errorMessage && hasVisibleOverviewBlock" class="state-card state-card--error">
+            <text>{{ errorMessage }}</text>
+          </view>
+          <template v-for="block in visibleBlocks" :key="block.key">
+            <FiLayoutBlock v-if="block.key === 'daily_topics'" :background-image-url="block.background_image_url">
+              <HomeDailyTopics
+                :edition="topicEdition"
+                :loading="topicsLoading"
+                :error-message="topicsErrorMessage"
+                :available-audio-ids="topicAudio.availableIds.value"
+                :active-audio-id="topicAudio.activeId.value"
+                :audio-status="topicAudio.status.value"
+                @read="openDailyTopic"
+                @play="topicAudio.toggle"
+                @retry="loadDailyTopics"
+                @more="openMoreTopics"
+              />
+            </FiLayoutBlock>
+            <FiLayoutBlock v-else-if="block.key === 'my_team_support'" :background-image-url="block.background_image_url">
+              <HomeSupportPanel
+                :now="homeMatchNow"
+                :has-auth-token="hasAuthToken"
+                :loading="supportLoading"
+                :profile="supportProfile"
+                :error-message="supportErrorMessage"
+                :teams="supportTeams"
+                :vote-submitting-team-id="voteSubmittingTeamId"
+                :favorite-submitting="favoriteSubmitting"
+                :sale-start-at="ticketSaleStartAt"
+                @select-team="openFavoriteTeamSheet"
+                @open-match="openSupportMatch"
+                @vote="handleHomeSupportVote"
+              />
+            </FiLayoutBlock>
+            <FiLayoutBlock v-else-if="block.key === 'fan_entries'" :background-image-url="block.background_image_url">
+              <HomeFanEntries
+                :team-name="fanEntriesTeam.teamName"
+                :consensus="fanLineupConsensus"
+                :transfer-summary="fanTransferSummary"
+                @open-lineup="openLineupBoard"
+                @open-transfer="openTransferBoard"
+                @open-director="openDirector"
+              />
+            </FiLayoutBlock>
+            <FiLayoutBlock v-else-if="block.key === 'story_pulse' && overview" :background-image-url="block.background_image_url">
+              <HomeStoryPanel
+                :headline-parts="headlineTitleParts"
+                :body="headlineBody"
+                :updated-at-label="updatedAtLabel"
+                :pulse-matches="pulseMatches"
+                :watch-points="watchPoints"
+                @open-tech-stats="openPulseMatchTechStats"
+              />
+            </FiLayoutBlock>
+            <FiLayoutBlock v-else-if="block.key === 'standings' && overview" :background-image-url="block.background_image_url">
+              <HomeStandingsPanel :teams="standings" @select="openStandingsRowSheet" />
+            </FiLayoutBlock>
+            <FiLayoutBlock v-else-if="block.key === 'top_scorers' && overview" :background-image-url="block.background_image_url">
+              <HomeRankingPanel title="射手榜" :players="scorers" @select-match="showScorerMatch" />
+            </FiLayoutBlock>
+          </template>
         </template>
       </view>
     </view>
@@ -124,7 +117,10 @@ import { useNavigationLayout } from '../../composables/useNavigationLayout'
 import { computed, ref, watch } from 'vue'
 import { onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
 import FiBrandNav from '../../components/FiBrandNav.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
 import FiLoginFloat from '../../components/FiLoginFloat.vue'
+import { usePageLayout } from '../../composables/usePageLayout'
 import HomeDailyTopics from './components/HomeDailyTopics.vue'
 import HomeSupportPanel from './components/HomeSupportPanel.vue'
 import HomeFanEntries from './components/HomeFanEntries.vue'
@@ -529,8 +525,14 @@ function openDirector() {
   uni.navigateTo({ url: teamId ? `/pages/director/index?team_id=${teamId}` : '/pages/director/index' })
 }
 
+const { visibleBlocks, pageBackgroundImageUrl, isBlockVisible, refreshLayout } = usePageLayout('home')
+const hasVisibleOverviewBlock = computed(
+  () => isBlockVisible('story_pulse') || isBlockVisible('standings') || isBlockVisible('top_scorers'),
+)
+
 onShow(() => {
   reportPageActivity('home')
+  void refreshLayout()
   const pending = [loadPage(), loadDailyTopics(), loadSupportData()]
   void loadTicketSaleMatches()
   void refreshFanEntries()
@@ -571,28 +573,5 @@ onShow(() => {
 .state-card--error text {
   font-size: var(--fi-font-28);
   color: var(--fi-color-error);
-}
-
-.page-bg-img {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: var(--fi-space-600);
-  background-repeat: no-repeat;
-  background-size: cover;
-  background-position: center top;
-  pointer-events: none;
-  z-index: 0;
-}
-.page-bg-fade {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: var(--fi-space-600);
-  background: var(--fi-color-page-backdrop-fade);
-  pointer-events: none;
-  z-index: 0;
 }
 </style>

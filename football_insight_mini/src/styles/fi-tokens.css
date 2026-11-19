@@ -1144,3 +1144,22 @@ page {
   --fi-space-fan-entry-pitch-height: var(--fi-primitive-fan-entry-pitch-height);
   --fi-space-fan-entry-avatar-overlap: var(--fi-primitive-fan-entry-avatar-overlap);
 }
+
+/* 页面装修：自定义页面背景图与卡片背景图柔光遮罩 */
+:root,
+page {
+  --fi-primitive-layout-card-scrim: rgba(255, 255, 255, 0.76);
+  --fi-primitive-layout-card-wash: rgba(255, 255, 255, 0.24);
+  --fi-primitive-layout-page-fade: linear-gradient(
+    180deg,
+    rgba(247, 248, 250, 0.18) 0%,
+    rgba(247, 248, 250, 0.68) 62%,
+    rgba(247, 248, 250, 0.94) 100%
+  );
+  --fi-primitive-layout-empty-border: rgba(21, 22, 27, 0.14);
+
+  --fi-color-layout-card-scrim: var(--fi-primitive-layout-card-scrim);
+  --fi-color-layout-card-wash: var(--fi-primitive-layout-card-wash);
+  --fi-color-layout-page-fade: var(--fi-primitive-layout-page-fade);
+  --fi-color-layout-empty-border: var(--fi-primitive-layout-empty-border);
+}

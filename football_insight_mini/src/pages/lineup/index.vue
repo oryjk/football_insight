@@ -2,7 +2,7 @@
   <page-meta :page-style="navigationPageStyle + pageLockStyle" />
   <FiSecondaryNav :shareable="false" @back="goBack" />
   <view class="page-root">
-    <view class="page-bg"></view>
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
 
     <!-- #ifdef H5 -->
     <view class="page page--notice">
@@ -12,14 +12,12 @@
 
     <!-- #ifndef H5 -->
     <view class="page">
-      <view v-if="teams.length" class="team-picker">
-        <FiTeamSelector :teams="teams" :model-value="teamId" @update:model-value="switchTeam" />
+      <view v-if="teams.length && (loading || errorMessage || !squad) && isBlockVisible('team_picker')" class="team-picker">
+        <FiLayoutBlock :background-image-url="blockBackground('team_picker')">
+          <FiTeamSelector :teams="teams" :model-value="teamId" @update:model-value="switchTeam" />
+        </FiLayoutBlock>
       </view>
-      <FiLoading
-        v-if="loading"
-        title="战术板加载中"
-        caption="正在准备球队名单和你的阵容。"
-      />
+      <FiLoading v-if="loading" title="战术板加载中" caption="正在准备球队名单和你的阵容。" />
 
       <view v-else-if="errorMessage" class="state-card state-card--error">
         <text>{{ errorMessage }}</text>
@@ -28,49 +26,49 @@
 
       <view v-else-if="squad" class="page-content">
         <view v-if="notice" class="notice"><text>{{ notice }}</text></view>
+        <template v-for="block in visibleBlocks" :key="block.key">
+          <FiLayoutBlock v-if="block.key === 'team_picker' && teams.length" :background-image-url="block.background_image_url">
+            <view class="team-picker">
+              <FiTeamSelector :teams="teams" :model-value="teamId" @update:model-value="switchTeam" />
+            </view>
+          </FiLayoutBlock>
 
-        <view class="status-row">
-          <view class="status-row__heading">
-            <text class="status-row__title">我的最佳阵容</text>
-            <text class="status-row__state" :class="`status-row__state--${saveState}`">{{ saveStateText }}</text>
+          <FiLayoutBlock v-else-if="block.key === 'status_bar'" :background-image-url="block.background_image_url">
+            <view class="status-row">
+              <view class="status-row__heading">
+                <text class="status-row__title">我的最佳阵容</text>
+                <text class="status-row__state" :class="`status-row__state--${saveState}`">{{ saveStateText }}</text>
+              </view>
+              <button class="community-link" @tap="openCommunity">看看大家怎么排 ›</button>
+            </view>
+          </FiLayoutBlock>
+
+          <FiLayoutBlock v-else-if="block.key === 'formation_bar'" :background-image-url="block.background_image_url">
+            <LineupFormationBar :model-value="editor.formation.value" @update:model-value="changeFormation" />
+          </FiLayoutBlock>
+
+          <view v-else-if="block.key === 'pitch'" class="pitch-slot">
+            <FiLayoutBlock :background-image-url="block.background_image_url" fill>
+              <LineupPitch :players="pitchPlayers" :selected-slot="editor.selectedSlot.value" fit-container :code-src="pitchCodeSrc" @tap="openSheet" @drag="editor.applyDrag" />
+            </FiLayoutBlock>
           </view>
-          <button class="community-link" @tap="openCommunity">看看大家怎么排 ›</button>
-        </view>
 
-        <LineupFormationBar :model-value="editor.formation.value" @update:model-value="changeFormation" />
+          <FiLayoutBlock v-else-if="block.key === 'hint'" :background-image-url="block.background_image_url">
+            <view class="hint-group">
+              <view class="hint-row">
+                <text class="hint">点选球员 · 按住拖动 · 已排 {{ editor.filled.value }}/11</text>
+                <text v-if="editor.filled.value < 11" class="hint-link" @tap="fillStartingEleven">一键填入首发</text>
+              </view>
+              <text class="hint">草稿仅自己可见，满 11 人可发布并参与排名</text>
+            </view>
+          </FiLayoutBlock>
 
-        <view class="pitch-slot">
-          <LineupPitch
-            :players="pitchPlayers"
-            :selected-slot="editor.selectedSlot.value"
-            fit-container
-            :code-src="pitchCodeSrc"
-            @tap="openSheet"
-            @drag="editor.applyDrag"
-          />
-        </view>
-
-        <view class="hint-row">
-          <text class="hint">点选球员 · 按住拖动 · 已排 {{ editor.filled.value }}/11</text>
-          <text v-if="editor.filled.value < 11" class="hint-link" @tap="fillStartingEleven">一键填入首发</text>
-        </view>
-
-        <text class="hint">草稿仅自己可见，满 11 人可发布并参与排名</text>
-
-        <view class="action-slot">
-          <LineupActionBar
-            :busy="saving"
-            :saving-draft="savingDraft"
-            :publishing="publishing"
-            :share-preparing="sharePreparing"
-            :complete="editor.filled.value === 11"
-            :published="Boolean(savedLineup)"
-            @reset="requestConfirmation('reset')"
-            @share="handleShare"
-            @draft="handleDraft"
-            @publish="requestConfirmation('publish')"
-          />
-        </view>
+          <FiLayoutBlock v-else-if="block.key === 'action_bar'" :background-image-url="block.background_image_url">
+            <view class="action-slot">
+              <LineupActionBar :busy="saving" :saving-draft="savingDraft" :publishing="publishing" :share-preparing="sharePreparing" :complete="editor.filled.value === 11" :published="Boolean(savedLineup)" @reset="requestConfirmation('reset')" @share="handleShare" @draft="handleDraft" @publish="requestConfirmation('publish')" />
+            </view>
+          </FiLayoutBlock>
+        </template>
       </view>
     </view>
 
@@ -104,7 +102,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { onLoad, onShow, onShareAppMessage } from '@dcloudio/uni-app'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
 import FiLoading from '../../components/FiLoading.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import LineupConfirmDialog from './components/LineupConfirmDialog.vue'
 import { getSharedLineup, searchLineupPlayers } from '../../api/lineup'
@@ -115,6 +115,7 @@ import { useLineupShare } from './useLineupShare'
 import LineupShareSheet from './components/LineupShareSheet.vue'
 import { getSupportProfile, listSupportTeams } from '../../api/support'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { useAppSession } from '../../stores/appSession'
 import { buildLineupListUrl, buildLineupPageUrl, parseLineupPageQuery } from '../../utils/lineupLinks'
 import { rememberPostLoginRedirect } from '../../utils/postLoginRedirect'
@@ -128,6 +129,7 @@ import FiTeamSelector from '../../components/FiTeamSelector.vue'
 import LineupActionBar from './components/LineupActionBar.vue'
 
 const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, isBlockVisible, blockBackground, refreshLayout } = usePageLayout('lineup')
 const session = useAppSession()
 
 const { teamId, squad, extras, addExtra, loading, errorMessage, notice, saving, savingDraft, publishing, saveState, savedLineup, hasUnpublishedChanges, editor, load, saveDraft, publish, fillStartingEleven, dispose } = useLineupPage()
@@ -393,6 +395,7 @@ onLoad((query) => {
 })
 
 onShow(() => {
+  void refreshLayout()
   // 只在首次进入时加载。登录页回跳会新建本页（switchTab 会关闭非 Tab 页），
   // 登录回跳的一次性意图只恢复私密草稿；发布仍须再次确认。
   if (started) return
@@ -418,16 +421,6 @@ onBeforeUnmount(() => { if (searchTimer) clearTimeout(searchTimer); dispose() })
   background: var(--fi-color-page-soft);
 }
 
-.page-bg {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  background: var(--fi-color-page-soft);
-  pointer-events: none;
-}
-
 .page {
   position: relative;
   z-index: 1;
@@ -446,8 +439,7 @@ onBeforeUnmount(() => { if (searchTimer) clearTimeout(searchTimer); dispose() })
   gap: var(--fi-space-12);
 }
 
-.page-content > view:not(.pitch-slot),
-.page-content > text {
+.page-content > :not(.pitch-slot) {
   flex-shrink: 0;
 }
 
@@ -455,11 +447,18 @@ onBeforeUnmount(() => { if (searchTimer) clearTimeout(searchTimer); dispose() })
   position: relative;
   flex: 1;
   min-height: calc(var(--fi-space-64) * 6);
+  display: flex;
+  flex-direction: column;
+}
+
+.hint-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fi-space-8);
 }
 
 .team-picker {
   flex-shrink: 0;
-  margin-bottom: var(--fi-space-12);
 }
 
 .state-card {

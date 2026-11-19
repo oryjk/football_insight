@@ -120,6 +120,11 @@ pub fn build_admin_routes(pool: PgPool, config: &AppConfig) -> Router {
             pool.clone(),
             auth_service.clone(),
         ))
+        .merge(crate::page_layout::bootstrap::build_admin_page_layout_routes(
+            pool.clone(),
+            config,
+            auth_service.clone(),
+        ))
         .merge(admin_setup_routes(setup_service))
         .merge(admin_credentials_routes(
             auth_service.clone(),

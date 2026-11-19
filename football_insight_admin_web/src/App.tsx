@@ -18,6 +18,7 @@ import { Label } from "./components/ui/label";
 import { Card, CardContent } from "./components/ui/card";
 import { AdminShell, type AdminPage } from "./layout/AdminShell";
 import { ProductsPage } from "./features/products/ProductsPage";
+import { PageLayoutsPage } from "./features/pageLayouts/PageLayoutsPage";
 import { TelegraphCommentsPage } from "./features/topics/TelegraphCommentsPage";
 import { TopicReadersPage } from "./features/topics/TopicReadersPage";
 import { ReviewExemptPage } from "./features/review/ReviewExemptPage";
@@ -271,6 +272,13 @@ export function App() {
         )}
         {page === "products" ? (
           <ProductsPage
+            key={token}
+            api={api}
+            token={token}
+            onBusyChange={onProductBusy}
+          />
+        ) : page === "pageLayouts" ? (
+          <PageLayoutsPage
             key={token}
             api={api}
             token={token}

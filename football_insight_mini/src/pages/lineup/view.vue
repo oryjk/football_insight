@@ -2,48 +2,64 @@
   <page-meta :page-style="navigationPageStyle + (shareVisible ? 'overflow: hidden;' : '')" />
   <FiSecondaryNav :shareable="false" @back="goBack" />
   <view class="community-page">
-    <!-- #ifdef H5 -->
-    <text class="community-caption">请在微信小程序中查看分享阵容。</text>
-    <!-- #endif -->
-    <!-- #ifndef H5 -->
-    <FiLoading v-if="loading" title="阵容加载中" caption="正在读取球迷分享的完整阵容。" />
-    <text v-if="error" class="community-error">{{ error }}</text>
-    <button v-if="!loading && !detail" class="community-action" @tap="reload">重新加载</button>
-    <template v-if="detail">
-      <view class="community-panel">
-        <text class="community-title">{{ detail.team.team_name }} · {{ detail.formation }}</text>
-        <view class="community-row">
-          <image v-if="detail.author.avatar_url" :src="detail.author.avatar_url" class="author-avatar" mode="aspectFill" />
-          <text class="community-caption">{{ detail.author.display_name }}心中的最佳阵容</text>
-        </view>
-        <text class="community-caption">发布 {{ lineupDateLabel(detail.created_at) }} · 更新 {{ lineupDateLabel(detail.updated_at) }}</text>
-        <text v-if="overlapLine" class="community-caption community-caption--overlap">{{ overlapLine }}</text>
-      </view>
-      <LineupPitch :players="pitchPlayers" :exclusive-ids="exclusiveIds" :code-src="pitchCodeSrc" readonly />
-      <view class="community-row">
-        <view class="reaction-slot"><FiReactionBar size="md" :count="detail.likes_count" :liked="detail.liked_by_me" :disliked="detail.disliked_by_me" :pending="pendingLikes.length > 0" @like="like(returnUrl)" @dislike="dislike(returnUrl)" /></view>
-        <button class="community-action" @tap="openShare">分享阵容</button>
-      </view>
-      <view class="community-row">
-        <button class="community-action community-action--active" :disabled="ownershipLoading" @tap="edit">{{ ownershipLoading ? '加载中…' : isOwner ? '编辑' : '我也排一套' }}</button>
-        <button class="community-action" @tap="list">球队战术板</button>
-      </view>
-    </template>
-    <LineupShareSheet v-model:visible="shareVisible" :busy="shareBusy" :ready="Boolean(sharePayload)" :image-path="imagePath" :error="shareError" @generate="generate" @preview="preview" @save="saveImage" />
-    <canvas canvas-id="lineup-share-canvas" class="lineup-canvas" :style="{ width: '750px', height: '1200px' }" />
-    <canvas canvas-id="lineup-card-canvas" class="lineup-canvas" :style="{ width: '750px', height: '600px' }" />
-    <!-- #endif -->
+    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
+    <view class="community-content">
+      <!-- #ifdef H5 -->
+      <text class="community-caption">请在微信小程序中查看分享阵容。</text>
+      <!-- #endif -->
+      <!-- #ifndef H5 -->
+      <FiLoading v-if="loading" title="阵容加载中" caption="正在读取球迷分享的完整阵容。" />
+      <text v-if="error" class="community-error">{{ error }}</text>
+      <button v-if="!loading && !detail" class="community-action" @tap="reload">重新加载</button>
+      <template v-if="detail">
+        <template v-for="block in visibleBlocks" :key="block.key">
+          <FiLayoutBlock v-if="block.key === 'summary_panel'" :background-image-url="block.background_image_url">
+            <view class="community-panel">
+              <text class="community-title">{{ detail.team.team_name }} · {{ detail.formation }}</text>
+              <view class="community-row">
+                <image v-if="detail.author.avatar_url" :src="detail.author.avatar_url" class="author-avatar" mode="aspectFill" />
+                <text class="community-caption">{{ detail.author.display_name }}心中的最佳阵容</text>
+              </view>
+              <text class="community-caption">发布 {{ lineupDateLabel(detail.created_at) }} · 更新 {{ lineupDateLabel(detail.updated_at) }}</text>
+              <text v-if="overlapLine" class="community-caption community-caption--overlap">{{ overlapLine }}</text>
+            </view>
+          </FiLayoutBlock>
+          <FiLayoutBlock v-else-if="block.key === 'pitch'" :background-image-url="block.background_image_url">
+            <LineupPitch :players="pitchPlayers" :exclusive-ids="exclusiveIds" :code-src="pitchCodeSrc" readonly />
+          </FiLayoutBlock>
+          <FiLayoutBlock v-else-if="block.key === 'reaction_bar'" :background-image-url="block.background_image_url">
+            <view class="community-row">
+              <view class="reaction-slot"><FiReactionBar size="md" :count="detail.likes_count" :liked="detail.liked_by_me" :disliked="detail.disliked_by_me" :pending="pendingLikes.length > 0" @like="like(returnUrl)" @dislike="dislike(returnUrl)" /></view>
+              <button class="community-action" @tap="openShare">分享阵容</button>
+            </view>
+          </FiLayoutBlock>
+          <FiLayoutBlock v-else-if="block.key === 'navigation_bar'" :background-image-url="block.background_image_url">
+            <view class="community-row">
+              <button class="community-action community-action--active" :disabled="ownershipLoading" @tap="edit">{{ ownershipLoading ? '加载中…' : isOwner ? '编辑' : '我也排一套' }}</button>
+              <button class="community-action" @tap="list">球队战术板</button>
+            </view>
+          </FiLayoutBlock>
+        </template>
+      </template>
+      <LineupShareSheet v-model:visible="shareVisible" :busy="shareBusy" :ready="Boolean(sharePayload)" :image-path="imagePath" :error="shareError" @generate="generate" @preview="preview" @save="saveImage" />
+      <canvas canvas-id="lineup-share-canvas" class="lineup-canvas" :style="{ width: '750px', height: '1200px' }" />
+      <canvas canvas-id="lineup-card-canvas" class="lineup-canvas" :style="{ width: '750px', height: '600px' }" />
+      <!-- #endif -->
+    </view>
   </view>
 </template>
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { onLoad, onShareAppMessage, onShow } from '@dcloudio/uni-app'
+import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
+import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import FiLoading from '../../components/FiLoading.vue'
 import FiReactionBar from '../../components/FiReactionBar.vue'
 import LineupPitch from './components/LineupPitch.vue'
 import LineupShareSheet from './components/LineupShareSheet.vue'
 import { useNavigationLayout } from '../../composables/useNavigationLayout'
+import { usePageLayout } from '../../composables/usePageLayout'
 import { useAppSession } from '../../stores/appSession'
 import { buildLineupListUrl, buildLineupPageUrl, buildLineupViewUrl, parseLineupShareCode } from '../../utils/lineupLinks'
 import { createLineupDetail } from '../../composables/useLineupCommunity'
@@ -55,6 +71,7 @@ import { useLineupShare } from './useLineupShare'
 import { useLineupOwnership } from './useLineupOwnership'
 import { useLineupPitchCode } from './useLineupPitchCode'
 const { navigationPageStyle } = useNavigationLayout()
+const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('lineup_view')
 const session = useAppSession()
 const state = createLineupDetail()
 const { detail, loading, error, pendingLikes, like, dislike } = state
@@ -81,6 +98,7 @@ function reload(): void { if (code.value) void state.load(code.value); else erro
 onLoad(query => { code.value = parseLineupShareCode(query as Record<string, unknown>) })
 let started = false, loadedSessionRevision = -1
 onShow(() => {
+  void refreshLayout()
   if (!started || loadedSessionRevision !== session.revision.value) {
     started = true; loadedSessionRevision = session.revision.value; reload()
   }
