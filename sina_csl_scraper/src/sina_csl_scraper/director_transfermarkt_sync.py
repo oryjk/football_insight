@@ -155,6 +155,8 @@ class TransfermarktPlayer:
     contract_until: date | None = None
     market_value_eur: int | None = None
     tm_player_id: int | None = None
+    country: str = ""
+    position: str = ""
 
 
 @dataclass(frozen=True)
@@ -165,6 +167,8 @@ class SquadPlayerRecord:
     team_name: str = ""
     shirt_number: int | None = None
     active: bool = True
+    country: str = ""
+    position: str = ""
 
 
 @dataclass(frozen=True)
@@ -174,6 +178,8 @@ class DirectorCandidateRecord:
     current_club: str = ""
     league_tag: str = ""
     active: bool = True
+    country: str = ""
+    position: str = ""
 
 
 class TransfermarktClient(Protocol):
@@ -237,10 +243,39 @@ class PostgresTransfermarktStore:
     def __init__(self, connection) -> None:
         self.connection = connection
 
+    def reset_valuations(self) -> tuple[int, int]:
+        """Clear previously synced Transfermarkt fields before a clean re-import."""
+        with self.connection.transaction():
+            with self.connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE f_i_squad_players
+                    SET market_value_eur = NULL,
+                        birth_date = NULL,
+                        contract_until = NULL,
+                        transfermarkt_synced_at = NULL
+                    WHERE transfermarkt_synced_at IS NOT NULL
+                    """
+                )
+                squad_cleared = cursor.rowcount or 0
+                cursor.execute(
+                    """
+                    UPDATE f_i_director_candidates
+                    SET market_value_eur = NULL,
+                        birth_date = NULL,
+                        contract_until = NULL,
+                        transfermarkt_synced_at = NULL
+                    WHERE transfermarkt_synced_at IS NOT NULL
+                    """
+                )
+                cand_cleared = cursor.rowcount or 0
+        return (squad_cleared, cand_cleared)
+
     def load_squad_players(self) -> list[SquadPlayerRecord]:
         rows = self.connection.execute(
             """
-            SELECT sp.team_id, sp.player_id, sp.player_name, COALESCE(t.team_name, ''), sp.shirt_number, sp.active
+            SELECT sp.team_id, sp.player_id, sp.player_name, COALESCE(t.team_name, ''),
+                   sp.shirt_number, sp.active, COALESCE(sp.country, ''), COALESCE(sp.position, '')
             FROM f_i_squad_players AS sp
             LEFT JOIN f_i_teams AS t ON t.team_id = sp.team_id
             """
@@ -253,14 +288,17 @@ class PostgresTransfermarktStore:
                 team_name=str(team_name or "").strip(),
                 shirt_number=int(shirt_number) if shirt_number is not None else None,
                 active=bool(active),
+                country=str(country or "").strip(),
+                position=str(position or "").strip(),
             )
-            for team_id, player_id, player_name, team_name, shirt_number, active in rows
+            for team_id, player_id, player_name, team_name, shirt_number, active, country, position in rows
         ]
 
     def load_director_candidates(self) -> list[DirectorCandidateRecord]:
         rows = self.connection.execute(
             """
-            SELECT id, player_name, COALESCE(current_club, ''), COALESCE(league_tag, ''), active
+            SELECT id, player_name, COALESCE(current_club, ''), COALESCE(league_tag, ''),
+                   active, COALESCE(country, ''), COALESCE(position, '')
             FROM f_i_director_candidates
             """
         ).fetchall()
@@ -271,8 +309,10 @@ class PostgresTransfermarktStore:
                 current_club=str(current_club or "").strip(),
                 league_tag=str(league_tag or "").strip(),
                 active=bool(active),
+                country=str(country or "").strip(),
+                position=str(position or "").strip(),
             )
-            for cand_id, player_name, current_club, league_tag, active in rows
+            for cand_id, player_name, current_club, league_tag, active, country, position in rows
         ]
 
     def update_squad_players(self, rows: list[dict[str, Any]]) -> int:
@@ -1256,7 +1296,8 @@ def parse_players_csv(path: Path) -> list[TransfermarktPlayer]:
     )
     players: list[TransfermarktPlayer] = []
     with opener(path) as handle:
-        reader = csv.DictReader(handle)
+        filtered_lines = (line for line in handle if line.strip() and not line.lstrip().startswith("#"))
+        reader = csv.DictReader(filtered_lines)
         if not reader.fieldnames:
             return players
         for raw_row in reader:
@@ -1290,6 +1331,8 @@ def parse_players_csv(path: Path) -> list[TransfermarktPlayer]:
             )
             tm_id_raw = _first_nonempty(row, ("tm_player_id", "player_id"))
             tm_player_id = int(tm_id_raw) if tm_id_raw.isdigit() else None
+            country = _first_nonempty(row, ("country_of_citizenship", "country", "nationality"))
+            position = _first_nonempty(row, ("position", "sub_position"))
 
             player = TransfermarktPlayer(
                 player_name=name,
@@ -1300,6 +1343,8 @@ def parse_players_csv(path: Path) -> list[TransfermarktPlayer]:
                 contract_until=contract_until,
                 market_value_eur=market_value_eur,
                 tm_player_id=tm_player_id,
+                country=country,
+                position=position,
             )
             if _has_any_valuation_field(player):
                 players.append(player)
@@ -1379,6 +1424,166 @@ def fetch_sina_english_names(team_ids: Sequence[int]) -> dict[int, str]:
     return mapping
 
 
+_COUNTRY_ALIAS_GROUPS: dict[str, tuple[str, ...]] = {
+    "china": ("中国", "china", "china pr", "pr china"),
+    "hong_kong": ("中国香港", "香港", "hong kong", "hongkong"),
+    "chinese_taipei": ("中国台北", "中国台湾", "chinese taipei", "taiwan"),
+    "brazil": ("巴西", "brazil"),
+    "south_korea": ("韩国", "korea, south", "south korea", "korea republic"),
+    "japan": ("日本", "japan"),
+    "portugal": ("葡萄牙", "portugal"),
+    "spain": ("西班牙", "spain"),
+    "france": ("法国", "france"),
+    "germany": ("德国", "germany"),
+    "netherlands": ("荷兰", "netherlands"),
+    "croatia": ("克罗地亚", "croatia"),
+    "serbia": ("塞尔维亚", "serbia"),
+    "russia": ("俄罗斯", "russia"),
+    "switzerland": ("瑞士", "switzerland"),
+    "sweden": ("瑞典", "sweden"),
+    "argentina": ("阿根廷", "argentina"),
+    "colombia": ("哥伦比亚", "colombia"),
+    "uruguay": ("乌拉圭", "uruguay"),
+    "chile": ("智利", "chile"),
+    "peru": ("秘鲁", "peru"),
+    "ecuador": ("厄瓜多尔", "ecuador"),
+    "venezuela": ("委内瑞拉", "venezuela"),
+    "paraguay": ("巴拉圭", "paraguay"),
+    "cameroon": ("喀麦隆", "cameroon"),
+    "ghana": ("加纳", "ghana"),
+    "nigeria": ("尼日利亚", "nigeria"),
+    "cote_divoire": ("科特迪瓦", "cote d'ivoire", "ivory coast"),
+    "senegal": ("塞内加尔", "senegal"),
+    "angola": ("安哥拉", "angola"),
+    "dr_congo": ("民主刚果", "刚果(金)", "刚果民主共和国", "dr congo"),
+    "gabon": ("加蓬", "gabon"),
+    "guinea": ("几内亚", "guinea"),
+    "mali": ("马里", "mali"),
+    "australia": ("澳大利亚", "australia"),
+    "uzbekistan": ("乌兹别克斯坦", "uzbekistan"),
+    "romania": ("罗马尼亚", "romania"),
+    "poland": ("波兰", "poland"),
+    "czechia": ("捷克", "czech republic", "czechia"),
+    "belgium": ("比利时", "belgium"),
+    "italy": ("意大利", "italy"),
+    "england": ("英格兰", "england"),
+    "scotland": ("苏格兰", "scotland"),
+    "norway": ("挪威", "norway"),
+    "denmark": ("丹麦", "denmark"),
+    "montenegro": ("黑山", "montenegro"),
+    "bosnia": ("波黑", "bosnia-herzegovina", "bosnia and herzegovina"),
+    "slovenia": ("斯洛文尼亚", "slovenia"),
+    "slovakia": ("斯洛伐克", "slovakia"),
+    "hungary": ("匈牙利", "hungary"),
+    "austria": ("奥地利", "austria"),
+    "turkey": ("土耳其", "turkey", "turkiye", "türkiye"),
+    "bulgaria": ("保加利亚", "bulgaria"),
+    "georgia": ("格鲁吉亚", "georgia"),
+    "armenia": ("亚美尼亚", "armenia"),
+    "belarus": ("白俄罗斯", "belarus"),
+    "ukraine": ("乌克兰", "ukraine"),
+    "albania": ("阿尔巴尼亚", "albania"),
+    "north_macedonia": ("北马其顿", "north macedonia"),
+    "greece": ("希腊", "greece"),
+    "tunisia": ("突尼斯", "tunisia"),
+    "morocco": ("摩洛哥", "morocco"),
+    "algeria": ("阿尔及利亚", "algeria"),
+    "egypt": ("埃及", "egypt"),
+    "south_africa": ("南非", "south africa"),
+    "zimbabwe": ("津巴布韦", "zimbabwe"),
+    "zambia": ("赞比亚", "zambia"),
+    "equatorial_guinea": ("赤道几内亚", "equatorial guinea"),
+    "guinea_bissau": ("几内亚比绍", "guinea-bissau"),
+    "cape_verde": ("佛得角", "cape verde"),
+    "togo": ("多哥", "togo"),
+    "benin": ("贝宁", "benin"),
+    "madagascar": ("马达加斯加", "madagascar"),
+    "mozambique": ("莫桑比克", "mozambique"),
+    "burkina_faso": ("布基纳法索", "burkina faso"),
+    "united_states": ("美国", "united states", "usa"),
+    "canada": ("加拿大", "canada"),
+    "mexico": ("墨西哥", "mexico"),
+    "jamaica": ("牙买加", "jamaica"),
+    "costa_rica": ("哥斯达黎加", "costa rica"),
+    "honduras": ("洪都拉斯", "honduras"),
+    "panama": ("巴拿马", "panama"),
+    "iran": ("伊朗", "iran"),
+    "iraq": ("伊拉克", "iraq"),
+    "syria": ("叙利亚", "syria"),
+    "lebanon": ("黎巴嫩", "lebanon"),
+    "jordan": ("约旦", "jordan"),
+    "saudi_arabia": ("沙特阿拉伯", "沙特", "saudi arabia"),
+    "thailand": ("泰国", "thailand"),
+    "vietnam": ("越南", "vietnam"),
+    "indonesia": ("印度尼西亚", "印尼", "indonesia"),
+    "malaysia": ("马来西亚", "malaysia"),
+    "singapore": ("新加坡", "singapore"),
+    "new_zealand": ("新西兰", "new zealand"),
+}
+
+_COUNTRY_CANONICAL_LOOKUP: dict[str, str] = {
+    normalize_player_name(alias): canonical
+    for canonical, aliases in _COUNTRY_ALIAS_GROUPS.items()
+    for alias in aliases
+    if normalize_player_name(alias)
+}
+
+
+def canonicalize_country(raw: str) -> str:
+    """Resolve Chinese or English country names to a shared canonical key."""
+    norm = normalize_player_name(raw)
+    if not norm:
+        return ""
+    return _COUNTRY_CANONICAL_LOOKUP.get(norm, norm)
+
+
+def canonicalize_position(raw: str) -> str:
+    """Normalize Transfermarkt / Sina / DB position labels to GK / DF / MF / FW."""
+    text = raw.strip().lower()
+    if not text:
+        return ""
+    if text in {"gk", "goalkeeper", "门将", "守门员"} or "goalkeeper" in text or "keeper" in text:
+        return "GK"
+    if text in {"df", "defender", "后卫"} or "back" in text or "defender" in text:
+        return "DF"
+    if text in {"mf", "midfield", "midfielder", "中场"} or "midfield" in text:
+        return "MF"
+    if text in {"fw", "attack", "forward", "前锋"} or "forward" in text or "striker" in text or "winger" in text or "attack" in text:
+        return "FW"
+    return ""
+
+
+def _positions_contradict(tm_pos: str, db_pos: str) -> bool:
+    p1 = canonicalize_position(tm_pos)
+    p2 = canonicalize_position(db_pos)
+    if not p1 or not p2 or p1 == p2:
+        return False
+    if "GK" in (p1, p2):
+        return True
+    return {p1, p2} == {"DF", "FW"}
+
+
+def _countries_contradict(tm_country: str, db_country: str) -> bool:
+    c1 = canonicalize_country(tm_country)
+    c2 = canonicalize_country(db_country)
+    if not c1 or not c2:
+        return False
+    # Allow Hong Kong / Chinese Taipei / China naturalized edge cases to be checked via club/position
+    china_group = {"china", "hong_kong", "chinese_taipei"}
+    if c1 in china_group and c2 in china_group:
+        return False
+    return c1 != c2
+
+
+def _is_single_word_non_cjk(name: str) -> bool:
+    cleaned = _collapse_ws(name)
+    if not cleaned:
+        return False
+    if any("\u4e00" <= ch <= "\u9fff" for ch in cleaned):
+        return False
+    return len(cleaned.split()) == 1
+
+
 def sync_transfermarkt_from_players(
     *,
     players: Sequence[TransfermarktPlayer],
@@ -1409,8 +1614,10 @@ def sync_transfermarkt_from_players(
             for key in _name_match_keys(record.player_name):
                 candidates_by_name.setdefault(key, []).append(record)
 
-    squad_best: dict[tuple[int, int], tuple[tuple[int, int, int, int], dict[str, Any], str]] = {}
-    candidate_best: dict[int, tuple[tuple[int, int, int], dict[str, Any], str]] = {}
+    squad_best: dict[tuple[int, int], tuple[tuple[int, int, int, int, int, int], dict[str, Any], str]] = {}
+    candidate_best: dict[int, tuple[tuple[int, int, int, int], dict[str, Any], str]] = {}
+    rejected_ambiguous = 0
+    is_global_dataset = source_label.startswith("dataset:")
 
     for player in players:
         if not _has_any_valuation_field(player):
@@ -1422,11 +1629,21 @@ def sync_transfermarkt_from_players(
         for key in _name_match_keys(player.player_name):
             records = squad_by_name.get(key)
             if records:
-                # Prefer records matching club, shirt number, active
+                valid_records = [
+                    rec
+                    for rec in records
+                    if not _countries_contradict(player.country, rec.country)
+                    and not _positions_contradict(player.position, rec.position)
+                ]
+                if not valid_records:
+                    rejected_ambiguous += 1
+                    continue
                 matched_squad = max(
-                    records,
+                    valid_records,
                     key=lambda rec: (
                         _club_similarity_score(player.club_name, rec.team_name),
+                        1 if (canonicalize_country(player.country) and canonicalize_country(player.country) == canonicalize_country(rec.country)) else 0,
+                        1 if (canonicalize_position(player.position) and canonicalize_position(player.position) == canonicalize_position(rec.position)) else 0,
                         1 if (player.shirt_number is not None and rec.shirt_number == player.shirt_number) else 0,
                         1 if rec.active else 0,
                     ),
@@ -1439,17 +1656,39 @@ def sync_transfermarkt_from_players(
 
         if matched_squad is not None:
             club_score = _club_similarity_score(player.club_name, matched_squad.team_name)
-            is_single_latin_word = (
-                player.player_name.isascii() and len(player.player_name.strip().split()) == 1
-            )
-            # Guard against false positives on single-word global names (e.g. "Felipe", "Oscar")
-            if is_single_latin_word and not match_via_shirt and club_score == 0 and player.league_key != "csl":
+            # Diacritic-aware guard against single-word global name collisions (e.g. "Rômulo", "Felipe", "Oscar")
+            if (
+                _is_single_word_non_cjk(player.player_name)
+                and not match_via_shirt
+                and club_score == 0
+                and player.league_key != "csl"
+                and (is_global_dataset or player.league_key != "csv")
+            ):
                 matched_squad = None
+                rejected_ambiguous += 1
 
         if matched_squad is not None:
             pk = (matched_squad.team_id, matched_squad.player_id)
+            country_exact = (
+                1
+                if (
+                    canonicalize_country(player.country)
+                    and canonicalize_country(player.country) == canonicalize_country(matched_squad.country)
+                )
+                else 0
+            )
+            pos_exact = (
+                1
+                if (
+                    canonicalize_position(player.position)
+                    and canonicalize_position(player.position) == canonicalize_position(matched_squad.position)
+                )
+                else 0
+            )
             score = (
                 _club_similarity_score(player.club_name, matched_squad.team_name),
+                country_exact,
+                pos_exact,
                 1 if player.league_key == "csl" else 0,
                 1 if player.market_value_eur is not None else 0,
                 1 if player.contract_until is not None else 0,
@@ -1471,9 +1710,17 @@ def sync_transfermarkt_from_players(
         for key in _name_match_keys(player.player_name):
             records = candidates_by_name.get(key)
             if records:
+                valid_cands = [
+                    rec
+                    for rec in records
+                    if not _countries_contradict(player.country, rec.country)
+                    and not _positions_contradict(player.position, rec.position)
+                ]
+                if not valid_cands:
+                    continue
                 expected_tag = LEAGUE_KEY_TO_CANDIDATE_TAG.get(player.league_key, "")
                 matched_cand = max(
-                    records,
+                    valid_cands,
                     key=lambda rec: (
                         _club_similarity_score(player.club_name, rec.current_club),
                         1 if expected_tag and rec.league_tag == expected_tag else 0,
@@ -1483,8 +1730,19 @@ def sync_transfermarkt_from_players(
                 break
 
         if matched_cand is not None:
+            club_score_c = _club_similarity_score(player.club_name, matched_cand.current_club)
+            if (
+                _is_single_word_non_cjk(player.player_name)
+                and club_score_c == 0
+                and is_global_dataset
+            ):
+                matched_cand = None
+                rejected_ambiguous += 1
+
+        if matched_cand is not None:
             score_c = (
                 _club_similarity_score(player.club_name, matched_cand.current_club),
+                1 if (canonicalize_country(player.country) and canonicalize_country(player.country) == canonicalize_country(matched_cand.country)) else 0,
                 1 if player.market_value_eur is not None else 0,
                 1 if player.contract_until is not None else 0,
             )
@@ -1516,10 +1774,12 @@ def sync_transfermarkt_from_players(
         "source": source_label,
         "players_loaded": len(players),
         "sina_names_loaded": len(english_by_player_id),
+        "rejected_ambiguous": rejected_ambiguous,
         "squad_matches": len(squad_rows),
         "squad_updated": squad_updated,
         "candidate_matches": len(candidate_rows),
         "candidate_updated": candidate_updated,
         "sample_matches": sample_matches,
     }
+
 

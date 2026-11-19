@@ -629,6 +629,11 @@ def sync_director_transfermarkt_command(
         "--write-db",
         help="Write matched valuations/dates into PostgreSQL (defaults to dry-run when omitted).",
     ),
+    reset: bool = typer.Option(
+        False,
+        "--reset",
+        help="Clear previously synced Transfermarkt fields before writing (use with --write-db).",
+    ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -658,9 +663,12 @@ def sync_director_transfermarkt_command(
         client = HttpTransfermarktClient(base_url=base_url)
         if resolved_database_url:
             with psycopg.connect(resolved_database_url, autocommit=True) as connection:
+                store = PostgresTransfermarktStore(connection)
+                if reset and not effective_dry_run:
+                    store.reset_valuations()
                 summary = sync_transfermarkt_valuations(
                     client=client,
-                    store=PostgresTransfermarktStore(connection),
+                    store=store,
                     leagues=league_keys,
                     dry_run=effective_dry_run,
                     delay=delay,
@@ -700,6 +708,9 @@ def sync_director_transfermarkt_command(
     if resolved_database_url:
         with psycopg.connect(resolved_database_url, autocommit=True) as connection:
             store = PostgresTransfermarktStore(connection)
+            cleared = (0, 0)
+            if reset and not effective_dry_run:
+                cleared = store.reset_valuations()
             eng_names: dict[int, str] = {}
             if sina_names:
                 team_ids = [rec.team_id for rec in store.load_squad_players() if rec.active]
@@ -712,6 +723,9 @@ def sync_director_transfermarkt_command(
                 source_label=source_label,
                 sina_english_names=eng_names,
             )
+            if reset and not effective_dry_run:
+                summary["squad_reset"] = cleared[0]
+                summary["candidate_reset"] = cleared[1]
     else:
         summary = sync_transfermarkt_from_players(
             players=players,

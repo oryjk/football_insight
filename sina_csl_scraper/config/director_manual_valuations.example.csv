@@ -1,0 +1,9 @@
+# 手动校准模板：复制为 data/manual_values.csv 后填入最新德转数据，执行：
+#   uv run sina-csl-scraper sync-director-transfermarkt --from-csv data/manual_values.csv --no-sina-names --write-db
+# 字段说明：
+#   player_name: 中文名（与 f_i_squad_players 或 f_i_director_candidates 一致）
+#   club_name: 所属球队（用于同名消歧，可留空）
+#   market_value_eur: 欧元身价（支持 1800000 / 180万欧 / €1.80m）
+#   birth_date: 出生日期（YYYY-MM-DD）
+#   contract_until: 合同到期日（YYYY-MM-DD）
+player_name,club_name,market_value_eur,birth_date,contract_until

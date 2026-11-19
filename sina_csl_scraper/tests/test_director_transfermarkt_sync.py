@@ -791,3 +791,38 @@ def test_cli_sync_director_transfermarkt_from_csv(tmp_path) -> None:
     assert payload["source"] == f"csv:{csv_path}"
 
 
+def test_precision_guards_reject_diacritic_single_word_and_country_position_mismatches() -> None:
+    from sina_csl_scraper.director_transfermarkt_sync import sync_transfermarkt_from_players
+
+    store = FakeTransfermarktStore(
+        squad_players=[
+            SquadPlayerRecord(77680, 101, "罗慕洛", "成都蓉城", 10, True, "巴西", "MF"),
+            SquadPlayerRecord(77681, 102, "马莱莱", "大连英博", 11, True, "瑞士", "FW"),
+            SquadPlayerRecord(77682, 103, "武磊", "上海海港", 7, True, "中国", "FW"),
+        ],
+    )
+    players = [
+        # 1) Diacritic single-word name from a non-CSL European club -> MUST be rejected
+        TransfermarktPlayer("Rômulo", "Göztepe", "tr1", None, date(2002, 2, 8), date(2028, 6, 30), 450_000, None, "Brazil", "Attack"),
+        # 2) Country contradiction (Portugal != China) -> MUST be rejected
+        TransfermarktPlayer("Lei Wu", "Some FC", "po1", None, date(1995, 1, 1), date(2027, 6, 30), 500_000, None, "Portugal", "Attack"),
+        # 3) Position contradiction (Goalkeeper != FW) -> MUST be rejected
+        TransfermarktPlayer("Cephas Malele", "Some FC", "fr1", None, date(1994, 1, 8), date(2027, 6, 30), 100_000, None, "Switzerland", "Goalkeeper"),
+        # 4) Valid full-name + country + position match -> MUST succeed
+        TransfermarktPlayer("Cephas Malele", "FC Zürich", "ch1", None, date(1994, 1, 8), date(2026, 12, 31), 1_500_000, None, "Switzerland", "Attack"),
+    ]
+    summary = sync_transfermarkt_from_players(
+        players=players,
+        store=store,
+        dry_run=False,
+        source_label="dataset:players.csv.gz",
+        sina_english_names={101: "Romulo", 102: "Cephas Malele", 103: "Wu Lei"},
+    )
+    assert summary["squad_matches"] == 1
+    assert summary["squad_updated"] == 1
+    assert summary["rejected_ambiguous"] >= 3
+    assert store.updated_squad_rows[0]["player_id"] == 102
+    assert store.updated_squad_rows[0]["market_value_eur"] == 1_500_000
+
+
+
