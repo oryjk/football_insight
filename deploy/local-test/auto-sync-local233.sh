@@ -65,6 +65,7 @@ DEPLOY_BRANCH=${DEPLOY_BRANCH:-main}
 AUTO_SYNC_BACKEND=${AUTO_SYNC_BACKEND:-1}
 AUTO_SYNC_MP_RELEASE=${AUTO_SYNC_MP_RELEASE:-0}
 AUTO_SYNC_MP_ROBOT=${AUTO_SYNC_MP_ROBOT:-2}
+AUTO_SYNC_FETCH_TIMEOUT_SECONDS=${AUTO_SYNC_FETCH_TIMEOUT_SECONDS:-30}
 GH_REPO=${GH_REPO:-oryjk/football_insight}
 
 log() {
@@ -245,7 +246,23 @@ tick() {
         return 0
     fi
 
-    git -C "$REPO_ROOT" fetch --quiet --no-write-fetch-head origin "$DEPLOY_BRANCH:refs/remotes/origin/$DEPLOY_BRANCH"
+    local fetch_exit=0
+    if command -v timeout >/dev/null 2>&1; then
+        timeout --kill-after=5s "${AUTO_SYNC_FETCH_TIMEOUT_SECONDS}s" \
+            git -C "$REPO_ROOT" fetch --quiet --no-write-fetch-head origin "$DEPLOY_BRANCH:refs/remotes/origin/$DEPLOY_BRANCH" \
+            || fetch_exit=$?
+    else
+        git -C "$REPO_ROOT" fetch --quiet --no-write-fetch-head origin "$DEPLOY_BRANCH:refs/remotes/origin/$DEPLOY_BRANCH" \
+            || fetch_exit=$?
+    fi
+    if ((fetch_exit != 0)); then
+        if ((fetch_exit == 124 || fetch_exit == 137)); then
+            notice "git fetch timed out after ${AUTO_SYNC_FETCH_TIMEOUT_SECONDS}s (proxy/SSH stall); will retry next tick."
+        else
+            notice "git fetch failed (exit ${fetch_exit}); will retry next tick."
+        fi
+        return 1
+    fi
 
     local before target
     before=$(git -C "$REPO_ROOT" rev-parse HEAD)
