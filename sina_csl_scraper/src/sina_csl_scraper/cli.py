@@ -24,6 +24,13 @@ from .cfl_client import CflCslClient
 from .client import SinaCslClient, serialize_datasets
 from .constants import DEFAULT_LEAGUE_ID
 from .director_avatars import PostgresDirectorAvatarStore, sync_director_avatars
+from .director_sina_sync import (
+    DEFAULT_LEAGUES_STR,
+    DefaultSinaDirectorClient,
+    PostgresDirectorSinaStore,
+    parse_leagues_arg,
+    sync_director_sina,
+)
 from .leisu import LeisuBrowserClient, LeisuCornerEnricher, load_leisu_match_map
 from .models import MatchResult
 from .postgres_repository import PostgresInsightSyncRepository
@@ -402,6 +409,104 @@ def sync_director_avatars_command(
     typer.echo(json.dumps(summary, ensure_ascii=False))
     if summary["failed"]:
         raise typer.Exit(1)
+
+
+@app.command("sync-director-sina")
+def sync_director_sina_command(
+    leagues: str = typer.Option(
+        DEFAULT_LEAGUES_STR,
+        "--leagues",
+        help="Comma-separated Sina league IDs (default: ACL, ACL2, CL1, SPL, MLS, Serie A, La Liga, Bundesliga, EPL, Ligue 1).",
+    ),
+    season: int | None = typer.Option(None, "--season", help="Override season year for all leagues."),
+    include_acl: bool = typer.Option(
+        True,
+        "--include-acl/--no-include-acl",
+        help="Include non-K1/J1 clubs in ACL/ACL2 (enabled by default).",
+    ),
+    include_no_avatar: bool = typer.Option(
+        False,
+        "--include-no-avatar",
+        help="Also upsert players without an avatar.",
+    ),
+    deactivate_no_avatar: bool = typer.Option(
+        False,
+        "--deactivate-no-avatar",
+        help="Mark candidates still lacking avatar_url as active=FALSE after sync.",
+    ),
+    force_avatars: bool = typer.Option(
+        False,
+        "--force-avatars",
+        help="Re-download and re-upload avatars even when an existing MinIO URL is present.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Fetch and classify squads without uploading avatars or writing to PostgreSQL.",
+    ),
+    limit_teams: int | None = typer.Option(
+        None,
+        "--limit-teams",
+        min=1,
+        help="Process at most N teams across all leagues.",
+    ),
+    interval: float = typer.Option(
+        0.2,
+        "--interval",
+        min=0.0,
+        help="Seconds to sleep between Sina API requests.",
+    ),
+    database_url: str | None = typer.Option(None, envvar=["FI_DATABASE_URL", "DATABASE_URL"]),
+    minio_endpoint: str = typer.Option(_env_default("FI_MINIO_ENDPOINT", "https://oryjk.cn:82/minio")),
+    minio_access_key: str = typer.Option(_env_default("FI_MINIO_ACCESS_KEY", "") or ""),
+    minio_secret_key: str = typer.Option(_env_default("FI_MINIO_SECRET_KEY", "") or ""),
+    minio_bucket: str = typer.Option(_env_default("FI_MINIO_BUCKET", "football-insight") or "football-insight"),
+    minio_region: str = typer.Option(_env_default("FI_MINIO_REGION", "us-east-1") or "us-east-1"),
+    minio_prefix: str = typer.Option(_env_default("FI_MINIO_PREFIX", "summary") or "summary"),
+    minio_public_base_url: str | None = typer.Option(_env_default("FI_MINIO_PUBLIC_BASE_URL")),
+) -> None:
+    """Sync multi-league squads and official portraits from Sina Sports into f_i_director_candidates."""
+    if not database_url:
+        raise typer.BadParameter("PostgreSQL database_url is required")
+    if not dry_run and (not minio_access_key or not minio_secret_key):
+        raise typer.BadParameter("MinIO credentials are required unless --dry-run")
+    try:
+        league_ids = parse_leagues_arg(leagues)
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from error
+
+    public_base = minio_public_base_url or default_public_base_url(minio_endpoint, minio_bucket)
+    target = (
+        None
+        if dry_run
+        else MinioAssetTarget.from_credentials(
+            endpoint=minio_endpoint,
+            access_key=minio_access_key,
+            secret_key=minio_secret_key,
+            bucket=minio_bucket,
+            region=minio_region,
+            public_base_url=public_base,
+        )
+    )
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        summary = sync_director_sina(
+            client=DefaultSinaDirectorClient(),
+            store=PostgresDirectorSinaStore(connection),
+            leagues=league_ids,
+            season=season,
+            include_acl=include_acl,
+            include_no_avatar=include_no_avatar,
+            deactivate_no_avatar=deactivate_no_avatar,
+            force_avatars=force_avatars,
+            dry_run=dry_run,
+            limit_teams=limit_teams,
+            interval=interval,
+            fetcher=None if dry_run else HttpAssetFetcher(),
+            target=target,
+            prefix=minio_prefix,
+            public_base_url=public_base,
+        )
+    typer.echo(json.dumps(summary, ensure_ascii=False))
 
 
 @app.command()
