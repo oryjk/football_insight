@@ -40,9 +40,12 @@
             </view>
             <text class="player-row__name">{{ player.player_name }}</text>
           </view>
-          <text class="player-row__meta">
-            {{ player.country }}{{ player.shirt_number ? ` · ${player.shirt_number}号` : '' }}
-          </text>
+          <view class="player-row__meta-line">
+            <text class="player-row__meta">{{ formatSquadMeta(player) }}</text>
+            <text v-if="formatMarketValueEur(player.market_value_eur)" class="player-row__value">
+              {{ formatMarketValueEur(player.market_value_eur) }}
+            </text>
+          </view>
         </view>
         <view class="player-row__toggle">
           <button
@@ -85,7 +88,12 @@
               <text class="signing-chip__name">{{ item.player_name }}</text>
               <text class="signing-chip__tag">{{ directorLeagueLabel(item.league_tag) }}</text>
             </view>
-            <text class="signing-chip__club">{{ item.current_club }}</text>
+            <view class="player-row__meta-line">
+              <text class="signing-chip__club">{{ formatSigningMeta(item) }}</text>
+              <text v-if="formatMarketValueEur(item.market_value_eur)" class="player-row__value">
+                {{ formatMarketValueEur(item.market_value_eur) }}
+              </text>
+            </view>
           </view>
           <button
             class="signing-chip__remove"
@@ -114,7 +122,12 @@ import FiAvatar from '../../../components/FiAvatar.vue'
 import type { DirectorSquadPlayerDto, PlanPlayerItem } from '../../../types/director'
 import { directorLeagueLabel } from '../../../utils/directorLinks'
 import { resolvePesPositionBadge } from '../badges'
-import type { ForeignQuotaCheck } from '../helpers'
+import {
+  formatContractUntil,
+  formatMarketValueEur,
+  formatPlayerAge,
+  type ForeignQuotaCheck,
+} from '../helpers'
 
 const props = defineProps<{
   squadForeign: DirectorSquadPlayerDto[]
@@ -136,6 +149,23 @@ function isStay(playerId: number): boolean {
 
 function isLeave(playerId: number): boolean {
   return props.foreignLeaveIds.includes(playerId)
+}
+
+function formatSquadMeta(player: DirectorSquadPlayerDto): string {
+  return [
+    player.country,
+    player.shirt_number ? `${player.shirt_number}号` : '',
+    formatPlayerAge(player.birth_date),
+    formatContractUntil(player.contract_until),
+  ].filter(Boolean).join(' · ')
+}
+
+function formatSigningMeta(item: PlanPlayerItem): string {
+  return [
+    item.current_club,
+    formatPlayerAge(item.birth_date),
+    formatContractUntil(item.contract_until),
+  ].filter(Boolean).join(' · ')
 }
 </script>
 
@@ -299,10 +329,25 @@ function isLeave(playerId: number): boolean {
   line-height: var(--fi-leading-tight);
 }
 
+.player-row__meta-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--fi-space-8);
+}
+
 .player-row__meta {
   color: var(--fi-color-text-muted);
   font-size: var(--fi-font-22);
   line-height: var(--fi-leading-none);
+}
+
+.player-row__value {
+  color: #b45309;
+  font-size: var(--fi-font-22);
+  font-weight: var(--fi-weight-bold);
+  line-height: var(--fi-leading-none);
+  font-variant-numeric: tabular-nums;
 }
 
 .player-row__toggle {

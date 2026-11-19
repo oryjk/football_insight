@@ -27,6 +27,9 @@ export interface PlanPlayerItem {
   league_tag: string
   current_club: string
   avatar_url: string | null
+  market_value_eur?: number | null
+  birth_date?: string | null
+  contract_until?: string | null
 }
 
 export interface DirectorWindowDto {
@@ -50,6 +53,9 @@ export interface DirectorSquadPlayerDto {
   position: DirectorPosition
   country: string
   avatar_url: string | null
+  market_value_eur?: number | null
+  birth_date?: string | null
+  contract_until?: string | null
 }
 
 export interface DirectorAuthorDto {
@@ -107,6 +113,9 @@ export interface DirectorCandidateDto {
   current_club: string
   tags: string[]
   avatar_url: string | null
+  market_value_eur?: number | null
+  birth_date?: string | null
+  contract_until?: string | null
 }
 
 export interface DirectorCandidatesResponse {

@@ -154,6 +154,9 @@ pub struct SquadPlayerDto {
     pub position: Option<String>,
     pub country: Option<String>,
     pub avatar_url: Option<String>,
+    pub market_value_eur: Option<i32>,
+    pub birth_date: Option<String>,
+    pub contract_until: Option<String>,
 }
 
 impl From<SquadPlayer> for SquadPlayerDto {
@@ -165,6 +168,9 @@ impl From<SquadPlayer> for SquadPlayerDto {
             position: p.position,
             country: p.country,
             avatar_url: p.avatar_url,
+            market_value_eur: p.market_value_eur,
+            birth_date: p.birth_date,
+            contract_until: p.contract_until,
         }
     }
 }
@@ -282,6 +288,9 @@ pub struct CandidateItemDto {
     pub current_club: String,
     pub tags: Vec<String>,
     pub avatar_url: Option<String>,
+    pub market_value_eur: Option<i32>,
+    pub birth_date: Option<String>,
+    pub contract_until: Option<String>,
 }
 
 impl From<CandidateItem> for CandidateItemDto {
@@ -299,6 +308,9 @@ impl From<CandidateItem> for CandidateItemDto {
             current_club: c.current_club,
             tags: c.tags,
             avatar_url: c.avatar_url,
+            market_value_eur: c.market_value_eur,
+            birth_date: c.birth_date,
+            contract_until: c.contract_until,
         }
     }
 }

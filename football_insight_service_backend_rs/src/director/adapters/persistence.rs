@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::{FromRow, PgPool, types::Json};
 use uuid::Uuid;
 
@@ -13,6 +13,10 @@ use crate::{
         ports::{DirectorRepository, DirectorUserProfile, ExistingPlanCodes, UpsertPlanRecord},
     },
 };
+
+fn format_opt_date(date: Option<NaiveDate>) -> Option<String> {
+    date.map(|d| d.format("%Y-%m-%d").to_string())
+}
 
 pub struct PostgresDirectorRepository {
     pool: PgPool,
@@ -80,7 +84,10 @@ const SQUAD_PLAYER_AVATAR_EXPR: &str =
 
 const POOL_CANDIDATE_SELECT: &str = "SELECT c.code, c.player_name, c.position, c.country, c.is_foreign,
        c.league_tag, c.current_club, c.tags,
-       COALESCE(NULLIF(BTRIM(c.avatar_url), ''), sp_avatar.avatar_url) AS avatar_url
+       COALESCE(NULLIF(BTRIM(c.avatar_url), ''), sp_avatar.avatar_url) AS avatar_url,
+       COALESCE(c.market_value_eur, sp_tm.market_value_eur) AS market_value_eur,
+       COALESCE(c.birth_date, sp_tm.birth_date) AS birth_date,
+       COALESCE(c.contract_until, sp_tm.contract_until) AS contract_until
 FROM f_i_director_candidates c
 LEFT JOIN LATERAL (
     SELECT COALESCE(
@@ -97,7 +104,21 @@ LEFT JOIN LATERAL (
              sp.last_season DESC,
              (NULLIF(BTRIM(sp.avatar_storage_url), '') IS NOT NULL) DESC
     LIMIT 1
-) sp_avatar ON TRUE";
+) sp_avatar ON TRUE
+LEFT JOIN LATERAL (
+    SELECT sp.market_value_eur, sp.birth_date, sp.contract_until
+    FROM f_i_squad_players sp
+    WHERE sp.player_name = c.player_name
+      AND (
+          sp.market_value_eur IS NOT NULL
+          OR sp.birth_date IS NOT NULL
+          OR sp.contract_until IS NOT NULL
+      )
+    ORDER BY sp.active DESC,
+             sp.last_season DESC,
+             sp.transfermarkt_synced_at DESC NULLS LAST
+    LIMIT 1
+) sp_tm ON TRUE";
 
 #[derive(FromRow)]
 struct WindowRow {
@@ -130,6 +151,9 @@ struct SquadPlayerRow {
     position: Option<String>,
     country: Option<String>,
     avatar_url: Option<String>,
+    market_value_eur: Option<i32>,
+    birth_date: Option<NaiveDate>,
+    contract_until: Option<NaiveDate>,
 }
 
 impl From<SquadPlayerRow> for SquadPlayer {
@@ -143,6 +167,9 @@ impl From<SquadPlayerRow> for SquadPlayer {
             position: r.position,
             country: r.country,
             avatar_url: r.avatar_url,
+            market_value_eur: r.market_value_eur,
+            birth_date: format_opt_date(r.birth_date),
+            contract_until: format_opt_date(r.contract_until),
         }
     }
 }
@@ -158,6 +185,9 @@ struct PoolCandidateRow {
     current_club: String,
     tags: Json<Vec<String>>,
     avatar_url: Option<String>,
+    market_value_eur: Option<i32>,
+    birth_date: Option<NaiveDate>,
+    contract_until: Option<NaiveDate>,
 }
 
 impl From<PoolCandidateRow> for PoolCandidate {
@@ -172,6 +202,9 @@ impl From<PoolCandidateRow> for PoolCandidate {
             current_club: r.current_club,
             tags: r.tags.0,
             avatar_url: r.avatar_url,
+            market_value_eur: r.market_value_eur,
+            birth_date: format_opt_date(r.birth_date),
+            contract_until: format_opt_date(r.contract_until),
         }
     }
 }
@@ -313,7 +346,8 @@ impl DirectorRepository for PostgresDirectorRepository {
     async fn team_active_squad(&self, team_id: i64) -> Result<Vec<SquadPlayer>, DirectorError> {
         sqlx::query_as::<_, SquadPlayerRow>(&format!(
             "SELECT sp.player_id, sp.team_id, t.team_name, sp.player_name,
-                    sp.shirt_number, sp.position, sp.country, {SQUAD_PLAYER_AVATAR_EXPR}
+                    sp.shirt_number, sp.position, sp.country, {SQUAD_PLAYER_AVATAR_EXPR},
+                    sp.market_value_eur, sp.birth_date, sp.contract_until
              FROM f_i_squad_players sp
              JOIN f_i_teams t ON t.team_id = sp.team_id
              WHERE sp.team_id = $1 AND sp.active = TRUE
@@ -335,7 +369,8 @@ impl DirectorRepository for PostgresDirectorRepository {
         let pattern = keyword.map(|kw| format!("%{kw}%"));
         sqlx::query_as::<_, SquadPlayerRow>(&format!(
             "SELECT sp.player_id, sp.team_id, t.team_name, sp.player_name,
-                    sp.shirt_number, sp.position, sp.country, {SQUAD_PLAYER_AVATAR_EXPR}
+                    sp.shirt_number, sp.position, sp.country, {SQUAD_PLAYER_AVATAR_EXPR},
+                    sp.market_value_eur, sp.birth_date, sp.contract_until
              FROM f_i_squad_players sp
              JOIN f_i_teams t ON t.team_id = sp.team_id
              WHERE sp.active = TRUE
@@ -364,7 +399,8 @@ impl DirectorRepository for PostgresDirectorRepository {
     ) -> Result<Option<SquadPlayer>, DirectorError> {
         sqlx::query_as::<_, SquadPlayerRow>(&format!(
             "SELECT sp.player_id, sp.team_id, t.team_name, sp.player_name,
-                    sp.shirt_number, sp.position, sp.country, {SQUAD_PLAYER_AVATAR_EXPR}
+                    sp.shirt_number, sp.position, sp.country, {SQUAD_PLAYER_AVATAR_EXPR},
+                    sp.market_value_eur, sp.birth_date, sp.contract_until
              FROM f_i_squad_players sp
              JOIN f_i_teams t ON t.team_id = sp.team_id
              WHERE sp.player_id = $1

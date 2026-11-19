@@ -160,6 +160,12 @@ pub struct PlanPlayerItem {
     pub league_tag: String,
     pub current_club: String,
     pub avatar_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub market_value_eur: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub birth_date: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contract_until: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -188,6 +194,9 @@ pub struct SquadPlayer {
     pub position: Option<String>,
     pub country: Option<String>,
     pub avatar_url: Option<String>,
+    pub market_value_eur: Option<i32>,
+    pub birth_date: Option<String>,
+    pub contract_until: Option<String>,
 }
 
 impl SquadPlayer {
@@ -213,6 +222,9 @@ impl SquadPlayer {
             league_tag: "CSL".into(),
             current_club: self.team_name.clone(),
             avatar_url: self.avatar_url.clone(),
+            market_value_eur: self.market_value_eur,
+            birth_date: self.birth_date.clone(),
+            contract_until: self.contract_until.clone(),
         }
     }
 }
@@ -228,6 +240,9 @@ pub struct PoolCandidate {
     pub current_club: String,
     pub tags: Vec<String>,
     pub avatar_url: Option<String>,
+    pub market_value_eur: Option<i32>,
+    pub birth_date: Option<String>,
+    pub contract_until: Option<String>,
 }
 
 impl PoolCandidate {
@@ -244,6 +259,9 @@ impl PoolCandidate {
             league_tag: self.league_tag.clone(),
             current_club: self.current_club.clone(),
             avatar_url: self.avatar_url.clone(),
+            market_value_eur: self.market_value_eur,
+            birth_date: self.birth_date.clone(),
+            contract_until: self.contract_until.clone(),
         }
     }
 }
@@ -262,6 +280,9 @@ pub struct CandidateItem {
     pub current_club: String,
     pub tags: Vec<String>,
     pub avatar_url: Option<String>,
+    pub market_value_eur: Option<i32>,
+    pub birth_date: Option<String>,
+    pub contract_until: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -697,6 +718,9 @@ mod tests {
             league_tag: league_tag.to_string(),
             current_club: "测试队".to_string(),
             avatar_url: None,
+            market_value_eur: None,
+            birth_date: None,
+            contract_until: None,
         }
     }
 
@@ -713,6 +737,9 @@ mod tests {
             league_tag: "CSL".to_string(),
             current_club: "测试队".to_string(),
             avatar_url: None,
+            market_value_eur: None,
+            birth_date: None,
+            contract_until: None,
         }
     }
 
@@ -967,5 +994,71 @@ mod tests {
         );
         assert_eq!(normalize_share_code("short"), None);
         assert_eq!(normalize_share_code("AB12-D34"), None);
+    }
+
+    #[test]
+    fn plan_player_item_transfermarkt_fields_backward_compat_and_propagation() {
+        // Legacy JSONB without market_value_eur / birth_date / contract_until deserializes cleanly
+        let legacy_json = r#"{
+            "key": "squad:1001",
+            "source": "squad",
+            "player_id": 1001,
+            "candidate_code": null,
+            "player_name": "费利佩",
+            "position": "FW",
+            "country": "巴西",
+            "is_foreign": true,
+            "league_tag": "CSL",
+            "current_club": "成都蓉城",
+            "avatar_url": null
+        }"#;
+        let parsed: PlanPlayerItem = serde_json::from_str(legacy_json).unwrap();
+        assert_eq!(parsed.market_value_eur, None);
+        assert_eq!(parsed.birth_date, None);
+        assert_eq!(parsed.contract_until, None);
+        // None fields are omitted when serializing
+        let serialized = serde_json::to_string(&parsed).unwrap();
+        assert!(!serialized.contains("market_value_eur"));
+        assert!(!serialized.contains("birth_date"));
+        assert!(!serialized.contains("contract_until"));
+
+        // SquadPlayer::to_plan_item propagates all 3 fields
+        let squad = SquadPlayer {
+            player_id: 1001,
+            team_id: DEFAULT_TEAM_ID,
+            team_name: "成都蓉城".into(),
+            player_name: "费利佩".into(),
+            shirt_number: Some(21),
+            position: Some("FW".into()),
+            country: Some("巴西".into()),
+            avatar_url: None,
+            market_value_eur: Some(1_800_000),
+            birth_date: Some("1992-04-10".into()),
+            contract_until: Some("2026-12-31".into()),
+        };
+        let from_squad = squad.to_plan_item();
+        assert_eq!(from_squad.market_value_eur, Some(1_800_000));
+        assert_eq!(from_squad.birth_date.as_deref(), Some("1992-04-10"));
+        assert_eq!(from_squad.contract_until.as_deref(), Some("2026-12-31"));
+
+        // PoolCandidate::to_plan_item propagates all 3 fields
+        let pool = PoolCandidate {
+            code: "k1-cesinha".into(),
+            player_name: "塞西尼亚".into(),
+            position: "FW".into(),
+            country: "巴西".into(),
+            is_foreign: true,
+            league_tag: "K1".into(),
+            current_club: "大邱FC".into(),
+            tags: vec![],
+            avatar_url: None,
+            market_value_eur: Some(1_200_000),
+            birth_date: Some("1989-11-29".into()),
+            contract_until: Some("2026-12-31".into()),
+        };
+        let from_pool = pool.to_plan_item();
+        assert_eq!(from_pool.market_value_eur, Some(1_200_000));
+        assert_eq!(from_pool.birth_date.as_deref(), Some("1989-11-29"));
+        assert_eq!(from_pool.contract_until.as_deref(), Some("2026-12-31"));
     }
 }

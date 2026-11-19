@@ -128,6 +128,9 @@ export function candidateToPlanPlayer(candidate: DirectorCandidateDto): PlanPlay
     league_tag: candidate.league_tag,
     current_club: candidate.current_club,
     avatar_url: candidate.avatar_url,
+    market_value_eur: candidate.market_value_eur ?? null,
+    birth_date: candidate.birth_date ?? null,
+    contract_until: candidate.contract_until ?? null,
   }
 }
 
@@ -279,4 +282,61 @@ export function formatShortDateTime(iso: string): string {
   const hour = String(date.getHours()).padStart(2, '0')
   const minute = String(date.getMinutes()).padStart(2, '0')
   return `${month}-${day} ${hour}:${minute}`
+}
+
+export function formatMarketValueEur(eur?: number | null): string {
+  if (typeof eur !== 'number' || !Number.isFinite(eur) || eur <= 0) {
+    return ''
+  }
+  if (eur >= 100_000_000) {
+    const billions = (eur / 100_000_000).toFixed(2).replace(/\.?0+$/, '')
+    return `${billions}亿欧`
+  }
+  if (eur >= 10_000) {
+    const wan = eur / 10_000
+    const formatted = wan >= 100 ? String(Math.round(wan)) : wan.toFixed(1).replace(/\.0$/, '')
+    return `${formatted}万欧`
+  }
+  return `€${Math.round(eur)}`
+}
+
+export function computePlayerAge(birthDate?: string | null, today: Date = new Date()): number | null {
+  if (!birthDate) return null
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthDate.trim())
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  if (!Number.isInteger(year) || month < 1 || month > 12 || day < 1 || day > 31) {
+    return null
+  }
+  let age = today.getFullYear() - year
+  const currentMonth = today.getMonth() + 1
+  if (currentMonth < month || (currentMonth === month && today.getDate() < day)) {
+    age -= 1
+  }
+  return age >= 12 && age <= 55 ? age : null
+}
+
+export function formatPlayerAge(birthDate?: string | null, today?: Date): string {
+  const age = computePlayerAge(birthDate, today)
+  return age === null ? '' : `${age}岁`
+}
+
+export function formatContractUntil(contractUntil?: string | null): string {
+  if (!contractUntil) return ''
+  const match = /^(\d{4})/.exec(contractUntil.trim())
+  return match ? `合同至${match[1]}` : ''
+}
+
+export function sumMarketValueEur(
+  items: ReadonlyArray<{ market_value_eur?: number | null }>,
+): number {
+  let total = 0
+  for (const item of items) {
+    if (typeof item.market_value_eur === 'number' && Number.isFinite(item.market_value_eur) && item.market_value_eur > 0) {
+      total += item.market_value_eur
+    }
+  }
+  return total
 }

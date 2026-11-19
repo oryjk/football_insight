@@ -16,7 +16,9 @@
     </view>
 
     <view class="roster-block">
-      <text class="roster-title">最终外援阵容（{{ finalForeignList.length }} 人）</text>
+      <text class="roster-title">
+        最终外援阵容（{{ finalForeignList.length }} 人{{ totalForeignValueLabel ? ` · 总身价 ${totalForeignValueLabel}` : '' }}）
+      </text>
       <view class="roster-grid">
         <view v-for="item in finalForeignList" :key="item.key" class="roster-chip">
           <view class="roster-chip__top">
@@ -37,7 +39,7 @@
             </text>
           </view>
           <text class="roster-chip__meta">
-            {{ directorLeagueLabel(item.league_tag) }} · {{ item.current_club }}
+            {{ formatOverviewMeta(item) }}
           </text>
         </view>
       </view>
@@ -73,9 +75,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import FiAvatar from '../../../components/FiAvatar.vue'
-import type { DirectorPlanDto } from '../../../types/director'
+import type { DirectorPlanDto, PlanPlayerItem } from '../../../types/director'
 import { directorLeagueLabel, directorPositionLabel } from '../../../utils/directorLinks'
 import { resolvePesPositionBadge } from '../badges'
+import {
+  formatContractUntil,
+  formatMarketValueEur,
+  formatPlayerAge,
+  sumMarketValueEur,
+} from '../helpers'
 
 const props = defineProps<{
   plan: DirectorPlanDto
@@ -85,6 +93,20 @@ const finalForeignList = computed(() => [
   ...props.plan.foreign_stays.map(item => ({ ...item, isNew: false })),
   ...props.plan.foreign_ins.map(item => ({ ...item, isNew: true })),
 ])
+
+const totalForeignValueLabel = computed(() =>
+  formatMarketValueEur(sumMarketValueEur(finalForeignList.value)),
+)
+
+function formatOverviewMeta(item: PlanPlayerItem): string {
+  return [
+    directorLeagueLabel(item.league_tag),
+    item.current_club,
+    formatPlayerAge(item.birth_date),
+    formatMarketValueEur(item.market_value_eur),
+    formatContractUntil(item.contract_until),
+  ].filter(Boolean).join(' · ')
+}
 </script>
 
 <style scoped lang="css">

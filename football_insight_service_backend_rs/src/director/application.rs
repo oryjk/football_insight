@@ -209,6 +209,9 @@ impl DirectorService {
                     current_club: row.current_club,
                     tags: row.tags,
                     avatar_url: row.avatar_url,
+                    market_value_eur: row.market_value_eur,
+                    birth_date: row.birth_date,
+                    contract_until: row.contract_until,
                 });
             }
         }
@@ -238,6 +241,9 @@ impl DirectorService {
                         current_club: plan_item.current_club,
                         tags: vec!["中超现役".into()],
                         avatar_url: plan_item.avatar_url,
+                        market_value_eur: plan_item.market_value_eur,
+                        birth_date: plan_item.birth_date,
+                        contract_until: plan_item.contract_until,
                     });
                     added_squad += 1;
                     if added_squad >= 40 {
@@ -733,6 +739,9 @@ impl DirectorService {
                     league_tag,
                     current_club,
                     avatar_url: None,
+                    market_value_eur: None,
+                    birth_date: None,
+                    contract_until: None,
                 })
             }
         }
@@ -878,6 +887,9 @@ pub(crate) mod tests {
                     position: Some("FW".into()),
                     country: Some("巴西".into()),
                     avatar_url: None,
+                    market_value_eur: Some(1_800_000),
+                    birth_date: Some("1992-04-10".into()),
+                    contract_until: Some("2026-12-31".into()),
                 },
                 SquadPlayer {
                     player_id: 1002,
@@ -888,6 +900,9 @@ pub(crate) mod tests {
                     position: Some("MF".into()),
                     country: Some("巴西".into()),
                     avatar_url: None,
+                    market_value_eur: None,
+                    birth_date: None,
+                    contract_until: None,
                 },
                 SquadPlayer {
                     player_id: 1003,
@@ -898,6 +913,9 @@ pub(crate) mod tests {
                     position: Some("DF".into()),
                     country: Some("荷兰".into()),
                     avatar_url: None,
+                    market_value_eur: None,
+                    birth_date: None,
+                    contract_until: None,
                 },
                 SquadPlayer {
                     player_id: 2001,
@@ -908,6 +926,9 @@ pub(crate) mod tests {
                     position: Some("FW".into()),
                     country: Some("中国".into()),
                     avatar_url: None,
+                    market_value_eur: None,
+                    birth_date: None,
+                    contract_until: None,
                 },
                 SquadPlayer {
                     player_id: 2002,
@@ -918,6 +939,9 @@ pub(crate) mod tests {
                     position: Some("MF".into()),
                     country: Some("中国台湾".into()),
                     avatar_url: None,
+                    market_value_eur: None,
+                    birth_date: None,
+                    contract_until: None,
                 },
             ]
         }
@@ -934,6 +958,9 @@ pub(crate) mod tests {
                     current_club: "大邱FC".into(),
                     tags: vec!["K联赛核心".into()],
                     avatar_url: None,
+                    market_value_eur: Some(1_200_000),
+                    birth_date: Some("1989-11-29".into()),
+                    contract_until: Some("2026-12-31".into()),
                 },
                 PoolCandidate {
                     code: "j1-tanaka".into(),
@@ -945,6 +972,9 @@ pub(crate) mod tests {
                     current_club: "川崎前锋".into(),
                     tags: vec!["亚外".into()],
                     avatar_url: None,
+                    market_value_eur: None,
+                    birth_date: None,
+                    contract_until: None,
                 },
                 PoolCandidate {
                     code: "csl-dom-1".into(),
@@ -956,6 +986,9 @@ pub(crate) mod tests {
                     current_club: "北京国安".into(),
                     tags: vec!["国脚".into()],
                     avatar_url: None,
+                    market_value_eur: None,
+                    birth_date: None,
+                    contract_until: None,
                 },
             ]
         }
@@ -1011,6 +1044,9 @@ pub(crate) mod tests {
                 position: Some("MF".into()),
                 country: Some("巴西".into()),
                 avatar_url: None,
+                market_value_eur: Some(5_000_000),
+                birth_date: Some("1991-09-09".into()),
+                contract_until: Some("2026-12-31".into()),
             }])
         }
 
@@ -1029,6 +1065,9 @@ pub(crate) mod tests {
                     position: Some("MF".into()),
                     country: Some("巴西".into()),
                     avatar_url: None,
+                    market_value_eur: Some(5_000_000),
+                    birth_date: Some("1991-09-09".into()),
+                    contract_until: Some("2026-12-31".into()),
                 }))
             } else {
                 Ok(None)

@@ -31,6 +31,15 @@ from .director_sina_sync import (
     parse_leagues_arg,
     sync_director_sina,
 )
+from .director_transfermarkt_sync import (
+    DEFAULT_BASE_URL as DEFAULT_TM_BASE_URL,
+    DEFAULT_DELAY_SECONDS as DEFAULT_TM_DELAY_SECONDS,
+    DEFAULT_TM_LEAGUES_STR,
+    HttpTransfermarktClient,
+    PostgresTransfermarktStore,
+    parse_tm_leagues_arg,
+    sync_transfermarkt_valuations,
+)
 from .leisu import LeisuBrowserClient, LeisuCornerEnricher, load_leisu_match_map
 from .models import MatchResult
 from .postgres_repository import PostgresInsightSyncRepository
@@ -505,6 +514,79 @@ def sync_director_sina_command(
             target=target,
             prefix=minio_prefix,
             public_base_url=public_base,
+        )
+    typer.echo(json.dumps(summary, ensure_ascii=False))
+
+
+@app.command("sync-director-transfermarkt")
+def sync_director_transfermarkt_command(
+    leagues: str = typer.Option(
+        DEFAULT_TM_LEAGUES_STR,
+        "--leagues",
+        help="Comma-separated league keys (csl,k1,j1,epl,laliga,seriea,bundesliga,ligue1).",
+    ),
+    base_url: str = typer.Option(
+        DEFAULT_TM_BASE_URL,
+        "--base-url",
+        help="Transfermarkt base URL (default: https://www.transfermarkt.cn).",
+    ),
+    delay: float = typer.Option(
+        DEFAULT_TM_DELAY_SECONDS,
+        "--delay",
+        min=0.0,
+        help="Polite delay in seconds between Transfermarkt HTTP requests.",
+    ),
+    limit_clubs: int | None = typer.Option(
+        None,
+        "--limit-clubs",
+        min=1,
+        help="Process at most N clubs across all selected leagues.",
+    ),
+    write_db: bool = typer.Option(
+        False,
+        "--write-db",
+        help="Write matched valuations/dates into PostgreSQL (defaults to dry-run when omitted).",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Force dry-run without writing to PostgreSQL (default when --write-db is not passed).",
+    ),
+    database_url: str | None = typer.Option(
+        None,
+        envvar=["FI_DATABASE_URL", "DATABASE_URL"],
+        help="PostgreSQL connection string (required when --write-db is enabled).",
+    ),
+) -> None:
+    """Backfill market_value_eur, birth_date, and contract_until from Transfermarkt."""
+    try:
+        league_keys = parse_tm_leagues_arg(leagues)
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from error
+
+    effective_dry_run = dry_run or not write_db
+    if not effective_dry_run and not database_url:
+        raise typer.BadParameter("PostgreSQL database_url is required when --write-db is enabled")
+
+    client = HttpTransfermarktClient(base_url=base_url)
+    if database_url:
+        with psycopg.connect(database_url, autocommit=True) as connection:
+            summary = sync_transfermarkt_valuations(
+                client=client,
+                store=PostgresTransfermarktStore(connection),
+                leagues=league_keys,
+                dry_run=effective_dry_run,
+                delay=delay,
+                limit_clubs=limit_clubs,
+            )
+    else:
+        summary = sync_transfermarkt_valuations(
+            client=client,
+            store=None,
+            leagues=league_keys,
+            dry_run=True,
+            delay=delay,
+            limit_clubs=limit_clubs,
         )
     typer.echo(json.dumps(summary, ensure_ascii=False))
 

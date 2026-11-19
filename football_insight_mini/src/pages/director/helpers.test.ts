@@ -2,10 +2,15 @@ import { describe, expect, test } from 'bun:test'
 import {
   buildDirectorShareText,
   computeDirectorStyleTag,
+  computePlayerAge,
   createCustomPlanPlayer,
   deserializeDirectorDraft,
   filterCandidatesByLeague,
+  formatContractUntil,
+  formatMarketValueEur,
+  formatPlayerAge,
   serializeDirectorDraft,
+  sumMarketValueEur,
   toUpsertPlayerInput,
   validateForeignQuota,
 } from './helpers'
@@ -215,3 +220,30 @@ describe('director share text & link helpers', () => {
     expect(parseDirectorViewCode({ scene: encodeURIComponent('s=share&c=director&t=ZX98CV76') })).toBe('ZX98CV76')
   })
 })
+
+describe('director Transfermarkt value, age & contract helpers', () => {
+  test('formats market values in EUR cleanly', () => {
+    expect(formatMarketValueEur(null)).toBe('')
+    expect(formatMarketValueEur(0)).toBe('')
+    expect(formatMarketValueEur(1_500_000)).toBe('150万欧')
+    expect(formatMarketValueEur(450_000)).toBe('45万欧')
+    expect(formatMarketValueEur(125_000)).toBe('12.5万欧')
+    expect(formatMarketValueEur(8_000)).toBe('8千欧')
+  })
+
+  test('computes and formats player age and contract year', () => {
+    const ref = new Date(2026, 4, 15) // 2026-05-15
+    expect(computePlayerAge('1996-05-10', ref)).toBe(30)
+    expect(computePlayerAge('1996-05-20', ref)).toBe(29)
+    expect(computePlayerAge('invalid', ref)).toBeNull()
+    expect(formatPlayerAge('1996-05-10', ref)).toBe('30岁')
+    expect(formatContractUntil('2026-12-31')).toBe('合同至2026')
+    expect(formatContractUntil(null)).toBe('')
+  })
+
+  test('sums valid market values across players', () => {
+    expect(sumMarketValueEur([{ market_value_eur: 1_200_000 }, { market_value_eur: null }, { market_value_eur: 800_000 }])).toBe(2_000_000)
+    expect(sumMarketValueEur([{ market_value_eur: null }])).toBe(0)
+  })
+})
+

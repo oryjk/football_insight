@@ -144,7 +144,7 @@
                 <text class="candidate-row__name">{{ item.player_name }}</text>
                 <view class="candidate-row__league">{{ directorLeagueLabel(item.league_tag) }}</view>
               </view>
-              <text class="candidate-row__meta">{{ item.current_club }} · {{ item.country }}</text>
+              <view class="candidate-row__meta-line"><text class="candidate-row__meta">{{ candidateMeta(item) }}</text><text v-if="formatMarketValueEur(item.market_value_eur)" class="candidate-row__value">{{ formatMarketValueEur(item.market_value_eur) }}</text></view>
               <view v-if="item.tags.length" class="candidate-row__tags">
                 <text
                   v-for="tag in item.tags"
@@ -180,11 +180,7 @@ import type {
 } from '../../../types/director'
 import { directorLeagueLabel } from '../../../utils/directorLinks'
 import { resolveCandidateTagTone, resolvePesPositionBadge, type PesPositionBadge } from '../badges'
-import {
-  DIRECTOR_DOMESTIC_LEAGUE_TABS,
-  DIRECTOR_FOREIGN_LEAGUE_TABS,
-  DIRECTOR_POSITIONS,
-} from '../helpers'
+import { DIRECTOR_DOMESTIC_LEAGUE_TABS, DIRECTOR_FOREIGN_LEAGUE_TABS, DIRECTOR_POSITIONS, formatContractUntil, formatMarketValueEur, formatPlayerAge } from '../helpers'
 
 const props = defineProps<{
   visible: boolean
@@ -233,6 +229,10 @@ watch(
 
 function positionBadge(item: DirectorCandidateDto): PesPositionBadge {
   return resolvePesPositionBadge(item.position, item.tags)
+}
+
+function candidateMeta(item: DirectorCandidateDto): string {
+  return [item.current_club, item.country, formatPlayerAge(item.birth_date), formatContractUntil(item.contract_until)].filter(Boolean).join(' · ')
 }
 
 function onSearchInput(event: unknown): void {
@@ -432,10 +432,9 @@ function handleCustomSubmit(): void {
   line-height: var(--fi-leading-none);
 }
 
-.candidate-row__meta {
-  color: var(--fi-color-text-muted);
-  font-size: var(--fi-font-22);
-}
+.candidate-row__meta-line { display: flex; align-items: center; flex-wrap: wrap; gap: var(--fi-space-8); }
+.candidate-row__meta { color: var(--fi-color-text-muted); font-size: var(--fi-font-22); }
+.candidate-row__value { color: #b45309; font-size: var(--fi-font-22); font-weight: var(--fi-weight-bold); font-variant-numeric: tabular-nums; }
 
 .candidate-row__tags {
   display: flex;
