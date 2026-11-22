@@ -384,8 +384,10 @@ async function ensureAllSeasonMatchesLoaded() {
     )
 
     const matchMap = new Map<number, MatchCard>()
-    for (const response of responses) {
-      for (const match of response.matches) {
+    for (let i = 0; i < responses.length; i += 1) {
+      const matches = responses[i].matches
+      for (let j = 0; j < matches.length; j += 1) {
+        const match = matches[j]
         matchMap.set(match.match_id, match)
       }
     }

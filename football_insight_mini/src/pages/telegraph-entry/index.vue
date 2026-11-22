@@ -2,7 +2,7 @@
   <page-meta :page-style="pageStyle" />
   <FiSecondaryNav :share-disabled="!entry" @back="goBack" @share="copyShareLink" />
   <view class="entry-page-offset">
-    <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
+    <FiPageBackdrop v-if="pageBackgroundImageUrl" :image-url="pageBackgroundImageUrl" full-page />
     <view class="entry-page" :class="{ 'entry-page--with-composer': Boolean(entry && commentsVisible) }">
       <view v-if="loading && !entry" class="entry-page__state">
         <text>正在加载电报详情…</text>
@@ -13,46 +13,47 @@
         <button class="entry-page__retry" @tap="loadInitial(false)">重新加载</button>
       </view>
 
-      <view v-else-if="entry">
+      <view
+        v-else-if="entry && timelineVisible"
+        class="fi-layout-block"
+        :class="{ 'fi-layout-block--bg': Boolean(timelineBgUrl) }"
+      >
         <view
-          v-for="block in visibleBlocks"
-          :key="block.key"
-          class="fi-layout-block"
-          :class="{ 'fi-layout-block--bg': Boolean(block.background_image_url) }"
-        >
-          <view
-            v-if="block.background_image_url"
-            class="fi-layout-block__bg"
-            :style="{ backgroundImage: `url(${block.background_image_url})` }"
-            aria-hidden="true"
+          v-if="timelineBgUrl"
+          class="fi-layout-block__bg"
+          :style="{ backgroundImage: `url(${timelineBgUrl})` }"
+          aria-hidden="true"
+        />
+        <view v-if="timelineBgUrl" class="fi-layout-block__wash" aria-hidden="true" />
+        <view class="fi-layout-block__inner">
+          <TelegraphEntryTimeline
+            :entry="entry"
+            :day-label="dayLabel"
+            :comments-visible="commentsVisible"
+            :reaction-pending="reactionPending"
+            :comments="comments"
+            :comments-loading="commentsLoading"
+            :loading-more="loadingMoreComments"
+            :has-more="commentsHasMore"
+            :comments-error="commentsError"
+            :pending-like-ids="pendingCommentLikeIds"
+            :deleting-comment-id="deletingCommentId"
+            @share="copyShareLink"
+            @like-entry="page.likeEntry"
+            @dislike-entry="page.dislikeEntry"
+            @focus-comment="page.startRootComment"
+            @retry-comments="page.reloadComments"
+            @load-more="page.loadMoreComments"
+            @open-comment="page.openComment"
+            @like-comment="page.toggleCommentLike"
+            @delete-comment="handleDeleteComment"
           />
-          <view v-if="block.background_image_url" class="fi-layout-block__wash" aria-hidden="true" />
-          <view class="fi-layout-block__inner">
-            <TelegraphEntryTimeline
-              v-if="block.key === 'timeline'"
-              :entry="entry"
-              :day-label="dayLabel"
-              :comments-visible="commentsVisible"
-              :reaction-pending="reactionPending"
-              :comments="comments"
-              :comments-loading="commentsLoading"
-              :loading-more="loadingMoreComments"
-              :has-more="commentsHasMore"
-              :comments-error="commentsError"
-              :pending-like-ids="pendingCommentLikeIds"
-              :deleting-comment-id="deletingCommentId"
-              @share="copyShareLink"
-              @like-entry="page.likeEntry"
-              @dislike-entry="page.dislikeEntry"
-              @focus-comment="page.startRootComment"
-              @retry-comments="page.reloadComments"
-              @load-more="page.loadMoreComments"
-              @open-comment="page.openComment"
-              @like-comment="page.toggleCommentLike"
-              @delete-comment="handleDeleteComment"
-            />
-          </view>
         </view>
+      </view>
+
+      <view v-else-if="!entry" class="entry-page__state">
+        <text>正在加载电报详情…</text>
+        <button class="entry-page__retry" @tap="loadInitial(false)">重新加载</button>
       </view>
     </view>
   </view>
@@ -110,21 +111,24 @@ import { useTelegraphEntryPage } from './useTelegraphEntryPage'
 import { TELEGRAPH_ENTRY_SHARE_CANVAS_ID, useTelegraphEntryShareCard } from './useTelegraphEntryShareCard'
 
 const { navigationPageStyle } = useNavigationLayout()
-const { visibleBlocks, pageBackgroundImageUrl, refreshLayout } = usePageLayout('telegraph_entry')
+const { pageBackgroundImageUrl, isBlockVisible, blockBackground, refreshLayout } = usePageLayout('telegraph_entry')
+const timelineVisible = computed(() => isBlockVisible('timeline'))
+const timelineBgUrl = computed(() => blockBackground('timeline'))
 const session = useAppSession()
 const miniReview = useMiniReviewStatus()
 const shareCard = useTelegraphEntryShareCard()
 // 分享图按实际像素绘制，与页面布局的 rpx 无关。
 const shareCanvasStyle = { width: `${TELEGRAPH_SHARE_CARD.width}px`, height: `${TELEGRAPH_SHARE_CARD.height}px` }
 
-let topicId = ''
-let entryId = ''
+const topicId = ref('')
+const entryId = ref('')
+let pendingFocusOnLoad = false
 let lastSessionRevision = session.revision.value
 let hasLeftPage = false
 
 const page = useTelegraphEntryPage({
-  topicId: () => topicId,
-  entryId: () => entryId,
+  topicId: () => topicId.value,
+  entryId: () => entryId.value,
   session,
   miniReview,
 })
@@ -172,9 +176,18 @@ function handleDeleteComment(comment: TelegraphComment): void {
   })
 }
 
+function decodeQueryParam(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
 function copyShareLink(): void {
   copyPageShareLink(
-    buildTelegraphEntrySharePayload({ topicId, entryId, entry: entry.value }).path,
+    buildTelegraphEntrySharePayload({ topicId: topicId.value, entryId: entryId.value, entry: entry.value }).path,
   )
 }
 
@@ -189,15 +202,30 @@ watch(
   },
 )
 
+watch(
+  () => session.revision.value,
+  (nextRevision) => {
+    if (hasLeftPage || !topicId.value || !entryId.value || nextRevision === lastSessionRevision) {
+      return
+    }
+    lastSessionRevision = nextRevision
+    if (topic.value) {
+      void page.refreshAll()
+    } else {
+      void page.loadInitial(pendingFocusOnLoad)
+    }
+  },
+)
+
 onLoad((query) => {
-  topicId = typeof query?.topicId === 'string' ? decodeURIComponent(query.topicId) : ''
-  entryId = typeof query?.entryId === 'string' ? decodeURIComponent(query.entryId) : ''
+  topicId.value = decodeQueryParam(query?.topicId)
+  entryId.value = decodeQueryParam(query?.entryId)
   shareCard.reset()
-  const focus = query?.focus === '1'
+  pendingFocusOnLoad = query?.focus === '1'
   lastSessionRevision = session.revision.value
   void miniReview.ensureMiniReviewReady()
   void session.ensureSessionReady()
-  void page.loadInitial(focus)
+  void page.loadInitial(pendingFocusOnLoad)
 })
 
 onHide(() => {
@@ -208,10 +236,14 @@ onShow(() => {
   void refreshLayout()
   void miniReview.ensureMiniReviewReady()
   void session.ensureSessionReady()
-  if (topicId && entryId && topic.value && (hasLeftPage || session.revision.value !== lastSessionRevision)) {
+  if (topicId.value && entryId.value && (hasLeftPage || session.revision.value !== lastSessionRevision)) {
     hasLeftPage = false
     lastSessionRevision = session.revision.value
-    void page.refreshAll()
+    if (topic.value) {
+      void page.refreshAll()
+    } else {
+      void page.loadInitial(pendingFocusOnLoad)
+    }
   }
 })
 
@@ -229,8 +261,8 @@ onShareAppMessage(() => {
   const currentEntry = entry.value
   const options = { publishedAt: topic.value?.publishedAt, commentsVisible: commentsVisible.value }
   const fallback = buildTelegraphEntrySharePayload({
-    topicId,
-    entryId,
+    topicId: topicId.value,
+    entryId: entryId.value,
     entry: currentEntry,
     imageUrl: shareCard.imageUrl.value,
   })
@@ -239,8 +271,8 @@ onShareAppMessage(() => {
     ...fallback,
     promise: shareCard.prepare(currentEntry, options).then(imageUrl =>
       buildTelegraphEntrySharePayload({
-        topicId,
-        entryId,
+        topicId: topicId.value,
+        entryId: entryId.value,
         entry: currentEntry,
         imageUrl,
       }),
@@ -249,8 +281,8 @@ onShareAppMessage(() => {
 })
 
 onShareTimeline(() => buildTelegraphEntryTimelinePayload({
-  topicId,
-  entryId,
+  topicId: topicId.value,
+  entryId: entryId.value,
   entry: entry.value,
   imageUrl: shareCard.imageUrl.value,
 }))

@@ -318,7 +318,8 @@ export async function buildThreadFromLegacyComments(options: {
     if (!page.commentsEnabled) {
       return 'disabled'
     }
-    for (const item of page.items) {
+    for (let i = 0; i < page.items.length; i += 1) {
+      const item = page.items[i]
       if (!allItems.some(existing => existing.id === item.id)) {
         allItems.push(item)
       }

@@ -32,15 +32,15 @@ const builtInTags = new Set([
   "web-view",
 ]);
 
-async function collectWxmlFiles(directory) {
+async function collectFiles(directory, extension) {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = [];
 
   for (const entry of entries) {
     const path = join(directory.pathname, entry.name);
     if (entry.isDirectory()) {
-      files.push(...await collectWxmlFiles(new URL(`${entry.name}/`, directory)));
-    } else if (extname(entry.name) === ".wxml") {
+      files.push(...await collectFiles(new URL(`${entry.name}/`, directory), extension));
+    } else if (extname(entry.name) === extension) {
       files.push(path);
     }
   }
@@ -63,7 +63,7 @@ const appJson = JSON.parse(await readFile(new URL("app.json", outputDir), "utf8"
 const globalComponents = new Set(Object.keys(appJson.usingComponents || {}));
 const failures = [];
 
-for (const wxmlPath of await collectWxmlFiles(outputDir)) {
+for (const wxmlPath of await collectFiles(outputDir, ".wxml")) {
   const wxml = await readFile(wxmlPath, "utf8");
   const tags = new Set([...wxml.matchAll(/<([a-z][a-z0-9-]*)\b/g)].map((match) => match[1]));
   const localComponents = await readUsingComponents(wxmlPath);
@@ -81,4 +81,19 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log("All mini-program custom components are registered.");
+const unresolvedBabelHelpers = [];
+const babelRequirePattern = /require\(\s*["'](@babel\/runtime\/[^"']+)["']\s*\)/g;
+for (const jsPath of await collectFiles(outputDir, ".js")) {
+  const code = await readFile(jsPath, "utf8");
+  for (const match of code.matchAll(babelRequirePattern)) {
+    unresolvedBabelHelpers.push(`${jsPath}: require("${match[1]}")`);
+  }
+}
+
+if (unresolvedBabelHelpers.length > 0) {
+  console.error("Unresolved @babel/runtime helper requires in mp-weixin bundle:\n");
+  for (const item of unresolvedBabelHelpers.sort()) console.error(`- ${item}`);
+  process.exit(1);
+}
+
+console.log("All mini-program custom components are registered and no unresolved @babel/runtime requires exist.");

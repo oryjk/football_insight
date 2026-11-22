@@ -172,7 +172,9 @@ export function createOutlookLoader(deps: Dependencies) {
       ),
     )
     // One background request at a time; foreground selection shares the same promise.
-    for (const id of nextIds) {
+    const orderedIds = Array.from(nextIds)
+    for (let i = 0; i < orderedIds.length; i += 1) {
+      const id = orderedIds[i]
       if (scope !== owner || !allowed()) return
       if (id === undefined || id === selectedMatchId.value) continue
       try {

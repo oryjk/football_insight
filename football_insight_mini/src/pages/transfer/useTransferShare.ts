@@ -23,8 +23,9 @@ export function useTransferShare(contextKey: () => string, returnUrl: () => stri
   }
   // 海报大头像优先取 240px 小图，小图缺失或加载失败时回退原图；结果仍以原地址为键，绘制函数不用改。
   async function loadImage(url: string): Promise<string> {
-    for (const candidate of avatarCandidates(url, 240)) {
-      try { return await imageInfo(candidate) } catch { /* 试下一个 */ }
+    const candidates = avatarCandidates(url, 240)
+    for (let i = 0; i < candidates.length; i += 1) {
+      try { return await imageInfo(candidates[i]) } catch { /* 试下一个 */ }
     }
     throw new Error('image unavailable')
   }

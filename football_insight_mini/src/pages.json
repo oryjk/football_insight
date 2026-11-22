@@ -238,6 +238,12 @@
 				"pages/insights-transfer",
 				"pages/director"
 			]
+		},
+		"pages/topic-detail/index": {
+			"network": "all",
+			"packages": [
+				"pages/telegraph-entry"
+			]
 		}
 	},
 	"tabBar": {

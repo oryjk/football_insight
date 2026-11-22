@@ -47,7 +47,8 @@ export function useMatchesPage(
       if (progressiveLoad) {
         const responses = await Promise.allSettled(requests)
         const futureLists: MatchCard[][] = []
-        for (const response of responses) {
+        for (let i = 0; i < responses.length; i += 1) {
+          const response = responses[i]
           if (response.status === 'fulfilled') futureLists.push(response.value.matches)
           else console.warn('[matches] failed to load future round matches', response.reason)
         }

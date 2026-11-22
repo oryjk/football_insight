@@ -149,7 +149,8 @@ export function createPageLayoutStore(source: typeof pageLayoutApi = pageLayoutA
         const res = await source.getPageLayouts()
         if (!res || !Array.isArray(res.items)) return
         const next = buildDefaultMap()
-        for (const item of res.items) {
+        for (let i = 0; i < res.items.length; i += 1) {
+          const item = res.items[i]
           if (item && VALID_PAGE_KEYS.has(item.page_key)) {
             next[item.page_key] = normalizePageLayout(item.page_key, item)
           }
