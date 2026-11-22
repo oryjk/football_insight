@@ -20,6 +20,12 @@ try {
 export default defineConfig({
   ...(h5BasePath ? { base: h5BasePath } : {}),
   ...(releaseEnvDir ? { envDir: releaseEnvDir } : {}),
+  build: {
+    target: "es2017",
+  },
+  esbuild: {
+    target: "es2017",
+  },
   define: {
     __FOOTBALL_BUILD_INFO__: JSON.stringify({ revision, builtAt: new Date().toISOString() }),
   },
