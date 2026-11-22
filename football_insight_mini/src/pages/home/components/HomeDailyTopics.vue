@@ -9,7 +9,7 @@
     </view>
     <view v-if="loading && !edition.items.length" class="daily-topics__state">
       <text class="daily-topics__state-title">正在加载最新话题</text>
-      <text class="daily-topics__state-copy">足球相关新闻与来源</text>
+      <text class="daily-topics__state-copy">足球热点快讯与解读</text>
     </view>
     <view v-else-if="!edition.items.length" class="daily-topics__state">
       <text class="daily-topics__state-title">{{ errorMessage ? '话题暂时未能加载' : '暂无已发布话题' }}</text>

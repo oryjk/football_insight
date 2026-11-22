@@ -32,11 +32,6 @@
       <view class="roundup__meta">
         <view class="roundup__meta-info">
           <text v-if="active === null" class="roundup__tag" :class="`roundup__tag--${entry.category}`">{{ telegraphCategoryLabel(entry.category) }}</text>
-          <!-- 来源默认折叠，只露出媒体名；点开后逐条列出，可复制原文链接。 -->
-          <view v-if="entry.sources.length" class="roundup__source-toggle" role="button" :aria-expanded="expanded.has(entry.id)" hover-class="roundup__pressed" @tap.stop="toggle(entry.id)">
-            <text>来源：{{ publishers(entry) }}</text>
-            <text class="roundup__chevron" :class="{ 'roundup__chevron--open': expanded.has(entry.id) }">›</text>
-          </view>
         </view>
         <view class="roundup__actions">
           <FiReactionBar
@@ -61,22 +56,13 @@
           </button>
         </view>
       </view>
-      <view v-if="expanded.has(entry.id)" class="roundup__sources" @tap.stop>
-        <view v-for="source in entry.sources" :key="source.url" class="roundup__source">
-          <text class="roundup__source-title">{{ source.title }}</text>
-          <view class="roundup__source-meta">
-            <text>{{ source.publisher }} · {{ source.dateLabel }}</text>
-            <text class="roundup__copy" role="button" hover-class="roundup__pressed" @tap.stop="emit('copy', source.url)">复制原文链接</text>
-          </view>
-        </view>
-      </view>
     </view>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, ref } from 'vue'
 import FiReactionBar from '../../../components/FiReactionBar.vue'
 import FiTopicAudioEntry from '../../../components/topics/FiTopicAudioEntry.vue'
 import type { DailyTopicEntry, DailyTopicItem, TelegraphCategory } from '../../../types/dailyTopic'
@@ -98,7 +84,6 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   (e: 'play', category: TelegraphCategory | null): void
   (e: 'select', category: TelegraphCategory | null): void
-  (e: 'copy', url: string): void
   (e: 'like', entry: DailyTopicEntry): void
   (e: 'dislike', entry: DailyTopicEntry): void
   (e: 'open-entry', entry: DailyTopicEntry, focusComment: boolean): void
@@ -175,15 +160,6 @@ function onTouchEnd(event: TouchEvent) {
   const next = tabs.value[index + (dx < 0 ? 1 : -1)]
   if (next) select(next.value, dx < 0 ? 'right' : 'left')
 }
-
-const expanded = reactive(new Set<string>())
-function toggle(entryId: string) {
-  if (expanded.has(entryId)) expanded.delete(entryId)
-  else expanded.add(entryId)
-}
-function publishers(entry: DailyTopicEntry): string {
-  return Array.from(new Set(entry.sources.map(source => source.publisher))).join(' · ')
-}
 </script>
 
 <style scoped>
@@ -217,7 +193,6 @@ function publishers(entry: DailyTopicEntry): string {
   .roundup__content--from-right-b,
   .roundup__content--from-left-a,
   .roundup__content--from-left-b { animation: none; }
-  .roundup__chevron { transition: none; }
 }
 .roundup__day { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-16); }
 .roundup__day-copy { display: flex; align-items: baseline; gap: var(--fi-space-16); min-width: 0; }
@@ -246,14 +221,5 @@ function publishers(entry: DailyTopicEntry): string {
 .roundup__tag--domestic { background: var(--fi-color-primary-soft); color: var(--fi-color-primary-deep); }
 .roundup__tag--world { background: var(--fi-color-outsider-soft); color: var(--fi-color-outsider); }
 .roundup__tag--abroad { background: var(--fi-color-hat-trick-bg); color: var(--fi-color-hat-trick-text); }
-.roundup__source-toggle { display: inline-flex; align-items: center; gap: var(--fi-space-8); padding: var(--fi-space-8) 0; color: var(--fi-color-text-caption); font-size: var(--fi-font-22); line-height: var(--fi-leading-normal); }
-.roundup__chevron { display: inline-block; transform: rotate(90deg); transition: transform var(--fi-motion-duration-base) var(--fi-motion-ease-out); }
-.roundup__chevron--open { transform: rotate(-90deg); }
 .roundup__pressed { opacity: var(--fi-opacity-pressed); }
-.roundup__sources { margin-top: var(--fi-space-8); padding: var(--fi-space-4) var(--fi-space-20); border-radius: var(--fi-radius-md); background: var(--fi-color-bg); }
-.roundup__source { padding: var(--fi-space-16) 0; border-bottom: var(--fi-border-divider); }
-.roundup__source:last-child { border-bottom: 0; }
-.roundup__source-title { display: block; color: var(--fi-color-text-secondary); font-size: var(--fi-font-24); line-height: var(--fi-leading-normal); }
-.roundup__source-meta { display: flex; align-items: center; justify-content: space-between; gap: var(--fi-space-16); margin-top: var(--fi-space-8); color: var(--fi-color-text-caption); font-size: var(--fi-font-22); }
-.roundup__copy { flex-shrink: 0; color: var(--fi-color-primary); }
 </style>

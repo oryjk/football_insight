@@ -4,27 +4,39 @@
   <view class="topic-page-offset">
     <FiPageBackdrop :image-url="pageBackgroundImageUrl" full-page />
     <view class="topics-page">
-      <template v-for="block in visibleBlocks" :key="block.key">
-        <FiLayoutBlock v-if="block.key === 'heading'" :background-image-url="block.background_image_url">
-          <view class="topics-heading">
+      <view
+        v-for="block in visibleBlocks"
+        :key="block.key"
+        class="fi-layout-block"
+        :class="{ 'fi-layout-block--bg': Boolean(block.background_image_url) }"
+      >
+        <view
+          v-if="block.background_image_url"
+          class="fi-layout-block__bg"
+          :style="{ backgroundImage: `url(${block.background_image_url})` }"
+          aria-hidden="true"
+        />
+        <view v-if="block.background_image_url" class="fi-layout-block__wash" aria-hidden="true" />
+        <view class="fi-layout-block__inner">
+          <view v-if="block.key === 'heading'" class="topics-heading">
             <text class="topics-title">全部话题</text>
             <text class="topics-caption">每日电报 · 最新在前</text>
           </view>
-        </FiLayoutBlock>
 
-        <FiLayoutBlock v-else-if="block.key === 'list'" :background-image-url="block.background_image_url">
-          <view v-if="items.length" class="topics-list">
-            <TopicHistoryCard v-for="item in items" :key="item.id" :item="item" :heat="topicHeatValue(item.id, item.heat)" @read="openTopic" />
+          <view v-else-if="block.key === 'list'">
+            <view v-if="items.length" class="topics-list">
+              <TopicHistoryCard v-for="item in items" :key="item.id" :item="item" :heat="topicHeatValue(item.id, item.heat)" @read="openTopic" />
+            </view>
+            <view class="topics-state">
+              <text v-if="loading">正在加载话题…</text>
+              <view v-else-if="errorMessage"><text>{{ errorMessage }}</text><button class="topics-state__action" @tap="retry">重新加载</button></view>
+              <text v-else-if="!items.length">暂无已发布话题</text>
+              <button v-else-if="nextCursor" class="topics-state__action" @tap="load(false)">加载更多话题</button>
+              <text v-else>已显示全部话题</text>
+            </view>
           </view>
-          <view class="topics-state">
-            <text v-if="loading">正在加载话题…</text>
-            <template v-else-if="errorMessage"><text>{{ errorMessage }}</text><button class="topics-state__action" @tap="retry">重新加载</button></template>
-            <text v-else-if="!items.length">暂无已发布话题</text>
-            <button v-else-if="nextCursor" class="topics-state__action" @tap="load(false)">加载更多话题</button>
-            <text v-else>已显示全部话题</text>
-          </view>
-        </FiLayoutBlock>
-      </template>
+        </view>
+      </view>
     </view>
   </view>
 </template>
@@ -36,7 +48,6 @@ import { usePageLayout } from '../../composables/usePageLayout'
 import { onScopeDispose, ref } from 'vue'
 import { onLoad, onPullDownRefresh, onReachBottom, onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import TopicHistoryCard from './components/TopicHistoryCard.vue'
-import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
 import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'

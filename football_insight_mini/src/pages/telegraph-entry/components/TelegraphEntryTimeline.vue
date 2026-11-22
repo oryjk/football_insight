@@ -29,30 +29,6 @@
           <text v-if="entry.title" class="x-node__entry-title">【{{ entry.title }}】</text>{{ entry.text }}
         </text>
 
-        <view v-if="entry.sources.length" class="x-node__source-wrap">
-          <view
-            class="x-node__source-toggle"
-            role="button"
-            :aria-expanded="sourcesExpanded"
-            hover-class="timeline__pressed"
-            @tap="sourcesExpanded = !sourcesExpanded"
-          >
-            <text>来源：{{ publishers }}</text>
-            <text class="x-node__chevron" :class="{ 'x-node__chevron--open': sourcesExpanded }">›</text>
-          </view>
-          <view v-if="sourcesExpanded" class="x-node__sources">
-            <view v-for="source in entry.sources" :key="source.url" class="x-node__source">
-              <text class="x-node__source-title">{{ source.title }}</text>
-              <view class="x-node__source-meta">
-                <text>{{ source.publisher }} · {{ source.dateLabel }}</text>
-                <text class="x-node__copy" role="button" hover-class="timeline__pressed" @tap="emit('copy-source', source.url)">
-                  复制原文链接
-                </text>
-              </view>
-            </view>
-          </view>
-        </view>
-
         <view class="x-node__entry-controls">
           <button
             v-if="commentsVisible"
@@ -161,12 +137,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
 import type { DailyTopicEntry, TelegraphComment } from '../../../types/dailyTopic'
 import { formatTopicHeat, telegraphCategoryLabel } from '../../../utils/dailyTopics'
 import TelegraphCommentNode from './TelegraphCommentNode.vue'
 
-const props = defineProps<{
+defineProps<{
   entry: DailyTopicEntry
   dayLabel: string
   commentsVisible: boolean
@@ -181,7 +156,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'copy-source', url: string): void
   (e: 'share'): void
   (e: 'like-entry'): void
   (e: 'dislike-entry'): void
@@ -192,11 +166,6 @@ const emit = defineEmits<{
   (e: 'like-comment', comment: TelegraphComment): void
   (e: 'delete-comment', comment: TelegraphComment): void
 }>()
-
-const sourcesExpanded = ref(false)
-const publishers = computed(() =>
-  Array.from(new Set(props.entry.sources.map(source => source.publisher))).join(' · '),
-)
 
 function formatCount(count: number): string {
   return formatTopicHeat(count)
@@ -343,68 +312,6 @@ function formatCount(count: number): string {
 
 .x-node__entry-title {
   font-weight: var(--fi-weight-bold);
-}
-
-.x-node__source-wrap {
-  margin-top: var(--fi-space-10);
-}
-
-.x-node__source-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--fi-space-8);
-  padding: var(--fi-space-6) 0;
-  color: var(--fi-color-text-caption);
-  font-size: var(--fi-font-22);
-  line-height: var(--fi-leading-normal);
-}
-
-.x-node__chevron {
-  display: inline-block;
-  transform: rotate(90deg);
-  transition: transform var(--fi-motion-duration-base) var(--fi-motion-ease-out);
-}
-
-.x-node__chevron--open {
-  transform: rotate(-90deg);
-}
-
-.x-node__sources {
-  margin-top: var(--fi-space-8);
-  padding: var(--fi-space-4) var(--fi-space-16);
-  border-radius: var(--fi-radius-md);
-  background: var(--fi-color-page-soft);
-}
-
-.x-node__source {
-  padding: var(--fi-space-12) 0;
-  border-bottom: var(--fi-border-divider);
-}
-
-.x-node__source:last-child {
-  border-bottom: 0;
-}
-
-.x-node__source-title {
-  display: block;
-  color: var(--fi-color-text-secondary);
-  font-size: var(--fi-font-24);
-  line-height: var(--fi-leading-normal);
-}
-
-.x-node__source-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--fi-space-12);
-  margin-top: var(--fi-space-6);
-  color: var(--fi-color-text-caption);
-  font-size: var(--fi-font-22);
-}
-
-.x-node__copy {
-  flex-shrink: 0;
-  color: var(--fi-color-primary);
 }
 
 .x-node__entry-controls {

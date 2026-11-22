@@ -17,10 +17,23 @@
         <text>评论功能已关闭</text>
       </view>
 
-      <template v-else-if="entry && focalComment">
-        <template v-for="block in visibleBlocks" :key="block.key">
-          <FiLayoutBlock v-if="block.key === 'thread'" :background-image-url="block.background_image_url">
+      <view v-else-if="entry && focalComment">
+        <view
+          v-for="block in visibleBlocks"
+          :key="block.key"
+          class="fi-layout-block"
+          :class="{ 'fi-layout-block--bg': Boolean(block.background_image_url) }"
+        >
+          <view
+            v-if="block.background_image_url"
+            class="fi-layout-block__bg"
+            :style="{ backgroundImage: `url(${block.background_image_url})` }"
+            aria-hidden="true"
+          />
+          <view v-if="block.background_image_url" class="fi-layout-block__wash" aria-hidden="true" />
+          <view class="fi-layout-block__inner">
             <TelegraphCommentThread
+              v-if="block.key === 'thread'"
               :entry="entry"
               :day-label="dayLabel"
               :ancestors="ancestors"
@@ -42,9 +55,9 @@
               @load-more="page.loadMoreReplies"
               @share="copyShareLink"
             />
-          </FiLayoutBlock>
-        </template>
-      </template>
+          </view>
+        </view>
+      </view>
     </view>
   </view>
 
@@ -77,7 +90,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { onHide, onLoad, onPullDownRefresh, onReachBottom, onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
-import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
 import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiProfileSetupSheet from '../../components/FiProfileSetupSheet.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'

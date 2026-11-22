@@ -6,17 +6,30 @@
     <view class="topic-detail">
       <view v-if="loading" class="topic-detail__state">正在加载话题…</view>
       <view v-else-if="errorMessage" class="topic-detail__state"><text>{{ errorMessage }}</text><button class="topic-detail__retry" @tap="load">重新加载</button></view>
-      <template v-else-if="item">
-        <template v-for="block in visibleBlocks" :key="block.key">
-          <FiLayoutBlock v-if="block.key === 'header'" :background-image-url="block.background_image_url">
-            <template v-if="isRoundupTopic(item)">
+      <view v-else-if="item" class="topic-detail__blocks">
+        <view
+          v-for="block in renderBlocks"
+          :key="block.key"
+          class="fi-layout-block"
+          :class="{ 'fi-layout-block--bg': Boolean(block.background_image_url) }"
+        >
+          <view
+            v-if="block.background_image_url"
+            class="fi-layout-block__bg"
+            :style="{ backgroundImage: `url(${block.background_image_url})` }"
+            aria-hidden="true"
+          />
+          <view v-if="block.background_image_url" class="fi-layout-block__wash" aria-hidden="true" />
+          <view class="fi-layout-block__inner">
+            <view v-if="block.key === 'header' && isRoundupTopic(item)">
               <text class="topic-detail__title">每日电报</text>
               <view class="topic-detail__meta-row">
                 <text class="topic-detail__meta">更新于 {{ item.publishedLabel }}</text>
                 <view class="topic-detail__size"><FiSegmented compact frameless :items="READING_SIZE_ITEMS" :model-value="readingSize" aria-label="文字大小" @update:model-value="setReadingSize" /></view>
               </view>
-            </template>
-            <template v-else>
+            </view>
+
+            <view v-else-if="block.key === 'header'">
               <FiTopicTeamTags v-if="timeline.tags.value.length" :tags="timeline.tags.value" :selected-team-id="timeline.selectedTeamId.value" @select="selectTimelineTeam" />
               <text class="topic-detail__title">{{ item.title }}</text>
               <view class="topic-detail__meta-row">
@@ -25,11 +38,10 @@
               </view>
               <view class="topic-detail__heat"><FiTopicMeta :heat="topicHeatValue(item.id, item.heat)" :minutes="item.readMinutes" /></view>
               <view class="topic-detail__audio"><FiTopicAudioEntry :ready="audio.availableIds.value.includes(item.id)" :playing="audio.status.value === 'playing'" :loading="audio.status.value === 'loading'" @play="audio.toggle(item.id)" /></view>
-            </template>
-          </FiLayoutBlock>
+            </view>
 
-          <FiLayoutBlock v-else-if="block.key === 'audio_player' && audio.activeId.value" :background-image-url="block.background_image_url">
             <FiTopicAudioPlayer
+              v-else-if="block.key === 'audio_player' && audio.activeId.value"
               :title="isRoundupTopic(item) ? (audio.activeId.value === item.id ? '每日电报 · 全部' : audio.activeTitle.value) : item.title"
               :status="audio.status.value"
               :current-time="audio.currentTime.value"
@@ -39,10 +51,8 @@
               @seek="audio.seek"
               @close="audio.stop"
             />
-          </FiLayoutBlock>
 
-          <FiLayoutBlock v-else-if="block.key === 'roundup_content' && isRoundupTopic(item)" :background-image-url="block.background_image_url">
-            <view class="topic-detail__roundup">
+            <view v-else-if="block.key === 'roundup_content'" class="topic-detail__roundup">
               <TopicRoundup
                 :item="item"
                 :font-rpx="bodyFontRpx"
@@ -54,46 +64,28 @@
                 :comments-visible="interactions.commentsVisible.value"
                 @play="audio.toggle(telegraphAudio)"
                 @select="telegraphTab = $event"
-                @copy="copyEntrySource"
                 @like="interactions.likeEntry"
                 @dislike="interactions.dislikeEntry"
                 @open-entry="interactions.openEntry"
               />
             </view>
-          </FiLayoutBlock>
 
-          <FiLayoutBlock v-else-if="block.key === 'article_gallery' && !isRoundupTopic(item) && item.images?.length" :background-image-url="block.background_image_url">
-            <view class="topic-detail__gallery">
+            <view v-else-if="block.key === 'article_gallery' && item.images?.length" class="topic-detail__gallery">
               <TopicImageGallery :key="item.id" :images="item.images" @preview="previewPhoto" />
             </view>
-          </FiLayoutBlock>
 
-          <FiLayoutBlock v-else-if="block.key === 'article_body' && !isRoundupTopic(item)" :background-image-url="block.background_image_url">
-            <view>
+            <view v-else-if="block.key === 'article_body'">
               <text v-for="(paragraph, index) in item.paragraphs" :key="index" class="topic-detail__paragraph" :style="{ fontSize: `${bodyFontRpx}rpx` }">{{ paragraph }}</text>
-              <view class="topic-detail__sources">
-                <view class="topic-detail__sources-toggle" role="button" :aria-expanded="sourcesOpen" hover-class="topic-detail__pressed" @tap="sourcesOpen = !sourcesOpen">
-                  <text class="topic-detail__sources-heading">来源（{{ item.sources.length }}）</text>
-                  <text class="topic-detail__chevron" :class="{ 'topic-detail__chevron--open': sourcesOpen }">›</text>
-                </view>
-                <view v-for="(source, index) in item.sources" v-show="sourcesOpen" :key="source.url" class="topic-detail__source">
-                  <text class="topic-detail__source-title">{{ index + 1 }}. {{ source.title }}</text>
-                  <text class="topic-detail__meta">{{ source.publisher }} · {{ source.dateLabel }}</text>
-                  <button class="topic-detail__copy" @tap="copySource(source.url)">复制原文链接</button>
-                </view>
-              </view>
             </view>
-          </FiLayoutBlock>
 
-          <FiLayoutBlock v-else-if="block.key === 'article_timeline' && !isRoundupTopic(item) && timeline.tags.value.length" :background-image-url="block.background_image_url">
-            <view id="topic-timeline" class="topic-detail__timeline">
+            <view v-else-if="block.key === 'article_timeline'" id="topic-timeline" class="topic-detail__timeline">
               <TopicTimeline :anchor="item" :tags="timeline.tags.value" :selected-team-id="timeline.selectedTeamId.value" :items="timeline.items.value"
                 :loading="timeline.loading.value" :error-message="timeline.errorMessage.value" :has-more="!!timeline.nextCursor.value"
                 @select="timeline.selectTeam" @read="openTimelineTopic" @more="timeline.loadMore" @retry="timeline.retry" />
             </view>
-          </FiLayoutBlock>
-        </template>
-      </template>
+          </view>
+        </view>
+      </view>
     </view>
   </view>
   <canvas :canvas-id="TOPIC_SHARE_CANVAS_ID" class="topic-share-canvas" :style="shareCanvasStyle" />
@@ -109,7 +101,6 @@ import { useMiniReviewStatus } from '../../stores/miniReview'
 import { useTelegraphInteractions } from './useTelegraphInteractions'
 import { topicVisitorId } from '../../utils/topicVisitor'
 import { topicHeatValue, setTopicHeat, syncTopicHeat } from '../../stores/topicHeat'
-import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
 import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiTopicMeta from '../../components/topics/FiTopicMeta.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
@@ -125,7 +116,7 @@ import { useTopicTimeline } from './useTopicTimeline'
 import FiSegmented from '../../components/FiSegmented.vue'
 import { READING_SIZE_ITEMS, loadReadingSize, normalizeReadingSize, readingSizeRpx, saveReadingSize } from './readingSize'
 import type { DailyTopicItem } from '../../types/dailyTopic'
-import { DAILY_TOPICS_TEAM_ID, isRoundupTopic, isTopicSourceUrl, mapTopicDetail, telegraphAudioEdition, telegraphAudioId, topicDetailUrl } from '../../utils/dailyTopics'
+import { DAILY_TOPICS_TEAM_ID, isRoundupTopic, mapTopicDetail, telegraphAudioEdition, telegraphAudioId, topicDetailUrl } from '../../utils/dailyTopics'
 import type { TelegraphCategory } from '../../types/dailyTopic'
 import { ApiRequestError, extractApiErrorMessage } from '../../utils/apiError'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
@@ -139,7 +130,7 @@ const miniReview = useMiniReviewStatus()
 const item = ref<DailyTopicItem | null>(null)
 // 每日电报是全联赛快讯流，不做按球队的话题追踪，也不发追踪请求。
 const timeline = useTopicTimeline(computed(() => item.value && !isRoundupTopic(item.value) ? item.value : null))
-const loading = ref(false)
+const loading = ref(true)
 const errorMessage = ref('')
 // 每日电报的播放批次含整期和各分类语音；旧话题就是它自己。
 const edition = computed(() => telegraphAudioEdition(item.value))
@@ -148,6 +139,20 @@ const telegraphAudio = computed(() => item.value ? telegraphAudioId(item.value.i
 const audio = useDailyTopicAudio(edition)
 const shareCard = useTopicShareCard()
 const shareArticle = computed(() => !loading.value && !errorMessage.value ? item.value : null)
+const renderBlocks = computed(() => {
+  const current = item.value
+  if (!current) return []
+  const roundup = isRoundupTopic(current)
+  return visibleBlocks.value.filter((block) => {
+    if (block.key === 'header') return true
+    if (block.key === 'audio_player') return Boolean(audio.activeId.value)
+    if (block.key === 'roundup_content') return roundup
+    if (block.key === 'article_gallery') return !roundup && Boolean(current.images?.length)
+    if (block.key === 'article_body') return !roundup
+    if (block.key === 'article_timeline') return !roundup && timeline.tags.value.length > 0
+    return false
+  })
+})
 // 分享图按实际像素绘制，与页面布局的 rpx 无关。
 const shareCanvasStyle = { width: `${TOPIC_SHARE_CARD.width}px`, height: `${TOPIC_SHARE_CARD.height}px` }
 let topicId = ''
@@ -160,11 +165,23 @@ const interactions = useTelegraphInteractions({
   session,
   miniReview,
 })
+function decodeQueryParam(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
 async function load() {
   const current = ++revision
   audio.stop()
   shareCard.reset()
-  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(topicId)) { errorMessage.value = '话题不存在或已下线'; return }
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(topicId)) {
+    loading.value = false
+    errorMessage.value = '话题不存在或已下线'
+    return
+  }
   loading.value = true
   errorMessage.value = ''
   lastLoadedSessionRevision = session.revision.value
@@ -199,14 +216,6 @@ async function refreshViewerState() {
     // Silent refresh on session switch never interrupts reading.
   }
 }
-function copySource(url: string) {
-  if (!isTopicSourceUrl(url) || !item.value?.sources.some(source => source.url === url)) return
-  uni.setClipboardData({ data: url, success: () => uni.showToast({ title: '原文链接已复制', icon: 'none' }) })
-}
-function copyEntrySource(url: string) {
-  if (!isTopicSourceUrl(url) || !item.value?.entries.some(entry => entry.sources.some(source => source.url === url))) return
-  uni.setClipboardData({ data: url, success: () => uni.showToast({ title: '原文链接已复制', icon: 'none' }) })
-}
 function selectTimelineTeam(teamId: number) {
   timeline.selectTeam(teamId)
   uni.pageScrollTo({ selector: '#topic-timeline', duration: 700 })
@@ -219,7 +228,7 @@ function previewPhoto(url: string, urls: string[]) {
   }
 }
 onLoad(query => {
-  topicId = typeof query?.id === 'string' ? query.id : ''
+  topicId = decodeQueryParam(query?.id)
   void miniReview.ensureMiniReviewReady()
   void session.ensureSessionReady()
   void load()
@@ -249,7 +258,6 @@ onShareAppMessage(() => {
 onShareTimeline(() => buildTopicTimelinePayload(shareArticle.value, shareCard.imageUrl.value))
 onScopeDispose(() => { revision += 1 })
 
-const sourcesOpen = ref(false)
 const readingSize = ref(loadReadingSize())
 const bodyFontRpx = computed(() => readingSizeRpx(readingSize.value))
 function setReadingSize(key: string) {
@@ -263,6 +271,7 @@ function setReadingSize(key: string) {
 .topic-page-offset { position: relative; min-height: 100vh; padding-top: var(--fi-brand-nav-height); background: var(--fi-color-page); box-sizing: border-box; }
 .topic-share-canvas { position: fixed; left: -9999rpx; top: 0; pointer-events: none; }
 .topic-detail { position: relative; z-index: 1; padding: var(--fi-space-28) var(--fi-space-28) var(--fi-space-40); }
+.topic-detail__blocks { display: flex; flex-direction: column; }
 .topic-detail__timeline { margin-top: var(--fi-space-32); }
 .topic-detail__roundup { margin-top: var(--fi-space-28); }
 .topic-detail__title { display: block; margin-top: var(--fi-space-16); color: var(--fi-color-text-primary); font-size: var(--fi-font-36); font-weight: var(--fi-weight-extrabold); line-height: var(--fi-leading-normal); }
@@ -274,19 +283,7 @@ function setReadingSize(key: string) {
 .topic-detail__audio { margin: var(--fi-space-24) 0; }
 .topic-detail__gallery { margin-top: var(--fi-space-24); }
 .topic-detail__paragraph { display: block; margin-top: var(--fi-space-28); color: var(--fi-color-text-primary); font-size: var(--fi-font-32); line-height: var(--fi-leading-relaxed); white-space: pre-wrap; }
-.topic-detail__sources { margin-top: var(--fi-space-32); padding-top: var(--fi-space-24); border-top: var(--fi-border-divider); }
-.topic-detail__sources-toggle { display: flex; align-items: center; justify-content: space-between; }
-.topic-detail__chevron { color: var(--fi-color-text-caption); font-size: var(--fi-font-32); transform: rotate(90deg); transition: transform var(--fi-motion-duration-base) var(--fi-motion-ease-out); }
-.topic-detail__chevron--open { transform: rotate(-90deg); }
-.topic-detail__pressed { opacity: var(--fi-opacity-pressed); }
-.topic-detail__sources-heading { display: block; color: var(--fi-color-text-primary); font-size: var(--fi-font-26); font-weight: var(--fi-weight-bold); }
-.topic-detail__source { margin-top: var(--fi-space-24); }
-.topic-detail__source-title { display: block; color: var(--fi-color-text-secondary); font-size: var(--fi-font-26); line-height: var(--fi-leading-normal); }
-.topic-detail__copy { display: inline-flex; margin: var(--fi-space-12) 0 0; padding: var(--fi-space-12) 0; background: transparent; color: var(--fi-color-primary); font-size: var(--fi-font-24); line-height: var(--fi-leading-normal); }
-.topic-detail__copy::after, .topic-detail__retry::after { border: 0; }
+.topic-detail__retry::after { border: 0; }
 .topic-detail__state { padding: var(--fi-space-40) 0; text-align: center; color: var(--fi-color-text-secondary); font-size: var(--fi-font-26); }
 .topic-detail__retry { margin-top: var(--fi-space-24); font-size: var(--fi-font-26); color: var(--fi-color-primary); background: var(--fi-color-bg); }
-@media (prefers-reduced-motion: reduce) {
-  .topic-detail__chevron { transition: none; }
-}
 </style>

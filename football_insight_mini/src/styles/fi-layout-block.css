@@ -1,0 +1,61 @@
+/* 页面装修卡片容器：用于不经自定义组件 slot 投影的直接布局块（避免真机 v-for + slot 丢内容）。 */
+.fi-layout-block {
+  width: 100%;
+  min-width: 0;
+}
+
+.fi-layout-block--fill {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.fi-layout-block--bg {
+  position: relative;
+  border-radius: var(--fi-radius-xl);
+  overflow: hidden;
+  --fi-component-panel-bg: var(--fi-color-layout-card-scrim);
+  --fi-color-surface-frosted: var(--fi-color-layout-card-scrim);
+  --fi-color-surface-panel: var(--fi-color-layout-card-scrim);
+  --fi-color-page-soft: var(--fi-color-layout-card-scrim);
+}
+
+.fi-layout-block__bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.fi-layout-block__wash {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--fi-color-layout-card-wash);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.fi-layout-block__inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-width: 0;
+}
+
+.fi-layout-block--fill .fi-layout-block__inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}

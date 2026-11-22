@@ -13,10 +13,23 @@
         <button class="entry-page__retry" @tap="loadInitial(false)">重新加载</button>
       </view>
 
-      <template v-else-if="entry">
-        <template v-for="block in visibleBlocks" :key="block.key">
-          <FiLayoutBlock v-if="block.key === 'timeline'" :background-image-url="block.background_image_url">
+      <view v-else-if="entry">
+        <view
+          v-for="block in visibleBlocks"
+          :key="block.key"
+          class="fi-layout-block"
+          :class="{ 'fi-layout-block--bg': Boolean(block.background_image_url) }"
+        >
+          <view
+            v-if="block.background_image_url"
+            class="fi-layout-block__bg"
+            :style="{ backgroundImage: `url(${block.background_image_url})` }"
+            aria-hidden="true"
+          />
+          <view v-if="block.background_image_url" class="fi-layout-block__wash" aria-hidden="true" />
+          <view class="fi-layout-block__inner">
             <TelegraphEntryTimeline
+              v-if="block.key === 'timeline'"
               :entry="entry"
               :day-label="dayLabel"
               :comments-visible="commentsVisible"
@@ -28,7 +41,6 @@
               :comments-error="commentsError"
               :pending-like-ids="pendingCommentLikeIds"
               :deleting-comment-id="deletingCommentId"
-              @copy-source="copyEntrySource"
               @share="copyShareLink"
               @like-entry="page.likeEntry"
               @dislike-entry="page.dislikeEntry"
@@ -39,9 +51,9 @@
               @like-comment="page.toggleCommentLike"
               @delete-comment="handleDeleteComment"
             />
-          </FiLayoutBlock>
-        </template>
-      </template>
+          </view>
+        </view>
+      </view>
     </view>
   </view>
 
@@ -75,7 +87,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { onHide, onLoad, onPullDownRefresh, onReachBottom, onShareAppMessage, onShareTimeline, onShow } from '@dcloudio/uni-app'
-import FiLayoutBlock from '../../components/FiLayoutBlock.vue'
 import FiPageBackdrop from '../../components/FiPageBackdrop.vue'
 import FiProfileSetupSheet from '../../components/FiProfileSetupSheet.vue'
 import FiSecondaryNav from '../../components/FiSecondaryNav.vue'
@@ -84,7 +95,7 @@ import { usePageLayout } from '../../composables/usePageLayout'
 import { useAppSession } from '../../stores/appSession'
 import { useMiniReviewStatus } from '../../stores/miniReview'
 import type { TelegraphComment } from '../../types/dailyTopic'
-import { isTopicSourceUrl, roundupDayLabel } from '../../utils/dailyTopics'
+import { roundupDayLabel } from '../../utils/dailyTopics'
 import { editableNicknameInitialValue } from '../../utils/profileGate'
 import { copyPageShareLink, goBackFromSecondaryPage } from '../../utils/secondaryNavigation'
 import {
@@ -150,16 +161,6 @@ const pageStyle = computed(() =>
     ? `${navigationPageStyle.value};overflow:hidden;`
     : navigationPageStyle.value,
 )
-
-function copyEntrySource(url: string): void {
-  if (!isTopicSourceUrl(url) || !entry.value?.sources.some(source => source.url === url)) {
-    return
-  }
-  uni.setClipboardData({
-    data: url,
-    success: () => uni.showToast({ title: '原文链接已复制', icon: 'none' }),
-  })
-}
 
 function goBack(): void {
   goBackFromSecondaryPage()
