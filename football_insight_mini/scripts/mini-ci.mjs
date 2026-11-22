@@ -67,7 +67,14 @@ async function main() {
   });
 
   const desc = descArg || `v${manifest.versionName} CI 上传`;
-  const setting = { es6: false, minifyJS: false, minifyWXML: false, minifyWXSS: false };
+  const setting = {
+    es6: false,
+    es7: false,
+    minify: false,
+    minifyJS: false,
+    minifyWXML: false,
+    minifyWXSS: false,
+  };
 
   if (command === "upload") {
     const result = await ci.upload({ project, version: manifest.versionName, desc, robot, setting });

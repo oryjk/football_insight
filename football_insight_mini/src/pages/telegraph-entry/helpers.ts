@@ -85,7 +85,8 @@ export function mergeTelegraphComments(
   }
   const seen = new Set(existing.map(comment => comment.id))
   const merged = [...existing]
-  for (const comment of incoming) {
+  for (let i = 0; i < incoming.length; i += 1) {
+    const comment = incoming[i]
     if (!seen.has(comment.id)) {
       seen.add(comment.id)
       merged.push(comment)

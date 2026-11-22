@@ -82,18 +82,18 @@ if (failures.length > 0) {
 }
 
 const unresolvedBabelHelpers = [];
-const babelRequirePattern = /require\(\s*["'](@babel\/runtime\/[^"']+)["']\s*\)/g;
+const babelHelperPattern = /@babel\/runtime\/[^\s"'`)]+|regeneratorValues/g;
 for (const jsPath of await collectFiles(outputDir, ".js")) {
   const code = await readFile(jsPath, "utf8");
-  for (const match of code.matchAll(babelRequirePattern)) {
-    unresolvedBabelHelpers.push(`${jsPath}: require("${match[1]}")`);
+  for (const match of code.matchAll(babelHelperPattern)) {
+    unresolvedBabelHelpers.push(`${jsPath}: ${match[0]}`);
   }
 }
 
 if (unresolvedBabelHelpers.length > 0) {
-  console.error("Unresolved @babel/runtime helper requires in mp-weixin bundle:\n");
+  console.error("Unresolved @babel/runtime helper references in mp-weixin bundle:\n");
   for (const item of unresolvedBabelHelpers.sort()) console.error(`- ${item}`);
   process.exit(1);
 }
 
-console.log("All mini-program custom components are registered and no unresolved @babel/runtime requires exist.");
+console.log("All mini-program custom components are registered and no unresolved @babel/runtime references exist.");
