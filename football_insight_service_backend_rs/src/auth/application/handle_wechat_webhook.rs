@@ -13,6 +13,7 @@ use crate::system_config::ports::system_config_port::SystemConfigPort;
 const PRODUCT_INTRO_ARTICLE_URL: &str = "https://mp.weixin.qq.com/s?__biz=MzA3Nzc1NTk1Mg==&mid=2247483892&idx=1&sn=c41ff0a1987269db51417a11d0c7b885";
 const WECHAT_INVITE_REPLY_TEMPLATE_KEY: &str = "wechat_invite_reply_template";
 const WECHAT_NEXT_MATCH_REPLY_ENABLED_KEY: &str = "wechat_next_match_reply_enabled";
+const WECHAT_AI_REPLY_TEMPLATE_KEY: &str = "wechat_ai_reply_template";
 
 #[derive(Debug, Clone)]
 pub struct WechatVerificationInput {
@@ -175,6 +176,27 @@ impl HandleWechatWebhookUseCase {
                 );
 
                 let reply_content = self.next_match_reply(&incoming.from_user_name).await;
+
+                let encrypted = self.build_text_reply(
+                    message_mode,
+                    &incoming.from_user_name,
+                    &incoming.to_user_name,
+                    &input.timestamp,
+                    &input.nonce,
+                    &incoming.app_id,
+                    reply_content,
+                )?;
+                return Ok(Some(encrypted));
+            }
+
+            if matches!(normalized_command.as_str(), "ai" | "ai咨询" | "ai工作流") {
+                tracing::info!(
+                    open_id = %incoming.from_user_name,
+                    command = %normalized_command,
+                    "wechat ai keyword text command received"
+                );
+
+                let reply_content = self.ai_reply_message().await;
 
                 let encrypted = self.build_text_reply(
                     message_mode,
@@ -374,6 +396,17 @@ impl HandleWechatWebhookUseCase {
         build_invite_code_message(invite_code, custom_template.as_deref())
     }
 
+    async fn ai_reply_message(&self) -> String {
+        let custom_template = self
+            .system_config_port
+            .get_config_value(WECHAT_AI_REPLY_TEMPLATE_KEY)
+            .await
+            .ok()
+            .flatten();
+
+        build_ai_reply_message(custom_template.as_deref())
+    }
+
     async fn next_match_reply_enabled(&self) -> bool {
         match self
             .system_config_port
@@ -431,6 +464,39 @@ fn build_invite_code_message(invite_code: &str, template: Option<&str>) -> Strin
     }
 
     with_product_intro(template.replace("{invite_code}", invite_code))
+}
+
+fn default_ai_reply_message() -> String {
+    r#"【何止编程 · AI 工程工作流实战清单】
+
+感谢来聊！这次一个人用 AI 把「记金（Sumly）」从 0 磨到 App Store 上线（原生 iOS + Go 后端 + React 配置后台），核心踩坑与落地心法总结为 4 条：
+
+1. 拆角色，别塞一个对话框
+用多 Agent 分工（架构 / 客户端 / 后端 / 独立审校 / 发布）+ Git Worktree 隔离并行改代码，避免上下文漂移。
+
+2. 先搭护栏，再让 AI 写业务
+严格类型与分层架构（Swift 6 / Clean Architecture）+ 380+ 自动化测试 + 模拟器截屏视觉验收，把 AI 关进可验证的铁轨里。
+
+3. 文档即上下文，规范即提示词
+把项目约定、边界口径、发布红线写进仓库 AGENTS.md，让每个新开的 Agent 开局就懂你的工程标准。
+
+4. 人定品味，AI 扛执行
+把精力花在产品取舍与体验细节，用 AI 把验证周期从两周压缩到半小时。
+
+——————
+交流与 AI 咨询：
+如果你正在探索团队/个人 AI Coding 工作流与多 Agent 落地，或想用 AI 低成本把产品想法从 0 到 1 做出上线级 MVP，欢迎扫码加我微信（备注「AI交流」优先通过）：
+<a href="https://oryjk.cn:82/minio/football-insight/summary/student/contact-wechat-740aed5038f2113f.jpg">点击查看联系微信二维码</a>
+
+也可直接在公众号回复你的场景，看到必回。"#
+        .to_string()
+}
+
+fn build_ai_reply_message(template: Option<&str>) -> String {
+    match template.map(str::trim).filter(|item| !item.is_empty()) {
+        Some(custom) => custom.to_string(),
+        None => default_ai_reply_message(),
+    }
 }
 
 fn official_bind_message(
@@ -777,6 +843,7 @@ mod tests {
     struct FakeSystemConfigPort {
         invite_reply_template: Option<String>,
         next_match_reply_enabled: Option<String>,
+        ai_reply_template: Option<String>,
     }
 
     fn next_match_enabled_config() -> FakeSystemConfigPort {
@@ -808,6 +875,10 @@ mod tests {
 
             if config_key == "wechat_next_match_reply_enabled" {
                 return Ok(self.next_match_reply_enabled.clone());
+            }
+
+            if config_key == "wechat_ai_reply_template" {
+                return Ok(self.ai_reply_template.clone());
             }
 
             Ok(None)
@@ -1344,6 +1415,89 @@ mod tests {
             .unwrap();
 
         assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn handle_ai_keyword_variants_returns_default_workflow_checklist_within_wechat_limit() {
+        let use_case = HandleWechatWebhookUseCase::new(
+            Arc::new(FakeRepository::default()),
+            Arc::new(FakeCryptoPort),
+            Arc::new(FakeCurrentStandardMatchPort),
+            Arc::new(FakeSystemConfigPort::default()),
+            Arc::new(GateAccessFake::granted()),
+        );
+
+        for text in ["AI", "ai", " Ai ", "AI咨询", "AI 工作流"] {
+            let result = use_case
+                .handle_message(WechatMessageInput {
+                    signature: "sig".to_string(),
+                    timestamp: "1".to_string(),
+                    nonce: "2".to_string(),
+                    body: format!(
+                        "<xml><ToUserName><![CDATA[gh_123]]></ToUserName><FromUserName><![CDATA[openid_123]]></FromUserName><CreateTime>1</CreateTime><MsgType><![CDATA[text]]></MsgType><Content><![CDATA[{text}]]></Content></xml>"
+                    ),
+                })
+                .await
+                .unwrap()
+                .unwrap();
+
+            assert!(result.starts_with("plain::"));
+            let body = result.strip_prefix("plain::").unwrap();
+            assert!(body.contains("AI 工程工作流实战清单"));
+            assert!(body.contains("contact-wechat-740aed5038f2113f.jpg"));
+            assert!(!body.contains(super::PRODUCT_INTRO_ARTICLE_URL));
+            assert!(
+                body.len() <= 2048,
+                "WeChat text reply must stay within 2048 UTF-8 bytes, got {}",
+                body.len()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn handle_ai_keyword_prefers_system_config_template_and_falls_back_on_error() {
+        let custom_use_case = HandleWechatWebhookUseCase::new(
+            Arc::new(FakeRepository::default()),
+            Arc::new(FakeCryptoPort),
+            Arc::new(FakeCurrentStandardMatchPort),
+            Arc::new(FakeSystemConfigPort {
+                ai_reply_template: Some("自定义 AI 回复内容".to_string()),
+                ..FakeSystemConfigPort::default()
+            }),
+            Arc::new(GateAccessFake::granted()),
+        );
+
+        let custom_result = custom_use_case
+            .handle_message(WechatMessageInput {
+                signature: "sig".to_string(),
+                timestamp: "1".to_string(),
+                nonce: "2".to_string(),
+                body: "<xml><ToUserName><![CDATA[gh_123]]></ToUserName><FromUserName><![CDATA[openid_123]]></FromUserName><CreateTime>1</CreateTime><MsgType><![CDATA[text]]></MsgType><Content><![CDATA[AI]]></Content></xml>".to_string(),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(custom_result, "plain::自定义 AI 回复内容");
+
+        let fallback_use_case = HandleWechatWebhookUseCase::new(
+            Arc::new(FakeRepository::default()),
+            Arc::new(FakeCryptoPort),
+            Arc::new(FakeCurrentStandardMatchPort),
+            Arc::new(FailingSystemConfigPort),
+            Arc::new(GateAccessFake::granted()),
+        );
+
+        let fallback_result = fallback_use_case
+            .handle_message(WechatMessageInput {
+                signature: "sig".to_string(),
+                timestamp: "1".to_string(),
+                nonce: "2".to_string(),
+                body: "<xml><ToUserName><![CDATA[gh_123]]></ToUserName><FromUserName><![CDATA[openid_123]]></FromUserName><CreateTime>1</CreateTime><MsgType><![CDATA[text]]></MsgType><Content><![CDATA[ai]]></Content></xml>".to_string(),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(fallback_result.contains("AI 工程工作流实战清单"));
     }
 
     #[tokio::test]
