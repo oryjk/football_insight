@@ -33,7 +33,7 @@ describe('pageLayoutDefaults', () => {
     expect(keys.length).toBe(25)
     for (const key of keys) {
       const blocks = DEFAULT_PAGE_BLOCK_KEYS[key]
-      expect(blocks.length).toBeGreaterThan(0)
+      expect(blocks.length > 0).toBe(true)
       expect(new Set(blocks).size).toBe(blocks.length)
     }
   })
@@ -41,6 +41,9 @@ describe('pageLayoutDefaults', () => {
   test('sanitizeImageUrl allows only trimmed http(s) URLs without whitespace', () => {
     expect(sanitizeImageUrl('https://cdn.example.com/bg.png')).toBe('https://cdn.example.com/bg.png')
     expect(sanitizeImageUrl('  http://cdn.example.com/a.jpg  ')).toBe('http://cdn.example.com/a.jpg')
+    expect(sanitizeImageUrl('https://oryjk.cn:82/minio/football-insight/bg.webp')).toBe(
+      'https://oryjk.cn:18443/minio/football-insight/bg.webp',
+    )
     expect(sanitizeImageUrl('javascript:alert(1)')).toBeNull()
     expect(sanitizeImageUrl('data:image/png;base64,abc')).toBeNull()
     expect(sanitizeImageUrl('https://cdn.example.com/a b.png')).toBeNull()
@@ -98,7 +101,7 @@ describe('pageLayoutDefaults', () => {
   test('defaults built-in stadium MinIO background and honors explicit null clear', () => {
     const defaultHome = createDefaultPageLayout('home')
     expect(defaultHome.background_image_url).toBe(
-      'https://oryjk.cn:82/minio/football-insight/static/user/phoenix-stadium-bg.webp',
+      'https://oryjk.cn:18443/minio/football-insight/static/user/phoenix-stadium-bg.webp',
     )
     const defaultTopics = createDefaultPageLayout('topics')
     expect(defaultTopics.background_image_url).toBeNull()

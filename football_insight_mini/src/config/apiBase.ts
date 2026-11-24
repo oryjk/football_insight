@@ -19,7 +19,7 @@ function resolveApiBaseUrl(): string {
   if (isProductionBuild) {
     // #ifdef MP-WEIXIN
     return normalizeBaseUrl(import.meta.env.VITE_MP_WEIXIN_API_BASE_URL)
-      ?? 'https://oryjk.cn:82/football-api/v1'
+      ?? 'https://oryjk.cn:18443/football-api/v1'
     // #endif
     return envBaseUrl ?? PRODUCTION_API_BASE_URL
   }

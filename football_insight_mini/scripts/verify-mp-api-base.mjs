@@ -7,7 +7,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runInNewContext } from 'node:vm'
 
-export const PRODUCTION_API_BASE_URL = 'https://oryjk.cn:82/football-api/v1'
+export const PRODUCTION_API_BASE_URL = 'https://oryjk.cn:18443/football-api/v1'
 
 export function verifyMiniProgramApiBase(projectRoot) {
   const distPath = path.join(projectRoot, 'dist', 'build', 'mp-weixin')

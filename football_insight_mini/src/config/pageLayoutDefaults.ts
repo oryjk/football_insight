@@ -1,5 +1,6 @@
 import type { PageLayoutBlock, PageLayoutKey, PublicPageLayout } from '../types/pageLayout'
 import { PHOENIX_STADIUM_BG_IMAGE_URL } from './assets'
+import { resolvePublicAssetUrl } from './publicAssetOrigin'
 
 export const DEFAULT_PAGE_BACKGROUND_URLS: Partial<Record<PageLayoutKey, string>> = {
   home: PHOENIX_STADIUM_BG_IMAGE_URL,
@@ -58,7 +59,7 @@ export function sanitizeImageUrl(url: unknown): string | null {
   if (typeof url !== 'string') return null
   const trimmed = url.trim()
   if (!trimmed) return null
-  if (/^https?:\/\/[^\s]+$/i.test(trimmed)) return trimmed
+  if (/^https?:\/\/[^\s]+$/i.test(trimmed)) return resolvePublicAssetUrl(trimmed)
   return null
 }
 
@@ -85,8 +86,9 @@ export function normalizePageLayout(
   const seen = new Set<string>()
   const blocks: PageLayoutBlock[] = []
 
-  if (Array.isArray(raw?.blocks)) {
-    for (const item of raw.blocks) {
+  const rawBlocks = raw?.blocks
+  if (Array.isArray(rawBlocks)) {
+    for (const item of rawBlocks) {
       if (!item || typeof item.key !== 'string' || !validSet.has(item.key) || seen.has(item.key)) {
         continue
       }

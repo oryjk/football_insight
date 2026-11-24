@@ -12,7 +12,7 @@ import JSON5 from "json5";
 const defaultProjectRoot = fileURLToPath(new URL("..", import.meta.url));
 
 // 审核版本登记走本项目 Rust 后端（match.oryjk.cn）的 mini-review 登记库，密钥放在 .env.ci.local（不入 git）。
-export const DEFAULT_MINI_REVIEW_API_URL = "https://match.oryjk.cn:82/api/v1";
+export const DEFAULT_MINI_REVIEW_API_URL = "https://oryjk.cn:18443/football-api/v1";
 export const DEFAULT_MINI_REVIEW_PROJECT_CODE = "football_insight_mini";
 
 export function parseEnvFile(filePath) {

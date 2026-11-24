@@ -12,7 +12,7 @@ import {
   syncManifestVersion,
 } from './sync-manifest-version.mjs'
 
-const productionApi = 'https://oryjk.cn:82/football-api/v1'
+const productionApi = 'https://oryjk.cn:18443/football-api/v1'
 const localApi = 'http://127.0.0.1:8092/api/v1'
 const roots: string[] = []
 
@@ -50,7 +50,7 @@ describe('mini-ci upload arguments', () => {
 describe('mini review version allocation', () => {
   const config = {
     apiKey: 'test-key',
-    baseUrl: 'https://match.oryjk.cn:82/api/v1',
+    baseUrl: 'https://oryjk.cn:18443/football-api/v1',
     projectCode: 'football_insight_mini',
     skip: false,
   }
@@ -64,7 +64,7 @@ describe('mini review version allocation', () => {
     const version = await allocateReviewVersion({ config, explicitVersion: '', currentVersion: '1.2.2', fetchImpl: fetchImpl as typeof fetch })
     expect(version).toBe('1.2.3')
     expect(calls).toHaveLength(1)
-    expect(calls[0].url).toBe('https://match.oryjk.cn:82/api/v1/mini-review/allocate')
+    expect(calls[0].url).toBe('https://oryjk.cn:18443/football-api/v1/mini-review/allocate')
     expect(calls[0].options.method).toBe('POST')
     expect((calls[0].options.headers as Record<string, string>)['X-Api-Key']).toBe('test-key')
     expect(JSON.parse(String(calls[0].options.body))).toEqual({
@@ -104,7 +104,7 @@ describe('mini review version allocation', () => {
     expect(miniReviewConfig({ env: { MINI_REVIEW_SKIP: '1' }, envFile: '/nonexistent' }).skip).toBe(true)
     const defaults = miniReviewConfig({ env: {}, envFile: '/nonexistent' })
     expect(defaults.projectCode).toBe('football_insight_mini')
-    expect(defaults.baseUrl).toBe('https://match.oryjk.cn:82/api/v1')
+    expect(defaults.baseUrl).toBe('https://oryjk.cn:18443/football-api/v1')
     expect(miniReviewConfig({ env: { MINI_REVIEW_API_KEY: 'k' }, envFile: '/nonexistent' }).apiKey).toBe('k')
   })
 
