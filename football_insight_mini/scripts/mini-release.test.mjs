@@ -10,14 +10,15 @@ import {
 } from "./mini-release-guards.mjs";
 import { runMiniRelease } from "./mini-release.mjs";
 
-const productionApi = "https://match.oryjk.cn/api/v1";
+const productionApi = "https://match.oryjk.cn:82/api/v1";
+const h5Api = "https://match.oryjk.cn/api/v1";
 const localApi = "http://127.0.0.1:8092/api/v1";
 const roots = [];
 
 function fixture(api = productionApi) {
   const root = mkdtempSync(path.join(tmpdir(), "football-mini-release-test-"));
   roots.push(root);
-  writeFileSync(path.join(root, ".env.production"), `VITE_API_BASE_URL=${productionApi}\nVITE_PRODUCTION_ONLY=yes\n`);
+  writeFileSync(path.join(root, ".env.production"), `VITE_MP_WEIXIN_API_BASE_URL=${productionApi}\nVITE_API_BASE_URL=${h5Api}\nVITE_PRODUCTION_ONLY=yes\n`);
   writeFileSync(path.join(root, ".env.development"), `VITE_API_BASE_URL=${localApi}\n`);
   writeFileSync(path.join(root, ".env.local"), `VITE_API_BASE_URL=${localApi}\nVITE_LOCAL_ONLY=pollution\n`);
   const dist = path.join(root, "dist/build/mp-weixin");
@@ -67,13 +68,15 @@ describe("production release environment", () => {
       ...process.env,
       NODE_ENV: "development",
       VITE_API_BASE_URL: localApi,
+      VITE_MP_WEIXIN_API_BASE_URL: localApi,
       VITE_DEV_ONLY: "must-not-leak",
       UNI_INPUT_DIR: "/wrong/source",
       MINI_CI_PRIVATE_KEY_PATH: "/test/private.key",
     };
     const env = loadProductionEnvironment(root, inherited);
     expect(env.NODE_ENV).toBe("production");
-    expect(env.VITE_API_BASE_URL).toBe(productionApi);
+    expect(env.VITE_MP_WEIXIN_API_BASE_URL).toBe(productionApi);
+    expect(env.VITE_API_BASE_URL).toBe(h5Api);
     expect(env.VITE_PRODUCTION_ONLY).toBe("yes");
     expect(env.VITE_DEV_ONLY).toBeUndefined();
     expect(env.UNI_INPUT_DIR).toBeUndefined();
@@ -84,7 +87,7 @@ describe("production release environment", () => {
   test("ignores .env.local / .env.development overlays and keeps only the production file", () => {
     const root = fixture();
     const env = loadProductionEnvironment(root, { PATH: process.env.PATH });
-    expect(env.VITE_API_BASE_URL).toBe(productionApi);
+    expect(env.VITE_MP_WEIXIN_API_BASE_URL).toBe(productionApi);
     expect(env.VITE_LOCAL_ONLY).toBeUndefined();
   });
 
@@ -96,9 +99,9 @@ describe("production release environment", () => {
 
   test("fails when the production file omits the API or uses a non-production endpoint", () => {
     const root = fixture();
-    writeFileSync(path.join(root, ".env.production"), "VITE_OTHER=value\n");
-    expect(() => loadProductionEnvironment(root)).toThrow("VITE_API_BASE_URL");
-    writeFileSync(path.join(root, ".env.production"), `VITE_API_BASE_URL=${localApi}\n`);
+    writeFileSync(path.join(root, ".env.production"), `VITE_API_BASE_URL=${h5Api}\n`);
+    expect(() => loadProductionEnvironment(root)).toThrow("VITE_MP_WEIXIN_API_BASE_URL");
+    writeFileSync(path.join(root, ".env.production"), `VITE_MP_WEIXIN_API_BASE_URL=${localApi}\n`);
     expect(() => loadProductionEnvironment(root)).toThrow(productionApi);
   });
 
@@ -106,10 +109,11 @@ describe("production release environment", () => {
     expect(normalizeReleaseApiBase(` ${productionApi}/ `)).toBe(productionApi);
     for (const api of [
       localApi,
-      "http://match.oryjk.cn/api/v1",
+      h5Api,
+      "http://match.oryjk.cn:82/api/v1",
       "https://example.com/api/v1",
-      "https://match.oryjk.cn/api/v1?debug=1",
-      "https://match.oryjk.cn/api",
+      "https://match.oryjk.cn:82/api/v1?debug=1",
+      "https://match.oryjk.cn:82/api",
       "",
       undefined,
     ]) {
@@ -185,7 +189,7 @@ describe("Bun release pipeline", () => {
     for (const { cmd, env } of runner.steps) {
       expect(cmd.slice(0, 3)).toEqual([process.execPath, "--no-env-file", "--bun"]);
       expect(env.NODE_ENV).toBe("production");
-      expect(env.VITE_API_BASE_URL).toBe(productionApi);
+      expect(env.VITE_MP_WEIXIN_API_BASE_URL).toBe(productionApi);
       // 外层 MINI_REVIEW_SKIP=1 的 upload 仍必须登记。
       expect(env.MINI_REVIEW_SKIP).toBe("0");
       expect(env.VITE_DEV_ONLY).toBeUndefined();

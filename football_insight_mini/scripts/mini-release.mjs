@@ -49,7 +49,7 @@ export async function runMiniRelease(command, args = [], {
   const production = loadProductionEnvironment(projectRoot, env);
   // 上传必须走登记库，不能被上一次离线验证留下的 MINI_REVIEW_SKIP=1 意外跳过。
   if (command === "upload") production.MINI_REVIEW_SKIP = "0";
-  console.log(`[mini-release] Bun ${Bun.version}; mode=production; API=${production.VITE_API_BASE_URL}`);
+  console.log(`[mini-release] Bun ${Bun.version}; mode=production; API=${production.VITE_MP_WEIXIN_API_BASE_URL}`);
 
   if (command === "upload") {
     console.log("[mini-release] 检查 Git：main / clean / origin/main 已推送");

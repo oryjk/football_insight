@@ -60,7 +60,7 @@
 
 ## 当前部署约定
 
-- 线上域名入口：`jd`（`match.oryjk.cn` DNS 解析到 jd 公网 IP 117.72.164.211）；jd 的 Nginx 把 `/api/v1/`、`/football/wechat/webhook` 反代到 `peiqian`（内网 10.8.10.2:8092），`/football/` 前端静态资源由 jd 本地直接服务
+- 线上域名入口：`match.oryjk.cn` 的 A 记录指向 `local109`。小程序通过 HTTPS 82 到 local109，再经 WireGuard 转到 jd；jd 的 Nginx 把 `/api/v1/`、`/football/wechat/webhook` 反代到 `peiqian`（内网 10.8.10.2:8092），`/football/` 静态资源由 jd 服务。旧小程序、web-view 和公众号 HTTPS webhook 仍依赖公网 443。
 - 真正承接线上 API / 公众号 webhook 流量的后端是 `peiqian` 上的 Docker 容器；发版 `peiqian` 即对线上生效。jd 上也保留一个后端容器但不在流量路径上（备用，无需每次同步发版）
 - 「最佳盯盘时段」离线统计在 `peiqian` 以独立镜像、独立容器和 systemd timer 运行，不改动 monitor 抢票容器；部署、验证和回滚见 `DEPLOYMENT.md`「最佳盯盘时段（离线统计）部署」
 - 生产数据库 `football-data-postgres` 运行在 `peiqian`；后端迁移在 `peiqian` 上用本次新镜像里的 `/usr/local/bin/run_migrations` 应用（`docker run --rm --network host --env-file <生产 env> --entrypoint /usr/local/bin/run_migrations <新镜像>`，迁移在编译时嵌入，不依赖 peiqian 源码；`_sqlx_migrations` 表记账；命令见 `DEPLOYMENT.md`「3. 数据库迁移」），部署脚本不会自动跑迁移
@@ -140,7 +140,7 @@ bun run dev:mp-weixin
 bun run build:mp-weixin
 ```
 
-**小程序发版与审核版本号**：默认在 local233（Ubuntu，`/home/betalpha/projects/football_insight/football_insight_mini`）直接执行 `bun run mp:release -- --robot 2 --desc "本次变更说明"`（构建 + 向生产后端 mini-review 登记库申请版本号 + `miniprogram-ci` 上传），无需连接 Mac 或 peiqian。local233 已配置上传私钥 `private.<appid>.key` 与 `.env.ci.local`，均为 0600 权限且被 Git 忽略；登记地址使用 `https://match.oryjk.cn/api/v1`，不可照搬 peiqian 的回环地址。发版前先把全部业务改动提交推送，从干净 main 构建。上传一律加 `--robot 2`：robot 2 上传后才是微信后台的「体验版」，用于测试和最终提审；不加参数默认 robot 1，只会出现在开发版，用户看不到。peiqian 保留为备用上传环境。审核版本号由后端 `f_i_mini_review_statuses` 登记库统一分配，不要手动改 `manifest.json` 的 `versionName`；指定版本用 `MINI_PROGRAM_VERSION=x.y.z`，离线构建用 `MINI_REVIEW_SKIP=1`。完整步骤见 `football_insight_mini/README.md` 的「微信小程序发布」一节。
+**小程序发版与审核版本号**：默认在 local233（Ubuntu，`/home/betalpha/projects/football_insight/football_insight_mini`）直接执行 `bun run mp:release -- --robot 2 --desc "本次变更说明"`（构建 + 向生产后端 mini-review 登记库申请版本号 + `miniprogram-ci` 上传），无需连接 Mac 或 peiqian。local233 已配置上传私钥 `private.<appid>.key` 与 `.env.ci.local`，均为 0600 权限且被 Git 忽略；登记地址使用 `https://match.oryjk.cn:82/api/v1`，不可照搬 peiqian 的回环地址。发版前先把全部业务改动提交推送，从干净 main 构建。上传一律加 `--robot 2`：robot 2 上传后才是微信后台的「体验版」，用于测试和最终提审；不加参数默认 robot 1，只会出现在开发版，用户看不到。peiqian 保留为备用上传环境。审核版本号由后端 `f_i_mini_review_statuses` 登记库统一分配，不要手动改 `manifest.json` 的 `versionName`；指定版本用 `MINI_PROGRAM_VERSION=x.y.z`，离线构建用 `MINI_REVIEW_SKIP=1`。完整步骤见 `football_insight_mini/README.md` 的「微信小程序发布」一节。
 
 ### 抓取器
 

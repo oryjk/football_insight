@@ -14,14 +14,14 @@ function requireBun() {
   if (!process.versions.bun) throw new Error("小程序构建和上传必须使用 Bun，请运行 bun run mp:release。");
 }
 
-// 生产 API 必须精确为 https://match.oryjk.cn/api/v1，不允许本地地址、其他域名或带尾斜杠的变体。
+// 小程序发布仅接受产物校验指定的线上 API，校验前统一移除末尾斜杠。
 export function normalizeReleaseApiBase(value) {
   if (typeof value !== "string" || !value.trim()) {
-    throw new Error(".env.production 必须显式配置 VITE_API_BASE_URL，禁止回退到本地地址。");
+    throw new Error(".env.production 必须显式配置 VITE_MP_WEIXIN_API_BASE_URL，禁止回退到本地地址。");
   }
   const base = value.trim().replace(/\/+$/, "");
   if (base !== PRODUCTION_API_BASE_URL) {
-    throw new Error(`生产 VITE_API_BASE_URL 必须精确为 ${PRODUCTION_API_BASE_URL}，实际为 ${value}。`);
+    throw new Error(`生产 VITE_MP_WEIXIN_API_BASE_URL 必须精确为 ${PRODUCTION_API_BASE_URL}，实际为 ${value}。`);
   }
   return base;
 }
@@ -48,8 +48,8 @@ export function loadProductionEnvironment(projectRoot = defaultProjectRoot, inhe
   } catch {
     throw new Error("无法解析生产构建环境，已阻止构建/上传。");
   }
-  const apiBase = normalizeReleaseApiBase(production.VITE_API_BASE_URL);
-  return { ...clean, ...production, VITE_API_BASE_URL: apiBase };
+  const apiBase = normalizeReleaseApiBase(production.VITE_MP_WEIXIN_API_BASE_URL);
+  return { ...clean, ...production, VITE_MP_WEIXIN_API_BASE_URL: apiBase };
 }
 
 function executeGit(args, cwd) {

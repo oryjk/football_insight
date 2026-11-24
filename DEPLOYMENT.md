@@ -4,12 +4,12 @@
 
 ## 生产环境
 
-- 线上域名入口机：`jd`（`match.oryjk.cn` 的 DNS 解析到 jd 公网 IP `117.72.164.211`）
+- 线上域名入口机：`local109`。`match.oryjk.cn` 的 AliDNS A 记录指向 local109，由 local109 的 Nginx 经 WireGuard 转发至 jd 的 HTTPS 82 入口。公网 82 已验证。旧小程序、H5 和公众号 HTTPS webhook 仍需要公网 443。
 - jd 登录：`ssh jd`；jd 上的 Nginx 把 `/api/v1/` 和 `/football/wechat/webhook` 反代到 `peiqian` 的 `10.8.10.2:8092`（WireGuard），`/football/` 前端静态资源由 jd 本地直接服务
 - 真正承接线上 API/webhook 流量的后端：`peiqian`（`ssh peiqian`）上的 Docker 容器；发版 peiqian 即对线上生效
 - jd 上也保留一个后端容器，但不在流量路径上（备用，无需每次同步发版）
 - 前端访问地址：`https://match.oryjk.cn/football/`
-- 后端接口前缀：`https://match.oryjk.cn/api/v1/`
+- 后端接口前缀：H5 使用 `https://match.oryjk.cn/api/v1/`；新构建的微信小程序使用 `https://match.oryjk.cn:82/api/v1/`。
 - 结论：后端发版发 `peiqian` 即生效；`jd` 容器为备用，无需每次同步发版
 
 ## 生产目录
@@ -28,7 +28,7 @@
 
 ## Nginx 约定
 
-- `jd` 是当前线上域名入口机
+- local109 的 `nginx`（82）与 `nginx80`（443）分别配置 `match.oryjk.cn`，转发时使用同一域名进行 TLS 校验。两者共用 local109 上的 `match.oryjk.cn` 证书，换证时需与 jd 同步。
 - `peiqian` 当前已确认本机后端 `8092` 和 `ticket-monitor-axum` `4000` 正常监听
 - 当前只允许修改 football 相关路径
 - 如果发现路由冲突，不要直接修改其他服务配置，先确认
@@ -397,7 +397,7 @@ ssh peiqian 'journalctl -u football-insight.service -n 100 --no-pager'
 
 ### 小程序改动
 
-默认在 local233 的 `/home/betalpha/projects/football_insight/football_insight_mini` 从干净 main 执行 `bun run mp:release -- --robot 2 --desc "本次变更说明"`，统一完成生产构建、审核版本登记和测试上传。local233 已配置上传私钥和 `.env.ci.local`（0600 权限，Git 忽略），登记地址为 `https://match.oryjk.cn/api/v1`；开发、构建与上传在同一台 Ubuntu 机器完成，无需连接 Mac。上传前先提交推送全部业务改动；版本文件若因登记发生变化，也需提交推送后重跑。
+默认在 local233 的 `/home/betalpha/projects/football_insight/football_insight_mini` 从干净 main 执行 `bun run mp:release -- --robot 2 --desc "本次变更说明"`，统一完成生产构建、审核版本登记和测试上传。local233 已配置上传私钥和 `.env.ci.local`（0600 权限，Git 忽略），登记地址为 `https://match.oryjk.cn:82/api/v1`；开发、构建与上传在同一台 Ubuntu 机器完成，无需连接 Mac。上传前先提交推送全部业务改动；版本文件若因登记发生变化，也需提交推送后重跑。
 
 local233 无法发布时可使用 peiqian 已配置私钥、`.env.ci.local` 与 Bun 的备用环境；先通过既有 clash 代理更新干净 main，再执行同一发布入口。robot 2 上传不代替微信公众平台提审和正式发布。
 

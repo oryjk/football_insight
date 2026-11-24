@@ -17,6 +17,10 @@ function resolveApiBaseUrl(): string {
   const isProductionBuild = import.meta.env.PROD
 
   if (isProductionBuild) {
+    // #ifdef MP-WEIXIN
+    return normalizeBaseUrl(import.meta.env.VITE_MP_WEIXIN_API_BASE_URL)
+      ?? 'https://match.oryjk.cn:82/api/v1'
+    // #endif
     return envBaseUrl ?? PRODUCTION_API_BASE_URL
   }
 

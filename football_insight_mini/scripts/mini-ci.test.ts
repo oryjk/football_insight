@@ -12,7 +12,7 @@ import {
   syncManifestVersion,
 } from './sync-manifest-version.mjs'
 
-const productionApi = 'https://match.oryjk.cn/api/v1'
+const productionApi = 'https://match.oryjk.cn:82/api/v1'
 const localApi = 'http://127.0.0.1:8092/api/v1'
 const roots: string[] = []
 
@@ -50,7 +50,7 @@ describe('mini-ci upload arguments', () => {
 describe('mini review version allocation', () => {
   const config = {
     apiKey: 'test-key',
-    baseUrl: 'https://match.oryjk.cn/api/v1',
+    baseUrl: 'https://match.oryjk.cn:82/api/v1',
     projectCode: 'football_insight_mini',
     skip: false,
   }
@@ -64,7 +64,7 @@ describe('mini review version allocation', () => {
     const version = await allocateReviewVersion({ config, explicitVersion: '', currentVersion: '1.2.2', fetchImpl: fetchImpl as typeof fetch })
     expect(version).toBe('1.2.3')
     expect(calls).toHaveLength(1)
-    expect(calls[0].url).toBe('https://match.oryjk.cn/api/v1/mini-review/allocate')
+    expect(calls[0].url).toBe('https://match.oryjk.cn:82/api/v1/mini-review/allocate')
     expect(calls[0].options.method).toBe('POST')
     expect((calls[0].options.headers as Record<string, string>)['X-Api-Key']).toBe('test-key')
     expect(JSON.parse(String(calls[0].options.body))).toEqual({
@@ -102,7 +102,9 @@ describe('mini review version allocation', () => {
 
   test('miniReviewConfig reads explicit env first and honors skip flags', () => {
     expect(miniReviewConfig({ env: { MINI_REVIEW_SKIP: '1' }, envFile: '/nonexistent' }).skip).toBe(true)
-    expect(miniReviewConfig({ env: {}, envFile: '/nonexistent' }).projectCode).toBe('football_insight_mini')
+    const defaults = miniReviewConfig({ env: {}, envFile: '/nonexistent' })
+    expect(defaults.projectCode).toBe('football_insight_mini')
+    expect(defaults.baseUrl).toBe(productionApi)
     expect(miniReviewConfig({ env: { MINI_REVIEW_API_KEY: 'k' }, envFile: '/nonexistent' }).apiKey).toBe('k')
   })
 
@@ -202,7 +204,7 @@ describe('direct mini-ci invocation (bypassing the entry)', () => {
       writeFileSync(path.join(root, 'scripts', file), readFileSync(new URL(file, import.meta.url)))
     }
     writeFileSync(path.join(root, 'src/manifest.json'), JSON.stringify({ 'mp-weixin': { appid: 'wx-test-only' }, versionName: '0.0.1' }))
-    writeFileSync(path.join(root, '.env.production'), `VITE_API_BASE_URL=${productionApi}\n`)
+    writeFileSync(path.join(root, '.env.production'), `VITE_MP_WEIXIN_API_BASE_URL=${productionApi}\n`)
     const dist = path.join(root, 'dist/build/mp-weixin')
     mkdirSync(path.join(dist, 'config'), { recursive: true })
     writeFileSync(path.join(dist, 'app.json'), '{}')

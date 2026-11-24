@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { verifyMiniProgramApiBase } from './verify-mp-api-base.mjs'
 
-const productionApi = 'https://match.oryjk.cn/api/v1'
+const productionApi = 'https://match.oryjk.cn:82/api/v1'
 const localApi = 'http://127.0.0.1:8092/api/v1'
 const roots: string[] = []
 
@@ -34,7 +34,8 @@ describe('mini-program upload API address', () => {
   test.each([
     localApi,
     'http://localhost:8092/api/v1',
-    'http://match.oryjk.cn/api/v1',
+    'http://match.oryjk.cn:82/api/v1',
+    'https://match.oryjk.cn/api/v1',
     'https://example.com/api/v1',
     undefined,
   ])('rejects an unusable upload endpoint: %s', (apiBaseUrl) => {
