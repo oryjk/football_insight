@@ -60,7 +60,7 @@
 
 ## 当前部署约定
 
-- 线上域名入口：`match.oryjk.cn` 的 A 记录指向 `local109`。小程序通过 HTTPS 82 到 local109，再经 WireGuard 转到 jd；jd 的 Nginx 把 `/api/v1/`、`/football/wechat/webhook` 反代到 `peiqian`（内网 10.8.10.2:8092），`/football/` 静态资源由 jd 服务。旧小程序、web-view 和公众号 HTTPS webhook 仍依赖公网 443。
+- 线上域名入口：`match.oryjk.cn` 的 A 记录指向 `local109`。小程序使用 `https://oryjk.cn:82/football-api/v1`，由 local109 去掉专用前缀后经 WireGuard 转到 jd 的 `match.oryjk.cn/api/v1`；jd 的 Nginx 把 `/api/v1/`、`/football/wechat/webhook` 反代到 `peiqian`（内网 10.8.10.2:8092），`/football/` 静态资源由 jd 服务。旧小程序、web-view 和公众号 HTTPS webhook 仍依赖公网 443。
 - 真正承接线上 API / 公众号 webhook 流量的后端是 `peiqian` 上的 Docker 容器；发版 `peiqian` 即对线上生效。jd 上也保留一个后端容器但不在流量路径上（备用，无需每次同步发版）
 - 「最佳盯盘时段」离线统计在 `peiqian` 以独立镜像、独立容器和 systemd timer 运行，不改动 monitor 抢票容器；部署、验证和回滚见 `DEPLOYMENT.md`「最佳盯盘时段（离线统计）部署」
 - 生产数据库 `football-data-postgres` 运行在 `peiqian`；后端迁移在 `peiqian` 上用本次新镜像里的 `/usr/local/bin/run_migrations` 应用（`docker run --rm --network host --env-file <生产 env> --entrypoint /usr/local/bin/run_migrations <新镜像>`，迁移在编译时嵌入，不依赖 peiqian 源码；`_sqlx_migrations` 表记账；命令见 `DEPLOYMENT.md`「3. 数据库迁移」），部署脚本不会自动跑迁移

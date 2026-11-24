@@ -9,7 +9,7 @@
 - 真正承接线上 API/webhook 流量的后端：`peiqian`（`ssh peiqian`）上的 Docker 容器；发版 peiqian 即对线上生效
 - jd 上也保留一个后端容器，但不在流量路径上（备用，无需每次同步发版）
 - 前端访问地址：`https://match.oryjk.cn/football/`
-- 后端接口前缀：H5 使用 `https://match.oryjk.cn/api/v1/`；新构建的微信小程序使用 `https://match.oryjk.cn:82/api/v1/`。
+- 后端接口前缀：H5 使用 `https://match.oryjk.cn/api/v1/`；微信小程序使用 `https://oryjk.cn:82/football-api/v1/`，local109 将该路径转到 jd 的 `match.oryjk.cn/api/v1/`。
 - 结论：后端发版发 `peiqian` 即生效；`jd` 容器为备用，无需每次同步发版
 
 ## 生产目录

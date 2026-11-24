@@ -12,7 +12,7 @@ import {
   syncManifestVersion,
 } from './sync-manifest-version.mjs'
 
-const productionApi = 'https://match.oryjk.cn:82/api/v1'
+const productionApi = 'https://oryjk.cn:82/football-api/v1'
 const localApi = 'http://127.0.0.1:8092/api/v1'
 const roots: string[] = []
 
@@ -104,7 +104,7 @@ describe('mini review version allocation', () => {
     expect(miniReviewConfig({ env: { MINI_REVIEW_SKIP: '1' }, envFile: '/nonexistent' }).skip).toBe(true)
     const defaults = miniReviewConfig({ env: {}, envFile: '/nonexistent' })
     expect(defaults.projectCode).toBe('football_insight_mini')
-    expect(defaults.baseUrl).toBe(productionApi)
+    expect(defaults.baseUrl).toBe('https://match.oryjk.cn:82/api/v1')
     expect(miniReviewConfig({ env: { MINI_REVIEW_API_KEY: 'k' }, envFile: '/nonexistent' }).apiKey).toBe('k')
   })
 

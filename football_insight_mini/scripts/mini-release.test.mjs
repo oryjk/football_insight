@@ -10,7 +10,7 @@ import {
 } from "./mini-release-guards.mjs";
 import { runMiniRelease } from "./mini-release.mjs";
 
-const productionApi = "https://match.oryjk.cn:82/api/v1";
+const productionApi = "https://oryjk.cn:82/football-api/v1";
 const h5Api = "https://match.oryjk.cn/api/v1";
 const localApi = "http://127.0.0.1:8092/api/v1";
 const roots = [];
@@ -110,10 +110,11 @@ describe("production release environment", () => {
     for (const api of [
       localApi,
       h5Api,
-      "http://match.oryjk.cn:82/api/v1",
+      "http://oryjk.cn:82/football-api/v1",
+      "https://match.oryjk.cn:82/api/v1",
       "https://example.com/api/v1",
-      "https://match.oryjk.cn:82/api/v1?debug=1",
-      "https://match.oryjk.cn:82/api",
+      "https://oryjk.cn:82/football-api/v1?debug=1",
+      "https://oryjk.cn:82/football-api",
       "",
       undefined,
     ]) {
