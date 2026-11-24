@@ -49,6 +49,8 @@ export function getOrderStatus(orderNo: string): Promise<OrderStatusResponse> {
   return request<OrderStatusResponse>({
     url: `/payment/order/${orderNo}`,
     auth: true,
+    // 查询可能触发微信虚拟支付对账和发货确认。
+    allowFailover: false,
   })
 }
 

@@ -18,6 +18,7 @@ import {
   setAccessToken,
   setManualLogout,
 } from '../utils/authStorage'
+import { prepareApiRoute } from '../utils/request'
 
 export type SessionStatus = 'guest' | 'loading' | 'authenticated' | 'error'
 
@@ -68,6 +69,7 @@ export interface AppSession {
 export interface AppSessionDeps {
   /** 微信 code 提供方（默认 uni.login）；测试注入可控延迟的 code promise。 */
   getMiniWechatCode?: () => Promise<string>
+  prepareApiRoute?: () => Promise<void> | undefined
 }
 
 const ENSURE_SUCCESS_CACHE_MS = 60_000
@@ -106,6 +108,7 @@ function defaultGetMiniWechatCode(): Promise<string> {
  */
 export function createAppSession(source: typeof authApi = authApi, deps: AppSessionDeps = {}): AppSession {
   const getMiniWechatCode = deps.getMiniWechatCode ?? defaultGetMiniWechatCode
+  const prepareAuthRoute = deps.prepareApiRoute ?? prepareApiRoute
   const currentUser = ref<CurrentUser | null>(null)
   const hasAccessToken = ref(Boolean(getAccessToken()))
   const status = ref<SessionStatus>('guest')
@@ -202,6 +205,11 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
     fallback: string,
   ): Promise<TResponse> {
     try {
+      const pendingRoute = prepareAuthRoute()
+      if (pendingRoute) {
+        await pendingRoute
+        assertRevisionCurrent(intentRevision)
+      }
       const response = await action()
       assertRevisionCurrent(intentRevision)
       publishAuthResponse(response, intentRevision)
@@ -414,6 +422,12 @@ export function createAppSession(source: typeof authApi = authApi, deps: AppSess
     try {
       const code = await getMiniWechatCode()
       assertRevisionCurrent(intentRevision)
+      // 冷启动的普通读请求可在微信 code 返回前完成选路，必要时再发短探测。
+      const pendingRoute = prepareAuthRoute()
+      if (pendingRoute) {
+        await pendingRoute
+        assertRevisionCurrent(intentRevision)
+      }
       const acquisition = readAcquisitionSource()
       const response = await (acquisition
         ? source.loginWithMiniWechat(code, acquisition)

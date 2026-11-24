@@ -501,6 +501,30 @@ describe('登录与刷新交错竞态', () => {
 })
 
 describe('微信认证意图从获取 code 前建立', () => {
+  test('选路探测期间退出后不会兑换已获取的微信 code', async () => {
+    const stub = createSourceStub()
+    const route = deferred<void>()
+    let probes = 0
+    const session = createAppSession(stub.source, {
+      getMiniWechatCode: async () => 'wechat-code',
+      prepareApiRoute: () => {
+        probes += 1
+        return route.promise
+      },
+    })
+
+    const loginResult = captureError(() => session.loginWithMiniWechat())
+    await Promise.resolve()
+    expect(probes).toBe(1)
+    expect(stub.calls.loginWithMiniWechat).toBe(0)
+    await session.logoutSession()
+    route.resolve(undefined)
+
+    expect(await loginResult).toBeInstanceOf(SessionSupersededError)
+    expect(stub.calls.loginWithMiniWechat).toBe(0)
+    expect(session.status.value).toBe('guest')
+  })
+
   test('第一次 code 慢、第二次登录成功、用户退出后第一次 code 才返回：不发旧认证请求，最终 guest', async () => {
     const stub = createSourceStub()
     const slowCode = deferred<string>()
