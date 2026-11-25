@@ -6,24 +6,26 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { PRODUCTION_API_BASE_URL } from "./verify-mp-api-base.mjs";
+import { PRODUCTION_API_BASE_URL, PRODUCTION_BACKUP_API_BASE_URLS } from "./verify-mp-api-base.mjs";
 
 const defaultProjectRoot = fileURLToPath(new URL("..", import.meta.url));
+const LEGACY_PRODUCTION_API_BASE_URL = "https://oryjk.cn:18443/football-api/v1";
 
 function requireBun() {
   if (!process.versions.bun) throw new Error("小程序构建和上传必须使用 Bun，请运行 bun run mp:release。");
 }
 
 // 小程序发布仅接受产物校验指定的线上 API，校验前统一移除末尾斜杠。
-export function normalizeReleaseApiBase(value) {
+export function normalizeReleaseApiBase(value, key = "VITE_MP_WEIXIN_API_BASE_URL", expected = PRODUCTION_API_BASE_URL) {
   if (typeof value !== "string" || !value.trim()) {
-    throw new Error(".env.production 必须显式配置 VITE_MP_WEIXIN_API_BASE_URL，禁止回退到本地地址。");
+    throw new Error(`.env.production 必须显式配置 ${key}，禁止回退到本地地址。`);
   }
   const base = value.trim().replace(/\/+$/, "");
-  if (base !== PRODUCTION_API_BASE_URL) {
-    throw new Error(`生产 VITE_MP_WEIXIN_API_BASE_URL 必须精确为 ${PRODUCTION_API_BASE_URL}，实际为 ${value}。`);
+  // 迁移构建机上已有的客户端配置，产物仍由校验器要求使用新的主地址。
+  if (base === expected || (expected === PRODUCTION_API_BASE_URL && base === LEGACY_PRODUCTION_API_BASE_URL)) {
+    return expected;
   }
-  return base;
+  throw new Error(`生产 ${key} 必须精确为 ${expected}，实际为 ${value}。`);
 }
 
 // 清理继承的 VITE_* / UNI_*（外层 `bun run` 可能提前注入 .env.development，--no-env-file 不会清除已继承的值），
@@ -49,7 +51,12 @@ export function loadProductionEnvironment(projectRoot = defaultProjectRoot, inhe
     throw new Error("无法解析生产构建环境，已阻止构建/上传。");
   }
   const apiBase = normalizeReleaseApiBase(production.VITE_MP_WEIXIN_API_BASE_URL);
-  return { ...clean, ...production, VITE_MP_WEIXIN_API_BASE_URL: apiBase };
+  const backupKeys = ["VITE_MP_WEIXIN_BACKUP_API_BASE_URL", "VITE_MP_WEIXIN_SECOND_BACKUP_API_BASE_URL"];
+  const backups = Object.fromEntries(backupKeys.map((key, index) => {
+    const expected = PRODUCTION_BACKUP_API_BASE_URLS[index];
+    return [key, normalizeReleaseApiBase(production[key] ?? expected, key, expected)];
+  }));
+  return { ...clean, ...production, ...backups, VITE_MP_WEIXIN_API_BASE_URL: apiBase };
 }
 
 function executeGit(args, cwd) {

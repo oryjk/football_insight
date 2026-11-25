@@ -47,7 +47,10 @@ jobs:
             echo "Missing GitHub Secrets: MINI_REVIEW_API_KEY and/or MINI_CI_PRIVATE_KEY" >&2
             exit 1
           fi
-          printf 'VITE_MP_WEIXIN_API_BASE_URL=https://oryjk.cn:18443/football-api/v1\n' > .env.production
+          printf '%s\n' \
+            'VITE_MP_WEIXIN_API_BASE_URL=https://oryjk.cn/football-api/v1' \
+            'VITE_MP_WEIXIN_BACKUP_API_BASE_URL=https://backup.oryjk.cn:19443/football-api/v1' \
+            'VITE_MP_WEIXIN_SECOND_BACKUP_API_BASE_URL=https://home.oryjk.cn:18443/football-api/v1' > .env.production
           printf 'MINI_REVIEW_API_KEY=%s\nMINI_REVIEW_API_URL=https://oryjk.cn:18443/football-api/v1\n' "$MINI_REVIEW_API_KEY" > .env.ci.local
           printf '%s\n' "$MINI_CI_PRIVATE_KEY" > private.wxc61da17a97f6eb1b.key
           chmod 600 .env.production .env.ci.local private.wxc61da17a97f6eb1b.key

@@ -10,7 +10,9 @@ import {
 } from "./mini-release-guards.mjs";
 import { runMiniRelease } from "./mini-release.mjs";
 
-const productionApi = "https://oryjk.cn:18443/football-api/v1";
+const productionApi = "https://oryjk.cn/football-api/v1";
+const backupApi = "https://backup.oryjk.cn:19443/football-api/v1";
+const secondBackupApi = "https://home.oryjk.cn:18443/football-api/v1";
 const h5Api = "https://match.oryjk.cn/api/v1";
 const localApi = "http://127.0.0.1:8092/api/v1";
 const roots = [];
@@ -24,7 +26,8 @@ function fixture(api = productionApi) {
   const dist = path.join(root, "dist/build/mp-weixin");
   mkdirSync(path.join(dist, "config"), { recursive: true });
   writeFileSync(path.join(dist, "app.json"), "{}");
-  writeFileSync(path.join(dist, "config/apiBase.js"), `exports.API_BASE_URL = ${JSON.stringify(api)};`);
+  writeFileSync(path.join(dist, "config/apiBase.js"),
+    `exports.API_BASE_URL = ${JSON.stringify(api)}; exports.API_BACKUP_BASE_URLS = ${JSON.stringify([backupApi, secondBackupApi])};`);
   return root;
 }
 
@@ -105,16 +108,31 @@ describe("production release environment", () => {
     expect(() => loadProductionEnvironment(root)).toThrow(productionApi);
   });
 
-  test("accepts only the exact production endpoint (trim and trailing slash tolerated)", () => {
+  test("defaults omitted backups, normalizes explicit backups and rejects a wrong backup", () => {
+    const root = fixture();
+    const envFile = path.join(root, ".env.production");
+    const expected = {
+      VITE_MP_WEIXIN_BACKUP_API_BASE_URL: backupApi,
+      VITE_MP_WEIXIN_SECOND_BACKUP_API_BASE_URL: secondBackupApi,
+    };
+    expect(loadProductionEnvironment(root)).toMatchObject(expected);
+    writeFileSync(envFile, `VITE_MP_WEIXIN_API_BASE_URL=${productionApi}\nVITE_MP_WEIXIN_SECOND_BACKUP_API_BASE_URL= "${secondBackupApi}/"\n`);
+    expect(loadProductionEnvironment(root)).toMatchObject(expected);
+    writeFileSync(envFile, `VITE_MP_WEIXIN_API_BASE_URL=${productionApi}\nVITE_MP_WEIXIN_SECOND_BACKUP_API_BASE_URL=${localApi}\n`);
+    expect(() => loadProductionEnvironment(root)).toThrow("VITE_MP_WEIXIN_SECOND_BACKUP_API_BASE_URL");
+  });
+
+  test("normalizes the current and legacy production settings to the canonical primary", () => {
     expect(normalizeReleaseApiBase(` ${productionApi}/ `)).toBe(productionApi);
+    expect(normalizeReleaseApiBase("https://oryjk.cn:18443/football-api/v1")).toBe(productionApi);
     for (const api of [
       localApi,
       h5Api,
-      "http://oryjk.cn:18443/football-api/v1",
+      "http://oryjk.cn/football-api/v1",
       "https://oryjk.cn:82/football-api/v1",
       "https://example.com/api/v1",
-      "https://oryjk.cn:18443/football-api/v1?debug=1",
-      "https://oryjk.cn:18443/football-api",
+      "https://oryjk.cn/football-api/v1?debug=1",
+      "https://oryjk.cn/football-api",
       "",
       undefined,
     ]) {

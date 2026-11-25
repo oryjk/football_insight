@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { ApiRequestError } from './apiError'
 import { createApiRequester } from './request'
 
-const main = 'https://oryjk.cn:18443/football-api/v1'
+const main = 'https://oryjk.cn/football-api/v1'
 const backup = 'https://backup.oryjk.cn:19443/football-api/v1'
+const secondBackup = 'https://home.oryjk.cn:18443/football-api/v1'
 const globalWithUni = globalThis as unknown as { uni?: unknown }
 const originalUni = globalWithUni.uni
 type Request = UniApp.RequestOptions
@@ -42,6 +43,62 @@ async function expectRequestError(result: Promise<unknown>, expected: Record<str
 }
 
 describe('production mini-program API failover', () => {
+  test('fails over in order to the second backup and rechecks higher-priority routes after cooldown', async () => {
+    let now = 0
+    const { request } = createApiRequester(main, [backup, secondBackup], () => now)
+    const first = request({ url: '/rounds', auth: true })
+    fail(0)
+    respond(1, 504)
+    expect(urls()).toEqual([main + '/rounds', backup + '/rounds', secondBackup + '/rounds'])
+    expect(calls[2].header?.Authorization).toBe('Bearer test-token')
+    respond(2)
+    await first
+
+    const sticky = request({ url: '/sticky' })
+    expect(calls[3].url).toBe(secondBackup + '/sticky')
+    respond(3)
+    await sticky
+
+    now = 60_001
+    const probe = request({ url: '/probe' })
+    respond(4, 503)
+    expect(urls().slice(4)).toEqual([main + '/probe', backup + '/probe'])
+    respond(5)
+    await probe
+
+    const recovered = request({ url: '/recovered' })
+    expect(calls[6].url).toBe(backup + '/recovered')
+    respond(6)
+    await recovered
+  })
+
+  test('prepares the second backup and does not replay a payment GET', async () => {
+    const { request, prepareApiRoute } = createApiRequester(main, [backup, secondBackup])
+    const probe = prepareApiRoute()
+    expect(probe).toBe(prepareApiRoute())
+    fail(0)
+    fail(1)
+    expect(urls()).toEqual([main, backup, secondBackup].map((base) => base + '/system/public-config'))
+    expect(calls[2].header?.Authorization).toBe(undefined)
+    respond(2)
+    await probe
+
+    const status = request({ url: '/payment/order/123', allowFailover: false })
+    fail(3)
+    await expectRequestError(status, { networkFailed: true })
+    expect(urls().slice(3)).toEqual([secondBackup + '/payment/order/123'])
+  })
+
+  test('returns the first route failure after all three routes are unavailable', async () => {
+    const { request } = createApiRequester(main, [backup, secondBackup])
+    const result = request({ url: '/rounds' })
+    respond(0, 502)
+    fail(1)
+    respond(2, 504)
+    await expectRequestError(result, { statusCode: 502 })
+    expect(urls()).toEqual([main, backup, secondBackup].map((base) => base + '/rounds'))
+  })
+
   test('reroutes an authenticated GET following a transport failure and sticks to the working backup', async () => {
     const { request } = createApiRequester(main, backup)
     const result = request({ url: '/auth/me?view=full', auth: true, headers: { 'X-Fi-Test': 'value' } })

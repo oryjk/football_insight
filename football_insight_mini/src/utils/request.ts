@@ -1,6 +1,6 @@
 import { ApiRequestError } from './apiError'
 import { getAccessToken } from './authStorage'
-import { API_BACKUP_BASE_URL, API_BASE_URL } from '../config/apiBase'
+import { API_BACKUP_BASE_URLS, API_BASE_URL } from '../config/apiBase'
 
 const REQUEST_TIMEOUT_MS = 20000
 const PRIMARY_PROBE_COOLDOWN_MS = 60_000
@@ -77,7 +77,9 @@ function normalizeErrorMessage(data: unknown, statusCode: number): string {
   return `请求失败（${statusCode}）`
 }
 
-export function createApiRequester(primary: string, backup: string | null, now = Date.now) {
+export function createApiRequester(primary: string, backups: string | readonly string[] | null, now = Date.now) {
+  const origins = [...new Set([primary, ...(typeof backups === 'string' ? [backups] : backups ?? [])])]
+  const hasBackup = origins.length > 1
   let activeBase = primary
   let routeRevision = 0
   let routeConfirmed = false
@@ -87,17 +89,18 @@ export function createApiRequester(primary: string, backup: string | null, now =
   function sendRequest<TResponse>(options: RequestOptions, timeout = REQUEST_TIMEOUT_MS): Promise<TResponse> {
     const method = options.method ?? 'GET'
     // 仅路由本项目的相对 API 路径，完整 URL 保持调用方指定的地址。
-    const canRoute = Boolean(backup) && /^\/(?![\\/])/.test(options.url)
+    const canRoute = hasBackup && /^\/(?![\\/])/.test(options.url)
     const canRetry = method === 'GET' && (!canRoute || options.allowFailover !== false)
-    const alternate = canRoute && canRetry ? backup : null
+    const canFailOver = canRoute && canRetry
     const revision = routeRevision
     let base = canRoute ? activeBase : primary
 
-    if (alternate && base === backup && now() >= nextPrimaryProbeAt) {
+    if (canFailOver && base !== primary && now() >= nextPrimaryProbeAt) {
       // 并发读请求中，只有首个请求在冷却期结束时试探主线。
       base = primary
       nextPrimaryProbeAt = now() + PRIMARY_PROBE_COOLDOWN_MS
     }
+    const candidates = canFailOver ? [base, ...origins.filter((origin) => origin !== base)] : [base]
 
     return new Promise((resolve, reject) => {
       const headers: Record<string, string> = {
@@ -109,23 +112,24 @@ export function createApiRequester(primary: string, backup: string | null, now =
         if (token) headers.Authorization = `Bearer ${token}`
       }
 
-      function attemptRequest(attemptBase: string, firstFailure?: ApiRequestError) {
+      function attemptRequest(index: number, firstFailure?: ApiRequestError) {
+        const attemptBase = candidates[index]
         function finishFailure(error: ApiRequestError, timedOut = false) {
           if (canRoute && routeRevision === revision && attemptBase === activeBase) {
             routeConfirmed = false
           }
 
-          if (alternate && !firstFailure) {
-            attemptRequest(attemptBase === primary ? alternate : primary, error)
+          if (index + 1 < candidates.length) {
+            attemptRequest(index + 1, firstFailure ?? error)
             return
           }
-          if (!alternate && canRetry && timedOut && !firstFailure) {
+          if (!canFailOver && canRetry && timedOut && !firstFailure) {
             console.warn(`[request retry] ${options.url} timed out, retrying once`)
-            attemptRequest(attemptBase, error)
+            attemptRequest(index, error)
             return
           }
 
-          const finalError = (alternate && firstFailure) || error
+          const finalError = (canFailOver && firstFailure) || error
           if (finalError.networkFailed && !options.silentNetworkError) {
             showNetworkUnavailableDialog(finalError.message)
           }
@@ -146,7 +150,7 @@ export function createApiRequester(primary: string, backup: string | null, now =
               if (success && attemptBase !== activeBase) {
                 activeBase = attemptBase
                 routeRevision += 1
-                if (activeBase === backup) nextPrimaryProbeAt = now() + PRIMARY_PROBE_COOLDOWN_MS
+                if (activeBase !== primary) nextPrimaryProbeAt = now() + PRIMARY_PROBE_COOLDOWN_MS
               }
               if (attemptBase === activeBase) routeConfirmed = true
             }
@@ -170,12 +174,12 @@ export function createApiRequester(primary: string, backup: string | null, now =
         })
       }
 
-      attemptRequest(base)
+      attemptRequest(0)
     })
   }
 
   function prepareApiRoute(): Promise<void> | undefined {
-    if (!backup || routeConfirmed) return
+    if (!hasBackup || routeConfirmed) return
     if (!authRouteProbe) {
       authRouteProbe = sendRequest({
         url: '/system/public-config',
@@ -193,4 +197,4 @@ export function createApiRequester(primary: string, backup: string | null, now =
   }
 }
 
-export const { request, prepareApiRoute } = createApiRequester(API_BASE_URL, API_BACKUP_BASE_URL)
+export const { request, prepareApiRoute } = createApiRequester(API_BASE_URL, API_BACKUP_BASE_URLS)

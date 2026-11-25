@@ -12,7 +12,8 @@ import {
   syncManifestVersion,
 } from './sync-manifest-version.mjs'
 
-const productionApi = 'https://oryjk.cn:18443/football-api/v1'
+const productionApi = 'https://oryjk.cn/football-api/v1'
+const backupApis = ['https://backup.oryjk.cn:19443/football-api/v1', 'https://home.oryjk.cn:18443/football-api/v1']
 const localApi = 'http://127.0.0.1:8092/api/v1'
 const roots: string[] = []
 
@@ -208,7 +209,8 @@ describe('direct mini-ci invocation (bypassing the entry)', () => {
     const dist = path.join(root, 'dist/build/mp-weixin')
     mkdirSync(path.join(dist, 'config'), { recursive: true })
     writeFileSync(path.join(dist, 'app.json'), '{}')
-    writeFileSync(path.join(dist, 'config/apiBase.js'), `exports.API_BASE_URL = ${JSON.stringify(api)};`)
+    writeFileSync(path.join(dist, 'config/apiBase.js'),
+      `exports.API_BASE_URL = ${JSON.stringify(api)}; exports.API_BACKUP_BASE_URLS = ${JSON.stringify(backupApis)};`)
     const privateKeyPath = path.join(root, 'private.test.key')
     writeFileSync(privateKeyPath, 'not-a-real-key')
     return { root, privateKeyPath }

@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { verifyMiniProgramApiBase } from './verify-mp-api-base.mjs'
 
-const productionApi = 'https://oryjk.cn:18443/football-api/v1'
+const productionApi = 'https://oryjk.cn/football-api/v1'
+const backupApis = ['https://backup.oryjk.cn:19443/football-api/v1', 'https://home.oryjk.cn:18443/football-api/v1']
 const localApi = 'http://127.0.0.1:8092/api/v1'
 const roots: string[] = []
 
@@ -20,8 +21,8 @@ function artifact(source: string | undefined): string {
   return root
 }
 
-function artifactWithExport(apiBaseUrl: string | undefined): string {
-  return artifact(`exports.API_BASE_URL = ${JSON.stringify(apiBaseUrl)};`)
+function artifactWithExport(apiBaseUrl: string | undefined, backups = backupApis): string {
+  return artifact(`exports.API_BASE_URL = ${JSON.stringify(apiBaseUrl)}; exports.API_BACKUP_BASE_URLS = ${JSON.stringify(backups)};`)
 }
 
 afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })))
@@ -31,10 +32,16 @@ describe('mini-program upload API address', () => {
     expect(verifyMiniProgramApiBase(artifactWithExport(productionApi))).toBe(productionApi)
   })
 
+  test('requires both production backups in their configured order', () => {
+    expect(() => verifyMiniProgramApiBase(artifactWithExport(productionApi, backupApis.slice(0, 1)))).toThrow('备用 API')
+    expect(() => verifyMiniProgramApiBase(artifactWithExport(productionApi, [...backupApis].reverse()))).toThrow('备用 API')
+  })
+
   test.each([
     localApi,
     'http://localhost:8092/api/v1',
-    'http://oryjk.cn:18443/football-api/v1',
+    'http://oryjk.cn/football-api/v1',
+    'https://oryjk.cn:18443/football-api/v1',
     'https://oryjk.cn:82/football-api/v1',
     'https://match.oryjk.cn/api/v1',
     'https://example.com/api/v1',
@@ -84,6 +91,7 @@ describe('mini-program upload API address', () => {
         if (hostBun) hostProcess.env.__FI_SANDBOX_PWNED_BUN__ = 'yes';
       } catch (e) {}
       exports.API_BASE_URL = ${JSON.stringify(productionApi)};
+      exports.API_BACKUP_BASE_URLS = ${JSON.stringify(backupApis)};
     `)
     delete process.env.__FI_SANDBOX_PWNED__
     delete process.env.__FI_SANDBOX_PWNED_BUN__

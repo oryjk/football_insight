@@ -2,7 +2,9 @@
 // 开发地址可通过 VITE_API_BASE_URL 显式覆盖。
 const DEVELOPMENT_API_BASE_URL = 'http://172.16.60.233:18092/api/v1'
 const PRODUCTION_API_BASE_URL = 'https://match.oryjk.cn/api/v1'
-const WEIXIN_PRODUCTION_API_BASE_URL = 'https://oryjk.cn:18443/football-api/v1'
+const WEIXIN_PRODUCTION_API_BASE_URL = 'https://oryjk.cn/football-api/v1'
+const WEIXIN_PRODUCTION_BACKUP_API_BASE_URL = 'https://backup.oryjk.cn:19443/football-api/v1'
+const WEIXIN_PRODUCTION_SECOND_BACKUP_API_BASE_URL = 'https://home.oryjk.cn:18443/football-api/v1'
 
 function normalizeBaseUrl(value: unknown): string | null {
   if (typeof value !== 'string') {
@@ -34,16 +36,19 @@ function resolveApiBaseUrl(): string {
 
 export const API_BASE_URL = resolveApiBaseUrl()
 
-function resolveApiBackupBaseUrl(): string | null {
+function resolveApiBackupBaseUrls(): readonly string[] {
   // #ifdef MP-WEIXIN
   if (import.meta.env.PROD && API_BASE_URL === WEIXIN_PRODUCTION_API_BASE_URL) {
-    return 'https://backup.oryjk.cn:19443/football-api/v1'
+    return [
+      normalizeBaseUrl(import.meta.env.VITE_MP_WEIXIN_BACKUP_API_BASE_URL) ?? WEIXIN_PRODUCTION_BACKUP_API_BASE_URL,
+      normalizeBaseUrl(import.meta.env.VITE_MP_WEIXIN_SECOND_BACKUP_API_BASE_URL) ?? WEIXIN_PRODUCTION_SECOND_BACKUP_API_BASE_URL,
+    ]
   }
   // #endif
-  return null
+  return []
 }
 
-export const API_BACKUP_BASE_URL = resolveApiBackupBaseUrl()
+export const API_BACKUP_BASE_URLS = resolveApiBackupBaseUrls()
 
 if (import.meta.env.DEV) {
   console.info(`[api-base] ${API_BASE_URL}`)

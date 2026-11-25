@@ -1,13 +1,17 @@
 #!/usr/bin/env bun
 // 校验小程序构建产物真实导出的 API 地址。
-// 每次调用都在独立 vm 上下文重新求值 exports.API_BASE_URL：不走 require 模块缓存，
+// 每次调用都在独立 vm 上下文重新求值主、备地址：不走 require 模块缓存，
 // 同路径重写后再次校验一定读到新值；求值环境不提供网络、process 或 require，并限定执行时间。
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runInNewContext } from 'node:vm'
 
-export const PRODUCTION_API_BASE_URL = 'https://oryjk.cn:18443/football-api/v1'
+export const PRODUCTION_API_BASE_URL = 'https://oryjk.cn/football-api/v1'
+export const PRODUCTION_BACKUP_API_BASE_URLS = [
+  'https://backup.oryjk.cn:19443/football-api/v1',
+  'https://home.oryjk.cn:18443/football-api/v1',
+]
 
 export function verifyMiniProgramApiBase(projectRoot) {
   const distPath = path.join(projectRoot, 'dist', 'build', 'mp-weixin')
@@ -24,19 +28,36 @@ export function verifyMiniProgramApiBase(projectRoot) {
   // exports.constructor.constructor 拿到宿主 Function 逃逸到 process/Bun）；
   // 载体 exports 在被求值代码内部建立，原型链只能到达沙箱自己的 realm。
   // Bun 在 vm 上下文中注入的 console 是沙箱 realm 本地对象，经原型链验证不构成宿主桥。
-  const source = `'use strict';\nconst exports = {};\n${readFileSync(apiFile, 'utf8')}\n;exports.API_BASE_URL;`
-  let actual
+  const source = `'use strict';\nconst exports = {};\n${readFileSync(apiFile, 'utf8')}\n;
+    (() => {
+      const primary = exports.API_BASE_URL;
+      const backups = exports.API_BACKUP_BASE_URLS;
+      return JSON.stringify([
+        typeof primary === 'string' ? primary : null,
+        typeof primary,
+        Array.isArray(backups) ? Array.from(backups, (base) => typeof base === 'string' ? base : null) : [],
+      ]);
+    })();`
+  let exportsSnapshot
   try {
-    actual = runInNewContext(source, undefined, { timeout: 1000, filename: apiFile })
+    const snapshot = runInNewContext(source, undefined, { timeout: 1000, filename: apiFile })
+    if (typeof snapshot !== 'string') throw new Error('invalid export snapshot')
+    exportsSnapshot = JSON.parse(snapshot)
+    if (!Array.isArray(exportsSnapshot)) throw new Error('invalid export snapshot')
   } catch (error) {
     // 沙箱抛出的对象是另一 realm 的值，只读取字符串 message，不调用其任何方法。
     const detail = error && typeof error === 'object' && typeof error.message === 'string' ? error.message : 'unknown'
     throw new Error(`无法读取编译包的 exports.API_BASE_URL，已阻止上传（${detail}）；请检查 config/apiBase.js。`)
   }
-  // 只接受真实的字符串导出：沙箱对象（哪怕 toString 能拼出生产地址）不当宿主可信值用。
+  const [actual, actualType, actualBackups] = exportsSnapshot
+  // 只接受沙箱内提取出的原始字符串，宿主不调用导出对象的方法。
   if (typeof actual !== 'string' || actual !== PRODUCTION_API_BASE_URL) {
-    const shown = typeof actual === 'string' ? actual : `非字符串导出（${typeof actual}）`
+    const shown = typeof actual === 'string' ? actual : `非字符串导出（${actualType}）`
     throw new Error(`小程序上传产物的 API 地址必须是 ${PRODUCTION_API_BASE_URL}，实际为 ${shown}；请重新执行生产构建`)
+  }
+  if (!Array.isArray(actualBackups) || actualBackups.length !== PRODUCTION_BACKUP_API_BASE_URLS.length
+    || PRODUCTION_BACKUP_API_BASE_URLS.some((base, index) => actualBackups[index] !== base)) {
+    throw new Error('小程序上传产物的备用 API 与生产配置不一致；请重新执行生产构建')
   }
   return actual
 }
